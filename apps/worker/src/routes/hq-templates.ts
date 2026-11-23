@@ -25,6 +25,7 @@ import { dbFor } from '../services/db-router.js';
 import type { Env } from '../worker-env.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { createRedistributionJob, redistributionJobResult } from '../services/hq-templates/distribution-jobs.js';
 import { templateVersions, compareTemplateVersions, restoreTemplateVersion, templateReceivedVersions, HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate, preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection } from '../services/hq-templates/distribution.js';
 
 export const hqTemplates = new Hono<Env>();
@@ -65,6 +66,10 @@ const reasons: Record<string, string> = {
   SELECTION_REQUIRED: '重複した項目ごとに上書きか別名を選んでください',
   SELECTION_CHANGED: '実行済みの選択は変更できません。結果を確認してください',
   FOLDER_SELECTION_CONFLICT: '親フォルダを別名にする場合は、子フォルダも別名にしてください',
+  INVALID_PREFLIGHT: '配る前の確かめを指定してください',
+  PREFLIGHT_EXPIRED: '確かめの期限が切れました。もう一度確かめてください',
+  PREFLIGHT_CONSUMED: 'この確かめは使用済みです。もう一度確かめてください',
+  NO_BOUND_STORES: '配り直せる店がありません。統括から配った店を選んでください',
 };
 async function body(c: { req: { text(): Promise<string> } }): Promise<Record<string, unknown>> {
   const text = await c.req.text();
@@ -266,6 +271,15 @@ hqTemplates.post('/api/hq/templates/:id/distribute', inputJsonBoundary(), async 
     : await distributeTemplate(dbFor(c.env), await authority(c), c.req.param('id'), input.preflightId, input.resolutions as DistributionSelection[], c.env.IMAGES, c.env.WORKER_URL || new URL(c.req.url).origin);
   c.set('auditRecorded', true); return c.json({ success: true, data });
 });
+// 統括から配った店だけを、対応表の店の物へ裏の仕事で配り直す。同じ依頼キーの再送は同じジョブを返す。
+hqTemplates.post('/api/hq/templates/:id/redistributions', inputJsonBoundary(), async c => {
+  const input = await body(c), headerKey = c.req.header('Idempotency-Key');
+  if (headerKey !== undefined && input.requestKey !== undefined && headerKey !== input.requestKey) throw new HqTemplateError('INVALID_REQUEST_ID');
+  const result = await createRedistributionJob(dbFor(c.env), await authority(c), c.req.param('id'), { preflightIds: input.preflightIds, requestKey: headerKey ?? input.requestKey });
+  c.set('auditRecorded', true);
+  return c.json({ success: true, data: result.job }, result.created ? 201 : 200);
+});
+hqTemplates.get('/api/hq/templates/:id/redistributions/:jobId', async c => c.json({ success: true, data: await redistributionJobResult(dbFor(c.env), await authority(c), c.req.param('id'), c.req.param('jobId')) }));
 hqTemplates.get('/api/hq/templates/:id/distributions/:runId', async c => {
   const auth=await authority(c),db=dbFor(c.env),template=await getHqTemplate(db,auth.tenantId,c.req.param('id'));
   if(!template) throw new HqTemplateError('NOT_FOUND',404);

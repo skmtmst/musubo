@@ -45,6 +45,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {name:'line webhook recovery',classification:{kind:'core',reason:'保存済みのLINE受信から未完の工程だけを再開する'},enforcement:{mode:'exempt',reason:'基本受信の回収は単一機能に属さない。停止した契約・アカウントを除外し、採点・マイル・自動化・配送は既存の個別停止判定に従う。返信鍵なしと送達不明は要確認に止める'}},
   {name:'durable tracked click continuation',classification:{kind:'feature',featureId:'inflow_tracking'},enforcement:{mode:'gated',sources:['apps/worker/src/services/tracked-click-steps.ts'],markers:["featureId:'inflow_tracking'","job:'durable tracked click continuation'"]}},
   {name:'durable banner generation',classification:{kind:'core',reason:'統括のバナー生成の継続'},enforcement:{mode:'exempt',reason:'店舗別機能スイッチの対象外。生成の直前に統括の契約・枚数上限・停止依頼を判定する'}},
+  {name:'HQ catalog redistribution',classification:{kind:'core',reason:'統括のひな形の配り直しの継続'},enforcement:{mode:'exempt',reason:'同期の配布と同じ統括の処理。店に書く直前に統括の編集権限・店の所属・ひな形の版・対応表と店の物を確かめ、受付・公開・送信はしない'}},
   { name: 'form document retention', classification: { kind: 'core', reason: '本人確認書類の保存期限と未送信添付の後始末' }, enforcement: { mode: 'exempt', reason: '送信・公開をせず、フォーム機能の停止中も保存期限を守る' } },
   {name:'API draft and integration retention',classification:{kind:'core',reason:'保存期限を過ぎた下書きと連携の一時情報の消去'},enforcement:{mode:'exempt',reason:'外部送信をせず、機能の有効・無効にかかわらず保存期限を守る'}},
   {name:'restaurant followup jobs',classification:{kind:'feature',featureId:'restaurant_test'},enforcement:{mode:'gated',sources:['apps/worker/src/features/scenarios/scenario-source-jobs.ts'],markers:["featureId: 'restaurant_test'",'featureJobCanRun(db,']}},

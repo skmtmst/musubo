@@ -67,6 +67,7 @@ export async function runFrequentHeavyJobs(
     {name:'line webhook recovery',run:async()=>{const {processDueLineWebhookRetries}=await import('../services/line-webhook-recovery.js');await processDueLineWebhookRetries(env);}},
     {name:'durable tracked click continuation',run:async()=>{const {processDueTrackedClicks}=await import('../services/tracked-click-steps.js');await processDueTrackedClicks(env);}},
     {name:'durable banner generation',run:async()=>{const {processDueBannerGenerations}=await import('../services/banner-jobs.js');await processDueBannerGenerations(env);}},
+    {name:'HQ catalog redistribution',run:async()=>{const {processHqDistributionJobs}=await import('../services/hq-templates/distribution-jobs.js');await processHqDistributionJobs(env.DB);}},
     {
       name: 'form document retention',
       run: async () => { await purgeExpiredFormDocuments(env.DB, env.IMAGES, new Date(event.scheduledTime)); },

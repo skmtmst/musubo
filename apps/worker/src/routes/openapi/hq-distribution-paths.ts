@@ -79,6 +79,28 @@ export const hqDistributionPaths = {
       responses: { '200': { description: 'Distribution run result' }, '400': { description: 'Invalid or changed selection' }, '403': { description: 'Owner or admin role required' }, '409': { description: 'Template or target version conflict' } },
     },
   },
+  '/api/hq/templates/{id}/redistributions': {
+    post: {
+      tags: ['HQ Templates'], summary: '統括から配った店へ裏の仕事で配り直す',
+      description: '予約メニュー・マイルの景品のひな形だけ。30分以内の配る前の確かめ（自分が作り、今の版のもの）から、対応表に記録がある店だけをジョブにする。対応のない店は skippedAccountIds で返し、名前で選ぶ今の配布の流れに残す。同じ requestKey（または Idempotency-Key）の再送は同じジョブを返し、中身が違えば 409。店ごとの書き込みは定期処理が進め、直していない店は新しい版に更新、直した店と公開中の景品は「本部の新しい版があります」と知らせる。',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'Idempotency-Key', in: 'header', schema: { type: 'string' }, description: '再送時も同じ値を使う依頼ID。省略時は body.requestKey が必須' }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['preflightIds'], properties: {
+        preflightIds: { type: 'array', minItems: 1, maxItems: 10, uniqueItems: true, items: { type: 'string' } }, requestKey: { type: 'string', minLength: 8, maxLength: 128 },
+      } } } } },
+      responses: { '200': { description: 'The same redistribution job for the same request key' }, '201': { description: 'Redistribution job accepted' }, '400': { description: 'Invalid request key or preflight' }, '403': { description: 'HQ edit permission required (read-only and impersonation are rejected)' }, '404': { description: 'Template or preflight not found' }, '409': { description: 'Preflight expired or consumed, template version changed, no bound stores, or idempotency conflict' }, '422': { description: 'Template type does not support redistribution' } },
+    },
+  },
+  '/api/hq/templates/{id}/redistributions/{jobId}': {
+    get: {
+      tags: ['HQ Templates'], summary: '配り直しのジョブの進みと店ごとの結果を取得',
+      description: 'status は pending/running/completed/partial/failed。店ごとの outcome は applied（更新した）/notified（店の判断待ち）/unchanged/failed/conflict。code は失敗の理由だけ。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'jobId', in: 'path', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: 'Redistribution job progress' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' } },
+    },
+  },
   '/api/hq/templates/{id}/distributions/{runId}': {
     get: {
       tags: ['HQ Templates'], summary: '配布実行の結果を取得',
