@@ -3,9 +3,9 @@
 .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menuMap { position: relative; width: 100%; background: var(--color-canvas); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); overflow: hidden; }
 .menuArea { position: absolute; display: grid; place-items: center; border: 1px solid var(--color-hairline); color: var(--color-ink-secondary); font-size: var(--text-body); box-sizing: border-box; }
-.bodyText { white-space: pre-wrap; overflow-wrap: anywhere; }
+.bodyText { font-size: var(--text-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 .menuPage { display: grid; gap: var(--space-12); }
-.destinations { display: grid; gap: var(--space-12); list-style: none; padding: 0; margin: 0; }
+.destinations { font-size: var(--text-body); display: grid; gap: var(--space-12); list-style: none; padding: 0; margin: 0; }
 .destinations li { display: grid; gap: var(--space-4); }
 .selection { display: grid; gap: var(--space-8); min-width: 0; }
 .preview { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }

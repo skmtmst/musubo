@@ -172,7 +172,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
             className={styles.full}
           /></SaveErrorField>
 {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
-        <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder">{folderState === 'loading' ? <p role="status">フォルダを読み込んでいます。</p> : folderState === 'error' ? <><p role="alert">フォルダを読み込めませんでした。</p><Button type="button" onClick={() => setFolderAttempt((n) => n + 1)}>もう一度読み込む</Button></> : <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
+        <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder">{folderState === 'loading' ? <p className="text-body" role="status">フォルダを読み込んでいます。</p> : folderState === 'error' ? <><p className="text-body" role="alert">フォルダを読み込めませんでした。</p><Button type="button" onClick={() => setFolderAttempt((n) => n + 1)}>もう一度読み込む</Button></> : <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
             size="full"

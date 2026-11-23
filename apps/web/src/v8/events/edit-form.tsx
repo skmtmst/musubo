@@ -321,7 +321,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         </Field>
       </>
       return <Field label="予約 URL"><Notice tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(accountId)}`}>アカウント設定へ →</Button> : undefined} message="LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。" /></Field>
-  })() : <Field label="予約 URL"><p>公開して保存すると、ここに URL が出ます</p></Field>
+  })() : <Field label="予約 URL"><p className="text-body">公開して保存すると、ここに URL が出ます</p></Field>
 
 
   if (loading) return <ListState kind="loading" title="読み込んでいます…" />

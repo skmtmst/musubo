@@ -19,7 +19,7 @@ export function CatalogDetails({selection,onClose}:{selection:StarterCatalogSele
         {details.pages.map((page,index)=><section key={index} className={styles.menuPage}><h3>{page.name}</h3><div className={styles.menuMap} style={{aspectRatio:`${page.width}/${page.height}`}} aria-label={`${page.name}のボタン配置`}>
           {page.areas.map((area,i)=><span key={i} className={styles.menuArea} style={{left:`${100*area.x/page.width}%`,top:`${100*area.y/page.height}%`,width:`${100*area.width/page.width}%`,height:`${100*area.height/page.height}%`}} title={area.label}>{i+1}</span>)}
         </div><ol className={styles.destinations}>{page.areas.map((area,i)=><li key={i}><strong>{i+1}. {area.label}</strong><span className={styles.bodyText}>{area.destination}</span></li>)}</ol></section>)}
-        <p className="text-body">配るときに、参照先を店のIDへ置き換えます。参照先が足りない場合は公開せず、確認待ちになります。</p></>:details.lines.length?<dl>{details.lines.map((line,i)=><div key={i}><dt>{line.label}</dt><dd className={styles.bodyText}>{line.value}</dd></div>)}</dl>:<p className="text-body">本文を持たない設定です。カタログで中身を確認できます。</p>}
+        <p className="text-body">配るときに、参照先を店のIDへ置き換えます。参照先が足りない場合は公開せず、確認待ちになります。</p></>:details.lines.length?<dl className="text-body">{details.lines.map((line,i)=><div key={i}><dt>{line.label}</dt><dd className={styles.bodyText}>{line.value}</dd></div>)}</dl>:<p className="text-body">本文を持たない設定です。カタログで中身を確認できます。</p>}
     </>}
   </Dialog>
 }

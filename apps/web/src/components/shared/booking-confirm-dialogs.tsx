@@ -216,8 +216,8 @@ export function ClosureOverlapStep({ rows, mediaNote }: {
           </div>
         ))}
       </div>
-      <p>重なる予約は取り消しません。</p>
-      <p>重なる予約への連絡は自動では送られません。</p>
+      <p className="text-body">重なる予約は取り消しません。</p>
+      <p className="text-body">重なる予約への連絡は自動では送られません。</p>
       {mediaNote ? <Notice tone="info">
         {mediaNote}
       </Notice> : null}
