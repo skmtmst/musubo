@@ -6,6 +6,7 @@ import { CHAT_SEARCH_MAX_CHARS, type ChatSearch } from './use-chat-search'
 import styles from './chat-search-bar.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import SearchField from '@/components/shared/search-field'
+import { ListToolbarFrame, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
 
 /*
@@ -50,18 +51,20 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
   const count = busy ? '読み込んでいます…' : chatSearchCountText(search)
 
   return (
-    <div className={styles.band} role="search" aria-label="会話の中を探す" data-design-node="f64Ok">
-      <SearchField
-        ref={inputRef}
-        className={styles.field}
-        value={search.query}
-        maxLength={CHAT_SEARCH_MAX_CHARS}
-        placeholder="会話の中を探す"
-        aria-label="会話の中を探す"
-        updateMode="immediate"
-        onChange={search.setQuery}
-        onKeyDown={onKeyDown}
-      />
+    <ListToolbarFrame conversation role="search" aria-label="会話の中を探す" data-design-node="f64Ok">
+      <ListToolbarSearchSlot flexible>
+        <SearchField
+          ref={inputRef}
+          className={styles.field}
+          value={search.query}
+          maxLength={CHAT_SEARCH_MAX_CHARS}
+          placeholder="会話の中を探す"
+          aria-label="会話の中を探す"
+          updateMode="immediate"
+          onChange={search.setQuery}
+          onKeyDown={onKeyDown}
+        />
+      </ListToolbarSearchSlot>
       <span className={styles.count} role="status" aria-live="polite">{count}</span>
       <IconButton
         aria-label="前の当たりへ（古い方）"
@@ -80,6 +83,6 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
       <IconButton aria-label="探すのをやめる" onClick={search.close}>
         <X aria-hidden="true" />
       </IconButton>
-    </div>
+    </ListToolbarFrame>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type HTMLAttributes } from 'react'
 import { isImeComposing } from './ime'
 import { OVERLAY_MODAL_OPEN_EVENT, useV8Leave } from './overlay-utils'
 import styles from './menu-portal.module.css'
@@ -29,6 +29,10 @@ function topModal(): Element | undefined {
   return [...document.querySelectorAll('[aria-modal="true"]')]
     .filter(el => !el.closest('[hidden],[inert],[aria-hidden="true"],[data-closing]'))
     .sort((a, b) => layer(a) - layer(b)).at(-1)
+}
+
+export function SavedSearchMenuSurface({ children, ...props }: Omit<HTMLAttributes<HTMLDivElement>, 'className'>) {
+  return <div {...props} className={styles.savedSearchSurface}>{children}</div>
 }
 
 export type MenuPortalAlign = 'start' | 'end'

@@ -8,12 +8,13 @@ import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
 import IconButton from '@/components/shared/icon-button';
 import SegmentedControl from '@/components/shared/segmented';
-import MenuPortal from '@/components/shared/menu-portal';
+import MenuPortal, { SavedSearchMenuSurface } from '@/components/shared/menu-portal';
 import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
-import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import StatusBadge from '@/components/shared/status-badge';
 import { STATUS_WORD } from '@/components/chats/friend-info-status';
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
 import { InboxListPane } from '@/components/templates/inbox-page';
@@ -173,7 +174,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
           </IconButton>
           <MenuPortal open={savedViewsOpen} align="start" getAnchor={() => savedSearchRef.current} onClose={() => setSavedViewsOpen(false)}>
-            <div className={styles.savedViewsPanel} data-saved-views-panel>
+            <SavedSearchMenuSurface data-saved-views-panel>
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
@@ -248,7 +249,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
-            </div>
+            </SavedSearchMenuSurface>
           </MenuPortal>
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
@@ -561,7 +562,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           </div>
                           <div className={styles.rowAside}>
                             <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
-                            <StatusPill tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusPill>
+                            <StatusBadge data-status-pill="" tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusBadge>
                             <SlaBadge fields={chat as ChatSlaFields} now={Date.now()} />
                           </div>
                         </div>

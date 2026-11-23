@@ -173,5 +173,3 @@
 
 /* hold：右の友だち情報は320。狭い板では今までどおり重ねて開く。 */
 :global(:root) .infoPanel { width: var(--tpl-inbox-summary-width); }
-
-.savedViewsPanel { width: min(320px, calc(100vw - 16px)); max-height: min(600px, calc(100vh - 100px)); overflow-y: auto; padding: var(--space-16); background: var(--color-canvas); border: 1px solid var(--surface-edge); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
