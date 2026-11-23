@@ -143,7 +143,7 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
     await open('/login/two-factor#lh_2fa=challenge-1', 'v8')
     expect(host.textContent).toContain('二段階認証')
     // 頭は公式ロゴだけを表示し、段数と店舗名は混ぜない。
-    expect(host.querySelector('[data-auth-head] img')?.getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect(host.querySelector('[data-auth-head] img')?.getAttribute('src')).toBe('/brand/musubo-color-188-1x.png')
     expect(host.querySelector('[data-auth-head]')?.textContent).not.toContain('テスト統括')
     expect(host.querySelector('[data-auth-head]')?.textContent).not.toContain('2 / 2')
     const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')

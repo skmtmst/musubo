@@ -30,6 +30,7 @@
   width: 140px;
   max-width: none;
   height: auto;
+  aspect-ratio: 3020 / 890;
 }
 
 .compact { padding: 2px 0 0; }
