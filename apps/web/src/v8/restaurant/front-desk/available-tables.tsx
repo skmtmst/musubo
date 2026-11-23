@@ -24,9 +24,10 @@ export function tableGroups(tables: RestaurantTable[], floors: RestaurantFloor[]
   return groups
 }
 
-export default function AvailableTables({ tables, floors, floorId, onFloorChange, selected, onSelect, guests, disabled }: {
+export default function AvailableTables({ tables, floors, floorId, onFloorChange, selected, onSelect, guests, disabled, radioName = 'walk-in-table', heading, errorNames = ['walk-in-table', 'id', 'table.id', 'tableId'] }: {
   tables: RestaurantTable[]; floors: RestaurantFloor[]; floorId: string; onFloorChange: (id: string) => void
   selected: string; onSelect: (id: string) => void; guests: number; disabled: boolean
+  radioName?: string; heading?: string; errorNames?: string[]
 }) {
   const groups = tableGroups(tables, floors)
   const visible = floorId === 'all' ? groups : groups.filter(group => group.id === floorId)
@@ -35,10 +36,10 @@ export default function AvailableTables({ tables, floors, floorId, onFloorChange
       { label: 'すべて', count: tables.length, current: floorId === 'all', onClick: () => onFloorChange('all') },
       ...floors.map(floor => ({ label: floor.name, count: groups.find(group => group.id === floor.id)?.tables.length ?? 0, current: floorId === floor.id, onClick: () => onFloorChange(floor.id) })),
     ]} />}
-    <p className={styles.label}>{`今すぐ座れる卓（${guests}名が座れる卓だけ）`}</p>
-    <SaveErrorField names={['walk-in-table', 'id', 'table.id', 'tableId']}><div className={styles.floorGroups} role="group" aria-label="卓の選択" tabIndex={-1}>
-    {visible.filter(group => group.tables.length).map(group => <RadioCardGroup key={group.id || 'unassigned'} legend={group.name || `今すぐ座れる卓（${guests}名）`} legendVisible={Boolean(group.name)} columns={3}>
-      {group.tables.map(table => <RadioCard key={table.id} name="walk-in-table" value={table.id} checked={selected === table.id} onChange={onSelect} title={table.code} note={tableNote(table)} icon={<Armchair size={16} aria-hidden="true" />} height="short" disabled={disabled} />)}
+    <p className={styles.label}>{heading ?? `今すぐ座れる卓（${guests}名が座れる卓だけ）`}</p>
+    <SaveErrorField names={errorNames}><div className={styles.floorGroups} role="group" aria-label="卓の選択" tabIndex={-1}>
+    {visible.filter(group => group.tables.length).map(group => <RadioCardGroup key={group.id || 'unassigned'} legend={group.name || heading || `今すぐ座れる卓（${guests}名）`} legendVisible={Boolean(group.name)} columns={3}>
+      {group.tables.map(table => <RadioCard key={table.id} name={radioName} value={table.id} checked={selected === table.id} onChange={onSelect} title={table.code} note={tableNote(table)} icon={<Armchair size={16} aria-hidden="true" />} height="short" disabled={disabled} />)}
     </RadioCardGroup>)}
     </div></SaveErrorField>
     {floorId !== 'all' && !visible.some(group => group.tables.length) && <p role="status">この階・エリアに座れる卓はありません。</p>}
