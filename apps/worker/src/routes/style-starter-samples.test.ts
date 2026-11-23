@@ -341,3 +341,38 @@ describe('初期セットの本文とメタ情報の境界', () => {
     expect(JSON.stringify(response.body)).toContain('機能本文の目印');
   });
 });
+
+test('初期セットの写しはまとめて読み、個別取得と一致する', async () => {
+  expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'configured', value: 'simple' } } })).status).toBe(200);
+  const queries: string[] = [];
+  const original = sql.db.prepare.bind(sql.db);
+  const prepare = vi.spyOn(sql.db, 'prepare');
+  prepare.mockImplementation((statement: string) => { queries.push(statement); return original(statement); });
+  const result = await request(base + '/starter-items?account_id=a');
+  expect(result.status).toBe(200);
+  expect(queries.filter(q => q.includes('CASE i.kind') && q.includes('AS _snapshot'))).toHaveLength(1);
+  expect(queries.filter(q => /^SELECT \(.+\) snapshot/s.test(q))).toHaveLength(0);
+  prepare.mockRestore();
+  const items = result.body.data.items as Array<{kind:string;target_id:string;currentSnapshot:string|null}>;
+  expect(items.length).toBeGreaterThan(1);
+  for (const item of items) expect(item.currentSnapshot).toBe(await resourceSnapshot(sql.db, 'a', item.kind, item.target_id));
+});
+
+test.each([1, 100, 1000])('見本が %i 件増えても問い合わせ回数は増えない', async (n) => {
+  expect((await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'configured', value: 'simple' } } })).status).toBe(200);
+  const source = sql.raw.prepare("SELECT * FROM style_starter_items WHERE line_account_id='a' AND kind='template' LIMIT 1").get() as Record<string, unknown>;
+  expect(source).toBeTruthy();
+  const insert = sql.raw.prepare(`INSERT INTO style_starter_items(line_account_id,style,item_key,kind,target_id,is_sample,feature,set_id,set_version,applied_at,source_snapshot,pending_update) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`);
+  sql.raw.transaction(() => { for (let i=0;i<n;i++) insert.run(source.line_account_id,source.style,`bench-${String(i).padStart(5,'0')}`,source.kind,source.target_id,source.is_sample,source.feature,source.set_id,source.set_version,source.applied_at,source.source_snapshot,source.pending_update); })();
+  const original = sql.db.prepare.bind(sql.db);
+  let calls = 0;
+  const spy = vi.spyOn(sql.db, 'prepare');
+  spy.mockImplementation((statement:string) => { calls++; return original(statement); });
+  const result = await request(base + '/starter-items?account_id=a');
+  spy.mockRestore();
+  expect(result.status).toBe(200);
+  expect(calls).toBeLessThanOrEqual(3);
+  const copies = (result.body.data.items as Array<{key:string;name:string;status:string|null;currentSnapshot:string|null}>).filter(item => item.key.startsWith('bench-'));
+  expect(copies).toHaveLength(n);
+  expect(new Set(copies.map(item => JSON.stringify([item.name,item.status,item.currentSnapshot]))).size).toBe(1);
+}, 60_000);
