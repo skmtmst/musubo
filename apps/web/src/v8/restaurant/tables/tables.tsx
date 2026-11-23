@@ -2,6 +2,7 @@
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import Card from '@/components/shared/card'
 import { Tabs } from '@/components/shared/tabs'
+import SegmentedControl from '@/components/shared/segmented'
 
 import { tableRequirements as b244Requirements } from './requirements'
 
@@ -240,7 +241,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
       seatDetailType:draft.seatDetailType,
       width:draft.shape==='long'?(draft.orientation==='vertical'?64:120):draft.seatType==='counter'?(draft.orientation==='vertical'?64:80):80,
       height:draft.shape==='long'?(draft.orientation==='vertical'?120:64):draft.seatType==='counter'?(draft.orientation==='vertical'?80:64):80,
-      rotation:0,smokingPolicy:draft.smokingPolicy,partition:draft.partition,shoesAllowed:draft.shoesAllowed,visibleOnMap:draft.visibleOnMap,chairArrangement:draft.chairArrangement,chairSide:draft.seatType==='counter'||draft.chairArrangement==='one'?draft.chairSide:null,
+      rotation:0,smokingPolicy:draft.smokingPolicy,partition:draft.partition,shoesAllowed:draft.shoesAllowed,visibleOnMap:draft.visibleOnMap,chairArrangement:draft.shape==='long'?draft.chairArrangement:'both',chairSide:draft.seatType==='counter'||(draft.shape==='long'&&draft.chairArrangement==='one')?draft.chairSide:null,
       ...(!editing?{isActive:draft.isActive}:{}),
       ...(editing&&draft.isActive&&!editing.is_active?{isActive:true}:{}),
     }
@@ -384,7 +385,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
           卓の変更は保存しました。最新の予約を読み込めなかったため、止める確認を開けていません。
         </Notice>
       ) : null}
-      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<Card variant="aside" padding="default"><header className={styles.listHeading}><h2>卓一覧</h2><Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button></header><Tabs label="卓一覧の階・エリア" size="compact" items={[{label:"すべて",current:floorFilter==='all',onClick:()=>setFloorFilter('all')},...floors.map(f=>({label:f.name,current:floorFilter===f.id,onClick:()=>setFloorFilter(f.id)}))]}/><Tabs label="卓の状態" size="compact" items={[{label:'全状態',current:statusFilter==='all',onClick:()=>setStatusFilter('all')},{label:'受付中',current:statusFilter==='active',onClick:()=>setStatusFilter('active')},{label:'停止中',current:statusFilter==='suspended',onClick:()=>setStatusFilter('suspended')}]}/>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<Card variant="aside" padding="default"><header className={styles.listHeading}><h2>卓一覧</h2><Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button></header><Tabs label="卓一覧の階・エリア" size="compact" items={[{label:"すべて",current:floorFilter==='all',onClick:()=>setFloorFilter('all')},...floors.map(f=>({label:f.name,current:floorFilter===f.id,onClick:()=>setFloorFilter(f.id)}))]} actions={<SegmentedControl aria-label="卓の状態" size="small" fit="content" value={statusFilter} onChange={setStatusFilter} options={[{value:'all',label:'全状態'},{value:'active',label:'受付中'},{value:'suspended',label:'停止中'}]}/>}/>
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
