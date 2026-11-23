@@ -45,7 +45,7 @@ function pagePath(key: string) {
 function Ranking({ title, rows, kind }: { title: string; rows: SearchConsoleMetricRow[]; kind: 'query' | 'page' }) {
   return <Card variant="form" aria-label={title}>
     <CardHeader size="stacked" title={title} />
-    {rows.length === 0 ? <p>データがありません</p> : <DataTable label={title} grid={{
+    {rows.length === 0 ? <p className="text-body">データがありません</p> : <DataTable label={title} grid={{
       columns: 'minmax(0, 1fr) var(--tpl-an-col-60) var(--tpl-an-col-70) var(--tpl-an-sc-col-64)',
       gap: 'var(--polish-space-row)', padding: '0 var(--polish-space-field)', headPadding: '0 var(--polish-space-field)',
       rowHeight: 'var(--tpl-list-row-h)',

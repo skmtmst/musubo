@@ -199,11 +199,11 @@ export default function RichMenuCreateForm({
 
     <Card variant="form" padding="roomy" layout="vertical" gap="normal">
       <SectionHeader title="トークを開いたとき" />
-      <p>メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。</p>
+      <p className="text-body">メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。</p>
       <SectionHeader title="画像" />
       {imageAction ?? <Button href="/contents">登録メディアから選ぶ</Button>}
-      <p>{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p>
-      <p>選んだ画像は下書きの最初に見せるページへ登録します。</p>
+      <p className="text-body">{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p>
+      <p className="text-body">選んだ画像は下書きの最初に見せるページへ登録します。</p>
     </Card>
 
     <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-label="押した面ごとの動き">
@@ -222,7 +222,7 @@ export default function RichMenuCreateForm({
       </Card>)}
       <Notice tone={unsetLabels.length > 0 ? 'warn' : 'success'} message={currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'} />
     </Card>
-    <LinePreview note="メニューを開くボタンの文字と面の分け方を確認できます"><p>{value.chatBarText || 'メニュー'}</p><RichMenuTemplatePreview template={template} /></LinePreview>
+    <LinePreview note="メニューを開くボタンの文字と面の分け方を確認できます"><p className="text-body">{value.chatBarText || 'メニュー'}</p><RichMenuTemplatePreview template={template} /></LinePreview>
     <Notice tone="warn" heading="公開前に見ておくところ"><p>アクションが未設定の面が {unsetLabels.length}つあります</p><MediaLimitNote maxMb={1} /><p>切替メニューの移動先は、公開してからでないと動きません</p></Notice>
     {footer}
   </Card>
