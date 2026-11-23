@@ -245,6 +245,42 @@ describe('手動送信の差し込み(N-026)', () => {
     expect(outbox()).toHaveLength(0);
   });
 
+  test('プレビューは有効な共通情報を埋め、存在しない情報を消さず未解決として返す', async () => {
+    const content = '{{name}}さん\n{{var.hours}} / {{var.deleted_key}}';
+    const res = await postPreview({ content });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { content: '利用者1さん\n9-18時 / {{var.deleted_key}}', unresolved: ['var.deleted_key'] } });
+    expect(sqlite.raw.prepare('SELECT COUNT(*) AS n FROM common_var_resolution_failures').get()).toEqual({ n: 0 });
+    expect(outbox()).toHaveLength(0); expect(pushMessage).not.toHaveBeenCalled();
+    const sent = await postSend({ content, revision: 0 }, KEY5);
+    expect(sent.status).toBe(400); expect(pushMessage).not.toHaveBeenCalled();
+  });
+
+  test('期限切れの共通情報もプレビューで消さず、代替値があればその値を表示する', async () => {
+    sqlite.raw.exec("UPDATE common_vars SET valid_until='2000-01-01T00:00:00.000Z' WHERE var_key='hours'");
+    const first = await postPreview({ content: '{{var.hours}}' });
+    expect(await first.json()).toMatchObject({ data: { content: '{{var.hours}}', unresolved: ['var.hours'] } });
+    sqlite.raw.exec("UPDATE common_vars SET expiry_behavior='fallback',fallback_value='休業' WHERE var_key='hours'");
+    const second = await postPreview({ content: '{{var.hours}}' });
+    expect(await second.json()).toMatchObject({ data: { content: '休業', unresolved: [] } });
+    expect(sqlite.raw.prepare('SELECT COUNT(*) AS n FROM common_var_resolution_failures').get()).toEqual({ n: 0 });
+  });
+
+  test('複数段階の解決失敗があっても有効な共通情報は表示する', async () => {
+    sqlite.raw.exec(`
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES('cv-business','acc-1','営業時間','business_hours','古い営業時間');
+      INSERT INTO rt_organizations(id,account_id,name,status) VALUES('org','acc-1','店舗','active');
+      INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店舗','S','acc-1');
+      INSERT INTO rt_google_connections(id,store_id,line_account_id,location_name,status)
+        VALUES('connection','store','acc-1','accounts/1/locations/2','connected');
+    `);
+    const res = await postPreview({ content: '{{var.deleted_key}} / {{var.business_hours}} / {{var.hours}}' });
+    expect(await res.json()).toMatchObject({ data: {
+      content: '{{var.deleted_key}} / {{var.business_hours}} / 9-18時',
+      unresolved: ['var.deleted_key', 'var.business_hours'],
+    } });
+  });
+
   test('差し込みの無い本文はプレビューでそのまま返る', async () => {
     const res = await postPreview({ content: 'そのままの文' });
     expect(res.status).toBe(200);
