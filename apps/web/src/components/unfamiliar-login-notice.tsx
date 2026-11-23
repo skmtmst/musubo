@@ -51,7 +51,7 @@ export default function UnfamiliarLoginNotice({ className }: { className?: strin
       tone="warn"
       heading="いつもと違う端末・場所からのログインです"
       message="大事な操作の前に毎回、本人確認をします。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください。"
-      action={<Button href="/staff" variant="secondary">ログイン中の端末を見る</Button>}
+      action={<Button href="/staff?section=sessions" variant="secondary">ログイン中の端末を見る</Button>}
       onClose={pinned ? undefined : close}
     />
   )

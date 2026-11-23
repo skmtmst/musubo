@@ -12,7 +12,7 @@ afterEach(() => { cleanup(); forgetSessionSnapshot(); localStorage.clear() })
 it('［閉じる］でその日は出さず、端末の確認への道は閉じる前に出している', async () => {
   rememberSessionSnapshot(snapshot('2026-10-25T01:00:00Z'))
   render(<UnfamiliarLoginNotice />)
-  expect((await screen.findByRole('link', { name: 'ログイン中の端末を見る' })).getAttribute('href')).toBe('/staff')
+  expect((await screen.findByRole('link', { name: 'ログイン中の端末を見る' })).getAttribute('href')).toBe('/staff?section=sessions')
   fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
   expect(screen.queryByRole('note')).toBeNull()
   cleanup()

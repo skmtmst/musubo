@@ -10,6 +10,8 @@
   color: var(--color-ink); background: var(--color-board-tint);
 }
 :global(:root) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+/* 比較・分析は見出しから下端まで同じ地にする。 */
+:global(:root) .frame[data-template-layout='store-comparison'] { background: var(--color-canvas); }
 :global(:root) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
   --tpl-head-pad-top: var(--space-16);
   --tpl-head-pad-bottom: var(--space-8);
@@ -62,8 +64,8 @@
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
-/* 題から最初の道具・数の帯までは道具側の余白だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
-:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]):not(:has(> [data-kpi-strip])) { padding-top: 0; }
+/* 比較・分析だけは見出しと操作の間に余白を残す。 */
+:global(:root) .frame:not([data-template-layout='store-comparison']) > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]):not(:has(> [data-kpi-strip])) { padding-top: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
@@ -337,6 +339,8 @@
   width: var(--tpl-preview-content-width); flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field);
 }
+/* 見え方の欄を送っても、端末の切り替えが欄の上端に残る。上の手順の帯には重ねない。 */
+:global(:root) [data-page-template="create"][data-has-footer] .previewContent > :has(> :global([aria-label="プレビューの端末"])) { position: sticky; top: 0; z-index: 1; background: var(--color-canvas); }
 /* 設定カードは欄の幅を使う。端末の見本は自身の幅を保つ。 */
 :global(:root) .previewContent > :global([data-card-variant='aside']) { width: 100%; align-self: stretch; }
 :global(:root) [data-page-template='create'][data-has-footer] .createContent > *,

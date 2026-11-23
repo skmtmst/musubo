@@ -77,7 +77,7 @@ export interface ListPageBodyProps {
 export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   heightMode?: 'viewport' | 'content'
   boardId?: string
-  layout?: 'event-list'
+  layout?: 'event-list' | 'store-comparison'
   standalone?: boolean
   /** 明示された画面では、フォルダ機能を保ったまま主操作を題の右へ置く。 */
   createPlacement?: 'heading'

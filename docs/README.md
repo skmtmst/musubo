@@ -472,6 +472,7 @@
 
 - [ログイン確認中の表示](release-log/unreleased/175-kenta-login-polish.md) — 反映履歴。
 - [LINEアカウント未選択時の案内](release-log/unreleased/177-kenta-sidebar-unselected.md) — 反映履歴、確認 2026-11-23。
+- [比較・分析とログイン中の端末の表示を修正](release-log/unreleased/178-kenta-compare-bands.md) — 反映履歴、確認 2026-11-23。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
