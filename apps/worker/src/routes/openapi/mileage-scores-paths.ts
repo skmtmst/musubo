@@ -1,5 +1,21 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const mileageScoresPaths = {
+  '/api/mileage/redemptions/{id}/hand-cancel': {
+    post: {
+      tags: ['Mileage'], summary: '手渡し景品の交換を取り消す',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId', 'expectedStatus'], properties: { expectedStatus: { type: 'string', enum: ['reserved', 'succeeded'] }, accountId: { type: 'string' }, reason: { type: 'string', maxLength: 500 } } } } } },
+      responses: { '200': { description: '取消とマイル返却' }, '400': { description: '取消理由が不正' }, '403': { description: '権限がありません' }, '404': { description: 'アカウントが見つかりません' }, '409': { description: '取り消せない交換' } },
+    },
+  },
+  '/api/mileage/redemptions/{id}/hand-delivery': {
+    post: {
+      tags: ['Mileage'], summary: '手渡し景品を渡した記録を残す',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId'], properties: { accountId: { type: 'string' } } } } } },
+      responses: { '200': { description: '手渡しを記録' }, '403': { description: '権限がありません' }, '404': { description: 'アカウントが見つかりません' }, '409': { description: '手渡しできない交換' } },
+    },
+  },
   '/api/mileage/rules': {
     get: {
       tags: ['Mileage'], summary: 'LINEアカウント範囲内のマイル付与ルールを取得',
@@ -50,7 +66,7 @@ export const mileageScoresPaths = {
       tags: ['Mileage'], summary: '届かなかった特典交換の一覧を取得（既定は要対応：失敗中＋配送中）',
       parameters: [
         { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
-        { name: 'status', in: 'query', schema: { type: 'string', enum: ['all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded'] } },
+        { name: 'status', in: 'query', schema: { type: 'string', enum: ['all', 'needs_attention', 'reserved', 'delivering', 'succeeded', 'delivery_failed', 'refunded', 'cancelled'] } },
         { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
         { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
       ],

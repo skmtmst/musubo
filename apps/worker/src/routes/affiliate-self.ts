@@ -238,7 +238,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     });
     return c.json({
-      success: delivery.status === 'succeeded',
+      success: delivery.status === 'succeeded' || delivery.status === 'pending',
       replayed: reserved.kind === 'existing',
       redemptionId: reserved.redemption.id,
       ...delivery,

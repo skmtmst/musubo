@@ -29,9 +29,12 @@ export function parseCatalogDefinition(type:HqCatalogTemplateType,value:unknown)
  try {
   const actionName=optionalText(raw.commonActionName,200);
   const {commonActionVersionId:_,...validated}=validateMileageRewardDraft({...raw,commonActionVersionId:actionName?'hq-reference':null} as unknown as MileageRewardDraftInput);
+  // 手渡しのひな形は未対応。別種類として保存・配布しない。
+  const rewardKind = validated.rewardKind;
+  if (rewardKind === 'handgift') return invalid();
   // 店別のIDを、統括の名前として解釈して別資源へ結びつけない。
   const walk=(c:typeof validated.targetConditions):void=>{if(!c)return;for(const r of c.rules)if(['friend_field','support_mark','form_answered','scenario_state'].includes(r.type))throw new HqTemplateError('UNSUPPORTED_REFERENCE',422);c.groups?.forEach(walk);};walk(validated.targetConditions);
-  return {schemaVersion:1,settings:{...validated,commonActionName:actionName}};
+  return {schemaVersion:1,settings:{...validated,rewardKind,commonActionName:actionName}};
  }catch(e){if(e instanceof HqTemplateError)throw e;return invalid();}
 }
 const columns:Record<string,string[]>={
@@ -47,13 +50,13 @@ const rows=(table:string,where:string)=>`(SELECT COALESCE(json_group_array(json(
 function snapshotSql(type:HqCatalogTemplateType) {
  const account='(SELECT accountId FROM scope)',table=type==='booking_menu'?'menus':'mileage_rewards',versionTable=type==='booking_menu'?'menu_versions':'mileage_reward_versions',owner=type==='booking_menu'?'menu_id':'reward_id';
  const usage=type==='booking_menu'?`SELECT menu_id id,COUNT(*) n FROM (SELECT menu_id FROM bookings UNION ALL SELECT menu_id FROM staff_menus UNION ALL SELECT menu_id FROM booking_menu_resources) GROUP BY menu_id`:`SELECT reward_id id,COUNT(*) n FROM (SELECT reward_id FROM mileage_redemptions UNION ALL SELECT v.reward_id FROM mileage_reward_codes c JOIN mileage_reward_versions v ON v.id=c.reward_version_id) GROUP BY reward_id`;
- return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}),'paymentConnected',EXISTS(SELECT 1 FROM booking_payment_connections WHERE line_account_id=${account} AND disconnected_at IS NULL),'style',COALESCE((SELECT style FROM account_styles WHERE line_account_id=${account}),'standard'))`;
+ return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'handgiftIds',json((SELECT COALESCE(json_group_array(reward_id),'[]') FROM (SELECT reward_id FROM mileage_handgift_rewards WHERE reward_id IN (SELECT id FROM mileage_rewards WHERE line_account_id=${account}) ORDER BY reward_id))),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}),'paymentConnected',EXISTS(SELECT 1 FROM booking_payment_connections WHERE line_account_id=${account} AND disconnected_at IS NULL),'style',COALESCE((SELECT style FROM account_styles WHERE line_account_id=${account}),'standard'))`;
 }
 export async function catalogSnapshot(db:D1Database,accountId:string,type:HqCatalogTemplateType):Promise<string> {
  return (await db.prepare(`SELECT (${snapshotSql(type)}) snapshot`).bind(accountId).first<{snapshot:string}>())!.snapshot;
 }
 type Row=Record<string,string|number|null>;
-interface Snapshot {targets:Row[];versions:Row[];usage:Array<{id:string;n:number}>;tags:Row[];scenarios:Row[];actions:Row[];actionVersions:Row[];programs:Row[]}
+interface Snapshot {handgiftIds?:string[];targets:Row[];versions:Row[];usage:Array<{id:string;n:number}>;tags:Row[];scenarios:Row[];actions:Row[];actionVersions:Row[];programs:Row[]}
 function named(rows:Row[],name:unknown):Row {
  if(typeof name!=='string'||!name.trim())throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
  const matches=rows.filter(r=>normalizeScopedTagName(String(r.name))===normalizeScopedTagName(name));
@@ -79,7 +82,7 @@ export function inspectCatalog(def:HqCatalogTemplateDefinition,snapshot:string,t
  if(type==='booking_menu'){return [{sourceId:type,itemKind:type,name,targetId:null,expectedRevision:null,duplicate:!!same.length,allowedModes:['create']},...catalogReferences(def,snapshot,type)];}
  if(same.length>1)throw new HqTemplateError('VERSION_CONFLICT',409);
  const row=same[0],versions=snap.versions.filter(v=>v.reward_id===row?.id),used=snap.usage.some(u=>u.id===row?.id&&u.n>0);
- const safe=!!row&&!used&&(row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
+ const safe=!!row&&!snap.handgiftIds?.includes(String(row.id))&&!used&&(row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
  return [{sourceId:type,itemKind:type,name,targetId:row?String(row.id):null,expectedRevision:row?JSON.stringify(row):null,duplicate:!!row,allowedModes:(row?safe?['overwrite','alias']:['alias']:['create']) as Array<'create'|'overwrite'|'alias'>},...catalogReferences(def,snapshot,type)];
 }
 export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[],origin?:{templateId:string;versionId:string}) {
