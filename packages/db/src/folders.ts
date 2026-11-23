@@ -138,7 +138,7 @@ export async function createFolder(
       now,
     )
     .run(); } catch (error) {
-      if (/UNIQUE/.test(String(error))) throw new FolderConflictError();
+      if (/UNIQUE constraint failed: folders\.account_id, folders\.name/i.test(String(error))) throw new FolderNameConflictError();
       throw error;
     }
   return (await getFolderById(db, id))!;
@@ -439,10 +439,11 @@ export async function getFolderItemCounts(
 }
 
 export class FolderConflictError extends Error { constructor() { super('FOLDER_CONFLICT'); } }
+export class FolderNameConflictError extends FolderConflictError {}
 export function folderRevisionGuard(db: D1Database, id: string, revision: number) {
   return db.prepare("SELECT json(CASE WHEN EXISTS(SELECT 1 FROM folders WHERE id=? AND revision=?) THEN '{}' ELSE 'FOLDER_CONFLICT' END)").bind(id,revision);
 }
 export async function folderBatch(db: D1Database, statements: D1PreparedStatement[]) {
   try { return await db.batch(statements); }
-  catch (error) { if (/malformed JSON|FOLDER_CONFLICT|UNIQUE/i.test(String(error))) throw new FolderConflictError(); throw error; }
+  catch (error) { if (/UNIQUE constraint failed: folders\.account_id, folders\.name/i.test(String(error))) throw new FolderNameConflictError(); if (/malformed JSON|FOLDER_CONFLICT/i.test(String(error))) throw new FolderConflictError(); throw error; }
 }

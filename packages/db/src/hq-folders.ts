@@ -10,7 +10,7 @@ async function atomic(db: D1Database, statements: D1PreparedStatement[]) {
   try { return await db.batch(statements); }
   catch (e) {
     if (/malformed JSON|FOLDER_CONFLICT/i.test(String(e))) throw new HqFolderError('VERSION_CONFLICT',409);
-    if (/UNIQUE/i.test(String(e))) throw new HqFolderError('FOLDER_NAME_CONFLICT',409);
+    if (/UNIQUE constraint failed: hq_banner_folders\.tenant_id, hq_banner_folders\.kind, hq_banner_folders\.name/i.test(String(e))) throw new HqFolderError('FOLDER_NAME_CONFLICT',409);
     throw e;
   }
 }

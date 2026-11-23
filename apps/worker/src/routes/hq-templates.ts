@@ -7,7 +7,7 @@ import { importHqTags } from '../services/hq-templates/tag-import.js';
 import { previewRichMenu } from '../services/hq-templates/rich-menu-preview.js';
 import { messageTemplateSearchIds, listTemplateViews, saveTemplateView, archiveTemplateView } from '../services/hq-templates/saved-views.js';
 import { markListStats } from '../services/hq-templates/mark-list-stats.js';
-import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { folderInputError, folderNameConflict, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
 import { HQ_TEMPLATE_TYPES, getStaffById, getHqTemplate, type HqTemplateType } from '@line-crm/db';
 import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
@@ -78,6 +78,7 @@ hqTemplates.onError((error, c) => {
   if (error instanceof UnexpectedRouteError) throw error;
   if (!(error instanceof HqTemplateError)) throw new UnexpectedRouteError(c, { success: false, code: 'UNAVAILABLE', error: '処理結果を確認できません。再確認してください' });
   const code = error.code;
+  if (code === 'FOLDER_NAME_CONFLICT') return folderNameConflict(c);
   return inputError(c, { success: false, code, ...((error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。再確認してください') }, error.status);
 });
 // 単独で route を登録しても保護されるよう、入口内にも境界を置く。
@@ -87,6 +88,7 @@ hqTemplates.use('/api/hq/templates/*', requireRole('owner', 'admin'), async (c, 
     if (error instanceof UnexpectedRouteError) throw error;
     if (!(error instanceof HqTemplateError)) throw new UnexpectedRouteError(c, { success: false, code: 'UNAVAILABLE', error: '処理結果を確認できません。しばらくしてから再確認してください' });
     const code = error.code;
+    if (code === 'FOLDER_NAME_CONFLICT') return folderNameConflict(c);
     return inputError(c, { success: false, ...((error.status === 400 || error.status === 422) ? { fields: error.fields } : {}), error: reasons[code] ?? (error.status < 500 ? '入力内容を確認してください' : '処理結果を確認できません。しばらくしてから再確認してください'), code }, error.status);
   }
 });

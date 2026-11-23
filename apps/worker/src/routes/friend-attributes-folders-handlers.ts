@@ -1,6 +1,6 @@
-import { inputError } from '../lib/input-errors.js';
+import { folderNameConflict, inputError } from '../lib/input-errors.js';
 
-import { getFolderById, createFolder, updateFolder, swapFolderOrder, FolderConflictError, deleteFolder, isFolderKind } from '@line-crm/db';
+import { getFolderById, createFolder, updateFolder, swapFolderOrder, FolderConflictError, FolderNameConflictError, deleteFolder, isFolderKind } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -68,7 +68,8 @@ export const post__api_folders_1 = async (c: Context<Env, "/api/folders">) => {
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
-    if (err instanceof FolderConflictError) return c.json({success:false,error:'同じ名前のフォルダがあります'},409);
+    if (err instanceof FolderNameConflictError) return folderNameConflict(c);
+    if (err instanceof FolderConflictError) return c.json({success:false,code:'VERSION_CONFLICT',error:'フォルダが更新されました'},409);
     throw err;
   }
 };
@@ -136,7 +137,8 @@ export const patch__api_folders_id_2 = async (c: Context<Env, "/api/folders/:id"
     const folder = await updateFolder(c.env.DB, id, patch);
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
-    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
+    if (err instanceof FolderNameConflictError) return folderNameConflict(c);
+    if (err instanceof FolderConflictError) return c.json({success:false,code:'VERSION_CONFLICT',error:'フォルダが更新されました'},409);
     throw err;
   }
 };
@@ -172,7 +174,7 @@ export const post__api_folders_id_swap_order_3 = async (c: Context<Env, "/api/fo
     await swapFolderOrder(c.env.DB, a, b);
     return c.json({ success: true, data: { swapped: [id, withId] } });
   } catch (err) {
-    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
+    if (err instanceof FolderConflictError) return c.json({success:false,code:'VERSION_CONFLICT',error:'フォルダが更新されました'},409);
     throw err;
   }
 };
@@ -199,7 +201,7 @@ export const delete__api_folders_id_4 = async (c: Context<Env, "/api/folders/:id
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
+    if (err instanceof FolderConflictError) return c.json({success:false,code:'VERSION_CONFLICT',error:'フォルダが更新されました'},409);
     throw err;
   }
 };

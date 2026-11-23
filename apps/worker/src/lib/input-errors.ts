@@ -194,12 +194,18 @@ export function inputErrorMessage(code: string, fallback = '入力内容を確�
   return Object.hasOwn(messages, code) ? messages[code]! : fallback;
 }
 
+export function folderNameConflict(c: Context, code = 'FOLDER_NAME_CONFLICT') {
+  const message = '同じ名前のフォルダがあります';
+  return c.json({ success: false, code, error: message, fields: { name: message } }, 409);
+}
+
 /** フォルダの口で使うJSONの鍵を、DB側の共通エラーへ対応させる。 */
 export function folderInputError(
   c: Context,
   failure: { code: string; status: ContentfulStatusCode },
   versionKeys: readonly [string, string] = ['expectedRevision', 'withExpectedRevision'],
 ) {
+  if (failure.code === 'FOLDER_NAME_CONFLICT') return folderNameConflict(c);
   const keys: Record<string, string[]> = {
     INVALID_INPUT: [], INVALID_FOLDER_KIND: ['kind'], INVALID_FOLDER_NAME: ['name'],
     INVALID_FOLDER_COLOR: ['color'], INVALID_REVISION: [versionKeys[0]], INVALID_FOLDER: ['folderId'],

@@ -6,6 +6,7 @@ import { friendAttributes } from './friend-attributes.js';
 import { hqBanners } from './hq-banners.js';
 import { hqTemplates } from './hq-templates.js';
 import { hqBroadcasts } from './hq-broadcasts.js';
+import { apiContractMiddleware } from '../middleware/api-contract.js';
 import type { Env } from '../worker-env.js';
 let f:SqliteD1,app:Hono<Env>;
 let actor:{id:string;name:string;role:'owner'|'admin'|'staff';tenantId:string;readOnly:boolean};
@@ -21,6 +22,34 @@ beforeEach(()=>{
 afterEach(()=>f.raw.close());
 const call=(path:string,method='GET',body?:unknown)=>app.request(path,{method,headers:{'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})},{DB:f.db});
 async function data(response:Response){expect(response.status,await response.clone().text()).toBeLessThan(300);return (await response.json() as {data:any}).data;}
+describe('同名フォルダの作成・改名',()=>{
+ it('本来のAPI変換を通しても、統括配信フォルダの重複の理由を伝える',async()=>{
+  const api=new Hono<Env>();api.use('*',apiContractMiddleware);api.use('*',async(c,next)=>{c.set('staff',actor);await next()});api.route('/',hqBroadcasts);
+  const post=()=>api.request('/api/hq/broadcasts/folders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'テスト'})},{DB:f.db});
+  expect((await post()).status).toBe(201);const duplicate=await post();expect(duplicate.status).toBe(409);
+  expect(await duplicate.json()).toMatchObject({error:{code:'FOLDER_NAME_CONFLICT',message:'同じ名前のフォルダがあります',fieldErrors:[{field:'name',message:'同じ名前のフォルダがあります'}]}});
+ });
+ it.each([
+  {path:'/api/hq/broadcasts/folders',body:{},version:'expectedVersion'},
+  {path:'/api/hq/templates/folders',body:{},version:'expectedRevision'},
+  {path:'/api/hq/banners/folders',body:{kind:'project'},version:'expectedRevision'},
+  {path:'/api/folders',body:{kind:'friend_add_rule',accountId:'a'},version:'expectedRevision'},
+ ])('$path は重複だけを409と名前の理由にする',async({path,body,version})=>{
+  const first=await data(await call(path,'POST',{...body,name:'テスト'}));
+  const second=await data(await call(path,'POST',{...body,name:'別名'}));
+  const duplicate=await call(path,'POST',{...body,name:' テスト '});
+  expect(duplicate.status,await duplicate.clone().text()).toBe(409);
+  expect(await duplicate.json()).toMatchObject({error:'同じ名前のフォルダがあります',fields:{name:'同じ名前のフォルダがあります'}});
+  const renamed=await call(`${path}/${second.id}`,'PATCH',{...body,name:'テスト',[version]:1});
+  expect(renamed.status,await renamed.clone().text()).toBe(409);
+  expect(await renamed.json()).toMatchObject({error:'同じ名前のフォルダがあります',fields:{name:'同じ名前のフォルダがあります'}});
+  const same=await call(`${path}/${first.id}`,'PATCH',{...body,name:'テスト',[version]:1});expect(same.status,await same.clone().text()).toBe(200);
+  if(path==='/api/folders'||path==='/api/hq/broadcasts/folders'){
+   const stale=await call(`${path}/${first.id}`,'PATCH',{...body,name:'テスト',[version]:1});
+   expect(stale.status).toBe(409);expect(await stale.json()).toMatchObject({code:'VERSION_CONFLICT'});
+  }
+ });
+});
 describe('新しい店の共通フォルダ',()=>{
  it.each(['affiliate','affiliate_offer','mileage_reward','friend_add_rule'])('%s: 作る・改名・色・並べ替え・削除と古い版を拒否',async kind=>{
   const a=await data(await call('/api/folders','POST',{kind,accountId:'a',name:'A',color:'#3b82f6'}));

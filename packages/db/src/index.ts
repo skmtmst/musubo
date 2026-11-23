@@ -747,7 +747,7 @@ export function createDb(d1: D1Database): D1Database {
   return d1;
 }
 export {
-  FOLDER_ITEM_COUNT_TABLES, FOLDER_KINDS, FolderConflictError, countFoldersByKind, createFolder, deleteFolder,
+  FOLDER_ITEM_COUNT_TABLES, FOLDER_KINDS, FolderConflictError, FolderNameConflictError, countFoldersByKind, createFolder, deleteFolder,
   folderBatch, folderRevisionGuard, getFolderById, getFolderItemCounts, getFolders, isFolderKind,
   swapFolderOrder, updateFolder,
 } from './folders';
