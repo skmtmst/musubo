@@ -159,7 +159,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
       titleIcon={false}
       confirmIcon={<Send size={16} aria-hidden="true" />}
       description={subtitle}
-      confirmLabel={countError ? (scheduled ? '予約する' : '送る') : primaryLabel}
+      confirmLabel={countError ? (approval ? '承認を依頼する' : scheduled ? '予約する' : '送る') : primaryLabel}
       busyLabel="送っています…"
       cancelLabel="戻る"
       busy={busy}

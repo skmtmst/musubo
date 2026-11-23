@@ -59,11 +59,17 @@ describe('共通の「送る前の確かめ」窓（U1）', () => {
   })
   it.each([
     [[{ name: '店', recipients: 1272, stopped: NaN }]],
+    [[{ name: '店', recipients: 1272, stopped: -1 }]],
+    [[{ name: '店', recipients: 1.5, stopped: 0 }]],
     [[{ name: '店', recipients: 1, stopped: 0 }]],
   ])('店ごとの人数が不正または合計と違えば送信を止める', (perAccount) => {
     render(<SendConfirmDialog {...base} perAccount={perAccount} accountCount={1} />)
     expect(screen.getByText('人数を数えられませんでした')).toBeTruthy()
     expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+  it('承認が必要で人数を確認できないときは承認の依頼を押せない', () => {
+    render(<SendConfirmDialog {...base} recipients={null} approval={{ note: '承認が必要です' }} primaryLabel="承認を依頼する" />)
+    expect((screen.getByRole('button', { name: '承認を依頼する' }) as HTMLButtonElement).disabled).toBe(true)
   })
   it('予約時は予約する前の確認と表示する', () => {
     render(<SendConfirmDialog {...base} scheduled recipients={null} />)
