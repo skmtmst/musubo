@@ -425,7 +425,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
                 renderEditor={(action, update) => {
                   const key = referenceKey(action.actionType)
                   return key ? <EntityPickerField label="操作の対象" noun="対象" items={webinarActionItems(action.actionType, actionResources)} value={String(action.config[key] ?? '')} onChange={id => update({ ...action, config: { ...action.config, [key]: id } })}
-                      /> : <p>ほかに決めることはありません</p>
+                      /> : <p className="text-body">ほかに決めることはありません</p>
                 }} />}
                     </div>
                   )}
