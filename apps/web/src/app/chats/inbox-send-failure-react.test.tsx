@@ -214,6 +214,10 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
     await typeAndSend('{{var.guest_count}}名でお待ちしています')
     await eventually(() => expect(host.textContent).toContain('入らないため、送りませんでした'))
     const composer = host.querySelector('[data-inbox-v4="composer"]')!
+    // 口が返した差し込みの名前を、返信欄と同じ札の名前（人数）で言う。名前の無い一般の文にしない。
+    const failure = composer.querySelector('[role="alert"]')!
+    expect(failure.textContent).toContain('「人数」が入らないため、送りませんでした。その部分を書き換えるか消してから、送り直してください。')
+    expect(failure.textContent).not.toContain('差し込みの値が入らないため')
     expect(composer.textContent).not.toContain('{{')
     expect(composer.querySelector('[data-token="{{var.guest_count}}"]')?.textContent).toBe('人数')
     expect((host.querySelector('[aria-label="メッセージを入力"]') as HTMLElement & { value: string }).value).toBe('{{var.guest_count}}名でお待ちしています')
