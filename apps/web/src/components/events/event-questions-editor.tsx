@@ -77,8 +77,7 @@ export default function EventQuestionsEditor({
               /></SaveErrorField>
             </div>
             <Button
-              variant="text"
-              textTone="danger"
+              variant="text" textTone="danger"
               size="field"
               onClick={() => onChange(questions.filter((_, i) => i !== index))}
             >
