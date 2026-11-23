@@ -56,7 +56,7 @@ describe('describeSendFailure: N-028/N-029 失敗理由の言い換え', () => {
     expect(describeSendFailure(error, NOW)).toContain('受け付けませんでした')
   })
 
-  // N-026: 差し込みの未解決はLINEの拒否ではなく本文側の問題。直す差し込みを札の名前で伝え、生の記号は出さない。
+  // 差し込みの未解決はLINEの拒否ではなく本文側の問題。直す差し込みを札の名前で伝え、生の記号は出さない。
   it('差し込み未解決の400は差し込みの名前と修正方法を伝える', () => {
     const error = new ApiError(400, '', 'UNRESOLVED_TEMPLATE_VARIABLES', {
       variables: ['pet_name', 'var.guest_count', 'var.closure_datetime'],

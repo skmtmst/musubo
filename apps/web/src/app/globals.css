@@ -575,8 +575,7 @@
   --polish-table-hover: var(--color-canvas-sunken);
 }
 :root {
-  --polish-text-page: 32px;
-  --polish-text-page-title: 24px; /* ページの題。クーポンの大きな数字（--polish-text-page）とは別 */
+  --polish-text-page: 32px; --polish-text-page-title: 24px; /* page-title はページの題。page はクーポンの大きな数字 */
   --polish-text-section: 15px;
   --polish-text-body: 13px;
   --polish-text-support: 12px;

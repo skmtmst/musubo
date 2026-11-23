@@ -325,7 +325,7 @@ export default function TemplatePicker({
   )
 
   /*
-   * N-026: 差し込みを含むテンプレートは、送信と同じ解決器の結果をプレビューに出す。
+   * 差し込みを含むテンプレートは、送信と同じ解決器の結果をプレビューに出す。
    * 確かめるのは見ている1件と、まとめて送るときに選んだもの（最大5件）だけ。一覧の全部には問い合わせない。
    */
   const previewTargets = useMemo<PreviewTarget[]>(() => {

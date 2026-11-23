@@ -52,7 +52,7 @@ export async function runInheritedFontPatrol(baseUrl, targetRoutes = routes) {
 /*
  * 手で回す：node apps/web/scripts/v8-guard/inherited-font-patrol.mjs <管理画面の URL>
  * CI の巡回にはまだつながない（別にもう一周するので CI が延び、データの文言で揺れるため。
- * 既存の巡回に相乗りさせて速く・安定させてからつなぐ。2026-11-23 司令塔）。
+ * 既存の巡回に相乗りさせて速く・安定させてからつなぐ）。
  */
 if (import.meta.url === `file://${process.argv[1]}` && process.argv[2]) {
   const result = await runInheritedFontPatrol(process.argv[2])

@@ -40,7 +40,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
       />
     ) : deepLinkNotice ? (
       // URL指定の会話が開けなかったときの空状態。別人は開かず、
-      // 理由と戻り先だけ出す(#673)。不正IDではselectedChatIdがnullに
+      // 理由と戻り先だけ出す。不正IDではselectedChatIdがnullに
       // なるため、通常の「選択してください」より先に判定する。
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="max-w-md text-center">
