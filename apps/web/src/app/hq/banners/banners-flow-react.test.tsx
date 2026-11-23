@@ -176,7 +176,8 @@ describe('バナー生成のプロジェクトの中', () => {
     mocks.createGeneration.mockResolvedValue({ success: true, data: generation('g-new', 'queued') })
     mocks.getGeneration.mockResolvedValue({ success: true, data: generation('g-new', 'done') })
     render(<HqBannerProjectV8 />)
-    expect((await screen.findByRole('button', { name: 'AI を使うアカウント' })).textContent).toContain('支店')
+    // 選ぶ部品（EntitySelect）は選んだ名前を押す所の外側の行に出す。
+    expect((await screen.findByRole('button', { name: 'AI を使うアカウント' })).parentElement?.textContent).toContain('支店')
     fireEvent.change(document.querySelector('input[placeholder]:not([type="file"])')!, { target: { value: '秋の新商品' } })
     fireEvent.click(screen.getByRole('button', { name: /^生成する（\d+ 枚）$/ }))
     await waitFor(() => expect(mocks.createGeneration).toHaveBeenCalledWith('p1', expect.anything(), { accountId: 'a2' }))
