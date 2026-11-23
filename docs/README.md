@@ -472,7 +472,7 @@
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
-- [送る前の人数確認を確実にする](release-log/unreleased/PR-kenta-c16-send-guard.md)
+- [送る前の人数確認を確実にする](release-log/unreleased/173-kenta-c16-send-guard.md)
 
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
 
