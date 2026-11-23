@@ -12,6 +12,8 @@ vi.hoisted(() => {
 const api = vi.hoisted(() => ({
   createReservation: vi.fn(), postSeatVisitMark: vi.fn(), reservationsDay: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(),
 }))
+const floorApi = vi.hoisted(() => ({ floors: vi.fn(async () => ({ data: [] })) }))
+vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: floorApi }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
@@ -90,6 +92,7 @@ describe('ウォークイン（E-3）', () => {
     for (let i = 0; i < 4; i += 1) fireEvent.click(screen.getByRole('button', { name: '人数を増やす' }))
     await waitFor(() => expect(screen.queryByText('T1')).toBeNull())
     expect(screen.getByText('個室A')).not.toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: /個室A/ }))
     fireEvent.click(screen.getByRole('button', { name: /入店にする/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ seated: true }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({ guestCount: 6, tableId: 'pa' }))
