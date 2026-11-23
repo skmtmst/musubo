@@ -34,9 +34,8 @@ function useClosedForLogin(unfamiliarAt: string | null) {
  * この帯が出ているあいだ、そのセッションの大事な操作は毎回の本人確認が要る
  * （Worker側で強制）。心当たりがない人の逃げ道として、セッション管理への
  * リンク（他の端末のログイン解除）を右に置く。
- * ［閉じる］で、そのログインについてはその端末でずっと出さない（2026-11-23 オーナー
- * 「ずっと出ないように閉じられるように」）。どの画面でも閉じられる。別のいつもと違う
- * ログインがあれば、また出す（知らない人のログインに気づけるようにするため）。
+ * ［閉じる］で、そのログインについてはその端末でずっと出さない。どの画面でも閉じられる。
+ * 別のいつもと違うログインがあれば、また出す（知らない人のログインに気づけるようにするため）。
  */
 export default function UnfamiliarLoginNotice({ className }: { className?: string }) {
   const [unfamiliarAt, setUnfamiliarAt] = useState<string | null>(null)
