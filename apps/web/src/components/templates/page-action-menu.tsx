@@ -23,9 +23,9 @@ export default function PageActionMenu({ buttons, menu, label }: { buttons: Reac
     disabled: node.props.disabled,
     disabledReason: 'disabledReason' in node.props ? node.props.disabledReason ?? undefined : undefined,
     lockedReason: node.props.lockedReason ?? undefined,
-    tone: /danger/.test(node.props.variant ?? '') ? 'danger' : undefined,
+    tone: /danger/.test(node.props.variant ?? '') || node.props.textTone === 'danger' ? 'danger' : undefined,
     content: cloneElement(node, {
-      variant: 'text', textTone: /danger/.test(node.props.variant ?? '') ? 'danger' : node.props.textTone, role: 'menuitem',
+      variant: 'text', textTone: /danger/.test(node.props.variant ?? '') || node.props.textTone === 'danger' ? 'danger' : 'ink', role: 'menuitem',
       busy: busy || ('busy' in node.props ? node.props.busy : undefined),
       onClick: (event: MouseEvent<HTMLButtonElement> & MouseEvent<HTMLAnchorElement>) => {
         if (inFlight.current) return inFlight.current

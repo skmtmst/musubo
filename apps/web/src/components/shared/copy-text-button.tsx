@@ -112,7 +112,7 @@ export default function CopyTextButton({
         variant={variant}
         size={size}
         className={size === 'inline' ? styles.button : undefined}
-        textTone={size === 'inline' && state === 'copied' ? 'accent' : undefined}
+        textTone={role === 'menuitem' ? 'ink' : size === 'inline' && state === 'copied' ? 'accent' : undefined}
         role={role}
         disabled={disabled}
         onClick={(event) => { event.stopPropagation(); void copy() }}

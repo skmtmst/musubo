@@ -748,6 +748,11 @@ jobs:
             echo "::error::速度・画面検査のサーバーが起動しませんでした"
             exit 1
           fi
+      - name: Close controls and menu colors stay neutral
+        if: steps.scope.outputs.run == 'true'
+        env:
+          V8_GUARD_URL: http://127.0.0.1:4310
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/close-plain.test.mjs apps/web/scripts/v8-guard/menu-color.test.mjs
       - name: No permission copy flashes during navigation
         if: steps.scope.outputs.run == 'true'
         env:
