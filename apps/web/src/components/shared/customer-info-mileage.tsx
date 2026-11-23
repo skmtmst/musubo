@@ -7,11 +7,14 @@ import styles from './customer-info-mileage.module.css'
 export type CustomerMileageState =
   | { kind: 'loading' }
   | { kind: 'error' }
+  /** 店でマイルを使っていない（機能がオフ）。取得失敗ではないので再試行は出さない。 */
+  | { kind: 'disabled' }
   | { kind: 'data'; summary: MileageSummary; history: MileageHistoryItem[] }
 
 /** 顧客情報の数と記録。取得・再試行・権限は呼び出す側で保つ。 */
 export default function CustomerInfoMileage({ state, onRetry }: { state: CustomerMileageState; onRetry: () => void }) {
   if (state.kind === 'loading') return <DelayedSkeleton loading skeleton={<Skeleton width="100%" height="var(--tpl-fdt-mile-lh)" />} />
+  if (state.kind === 'disabled') return <p className={styles.caption}>マイルは使っていません</p>
   if (state.kind === 'error') return <div className={styles.summary}>
     <p className={styles.error}>マイルを読み込めませんでした</p>
     <Button variant="text" size="inline" onClick={onRetry}>再試行する</Button>

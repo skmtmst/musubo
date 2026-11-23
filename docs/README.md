@@ -491,6 +491,7 @@
 - [配信のLINEプレビュー表示](release-log/unreleased/180-kenta-preview-phone-only.md) — 反映履歴。
 - [ログイン画面とメニューのロゴ表示](release-log/unreleased/184-kenta-logo-sharp.md) — 反映履歴。
 - [統括メンバー画面の設定メニューを整える](release-log/unreleased/185-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
+- [受信箱のマイル表示](release-log/unreleased/191-kenta-friend-mileage-error.md) — マイルを使っていない店舗の表示に関する修正履歴。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
