@@ -57,7 +57,7 @@ const baseInput = {
   staffId: 'staff-1',
 };
 
-describe('N-268: 下書き・公開・導出状態', () => {
+describe('成果地点は公開状態に応じて計測と状態表示を切り替える', () => {
   it('下書きで保存すると計測に乗らず、公開で計測できるようになる', async () => {
     const db = asD1(setup());
     const created = await createConversionDefinition(db, { ...baseInput, draft: true });
@@ -135,7 +135,7 @@ describe('N-268: 下書き・公開・導出状態', () => {
   });
 });
 
-describe('N-270: 外部受信の鍵と台帳', () => {
+describe('外部受信の鍵を暗号化し受け口の状態と台帳を管理する', () => {
   it('鍵を発行すると暗号化して保存し、照合には復号した平文を使う', async () => {
     const db = asD1(setup());
     const created = await createConversionDefinition(db, baseInput);
@@ -184,7 +184,7 @@ describe('N-270: 外部受信の鍵と台帳', () => {
   });
 });
 
-describe('N-265/N-269: 母数・CVRと暦日の一致', () => {
+describe('経路の母数と成果率を数え集計の暦日を揃える', () => {
   it('経路の母数はその経路を踏んだ友だち数、CVRは純成果÷母数', async () => {
     const sqlite = setup();
     sqlite.exec(`
@@ -242,7 +242,7 @@ describe('N-265/N-269: 母数・CVRと暦日の一致', () => {
   });
 });
 
-describe('#1037 IDEA-19: 成果1件ごとの状態と検証受信の区別', () => {
+describe('成果の業務状態を表示し検証受信を本集計から分ける', () => {
   it('確定・確認待ち・却下・取消を業務状態として導出し、新しい順で返す', async () => {
     const sqlite = setup();
     sqlite.exec(`

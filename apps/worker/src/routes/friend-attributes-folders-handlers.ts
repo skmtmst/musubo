@@ -20,7 +20,7 @@ export const post__api_folders_1 = async (c: Context<Env, "/api/folders">) => {
     const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     // テンプレートのフォルダはアカウント単位。accountId なしで作れるのは
     // 全アカウントを見られる人だけ（タグと同じ決まり）。画面は必ず選択中の
-    // アカウントを送る。回答フォームの箱（R25）も同じく選択中のアカウントに付ける。
+    // アカウントを送る。回答フォームの箱も同じく選択中のアカウントに付ける。
     if (!accountId) {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.canSeeUnassigned) return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);

@@ -120,7 +120,7 @@ function isDone(state: SetupState, step: string): boolean {
  * `YOUR_DEV_ACCOUNT_ID` / `YOUR_DEV_D1_DATABASE_ID` so it never leaks the
  * upstream maintainer's IDs. Wrangler reads those placeholders verbatim and
  * fails routing (`Could not route to /accounts/YOUR_DEV_ACCOUNT_ID/...`),
- * which used to surface as "no such table: line_accounts" two steps later.
+ * producing a misleading "no such table: line_accounts" error later.
  *
  * We patch the file in-place (so `wrangler` resolves `main = "src/index.ts"`
  * and `assets.directory` correctly relative to apps/worker/) and capture the

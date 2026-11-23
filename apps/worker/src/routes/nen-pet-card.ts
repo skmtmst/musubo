@@ -3,7 +3,7 @@ import { isFeedingSupportedAnimal, petAnimalTypeLabel, toPetAnimalType } from '.
 
 
 export function petCard(pet: Record<string, unknown>): Message {
-  // DEEP-24: 「その他」は犬へ倒さず「その他」と出す。フード目安の計算は
+  // 「その他」は犬へ倒さず「その他」と出す。フード目安の計算は
   // 犬・猫専用なので、対象外の子には数値の代わりにその旨を添える。
   const supported = isFeedingSupportedAnimal(toPetAnimalType(pet.animal_type));
   const guide = `${pet.recommended_daily_min_grams}〜${pet.recommended_daily_max_grams}g/日`;

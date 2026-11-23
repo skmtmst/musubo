@@ -73,7 +73,7 @@ export interface ScanResult {
   source?: MediaRefKind;
   sourceRows?: number;
   cycleCompleted?: boolean;
-  /** 表そのものが無くて読めなかった読み口（R34）。空ならすべての使用先読めた。 */
+  /** 表そのものが無くて読めなかった読み口。空ならすべての使用先読めた。 */
   skippedTables?: string[];
 }
 
@@ -107,7 +107,7 @@ async function findMatches(
   mediaId: string,
 ): Promise<{
   matches: Array<{ refKind: MediaRefKind; refId: string }>;
-  /** 表そのものが無くて読めなかった読み口（R34）。 */
+  /** 表そのものが無くて読めなかった読み口。 */
   skippedTables: string[];
 }> {
   const matches: Array<{ refKind: MediaRefKind; refId: string }> = [];
@@ -143,7 +143,7 @@ async function findMatches(
       }
     } catch (err) {
       // 表そのものが無い読み口だけ飛ばす。全部を例外にすると、どの画像でも
-      // 取得が失敗し、読み直しても直らない（R34）。一時的なD1障害は
+      // 取得が失敗し、読み直しても直らない。一時的なD1障害は
       // 例外のままにして、0件と偽らない。
       if (!isMissingSourceTable(err, source.table)
         && !(source.refKind === 'template' && isMissingSourceTable(err, 'broadcast_message_assets'))) throw err;
@@ -166,7 +166,7 @@ export async function scanSingleMediaUsage(
   item: MediaToScan,
 ): Promise<ScanResult> {
   // 版の表が無い環境では旧版の固定参照まで拾えない。現行キーとライブ参照
-  // だけでも走査は続け、その読み残しを呼び出し側へ返す（R34）。
+  // だけでも走査は続け、その読み残しを呼び出し側へ返す。
   let versionTokens: string[] = [];
   const skippedTables: string[] = [];
   try {

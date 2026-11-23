@@ -124,7 +124,7 @@ beforeEach(() => {
   }))
 })
 
-describe('通知ステップの受付検査（#489 中9）', () => {
+describe('通知ステップの種類と本文を検証してから保存する', () => {
   const postStep = (body: unknown) => request('/api/reminders/reminder-1/steps', {
     method: 'POST', body: JSON.stringify(body),
   })
@@ -154,7 +154,7 @@ describe('通知ステップの受付検査（#489 中9）', () => {
   })
 })
 
-describe('並び替えの所属確認（#489 中10）', () => {
+describe('リマインドの並び替えは存在と操作権限を確認する', () => {
   const reorder = (ids: string[]) => request('/api/reminders/reorder', {
     method: 'PATCH', body: JSON.stringify({ ids }),
   })
@@ -191,7 +191,7 @@ describe('並び替えの所属確認（#489 中10）', () => {
   })
 })
 
-describe('作成後のきっかけ変更の拒否（#489 中11）', () => {
+describe('作成済みリマインドのきっかけの変更を拒否する', () => {
   const put = (body: unknown) => request('/api/reminders/reminder-1', {
     method: 'PUT', body: JSON.stringify(body),
   })
@@ -219,7 +219,7 @@ describe('作成後のきっかけ変更の拒否（#489 中11）', () => {
   })
 })
 
-describe('R146 監査：未公開の下書きは再開できない', () => {
+describe('公開版のないリマインドは再開を拒否する', () => {
   const put = (body: unknown) => request('/api/reminders/reminder-1', {
     method: 'PUT', body: JSON.stringify(body),
   })
@@ -244,7 +244,7 @@ describe('R146 監査：未公開の下書きは再開できない', () => {
   })
 })
 
-describe('下書き保存時の空本文の拒否（#489 中16）', () => {
+describe('リマインドの下書きは型紙なしの空本文を拒否する', () => {
   const putDraft = (settings: unknown) => request('/api/reminders/reminder-1/draft', {
     method: 'PUT', body: JSON.stringify(settings),
   })

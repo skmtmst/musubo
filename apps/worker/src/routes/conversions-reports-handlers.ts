@@ -353,7 +353,7 @@ export const post__api_conversions_track_7 = async (c: Context<Env, "/api/conver
     if (err instanceof Error && err.message === 'conversion_friend_not_found') {
       return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
     }
-    // R40: 数えない条件に当てはまる人は記録しない。失敗ではなく対象外。
+    // 数えない条件に当てはまる人は記録しない。失敗ではなく対象外。
     if (err instanceof Error && err.message === 'conversion_excluded') {
       return inputError(c, { success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422, []);
     }

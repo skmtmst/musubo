@@ -84,7 +84,7 @@ async function displayStatusOf(db: SqliteD1, id: string): Promise<{ displayStatu
   return { displayStatus: body.data.displayStatus, label: body.data.displayStatusLabel };
 }
 
-describe('10の状態（#816）', () => {
+describe('配信の承認・送信・停止の状態を一覧と詳細に表示する', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -213,7 +213,7 @@ describe('10の状態（#816）', () => {
   });
 });
 
-describe('宛先台帳（#816）', () => {
+describe('配信の宛先を統括ごとに絞り状態と送信結果を返す', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -378,7 +378,7 @@ describe('再送は一時的な失敗だけ（#816）', () => {
   });
 });
 
-describe('操作の記録（#816）', () => {
+describe('配信の操作と承認の記録を統括の範囲で返す', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {

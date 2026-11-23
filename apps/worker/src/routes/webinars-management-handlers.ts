@@ -97,7 +97,7 @@ export const put__api_webinars_id_2 = async (c: Context<Env, "/api/webinars/:id"
   if (!row) return c.json({ success: false, error: 'Not found' }, 404);
   const body = await c.req.json<WebinarBody>();
   if (!Number.isInteger(body.expectedVersion) || body.expectedVersion! < 0) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: '確認した版が必要です' }, 400, ['expectedVersion']);
-  // R95: 下書きから公開中への切替は通常更新では受けない。公開前検査と
+  // 下書きから公開中への切替は通常更新では受けない。公開前検査と
   // 公開版の固定を通す公開専用口（POST /:id/publish）へ寄せる。
   // 公開中のまま他項目を直す保存は通す。
   if (body.status === 'active' && row.status !== 'active') {

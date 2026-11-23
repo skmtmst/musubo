@@ -1062,7 +1062,7 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
   });
 
   test('LIFF の空き枠口は休みの日を closed_dates で返す', async () => {
-    // R92: 店舗の受付期間（60日）の内側の日で確かめる。期間の外は
+    // 店舗の受付期間（60日）の内側の日で確かめる。期間の外は
     // 休み印の対象外（枠自体が出ない）になる。
     const jst = (offsetDays: number) =>
       new Date(Date.now() + offsetDays * 86_400_000 + 9 * 3_600_000).toISOString().slice(0, 10);
