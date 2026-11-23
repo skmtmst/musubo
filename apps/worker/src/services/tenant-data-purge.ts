@@ -257,17 +257,52 @@ async function purgeOneTenant(
               SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
             )`,
         ).bind(...tenantParams, chunk);
+        const cycleParents: Record<string, { parent: string; columns: string[]; scope: string }> = {
+          hq_template_versions: { parent: 'hq_templates', columns: ['current_version_id'], scope: 'tenant_id = ?' },
+          action_score_rule_versions: { parent: 'action_score_rule_sets', columns: ['current_draft_version_id', 'current_published_version_id'], scope: 'line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = ?)' },
+          automation_versions: { parent: 'automation_definitions', columns: ['current_draft_version_id', 'current_published_version_id'], scope: 'line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = ?)' },
+          common_action_versions: { parent: 'common_actions', columns: ['current_draft_version_id', 'current_published_version_id'], scope: 'line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = ?)' },
+          mileage_reward_versions: { parent: 'mileage_rewards', columns: ['current_draft_version_id', 'current_published_version_id'], scope: 'line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id = ?)' },
+          banner_images: { parent: 'banner_generations', columns: ['reference_image_id'], scope: 'tenant_id = ?' },
+        };
+        const cycle = cycleParents[table];
+        const batch: D1PreparedStatement[] = [];
         if (GUARDED_PURGE_TABLES.has(table)) {
-          // 許可は対象統括・表の DELETE と同じ原子的 batch 内だけに存在する。
-          const grant = env.DB.prepare(`INSERT INTO tenant_purge_guard (tenant_id, table_name)
+          batch.push(env.DB.prepare(`INSERT INTO tenant_purge_guard (tenant_id, table_name)
             VALUES ((SELECT id FROM tenants WHERE id = ? AND data_purged_at IS NULL
               AND (plan_status = 'canceled' OR (plan_status = 'trialing' AND trial_ends_at IS NOT NULL AND trial_ends_at < ?))
               AND (purge_requested_at IS NOT NULL OR (retention_anchor_at IS NOT NULL AND retention_anchor_at < ?))), ?)`)
-            .bind(tenant.id, now, retentionCutoff(now), table);
-          const revoke = env.DB.prepare('DELETE FROM tenant_purge_guard WHERE tenant_id = ? AND table_name = ?')
-            .bind(tenant.id, table);
-          const results = await env.DB.batch([grant, statement, revoke]);
-          deleted = results[1];
+            .bind(tenant.id, now, retentionCutoff(now), table));
+        }
+        if (table === 'media') {
+          // media の CASCADE は画像を先に消すため、参照も同時に外す。
+          batch.push(env.DB.prepare(`UPDATE banner_generations SET reference_image_id = NULL
+            WHERE tenant_id = ? AND reference_image_id IN (
+              SELECT id FROM banner_images WHERE tenant_id = ? AND media_id IN (
+                SELECT media.id FROM media WHERE ${condition} ORDER BY media.rowid LIMIT ?
+              )
+            )`).bind(tenant.id, tenant.id, ...tenantParams, chunk));
+        }
+        if (cycle) {
+          // 対象の版だけ参照を外し、削除と同じ batch で確定する。
+          for (const column of cycle.columns) {
+            batch.push(env.DB.prepare(`UPDATE ${cycle.parent} SET ${column} = NULL
+              WHERE ${cycle.scope} AND ${column} IN (
+                SELECT ${table}.id FROM ${table} WHERE ${table}.rowid IN (
+                  SELECT ${table}.rowid FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?
+                )
+              )`).bind(tenant.id, ...tenantParams, chunk));
+          }
+        }
+        batch.push(statement);
+        const deleteIndex = batch.length - 1;
+        if (GUARDED_PURGE_TABLES.has(table)) {
+          batch.push(env.DB.prepare('DELETE FROM tenant_purge_guard WHERE tenant_id = ? AND table_name = ?')
+            .bind(tenant.id, table));
+        }
+        if (batch.length > 1) {
+          const results = await env.DB.batch(batch);
+          deleted = results[deleteIndex];
         } else {
           deleted = await statement.run();
         }
