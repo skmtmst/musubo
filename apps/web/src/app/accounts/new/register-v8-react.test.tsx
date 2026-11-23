@@ -82,7 +82,6 @@ beforeEach(() => {
   calls.friendsList.mockResolvedValue({ success: true, data: { total: 0 } })
   calls.styleGet.mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
   calls.styleSave.mockResolvedValue({ success: true, data: { version: 1 } })
-  calls.starterSet.mockResolvedValue({ success: true, data: { definition: { items: [{ key: 'menu', kind: 'rich_menu' }] } } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
@@ -94,9 +93,6 @@ const chooseStyle = async (label: string) => {
   const save = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
   await waitFor(() => expect(save.disabled).toBe(false))
   fireEvent.click(save)
-  const menu = await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
-  expect(calls.styleSave).not.toHaveBeenCalled()
-  fireEvent.click(within(menu).getByRole('button', { name: 'このメニューで進む' }))
 }
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
@@ -187,6 +183,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await chooseStyle('飲食店')
     await waitFor(() => expect(shownNode()).toBe('Plmq1'))
     expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
+    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } })
+    expect(calls.starterSet).not.toHaveBeenCalled()
   })
 
   it('登録しても受信が確認されるまでは接続確認の段を表示する', async () => {
