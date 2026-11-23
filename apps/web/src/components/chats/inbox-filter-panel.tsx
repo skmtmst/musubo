@@ -10,7 +10,8 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
 import Button from '@/components/shared/button'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
+import MenuPortal from '@/components/shared/menu-portal'
 
 /**
  * 受信箱の絞り込みパネル（設計 Pencil `bXyEA` 受信箱 絞り込みパネル）。
@@ -61,6 +62,7 @@ export default function InboxFilterPanel({
   slaEnabled = false,
   emailInboxEnabled = true,
   auxiliaryActions,
+  anchorRef,
   onChange,
   onReset,
   onClose,
@@ -78,6 +80,7 @@ export default function InboxFilterPanel({
   emailInboxEnabled?: boolean
   /** 対応ルールなど、画面が持つ補助操作。 */
   auxiliaryActions?: ReactNode
+  anchorRef?: RefObject<HTMLElement | null>
   onChange: (next: InboxFilterValue) => void
   onReset: () => void
   onClose: () => void
@@ -94,14 +97,14 @@ export default function InboxFilterPanel({
   const unassignedCount = unassignedUnreadCount ?? (assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(UNASSIGNED))
   const unassignedDescription = unassignedCount === null ? '未読 —' : `未読 ${unassignedCount}件`
 
-  return (
-    <div className="fixed inset-0 z-50" role="presentation">
+  const panel = (
+    <div className={anchorRef ? "" : "fixed inset-0 z-50"} role="presentation">
       {/*
         INBOX-03: 閉じる操作は背景そのものに繋ぐ。以前は外枠の
         `target === currentTarget` を見ていたが、背景は子要素が全面を覆う
         ためその判定に届かず、灰色部分を押しても閉じなかった。
       */}
-      <div className="bg-ink/20 absolute inset-0" aria-hidden="true" onMouseDown={onClose} />
+      {!anchorRef ? <div className="bg-ink/20 absolute inset-0" aria-hidden="true" onMouseDown={onClose} /> : null}
       {/*
         狭い幅では画面の内側16pxいっぱいのシートにする(#982 LAY-04)。
         以前は top/right/width を固定していたため、390pxでは右120pxの
@@ -116,7 +119,7 @@ export default function InboxFilterPanel({
         role="dialog"
         aria-modal="true"
         aria-label="絞り込み"
-        className="bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-overlay sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"
+        className={anchorRef ? "bg-canvas rounded-panel flex w-[min(420px,calc(100vw-2rem))] max-h-[calc(100dvh-5rem)] flex-col overflow-hidden shadow-overlay" : "bg-canvas rounded-panel fixed inset-4 flex w-auto flex-col overflow-hidden shadow-overlay sm:inset-auto sm:top-16 sm:right-6 sm:w-[min(420px,calc(100vw-2rem))] sm:max-h-[calc(100dvh-5rem)] lg:right-10"}
       >
         <header className="border-hairline flex h-14 shrink-0 items-center gap-2 border-b px-5">
           <Filter aria-hidden="true" size={20} className="text-ink" />
@@ -242,4 +245,5 @@ export default function InboxFilterPanel({
       </section>
     </div>
   )
+  return anchorRef ? <MenuPortal open={open} align="start" getAnchor={() => anchorRef.current} onClose={onClose}>{panel}</MenuPortal> : panel
 }

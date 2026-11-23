@@ -8,11 +8,13 @@ import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
 import IconButton from '@/components/shared/icon-button';
 import SegmentedControl from '@/components/shared/segmented';
-import { InboxFloatingPanel } from '@/components/shared/inbox-content';
+import MenuPortal from '@/components/shared/menu-portal';
 import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
+import StatusPill, { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import { STATUS_WORD } from '@/components/chats/friend-info-status';
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
 import { InboxListPane } from '@/components/templates/inbox-page';
 import { PageTitle } from '@/components/templates/page-frame';
@@ -104,6 +106,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
   const savedSearchRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -115,6 +118,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     }
     const onPointerDown = (event: PointerEvent) => {
       if (savedViewMenuId && event.target instanceof Element && event.target.closest('[data-menu-portal]')) return
+      if (event.target instanceof Element && event.target.closest('[data-saved-views-panel]')) return
       if (event.target instanceof Node && !savedSearchRef.current?.contains(event.target)) {
         setSavedViewsOpen(false)
         setSavedViewMenuId(null)
@@ -145,7 +149,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <IconButton variant="plain" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <IconButton ref={filterButtonRef} variant="plain" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
         </IconButton>
         {/*
@@ -168,7 +172,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             <Bookmark aria-hidden size={16} />
             {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
           </IconButton>
-          <InboxFloatingPanel open={savedViewsOpen} placement="below">
+          <MenuPortal open={savedViewsOpen} align="start" getAnchor={() => savedSearchRef.current} onClose={() => setSavedViewsOpen(false)}>
+            <div className={styles.savedViewsPanel} data-saved-views-panel>
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
@@ -243,7 +248,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
-            </InboxFloatingPanel>
+            </div>
+          </MenuPortal>
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
         {(
@@ -324,6 +330,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           `}</style>
       ) : null}
       <InboxFilterPanel
+        anchorRef={filterButtonRef}
         open={filterOpen}
         emailInboxEnabled={emailInboxEnabled}
         value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
@@ -533,7 +540,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                               <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
                             )}
                           </div>
-                          {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
                           <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
                             <p
                               id={`chat-row-preview-${chat.id}`}
@@ -555,8 +561,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                               </span>
                               <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
                             </span>
-                            <span className="ml-auto shrink-0"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></span>
+                            <span className="ml-auto shrink-0"><StatusPill tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusPill></span>
                           </div>
+                          <div className="flex justify-end"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></div>
                         </div>
                       </div>
                     </InboxListRow>

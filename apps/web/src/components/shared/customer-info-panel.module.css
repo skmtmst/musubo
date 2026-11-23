@@ -64,3 +64,7 @@
 @media (hover: none) { :root .row dd > :nth-child(2) { opacity: 1; } }
 /* 受信箱の外側が左右24を持つので、内側で同じ余白を重ねない。 */
 :root .panel[data-label-width='wide'] { --tpl-customer-label: max-content; padding: 0; }
+
+.profileLink { flex: 1; min-width: 0; color: var(--color-ink); }
+.profileLink > span { display: flex; align-items: center; gap: var(--space-8); min-width: 0; overflow: hidden; }
+.profileLink .profileName { display: block; }
