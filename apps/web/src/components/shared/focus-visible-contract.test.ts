@@ -69,7 +69,10 @@ describe('押せる部品のフォーカスが見える', () => {
       const focusCss = css.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, selectors) =>
         selectors.split(',').every((selector: string) => selector.includes(':not(:focus-visible)')) ? '' : rule,
       )
-      expect(focusCss, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
+      // 開閉行は外側の行に輪を出し、ボタンの輪と重ねない。
+      const disclosureRing = name === 'disclosure.module.css' && /\.itemHead:has\(\.itemToggle:focus-visible\)\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/.test(focusCss)
+      const checked = disclosureRing ? focusCss.replace(/html:root\s+\.itemToggle\.itemToggle:focus-visible\s*\{\s*outline:\s*none;\s*\}/, '') : focusCss
+      expect(checked, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
     }
   })
 

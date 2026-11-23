@@ -229,12 +229,10 @@
   background: var(--polish-active);
 }
 
-.itemToggle:focus-visible {
-  outline: none;
-}
-
-.itemToggle:focus-visible::after {
+.itemHead:has(.itemToggle:focus-visible) {
   outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--space-4);
+  border-radius: var(--radius-control);
 }
 
 .itemHelp,
@@ -334,3 +332,5 @@
 }
 
 html:root .root[data-size='body'] .title { font-size:14px; font-weight:600; }
+/* 全体の焦点輪より優先し、外側の行の輪だけを表示する。 */
+html:root .itemToggle.itemToggle:focus-visible { outline: none; }

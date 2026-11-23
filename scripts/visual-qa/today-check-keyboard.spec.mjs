@@ -20,6 +20,11 @@ test('新着の開閉は Enter・Space で動き、再読込後も本人と店�
   const toggle = page.locator('#today-check-new button[data-disclosure-toggle]')
   await expect(toggle).toHaveAttribute('aria-expanded', 'true')
   await toggle.focus()
+  const focusRing = await toggle.evaluate(element => {
+    const head = element.closest('[class*="itemHead"]')
+    return { button: getComputedStyle(element).outlineStyle, head: head ? getComputedStyle(head).outlineStyle : null, width: head ? getComputedStyle(head).outlineWidth : null }
+  })
+  expect(focusRing).toEqual({ button: 'none', head: 'solid', width: '2px' })
   await page.keyboard.press('Space')
   await expect(toggle).toHaveAttribute('aria-expanded', 'false')
   await page.reload()
