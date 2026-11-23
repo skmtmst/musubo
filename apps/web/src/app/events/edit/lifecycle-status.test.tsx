@@ -8,7 +8,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ getEvent: vi.fn(), getBookingSummary: vi.fn(), setEventLifecycle: vi.fn() }))
+const net = vi.hoisted(() => ({ getEvent: vi.fn(), getBookingSummary: vi.fn(), listSlots: vi.fn(), setEventLifecycle: vi.fn() }))
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'ev-1' : null) }),
@@ -28,7 +28,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       ...actual.eventsApi,
       getEvent: (...args: unknown[]) => net.getEvent(...args),
       getBookingSummary: (...args: unknown[]) => net.getBookingSummary(...args),
-      listSlots: async () => ({ items: [] }),
+      listSlots: (...args: unknown[]) => net.listSlots(...args),
       setEventLifecycle: (...args: unknown[]) => net.setEventLifecycle(...args),
     },
   }
@@ -41,6 +41,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   document.documentElement.dataset.theme = 'v8'
   net.getEvent.mockReset()
+  net.listSlots.mockReset()
+  net.listSlots.mockResolvedValue({ items: [{ is_active: 1, starts_at: '2099-12-01T00:00:00Z' }] })
   net.getBookingSummary.mockReset()
   net.getBookingSummary.mockResolvedValue({ confirmed: 1, totalCapacity: 10, requested: 0, waitlist: 0, cancelled: 0 })
   net.setEventLifecycle.mockReset()
@@ -80,11 +82,27 @@ describe('公開の状態（WEB318/319）', () => {
     expect(screen.queryByRole('button', { name: '公開状態の操作' })).toBeNull()
   })
 
-  it('公開中の札と操作は開催枠が過去でも同じ公開状態から決まる', async () => {
+  it('これからの枠があると公開中の札と一時停止の操作を表示する', async () => {
     net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'published', is_published: 1 })
     render(<EditEventPage />)
     const pause = await screen.findByRole('button', { name: '一時停止する' })
-    expect(pause.closest('[data-template-region="heading"]')?.textContent).toContain('公開中')
+    const heading = pause.closest('[data-template-region="heading"]')!
+    await waitFor(() => expect(heading.textContent).toContain('公開中'))
+    expect(screen.getByRole('button', { name: '公開状態の操作' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'その他の操作' })).toBeTruthy()
+  })
+
+  it('これからの枠がない公開中イベントは終了の札と終了操作を表示する', async () => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'published', is_published: 1 })
+    net.listSlots.mockResolvedValue({ items: [{ is_active: 1, starts_at: '2026-01-01T00:00:00Z' }] })
+    render(<EditEventPage />)
+    const finish = await screen.findByRole('button', { name: '終了する' })
+    expect(finish.closest('[data-template-region="heading"]')?.textContent).toContain('終了')
+    expect(finish.getAttribute('data-variant')).toBe('primary')
+    expect(screen.queryByRole('button', { name: '一時停止する' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '公開状態の操作' }))
+    expect(await screen.findByRole('menuitem', { name: '中止する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'その他の操作' })).toBeTruthy()
   })
 
   it('状態が読めなかったら、読み直しを出す', async () => {
