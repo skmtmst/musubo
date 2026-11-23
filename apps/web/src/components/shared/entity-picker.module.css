@@ -19,7 +19,7 @@
 /* まとめて選ぶ一覧。 */
 .embedded { flex: none; height: var(--tpl-picker-embed-h); }
 .multiList { gap: var(--tpl-picker-gap); padding: var(--tpl-picker-list-pad); }
-.multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; }
+.multiRows { display: flex; flex-direction: column; gap: var(--tpl-picker-row-gap); min-height: 0; overflow-y: auto; font-size: var(--text-body); }
 /* S2Vgi（正の形）：行は薄い枠の箱、選んだ行は緑の地と緑の枠。 */
 .multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
 .multiRow[data-selected] { background: var(--polish-selection-bg); box-shadow: var(--tpl-bd-ring); }
@@ -92,7 +92,7 @@
 .tpNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
 .tpError { width: 100%; padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
 .tpList .tpError { padding: 0; }
-.tpCards { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); }
+.tpCards { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); font-size: var(--text-body); }
 .tpCard {
   display: flex;
   align-items: center;
