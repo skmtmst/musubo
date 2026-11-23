@@ -46,6 +46,21 @@ test('回答後の返信は未解決なら送らず、値を直せば再開す�
   expect(pushViaHarnessProxy).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(vi.mocked(pushViaHarnessProxy).mock.calls[0][3])).toContain('営業時間: 10時');
 });
+test('回答後の返信は固定した版を使い、停止中は送らず再実行を待つ',async()=>{
+  vi.mocked(pushViaHarnessProxy).mockClear();
+  fixture.raw.exec(`INSERT INTO common_vars(id,line_account_id,name,var_key,type,value,status) VALUES('hours','a','営業時間','hours','text','新','stopped');
+    INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('old','hours',1,'営業時間','固定した値','test');
+    INSERT INTO form_common_var_pins(form_id,common_var_id,version_id) VALUES('form','hours','old');
+    UPDATE forms SET on_submit_message_type='text',on_submit_message_content='営業時間: {{var.hours}}',content_revision=content_revision+1 WHERE id='form';`);
+  const row=fixture.raw.prepare("SELECT content_revision FROM forms WHERE id='form'").get() as {content_revision:number};
+  expect((await publishFormVersion(fixture.db,'form',row.content_revision)).kind).toBe('published');
+  expect((await submit()).status).toBe(202);
+  expect(pushViaHarnessProxy).not.toHaveBeenCalled();
+  expect(fixture.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'stopped'}]);
+  fixture.raw.prepare("UPDATE common_vars SET status='active' WHERE id='hours'").run();
+  expect((await submit()).status).toBe(200);
+  expect(JSON.stringify(vi.mocked(pushViaHarnessProxy).mock.calls[0][3])).toContain('営業時間: 固定した値');
+});
 test('CS-C02: 全登録先が反映されてから自動化の条件を見る',async()=>{
   expect((await submit()).status).toBe(201);
   expect(observed).toHaveBeenCalledTimes(1);

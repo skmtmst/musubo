@@ -80,14 +80,15 @@ export async function recoverStuckDeliveries(db: D1Database): Promise<number> {
 export async function pauseFriendScenarioDelivery(
   db: D1Database,
   id: string,
+  reason: 'delivery_failed' | 'common_var_unavailable' = 'delivery_failed',
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE friend_scenarios
-          SET confirmation_revision = confirmation_revision + 1, status = 'paused', pause_reason = 'delivery_failed', updated_at = ?
+          SET confirmation_revision = confirmation_revision + 1, status = 'paused', pause_reason = ?, updated_at = ?
        WHERE id = ? AND status = 'delivering'`,
     )
-    .bind(jstNow(), id)
+    .bind(reason, jstNow(), id)
     .run();
 }
 

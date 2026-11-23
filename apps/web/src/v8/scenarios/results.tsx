@@ -21,6 +21,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge';
+import HelpTip from '@/components/shared/help-tip';
 import ScenarioResultSummary from './result-summary'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -64,7 +65,7 @@ function csvCell(value: unknown): string {
 
 /** 購読の状態の札（絵：途中・送信中・止まっている・送れずに止まった・読み終えた）。 */
 function subscriptionState(sub: Subscription): { label: string; tone: StatusBadgeTone } {
-  if (sub.pauseReason === 'delivery_unconfirmed') return { label: '要確認', tone: 'caution' }
+  if (sub.pauseReason === 'delivery_unconfirmed' || sub.pauseReason === 'common_var_unavailable') return { label: '要確認', tone: 'caution' }
   if (sub.status === 'completed') return { label: '読み終えた', tone: 'info' }
   if (sub.status === 'delivering') return { label: '送信中', tone: 'success' }
   if (sub.status === 'paused') {
@@ -76,7 +77,7 @@ function subscriptionState(sub: Subscription): { label: string; tone: StatusBadg
 }
 
 function nextLabel(sub: Subscription): string {
-  if (sub.pauseReason === 'delivery_unconfirmed') return '—（要確認）'
+  if (sub.pauseReason === 'delivery_unconfirmed' || sub.pauseReason === 'common_var_unavailable') return '—（要確認）'
   if (sub.status === 'completed') return '—'
   if (sub.status === 'paused') return '—（止めている）'
   return sub.nextDeliveryAt ? formatDateTime(sub.nextDeliveryAt) : emptyValue('unknown')
@@ -557,7 +558,7 @@ export default function ScenarioResultsV8() {
                   </GridHeadRow>
                   {runs.subscriptions.map((sub) => {
                     const state = subscriptionState(sub)
-                    const pausedByFailure = sub.status === 'paused' && sub.pauseReason === 'delivery_failed'
+                    const pausedByFailure = sub.status === 'paused' && (sub.pauseReason === 'delivery_failed' || sub.pauseReason === 'common_var_unavailable')
                     const items: ActionMenuItem[] = []
                     if (sub.status === 'active') {
                       items.push({
@@ -594,7 +595,7 @@ export default function ScenarioResultsV8() {
                       <GridRow key={sub.id} data-subscription-status={sub.status}>
                         <GridNameCell folder={false} name={<TruncatedText value={sub.friendName} />} />
                         <GridCell title={sub.pauseReason === 'delivery_unconfirmed' ? DELIVERY_UNCONFIRMED_REASON : undefined}>
-                          {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
+                          {sub.pauseReason === 'delivery_unconfirmed' ? <DeliveryUnconfirmedBadge /> : sub.pauseReason === 'common_var_unavailable' ? <HelpTip hover tone="dark" label="要確認の理由" trigger={<StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}>固定した共通情報の状態や期限を確認してください</HelpTip> : <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>}
                         </GridCell>
                         <GridCell>{sub.currentDisplayOrder !== undefined ? (sub.currentDisplayOrder === null ? '—' : `${sub.currentDisplayOrder} 通目まで`) : sortedSteps.some((step) => step.stepOrder === sub.currentStepOrder) ? `${sortedSteps.findIndex((step) => step.stepOrder === sub.currentStepOrder) + 1} 通目まで` : '—'}</GridCell>
                         <GridCell><TruncatedText value={nextLabel(sub)} /></GridCell>

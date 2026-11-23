@@ -126,10 +126,11 @@ export async function publishScenarioVersion(
   scenarioId: string,
   input: { staffId: string | null; idempotencyKey: string },
 ): Promise<ScenarioVersion> {
-  const scenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
+  const initialScenario = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
-    .first<Scenario>();
-  if (!scenario) throw new Error('SCENARIO_NOT_FOUND');
+    .first<Scenario & { current_published_version_id: string | null }>();
+  if (!initialScenario) throw new Error('SCENARIO_NOT_FOUND');
+  let scenario = initialScenario;
 
   const steps = await getScenarioSteps(db, scenarioId);
   const draftSteps = await buildVersionSnapshotSteps(db, '', steps, scenario.line_account_id ?? null);
@@ -168,6 +169,29 @@ export async function publishScenarioVersion(
     return replayed;
   }
 
+  // CAS が外れた時、先行公開以外の変更や固定参照の変更を見逃さない。
+  async function recoverPublishRace(): Promise<ScenarioVersion | null> {
+    const row = await db.prepare(`SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`)
+      .bind(input.idempotencyKey).first<ScenarioPublishKey>();
+    if (row) {
+      if (row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
+      const version = await getScenarioVersionById(db, scenarioId, row.version_id);
+      if (!version) throw new Error('SCENARIO_NOT_PUBLISHED');
+      return version;
+    }
+    const latest = await db.prepare(`SELECT * FROM scenarios WHERE id = ?`).bind(scenarioId).first<Scenario & { current_published_version_id: string | null }>();
+    if (!latest || latest.line_account_id !== scenario.line_account_id || latest.current_published_version_id === scenario.current_published_version_id) throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    const latestSteps = await getScenarioSteps(db, scenarioId);
+    const latestSnapshot = await buildVersionSnapshotSteps(db, '', latestSteps, latest.line_account_id ?? null);
+    const latestActions = await buildVersionSnapshotActions(db, '', scenarioId, latestSteps);
+    const checked = await db.prepare(`SELECT content_revision FROM scenarios WHERE id = ?`).bind(scenarioId).first<{ content_revision: number }>();
+    if (checked?.content_revision !== latest.content_revision || canonicalPublishPayload(latest, latestSnapshot, latestActions) !== draftPayload) {
+      throw new Error('SCENARIO_PUBLISH_CONFLICT');
+    }
+    scenario = latest;
+    return null;
+  }
+
   for (let attempt = 0; attempt < 5; attempt++) {
     // 期待値の再読込。毎回いまの指針と版番号を取り直す。
     const current = await getScenarioPublishedVersion(db, scenarioId);
@@ -176,13 +200,18 @@ export async function publishScenarioVersion(
         db.prepare(
           `INSERT OR IGNORE INTO scenario_publish_keys
              (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        ).bind(input.idempotencyKey, scenarioId, current.id, draftPayload, jstNow()),
+           SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM scenarios WHERE id=? AND content_revision=?)`,
+        ).bind(input.idempotencyKey, scenarioId, current.id, draftPayload, jstNow(), scenarioId, scenario.content_revision),
       ]);
       const row = await db.prepare(
         `SELECT * FROM scenario_publish_keys WHERE publish_idempotency_key = ?`,
       ).bind(input.idempotencyKey).first<ScenarioPublishKey>();
-      if (!row || row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) {
+      if (!row) {
+        const replayed = await recoverPublishRace();
+        if (replayed) return replayed;
+        continue;
+      }
+      if (row.scenario_id !== scenarioId || row.content_snapshot !== draftPayload) {
         throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
       }
       const version = await getScenarioVersionById(db, scenarioId, row.version_id);
@@ -196,8 +225,9 @@ export async function publishScenarioVersion(
     ).bind(scenarioId).first<{ version_number: number }>();
     const versionNumber = Number(next?.version_number ?? 1);
     const id = crypto.randomUUID();
-    const snapshotSteps = await buildVersionSnapshotSteps(db, id, steps, scenario.line_account_id ?? null);
-    const snapshotActions = await buildVersionSnapshotActions(db, id, scenarioId, steps);
+    const snapshotSteps = draftSteps.map(step => ({ ...step, version_step_id: `${id}:${step.step_order}` }));
+    const snapshotActions = draftActions.map(action => ({ ...action, version_action_id: `${id}#a${action.action_id}`,
+      version_step_id: typeof action.version_step_id === 'string' ? `${id}:${action.version_step_id.split(':').at(-1)}` : null }));
     const now = jstNow();
     try {
       // 単一原子。INSERT は素直な形にし、競合は制約違反で検出する
@@ -209,7 +239,8 @@ export async function publishScenarioVersion(
               on_complete_mode, on_complete_scenario_id, steps_snapshot, actions_snapshot,
               status, published_at, published_by_staff_id,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)`,
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?
+           WHERE EXISTS (SELECT 1 FROM scenarios WHERE id = ? AND content_revision = ?)`,
         ).bind(
           id,
           scenarioId,
@@ -224,20 +255,34 @@ export async function publishScenarioVersion(
           input.staffId,
           now,
           now,
+          scenarioId, scenario.content_revision,
         ),
         db.prepare(
+          `INSERT INTO scenario_version_common_var_pins (scenario_version_id, live_step_id, common_var_id, version_id)
+           SELECT ?, json_extract(step.value, '$.live_step_id'), json_extract(pin.value, '$.common_var_id'), json_extract(pin.value, '$.version_id')
+           FROM json_each(?) step, json_each(step.value, '$.common_var_pins') pin
+           WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(id, JSON.stringify(snapshotSteps), id),
+        db.prepare(
+          `INSERT INTO scenario_version_action_common_var_pins (scenario_version_id, live_action_id, common_var_id, version_id)
+           SELECT ?, json_extract(action.value, '$.action_id'), json_extract(pin.value, '$.common_var_id'), json_extract(pin.value, '$.version_id')
+           FROM json_each(?) action, json_each(action.value, '$.common_var_pins') pin
+           WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(id, JSON.stringify(snapshotActions), id),
+        db.prepare(
           `UPDATE scenarios SET content_revision = content_revision + 1, current_published_version_id = ?, updated_at = ?
-            WHERE id = ?`,
-        ).bind(id, now, scenarioId),
+            WHERE id = ? AND EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(id, now, scenarioId, id),
         db.prepare(
           `UPDATE scenario_versions SET status = 'retired', updated_at = ?
-            WHERE scenario_id = ? AND status = 'published' AND id != ?`,
-        ).bind(now, scenarioId, id),
+            WHERE scenario_id = ? AND status = 'published' AND id != ?
+              AND EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(now, scenarioId, id, id),
         db.prepare(
           `INSERT INTO scenario_publish_keys
              (publish_idempotency_key, scenario_id, version_id, content_snapshot, created_at)
-           VALUES (?, ?, ?, ?, ?)`,
-        ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now),
+           SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM scenario_versions WHERE id = ?)`,
+        ).bind(input.idempotencyKey, scenarioId, id, draftPayload, now, id),
       ]);
     } catch (error) {
       const kind = classifyPublishBatchError(error);
@@ -253,11 +298,20 @@ export async function publishScenarioVersion(
         }
         throw new Error('SCENARIO_PUBLISH_KEY_CONFLICT');
       }
-      if (kind === 'version-number') continue;
+      if (kind === 'version-number') {
+        const replayed = await recoverPublishRace();
+        if (replayed) return replayed;
+        continue;
+      }
       throw error;
     }
     const saved = await getScenarioVersionById(db, scenarioId, id);
-    if (!saved || saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
+    if (!saved) {
+      const replayed = await recoverPublishRace();
+      if (replayed) return replayed;
+      continue;
+    }
+    if (saved.status !== 'published') throw new Error('SCENARIO_NOT_PUBLISHED');
     return saved;
   }
   throw new Error('SCENARIO_PUBLISH_CONFLICT');

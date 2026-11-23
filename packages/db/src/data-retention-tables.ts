@@ -68,6 +68,13 @@ export function purgeTablesChildFirst(): string[] {
     if (name === 'booking_entitlement_notices') return ['booking_pass_plans','booking_entitlements','friends'];
     if (name === 'booking_pass_purchases') return ['booking_pass_plans','booking_entitlements','friends'];
     if (name === 'broadcast_execution_contexts') return ['broadcasts','mcp_connections'];
+    if (name === 'broadcast_common_var_pins') return ['broadcasts','common_vars','common_var_versions'];
+    if (name === 'scenario_action_common_var_pins') return ['scenario_actions','common_vars','common_var_versions'];
+    if (name === 'scenario_version_action_common_var_pins') return ['scenario_versions','common_vars','common_var_versions'];
+    if (name === 'scenario_step_common_var_pins') return ['scenario_steps','common_vars','common_var_versions'];
+    if (name === 'scenario_version_common_var_pins') return ['scenario_versions','common_vars','common_var_versions'];
+    if (name === 'form_common_var_pins') return ['forms','common_vars','common_var_versions'];
+    if (name === 'form_version_common_var_pins') return ['form_versions','common_vars','common_var_versions'];
     if (name === 'member_ranks') return ['member_rank_tiers'];
     if (name === 'hq_store_response_samples') return ['chats'];
     if (name === 'ec_auto_line_sends') return ['ec_behavior_events'];

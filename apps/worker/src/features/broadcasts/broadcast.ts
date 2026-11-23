@@ -1,4 +1,5 @@
 import { finishDedupBroadcast, recoverDispatchedDedupClaims } from './broadcast-dedup-progress.js';
+import { stealthChunkSize, parseStoredConditions } from './broadcast-batch-config.js';
 import { assertLimitedAudienceNames, storedDeliveryLimit, limitedDeliveryPlan, freezeLimitedAudience, holdLimitedBroadcast, renewLimitedReservation, LimitedBroadcastError } from './broadcast-delivery-limit.js';
 import { scopeStoredBroadcastSegmentQuery, restrictSegmentInput, scopedFriendIds, storedBroadcastFriendScope } from '../../services/segment-query-scope.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';
@@ -62,6 +63,9 @@ import {
 } from './broadcast-message-set.js';
 import {
   commonVarValuesForAccount,
+  commonVarKeysInContent,
+  BroadcastCommonVarResolutionError,
+  validateSavedPins,
   prepareBroadcastCommonVarSnapshot,
 } from '../../services/common-var-snapshot.js';
 
@@ -361,6 +365,7 @@ export async function processBroadcastSend(
         return (await getBroadcastById(db,broadcastId))!;
       }
       if (storedDeliveryLimit(broadcast)) throw new LimitedBroadcastError('上限付きの配信の宛先を確認できません。全員へは送りません。');
+      if (commonVarSnapshot) await validateSavedPins(db, broadcast.id, commonVarSnapshot, commonVarKeysInContent(combinedMessageContent(storedParts)), new Date().toISOString());
       const { requestId } = await lineClient.broadcast(messages, retryKey);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
       if (broadcastAccountId) {
@@ -464,6 +469,7 @@ export async function processBroadcastSend(
 
         const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
 
+        if (commonVarSnapshot) await validateSavedPins(db, broadcast.id, commonVarSnapshot, commonVarKeysInContent(combinedMessageContent(storedParts)), new Date().toISOString());
         await markBroadcastRecipientsDispatched(db, {
           broadcastId,
           attemptNo,
@@ -528,7 +534,7 @@ export async function processBroadcastSend(
     await updateBroadcastStatus(db, broadcastId, 'sent', { totalCount, successCount });
   } catch (err) {
     // 再試行できるよう、失敗時は下書きへ戻す。
-    await updateBroadcastStatus(db, broadcastId, 'draft');
+    if (!await isBroadcastStopped(db, broadcastId)) await updateBroadcastStatus(db, broadcastId, 'draft');
     throw err;
   }
 
@@ -835,41 +841,7 @@ export async function processScheduledBroadcasts(
 }
 
 
-/**
- * 1回のCron実行で送る人数の上限。
- *
- * stealth_spread_minutes は「何分かけて配りきるか」。既定の 0 は
- * 一気に送る（従来どおり）。
- *
- * Cron は1分ごとなので、全体を分数で割った人数を1回ぶんにする。
- * 途中で止めても batch_offset がそこに残り、次の tick が続きから送る。
- * この再開のしくみは元からあるもので、新しく二重送信の危険は増えない。
- *
- * 下限を1バッチにしているのは、0人になると永久に進まなくなるため。
- */
-export function stealthChunkSize(
-  total: number,
-  spreadMinutes: number,
-  batchSize: number,
-): number {
-  if (spreadMinutes <= 0) return total;
-  const perMinute = Math.ceil(total / spreadMinutes);
-  return Math.max(batchSize, perMinute);
-}
-
-/**
- * Cronから呼ばれるキュー処理。status='queued' のブロードキャストを
- * batch_offset から500人ずつ処理する。1回のCron実行で全バッチを処理可能。
- */
-function parseStoredConditions(stored: unknown): SegmentCondition | null {
-  if (typeof stored !== 'string' || stored === '') return null;
-  try {
-    const parsed = JSON.parse(stored) as SegmentCondition;
-    return parsed && Array.isArray(parsed.rules) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
+export { stealthChunkSize } from './broadcast-batch-config.js';
 
 export async function processQueuedBroadcasts(
   db: D1Database,
@@ -1052,7 +1024,14 @@ async function processQueuedBroadcastBatches(
       messageParts: finalParts,
       common_var_snapshot: commonVarSnapshot ? JSON.stringify(commonVarSnapshot) : null,
     };
-    const result = await processMultiAccountDedupBroadcast(db, broadcastForDedup);
+    let result;
+    try {
+      result = await processMultiAccountDedupBroadcast(db, broadcastForDedup);
+    } catch (err) {
+      if (!(err instanceof BroadcastCommonVarResolutionError)) throw err;
+      await releaseProgress(batchOffset);
+      return;
+    }
     if (!result.complete) {
       // 時間バジェットに達して途中で yield した。status='sending' のまま batch_offset を
       // -1(ロック) → 0 に戻し、次の cron tick が getQueuedBroadcasts で拾って続きを送る。
@@ -1113,6 +1092,7 @@ async function processQueuedBroadcastBatches(
       return;
     }
     if (storedDeliveryLimit(broadcast)) throw new LimitedBroadcastError('上限付きの配信の宛先を確認できません。全員へは送りません。');
+      if (commonVarSnapshot) await validateSavedPins(db, broadcast.id, commonVarSnapshot, commonVarKeysInContent(combinedMessageContent(storedParts)), new Date().toISOString());
       const { requestId } = await lineClient.broadcast(messages, retryKey);
     await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
     await createBroadcastInsight(db, broadcast.id);
@@ -1260,6 +1240,7 @@ async function processQueuedBroadcastBatches(
           // 外へ出す**直前**に台帳へ「出す」と書く。書いてから送ると、
           // 送信と記録のあいだで Worker が消えても送達不明として残る。
           // 逆にすると「届いたのに台帳は空」になり、次の試行が再送する。
+          if (commonVarSnapshot) await validateSavedPins(db, broadcast.id, commonVarSnapshot, commonVarKeysInContent(combinedMessageContent(storedParts)), new Date().toISOString());
           const dispatched=await markBroadcastRecipientsDispatched(db, {
             broadcastId: broadcast.id,
             attemptNo,
@@ -1303,6 +1284,10 @@ async function processQueuedBroadcastBatches(
             logger.error("services_broadcast_failed");
           }
         } catch (err) {
+          if (err instanceof BroadcastCommonVarResolutionError) {
+            await releaseProgress(progressBase + currentOffset);
+            return;
+          }
           logger.error("services_broadcast_failed");
           // 届いていないと断定できたものだけ再送の対象にする。分からない
           // ものは送達不明のまま置き、この tick の残りも飛ばす。
@@ -1376,6 +1361,7 @@ async function processQueuedBroadcastBatches(
     let sendableIds = sendable.map((f) => f.id);
     // 外へ出す直前に台帳へ「出す」と書く。ここで書いた印が残ったまま決着が
     // 付かなければ、その相手は送達不明として再送の対象から外れる。
+    if (commonVarSnapshot) await validateSavedPins(db, broadcast.id, commonVarSnapshot, commonVarKeysInContent(combinedMessageContent(storedParts)), new Date().toISOString());
     const dispatched=await markBroadcastRecipientsDispatched(db, {
       broadcastId: broadcast.id,
       attemptNo,

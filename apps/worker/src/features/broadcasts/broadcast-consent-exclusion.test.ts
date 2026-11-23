@@ -57,6 +57,35 @@ describe('637: 停止者を外して一斉配信を続ける', () => {
     expect(changed).toBe(true);expect(sentIds()).toEqual([]);
     expect(f.raw.prepare('SELECT stopped_at FROM broadcasts WHERE id=?').get(child)).toMatchObject({stopped_at:expect.any(String)});
   });
+  it('固定情報の停止は未送信の確保済み宛先を送達不明にしない', async () => {
+    seedBroadcast('scheduled', true);
+    f.raw.prepare("UPDATE broadcasts SET message_content='{{name}} {{var.shop_name}}' WHERE id='b'").run();
+    f.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES ('v','shop','店名','shop_name','値')").run();
+    f.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('v1','v',1,'店名','値','変更')").run();
+    f.raw.prepare("INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('b','v','v1')").run();
+    await processScheduledBroadcasts(f.db, calls as never);
+    for (const id of ['allowed', 'stopped', 'unknown']) f.raw.prepare("INSERT OR IGNORE INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,attempt_no,state) VALUES ('b',?,'shop',1,'claimed')").run(id);
+    const prepare = f.db.prepare.bind(f.db); let reads = 0;
+    const spy = vi.spyOn(f.db, 'prepare').mockImplementation(sql => {
+      const statement = prepare(sql);
+      if (!sql.includes('LEFT JOIN common_var_versions v ON v.id = p.version_id')) return statement;
+      const bind = statement.bind.bind(statement);
+      statement.bind = (...args: unknown[]) => {
+        const bound = bind(...args); const all = bound.all.bind(bound);
+        bound.all = async (...params: Parameters<typeof bound.all>) => {
+          if (++reads === 2) f.raw.prepare("UPDATE common_vars SET status='stopped' WHERE id='v'").run();
+          return all(...params);
+        };
+        return bound;
+      };
+      return statement;
+    });
+    try { await processQueuedBroadcasts(f.db, calls as never); } finally { spy.mockRestore(); }
+    expect(reads).toBeGreaterThanOrEqual(2);
+    expect(sentIds()).toEqual([]);
+    expect(f.raw.prepare("SELECT state,dispatched_at FROM broadcast_send_claims WHERE broadcast_id='b' AND friend_id='allowed'").get()).toEqual({ state: 'claimed', dispatched_at: null });
+    expect(f.raw.prepare("SELECT status,stopped_at FROM broadcasts WHERE id='b'").get()).toMatchObject({ status: 'sending', stopped_at: expect.any(String) });
+  });
   it('古い処理は送信直前の台帳を確定できない',async()=>{
     seedBroadcast('sending');
     f.raw.prepare("UPDATE broadcasts SET lock_version=2,batch_offset=-1 WHERE id='b'").run();

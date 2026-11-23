@@ -9,7 +9,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
 }> = [
   {
     kind: 'template',
-    sql: `SELECT t.id AS source_id, NULL AS source_parent_id, t.name AS source_name,
+    sql: `SELECT 'templates' AS source_table, t.id AS source_id, NULL AS source_parent_id, t.name AS source_name,
                  'active' AS source_status,
                  CASE WHEN instr(coalesce(t.message_content, ''), ?) > 0
                       THEN t.message_content
@@ -35,7 +35,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
     // 共通情報を直してももう変わらないので、予約中とは別の状態名で返す。
     // snapshot がまだ無い sending（開始直後の短い隙間・失敗からの再開待ち）は
     // 再開時にいまの値を読むため、変わる側に残す。
-    sql: `SELECT b.id AS source_id, NULL AS source_parent_id, b.title AS source_name,
+    sql: `SELECT 'broadcasts' AS source_table, b.id AS source_id, NULL AS source_parent_id, b.title AS source_name,
                  CASE WHEN b.status = 'sending' AND b.common_var_snapshot IS NOT NULL
                       THEN 'sending_fixed' ELSE b.status END AS source_status,
                  CASE WHEN instr(coalesce(b.message_content, ''), ?) > 0
@@ -51,7 +51,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'scenario',
-    sql: `SELECT ss.id AS source_id, s.id AS source_parent_id,
+    sql: `SELECT 'scenario_steps' AS source_table, ss.id AS source_id, s.id AS source_parent_id,
                  s.name || '・' || CAST(ss.step_order AS TEXT) || '通目' AS source_name,
                  CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  CASE WHEN instr(coalesce(ss.message_content, ''), ?) > 0
@@ -65,7 +65,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
                OR instr(coalesce(ss.message_bubbles_json, ''), ?) > 0
                OR instr(coalesce(ss.question_json, ''), ?) > 0)
            UNION ALL
-          SELECT sa.id AS source_id, s.id AS source_parent_id,
+          SELECT 'scenario_actions' AS source_table, sa.id AS source_id, s.id AS source_parent_id,
                  s.name || '・共通情報操作' AS source_name,
                  CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  sa.config_json AS source_content, 0 AS is_historical
@@ -74,24 +74,45 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
              AND json_extract(CASE WHEN json_valid(sa.config_json)
                                    THEN sa.config_json ELSE 'null' END, '$.varKey') = ?
            UNION ALL
+          SELECT 'scenario_message_actions' AS source_table, sa.id AS source_id, s.id AS source_parent_id,
+                 s.name || '・送信アクション' AS source_name,
+                 CASE WHEN s.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
+                 CASE WHEN instr(coalesce(sa.config_json,''), ?) > 0 THEN sa.config_json ELSE coalesce(t.message_content,'') END AS source_content,
+                 0 AS is_historical
+          FROM scenario_actions sa JOIN scenarios s ON s.id=sa.scenario_id
+          LEFT JOIN templates t ON t.id=COALESCE(json_extract(CASE WHEN json_valid(sa.config_json) THEN sa.config_json ELSE '{}' END,'$.templateId'), json_extract(CASE WHEN json_valid(sa.config_json) THEN sa.config_json ELSE '{}' END,'$.template_id')) AND t.line_account_id=s.line_account_id AND t.message_bubbles_json IS NULL
+          WHERE s.line_account_id=? AND sa.action_type IN ('send_message','send_template')
+            AND (instr(coalesce(sa.config_json,''), ?) > 0 OR instr(coalesce(t.message_content,''), ?) > 0)
+          UNION ALL
           -- N-186: 公開版スナップショットは編集中の下書きと別物。公開済み版から
           -- 送られる通文は、版を固定した時点で写した内容で差し込まれるため、
           -- 使用先として数える。下書き・廃止版は含めない。
-          SELECT v.id AS source_id, s.id AS source_parent_id,
+          SELECT 'scenario_versions' AS source_table, v.id AS source_id, s.id AS source_parent_id,
                  s.name || '・公開版v' || CAST(v.version_number AS TEXT) AS source_name,
                  'published' AS source_status,
                  v.steps_snapshot AS source_content, 0 AS is_historical
             FROM scenario_versions v JOIN scenarios s ON s.id = v.scenario_id
            WHERE s.line_account_id = ? AND v.status = 'published'
-             AND instr(coalesce(v.steps_snapshot, ''), ?) > 0`,
+             AND instr(coalesce(v.steps_snapshot, ''), ?) > 0
+          UNION ALL
+          SELECT 'scenario_version_actions',v.id,s.id,s.name || '・公開版の送信アクション','published',v.actions_snapshot,0
+          FROM scenario_versions v JOIN scenarios s ON s.id=v.scenario_id
+          WHERE s.line_account_id=? AND v.status='published' AND (
+            instr(coalesce(v.actions_snapshot,''),?)>0 OR EXISTS (
+              SELECT 1 FROM json_each(CASE WHEN json_valid(v.actions_snapshot) THEN v.actions_snapshot ELSE '[]' END) action
+              JOIN templates t ON t.line_account_id=s.line_account_id AND t.message_bubbles_json IS NULL
+                AND t.id=COALESCE(json_extract(CASE WHEN json_valid(json_extract(action.value,'$.config_json')) THEN json_extract(action.value,'$.config_json') ELSE '{}' END,'$.templateId'),
+                  json_extract(CASE WHEN json_valid(json_extract(action.value,'$.config_json')) THEN json_extract(action.value,'$.config_json') ELSE '{}' END,'$.template_id'))
+              WHERE json_extract(action.value,'$.action_type') IN ('send_template','send_message') AND instr(coalesce(t.message_content,''),?)>0
+            ))`,
     values: (varKey, token, account) => [
       token, token, account, token, token, token, account, varKey,
-      account, token,
+      token, account, token, token, account, token, account, token, token,
     ],
   },
   {
     kind: 'reminder',
-    sql: `SELECT rs.id AS source_id, r.id AS source_parent_id, r.name AS source_name,
+    sql: `SELECT 'reminder_steps' AS source_table, rs.id AS source_id, r.id AS source_parent_id, r.name AS source_name,
                  CASE WHEN r.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  rs.message_content AS source_content, 0 AS is_historical
             FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
@@ -99,7 +120,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
            UNION ALL
           -- N-186: 公開版スナップショットは編集中の下書きと別物。下書き・
           -- 失効版は含めない。所属は親のLINEアカウントで絞る。
-          SELECT v.id AS source_id, r.id AS source_parent_id,
+          SELECT 'reminder_versions' AS source_table, v.id AS source_id, r.id AS source_parent_id,
                  r.name || '・公開版v' || CAST(v.version_number AS TEXT) AS source_name,
                  'published' AS source_status,
                  v.settings_snapshot AS source_content, 0 AS is_historical
@@ -110,7 +131,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'auto_reply',
-    sql: `SELECT ar.id AS source_id, NULL AS source_parent_id,
+    sql: `SELECT 'auto_replies' AS source_table, ar.id AS source_id, NULL AS source_parent_id,
                  coalesce(nullif(ar.name, ''), ar.keyword) AS source_name,
                  CASE WHEN ar.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  CASE WHEN instr(coalesce(ar.response_content, ''), ?) > 0
@@ -130,7 +151,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   {
     kind: 'form',
     sql: `WITH target(token, account_id, var_key) AS (SELECT ?, ?, ?)
-          SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
+          SELECT 'forms' AS source_table, f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
                  CASE WHEN v.id IS NOT NULL AND (
                             instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
                          OR instr(coalesce(v.fields, ''), target.token) > 0
@@ -160,7 +181,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'automation',
-    sql: `SELECT a.id AS source_id, NULL AS source_parent_id, a.name AS source_name,
+    sql: `SELECT 'automations' AS source_table, a.id AS source_id, NULL AS source_parent_id, a.name AS source_name,
                  CASE WHEN a.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  CASE WHEN instr(coalesce(a.conditions, ''), ?) > 0
                       THEN a.conditions ELSE coalesce(a.actions, '') END AS source_content,
@@ -175,7 +196,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
                   WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = ?
                ))
            UNION ALL
-          SELECT d.id AS source_id, NULL AS source_parent_id, d.name AS source_name,
+          SELECT 'automation_definitions' AS source_table, d.id AS source_id, NULL AS source_parent_id, d.name AS source_name,
                  d.status AS source_status, '共通情報を使う操作があります' AS source_content,
                  0 AS is_historical
             FROM automation_definitions d
@@ -199,7 +220,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'friend_add',
-    sql: `SELECT s.id AS source_id, NULL AS source_parent_id,
+    sql: `SELECT 'account_settings' AS source_table, s.id AS source_id, NULL AS source_parent_id,
                  '友だち追加時の設定' AS source_name, 'active' AS source_status,
                  s.value AS source_content, 0 AS is_historical
             FROM account_settings s
@@ -213,7 +234,7 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'common_action',
-    sql: `SELECT a.id AS source_id, NULL AS source_parent_id, a.name AS source_name,
+    sql: `SELECT 'common_actions' AS source_table, a.id AS source_id, NULL AS source_parent_id, a.name AS source_name,
                  a.status AS source_status, '共通情報を使う操作があります' AS source_content,
                  0 AS is_historical
             FROM common_actions a
@@ -236,14 +257,16 @@ export const COMMON_VAR_USAGE_SUMMARY_SQL = `SELECT
     `(SELECT COUNT(*) FROM (${source.sql})) AS ${source.kind}`).join(',\n  ')},
   (SELECT COUNT(*) FROM forms f
     LEFT JOIN form_versions v ON v.id = f.current_published_version_id
-    CROSS JOIN (SELECT ? AS token) target
+    CROSS JOIN (SELECT ? AS token, ? AS var_key) target
     WHERE NOT EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id)
       AND (instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
         OR instr(coalesce(f.fields, ''), target.token) > 0
         OR instr(coalesce(f.layout, ''), target.token) > 0
         OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
         OR instr(coalesce(v.fields, ''), target.token) > 0
-        OR instr(coalesce(v.layout, ''), target.token) > 0)) AS unscoped_form`;
+        OR instr(coalesce(v.layout, ''), target.token) > 0
+        OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END, '$.references') j WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = target.var_key)
+        OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END, '$.references') j WHERE j.key = 'varKey' AND CAST(j.value AS TEXT) = target.var_key))) AS unscoped_form`;
 
 /**
  * 一覧に出す使用先件数をまとめて数える。
@@ -277,7 +300,7 @@ export async function getCommonVarUsageSummaries(
       const values = COMMON_VAR_USAGE_QUERIES.flatMap((source) =>
         source.values(varKey, token, lineAccountId));
       return db.prepare(COMMON_VAR_USAGE_SUMMARY_SQL)
-        .bind(...values, token);
+        .bind(...values, token, varKey);
     });
     const results = await db.batch<Record<CommonVarUsageKind, number> & { unscoped_form: number }>(statements);
     keys.forEach((varKey, index) => {

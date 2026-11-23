@@ -1,4 +1,5 @@
 // Public entry point. Implementation is organized by responsibility.
+export { resolvePinnedCommonVarAt, evaluatePinnedCommonVar } from './pinned.js';
 export {
   COMMON_VAR_TYPES,
   type CommonVarType,

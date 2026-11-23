@@ -97,11 +97,12 @@ describe('processStepDeliveries の版固定（実D1）', () => {
       await createScenarioStep(testDb.db, { scenarioId: scenario.id, stepOrder: 0, messageType: 'text', messageContent: '営業時間: {{var.hours}}' });
       insertFriend(testDb.raw, 'friend-1', { line_user_id: 'U-friend-1', line_account_id: 'account' });
       await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'cron-var' });
-      await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id);
+      const enrollment = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
       const { sent, client } = pushHarness();
       await processStepDeliveries(testDb.db, client as never);
       expect(sent).toEqual([]);
       expect(accountSends).toEqual([]);
+      expect(testDb.raw.prepare('SELECT status FROM friend_scenarios WHERE id=?').get(enrollment.id)).toEqual({status:'delivering'});
       expect(testDb.raw.prepare('SELECT var_key,reason FROM common_var_resolution_failures').all()).toEqual([{var_key:'hours',reason:'missing'}]);
     } finally { vi.useRealTimers(); }
   });
@@ -112,6 +113,30 @@ describe('processStepDeliveries の版固定（実D1）', () => {
     const {sent,client}=pushHarness();await processStepDeliveries(testDb.db,client as never);
     expect(sent).toHaveLength(0);expect(accountSends).toHaveLength(0);
     expect(testDb.raw.prepare('SELECT status FROM friend_scenarios WHERE id=?').get(enrollment.id)).toEqual({status:'paused'});
+  });
+
+  it('固定した共通情報が停止したら送信せず要確認にする', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-17T00:00:00Z'));
+    useSqliteClock(testDb.raw, () => new Date());
+    try {
+      testDb.raw.exec(`INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret) VALUES('account','店','ch','token','secret');
+        INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES('hours','account','営業時間','hours','新');
+        INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES('hours-old','hours',1,'営業時間','旧','test');`);
+      const scenario = await createScenario(testDb.db, { name: '案内', triggerType: 'manual' });
+      testDb.raw.prepare("UPDATE scenarios SET line_account_id='account' WHERE id=?").run(scenario.id);
+      const step = await createScenarioStep(testDb.db, { scenarioId: scenario.id, stepOrder: 0, messageType: 'text', messageContent: '{{var.hours}}' });
+      testDb.raw.prepare('INSERT INTO scenario_step_common_var_pins VALUES(?,?,?)').run(step.id, 'hours', 'hours-old');
+      insertFriend(testDb.raw, 'friend-1', { line_user_id: 'U-friend-1', line_account_id: 'account' });
+      await publishScenarioVersion(testDb.db, scenario.id, { staffId: null, idempotencyKey: 'cron-pinned-var' });
+      const enrollment = (await enrollFriendInScenario(testDb.db, 'friend-1', scenario.id))!;
+      testDb.raw.prepare("UPDATE common_vars SET status='stopped' WHERE id='hours'").run();
+      const { sent, client } = pushHarness();
+      await processStepDeliveries(testDb.db, client as never);
+      expect(sent).toHaveLength(0);
+      expect(accountSends).toHaveLength(0);
+      expect(testDb.raw.prepare('SELECT status,pause_reason FROM friend_scenarios WHERE id=?').get(enrollment.id)).toEqual({ status: 'paused', pause_reason: 'common_var_unavailable' });
+    } finally { vi.useRealTimers(); }
   });
 
   it('下書き編集のあとも固定版の文面を送る', async () => {

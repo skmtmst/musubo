@@ -2253,7 +2253,7 @@ describe('共通情報', () => {
       sendingFixedTotal: 1,
       byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, broadcast: 2, scenario: 1 },
       items: [
-        { kind: 'broadcast', source_id: 'b-fix', source_parent_id: null, source_name: '送信中の配信', source_status: 'sending_fixed', source_content: '{{var.shop_hours}}です', is_historical: 0 },
+        { kind: 'broadcast', source_table: 'broadcasts', fixed_version: 2, source_id: 'b-fix', source_parent_id: null, source_name: '送信中の配信', source_status: 'sending_fixed', source_content: '{{var.shop_hours}}です', is_historical: 0 },
         { kind: 'broadcast', source_id: 'b-sch', source_parent_id: null, source_name: '予約配信', source_status: 'scheduled', source_content: '{{var.shop_hours}}です', is_historical: 0 },
         { kind: 'scenario', source_id: 's-1', source_parent_id: null, source_name: '公開中シナリオ', source_status: 'published', source_content: '{{var.shop_hours}}', is_historical: 0 },
       ],
@@ -2271,9 +2271,9 @@ describe('共通情報', () => {
         items: [
           {
             name: '送信中の配信', status: '配信中（送信開始時の値で固定済み）',
-            changesOnSave: false, blocksDeletion: false,
+            changesOnSave: false, blocksDeletion: false, referenceMode: 'pinned', referencedVersion: 2,
           },
-          { name: '予約配信', status: '配信予約中', changesOnSave: true },
+          { name: '予約配信', status: '配信予約中', changesOnSave: true, referenceMode: 'live', referencedVersion: 3 },
           { name: '公開中シナリオ', status: '公開中', changesOnSave: true },
         ],
       },

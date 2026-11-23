@@ -1,5 +1,19 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const scenariosPaths = {
+  '/api/scenarios/{id}/actions/{actionId}/common-var-pins/{varId}': {
+    put: { tags: ['Scenarios'], summary: '次に公開する送信アクションの共通情報を固定',
+      parameters: ['id','actionId','varId'].map(name => ({ name, in: 'path', required: true, schema: { type: 'string' } })),
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId','versionId','expectedVersion'], properties: { accountId: { type: 'string' }, versionId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+      responses: { '200': { description: '変更済み' }, '400': { description: '入力が不正' }, '404': { description: '使用先が見つからない' }, '409': { description: '使用先または版を確認できない' } },
+    },
+  },
+  '/api/scenarios/{id}/steps/{stepId}/common-var-pins/{varId}': {
+    put: { tags: ['Scenarios'], summary: '次に公開する版で使う共通情報の固定を変更',
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }, { name: 'stepId', in: 'path', required: true, schema: { type: 'string' } }, { name: 'varId', in: 'path', required: true, schema: { type: 'string' } }],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['accountId','versionId','expectedVersion'], properties: { accountId: { type: 'string' }, versionId: { type: 'string', nullable: true }, expectedVersion: { type: 'integer', minimum: 1 } } } } } },
+      responses: { '200': { description: '変更済み' }, '400': { description: '入力が不正' }, '404': { description: '使用先が見つからない' }, '409': { description: '使用先または版を確認できない' } },
+    },
+  },
   '/api/scenarios/bulk-stop': {
     post: {
       tags: ['Scenarios'], summary: '確認したシナリオを一括停止',

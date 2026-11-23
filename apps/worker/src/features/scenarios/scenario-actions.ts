@@ -492,7 +492,10 @@ async function executeAction(
         : action.action_type === 'event_booking' ? 'event_booking' : 'send_message'
       await executeConfiguredAction(db, { friendId, accountId, source: 'scenario-action',
         sourceEventId: options.sourceEventId ?? (action.repeat_on_refire === 0 ? `once:${action.fires_key ?? action.id}` : crypto.randomUUID()),
-        actionId: action.id, type, params: c, dependencies: options.executorDependencies })
+        actionId: action.id, type, params: c, dependencies: options.executorDependencies,
+        commonVarPinOwner: options.fires === 'pinned' && action.id.includes('#a')
+          ? { kind: 'scenarioAction', versionId: action.id.slice(0, action.id.lastIndexOf('#a')), liveActionId: action.fires_key ?? action.id }
+          : undefined, })
       return false
     }
     default: {

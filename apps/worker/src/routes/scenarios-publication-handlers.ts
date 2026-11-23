@@ -409,7 +409,7 @@ export const post__api_scenario_subscriptions_subscriptionId_retry_14 = async (c
             body: { success: true, data: serializeFriendScenario(subscription) },
           };
         }
-        if (subscription.pause_reason !== 'delivery_failed') {
+        if (!['delivery_failed', 'common_var_unavailable'].includes(subscription.pause_reason ?? '')) {
           return {
             status: 409,
             body: { success: false, error: '配信失敗で止まっている購読だけを再送できます' },

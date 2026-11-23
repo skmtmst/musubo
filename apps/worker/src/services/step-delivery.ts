@@ -14,7 +14,7 @@ import { extractFlexAltText } from '../utils/flex-alt-text.js';
 // メッセージの組み立ては一斉配信と共有する。ここからも取れるようにしておく（呼び出し側が多い）。
 import { buildMessage } from './line-message.js';
 export { buildMessage };
-import { resolveSendInterpolationExtra } from './interpolation-context.js';
+import { CommonVarResolutionFailedError, resolveSendInterpolationExtra } from './interpolation-context.js';
 import {
   getFriendScenariosDueForDelivery,
   getStepsForDelivery,
@@ -404,11 +404,18 @@ async function processSingleDelivery(
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
   // 質問の前文・選択肢文にも expandVariables が効くので、共通情報の
   // 厳格スキャンは本文と質問JSONを合わせた全体で行う。
-  const extra = await resolveSendInterpolationExtra(
-    db, friend.id,
-    `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
-    { kind: 'scenario', id: fs.id },
-  );
+  let extra: Awaited<ReturnType<typeof resolveSendInterpolationExtra>>;
+  try {
+    extra = await resolveSendInterpolationExtra(
+      db, friend.id,
+      `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
+      { kind: 'scenario', id: fs.id }, undefined,
+      currentStep.live_step_id ? { kind: 'scenario', versionId: source.pinnedVersionId, liveStepId: currentStep.live_step_id } : undefined,
+    );
+  } catch (error) {
+    if (error instanceof CommonVarResolutionFailedError && error.pinnedFailure) await pauseFriendScenarioDelivery(db, fs.id, 'common_var_unavailable');
+    throw error;
+  }
   /*
    * 日付の差し込みの起点は「いま」。
    *
@@ -483,6 +490,17 @@ async function processSingleDelivery(
     }
     const { LineClient: LC } = await import('@line-crm/line-sdk');
     deliveryClient = new LC(account.channel_access_token);
+  }
+  // LINE へ出す直前にも、固定元の停止・期限を確認する。
+  if (currentStep.live_step_id) {
+    try {
+      await resolveSendInterpolationExtra(db, friend.id, `${resolved.messageContent}\n${resolved.questionJson ?? ''}`,
+        { kind: 'scenario', id: fs.id }, undefined,
+        { kind: 'scenario', versionId: source.pinnedVersionId, liveStepId: currentStep.live_step_id });
+    } catch (error) {
+      if (error instanceof CommonVarResolutionFailedError && error.pinnedFailure) await pauseFriendScenarioDelivery(db, fs.id, 'common_var_unavailable');
+      throw error;
+    }
   }
   // 実行・友だち・固定版の通・開始時刻から同じUUIDを作る。
   // 再開で変わる予定時刻や文面をキーへ混ぜない。
