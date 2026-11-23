@@ -69,7 +69,7 @@ export function BillingRetryPanel({ canManage, sessionReady, impersonating }: { 
   }
 
   if (!platform) return null
-  return <Card surface="muted" contentPadding="var(--tpl-sb-hc-banner-pad)">
+  return <Card contentPadding="var(--tpl-sb-hc-banner-pad)">
     <section className={styles.listSection} aria-label="安全監視の要確認">
       <h2 className={styles.heading}>安全監視：要確認一覧</h2>
       <p className={styles.sub}>決済の処理結果を確認できなかった通知です。必要に応じて再処理してください。</p>
