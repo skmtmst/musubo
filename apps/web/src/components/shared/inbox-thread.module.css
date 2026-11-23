@@ -32,8 +32,8 @@
 .bubbleOut { background: var(--tpl-inbox-bubble-out); }
 .delivery { display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
 .meta { position: relative; display: inline-flex; flex: none; align-items: flex-end; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
-/* 操作を表示するときだけ幅を確保し、吹き出しや隣の操作との重なりを防ぐ。 */
-.actions { position: absolute; display: flex; gap: var(--tpl-inbox-head-tools-gap); opacity: 0; pointer-events: none; }
+/* 操作の幅を確保し、表示しても吹き出しの折り返しが変わらないようにする。 */
+.actions { display: flex; gap: var(--tpl-inbox-head-tools-gap); opacity: 0; pointer-events: none; }
 .quoteBtn {
   border: 0;
   background: none;
@@ -41,8 +41,8 @@
   font-size: var(--text-micro);
   cursor: pointer;
 }
-.rowIn:hover .actions, .rowOut:hover .actions, .actions:focus-within { position: static; opacity: 1; pointer-events: auto; }
-@media (hover: none) { .actions { position: static; opacity: 1; pointer-events: auto; } }
+.rowIn:hover .actions, .rowOut:hover .actions, .actions:focus-within { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .actions { opacity: 1; pointer-events: auto; } }
 .quoteBtn:hover { color: var(--color-action); text-decoration: underline; }
 .quoted {
   margin-bottom: var(--tpl-inbox-chip-gap);
