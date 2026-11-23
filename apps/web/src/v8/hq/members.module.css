@@ -134,6 +134,5 @@
 .confirmLabel { width: var(--tpl-hq-confirm-label); flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .confirmValue { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-caption); }
 
-.identityLine { display: flex; align-items: center; gap: var(--space-4, 4px); min-width: 0; }
+.identityLine { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .identityLine > strong { min-width: 0; }
-.identityLine > [data-tone] { flex-shrink: 0; }

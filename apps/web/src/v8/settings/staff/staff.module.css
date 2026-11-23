@@ -619,6 +619,5 @@ html:root .table.table :global([data-shared-part='list-row']) {
   justify-content: center;
 }
 
-.personNameLine { display: flex; align-items: center; gap: var(--space-4, 4px); min-width: 0; }
+.personNameLine { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .personNameLine > button { min-width: 0; }
-.personNameLine > [data-tone] { flex-shrink: 0; }
