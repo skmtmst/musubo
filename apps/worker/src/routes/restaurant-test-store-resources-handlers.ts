@@ -606,7 +606,7 @@ export const post__api_restaurant_test_reservations_holds_23 = async (c: Context
   if (!body) return inputError(c, { success: false, error: '日時・人数・仮押さえの期限（1〜120分）を確認してください' }, 400, []);
   if (!await storeBelongsTo(c, organization.id, body.storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   if (raw?.allergies !== undefined && raw?.allergyNote !== undefined) return inputError(c, { success:false, error:'アレルギーの指定が重複しています' }, 400, ['allergies']);
-  const allergyResult = raw?.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, raw.allergies);
+  const allergyResult = raw?.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), body.storeId, raw.allergies);
   if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   const db = dbFor(c.env, body.storeId);
   const failure = await phoneIntakeFailure(db, body.storeId, body.startsAt, body.endsAt);

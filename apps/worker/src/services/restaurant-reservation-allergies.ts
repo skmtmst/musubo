@@ -1,8 +1,9 @@
 import { restaurantReservationAllergyLabels, validateRestaurantReservationAllergies, type RestaurantReservationAllergy } from '@line-crm/shared';
 import { accountAllergyOptions } from './allergy-options.js';
 
-export async function validateReservationAllergies(db: D1Database, accountId: string, input: unknown, existingOptions: readonly string[] = [], legacyOther?: string, existingOthers: readonly string[] = []) {
-  const { options } = await accountAllergyOptions(db, accountId);
+export async function validateReservationAllergies(db: D1Database, storeId: string, input: unknown, existingOptions: readonly string[] = [], legacyOther?: string, existingOthers: readonly string[] = []) {
+  const store = await db.prepare('SELECT line_account_id FROM rt_stores WHERE id = ?').bind(storeId).first<{line_account_id: string | null}>();
+  const options = store?.line_account_id ? (await accountAllergyOptions(db, store.line_account_id)).options : [];
   return validateRestaurantReservationAllergies(input, [...options, ...existingOptions], legacyOther, existingOthers);
 }
 

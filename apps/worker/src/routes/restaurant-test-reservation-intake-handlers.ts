@@ -112,7 +112,7 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
   const storeId = typeof body.storeId === 'string' ? body.storeId : '';
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   if (body.allergies !== undefined && body.allergyNote !== undefined) return inputError(c, { success:false, error:'アレルギーの指定が重複しています' }, 400, ['allergies']);
-  const allergyResult = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, body.allergies);
+  const allergyResult = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), storeId, body.allergies);
   if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
   if (!checked.ok) return inputError(c, { success: false, error: checked.error, field: checked.field }, 400, []);
@@ -190,7 +190,7 @@ export const post__api_restaurant_test_reservations_walk_in_4 = async (c: Contex
     if (body[key] !== undefined && (typeof body[key] !== 'string' || String(body[key]).length > 200)) return inputError(c, { success: false, error: '連絡先の形式を確認してください' }, 400, [key]);
   }
   if (body.allergies !== undefined && body.allergyNote !== undefined) return inputError(c, { success:false, error:'アレルギーの指定が重複しています' }, 400, ['allergies']);
-  const allergyResult = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, body.allergies);
+  const allergyResult = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), storeId, body.allergies);
   if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   const startsAt = new Date().toISOString();
   const checked = validateInboundReservation({ ...body, customerName: body.customerName || '予約なしの来店',
@@ -353,7 +353,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   const existingAllergies = reservationAllergyProjection(current).allergies ?? [];
   const existingOptions = existingAllergies.filter(item => item.kind === 'option').map(item => item.value);
   const existingOthers = existingAllergies.filter(item => item.kind === 'other').map(item => item.value);
-  const allergyResult = has('allergies') ? await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, body.allergies, existingOptions, current.allergies_json == null ? current.allergy_note?.trim() : undefined, existingOthers) : null;
+  const allergyResult = has('allergies') ? await validateReservationAllergies(dbFor(c.env), current.store_id, body.allergies, existingOptions, current.allergies_json == null ? current.allergy_note?.trim() : undefined, existingOthers) : null;
   if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   if (allergyResult?.ok && has('allergyNote')) return inputError(c, { success: false, error: 'アレルギーの指定が重複しています' }, 400, ['allergies']);
   if (allergyResult?.ok) next.allergy_note = restaurantReservationAllergyLabels(allergyResult.values).join('、') || null;
