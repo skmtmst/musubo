@@ -7102,6 +7102,37 @@ CREATE TABLE "reminders" (
   CHECK (lifecycle_status IN ('draft', 'published', 'stopped')), current_draft_version_id TEXT, current_published_version_id TEXT, created_from_recipe_id TEXT REFERENCES recipes(id), recipe_clone_run_id TEXT REFERENCES recipe_clone_runs(id), trigger_event_id TEXT, leap_year_policy TEXT NOT NULL DEFAULT 'mar1'
   CHECK (leap_year_policy IN ('feb28', 'mar1', 'skip')));
 
+CREATE TABLE restaurant_booking_ack_operation_items (
+  operation_id TEXT NOT NULL REFERENCES restaurant_booking_ack_operations(id) ON DELETE CASCADE,
+  booking_kind TEXT NOT NULL CHECK(booking_kind='restaurant'),
+  booking_id TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
+  PRIMARY KEY(operation_id,booking_kind,booking_id)
+);
+
+CREATE TABLE restaurant_booking_ack_operations (
+  id TEXT PRIMARY KEY NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  actor_id TEXT NOT NULL,
+  operation_kind TEXT NOT NULL CHECK(operation_kind IN ('single','all')),
+  requested_booking_id TEXT REFERENCES rt_reservations(id) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK(state IN ('active','undone')),
+  acknowledged_count INTEGER NOT NULL DEFAULT 0 CHECK(acknowledged_count>=0),
+  created_at TEXT NOT NULL,
+  CHECK((operation_kind='single' AND requested_booking_id IS NOT NULL) OR (operation_kind='all' AND requested_booking_id IS NULL))
+);
+
+CREATE TABLE restaurant_booking_acknowledgements (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  booking_kind TEXT NOT NULL CHECK(booking_kind='restaurant'),
+  booking_id TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
+  acknowledged_at TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL REFERENCES restaurant_booking_ack_operations(id) ON DELETE CASCADE,
+  PRIMARY KEY(line_account_id,store_id,booking_kind,booking_id)
+);
+
 CREATE TABLE restaurant_course_payment_settings (
   menu_id TEXT PRIMARY KEY REFERENCES rt_menu_items(id) ON DELETE CASCADE,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -11612,6 +11643,8 @@ CREATE INDEX idx_reminders_trigger_event ON reminders (trigger_event_id);
 CREATE INDEX idx_reminders_visible_order
   ON reminders (line_account_id, display_order, created_at)
   WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_restaurant_booking_ack_operation ON restaurant_booking_acknowledgements(operation_id);
 
 CREATE INDEX idx_rich_menu_area_taps_area  ON rich_menu_area_taps(area_id, tapped_at);
 
