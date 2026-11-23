@@ -174,3 +174,9 @@
 .cardsWrap > fieldset {
   width: 100%;
 }
+
+.floorGroups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-l);
+}

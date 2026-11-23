@@ -36,7 +36,7 @@ export default function AvailableTables({ tables, floors, floorId, onFloorChange
       ...floors.map(floor => ({ label: floor.name, count: groups.find(group => group.id === floor.id)?.tables.length ?? 0, current: floorId === floor.id, onClick: () => onFloorChange(floor.id) })),
     ]} />}
     <p className={styles.label}>{`今すぐ座れる卓（${guests}名が座れる卓だけ）`}</p>
-    <SaveErrorField names={['walk-in-table', 'id', 'table.id', 'tableId']}><div role="group" aria-label="卓の選択" tabIndex={-1}>
+    <SaveErrorField names={['walk-in-table', 'id', 'table.id', 'tableId']}><div className={styles.floorGroups} role="group" aria-label="卓の選択" tabIndex={-1}>
     {visible.filter(group => group.tables.length).map(group => <RadioCardGroup key={group.id || 'unassigned'} legend={group.name || `今すぐ座れる卓（${guests}名）`} legendVisible={Boolean(group.name)} columns={3}>
       {group.tables.map(table => <RadioCard key={table.id} name="walk-in-table" value={table.id} checked={selected === table.id} onChange={onSelect} title={table.code} note={tableNote(table)} icon={<Armchair size={16} aria-hidden="true" />} height="short" disabled={disabled} />)}
     </RadioCardGroup>)}
