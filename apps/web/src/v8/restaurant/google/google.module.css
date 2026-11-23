@@ -7,7 +7,7 @@
   --tpl-guide-connection-width: 640px;
   max-inline-size: var(--tpl-guide-connection-width);
 }
-/* 説明は本文の大きさ。指定が無いと外側の大きい文字を受け継ぐ（2026-11-23 オーナー指摘）。 */
+/* 説明は本文の大きさ。指定が無いと外側の大きい文字を受け継ぐ。 */
 .guideText {
   margin: 0;
   color: var(--color-ink-secondary);
