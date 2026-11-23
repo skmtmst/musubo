@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [回答フォームの予約先を保存前に試す](release-log/unreleased/PR-kenta-c22-routing.md)
+- [回答フォームの予約先を保存前に試す](release-log/unreleased/183-kenta-c22-routing.md)
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
