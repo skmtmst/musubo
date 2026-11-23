@@ -251,7 +251,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         ).bind(event.occurred_at.slice(0, 19).replace('T', ' '), couponCode).run();
       }
       try {
-        // R42: 注文の合計を型付きの数値として渡す。無い・壊れているときは
+        // 注文の合計を型付きの数値として渡す。無い・壊れているときは
         // 0円にせず金額なし(null)で記録し、metadata にも残して後から
         // 追えるようにする。
         const orderTotal = event.order?.total;

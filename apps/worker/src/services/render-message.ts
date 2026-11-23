@@ -53,8 +53,7 @@ export function renderMessageContent(
    * 日付を先に置き換える。
    *
    * 後にすると、友だち情報欄に入っていた値が偶然 `{{date}}` の形をして
-   * いた場合に二重に置き換わる。差し込みの値は利用者が入れたもので、
-   * それが差し込みとして解釈されるのは事故のもと。
+   * いた場合に二重に置き換わる。利用者の入力値は差し込みとして再解釈しない。
    */
   let result = expandDateVariables(normalizeStoreInterpolations(content), context.deliveredAt ?? new Date());
 
