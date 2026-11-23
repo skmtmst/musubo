@@ -131,7 +131,7 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
     {displayLifecycle ? <StatusBadge tone={displayLifecycle === 'published' ? 'success' : 'neutral'}>{LABELS[displayLifecycle]}</StatusBadge> : null}
     {actions[0] ? <Button variant={pastPublished ? 'primary' : 'secondary'} disabled={busy} onClick={() => choose(actions[0])}>{actions[0].label}</Button> : null}
     {actions.length > 1 ? <RowMenu label="公開状態の操作" items={actions.slice(1).map(option => ({ id: option.to, label: option.label, disabled: busy, onSelect: () => choose(option) }))} /> : null}
-    {lifecycle === null ? loadFailed ? <><span role="alert">公開の状態を読み込めませんでした。</span><Button onClick={() => setLoadSeq((value) => value + 1)}>読み直す</Button></> : <span role="status">状態を読み込んでいます…</span> : null}
+    {lifecycle === null ? loadFailed ? <><Notice tone="danger" message="公開の状態を読み込めませんでした。" /><Button onClick={() => setLoadSeq((value) => value + 1)}>読み直す</Button></> : <span role="status">状態を読み込んでいます…</span> : null}
     <ConfirmDialog open={pending !== null} title={`このイベントを${pending?.label ?? '変える'}？`}
       description={pending?.to === 'cancelled' ? '中止にすると申込の受付は止まり、申込の履歴は残ります。元に戻すことはできません。' : pending?.to === 'paused' ? '一時停止中はお客様の画面から申込ができなくなります。申込の履歴は残ります。' : '状態を変えます。'}
       destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変える'} busy={busy} error={error}
@@ -165,7 +165,7 @@ function EditEntry() {
       <PaymentSideCard title="決済をつないでいない店のとき">「お支払い」の段は出さず、「先払いを受けるには お支払いをつなぐ →」の 1 行だけ出します（押せない形にしない）。</PaymentSideCard>
       <PaymentSideCard title="キャンセルと返金">開始前のキャンセルの期限までの取り消しは自動で返金します。過ぎた取り消しは返金しません（予約設定 › 予約のルール）。</PaymentSideCard>
     </div>}
-    layout="record-detail" summaryLabel="お支払いの説明" summaryPreview={{ label: "お支払いの説明を見る", title: "お支払いの説明" }}
+    layout="record-detail" separators="none" summaryLabel="お支払いの説明" summaryPreview={{ label: "お支払いの説明を見る", title: "お支払いの説明" }}
     actions={<><LifecycleSection key={scope} accountId={selectedAccountId} eventId={id} onChanged={() => setStatusSeq((value) => value + 1)} /><Button href={`/events/change-review?id=${id}`}>変更の影響を確認</Button><Button href={`/events/preview?id=${id}`}>お客様表示を確認</Button><Button href={`/events/bookings?id=${id}`}>申込の一覧を見る</Button></>}
     stats={<BookingStatus key={scope} accountId={selectedAccountId} eventId={id} refreshKey={statusSeq} />}>
     <EventForm key={`form:${scope}:${statusSeq}`} accountId={selectedAccountId} eventId={id} />

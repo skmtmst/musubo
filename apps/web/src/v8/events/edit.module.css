@@ -3,15 +3,7 @@
 .lifecycle {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8, 8px);
-}
-
-:global([data-page-template='detail']):has(.side) > :global([data-template-region='body']) {
-  border-top: 0;
-}
-
-:global([data-page-template='detail']):has(.side) :global([data-template-region='preview']) {
-  border-left: 0;
+  gap: var(--space-8);
 }
 
 .side {

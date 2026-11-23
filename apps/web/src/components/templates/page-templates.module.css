@@ -737,3 +737,6 @@
 :global(:root) .inbox[data-inbox-narrow="list"] .conversation,
 :global(:root) .inbox[data-inbox-narrow="list"] .inboxSummaryPane { display: none; }
 :global(:root) .inbox[data-inbox-narrow="detail"] .inboxList { display: none; }
+
+:global(:root) [data-template-layout='record-detail'] > .split[data-detail-separators='none'] { border-top: 0; }
+:global(:root) .preview[data-detail-separators='none'] { border-left: 0; }
