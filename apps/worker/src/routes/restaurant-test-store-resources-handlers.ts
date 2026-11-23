@@ -1,3 +1,5 @@
+import { restaurantReservationAllergyLabels } from '@line-crm/shared';
+import { validateReservationAllergies, reservationAllergyProjection } from '../services/restaurant-reservation-allergies.js';
 import { parseRestaurantCoursePhotos } from '@line-crm/shared';
 import { validRestaurantCoursePhotos, validRestaurantMenuDescription, validRestaurantMenuImage } from './restaurant-menu-media.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
@@ -599,9 +601,13 @@ export const post__api_restaurant_test_reservations_holds_23 = async (c: Context
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '組織が見つかりません' }, 404);
-  const body = validateRestaurantHold(await c.req.json().catch(() => null));
+  const raw: Record<string, unknown> | null = await c.req.json().catch(() => null);
+  const body = validateRestaurantHold(raw);
   if (!body) return inputError(c, { success: false, error: '日時・人数・仮押さえの期限（1〜120分）を確認してください' }, 400, []);
   if (!await storeBelongsTo(c, organization.id, body.storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
+  if (raw?.allergies !== undefined && raw?.allergyNote !== undefined) return inputError(c, { success:false, error:'アレルギーの指定が重複しています' }, 400, ['allergies']);
+  const allergyResult = raw?.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, raw.allergies);
+  if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   const db = dbFor(c.env, body.storeId);
   const failure = await phoneIntakeFailure(db, body.storeId, body.startsAt, body.endsAt);
   if (failure) return c.json({ success: false, code: failure, error: failure }, 409);
@@ -623,9 +629,9 @@ export const post__api_restaurant_test_reservations_holds_23 = async (c: Context
     const id = crypto.randomUUID();
     const holdExpiresAt = new Date(Date.now() + body.holdMinutes * 60_000).toISOString();
     await capacity.commit([db.prepare(`INSERT INTO rt_reservations
-      (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status, note, hold_expires_at)
-      VALUES (?, ?, 'manual', '押さえ', ?, ?, ?, ?, 'pending', ?, ?)`)
-      .bind(id, body.storeId, body.guestCount, body.startsAt, body.endsAt, tableId, body.note?.trim() || null, holdExpiresAt)]);
+      (id, store_id, source, customer_name, guest_count, starts_at, ends_at, table_id, status, note, hold_expires_at${allergyResult?.ok ? ', allergy_note, allergies_json' : ''})
+      VALUES (?, ?, 'manual', '押さえ', ?, ?, ?, ?, 'pending', ?, ?${allergyResult?.ok ? ', ?, ?' : ''})`)
+      .bind(id, body.storeId, body.guestCount, body.startsAt, body.endsAt, tableId, body.note?.trim() || null, holdExpiresAt, ...(allergyResult?.ok ? [restaurantReservationAllergyLabels(allergyResult.values).join('、') || null, JSON.stringify(allergyResult.values)] : []))]);
     await adjustInventoryReservedCount(db, body.storeId, body.startsAt, body.guestCount);
     return c.json({ success: true, data: { id, tableId, holdExpiresAt } }, 201);
   } finally { await releaseLock(db, key, owner); }
@@ -648,7 +654,7 @@ export const get__api_restaurant_test_reservations_day_24 = async (c: Context<En
     LEFT JOIN rt_tables t ON t.id = r.table_id LEFT JOIN rt_menu_items m ON m.id = r.course_id
     WHERE r.store_id = ? AND datetime(r.starts_at) < datetime(?) AND datetime(r.ends_at) > datetime(?)
     ORDER BY r.starts_at, r.id`).bind(storeId, to, from).all();
-  return c.json({ success: true, data: { date, reservations: rows.results, closures: (await closuresForRange(db, storeId, from, to)).map(publicClosure) } });
+  return c.json({ success: true, data: { date, reservations: rows.results.map(row => ({ ...row, ...reservationAllergyProjection(row) })), closures: (await closuresForRange(db, storeId, from, to)).map(publicClosure) } });
 };
 
 export const get__api_restaurant_test_customers_history_25 = async (c: Context<Env, "/api/restaurant-test/customers/history">) => {
@@ -663,10 +669,10 @@ export const get__api_restaurant_test_customers_history_25 = async (c: Context<E
   const where = `r.store_id = ? AND r.status IN ('visited', 'seated') AND ${lineUid ? 'r.line_uid = ?' : `${customerPhoneSql} = ?`}`;
   const args = [storeId, lineUid || phone];
   const count = await db.prepare(`SELECT COUNT(*) AS total FROM rt_reservations r WHERE ${where}`).bind(...args).first<{ total: number }>();
-  const rows = await db.prepare(`SELECT r.id, r.starts_at, r.guest_count, r.allergy_note, t.label AS table_label, m.name AS course_name
+  const rows = await db.prepare(`SELECT r.id, r.starts_at, r.guest_count, r.allergy_note, r.allergies_json, t.label AS table_label, m.name AS course_name
     FROM rt_reservations r LEFT JOIN rt_tables t ON t.id = r.table_id LEFT JOIN rt_menu_items m ON m.id = r.course_id
     WHERE ${where} ORDER BY r.starts_at DESC, r.id LIMIT 20`).bind(...args).all();
-  return c.json({ success: true, data: { visitCount: count!.total, visits: rows.results } });
+  return c.json({ success: true, data: { visitCount: count!.total, visits: rows.results.map(row => ({ ...row, ...reservationAllergyProjection(row) })) } });
 };
 
 export const get__api_restaurant_test_customers_search_26 = async (c: Context<Env, "/api/restaurant-test/customers/search">) => {

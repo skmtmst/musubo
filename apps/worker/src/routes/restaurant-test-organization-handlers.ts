@@ -1,3 +1,4 @@
+import { reservationAllergyProjection } from '../services/restaurant-reservation-allergies.js';
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
@@ -306,7 +307,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
       stores: storesWithLineStatus,
       memberships: memberships.results,
       approvals: approvals.results,
-      reservations: reservations.results,
+      reservations: reservations.results.map(row => ({ ...row, ...reservationAllergyProjection(row) })),
       reservationTotal: reservationTotal?.total ?? 0,
       tables: tables.results,
       inventory: inventory.results.map((slot) => ({ ...slot, total_capacity: tables.results
@@ -317,7 +318,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
       reviews: reviews.results,
       posts: posts.results,
       lineFlows: lineFlows.results,
-      items: reservations.results, total: reservationTotal?.total ?? 0, paging: reservationFilter, sort: [{ field: 'starts_at', direction: 'asc' }],
+      items: reservations.results.map(row => ({ ...row, ...reservationAllergyProjection(row) })), total: reservationTotal?.total ?? 0, paging: reservationFilter, sort: [{ field: 'starts_at', direction: 'asc' }],
     }),
   });
 };

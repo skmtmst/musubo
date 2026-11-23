@@ -8178,7 +8178,7 @@ CREATE TABLE "rt_reservations" (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id), confirmation_revision INTEGER NOT NULL DEFAULT 1);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT, waitlist_entry_id TEXT, customer_version INTEGER NOT NULL DEFAULT 1, customer_request_id TEXT, dining_snapshot_json TEXT CHECK(dining_snapshot_json IS NULL OR json_valid(dining_snapshot_json)), departed_at TEXT, staff_id TEXT REFERENCES staff(id), confirmation_revision INTEGER NOT NULL DEFAULT 1, allergies_json TEXT CHECK(allergies_json IS NULL OR json_valid(allergies_json)));
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -13503,6 +13503,8 @@ BEGIN SELECT RAISE(ABORT,'referral_organization_conflict'); END;
 CREATE TRIGGER rt_referral_member_org_update BEFORE UPDATE ON rt_store_group_members
 WHEN NOT EXISTS(SELECT 1 FROM rt_store_groups g JOIN rt_stores s ON s.organization_id=g.organization_id WHERE g.id=NEW.group_id AND s.id=NEW.store_id)
 BEGIN SELECT RAISE(ABORT,'referral_organization_conflict'); END;
+
+CREATE TRIGGER rt_reservation_allergies_legacy_update AFTER UPDATE OF allergy_note ON rt_reservations WHEN NEW.allergy_note IS NOT OLD.allergy_note AND NEW.allergies_json IS OLD.allergies_json BEGIN UPDATE rt_reservations SET allergies_json = NULL WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_reservation_event_insert AFTER INSERT ON rt_reservations WHEN NEW.status IN('confirmed','seated','visited') BEGIN INSERT OR IGNORE INTO rt_reservation_events(id,reservation_id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json) SELECT 'rt:'||NEW.id||':'||NEW.customer_version||':restaurant.reservation.created',NEW.id,NEW.store_id,'restaurant.reservation.created',NEW.customer_version,strftime('%Y-%m-%dT%H:%M:%fZ','now'),NEW.id||':'||NEW.customer_version,s.line_account_id, (SELECT id FROM friends WHERE line_account_id=s.line_account_id AND line_user_id=NEW.line_uid), json_object('reservationId',NEW.id,'storeId',NEW.store_id,'startsAt',NEW.starts_at,'endsAt',NEW.ends_at,'status',NEW.status,'guestCount',NEW.guest_count) FROM rt_stores s WHERE s.id=NEW.store_id; END;
 

@@ -1,3 +1,4 @@
+import type { RestaurantReservationAllergy } from './restaurant-reservation-allergies.js';
 import { allergyValues } from './fixed-friend-fields.js';
 import { maskPhone } from './phone.js';
 /** 共通盤。保存先・状態・版は種類ごとの既存契約を保つ。 */
@@ -7,7 +8,7 @@ export interface ReservationBoardEntry {
  id: string; kind: 'people' | 'seats'; version: number; scopeId: string;
  startsAt: string; endsAt: string; status: string; customerName: string;
  guestCount: number; resourceIds: string[]; resourceLabel: string | null;
- contactLabel?:string|null; currentAllergy?:string|null; source: string; courseName: string | null; note: string | null; dining: DiningSnapshot | null;
+ contactLabel?:string|null; currentAllergy?:string|null; allergies?: RestaurantReservationAllergy[] | null; source: string; courseName: string | null; note: string | null; dining: DiningSnapshot | null;
  holdExpiresAt: string | null; arrivedAt?: string | null; departedAt?: string | null;
 }
 export interface ReservationBoardResource { id: string; label: string; active: boolean; capacity: number; groupLabel?: string; }
@@ -37,10 +38,11 @@ export function diningSnapshot(value:unknown):DiningSnapshot|null {
 }
 export function seatBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {
  let links:string[]=[];try{links=JSON.parse(String(r.table_ids_json??'[]'));}catch{/* old rows */}
+ let allergies: RestaurantReservationAllergy[] | null = null; try { const parsed: unknown = JSON.parse(String(r.allergies_json ?? 'null')); if (Array.isArray(parsed) && parsed.every(item => item && typeof item === 'object' && (item.kind === 'option' || item.kind === 'other') && typeof item.value === 'string')) allergies = parsed; } catch { /* 旧予約 */ }
  return {id:String(r.id),kind:'seats',version:Number(r.customer_version??1),scopeId:String(r.store_id),
  startsAt:reservationInstant(r.starts_at),endsAt:reservationInstant(r.ends_at),status:String(r.status),customerName:String(r.customer_name),
  guestCount:Number(r.guest_count),resourceIds:links.length?links:r.table_id?[String(r.table_id)]:[],resourceLabel:r.table_label?String(r.table_label):null,
- contactLabel:r.line_uid?'LINE UID':r.customer_phone?maskPhone(String(r.customer_phone)):'電話未登録',currentAllergy:r.allergy_note?String(r.allergy_note):null,source:String(r.source),courseName:r.course_name?String(r.course_name):null,note:r.note?String(r.note):null,
+ allergies, contactLabel:r.line_uid?'LINE UID':r.customer_phone?maskPhone(String(r.customer_phone)):'電話未登録',currentAllergy:r.allergy_note?String(r.allergy_note):null,source:String(r.source),courseName:r.course_name?String(r.course_name):null,note:r.note?String(r.note):null,
  arrivedAt:r.arrived_at?reservationInstant(r.arrived_at):null,departedAt:r.departed_at?reservationInstant(r.departed_at):null,dining:diningSnapshot(r.dining_snapshot_json),holdExpiresAt:r.hold_expires_at?reservationInstant(r.hold_expires_at):null};
 }
 export function peopleBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {

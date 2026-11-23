@@ -1,3 +1,5 @@
+import { restaurantReservationAllergyLabels, type RestaurantReservationAllergy } from '@line-crm/shared';
+import { reservationAllergyProjection, validateReservationAllergies } from '../services/restaurant-reservation-allergies.js';
 import { readRestaurantCustomerReservationForm,RestaurantReservationFormError } from '../services/restaurant-reservation-form.js';
 import { restaurantReservationAnswerError } from '@line-crm/shared';
 import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
@@ -132,6 +134,9 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     return liffBookingInputError(c, { success: false, error: 'invalid_hold' }, 400, ["note","customerPhone","startsAt","guestCount","requestId"]);
   const store = await storeFor(c, self.accountId, body.storeId);
   if (!store) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
+  if (body.allergies !== undefined && body.allergyNote !== undefined) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergies']);
+  const holdAllergies = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), self.accountId, body.allergies);
+  if (holdAllergies && !holdAllergies.ok) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergies']);
   const db = dbFor(c.env, store.id),
     startsAt = new Date(body.startsAt).toISOString();
   const course = await customerCourse(db, store.id, body.courseId);
@@ -147,6 +152,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       old.note !== customerDetailValue(body.note) ||
       (body.customerName!==undefined&&old.customer_name!==customerDetailValue(body.customerName)) ||
       (body.allergyNote!==undefined&&old.allergy_note!==customerDetailValue(body.allergyNote)) ||
+      (holdAllergies?.ok && JSON.stringify(holdAllergies.values) !== old.allergies_json) ||
       (normalizePhone(old.customer_phone ?? '') || null) !== (normalizePhone(body.customerPhone ?? '') || null) ||
       old.starts_at !== startsAt ||
       old.guest_count !== body.guestCount ||
@@ -186,7 +192,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
   await capacity.commit([db
     .prepare(
-      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`,
+      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note${holdAllergies?.ok ? ',allergies_json' : ''}) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,?${holdAllergies?.ok ? ',?' : ''} WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`,
     )
     .bind(
       id,
@@ -203,7 +209,8 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       customerDetailValue(body.note),
       (normalizePhone(body.customerPhone ?? '') || null),
       body.courseId || null,
-      customerDetailValue(body.allergyNote),
+      holdAllergies?.ok ? restaurantReservationAllergyLabels(holdAllergies.values).join('、') || null : customerDetailValue(body.allergyNote),
+      ...(holdAllergies?.ok ? [JSON.stringify(holdAllergies.values)] : []),
       store.id,
       result.hoursVersion,
       body.courseId || null, body.courseId || null, store.id, course?.durationMinutes ?? null,
@@ -256,6 +263,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       )
         return liffBookingInputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
       if (action === 'confirm' && !validCustomerDetails(b)) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ["note","customerPhone","customerName","allergyNote"]);
+      if (action !== 'confirm' && b.allergies !== undefined) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergies']);
       const db = dbFor(c.env),
         row = await db
           .prepare(
@@ -265,11 +273,39 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           .first<CustomerReservationRow>();
       if (!row) return liffBookingJson(c, { success: false, error: 'not_found' }, 404);
       const store = (await storeFor(c, self.accountId, row.store_id))!;
+      const existingAllergies = reservationAllergyProjection(row).allergies;
+      const legacyNote = !existingAllergies ? row.allergy_note?.trim() || null : null;
+      const legacyPreserved = action === 'confirm' && !!legacyNote && b.allergies === undefined;
+      if (action === 'confirm' && b.allergies !== undefined && b.allergyNote !== undefined) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergies']);
+      const requestedAllergies = action === 'confirm' && b.allergies !== undefined ? await validateReservationAllergies(dbFor(c.env), self.accountId, b.allergies, existingAllergies?.filter(item => item.kind === 'option').map(item => item.value) ?? [], row.allergies_json == null ? row.allergy_note?.trim() : undefined, existingAllergies?.filter(item => item.kind === 'other').map(item => item.value) ?? []) : null;
+      if (requestedAllergies && !requestedAllergies.ok) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergies']);
+      let mergedAllergies: RestaurantReservationAllergy[] | null = existingAllergies;
+      if (requestedAllergies?.ok) {
+        const merged: RestaurantReservationAllergy[] = existingAllergies ? [...existingAllergies] : row.allergy_note?.trim() ? [{ kind:'other', value:row.allergy_note.trim() }] : [];
+        for (const item of requestedAllergies.values) if (!merged.some(existing => existing.kind === item.kind && existing.value === item.value)) merged.push(item);
+        if (merged.length > 32) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergies']);
+        mergedAllergies = merged;
+      }
+      if (legacyPreserved && b.allergyNote !== undefined) {
+        const text = customerDetailValue(b.allergyNote);
+        if (text && text !== legacyNote) mergedAllergies = [{ kind:'other', value:legacyNote! }, { kind:'other', value:text }];
+      }
+      if (action === 'confirm' && existingAllergies && b.allergyNote !== undefined) {
+        const text = customerDetailValue(b.allergyNote);
+        if (text && text !== row.allergy_note && !existingAllergies.some(item => item.value === text)) {
+          if (existingAllergies.length >= 32 || text.length > 200) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ['allergyNote']);
+          mergedAllergies = [...existingAllergies, { kind:'other', value:text }];
+        }
+      }
+      const mergedAllergyNote = mergedAllergies ? restaurantReservationAllergyLabels(mergedAllergies).join('、') || null : null;
+      if (action === 'confirm' && row.status === 'confirmed' && (requestedAllergies || mergedAllergies) && !existingAllergies) return liffBookingJson(c, { success:false, error:'request_conflict' }, 409);
+      if (action === 'confirm' && row.status === 'confirmed' && existingAllergies && JSON.stringify(mergedAllergies) !== JSON.stringify(existingAllergies)) return liffBookingJson(c, { success:false, error:'request_conflict' }, 409);
+
       if (
         (action === 'confirm' && row.status === 'confirmed') ||
         (action === 'cancel' && row.status === 'cancelled')
       ) {
-        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)) || (b.customerName!==undefined&&customerDetailValue(b.customerName)!==row.customer_name) || (b.allergyNote!==undefined&&customerDetailValue(b.allergyNote)!==row.allergy_note))) return liffBookingJson(c, {success:false,error:'request_conflict'},409);
+        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)) || (b.customerName!==undefined&&customerDetailValue(b.customerName)!==row.customer_name) || (b.allergyNote!==undefined && !existingAllergies && !legacyPreserved && customerDetailValue(b.allergyNote)!==row.allergy_note))) return liffBookingJson(c, {success:false,error:'request_conflict'},409);
         if(action==='confirm' && typeof b.referralId==='string') await acceptReferral(db,b.referralId,store.id,row.id,self.uid,row.customer_version).run();
         await finish(c, store);
         return liffBookingJson(c, { success: true, data: customerBooking(row) });
@@ -278,7 +314,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const form=formSnapshot?.form;
       if(form){
         if((b.expectedFormVersion??0)!==form.version)return liffBookingJson(c,{success:false,error:'reservation_form_changed'},409);
-        const problem=restaurantReservationAnswerError(form.definition,{customerName:b.customerName===undefined?row.customer_name:b.customerName,customerPhone:b.customerPhone===undefined?row.customer_phone:b.customerPhone,allergyNote:b.allergyNote===undefined?row.allergy_note:b.allergyNote,note:b.note===undefined?row.note:b.note});
+        const problem=restaurantReservationAnswerError(form.definition,{customerName:b.customerName===undefined?row.customer_name:b.customerName,customerPhone:b.customerPhone===undefined?row.customer_phone:b.customerPhone,allergyNote:mergedAllergies ? (customerDetailValue(b.allergyNote) || (mergedAllergies.length ? 'あり' : null)) : legacyPreserved ? (customerDetailValue(b.allergyNote) || 'あり') : b.allergyNote===undefined?row.allergy_note:b.allergyNote,note:b.note===undefined?row.note:b.note});
         if(problem)return liffBookingInputError(c,{success:false,error:'invalid_reservation_answers',message:problem},400,['customerName','customerPhone','allergyNote','note']);
       }
       if (row.customer_version !== b.expectedVersion)
@@ -356,7 +392,8 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         ...row,
         note: action === 'confirm' && b.note !== undefined ? customerDetailValue(b.note) : row.note,
         customer_name:action==='confirm'&&b.customerName!==undefined?customerDetailValue(b.customerName)!:row.customer_name,
-        allergy_note:action==='confirm'&&b.allergyNote!==undefined?customerDetailValue(b.allergyNote):row.allergy_note,
+        allergy_note: action==='confirm' && mergedAllergies ? mergedAllergyNote : legacyPreserved ? row.allergy_note : action==='confirm'&&b.allergyNote!==undefined?customerDetailValue(b.allergyNote):row.allergy_note,
+        allergies_json: action === 'confirm' && mergedAllergies ? JSON.stringify(mergedAllergies) : row.allergies_json,
         customer_phone: action === 'confirm' && b.customerPhone !== undefined ? (normalizePhone(b.customerPhone ?? '') || null) : row.customer_phone,
         status: action === 'cancel' ? 'cancelled' : 'confirmed',
         starts_at: starts,
@@ -372,7 +409,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         ...(formSnapshot?[formSnapshot.guard]:[]),
         db
           .prepare(
-            `UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,customer_name=?,allergy_note=?,course_id=?,dining_snapshot_json=json_set(CASE WHEN course_id IS NOT ? THEN json_set(COALESCE(dining_snapshot_json,'{}'),'$.courseId',?,'$.courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=? AND store_id=?),'[]'))) ELSE COALESCE(dining_snapshot_json,'{}') END,'$.allergy',?),customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now')) AND (?='cancel' OR ? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
+            `UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,customer_name=?,allergy_note=?${mergedAllergies && action === 'confirm' ? ',allergies_json=?' : ''},course_id=?,dining_snapshot_json=json_set(CASE WHEN course_id IS NOT ? THEN json_set(COALESCE(dining_snapshot_json,'{}'),'$.courseId',?,'$.courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=? AND store_id=?),'[]'))) ELSE COALESCE(dining_snapshot_json,'{}') END,'$.allergy',?),customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now')) AND (?='cancel' OR ? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
           )
           .bind(
             next.status,
@@ -383,6 +420,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             next.note,
             next.customer_phone,
             next.customer_name,next.allergy_note,
+            ...(mergedAllergies && action === 'confirm' ? [JSON.stringify(mergedAllergies)] : []),
             courseId, courseId, courseId, courseId, store.id,next.allergy_note,
             row.id,
             self.uid,

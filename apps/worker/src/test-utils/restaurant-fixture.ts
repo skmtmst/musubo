@@ -11,6 +11,10 @@ export function seedRestaurantFixture(testDb: SqliteD1, {
   tenantId?: string;
   name?: string;
 } = {}): void {
+  const columns = testDb.raw.prepare('PRAGMA table_info(rt_reservations)').all() as Array<{ name: string }>;
+  if (!columns.some(column => column.name === 'allergies_json')) {
+    testDb.raw.exec("ALTER TABLE rt_reservations ADD COLUMN allergies_json TEXT CHECK(allergies_json IS NULL OR json_valid(allergies_json)); CREATE TRIGGER rt_reservation_allergies_legacy_update AFTER UPDATE OF allergy_note ON rt_reservations WHEN NEW.allergy_note IS NOT OLD.allergy_note AND NEW.allergies_json IS OLD.allergies_json BEGIN UPDATE rt_reservations SET allergies_json = NULL WHERE id = NEW.id; END;");
+  }
   // 統括ゲート（飲食店機能パック）。このAPI群はゲートの内側を検証する
   // フィクスチャなので、対象の統括には常にパックを付けておく。
   // ゲート自体の検証（無し→404）は別のdescribeで明示的に行う。
