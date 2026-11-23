@@ -250,10 +250,32 @@ describe('BERxg 座席・卓管理', () => {
     expect(icons).toHaveLength(4)
     for (const icon of icons) expect(icon.classList.contains('lucide-inbox')).toBe(true)
     for (const label of ['卓数', '受付中の卓', '受付中の定員', '個室', '卓一覧']) expect(board.textContent).toContain(label)
-    expect(screen.getByRole('button', { name: '卓の表示' }).textContent).toContain('すべて')
+    expect(within(screen.getByRole('tablist', { name: '卓一覧の階・エリア' })).getByRole('tab', { name: 'すべて' }).getAttribute('aria-selected')).toBe('true')
     expect(board.textContent).toContain('受付中')
     expect(screen.queryByText('結合のルール')).toBeNull()
     expect(screen.getByText('T3 · 窓側4人卓')).not.toBeNull()
+  })
+
+  it('卓一覧の階タブは座席図と別に一覧を絞る', async () => {
+    const base = { storeId:'store-1', width:500, height:500, version:1, outline:[], fixtures:[], tables:[] }
+    floorApi.floors.mockResolvedValue({ success:true, data:[{...base,id:'floor-a',name:'1階'},{...base,id:'floor-b',name:'テラス'}] })
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: tables.map((t, i) => ({ ...t, floor_id: i === 0 ? 'floor-a' : 'floor-b' })) }) })
+    render(<TablesPage />)
+    const tabs = await screen.findByRole('tablist', { name:'卓一覧の階・エリア' })
+    const terrace = await within(tabs).findByRole('tab', { name:'テラス' })
+    const first = `${tables[0].code} · ${tables[0].label}`
+    const second = `${tables[1].code} · ${tables[1].label}`
+    await screen.findByText(first)
+    fireEvent.click(terrace)
+    expect(screen.queryByText(first)).toBeNull()
+    expect(screen.getByText(second)).toBeTruthy()
+    const statuses = screen.getByRole('tablist', { name:'卓の状態' })
+    fireEvent.click(within(statuses).getByRole('tab', { name:'停止中' }))
+    expect(screen.queryByText(second)).toBeNull()
+    fireEvent.click(within(statuses).getByRole('tab', { name:'全状態' }))
+    expect(screen.getByText(second)).toBeTruthy()
+    fireEvent.click(within(tabs).getByRole('tab', { name:'すべて' }))
+    expect(screen.getByText(first)).toBeTruthy()
   })
 
   it('卓の行にはメニュー1個だけを出し、停止の確認を開くまで更新しない', async () => {

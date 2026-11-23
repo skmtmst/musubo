@@ -1,6 +1,7 @@
 'use client'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
-import { DetailPreview } from '@/components/shared/detail-content'
+import Card from '@/components/shared/card'
+import { Tabs } from '@/components/shared/tabs'
 
 import { tableRequirements as b244Requirements } from './requirements'
 
@@ -38,7 +39,6 @@ import StatusBadge from '@/components/shared/status-badge'
 import TableAutoAssignmentDialog from './auto-assignment-dialog'
 import { useSearchParams } from 'next/navigation'
 import TablePenEditor, { GuidedTableFields, type Draft } from '@/components/shared/restaurant-table-pen-editor'
-import RestaurantTableHeaderActions from '@/components/shared/restaurant-table-header-actions'
 import RestaurantFloorPanel from '@/components/shared/restaurant-floor-panel'
 import {planFloorTables} from '@/components/shared/restaurant-floor-placement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -83,7 +83,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   if (scope.current.accountId !== selectedAccountId || scope.current.storeId !== store?.id) scope.current = { accountId: selectedAccountId, storeId: store?.id, generation: scope.current.generation + 1 }
   const renderedScope = scope.current
   const [floors,setFloors]=useState<RestaurantFloor[]>([])
-  useEffect(()=>{let active=true;if(selectedAccountId&&store)void reservationBoardApi.floors(selectedAccountId,store.id).then(r=>{if(active)setFloors(r.data)}).catch(()=>{});return ()=>{active=false}},[selectedAccountId,store?.id,data.tables])
+  useEffect(()=>{let active=true;if(selectedAccountId&&store)void reservationBoardApi.floors(selectedAccountId,store.id).then(r=>{if(active){setFloors(r.data);setFloorFilter(current=>current==='all'||r.data.some(f=>f.id===current)?current:'all')}}).catch(()=>{});return ()=>{active=false}},[selectedAccountId,store?.id,data.tables])
   const role = useStaffRole()
   /* 閲覧のみの人には、追加・変更・停止・再開・並べ替えを置かない（2026-10-06 オーナー）。 */
   const canEdit = canManageRole(role)
@@ -93,7 +93,9 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   const [automationOpen, setAutomationOpen] = useState(initialAutomationOpen)
   const [selectedId, setSelectedId] = useState('')
   const [duplicateRequest,setDuplicateRequest]=useState(0)
+  const [floorFilter,setFloorFilter]=useState('all')
   const [statusFilter,setStatusFilter]=useState<'all'|'active'|'suspended'>('all')
+  useEffect(() => { setFloors([]); setFloorFilter('all') }, [selectedAccountId, store?.id])
   /* 窓：'new' は追加、卓の id は変更。 */
   const [editor, setEditor] = useState<string | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -365,7 +367,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   }
 
   const activeRows = rows.filter((item) => item.is_active)
-  const visibleRows=rows.filter(item=>statusFilter==='all'||(statusFilter==='active'?!!item.is_active:!item.is_active))
+  const visibleRows=rows.filter(item=>(floorFilter==='all'||item.floor_id===floorFilter)&&(statusFilter==='all'||(statusFilter==='active'?!!item.is_active:!item.is_active)))
   useEffect(()=>{if(!rows.some(row=>row.id===selectedId))setSelectedId(rows[0]?.id??'')},[rows,selectedId])
 
   return (
@@ -382,7 +384,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
           卓の変更は保存しました。最新の予約を読み込めなかったため、止める確認を開けていません。
         </Notice>
       ) : null}
-      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓一覧" titleActions={<Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button>} headerActions={<RestaurantTableHeaderActions statusFilter={statusFilter} onStatusFilter={setStatusFilter}/>}>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<Card variant="aside" padding="default"><header className={styles.listHeading}><h2>卓一覧</h2><Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button></header><Tabs label="卓一覧の階・エリア" size="compact" items={[{label:"すべて",current:floorFilter==='all',onClick:()=>setFloorFilter('all')},...floors.map(f=>({label:f.name,current:floorFilter===f.id,onClick:()=>setFloorFilter(f.id)}))]}/><Tabs label="卓の状態" size="compact" items={[{label:'全状態',current:statusFilter==='all',onClick:()=>setStatusFilter('all')},{label:'受付中',current:statusFilter==='active',onClick:()=>setStatusFilter('active')},{label:'停止中',current:statusFilter==='suspended',onClick:()=>setStatusFilter('suspended')}]}/>
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
@@ -397,7 +399,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
               </li>
             ))}
           </ul>
-        </DetailPreview>} asideLayout="detail">
+        </Card>} asideLayout="detail">
         <RestaurantFloorPanel>
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version,t.label,t.min_capacity,t.max_capacity,t.shape,t.width,t.height,t.smoking_policy,t.shoes_allowed,t.visible_on_map,t.chair_arrangement,t.chair_side,t.is_active]))} resources={rows.map(t=>({id:t.id,label:t.label,capacity:t.max_capacity,active:!!t.is_active}))} existingCodes={rows.map(t=>t.code)} canEdit={canEdit} onSelect={setSelectedId} onCreate={openNew} selectedId={selectedId} duplicateRequest={duplicateRequest} onCreated={async()=>{await ctx.reload()}}/>:null}
         </RestaurantFloorPanel>
