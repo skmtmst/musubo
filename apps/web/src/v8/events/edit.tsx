@@ -171,9 +171,9 @@ function EditEntry() {
     <LifecycleSection key={scope} accountId={selectedAccountId} eventId={id} onChanged={() => setStatusSeq((value) => value + 1)} />
     <EventForm key={`form:${scope}`} accountId={selectedAccountId} eventId={id} />
     <FormSection id="ev-edit-notes" title="気をつけること">
-      <p>承認制の申込は承認待ちの時点から残席を使います。承認・拒否・期限切れで確定または解放されます。</p>
-      <p>定員に達するとキャンセル待ちに切り替わります。</p>
-      <p>公開後に定員を減らしても、すでに確定した申込は取り消されません。</p>
+      <p className="text-body">承認制の申込は承認待ちの時点から残席を使います。承認・拒否・期限切れで確定または解放されます。</p>
+      <p className="text-body">定員に達するとキャンセル待ちに切り替わります。</p>
+      <p className="text-body">公開後に定員を減らしても、すでに確定した申込は取り消されません。</p>
     </FormSection>
   </DetailPage>
 }

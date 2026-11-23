@@ -995,7 +995,7 @@ function PublishTab({
         <RadioCard name="event-publish-state" value="draft" checked={draft.is_published === 0} onChange={() => update('is_published', 0)} title="下書き" note="友だちには見えない" />
         <RadioCard name="event-publish-state" value="published" checked={draft.is_published === 1} onChange={() => update('is_published', 1)} title="公開する" note="予約 URL が有効になる" />
       </RadioCardGroup>
-      <p>{draft.is_published === 1 ? '✓ 保存後、友だちに「予約 URL」を案内できます。' : '保存しても友だちには表示されません。'}</p>
+      <p className="text-body">{draft.is_published === 1 ? '✓ 保存後、友だちに「予約 URL」を案内できます。' : '保存しても友だちには表示されません。'}</p>
       <OgEditor value={{ ogTitle: draft.og_title, ogDescription: draft.og_description, ogImageUrl: draft.og_image_url }}
         onChange={(value) => { update('og_title', value.ogTitle); update('og_description', value.ogDescription); update('og_image_url', value.ogImageUrl) }}
         autoTitle={draft.name || undefined} autoDescription={draft.description ?? undefined} autoImageUrl={draft.image_url ?? undefined} />
