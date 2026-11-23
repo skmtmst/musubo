@@ -33,11 +33,18 @@ CREATE TABLE inbox_assignment_jobs (
  UNIQUE(account_id,idempotency_key)
 );
 CREATE INDEX inbox_assignment_jobs_due ON inbox_assignment_jobs(status,lease_until,created_at);
+CREATE UNIQUE INDEX inbox_assignment_one_active ON inbox_assignment_jobs(account_id) WHERE status IN ('pending','running');
 CREATE TABLE inbox_assignment_job_items (
  job_id TEXT NOT NULL REFERENCES inbox_assignment_jobs(id) ON DELETE CASCADE,
  chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','assigned','skipped')),
  PRIMARY KEY(job_id,chat_id)
+);
+-- 営業開始の再割当は店ごとに続きを保存する。
+CREATE TABLE inbox_assignment_opening_runs (
+ account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+ window_start INTEGER, cursor TEXT NOT NULL DEFAULT '', next_check INTEGER NOT NULL DEFAULT 0,
+ lease_owner TEXT, lease_until INTEGER
 );
 -- 無効化された担当者には新しい受信を割り当てず、未割当へ戻す。
 CREATE TRIGGER inbox_unassign_inactive_staff AFTER UPDATE OF is_active ON staff_members WHEN OLD.is_active=1 AND NEW.is_active=0 BEGIN UPDATE chats SET assignee_staff_id=NULL,assigned_by=NULL,assigned_at=NULL,assignment_token=NULL,revision=revision+1 WHERE assignee_staff_id=NEW.id AND status!='resolved'; END;

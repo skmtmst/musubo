@@ -50,6 +50,12 @@ test('割当できない同じ未対応期間は店内の知らせを一度だ�
  expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
  expect(external).not.toHaveBeenCalled();
 });
+test('営業時間外に担当できない時は責任者へ知らせを出さない',async()=>{
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec("UPDATE staff_presence SET away=1");
+ expect(await assignInbox(d.db,'a','f',new Date('2026-10-15T23:00:00Z'))).toBe(false);
+ expect(d.raw.prepare("SELECT count(*) n FROM notifications WHERE event_type='inbox_assignment_unavailable'").get()).toEqual({n:0});
+});
 test('割当を使わない店や既に担当のある会話は割当不能の知らせを出さない',async()=>{
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
  expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);

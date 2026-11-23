@@ -5082,6 +5082,10 @@
     "category": "purge",
     "scope": { "by": "lineAccount", "column": "account_id" }
   },
+  "inbox_assignment_opening_runs": {
+    "category": "purge",
+    "scope": { "by": "lineAccount", "column": "account_id" }
+  },
   "inbox_assignment_job_items": {
     "category": "purge",
     "scope": { "by": "parent", "column": "job_id", "parent": "inbox_assignment_jobs", "parentColumn": "id" }

@@ -1,21 +1,22 @@
 import { getStaffById } from '@line-crm/db';
 import { toAuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { canAccessAllLineAccounts } from './account-access.js';
-import { assignInbox } from './inbox-assignment.js';
+import { assignInbox,routingSettings } from './inbox-assignment.js';
 
 type Job={id:string;account_id:string;actor_staff_id:string;status:string;lease_owner:string|null;lease_until:number|null;assigned:number;skipped:number;total:number;attempts:number};
 export async function beginInboxAssignmentJob(db:D1Database,account:string,actor:string,key:string) {
  const id=crypto.randomUUID(),now=Date.now();
- await db.batch([
+ const results=await db.batch([
   db.prepare(`INSERT INTO inbox_assignment_jobs(id,account_id,idempotency_key,actor_staff_id,created_at,updated_at)
-    VALUES(?,?,?,?,?,?) ON CONFLICT(account_id,idempotency_key) DO NOTHING`).bind(id,account,key,actor,now,now),
+    VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING`).bind(id,account,key,actor,now,now),
   db.prepare(`INSERT INTO inbox_assignment_job_items(job_id,chat_id)
     SELECT ?,c.id FROM chats c JOIN friends f ON f.id=c.friend_id
      WHERE f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'
        AND EXISTS(SELECT 1 FROM inbox_assignment_jobs WHERE id=?)`).bind(id,account,id),
   db.prepare('UPDATE inbox_assignment_jobs SET total=(SELECT count(*) FROM inbox_assignment_job_items WHERE job_id=?) WHERE id=?').bind(id,id),
+  db.prepare("SELECT id,status,assigned,skipped,total FROM inbox_assignment_jobs WHERE account_id=? AND (idempotency_key=? OR status IN ('pending','running')) ORDER BY (idempotency_key=?) DESC LIMIT 1").bind(account,key,key),
  ]);
- return db.prepare('SELECT id,status,assigned,skipped,total FROM inbox_assignment_jobs WHERE account_id=? AND idempotency_key=?').bind(account,key).first<{id:string;status:string;assigned:number;skipped:number;total:number}>();
+ return (results[3].results[0]??null) as {id:string;status:string;assigned:number;skipped:number;total:number}|null;
 }
 export async function getInboxAssignmentJob(db:D1Database,account:string,id:string) {
  return db.prepare('SELECT id,status,assigned,skipped,total FROM inbox_assignment_jobs WHERE account_id=? AND id=?').bind(account,id).first<{id:string;status:string;assigned:number;skipped:number;total:number}>();
@@ -33,7 +34,9 @@ export async function processInboxAssignmentJobs(db:D1Database,now=Date.now()) {
   if(!actor||!actor.is_active||actor.invite_status!=='active'||actor.access_level==='read_only'||actor.tenant_status!=='active'||!['owner','admin'].includes(actor.role)||!account||!await canAccessAllLineAccounts(db,toAuthenticatedStaff(actor),[job.account_id])) {
    await db.prepare("UPDATE inbox_assignment_jobs SET status='failed',lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=? AND lease_owner=?").bind(Date.now(),job.id,owner).run();return;
   }
-  const items=(await db.prepare(`SELECT i.chat_id,c.friend_id FROM inbox_assignment_job_items i JOIN chats c ON c.id=i.chat_id WHERE i.job_id=? AND i.status='pending' ORDER BY i.chat_id LIMIT 20`).bind(job.id).all<{chat_id:string;friend_id:string}>()).results;
+  const targets=(await routingSettings(db,job.account_id)).targets.length;
+  const pageSize=Math.max(1,Math.min(20,Math.floor(300/(targets*8+15))));
+  const items=(await db.prepare(`SELECT i.chat_id,c.friend_id FROM inbox_assignment_job_items i JOIN chats c ON c.id=i.chat_id WHERE i.job_id=? AND i.status='pending' ORDER BY i.chat_id LIMIT ?`).bind(job.id,pageSize).all<{chat_id:string;friend_id:string}>()).results;
   for(const item of items){
    const token=`bulk:${job.id}:${item.chat_id}`;
    const wasAssigned=await db.prepare('SELECT 1 FROM inbox_assignment_logs WHERE mutation_token=?').bind(token).first();

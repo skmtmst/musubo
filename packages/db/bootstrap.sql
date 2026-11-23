@@ -4611,6 +4611,12 @@ CREATE TABLE inbox_assignment_logs (
  staff_id TEXT NOT NULL REFERENCES staff_members(id),strategy TEXT NOT NULL,decided_at TEXT NOT NULL,mutation_token TEXT NOT NULL UNIQUE
 );
 
+CREATE TABLE inbox_assignment_opening_runs (
+ account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+ window_start INTEGER, cursor TEXT NOT NULL DEFAULT '', next_check INTEGER NOT NULL DEFAULT 0,
+ lease_owner TEXT, lease_until INTEGER
+);
+
 CREATE TABLE inbox_assignment_settings (
  account_id TEXT PRIMARY KEY REFERENCES line_accounts(id),
  strategy TEXT NOT NULL DEFAULT 'none' CHECK(strategy IN('none','even','priority','random_weighted')),
@@ -12150,6 +12156,8 @@ CREATE INDEX idx_webinars_account_status_folder
   ON webinars (account_id, status, folder_id);
 
 CREATE INDEX inbox_assignment_jobs_due ON inbox_assignment_jobs(status,lease_until,created_at);
+
+CREATE UNIQUE INDEX inbox_assignment_one_active ON inbox_assignment_jobs(account_id) WHERE status IN ('pending','running');
 
 CREATE INDEX inbox_assignment_recent ON inbox_assignment_logs(account_id,staff_id,decided_at);
 

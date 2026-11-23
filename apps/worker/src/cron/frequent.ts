@@ -61,7 +61,7 @@ export async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
-    {name:'inbox assignment jobs',run:async()=>{const {processInboxAssignmentJobs}=await import('../services/inbox-assignment-jobs.js');await processInboxAssignmentJobs(env.DB);}},
+    {name:'inbox assignment jobs',run:async()=>{const pending=await env.DB.prepare("SELECT 1 FROM inbox_assignment_jobs WHERE status='pending' OR (status='running' AND lease_until<=?) LIMIT 1").bind(Date.now()).first();if(pending){const {processInboxAssignmentJobs}=await import('../services/inbox-assignment-jobs.js');await processInboxAssignmentJobs(env.DB);}else{const {processInboxOpeningAssignments}=await import('../services/inbox-assignment-opening.js');await processInboxOpeningAssignments(env.DB,new Date(event.scheduledTime));}}},
     {name:'operator push digest',run:async()=>{await sweepOperatorPush(env.DB,env,new Date(event.scheduledTime));await retryOperatorPush(env.DB,env,new Date(event.scheduledTime));}},
     {name:'makeup credit expiry',run:()=>expireMakeup(env.DB,new Date(event.scheduledTime))},
     {name:'AB test decisions (test transport)',run:()=>decideAbTests(env.DB,new Date(event.scheduledTime))},
