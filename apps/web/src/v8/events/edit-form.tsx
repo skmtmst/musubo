@@ -20,6 +20,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import Dialog from '@/components/shared/dialog';
 import Button from '@/components/shared/button';
+import CopyTextButton from '@/components/shared/copy-text-button';
 import SelectionButton from '@/components/shared/selection-button';
 import { X } from 'lucide-react';
 import Notice from '@/components/shared/notice';
@@ -114,7 +115,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const dirty = makeupEditState.dirty || eventPayment.dirty || JSON.stringify(draft) !== JSON.stringify(savedDraft)
   const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating || makeupEditState.busy })
 
-  const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
   async function duplicateSaved() {
@@ -131,17 +131,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       setError(caught instanceof ApiError && caught.status === 409
         ? '別の人が変更しました。読み直してから複製してください。' : '複製できませんでした。もう一度お試しください。')
     } finally { setDuplicating(false) }
-  }
-
-  async function copyValue(v: string) {
-    try {
-      await navigator.clipboard.writeText(v)
-      setCopiedValue(v)
-      setTimeout(() => setCopiedValue(null), 2000)
-    } catch {
-      // 押した欄の隣に読取専用の選択欄があるので何も出さない(点検#520の軽15)。
-      // 書けない環境では欄を押して範囲選択し、手でコピーできる。
-    }
   }
 
   const liffId = selectedAccount?.liffId ?? null
@@ -211,7 +200,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     setDraft((d) => ({ ...d, [key]: value }))
   }
 
-  async function save(nextTab?: Tab) {
+  async function save() {
     setSaving(true)
     setError(null)
     try {
@@ -279,7 +268,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         /* お支払い・1回の値段は中身を保存したあとに書く（409 は比べる窓。中身の保存は済んでいる）。 */
         await eventPayment.save(eventId)
         notifyToast('保存しました')
-        if (nextTab) setTab(nextTab)
       } else {
         const created = await eventsApi.createEvent(accountId, payload)
         notifyToast('イベントを作成しました。続けて予約枠を追加してください。')
@@ -299,6 +287,43 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     }
   }
 
+  const reservationUrls = eventId && savedDraft.is_published === 1 ? (() => {
+      const targetType = savedDraft.target_type ?? 'single'
+      const accountIdsArr: string[] = Array.isArray(savedDraft.account_ids)
+        ? savedDraft.account_ids
+        : typeof savedDraft.account_ids === 'string'
+          ? (() => { try { return JSON.parse(savedDraft.account_ids) as string[] } catch { return [] } })()
+          : []
+      if (targetType === 'multi-account-dedup') {
+        const templateUrl = `https://liff.line.me/{{liff_id}}/?page=event&id=${eventId}&liffId={{liff_id}}`
+        const targetAccounts = accounts.filter((account) => accountIdsArr.includes(account.id))
+        return <>
+          <Field label="broadcast 用テンプレ URL" help="{{liff_id}} は配信時に各友だちのアカウントに対応した値に置換されます。" note="broadcast 編集で「リンクするイベント」から選ぶと自動挿入。">
+            <TextInput readOnly value={templateUrl} onFocus={(event) => event.currentTarget.select()} />
+            <CopyTextButton value={templateUrl} aria-label="配信用 URL をコピー" variant="secondary" />
+          </Field>
+          {targetAccounts.length === 0 ? <Notice tone="warn" message="対象アカウントが選ばれていません" /> : null}
+          {targetAccounts.map((account) => {
+            const acct = account as unknown as { liffId?: string | null; name: string; country: string | null }
+            const name = `${acct.country ? acct.country + ' ' : ''}${acct.name}`
+            if (!acct.liffId) return <Notice key={account.id} tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(account.id)}`}>アカウント設定へ →</Button> : undefined} message={`${name}: LIFF ID 未設定`} />
+            const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
+            return <Field key={account.id} label={`${name}の固定 URL（QR・LP 直貼り用）`}>
+              <TextInput readOnly value={url} onFocus={(event) => event.currentTarget.select()} />
+              <CopyTextButton value={url} aria-label={`${name}の URL をコピー`} variant="secondary" />
+            </Field>
+          })}
+        </>
+      }
+      if (liffUrl) return <>
+        <Field label="予約 URL"><TextInput readOnly value={liffUrl} onFocus={(event) => event.currentTarget.select()} />
+          <CopyTextButton value={liffUrl} aria-label="予約 URL をコピー" variant="secondary" />
+        </Field>
+      </>
+      return <Field label="予約 URL"><Notice tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(accountId)}`}>アカウント設定へ →</Button> : undefined} message="LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。" /></Field>
+  })() : <Field label="予約 URL"><p>公開して保存すると、ここに URL が出ます</p></Field>
+
+
   if (loading) return <ListState kind="loading" title="読み込んでいます…" />
 
   return <SaveErrorScope errors={saveErrors}><>
@@ -310,42 +335,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         {eventId ? <Button href={`/events/bookings?id=${eventId}`}>予約を確認</Button> : null}
       </>}>{null}</FormSection>
     {error ? <Notice tone="danger" message={error} /> : null}
-    {eventId && draft.is_published === 1 && (() => {
-      const targetType = draft.target_type ?? 'single'
-      const accountIdsArr: string[] = Array.isArray(draft.account_ids)
-        ? draft.account_ids
-        : typeof draft.account_ids === 'string'
-          ? (() => { try { return JSON.parse(draft.account_ids) as string[] } catch { return [] } })()
-          : []
-      if (targetType === 'multi-account-dedup') {
-        const templateUrl = `https://liff.line.me/{{liff_id}}/?page=event&id=${eventId}&liffId={{liff_id}}`
-        const targetAccounts = accounts.filter((account) => accountIdsArr.includes(account.id))
-        return <FormSection id="ev-form-urls" title="予約 URL（友だちに案内する）">
-          <Field label="broadcast 用テンプレ URL" help="{{liff_id}} は配信時に各友だちのアカウントに対応した値に置換されます。" note="broadcast 編集で「リンクするイベント」から選ぶと自動挿入。">
-            <TextInput readOnly value={templateUrl} onFocus={(event) => event.currentTarget.select()} />
-            <Button onClick={() => copyValue(templateUrl)}>{copiedValue === templateUrl ? 'コピー済' : 'コピー'}</Button>
-          </Field>
-          {targetAccounts.length === 0 ? <Notice tone="warn" message="対象アカウントが選ばれていません" /> : null}
-          {targetAccounts.map((account) => {
-            const acct = account as unknown as { liffId?: string | null; name: string; country: string | null }
-            const name = `${acct.country ? acct.country + ' ' : ''}${acct.name}`
-            if (!acct.liffId) return <Notice key={account.id} tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(account.id)}`}>アカウント設定へ →</Button> : undefined} message={`${name}: LIFF ID 未設定`} />
-            const url = `https://liff.line.me/${acct.liffId}/?page=event&id=${eventId}&liffId=${acct.liffId}`
-            return <Field key={account.id} label={`${name}の固定 URL（QR・LP 直貼り用）`}>
-              <TextInput readOnly value={url} onFocus={(event) => event.currentTarget.select()} />
-              <Button onClick={() => copyValue(url)}>{copiedValue === url ? 'コピー済' : 'コピー'}</Button>
-            </Field>
-          })}
-        </FormSection>
-      }
-      if (liffUrl) return <FormSection id="ev-form-urls" title="予約 URL（友だちに案内する）"
-        description="LINE / OpenChat / IG DM どこでも貼れます。受信者がタップすると LINE で予約画面が開きます。">
-        <Field label="予約 URL"><TextInput readOnly value={liffUrl} onFocus={(event) => event.currentTarget.select()} />
-          <Button onClick={() => copyValue(liffUrl)}>{copiedValue === liffUrl ? 'コピー済' : 'コピー'}</Button>
-        </Field>
-      </FormSection>
-      return <Notice tone="warn" action={canManageRole(role) ? <Button variant="text" size="inline" href={`/accounts/detail?id=${encodeURIComponent(accountId)}`}>アカウント設定へ →</Button> : undefined} message="LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。" />
-    })()}
     {eventId && draft.is_published === 0 ? <Notice tone="warn" message="現在「下書き」状態です。公開設定タブで「公開する」を ON にすると友だち向けの予約 URL が表示されます。" /> : null}
     <Tabs label="イベントの編集" items={TABS.map((item) => ({
       label: item.label, current: tab === item.key, disabled: item.key !== 'overview' && !eventId,
@@ -361,12 +350,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         }} />
       </> : null} /> : null}
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} operationAccounts={eventOperationAccounts(savedDraft, accountId)} /> : null}
-    {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
+    {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} reservationUrls={reservationUrls} /> : null}
     {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'
       /* 変更のときは左端に［削除する］が入り幅が足りないので、説明の文は出さない（ボタンの名前で分かる）。 */
       ? eventId ? undefined : '保存するとイベントが作成され、予約枠タブに進みます'
-      : '「公開する」ON で友だちに予約 URL を案内できます'} actions={<>
-        {tab === 'overview' && eventId ? <Button onClick={() => save('slots')} disabled={saving}>保存して次へ →</Button> : null}
+      : undefined} actions={<>
         <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="保存中…">
           {tab === 'overview' && !eventId ? 'イベントを作る' : TABS.find((item) => item.key === tab)?.saveLabel ?? '保存する'}
         </Button>
@@ -937,10 +925,12 @@ function PublishTab({
   draft,
   update,
   tags,
+  reservationUrls,
 }: {
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   tags: Array<{ id: string; name: string }>
+  reservationUrls: React.ReactNode
 }) {
   // R23横展開(m18hと同じ形): 新しい候補にない公開対象タグは外して知らせる。
   const [tagPruned, setTagPruned] = useState(false)
@@ -995,7 +985,7 @@ function PublishTab({
         <RadioCard name="event-publish-state" value="draft" checked={draft.is_published === 0} onChange={() => update('is_published', 0)} title="下書き" note="友だちには見えない" />
         <RadioCard name="event-publish-state" value="published" checked={draft.is_published === 1} onChange={() => update('is_published', 1)} title="公開する" note="予約 URL が有効になる" />
       </RadioCardGroup>
-      <p>{draft.is_published === 1 ? '✓ 保存後、友だちに「予約 URL」を案内できます。' : '保存しても友だちには表示されません。'}</p>
+      {reservationUrls}
       <OgEditor value={{ ogTitle: draft.og_title, ogDescription: draft.og_description, ogImageUrl: draft.og_image_url }}
         onChange={(value) => { update('og_title', value.ogTitle); update('og_description', value.ogDescription); update('og_image_url', value.ogImageUrl) }}
         autoTitle={draft.name || undefined} autoDescription={draft.description ?? undefined} autoImageUrl={draft.image_url ?? undefined} />
