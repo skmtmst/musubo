@@ -105,7 +105,7 @@ export default function BulkBar({ count, unit = '件', hint, children, overflow,
       </strong>
       {total !== undefined && count < total && onSelectAll ? <Button size="compact" busy={selectingAll} busyLabel="対象を読み込んでいます…" onClick={() => void selectAll()}>条件に合う{total}{unit}すべてを選ぶ</Button> : null}
       {onClear ? <Button size="compact" disabled={selectingAll} onClick={onClear}>選ぶのをやめる</Button> : null}
-      {selectError ? <span role="alert">{selectError}</span> : null}
+      {selectError ? <span className="text-caption" role="alert">{selectError}</span> : null}
       {hint ? <span className={styles.hint}>{hint}</span> : null}
       {children || overflow ? (
         <span className={styles.actions}>
