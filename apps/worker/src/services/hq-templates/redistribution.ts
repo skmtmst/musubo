@@ -1,7 +1,7 @@
 import type { HqCatalogTemplateType } from '@line-crm/shared';
 import type { HqTemplateStatement } from '@line-crm/db';
 import { parseCatalogDefinition } from './catalog.js';
-import { bindingUnchangedCondition, readCatalogBinding, type CatalogBinding } from './catalog-binding.js';
+import { bindingUnchangedCondition, readStoreBinding, type CatalogBinding } from './catalog-binding.js';
 import { CATALOG_HASH_VERSION } from './catalog-record.js';
 import { bindingAppliedStatement, catalogApplyPlan, readCatalogTarget, targetUnchangedCondition, type CatalogVersionInput } from './catalog-target.js';
 import { decideRedistribution, redistributionNotices, type RedistributionDecision, type RedistributionNotice } from './redistribution-decision.js';
@@ -45,17 +45,15 @@ const conflictCodes: Record<string, string> = {
  */
 export async function planRedistribution(db: D1Database, input: { tenantId: string; templateId: string; kind: HqCatalogTemplateType; accountId: string; candidate: CatalogVersionInput }): Promise<RedistributionPlan> {
   const { tenantId, templateId, kind, accountId, candidate } = input;
-  let binding: CatalogBinding | null;
-  try { binding = await readCatalogBinding(db, tenantId, templateId, accountId, kind); }
-  catch (error) {
-    // 出所の欄と対応表が食い違う時は、どちらも正しいと決められないので書かない。
-    if (error instanceof HqTemplateError && error.code === 'VERSION_CONFLICT') return empty('conflict', 'origin_mismatch');
-    throw error;
-  }
-  if (!binding) return empty('unbound', null);
+  const stored = await readStoreBinding(db, tenantId, templateId, accountId);
+  if (!stored) return empty('unbound', null);
+  const binding = stored.binding;
+  if (stored.kind !== kind) return empty('conflict', 'origin_mismatch', binding);
   const target = await readCatalogTarget(db, kind, accountId, binding.targetId);
   // 店が削除した物の対応は残し、配り直しは失敗として記録する。消すかどうかは店と統括が判断する。
   if (!target) return empty('missing', 'target_missing', binding);
+  // 出所の欄と対応表が食い違う時は、どちらも正しいと決められないので書かない（正本は対応表、欄は照合だけに使う）。
+  if (target.originTemplateId !== templateId || target.originVersionId !== binding.appliedVersionId) return empty('conflict', 'origin_mismatch', binding);
   const versions = await loadCatalogVersions(db, tenantId, templateId, kind, [binding.appliedVersionId, binding.pendingVersionId, binding.dismissedVersionId, candidate.id]);
   const applied = versions.get(binding.appliedVersionId);
   if (!applied) return empty('conflict', 'origin_mismatch', binding);

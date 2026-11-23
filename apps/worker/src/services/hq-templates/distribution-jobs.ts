@@ -17,7 +17,7 @@ const SQL_NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')";
 
 export type RedistributionItemStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'conflict';
 interface JobRow { id: string; tenant_id: string; template_id: string; template_version_id: string; request_key: string; request_hash: string; status: string; created_by: string; notification_id: string | null; created_at: string; updated_at: string; finished_at: string | null }
-interface ItemRow { tenant_id: string; job_id: string; target_account_id: string; preflight_id: string; status: RedistributionItemStatus; attempt_count: number; error_code: string | null; finished_at: string | null }
+export interface RedistributionItemRow { tenant_id: string; job_id: string; target_account_id: string; preflight_id: string; status: RedistributionItemStatus; attempt_count: number; error_code: string | null; finished_at: string | null }
 
 async function batch(db: D1Database, statements: readonly HqTemplateStatement[]) {
   return db.batch(statements.map(statement => db.prepare(statement.sql).bind(...statement.bindings)));
@@ -33,8 +33,8 @@ function readPreflightIds(value: unknown): string[] {
   return [...value as string[]].sort();
 }
 
-function jobSummary(job: JobRow, items: ItemRow[], skippedAccountIds: string[] = []) {
-  const outcome = (item: ItemRow) => item.status === 'succeeded' ? (item.error_code === 'store_review_pending' ? 'notified' : item.error_code === 'unchanged' ? 'unchanged' : 'applied') : item.status;
+function jobSummary(job: JobRow, items: RedistributionItemRow[], skippedAccountIds: string[] = []) {
+  const outcome = (item: RedistributionItemRow) => item.status === 'succeeded' ? (item.error_code === 'store_review_pending' ? 'notified' : item.error_code === 'unchanged' ? 'unchanged' : 'applied') : item.status;
   return {
     jobId: job.id, status: job.status, templateVersionId: job.template_version_id, createdAt: job.created_at, finishedAt: job.finished_at,
     notificationId: job.notification_id, skippedAccountIds,
@@ -49,7 +49,7 @@ async function readJob(db: D1Database, tenantId: string, jobId: string) {
   const job = await db.prepare('SELECT * FROM hq_template_distribution_jobs WHERE id=? AND tenant_id=?').bind(jobId, tenantId).first<JobRow>();
   if (!job) return null;
   const items = (await db.prepare('SELECT tenant_id,job_id,target_account_id,preflight_id,status,attempt_count,error_code,finished_at FROM hq_template_distribution_job_items WHERE tenant_id=? AND job_id=? ORDER BY target_account_id')
-    .bind(tenantId, jobId).all<ItemRow>()).results;
+    .bind(tenantId, jobId).all<RedistributionItemRow>()).results;
   return { job, items };
 }
 
@@ -135,10 +135,10 @@ async function jobActorStillAuthorized(db: D1Database, job: JobRow): Promise<{ r
 
 const actorCondition = (job: JobRow) => ({ sql: `EXISTS(SELECT 1 FROM staff_members WHERE id=? AND tenant_id=? AND is_active=1 AND COALESCE(access_level,'full')<>'read_only' AND COALESCE(account_scope,'all')<>'accounts'
     AND (role IN ('owner','admin') OR (role='staff' AND role_bundle='hq_operator' AND assigned_line_account_id IS NULL AND account_scope='all')))`, bindings: [job.created_by, job.tenant_id] });
-const leaseCondition = (item: ItemRow, token: string) => ({ sql: `EXISTS(SELECT 1 FROM hq_template_distribution_job_items WHERE tenant_id=? AND job_id=? AND target_account_id=? AND status='running' AND lease_token=? AND lease_expires_at>${SQL_NOW})`,
+const leaseCondition = (item: RedistributionItemRow, token: string) => ({ sql: `EXISTS(SELECT 1 FROM hq_template_distribution_job_items WHERE tenant_id=? AND job_id=? AND target_account_id=? AND status='running' AND lease_token=? AND lease_expires_at>${SQL_NOW})`,
   bindings: [item.tenant_id, item.job_id, item.target_account_id, token] });
 
-function finishStatement(item: ItemRow, token: string, status: RedistributionItemStatus, code: string | null): HqTemplateStatement {
+function finishStatement(item: RedistributionItemRow, token: string, status: RedistributionItemStatus, code: string | null): HqTemplateStatement {
   return { sql: `UPDATE hq_template_distribution_job_items SET status=?,error_code=?,lease_token=NULL,lease_expires_at=NULL,finished_at=${SQL_NOW},updated_at=${SQL_NOW}
       WHERE tenant_id=? AND job_id=? AND target_account_id=? AND lease_token=?`, bindings: [status, code, item.tenant_id, item.job_id, item.target_account_id, token] };
 }
@@ -151,7 +151,7 @@ function itemResult(plan: RedistributionPlan): { status: RedistributionItemStatu
   return { status: plan.code === 'booking_not_used' ? 'failed' : 'conflict', code: plan.code };
 }
 
-async function claimItem(db: D1Database, item: ItemRow, leaseMs: number, maxAttempts: number): Promise<string | null> {
+async function claimItem(db: D1Database, item: RedistributionItemRow, leaseMs: number, maxAttempts: number): Promise<string | null> {
   const token = crypto.randomUUID(), now = new Date();
   const claimed = await db.prepare(`UPDATE hq_template_distribution_job_items SET status='running',lease_token=?,lease_expires_at=?,attempt_count=attempt_count+1,updated_at=?
       WHERE tenant_id=? AND job_id=? AND target_account_id=? AND status IN ('pending','running') AND (lease_expires_at IS NULL OR lease_expires_at<=${SQL_NOW}) AND attempt_count<?`)
@@ -161,9 +161,9 @@ async function claimItem(db: D1Database, item: ItemRow, leaseMs: number, maxAtte
   return token;
 }
 
-/** 札を持ったまま書けなかった店は、少し待ってから取り直せる状態へ戻す。札を失っていたら何もしない。 */
-async function releaseForRetry(db: D1Database, item: ItemRow, token: string, delayMs: number) {
-  await db.prepare(`UPDATE hq_template_distribution_job_items SET status='pending',lease_token=NULL,lease_expires_at=?,updated_at=? WHERE tenant_id=? AND job_id=? AND target_account_id=? AND lease_token=?`)
+/** 札を持ったまま書けなかった店は、少し待ってから取り直せる状態へ戻す。札を失った・切れていたら何もしない（もう他の実行者が取れる）。 */
+async function releaseForRetry(db: D1Database, item: RedistributionItemRow, token: string, delayMs: number) {
+  await db.prepare(`UPDATE hq_template_distribution_job_items SET status='pending',lease_token=NULL,lease_expires_at=?,updated_at=? WHERE tenant_id=? AND job_id=? AND target_account_id=? AND lease_token=? AND lease_expires_at>${SQL_NOW}`)
     .bind(new Date(Date.now() + delayMs).toISOString(), new Date().toISOString(), item.tenant_id, item.job_id, item.target_account_id, token).run();
 }
 
@@ -171,7 +171,7 @@ async function releaseForRetry(db: D1Database, item: ItemRow, token: string, del
  * 1店分を札つきで処理する。店への書き込み・対応表・店ごとの結果・操作の記録を同じ batch で確定する。
  * batch の先頭で札がまだ自分の物で期限内かを確かめ、期限切れの実行者は何も書けない。
  */
-export async function runRedistributionItem(db: D1Database, item: ItemRow, token: string, options: { retryDelayMs?: number } = {}): Promise<RedistributionItemStatus | 'retry'> {
+export async function runRedistributionItem(db: D1Database, item: RedistributionItemRow, token: string, options: { retryDelayMs?: number } = {}): Promise<RedistributionItemStatus | 'retry'> {
   const close = async (status: RedistributionItemStatus, code: string | null, statements: HqTemplateStatement[] = []) => {
     await batch(db, [guardStatement(leaseCondition(item, token)), ...statements, finishStatement(item, token, status, code)]);
     return status;
@@ -248,7 +248,7 @@ export async function processHqDistributionJobs(db: D1Database, options: { limit
   const due = (await db.prepare(`SELECT i.tenant_id,i.job_id,i.target_account_id,i.preflight_id,i.status,i.attempt_count,i.error_code,i.finished_at
       FROM hq_template_distribution_job_items i JOIN hq_template_distribution_jobs j ON j.id=i.job_id AND j.tenant_id=i.tenant_id
       WHERE i.status IN ('pending','running') AND (i.lease_expires_at IS NULL OR i.lease_expires_at<=${SQL_NOW}) AND i.attempt_count<? AND j.status IN ('pending','running')
-      ORDER BY j.created_at,i.created_at,i.target_account_id LIMIT ?`).bind(maxAttempts, options.limit ?? 30).all<ItemRow>()).results;
+      ORDER BY j.created_at,i.created_at,i.target_account_id LIMIT ?`).bind(maxAttempts, options.limit ?? 30).all<RedistributionItemRow>()).results;
   const results: Array<RedistributionItemStatus | 'retry' | 'skipped'> = [];
   for (const item of due) {
     const token = await claimItem(db, item, options.leaseMs ?? REDISTRIBUTION_LEASE_MS, maxAttempts);
