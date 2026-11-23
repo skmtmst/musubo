@@ -1324,4 +1324,4 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 
-- [ウォークインの階・エリア切り替え](release-log/unreleased/PR-kenta-walkin-floor-tabs.md)
+- [ウォークインの階・エリア切り替え](release-log/unreleased/210-kenta-walkin-floor-tabs.md)
