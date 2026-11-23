@@ -470,6 +470,7 @@
 
 ## 反映履歴
 
+- [受信箱のテンプレートの差し込みを名前の札で読む](release-log/unreleased/pending-kenta-template-unresolved-1123.md) — 反映履歴、確認 2026-11-23。
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
