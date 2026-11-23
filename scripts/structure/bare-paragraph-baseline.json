@@ -276,12 +276,6 @@
     "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
-    "file": "apps/web/src/components/shared/hq-message-inserts.tsx",
-    "fingerprint": "09c9ebfb2ccbec94d633b8244e4791041a5cd6665b3d698286d5cc7b99f93558",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/components/shared/inbox-list-states.tsx",
     "fingerprint": "28d2228cafeb729c4b7c922cb04d28b36b62feaf7ed2cfab8b444952ec9fcb9e",
     "count": 1,
@@ -298,12 +292,6 @@
     "fingerprint": "8ddd6030001796b729a952b38c1e3d9d31d02310e91c39cb2d1fe11dd9973a9c",
     "count": 1,
     "reason": "利用先の知らせの共通部品が補足サイズを指定"
-  },
-  {
-    "file": "apps/web/src/components/shared/media-slot.tsx",
-    "fingerprint": "e30e9d79368161a5ea357ba6317c2927f85b16dadeecac7b03b06514c01ccd5b",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/components/shared/message-composer.tsx",
@@ -1586,12 +1574,6 @@
   {
     "file": "apps/web/src/v8/webinar-edit/chrome.tsx",
     "fingerprint": "5d7d9953453e345631442aec5bfe00b1269c7fd49ea6fcc1639b05feb71c88cb",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/webinar-edit/notifications.tsx",
-    "fingerprint": "78a6deb056c40205dc763e834899cafb31f262ec6fa523883bc580af4ddd43ac",
     "count": 1,
     "reason": "既存の段落。文字サイズの継承先を確認中。"
   }
