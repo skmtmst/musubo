@@ -12,6 +12,7 @@
 - [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)
 - [受信箱の検索と顧客情報の修正](release-log/unreleased/196-kenta-inbox-search-field.md)
 - [予約台帳と来店スタンプの操作を修正](release-log/unreleased/197-kenta-booking-stamp-tweaks.md)
+- [飲食メニューの画像とアレルギーの追加](release-log/unreleased/198-kenta-menu-image-upload.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)

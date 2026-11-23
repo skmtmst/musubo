@@ -27,9 +27,10 @@ export function CustomerInfoViewport({ children }: { children: ReactNode }) {
 }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
-  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard', includeDiningFields = false, canViewFriend = false,
+  friendId, accountId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard', includeDiningFields = false, canViewFriend = false,
 }: {
   friendId: string
+  accountId?: string | null
   profile?: { name: string | null; pictureUrl?: string | null; addedAt: string }
   fields: FriendField[]
   state: 'loading' | 'ready' | 'error'
@@ -117,7 +118,7 @@ export default function CustomerInfoPanel({
             const field = shownFields.find(field => field.fixedKey === spec.key)!
             return <div className={styles.row} key={spec.key} data-layout={spec.key === 'allergy' && editing ? 'stack' : undefined}>
               <dt>{spec.label}</dt>
-              <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
+              <dd>{spec.key === 'allergy' ? <AllergyField accountId={accountId} value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
                 : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />
                 : <span className={value?.trim() ? styles.value : styles.note} title={display?.trim() ? display : undefined}>{display?.trim() ? display : '未設定'}</span>}{source && !editing ? <HelpTip hover label={`${spec.label}の出どころ`} icon={<FileText aria-hidden="true" />}>{source}</HelpTip> : null}</dd>
             </div>

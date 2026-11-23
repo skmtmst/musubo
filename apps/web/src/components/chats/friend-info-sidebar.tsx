@@ -447,6 +447,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 */}
                 {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
                 <CustomerInfoPanel
+                  accountId={accountId}
                   labelWidth="wide"
                   canViewFriend={canViewFeature('/friends', staffRole)}
                   friendId={friend.id}
