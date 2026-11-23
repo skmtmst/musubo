@@ -28,7 +28,7 @@ export function RowMore({ subject, items, lockedReason }: { subject: string; ite
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, headerIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, bodyOffset, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, footerNotePlacement = 'above', guideSlot, centerActions, onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth = false, minHeight, top, tone, busy, designNode, titleIcon, headerIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, bodyOffset, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, footerNotePlacement = 'above', guideSlot, centerActions, extraDirty, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   /** 題の下の小さな補足（絵の窓の頭が題＋1行のとき）。渡さないときは出ない。 */
@@ -40,6 +40,7 @@ export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth 
   top: number
   tone?: 'default' | 'destructive'
   busy?: boolean
+  extraDirty?: boolean
   designNode?: string
   guideSlot?: string
   centerActions?: boolean
@@ -123,6 +124,7 @@ export function RsDialog({ open, title, titleNote, titleSize, width, exactWidth 
       titleContent={titleSize ? <span style={{ fontSize: titleSize }}>{title}</span> : undefined}
       tone={tone}
       busy={busy}
+      dirty={extraDirty ? true : undefined}
       titleIcon={titleIcon}
       headerIcon={headerIcon}
       designTitleRow={titleRow}

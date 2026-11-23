@@ -1,6 +1,8 @@
 'use client'
 import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
 import { DialogNote } from '../booking-kit/parts'
+import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
+import type { RestaurantReservationAllergy } from '@line-crm/shared'
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { jstCalendar } from '@/lib/jst-datetime'
@@ -83,11 +85,12 @@ function recommendTable(tables: RestaurantTable[], count: number, free: (table: 
     .sort((a, b) => (a.max_capacity - count) - (b.max_capacity - count) || a.code.localeCompare(b.code, 'ja', { numeric: true }))[0] ?? null
 }
 
-export default function PhoneReservation({ accountStyle, staffRole, canUseAlternateBooking = false, tableDefinition, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+export default function PhoneReservation({ accountStyle, staffRole, canUseAlternateBooking = false, tableDefinition, allergyAccountId, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
   accountStyle?: import('@line-crm/shared').AccountStyle | null
   staffRole?: string | null
   canUseAlternateBooking?: boolean
   tableDefinition?: RestaurantTableDefinition
+  allergyAccountId?: string | null
   storeId: string
   storeName: string
   tables: RestaurantTable[]
@@ -122,7 +125,8 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
   const [time, setTime] = useState(preset.time || '')
   const [tableMode, setTableMode] = useState(preset.tableId || 'auto')
   const [courseId, setCourseId] = useState('')
-  const [allergy, setAllergy] = useState('')
+  const [selectedAllergies, setAllergies] = useState<RestaurantReservationAllergy[]>([])
+  const [memo, setMemo] = useState('')
   const [notifyTarget, setNotifyTarget] = useState<string | null>(null)
   const canNotify = kind === 'customer' && whoTab === 'line' && Boolean(person?.lineUid)
   const notifyKey = JSON.stringify([selectedAccountId, storeId, person?.lineUid])
@@ -162,7 +166,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
 
   const dirty = kind !== (preset.hold ? 'hold' : 'customer') || search !== '' || person !== null || manualPhone !== '' || manualName !== ''
     || date !== (preset.date ? toYmd(preset.date) : todayInput) || count !== '2' || time !== (preset.time || '')
-    || tableMode !== (preset.tableId || 'auto') || courseId !== '' || allergy !== '' || notify
+    || tableMode !== (preset.tableId || 'auto') || courseId !== '' || selectedAllergies.length > 0 || memo !== '' || notify
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
   useEffect(() => {
@@ -268,7 +272,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
       guestCount: guests, startsAt, endsAt: endsAtIso,
       tableId: tableMode === 'auto' ? null : tableMode,
       courseId: courseId || null,
-      allergyNote: allergy.trim() || null, notifyLine: notify,
+      allergies: selectedAllergies, note: memo.trim() || null, notifyLine: notify,
     })
   }
 
@@ -447,9 +451,8 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
           </Card>
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-allergy">
             <h2 id="rs-phone-allergy" className={styles.phoneCardTitle}>要望・アレルギー</h2>
-            <Field label="アレルギー・特記事項" htmlFor="rs-phone-allergy-input">
-              <SaveErrorField names={["allergy","allergyNote"]}><TextField id="rs-phone-allergy-input" value={allergy} onChange={(event) => setAllergy(event.target.value)} /></SaveErrorField>
-            </Field>
+            <ReservationAllergySelect accountId={allergyAccountId === undefined ? selectedAccountId : allergyAccountId} role={staffRole} values={selectedAllergies} onChange={setAllergies} disabled={busy || !canWrite} />
+            <Field label="メモ"><TextField value={memo} onChange={event => setMemo(event.target.value)} placeholder="記念日など" /></Field>
           </Card>
           {canNotify ? (
             <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-send">

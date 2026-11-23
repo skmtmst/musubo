@@ -275,9 +275,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (
         <>
-          <PhoneReservationDrawer staffRole={role} storeName={store.store.name} tableDefinition={store.tableDefinition} open={phoneOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}
+          <PhoneReservationDrawer staffRole={role} storeName={store.store.name} tableDefinition={store.tableDefinition} open={phoneOpen} accountId={store.accountId} allergyAccountId={store.store.line_account_id} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}
             onSaved={({ lineFailed }) => { setPhoneOpen(false); notifyToast(lineFailed ? '予約は入れました。LINE の確認は送れていません。' : '予約を入れました。', lineFailed ? { tone: 'error' } : undefined); void reload() }} />
-          <WalkInDialog tableDefinition={store.tableDefinition} open={walkInOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setWalkInOpen(false)}
+          <WalkInDialog tableDefinition={store.tableDefinition} open={walkInOpen} accountId={store.accountId} allergyAccountId={store.store.line_account_id} storeId={store.store.id} tables={tables} onClose={() => setWalkInOpen(false)}
             onSaved={({ seated }) => { setWalkInOpen(false); notifyToast(seated ? '入店にしました。' : '席は取りました。来店の印は付けられませんでした。表の［来店］を押してください。', seated ? undefined : { tone: 'error' }); void reload() }} />
         </>
       ) : null}

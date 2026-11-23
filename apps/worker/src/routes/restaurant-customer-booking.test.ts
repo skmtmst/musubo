@@ -129,6 +129,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('飲食店の本人予約', () => {
+  it('本人の席予約で複数選択を保存し、確定時の追加も保持する', async () => {
+    const allergies=[{kind:'option',value:'卵'},{kind:'other',value:'キウイ'}];
+    const input={storeId:'store',startsAt:start,guestCount:2,requestId:'allergy_input_1',allergies};
+    const held=await request('/api/liff/restaurant/holds',input);
+    expect(held.status).toBe(201);
+    const booking=(await read(held)).data;
+    expect(booking.allergies).toEqual(allergies);
+    expect((await request('/api/liff/restaurant/holds',input)).status).toBe(200);
+    expect((await request('/api/liff/restaurant/holds',{...input,allergies:[{kind:'option',value:'乳'}]})).status).toBe(409);
+    const confirmBody={expectedVersion:booking.version,allergies:[{kind:'other',value:'ごま'}]};
+    const confirmed=await request(`/api/liff/restaurant/reservations/${booking.id}/confirm`,confirmBody);
+    expect(confirmed.status).toBe(200);
+    expect((await read(confirmed)).data.allergies).toEqual([...allergies,{kind:'other',value:'ごま'}]);
+    expect((await request(`/api/liff/restaurant/reservations/${booking.id}/confirm`,confirmBody)).status).toBe(200);
+  });
+  it('本人の席予約で候補外を候補として送れない', async () => {
+    const response=await request('/api/liff/restaurant/holds',{storeId:'store',startsAt:start,guestCount:2,requestId:'allergy_input_2',allergies:[{kind:'option',value:'未知'}]});
+    expect(response.status).toBe(400);
+  });
   it('仮押さえ→確定→変更→取消。通知と媒体の知らせを一度だけ作る', async () => {
     const h = await hold();
     expect(h.status).toBe(201);
@@ -613,6 +632,53 @@ describe('専用の予約フォームの設定と確定',()=>{
   expect(response.status).toBe(409);expect(await response.json()).toMatchObject({error:'reservation_form_changed'});
   expect(db.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(h.id)).toEqual({status:'pending'});
   expect(db.raw.prepare('SELECT count(*) n FROM rt_customer_notice_outbox WHERE reservation_id=?').get(h.id)).toEqual({n:0});
+ });
+ it('店が記録したアレルギーを空の入力で消さず、追加の申告も残す',async()=>{
+  await settings();const {data:h}=await read(await hold());
+  db.raw.prepare('UPDATE rt_reservations SET allergy_note=?, allergies_json=? WHERE id=?').run('卵', JSON.stringify([{kind:'option',value:'卵'}]), h.id);
+  const current=db.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(h.id) as {customer_version:number};
+  const confirmed=await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:current.customer_version,expectedFormVersion:1,allergyNote:'キウイ'});
+  expect(confirmed.status).toBe(200);
+  const saved=db.raw.prepare('SELECT allergy_note,allergies_json FROM rt_reservations WHERE id=?').get(h.id) as {allergy_note:string;allergies_json:string};
+  expect(saved.allergy_note).toBe('卵、その他：キウイ');
+  expect(JSON.parse(saved.allergies_json)).toEqual([{kind:'option',value:'卵'},{kind:'other',value:'キウイ'}]);
+ });
+ it('確定時の空の入力で店のアレルギーを消さない',async()=>{
+  await settings();const {data:h}=await read(await hold());
+  db.raw.prepare('UPDATE rt_reservations SET allergy_note=?, allergies_json=? WHERE id=?').run('卵', JSON.stringify([{kind:'option',value:'卵'}]), h.id);
+  const current=db.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(h.id) as {customer_version:number};
+  const confirmed=await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:current.customer_version,expectedFormVersion:1,allergyNote:null});
+  expect(confirmed.status).toBe(200);
+  expect(db.raw.prepare('SELECT allergy_note,allergies_json FROM rt_reservations WHERE id=?').get(h.id)).toEqual({allergy_note:'卵',allergies_json:JSON.stringify([{kind:'option',value:'卵'}])});
+ });
+ it('店の記録が長くても、お客さまの空の入力で確定できる',async()=>{
+  await settings();const {data:h}=await read(await hold());
+  const entries=[{kind:'other',value:'あ'.repeat(100)},{kind:'other',value:'い'.repeat(100)},{kind:'other',value:'う'.repeat(100)}];
+  db.raw.prepare('UPDATE rt_reservations SET allergy_note=?, allergies_json=? WHERE id=?').run(entries.map(item=>'その他：'+item.value).join('、'), JSON.stringify(entries), h.id);
+  const current=db.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(h.id) as {customer_version:number};
+  const confirmed=await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:current.customer_version,expectedFormVersion:1,allergyNote:null});
+  expect(confirmed.status).toBe(200);
+  expect(JSON.parse((db.raw.prepare('SELECT allergies_json FROM rt_reservations WHERE id=?').get(h.id) as {allergies_json:string}).allergies_json)).toEqual(entries);
+ });
+ it.each([null,'キウイ'])('古い自由記述を確定時に失わない（入力=%s）',async(input)=>{
+  await settings();const {data:h}=await read(await hold());
+  db.raw.prepare('UPDATE rt_reservations SET allergy_note=? WHERE id=?').run('えび、調味料', h.id);
+  const current=db.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(h.id) as {customer_version:number};
+  const confirmed=await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:current.customer_version,expectedFormVersion:1,allergyNote:input});
+  expect(confirmed.status).toBe(200);
+  const saved=db.raw.prepare('SELECT allergy_note,allergies_json FROM rt_reservations WHERE id=?').get(h.id) as {allergy_note:string;allergies_json:string|null};
+  if(input){
+   expect(saved.allergy_note).toBe('その他：えび、調味料、その他：キウイ');
+   expect(JSON.parse(saved.allergies_json!)).toEqual([{kind:'other',value:'えび、調味料'},{kind:'other',value:'キウイ'}]);
+  }else{expect(saved.allergy_note).toBe('えび、調味料');expect(saved.allergies_json).toBeNull()}
+ });
+ it('旧自由記述がある席予約へ候補を追加しても旧記録を保つ',async()=>{
+  await settings();const {data:h}=await read(await hold());
+  db.raw.prepare('UPDATE rt_reservations SET allergy_note=? WHERE id=?').run('えび、調味料', h.id);
+  const current=db.raw.prepare('SELECT customer_version FROM rt_reservations WHERE id=?').get(h.id) as {customer_version:number};
+  const confirmed=await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:current.customer_version,expectedFormVersion:1,allergies:[{kind:'option',value:'卵'}]});
+  expect(confirmed.status).toBe(200);
+  expect((await read(confirmed)).data.allergies).toEqual([{kind:'other',value:'えび、調味料'},{kind:'option',value:'卵'}]);
  });
  it('必須の電話はAPIでも検証し、名前とアレルギーを同じ予約の確定と一緒に保存する',async()=>{
   await settings(true);const {data:h}=await read(await hold());

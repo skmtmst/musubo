@@ -11,16 +11,21 @@ import { DialogNote } from '../booking-kit/parts'
  */
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { useEffect, useMemo, useState } from 'react'
-import { Armchair, LogIn, Minus, Plus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { LogIn, Minus, Plus } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import IconButton from '@/components/shared/icon-button'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Notice from '@/components/shared/notice'
+import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
+import { useStaffRole } from '@/lib/staff-role'
+import type { RestaurantFloor, RestaurantReservationAllergy } from '@line-crm/shared'
+import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
+import AvailableTables, { tableGroups } from './available-tables'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { freeTables, tableBusy, tableNote, toYmd } from './slots'
 import { seatWalkIn } from './walk-in'
 import styles from './front-desk.module.css'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 const MAX_GUESTS = 100
 
@@ -42,9 +47,10 @@ export function nextFreeAt(tables: RestaurantTable[], guests: number, rows: Rest
   return best
 }
 
-export default function WalkInDialog({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
+export default function WalkInDialog({ tableDefinition, open, accountId, allergyAccountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  allergyAccountId?: string | null
   tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
@@ -52,43 +58,69 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
   onSaved: (result: { seated: boolean }) => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const role = useStaffRole()
+  const [allergies, setAllergies] = useState<RestaurantReservationAllergy[]>([])
 
   const [now, setNow] = useState(() => new Date())
   const [guests, setGuests] = useState(2)
   const capacityReason = tableCapacityReason(tableDefinition, accountId, storeId, tables, guests)
   const [tableId, setTableId] = useState('')
+  const [floorId, setFloorId] = useState('all')
+  const [floors, setFloors] = useState<RestaurantFloor[]>([])
+  const [floorStatus, setFloorStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const initialized = useRef(false)
   const [rows, setRows] = useState<RestaurantReservation[] | null>(null)
+  const [rowsScope, setRowsScope] = useState('')
+  const scope = JSON.stringify([accountId, storeId])
+  const currentRows = rowsScope === scope ? rows : null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!open) return
-    setNow(new Date()); setGuests(2); setTableId(''); setError(''); setRows(null)
+    setNow(new Date()); setGuests(2); setTableId(''); setFloorId('all'); setFloors([]); setAllergies([]); initialized.current = false; setError(''); setRows(null)
   }, [open])
 
   useEffect(() => {
     let current = true
     if (!open || !accountId || !storeId) return
+    setRows(null); setTableId(''); initialized.current = false
     void restaurantTestApi.reservationsDay(accountId, storeId, toYmd(now))
-      .then((res) => { if (current) setRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []) })
-      .catch(() => { if (current) { setRows([]); setError('今日の予約を読み込めませんでした。閉じてもう一度開いてください。') } })
+      .then((res) => { if (current) { setRowsScope(scope); setRows(Array.isArray(res.data?.reservations) ? res.data.reservations : []) } })
+      .catch(() => { if (current) { setRowsScope(scope); setRows([]); setError('今日の予約を読み込めませんでした。閉じてもう一度開いてください。') } })
     return () => { current = false }
   }, [open, accountId, storeId, now])
 
-  const free = useMemo(() => (rows ? freeTables(tables, guests, now.getTime(), rows) : []), [tables, guests, now, rows])
-  /* 頭の「空いている卓」は人数にかかわらず、いま予約が重なっていない動いている卓の数。 */
-  const freeAll = useMemo(() => (rows ? tables.filter((t) => t.is_active && !tableBusy(t.id, now.getTime(), now.getTime() + 1, rows)).length : 0), [tables, now, rows])
-  /* 人数を変えて選んでいた卓が外れたら、いちばん合う卓を選び直す。 */
   useEffect(() => {
-    if (!free.some((t) => t.id === tableId)) setTableId(free[0]?.id ?? '')
-  }, [free]) // eslint-disable-line react-hooks/exhaustive-deps
-  const waitUntil = rows && free.length === 0 ? nextFreeAt(tables, guests, rows, now.getTime()) : null
+    let current = true
+    setFloors([]); setFloorId('all'); setFloorStatus('loading')
+    if (open && accountId && storeId) void reservationBoardApi.floors(accountId, storeId)
+      .then(result => {
+        if (!Array.isArray(result.data)) throw new Error('階・エリアを読み込めませんでした')
+        if (current) { setFloors(result.data); setFloorStatus('ready') }
+      })
+      .catch(() => { if (current) setFloorStatus('error') })
+    return () => { current = false }
+  }, [open, accountId, storeId])
+
+  const free = useMemo(() => (currentRows ? freeTables(tables, guests, now.getTime(), currentRows) : []), [tables, guests, now, currentRows])
+  /* 頭の「空いている卓」は人数にかかわらず、いま予約が重なっていない動いている卓の数。 */
+  const freeAll = useMemo(() => (currentRows ? tables.filter((t) => t.is_active && !tableBusy(t.id, now.getTime(), now.getTime() + 1, currentRows)).length : 0), [tables, now, currentRows])
+  const visible = floorId === 'all' ? free : free.filter(table => table.floor_id === floorId)
+  useEffect(() => {
+    if (!currentRows || floorStatus === 'loading') return
+    if (!initialized.current) {
+      initialized.current = true
+      setTableId(tableGroups(free, floors).flatMap(group => group.tables)[0]?.id ?? '')
+    } else if (tableId && !visible.some(table => table.id === tableId)) setTableId('')
+  }, [currentRows, free, floors, floorId, floorStatus, tableId])
+  const waitUntil = currentRows && free.length === 0 ? nextFreeAt(tables, guests, currentRows, now.getTime()) : null
 
   const save = async () => {
     if (!tableId) { setError('座る卓を選んでください。'); return }
     setBusy(true); setError('')
     try {
-      const result = await seatWalkIn(accountId, { storeId, guestCount: guests, tableId, now: new Date() })
+      const result = await seatWalkIn(accountId, { storeId, guestCount: guests, tableId, now: new Date(), allergies })
       onSaved({ seated: result.seated })
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
@@ -110,10 +142,13 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
       title="ウォークインを入れる"
       description={`いま ${hm(now)}・空いている卓 ${freeAll}`}
       busy={busy}
+      dirty={allergies.length ? true : undefined}
       error={error || undefined}
       confirmLabel="入店にする"
       confirmIcon={<LogIn size={16} aria-hidden="true" />}
-      onConfirm={tableId ? () => save() : undefined}
+      confirmDisabled={!tableId || !currentRows || floorStatus === 'loading'}
+      confirmDisabledReason="座る卓を選んでください。"
+      onConfirm={() => save()}
       onCancel={onClose}
     >
       <div className={styles.walkIn}>
@@ -125,33 +160,15 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
             <IconButton aria-label="人数を増やす" disabled={guests >= MAX_GUESTS || busy} onClick={() => setGuests((n) => Math.min(MAX_GUESTS, n + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
           </div>
         </div>
-        {rows === null ? (
-          <p className={styles.hint}>空いている卓を調べています。</p>
-        ) : free.length === 0 ? (
-          <div className={styles.full} role="status">
+        <ReservationAllergySelect accountId={open ? (allergyAccountId === undefined ? accountId : allergyAccountId) : null} role={role} values={allergies} onChange={setAllergies} disabled={busy} />
+        {floorStatus === 'error' && <Notice tone="warn" message="階・エリアを読み込めませんでした。卓はすべて表示しています。" />}
+        {currentRows === null ? <p className={styles.hint}>空いている卓を調べています。</p> : <>
+          <AvailableTables tables={free} floors={floors} floorId={floorId} onFloorChange={setFloorId} selected={tableId} onSelect={setTableId} guests={guests} disabled={busy} />
+          {free.length === 0 && <div className={styles.full} role="status">
             <p className={styles.fullTitle}>いま座れる卓はありません</p>
             {capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{waitUntil ? `${guests}名が入る卓は ${hm(waitUntil)} ごろに空く予定です（約${Math.max(1, Math.round((waitUntil - now.getTime()) / 60_000))}分）。` : `${guests}名が入る卓がありません。人数を分けるか、予約台帳で卓を確かめてください。`}</p>}
-          </div>
-        ) : (
-          <div className={styles.cardsWrap}>
-          <SaveErrorField names={["walk-in-table","id","table.id","tableId"]}><RadioCardGroup legend={`今すぐ座れる卓（${guests}名が座れる卓だけ）`} legendVisible columns={3}>
-            {free.map((table) => (
-              <RadioCard
-                key={table.id}
-                name="walk-in-table"
-                value={table.id}
-                checked={tableId === table.id}
-                onChange={setTableId}
-                title={table.code}
-                note={tableNote(table)}
-                icon={<Armchair size={16} aria-hidden="true" />}
-                height="short"
-                disabled={busy}
-              />
-            ))}
-          </RadioCardGroup></SaveErrorField>
-          </div>
-        )}
+          </div>}
+        </>}
       </div>
     </Dialog></SaveErrorScope>
   )

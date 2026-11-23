@@ -1,3 +1,4 @@
+import type { RestaurantReservationAllergy } from '@line-crm/shared'
 /*
  * ウォークイン（予約なしの来店）を入れる口。ここ1か所にまとめる。
  *
@@ -18,7 +19,7 @@ export function isWalkIn(row: Pick<RestaurantReservation, 'source' | 'note'>): b
 
 export type WalkInResult = { id: string; seated: boolean }
 
-export async function seatWalkIn(accountId: string, input: { storeId: string; guestCount: number; tableId: string; now?: Date }): Promise<WalkInResult> {
+export async function seatWalkIn(accountId: string, input: { storeId: string; guestCount: number; tableId: string; now?: Date; allergies?: RestaurantReservationAllergy[] }): Promise<WalkInResult> {
   const start = input.now ?? new Date()
   const created = await restaurantTestApi.createReservation(accountId, {
     storeId: input.storeId,
@@ -28,6 +29,7 @@ export async function seatWalkIn(accountId: string, input: { storeId: string; gu
     startsAt: start.toISOString(),
     endsAt: new Date(start.getTime() + STAY_MINUTES * 60_000).toISOString(),
     tableId: input.tableId,
+    allergies: input.allergies,
     note: WALK_IN_NOTE,
     notifyLine: false,
   })

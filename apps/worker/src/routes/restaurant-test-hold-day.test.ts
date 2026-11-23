@@ -119,6 +119,105 @@ beforeEach(() => {
 
 describe('V8 仮押さえ・日付・来店履歴', () => {
   const hold = { storeId: 'store-ginza', startsAt: '2099-10-10T10:00:00Z', endsAt: '2099-10-10T12:00:00Z', guestCount: 2, holdMinutes: 15 };
+  it('仮押さえのアレルギーを保存・読出し・編集し、従来の文字入力も保持する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
+    const allergies = [{ kind: 'option', value: '卵' }, { kind: 'other', value: 'キウイ' }];
+    const created = await request('/api/restaurant-test/reservations/holds?account_id=account-1', { ...hold, allergies });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json() as any).data;
+    let day = await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    let item = (await day.json() as any).data.reservations.find((row: any) => row.id === id);
+    expect(item.allergies).toEqual(allergies);
+    expect(item.allergy_note).toBe('卵、その他：キウイ');
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergies: [{ kind: 'option', value: '乳' }] })).status).toBe(200);
+    day = await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    item = (await day.json() as any).data.reservations.find((row: any) => row.id === id);
+    expect(item.allergies).toEqual([{ kind: 'option', value: '乳' }]);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergyNote: '古い自由記述、区切りを残す' })).status).toBe(200);
+    day = await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    item = (await day.json() as any).data.reservations.find((row: any) => row.id === id);
+    expect(item.allergies).toBeNull();
+    expect(item.allergy_note).toBe('古い自由記述、区切りを残す');
+    const longLegacy = '長'.repeat(201);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergyNote:longLegacy })).status).toBe(200);
+    const preserved = await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergies:[{kind:'other',value:longLegacy},{kind:'option',value:'卵'}] });
+    expect(preserved.status).toBe(200);
+    const row = testDb.raw.prepare('SELECT allergies_json FROM rt_reservations WHERE id=?').get(id) as {allergies_json:string};
+    expect(JSON.parse(row.allergies_json)).toEqual([{kind:'other',value:longLegacy},{kind:'option',value:'卵'}]);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergies:[{kind:'other',value:longLegacy},{kind:'option',value:'乳'}] })).status).toBe(200);
+  });
+  it('候補外の値はその他で指定し、権限のない店舗を指定できない', async () => {
+    seedRestaurantFixture();
+    const endpoint = '/api/restaurant-test/reservations/holds?account_id=account-1';
+    expect((await request(endpoint, { ...hold, allergies: [{ kind: 'option', value: '未知の候補' }] })).status).toBe(400);
+    expect((await request(endpoint, { ...hold, allergyNote:'乳', allergies:[{kind:'option',value:'卵'}] })).status).toBe(400);
+    testDb.raw.exec("INSERT INTO staff_members(id,name,role,api_key,account_scope,tenant_id) VALUES('operator','担当者','staff','operator-key','accounts','00000000-0000-4000-8000-000000000001'); INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('operator','account-2',datetime('now'));");
+    authMocks.getStaffByApiKey.mockResolvedValue({ id:'operator', name:'担当者', role:'staff', access_level:'full', permission_keys:'[]', assigned_line_account_id:null, can_access_descendant_accounts:0 });
+    const scoped = '/api/restaurant-test/reservations/holds?account_id=account-2';
+    expect((await requestAs(scoped, 'operator-key', { ...hold, storeId:'store-yokohama', allergies: [{ kind: 'other', value: 'キウイ' }] })).status).toBe(400);
+  });
+  it('選択中のアカウントと異なる店舗では店舗側の候補を検証する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
+    const { saveVersionedAccountSetting } = await import('@line-crm/db');
+    for (const [accountId, option] of [['account-1', '大豆'], ['account-2', 'キウイ']]) {
+      await saveVersionedAccountSetting(testDb.db, { accountId: accountId!, key: 'friend.allergy_options_v1', data: [option], expectedVersion: 0 });
+    }
+    const endpoint = '/api/restaurant-test/reservations/holds?account_id=account-1';
+    expect((await request(endpoint, { ...hold, allergies: [{kind:'option',value:'大豆'}] })).status).toBe(400);
+    expect((await request(endpoint, { ...hold, allergies: [{kind:'option',value:'キウイ'}] })).status).toBe(201);
+  });
+  it('候補から削除された値も、すでに予約にあるときは編集で保持できる', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
+    const created = await request('/api/restaurant-test/reservations/holds?account_id=account-1', { ...hold, allergies: [{kind:'option',value:'卵'}] });
+    expect(created.status).toBe(201);
+    const {id} = (await created.json() as any).data;
+    const { saveVersionedAccountSetting } = await import('@line-crm/db');
+    await saveVersionedAccountSetting(testDb.db, { accountId:'account-2', key:'friend.allergy_options_v1', data:['乳'], expectedVersion:0 });
+    const updated = await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { allergies:[{kind:'option',value:'卵'},{kind:'option',value:'乳'}] });
+    expect(updated.status).toBe(200);
+    const row = testDb.raw.prepare('SELECT allergies_json FROM rt_reservations WHERE id=?').get(id) as {allergies_json:string};
+    expect(JSON.parse(row.allergies_json)).toEqual([{kind:'option',value:'卵'},{kind:'option',value:'乳'}]);
+  });
+  it('閲覧のみの担当者はアレルギーを保存できない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec("INSERT INTO staff_members(id,name,role,api_key,access_level,account_scope,tenant_id) VALUES('viewer','閲覧','staff','viewer-key','read_only','accounts','00000000-0000-4000-8000-000000000001'); INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('viewer','account-2',datetime('now'));");
+    authMocks.getStaffByApiKey.mockResolvedValue({ id:'viewer', name:'閲覧', role:'staff', access_level:'read_only', permission_keys:'[]', assigned_line_account_id:null, can_access_descendant_accounts:0 });
+    const response = await requestAs('/api/restaurant-test/reservations/holds?account_id=account-2', 'viewer-key', { ...hold, allergies: [{ kind:'option', value:'卵' }] });
+    expect(response.status).toBe(403);
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS n FROM rt_reservations WHERE allergies_json IS NOT NULL").get()).toEqual({n:0});
+  });
+  it('電話予約とウォークインに複数のアレルギーを記録する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();
+    const allergies = [{ kind:'option', value:'卵' }, { kind:'other', value:'キウイ' }];
+    const manual = await request('/api/restaurant-test/reservations/manual?account_id=account-1', { storeId:'store-ginza', customerName:'見本', guestCount:2, startsAt:'2099-10-10T10:00:00Z', endsAt:'2099-10-10T12:00:00Z', source:'phone', allergies });
+    expect(manual.status).toBe(201);
+    const manualId = (await manual.json() as any).data.id;
+    const walk = await request('/api/restaurant-test/reservations/walk-in?account_id=account-1', { storeId:'store-ginza', tableId:'table-ginza', guestCount:2, customerPhone:'09000000000', allergies });
+    expect(walk.status).toBe(201);
+    const walkId = (await walk.json() as any).data.id;
+    for (const id of [manualId, walkId]) {
+      const row = testDb.raw.prepare('SELECT allergy_note, allergies_json FROM rt_reservations WHERE id=?').get(id) as { allergy_note:string; allergies_json:string };
+      expect(row.allergy_note).toBe('卵、その他：キウイ');
+      expect(JSON.parse(row.allergies_json)).toEqual(allergies);
+    }
+    const history=await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
+    expect(history.status).toBe(200);
+    const visit=(await history.json() as any).data.visits.find((item:any)=>item.id===walkId);
+    expect(visit.allergies).toEqual(allergies);
+    expect(visit.allergy_note).toBe('卵、その他：キウイ');
+    const from=encodeURIComponent(new Date(Date.now()-60_000).toISOString());
+    const to=encodeURIComponent(new Date(Date.now()+3*60*60_000).toISOString());
+    const board=await request(`/api/restaurant-test/board?account_id=account-1&storeId=store-ginza&from=${from}&to=${to}`);
+    expect(board.status).toBe(200);
+    const entry=(await board.json() as any).data.items.find((item:any)=>item.id===walkId);
+    expect(entry.currentAllergy).toBe('卵、その他：キウイ');
+    expect(entry.allergies).toEqual(allergies);
+  });
+
   it('仮押さえは期限を保存し、重なる要求を409で止め、解除後は再登録できる', async () => {
     seedRestaurantFixture();
     testDb.raw.prepare("INSERT INTO rt_opening_hours_settings (store_id, hours_json, updated_by) VALUES ('store-ginza', '[]', 'test')").run();

@@ -1,5 +1,6 @@
 'use client'
-import { normalizePhone, phoneProblem } from '@line-crm/shared';
+import { allergyValues, normalizePhone, phoneProblem, type RestaurantReservationAllergy } from '@line-crm/shared';
+import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
 
 import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
 
@@ -54,13 +55,16 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
+export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, accountId, allergyAccountId, staffRole, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
   reservation: RestaurantReservation | null
   missing?: boolean
   tables: RestaurantTable[]
   courses: RestaurantMenuItem[]
   busy: boolean
   canWrite: boolean
+  accountId?: string | null
+  allergyAccountId?: string | null
+  staffRole?: string | null
   onClose: () => void
   onSave: (patch: ReservationPatch) => Promise<ReservationEditSaveResult> | void
   onCancelReservation: (id: string) => void
@@ -71,9 +75,11 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     initialReservation.current = { id: reservation.id, version: reservation.customer_version ?? 1 }
   }
   const changedElsewhere = missing || (!!reservation && !!initialReservation.current && (reservation.customer_version ?? 1) !== initialReservation.current.version)
+  const [allergies, setAllergies] = useState<RestaurantReservationAllergy[]>([])
   const [draft, setDraft] = useState({ customerName: '', customerPhone: '', guestCount: '2', allergyNote: '', startsAt: '', endsAt: '', tableId: '', courseId: '' })
   useEffect(() => {
     if (!reservation || (reservation.customer_version ?? 1) !== initialReservation.current?.version) return
+    setAllergies(reservation.allergies ?? allergyValues(reservation.allergy_note).map(value => ({ kind: 'other' as const, value })))
     setDraft({
       customerName: reservation.customer_name,
       customerPhone: reservation.customer_phone || '',
@@ -98,6 +104,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
   fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。', { required: true })
   if (!reservation) return null
+  const originalAllergies = reservation.allergies ?? allergyValues(reservation.allergy_note).map(value => ({ kind: 'other' as const, value }))
+  const allergyChanged = JSON.stringify(allergies) !== JSON.stringify(originalAllergies)
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
   const save = async () => {
@@ -123,7 +131,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         endsAt: datetimeLocalJstToUtcIso(input.endsAt),
         tableId: input.tableId || null,
         courseId: input.courseId || null,
-        allergyNote: input.allergyNote || null,
+        ...(allergyChanged ? { allergies } : {}),
       })
       if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
     } catch (error) {
@@ -148,6 +156,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       width={600}
       top={120}
       busy={busy}
+      extraDirty={allergyChanged}
       onCancel={onClose}
       onSubmit={canWrite && !hold ? save : undefined}
       actions={(
@@ -203,9 +212,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
               <SaveErrorField names={["courseId","draft.courseId","course_id","draft.course_id"]}><EntitySelect aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} /></SaveErrorField>
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
           </Field>
-          <Field label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
-            <SaveErrorField names={["allergyNote","draft.allergyNote","allergy_note","draft.allergy_note"]}><TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} /></SaveErrorField>
-          </Field>
+          <ReservationAllergySelect accountId={allergyAccountId === undefined ? accountId : allergyAccountId} role={staffRole} values={allergies} onChange={setAllergies} disabled={!canWrite || busy} />
         </>
       )}
     </RsDialog></SaveErrorScope>

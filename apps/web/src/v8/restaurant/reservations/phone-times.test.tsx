@@ -7,6 +7,7 @@ import { tables } from '../booking-kit/test-data'
 
 const api = vi.hoisted(() => ({ openingHours: vi.fn(), reservationsDay: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn() }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
+vi.mock('@/lib/api', async original => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, accountSettings: { ...actual.api.accountSettings, getAllergyOptions: vi.fn(async () => ({success:true,data:{version:1,options:['卵','乳']}})) } } } })
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 const hours = Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [{ opensAt: '17:00', closesAt: '23:00' }] }))
@@ -79,4 +80,15 @@ it('営業時間内の将来時刻は確定できる', async () => {
   await screen.findByRole('button', { name: '19:00', exact: true })
   fireEvent.submit(document.querySelector('form')!)
   await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ startsAt: '2026-11-02T10:00:00.000Z' })))
+})
+
+it('仮押さえで選んだアレルギーを送る', async () => {
+  open('19:00')
+  await screen.findByRole('button', {name:'19:00',exact:true})
+  const field=screen.getByRole('combobox',{name:'アレルギー'}) as HTMLInputElement
+  await waitFor(()=>expect(field.disabled).toBe(false))
+  fireEvent.focus(field)
+  fireEvent.click(screen.getByRole('option',{name:'卵'}))
+  fireEvent.submit(document.querySelector('form')!)
+  await waitFor(()=>expect(onSave).toHaveBeenCalledWith(expect.objectContaining({kind:'hold',allergies:[{kind:'option',value:'卵'}]})))
 })
