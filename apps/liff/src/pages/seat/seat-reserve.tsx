@@ -1,7 +1,8 @@
 import { defaultRestaurantReservationForm,restaurantReservationAnswerError } from '@line-crm/shared';
 import { useRequestGeneration } from '../../lib/use-request-generation.js';
 import { FieldError } from '../../components/forms/controls.js';
-import CourseChoice from '../../components/course-choice.js';
+import MenuChoiceCard from '../../components/menu-choice-card.js';
+import { formatYen } from '@line-crm/shared';
 import Card from '../../components/ui/card.js';
 import Badge from '../../components/ui/badge.js';
 import { useUrlStep } from '../../lib/use-url-step.js';
@@ -47,14 +48,14 @@ import SeatMine from './seat-mine.js';
 
 import type { View, Course, Store } from './seat-reserve-types.js';
 
-const STEPS = ['人数・日時・コース', '確認'];
+const STEPS = ['人数・日時', 'コース', '確認'];
 const DEFAULT_GUESTS = 2;
 
 /**
  * 飲食店の席の予約 (★V8 sAnyy)。入口は ?page=restaurant&token=...。
  * token は管理画面の「LINE 予約の URL」から店を決める。?view=mine で変更・取り消しから開く。
- * 流れ：① 人数と日時 → 仮押さえ → ② 確認 (残り時間) → 確定 → ③ 受け付けました。
- * 変更は ① で選び直して ② で「この内容に変える」(仮押さえなし・版を指定)。
+ * 流れ：① 人数と日時 → ② コース → 仮押さえ → ③ 確認 (残り時間) → 受け付けました。
+ * 変更は ① と ② で選び直して ③ で「この内容に変える」(仮押さえなし・版を指定)。
  */
 export default function SeatReserve() {
   const route = useParams();
@@ -233,8 +234,15 @@ export default function SeatReserve() {
 
   const slot = (() => {
     const v = days[date];
-    return Array.isArray(v) ? v.find((x) => x.startsAt === startsAt) ?? null : null;
+    return Array.isArray(v) ? v.find((x) => x.startsAt === startsAt && x.available) ?? null : null;
   })();
+
+  function selectCourse(id: string | null) {
+    if (!store || busy || id === courseId) return;
+    courseRef.current = id; setCourseId(id); setError(null); requestId.current = null;
+    setReferrals([]); setReferralLoaded(false);
+    void loadDays(store, [...new Set([...chips.map(c => c.date), date])], guestCount);
+  }
 
   async function proceed() {
     if (!store || !slot || busyRef.current) return;
@@ -273,6 +281,7 @@ export default function SeatReserve() {
       if (status !== undefined && status < 500) requestId.current = null;
       if ((e as { body?: { error?: string } }).body?.error === 'slot_conflict') {
         setStartsAt(null);
+        setView('pick');
         void fetchDay(store, date, guestCount, generation.current);
       }
     } finally {
@@ -403,14 +412,14 @@ export default function SeatReserve() {
   }
 
   if (loadState === 'loading') return (
-    <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
+    <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
       <div className="mx-auto w-full max-w-md px-4 pt-3"><LoadingView /></div>
     </LiffLookScope>
   );
   if (loadState === 'missing')
     return (
-      <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
+      <LiffLookScope className="min-h-screen bg-canvas">
         <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <StatusView
@@ -423,7 +432,7 @@ export default function SeatReserve() {
     );
   if (loadState === 'error' || !store)
     return (
-      <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
+      <LiffLookScope className="min-h-screen bg-canvas">
         <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <LoadErrorView note="ご予約はなくなっていません。" onRetry={() => void load()} />
@@ -433,13 +442,13 @@ export default function SeatReserve() {
 
   const minutes = cancelMinutes ?? 0;
   return (
-    <LiffLookScope className={`${view==='pick'||view==='confirm'?'restaurant-fusion ':''}min-h-screen bg-canvas`}>
+    <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title={view==='confirm'?'確認':store.reservationForm?.definition.title??'ご予約'} />
-      <div className={`mx-auto w-full max-w-md ${view==='done'?'px-6 pt-0':`px-4 ${view==='pick'||view==='confirm'?'pt-4':'pt-3'}`}`}>
-      {(view === 'pick' || view === 'confirm') && (
-        <Stepper appearance="restaurant" steps={STEPS} current={view === 'pick' ? 0 : STEPS.length - 1} />
+      <div className={`mx-auto w-full max-w-md ${view==='done'?'px-6 pt-0':`px-4 ${view==='pick'||view==='course'||view==='confirm'?'pt-4':'pt-3'}`}`}>
+      {(view === 'pick' || view === 'course' || view === 'confirm') && (
+        <Stepper steps={STEPS} current={view === 'pick' ? 0 : view === 'course' ? 1 : 2} />
       )}
-        <div key={view} className={`liff-step ${view==='pick'||view==='confirm'?'mt-3 space-y-3 pb-28':''}`}>
+        <div key={view} className={`liff-step ${view==='pick'||view==='course'||view==='confirm'?'mt-3 space-y-3 pb-28':''}`}>
           {view === 'pick' && (
             <>
             <SeatPick
@@ -480,13 +489,19 @@ export default function SeatReserve() {
                 </div>
               </Card>)}
             </section>}
-            {<CourseChoice compact courses={courses} value={courseId} disabled={busy} onChange={id=>{
-              setReferrals([]);setReferralLoaded(false);
-              courseRef.current=id; setCourseId(id); setStartsAt(null); requestId.current=null;
-              void loadDays(store,[...chips.map(c=>c.date),date],guestCount);
-            }} />}
-
             </>
+          )}
+          {view === 'course' && (
+            <section className="space-y-3.5" aria-label="コース選択">
+              <h2 className="text-xl font-bold text-ink">コースを選んでください</h2>
+              <ul className="space-y-3.5">
+                <li><MenuChoiceCard name="席のみ" selected={courseId === null} disabled={busy} onSelect={() => selectCourse(null)} details={<span className="font-semibold text-ink">120分</span>} /></li>
+                {courses.map(course => <li key={course.id}><MenuChoiceCard name={course.name} imageUrl={course.photoUrl} selected={courseId === course.id} disabled={busy} onSelect={() => selectCourse(course.id)} details={<><span className="font-semibold text-ink">{course.durationMinutes}分</span><span className="ml-2 font-bold text-liff-primary">{formatYen(course.price)}</span></>} /></li>)}
+              </ul>
+              {!slot && days[date] !== 'loading' && <p role="status">このコースでは選んだ時刻を利用できません。日時を選び直してください。</p>}
+              {error && <FieldError>{error}</FieldError>}
+              <Button variant="text" disabled={busy} onClick={backToPick}>← 日時を選び直す</Button>
+            </section>
           )}
           {view === 'confirm' && slot && (
             <SeatConfirm
@@ -543,13 +558,13 @@ export default function SeatReserve() {
       </div>
 
       {view === 'pick' && (
-        <BottomBar appearance="restaurant">
+        <BottomBar>
           {!slot && !busy && Array.isArray(currentSlots) ? (
             <p role="status" className="text-center text-xs leading-[18px] text-liff-sub">
               {hasOpenSlot(currentSlots) ? '時刻を選んでください' : '空いている時刻がありません。ほかの日を選んでください'}
             </p>
           ) : null}
-          <Button variant="restaurant-primary" aria-label={busy ? 'お取りしています…' : 'この時刻で進む'} disabled={!slot || busy} onClick={() => void proceed()}>
+          <Button variant="primary" aria-label={busy ? 'お取りしています…' : 'この時刻で進む'} disabled={!slot || busy} onClick={() => setView('course')}>
             {busy ? 'お取りしています…' : '次へ'}
           </Button>
           {target && (
@@ -562,9 +577,12 @@ export default function SeatReserve() {
           )}
         </BottomBar>
       )}
+      {view === 'course' && <BottomBar>
+        <Button variant="primary" aria-label={busy ? 'お取りしています…' : 'コースを選んで進む'} disabled={!slot || busy} onClick={() => void proceed()}>{busy ? 'お取りしています…' : '次へ'}</Button>
+      </BottomBar>}
       {view === 'confirm' && (
-        <BottomBar appearance="restaurant">
-          <Button variant="restaurant-primary" aria-label={target ? 'この内容に変える' : '予約を確定する'} disabled={busy || expired} onClick={() => void finish()}>
+        <BottomBar>
+          <Button variant="primary" aria-label={target ? 'この内容に変える' : '予約を確定する'} disabled={busy || expired} onClick={() => void finish()}>
             {busy ? '送信中…' : target ? 'この内容に変える' : '予約する'}
           </Button>
         </BottomBar>

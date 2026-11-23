@@ -1,5 +1,5 @@
 import Icon from '../../components/ui/icon.js';
-import { HiddenDateInput, RestaurantTimeChoices, FieldError } from '../../components/forms/controls.js';
+import { HiddenDateInput, RestaurantTimeChoices, RestaurantGuestChoices, RestaurantDayChoices, FieldError } from '../../components/forms/controls.js';
 import Button from '../../components/ui/button/index.js';
 import { useRef } from 'react';
 import type { RestaurantCustomerSlot, RestaurantUnavailableReason } from '@line-crm/shared';
@@ -19,7 +19,7 @@ import {
 export type DaySlots = RestaurantCustomerSlot[] | 'loading' | 'error' | 'closed';
 
 /**
- * ① 人数・日時・コース (V8)。人数は増減、日にちは端末の選択、時刻は空きの札。
+ * ① 人数・日時。人数と日付は札から選び、時刻は空きの札から選ぶ。
  * 選べない時刻 (満席) は押せない。空きを1つも持たない日は札を押せない形にし、下に注を出す。
  */
 export default function SeatPick({
@@ -78,14 +78,14 @@ export default function SeatPick({
   }
 
   return <div className="space-y-3" data-design-node="KRppA">
-    <div className="flex items-center gap-2">
-      <span id="seat-guest" className="flex-1 text-xs leading-[18px] font-semibold text-liff-sub">{guestLabel}</span>
-      <Button variant="restaurant-control" aria-label="人数を減らす" disabled={guestCount<=1} onClick={()=>onGuest(guestCount-1)}>−</Button>
-      <span aria-live="polite" className="text-[15px] leading-[23px] font-bold text-ink">{`${guestCount}名`}</span>
-      <Button variant="restaurant-control" aria-label="人数を増やす" disabled={guestCount>=100} onClick={()=>onGuest(guestCount+1)}>＋</Button>
-    </div>
+    <p className="text-xs leading-[18px] font-semibold text-liff-sub">{guestLabel}</p>
+    <RestaurantGuestChoices label={guestLabel} value={guestCount} onChange={onGuest} />
     <p className="text-xs leading-[18px] font-semibold text-liff-sub">{dateLabel}</p>
-    <Button variant="restaurant-date" type="button" aria-label="日にちを選ぶ" onClick={openOther}>{longDate(date).trim()}</Button>
+    <RestaurantDayChoices value={date} onChange={onDate} options={chips.map(chip => {
+      const availability=days[chip.date];
+      return {...chip, unavailable: availability==='closed' || (Array.isArray(availability) && !hasOpenSlot(availability))};
+    })} />
+    <Button variant="text" type="button" aria-label="日にちを選ぶ" onClick={openOther}>ほかの日を選ぶ ›</Button>
     <HiddenDateInput ref={otherRef} min={today} value={date} aria-label="ほかの日" tabIndex={-1} onChange={e=>e.target.value&&onDate(e.target.value)} />
     {day==='loading'||day===undefined ? <p role="status" className="text-xs text-liff-sub">空きを読み込んでいます…</p>
       : day==='error' ? <p className="text-[13px] leading-5 text-liff-sub">空きを読み込めませんでした。<Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>

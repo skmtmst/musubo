@@ -23,7 +23,7 @@ import { randomUUID } from 'node:crypto';
 const PORT = Number(process.env.QA_MOCK_PORT ?? 8790);
 
 /* features：③-2 第2弾の画面（waitlist・waitlist-expired・party・recurring・lesson・routed など）を出すときだけ撮影が足す。既定は空＝今までの見本のまま。 */
-const state = { delayMs: 0, fail: null, features: [] };
+const state = { delayMs: 0, fail: null, features: [], lookTheme: 'default' };
 let qaAvailableMiles = 1250;
 let qaBankProfile = null;
 const qaRedemptions = new Map();
@@ -156,7 +156,7 @@ function seatSlots(date, durationMinutes = 120) {
 /** 店の遅れたときの決まり（API-11 の lateArrivalPolicy）。 */
 const SEAT_LATE = { cancelAfterMinutes: 15, message: '15分を過ぎてご連絡がない場合は、取り消しになることがあります' };
 function seatMock(method, pathname, url, body) {
-  if (method==='GET' && pathname==='/api/liff/restaurant/courses') return [200,{success:true,timezone:'Asia/Tokyo',data:[{id:'qa-course',name:'秋の鹿肉コース',durationMinutes:90,price:5000,allergens:[]}]}];
+  if (method==='GET' && pathname==='/api/liff/restaurant/courses') return [200,{success:true,timezone:'Asia/Tokyo',data:[{id:'qa-course',name:'秋の鹿肉コース',durationMinutes:90,price:5000,allergens:[],photoUrl:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#e7d8bf"/><circle cx="60" cy="60" r="45" fill="#fff8ed"/><ellipse cx="60" cy="60" rx="28" ry="18" fill="#9d5942"/><circle cx="43" cy="47" r="7" fill="#718a52"/></svg>')}]}];
   if (method==='GET' && pathname==='/api/liff/restaurant/referrals') return [200,{success:true,data:[{storeId:'qa-other-store',storeName:'然 恵比寿店',distanceKm:1.2,startsAt:new Date(`${url.searchParams.get('date')}T19:30:00+09:00`).toISOString(),endsAt:new Date(`${url.searchParams.get('date')}T21:30:00+09:00`).toISOString(),bookingUrl:'https://liff.line.me/qa?page=restaurant&token=qa-other'}]}];
   if (method === 'GET' && pathname.startsWith('/api/liff/restaurant/link/')) {
     return pathname.endsWith('/qa-seat') ? [200, { success: true, data: SEAT_STORE }] : [404, { success: false, error: 'not_found' }];
@@ -411,6 +411,7 @@ const server = createServer(async (req, res) => {
     if (body.fail === undefined || body.fail === null || body.fail === 'all' || Array.isArray(body.fail)) {
       state.fail = body.fail ?? null;
     }
+    if (['default','line','natural','modern','gentle','night'].includes(body.lookTheme)) state.lookTheme = body.lookTheme;
     if (Array.isArray(body.features)) state.features = body.features.filter((f) => typeof f === 'string');
     json(res, 200, state);
     return;
@@ -419,6 +420,7 @@ const server = createServer(async (req, res) => {
     state.delayMs = 0;
     state.fail = null;
     state.features = [];
+    state.lookTheme = 'default';
     qaAvailableMiles = 1250;
     qaBankProfile = null;
     qaRedemptions.clear();
@@ -437,11 +439,13 @@ const server = createServer(async (req, res) => {
 
   const method = req.method ?? 'GET';
 
+  if (method === 'GET' && pathname === '/api/liff/customer-look') { json(res, 200, { success: true, data: { settings: state.lookTheme === 'default' ? {} : { liff_theme: state.lookTheme }, version: 1 } }); return; }
+
   // ---- 上の帯 (店名) ----
   if (method === 'GET' && pathname === '/api/liff/config') {
     json(res, 200, {
       success: true,
-      data: { botBasicId: '@qa', accountName: '然 - NEN -', accountId: 'qa-account' },
+      data: { botBasicId: '@qa', accountName: '然 - NEN -', accountId: 'qa-account', style: 'salon' },
     });
     return;
   }
