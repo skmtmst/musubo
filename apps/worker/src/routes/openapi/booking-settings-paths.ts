@@ -253,6 +253,41 @@ export const bookingSettingsPaths = {
       },
     },
   },
+  '/api/booking/admin/menus/{id}/hq-status': {
+    get: {
+      tags: ['Booking'], summary: '本部から配られた予約メニューの版と知らせ',
+      description: 'bound=false なら本部の配布物ではない（本部でひな形を消した後や、出所の記録が食い違う物は detached に理由を返し、知らせも出さない）。customized は店が変えた印（「この店専用（統括から）」）。pendingVersion があれば「本部の新しい版があります」で、notices に知らせる理由（store_edited）を返す。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '本部の版・届いている版・店が変えたか' }, '400': { description: 'account_id 未指定' }, '403': { description: '担当外のアカウント' }, '404': { description: '対象アカウントにメニューが存在しない' } },
+    },
+  },
+  '/api/booking/admin/menus/{id}/hq-adopt': {
+    post: {
+      tags: ['Booking'], summary: '本部の新しい版を取り込む',
+      description: '届いている版だけを取り込む。店が変えた所も本部の中身に戻り「統括から」になる。受付中か・並び順・担当・既存の予約の値段の控えは変えない。画面が見ていた版と違えば 409 で何も書かない。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['versionId'], properties: { versionId: { type: 'string' } } } } } },
+      responses: { '200': { description: '取り込んだ版' }, '400': { description: 'account_id または versionId 未指定' }, '403': { description: 'メニューを保存する権限がない・閲覧のみ' }, '404': { description: '本部から配られたメニューではない' }, '409': { description: '届いている版が変わった・本部のひな形が使えない・店のタグが無い' }, '422': { description: 'この店は予約を使っていない' } },
+    },
+  },
+  '/api/booking/admin/menus/{id}/hq-dismiss': {
+    post: {
+      tags: ['Booking'], summary: '本部の新しい版を取り込まず今のままにする',
+      description: 'その版の知らせだけを消す。次の版が届けばまた知らせる。メニューは書き換えない。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['versionId'], properties: { versionId: { type: 'string' } } } } } },
+      responses: { '200': { description: '知らせを閉じた版' }, '400': { description: 'account_id または versionId 未指定' }, '403': { description: 'メニューを保存する権限がない・閲覧のみ' }, '404': { description: '本部から配られたメニューではない' }, '409': { description: '届いている版が変わった' } },
+    },
+  },
   '/api/booking/admin/menus/{id}/versions/{version}/revert': {
     post: {
       tags: ['Booking'], summary: '予約メニューを指定版に戻す',

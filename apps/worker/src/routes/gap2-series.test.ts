@@ -1,6 +1,7 @@
 import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingSeries} from './booking-series.js';
+import booking from './booking.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {recurrenceDates} from '../features/booking/booking-series.js';
@@ -15,6 +16,12 @@ test('B4-01 B4-02 B4-04: 3回のpreviewと飛ばす1回、二重押しでも2予
  const preview=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',body);expect(preview.status).toBe(200);expect((await preview.json() as any).data.occurrences.map((x:any)=>x.available)).toEqual([true,true,true]);
  const b={...body,choices:[{index:1,action:'skip'}]};const r=await gapCall(app(),url,'POST',b,'same-key');expect(r.status).toBe(201);
  const replay=await gapCall(app(),url,'POST',b,'same-key');expect(replay.status).toBe(201);expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:2});expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:1});expect(fetch).not.toHaveBeenCalled();
+});
+test('B4-01: 予約済みの回を空きなしとして返す',async()=>{
+ seedGapBooking(d,'busy','confirmed','2026-11-27T05:00:00.000Z');
+ const r=await gapCall(app(),'/api/booking/admin/series/preview?account_id=a','POST',body);
+ expect(r.status).toBe(200);
+ expect((await r.json() as any).data.occurrences.map((o:any)=>o.available)).toEqual([true,false,true]);
 });
 test('B4-03: 保存直前の競合は全部か無し。batch途中の競合もrollback',async()=>{
  seedGapBooking(d,'busy','confirmed','2026-11-27T05:00:00.000Z');expect((await gapCall(app(),url,'POST',body)).status).toBe(409);expect(d.raw.prepare('SELECT count(*) n FROM booking_series').get()).toEqual({n:0});
@@ -31,6 +38,14 @@ test('B4-06: この回から後ぜんぶ変更、変更できない回は元の�
  const data=(await (await gapCall(app(),url,'POST',body)).json() as any).data;
  const r=await gapCall(app(),`/api/booking/admin/series/${data.series.id}?account_id=a`,'PATCH',{scope:'following',fromBookingId:data.bookings[1].id,expectedVersion:1,change:{startsAt:'2026-11-27T06:00:00.000Z'}});
  expect(r.status).toBe(200);expect((await r.json() as any).data.changed).toHaveLength(2);expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual([{starts_at:body.startsAt},{starts_at:'2026-11-27T06:00:00.000Z'},{starts_at:'2026-12-04T06:00:00.000Z'}]);
+});
+test('B4-06: 埋まっている回は変更せず競合として返す',async()=>{
+ const data=(await (await gapCall(app(),url,'POST',body)).json() as any).data;
+ seedGapBooking(d,'busy','confirmed','2026-12-04T06:00:00.000Z');
+ const r=await gapCall(app(),`/api/booking/admin/series/${data.series.id}?account_id=a`,'PATCH',{scope:'following',fromBookingId:data.bookings[1].id,expectedVersion:1,change:{startsAt:'2026-11-27T06:00:00.000Z'}});
+ const result=(await r.json() as any).data;
+ expect(r.status).toBe(200);expect(result.changed).toEqual([data.bookings[1].id]);expect(result.conflicts).toEqual([data.bookings[2].id]);
+ expect(d.raw.prepare('SELECT starts_at FROM bookings WHERE series_id=? ORDER BY series_index').all(data.series.id)).toEqual([{starts_at:body.startsAt},{starts_at:'2026-11-27T06:00:00.000Z'},{starts_at:'2026-12-04T05:00:00.000Z'}]);
 });
 test('B4-17 Q-01: 閲覧のみは一覧だけ、代理も作らない、店をまたげない',async()=>{
  for(const [who,im] of [[{...gapOwner,readOnly:true},false],[gapOwner,true]] as const)expect((await gapCall(gapApp(d,[bookingSeries],who,im),url,'POST',body)).status).toBe(403);
@@ -128,4 +143,16 @@ test('B4-17: 閲覧のみの担当は繰り返しを変更できない',async()=
  expect((await gapCall(a,path)).status).toBe(200);
  expect((await gapCall(a,path,'PATCH',{scope:'this',fromBookingId:data.bookings[0].id,expectedVersion:1,change:{startsAt:'2026-11-20T06:00:00Z'}})).status).toBe(403);
  expect(d.raw.prepare('SELECT starts_at FROM bookings ORDER BY series_index').all()).toEqual(data.bookings.map((b:any)=>({starts_at:b.starts_at})));
+});
+
+
+test('B4-18: LIFFでこの回だけ変更し、組の次の回を保つ',async()=>{
+ const created=await gapCall(app(),url,'POST',body);expect(created.status).toBe(201);
+ const data=(await created.json() as {data:{series:{id:string};bookings:Array<{id:string;lock_version:number}>}}).data;
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({sub:'Uf'}))));
+ const a=gapApp(d,[booking,bookingSeries]);
+ const response=await a.request(`/api/liff/booking/${data.bookings[0].id}/reschedule?liffId=liff-a`,{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json'},body:JSON.stringify({starts_at:'2026-11-20T06:00:00.000Z',lock_version:data.bookings[0].lock_version})},undefined,{waitUntil:()=>{},passThroughOnException:()=>{}} as any);
+ expect(response.status,await response.clone().text()).toBe(200);
+ expect(d.raw.prepare('SELECT starts_at,series_index FROM bookings WHERE series_id=? ORDER BY series_index').all(data.series.id)).toEqual([
+  {starts_at:'2026-11-20T06:00:00.000Z',series_index:0},{starts_at:'2026-11-27T05:00:00.000Z',series_index:1},{starts_at:'2026-12-04T05:00:00.000Z',series_index:2}]);
 });

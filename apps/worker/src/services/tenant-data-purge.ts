@@ -50,6 +50,7 @@ const GUARDED_PURGE_TABLES = new Set([
   'hq_template_distribution_runs',
   'hq_template_owned_r2_keys',
   'hq_templates',
+  'mileage_handgifts',
   'mileage_redemption_attempts',
   'mileage_redemption_step_deliveries',
   'mileage_redemptions',

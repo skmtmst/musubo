@@ -4312,6 +4312,42 @@ CREATE TABLE hq_support_requests (
   CHECK (priority IN ('low', 'medium', 'high')), channel TEXT NOT NULL DEFAULT 'admin'
   CHECK (channel IN ('admin', 'line', 'ops')), subject_auto INTEGER NOT NULL DEFAULT 0, assignee_staff_id TEXT, first_replied_at TEXT, last_message_at TEXT, resolved_at TEXT, closed_at TEXT, knowledge_revision INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE hq_template_distribution_job_items (
+  tenant_id TEXT NOT NULL,
+  job_id TEXT NOT NULL,
+  target_account_id TEXT NOT NULL,
+  preflight_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','running','succeeded','failed','conflict')),
+  lease_token TEXT,
+  lease_expires_at TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  error_code TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  finished_at TEXT,
+  PRIMARY KEY (tenant_id,job_id,target_account_id),
+  FOREIGN KEY (job_id,tenant_id) REFERENCES hq_template_distribution_jobs(id,tenant_id),
+  FOREIGN KEY (preflight_id,tenant_id) REFERENCES hq_template_preflights(id,tenant_id)
+);
+
+CREATE TABLE hq_template_distribution_jobs (
+  id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  template_version_id TEXT NOT NULL,
+  request_key TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','running','completed','partial','failed')),
+  created_by TEXT NOT NULL,
+  notification_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  finished_at TEXT,
+  PRIMARY KEY (id,tenant_id),
+  UNIQUE (tenant_id,request_key),
+  FOREIGN KEY (template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT
+);
+
 CREATE TABLE hq_template_distribution_results (
   run_id TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
@@ -4452,6 +4488,28 @@ CREATE TABLE hq_template_saved_views (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   archived_at TEXT
+);
+
+CREATE TABLE hq_template_store_bindings (
+  tenant_id TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  target_account_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('booking_menu','mileage_reward')),
+  target_id TEXT NOT NULL,
+  applied_version_id TEXT NOT NULL,
+  pending_version_id TEXT,
+  dismissed_version_id TEXT,
+  applied_snapshot_hash TEXT NOT NULL,
+  hash_version INTEGER NOT NULL DEFAULT 1 CHECK (hash_version > 0),
+  row_version INTEGER NOT NULL DEFAULT 1 CHECK (row_version > 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id,template_id,target_account_id),
+  UNIQUE (tenant_id,target_account_id,kind,target_id),
+  FOREIGN KEY (template_id,tenant_id) REFERENCES hq_templates(id,tenant_id),
+  FOREIGN KEY (applied_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT,
+  FOREIGN KEY (pending_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT,
+  FOREIGN KEY (dismissed_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE hq_template_versions (
@@ -5351,6 +5409,25 @@ CREATE TABLE mileage_grant_lots (
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE mileage_handgift_rewards (
+  reward_id TEXT PRIMARY KEY REFERENCES mileage_rewards(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE mileage_handgifts (
+  redemption_id TEXT PRIMARY KEY REFERENCES mileage_redemptions(id),
+  reward_id TEXT NOT NULL REFERENCES mileage_handgift_rewards(reward_id),
+  delivered_at TEXT,
+  delivered_by TEXT,
+  cancelled_at TEXT,
+  cancelled_by TEXT,
+  cancellation_reason TEXT,
+  CHECK ((delivered_at IS NULL) = (delivered_by IS NULL)),
+  CHECK ((cancelled_at IS NULL AND cancelled_by IS NULL AND cancellation_reason IS NULL)
+      OR (cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL
+          AND cancellation_reason IS NOT NULL AND length(trim(cancellation_reason)) > 0))
+);
+
 CREATE TABLE mileage_ledger (
   id                    TEXT PRIMARY KEY,
   program_id            TEXT NOT NULL REFERENCES mileage_programs(id),
@@ -5434,7 +5511,7 @@ CREATE TABLE mileage_redemptions (
   delivered_at             TEXT,
   refunded_at              TEXT,
   created_at               TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at               TEXT NOT NULL DEFAULT (datetime('now')), reward_name_snapshot TEXT, reward_kind_snapshot TEXT,
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now')), reward_name_snapshot TEXT, reward_kind_snapshot TEXT, anonymized_at TEXT,
   UNIQUE (program_id, idempotency_key)
 );
 
@@ -5506,7 +5583,7 @@ CREATE TABLE "mileage_rewards" (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, hq_template_id TEXT, hq_template_version_id TEXT);
 
 CREATE TABLE mileage_rules (
   id             TEXT PRIMARY KEY,
@@ -9852,6 +9929,16 @@ CREATE INDEX friend_delivery_consents_dispatch ON friend_delivery_consents(line_
 
 CREATE UNIQUE INDEX friends_account_member_number ON friends(line_account_id,member_number);
 
+CREATE INDEX hq_distribution_job_items_preflight ON hq_template_distribution_job_items(tenant_id,preflight_id);
+
+CREATE INDEX hq_distribution_job_items_queue ON hq_template_distribution_job_items(status,lease_expires_at,tenant_id,job_id);
+
+CREATE INDEX hq_distribution_jobs_status ON hq_template_distribution_jobs(status,updated_at);
+
+CREATE INDEX hq_distribution_jobs_version ON hq_template_distribution_jobs(tenant_id,template_id,template_version_id);
+
+CREATE INDEX hq_store_bindings_pending ON hq_template_store_bindings(tenant_id,target_account_id,pending_version_id);
+
 CREATE INDEX hq_store_comparison_exports_due ON hq_store_comparison_export_jobs(status,created_at);
 
 CREATE INDEX hq_store_response_period ON hq_store_response_samples(account_id,responded_at);
@@ -13075,11 +13162,62 @@ CREATE TRIGGER mileage_adjustment_approval_events_history_detach AFTER UPDATE OF
 
 CREATE TRIGGER mileage_adjustment_approval_events_history_insert AFTER INSERT ON mileage_adjustment_approval_events BEGIN UPDATE mileage_adjustment_approval_events SET request_id_history = COALESCE(NEW.request_id, NEW.request_id_history) WHERE id = NEW.id; END;
 
+CREATE TRIGGER mileage_handgifts_history_immutable BEFORE UPDATE ON mileage_handgifts
+WHEN (OLD.delivered_at IS NOT NULL AND
+      (OLD.delivered_at IS NOT NEW.delivered_at OR OLD.delivered_by IS NOT NEW.delivered_by))
+  OR (OLD.cancelled_at IS NOT NULL AND
+      (OLD.cancelled_at IS NOT NEW.cancelled_at OR OLD.cancelled_by IS NOT NEW.cancelled_by
+       OR (OLD.cancellation_reason IS NOT NEW.cancellation_reason AND NOT (
+         NEW.cancellation_reason = '削除済みのお客さまの取消' AND EXISTS (
+           SELECT 1 FROM mileage_redemptions r JOIN friends f
+             ON f.id = r.beneficiary_friend_id OR (r.beneficiary_friend_id IS NULL AND (
+               r.beneficiary_key = 'friend:' || f.id OR
+               (f.user_id IS NOT NULL AND (f.user_id = r.beneficiary_user_id OR r.beneficiary_key = 'user:' || f.user_id))))
+           JOIN operation_audit a ON a.id = 'customer-delete:friend_data:' || f.id
+           WHERE r.id = OLD.redemption_id AND a.action = 'deleting'
+             AND a.target_kind = 'customer_deletion' AND a.friend_id = f.id
+             AND json_extract(a.detail_json, '$.leaseUntil') > CAST(strftime('%s','now') AS INTEGER) * 1000
+         )
+       ))))
+  OR (OLD.cancelled_at IS NOT NULL AND OLD.delivered_at IS NULL AND NEW.delivered_at IS NOT NULL)
+BEGIN SELECT RAISE(ABORT, 'handgift history is immutable'); END;
+
+CREATE TRIGGER mileage_handgifts_identity_immutable BEFORE UPDATE OF redemption_id, reward_id ON mileage_handgifts
+WHEN OLD.redemption_id IS NOT NEW.redemption_id OR OLD.reward_id IS NOT NEW.reward_id
+BEGIN SELECT RAISE(ABORT, 'handgift identity is immutable'); END;
+
+CREATE TRIGGER mileage_handgifts_match_redemption BEFORE INSERT ON mileage_handgifts
+WHEN NOT EXISTS (
+  SELECT 1 FROM mileage_redemptions r
+  WHERE r.id = NEW.redemption_id AND r.reward_id = NEW.reward_id
+)
+BEGIN SELECT RAISE(ABORT, 'handgift redemption does not match reward'); END;
+
+CREATE TRIGGER mileage_handgifts_no_delete BEFORE DELETE ON mileage_handgifts
+WHEN NOT EXISTS (
+  SELECT 1 FROM tenant_purge_guard g
+  JOIN tenants t ON t.id = g.tenant_id
+  JOIN line_accounts a ON a.tenant_id = t.id
+  JOIN mileage_redemptions r ON r.line_account_id = a.id
+  WHERE g.table_name = 'mileage_handgifts' AND r.id = OLD.redemption_id
+    AND t.data_purged_at IS NULL
+    AND (t.plan_status = 'canceled' OR
+      (t.plan_status = 'trialing' AND t.trial_ends_at IS NOT NULL AND t.retention_anchor_at IS NOT NULL))
+)
+BEGIN SELECT RAISE(ABORT, 'handgift history cannot be deleted'); END;
+
 CREATE TRIGGER mileage_reward_folders_common_delete AFTER DELETE ON mileage_reward_folders BEGIN DELETE FROM folders WHERE id=OLD.id AND kind='mileage_reward' AND account_id=OLD.line_account_id; END;
 
 CREATE TRIGGER mileage_reward_folders_common_insert AFTER INSERT ON mileage_reward_folders WHEN NOT EXISTS(SELECT 1 FROM folders WHERE id=NEW.id) BEGIN INSERT INTO folders(id,kind,account_id,name,display_order,created_at,updated_at) VALUES(NEW.id,'mileage_reward',NEW.line_account_id,NEW.name,NEW.display_order,NEW.created_at,NEW.updated_at); END;
 
 CREATE TRIGGER mileage_reward_folders_common_update AFTER UPDATE ON mileage_reward_folders WHEN EXISTS(SELECT 1 FROM folders WHERE id=NEW.id AND (name IS NOT NEW.name OR display_order IS NOT NEW.display_order)) BEGIN UPDATE folders SET name=NEW.name,display_order=NEW.display_order,revision=revision+1,updated_at=NEW.updated_at WHERE id=NEW.id AND kind='mileage_reward' AND account_id=NEW.line_account_id; END;
+
+CREATE TRIGGER mileage_reward_hq_origin_update BEFORE UPDATE OF hq_template_id,hq_template_version_id ON mileage_rewards
+WHEN NEW.hq_template_id IS NOT NULL AND NOT EXISTS (
+ SELECT 1 FROM hq_templates t JOIN hq_template_versions v ON v.template_id=t.id AND v.tenant_id=t.tenant_id
+ JOIN line_accounts a ON a.tenant_id=t.tenant_id WHERE t.id=NEW.hq_template_id AND t.archived_at IS NULL
+ AND v.id=NEW.hq_template_version_id AND a.id=NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
 
 CREATE TRIGGER mileage_rewards_folder_insert BEFORE INSERT ON mileage_rewards WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='mileage_reward' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 

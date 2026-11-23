@@ -142,6 +142,7 @@ export type MileageRewardVersion = {
 }
 
 export type MileageRewardSummary = {
+  hqTemplateId?: string | null
   folderId?: string | null
   id: string
   lineAccountId: string

@@ -470,12 +470,20 @@
 
 ## 反映履歴
 
+- [統括の予約メニュー・景品の配り直し](release-log/unreleased/187-kenta-c13-hq-distribute.md) — 反映履歴、確認 2026-11-23。
+
+- [予約・景品の受け入れ条件の修正](release-log/unreleased/130-kenta-gapfix2.md) — 運用者向け変更履歴。確認 2026-11-20。
+
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
+
+- [手渡し景品の交換と取消](release-log/unreleased/128-kenta-c25-handgift.md) — 反映履歴、確認 2026-11-20。
 
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
+
+- [振り分け条件の自動確認](release-log/unreleased/93-kenta-gap-booking.md) — フォームの振り分け条件の確認追加の履歴。確認 2026-11-16。
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 

@@ -3,6 +3,7 @@
 
 export type MileageRewardKind =
   | 'coupon'
+  | 'handgift'
   | 'tag'
   | 'scenario'
   | 'template'
@@ -21,7 +22,8 @@ export type MileageRedemptionStatus =
   | 'delivering'
   | 'succeeded'
   | 'delivery_failed'
-  | 'refunded';
+  | 'refunded'
+  | 'cancelled';
 
 export interface MileageRewardVersion {
   id: string;
@@ -45,6 +47,7 @@ export interface MileageRewardVersion {
 export interface MileageRewardSummary {
   id: string;
   folderId?: string | null;
+  hqTemplateId: string | null;
   lineAccountId: string;
   programId: string;
   name: string;
@@ -114,6 +117,7 @@ export interface MileageRewardRedemption {
   failureMessage: string | null;
   deliveredAt: string | null;
   refundedAt: string | null;
+  anonymizedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -121,6 +125,7 @@ export interface MileageRewardRedemption {
 export type RewardRow = {
   id: string;
   folder_id: string | null;
+  active_hq_template_id: string | null;
   line_account_id: string;
   program_id: string;
   name: string;
@@ -175,6 +180,7 @@ export type RedemptionRow = {
   failure_message: string | null;
   delivered_at: string | null;
   refunded_at: string | null;
+  anonymized_at: string | null;
   created_at: string;
   updated_at: string;
 };

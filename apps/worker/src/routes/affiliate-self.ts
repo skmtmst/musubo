@@ -168,6 +168,8 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
       balanceSource: 'musubo',
       availableMiles: mileage.available,
       rewards: rewards.map((reward) => {
+        const { hqTemplateId: internalHqTemplateId, ...publicReward } = reward;
+        void internalHqTemplateId;
         const version = reward.currentVersion;
         const outOfCodes = reward.rewardKind === 'coupon' && reward.availableCodeCount === 0;
         const enoughMileage = version ? mileage.available >= version.requiredMiles : false;
@@ -180,7 +182,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
           && (redemptionCounts.byVersionId.get(version.id) ?? 0) >= version.stockLimit,
         );
         return {
-          ...reward,
+          ...publicReward,
           canRedeem: Boolean(version) && enoughMileage && !outOfCodes
             && !friendLimitReached && !stockLimitReached,
           unavailableReason: !version
@@ -236,7 +238,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     });
     return c.json({
-      success: delivery.status === 'succeeded',
+      success: delivery.status === 'succeeded' || delivery.status === 'pending',
       replayed: reserved.kind === 'existing',
       redemptionId: reserved.redemption.id,
       ...delivery,

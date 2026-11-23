@@ -4,6 +4,8 @@ import { normalizeScopedTagName, validateMileageRewardDraft, type MileageRewardD
 import type { HqCatalogTemplateType, HqCatalogTemplateDefinition } from '@line-crm/shared';
 import type { HqTemplateResolution } from './contract.js';
 import { boundedText, HqTemplateError, nextAlias } from './tag.js';
+import { bindingRecordStatements } from './catalog-binding.js';
+import { catalogRecord, catalogRecordHash } from './catalog-record.js';
 
 export const isCatalogType=(type:string):type is HqCatalogTemplateType=>type==='booking_menu'||type==='mileage_reward';
 const own=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'&&!Array.isArray(v);
@@ -29,15 +31,18 @@ export function parseCatalogDefinition(type:HqCatalogTemplateType,value:unknown)
  try {
   const actionName=optionalText(raw.commonActionName,200);
   const {commonActionVersionId:_,...validated}=validateMileageRewardDraft({...raw,commonActionVersionId:actionName?'hq-reference':null} as unknown as MileageRewardDraftInput);
+  // 手渡しのひな形は未対応。別種類として保存・配布しない。
+  const rewardKind = validated.rewardKind;
+  if (rewardKind === 'handgift') return invalid();
   // 店別のIDを、統括の名前として解釈して別資源へ結びつけない。
   const walk=(c:typeof validated.targetConditions):void=>{if(!c)return;for(const r of c.rules)if(['friend_field','support_mark','form_answered','scenario_state'].includes(r.type))throw new HqTemplateError('UNSUPPORTED_REFERENCE',422);c.groups?.forEach(walk);};walk(validated.targetConditions);
-  return {schemaVersion:1,settings:{...validated,commonActionName:actionName}};
+  return {schemaVersion:1,settings:{...validated,rewardKind,commonActionName:actionName}};
  }catch(e){if(e instanceof HqTemplateError)throw e;return invalid();}
 }
 const columns:Record<string,string[]>={
  menus:['id','line_account_id',...bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)),'is_active','deleted_at','auto_tag_id','version','created_at','updated_at','hq_template_id','hq_template_version_id','hq_customized'],
  menu_versions:['id','menu_id','version_number','name','category_label','description','duration_minutes','buffer_after_minutes','base_price','price_mode','sort_order','is_active','rules_json','created_at'],
- mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id'],
+ mileage_rewards:['id','line_account_id','program_id','name','description','image_url','reward_kind','status','sort_order','current_draft_version_id','current_published_version_id','created_at','updated_at','archived_at','folder_id','hq_template_id','hq_template_version_id'],
  mileage_reward_versions:['id','reward_id','version_number','status','required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','created_at','published_at','target_conditions','revision'],
  tags:['id','name','status','version','updated_at'],scenarios:['id','name','is_active','updated_at','current_published_version_id'],
  common_actions:['id','name','status','current_published_version_id','archived_at','updated_at'],
@@ -47,13 +52,17 @@ const rows=(table:string,where:string)=>`(SELECT COALESCE(json_group_array(json(
 function snapshotSql(type:HqCatalogTemplateType) {
  const account='(SELECT accountId FROM scope)',table=type==='booking_menu'?'menus':'mileage_rewards',versionTable=type==='booking_menu'?'menu_versions':'mileage_reward_versions',owner=type==='booking_menu'?'menu_id':'reward_id';
  const usage=type==='booking_menu'?`SELECT menu_id id,COUNT(*) n FROM (SELECT menu_id FROM bookings UNION ALL SELECT menu_id FROM staff_menus UNION ALL SELECT menu_id FROM booking_menu_resources) GROUP BY menu_id`:`SELECT reward_id id,COUNT(*) n FROM (SELECT reward_id FROM mileage_redemptions UNION ALL SELECT v.reward_id FROM mileage_reward_codes c JOIN mileage_reward_versions v ON v.id=c.reward_version_id) GROUP BY reward_id`;
- return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}),'paymentConnected',EXISTS(SELECT 1 FROM booking_payment_connections WHERE line_account_id=${account} AND disconnected_at IS NULL),'style',COALESCE((SELECT style FROM account_styles WHERE line_account_id=${account}),'standard'))`;
+ return `WITH scope AS (SELECT ? accountId) SELECT json_object('targets',json(${rows(table,`line_account_id=${account}`)}),'versions',json(${rows(versionTable,`${owner} IN (SELECT id FROM ${table} WHERE line_account_id=${account})`)}),'handgiftIds',json((SELECT COALESCE(json_group_array(reward_id),'[]') FROM (SELECT reward_id FROM mileage_handgift_rewards WHERE reward_id IN (SELECT id FROM mileage_rewards WHERE line_account_id=${account}) ORDER BY reward_id))),'usage',json((SELECT COALESCE(json_group_array(json_object('id',id,'n',n)),'[]') FROM (${usage} ORDER BY id))),'tags',json(${rows('tags',`line_account_id=${account}`)}),'scenarios',json(${rows('scenarios',`line_account_id=${account}`)}),'actions',json(${rows('common_actions',`line_account_id=${account}`)}),'actionVersions',json(${rows('common_action_versions',`common_action_id IN (SELECT id FROM common_actions WHERE line_account_id=${account})`)}),'programs',json(${rows('mileage_programs','1=1')}),'paymentConnected',EXISTS(SELECT 1 FROM booking_payment_connections WHERE line_account_id=${account} AND disconnected_at IS NULL),'style',COALESCE((SELECT style FROM account_styles WHERE line_account_id=${account}),'standard'))`;
+}
+/** 読んだ時から店のカタログ（メニュー・景品・タグ・処理・シナリオ）が変わっていない時だけ通る guard。 */
+export function catalogSnapshotGuard(accountId:string,type:HqCatalogTemplateType,snapshot:string):HqTemplateStatement {
+ return {sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]};
 }
 export async function catalogSnapshot(db:D1Database,accountId:string,type:HqCatalogTemplateType):Promise<string> {
  return (await db.prepare(`SELECT (${snapshotSql(type)}) snapshot`).bind(accountId).first<{snapshot:string}>())!.snapshot;
 }
 type Row=Record<string,string|number|null>;
-interface Snapshot {targets:Row[];versions:Row[];usage:Array<{id:string;n:number}>;tags:Row[];scenarios:Row[];actions:Row[];actionVersions:Row[];programs:Row[]}
+interface Snapshot {handgiftIds?:string[];targets:Row[];versions:Row[];usage:Array<{id:string;n:number}>;tags:Row[];scenarios:Row[];actions:Row[];actionVersions:Row[];programs:Row[]}
 function named(rows:Row[],name:unknown):Row {
  if(typeof name!=='string'||!name.trim())throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
  const matches=rows.filter(r=>normalizeScopedTagName(String(r.name))===normalizeScopedTagName(name));
@@ -79,39 +88,73 @@ export function inspectCatalog(def:HqCatalogTemplateDefinition,snapshot:string,t
  if(type==='booking_menu'){return [{sourceId:type,itemKind:type,name,targetId:null,expectedRevision:null,duplicate:!!same.length,allowedModes:['create']},...catalogReferences(def,snapshot,type)];}
  if(same.length>1)throw new HqTemplateError('VERSION_CONFLICT',409);
  const row=same[0],versions=snap.versions.filter(v=>v.reward_id===row?.id),used=snap.usage.some(u=>u.id===row?.id&&u.n>0);
- const safe=!!row&&!used&&(row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
+ const safe=!!row&&!snap.handgiftIds?.includes(String(row.id))&&!used&&(row.status==='draft'&&!row.archived_at&&!row.current_published_version_id&&versions.every(v=>v.status==='draft'));
  return [{sourceId:type,itemKind:type,name,targetId:row?String(row.id):null,expectedRevision:row?JSON.stringify(row):null,duplicate:!!row,allowedModes:(row?safe?['overwrite','alias']:['alias']:['create']) as Array<'create'|'overwrite'|'alias'>},...catalogReferences(def,snapshot,type)];
 }
-export function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[],origin?:{templateId:string;versionId:string}) {
+type CatalogReference={sourceId:string;targetId:string|null};
+/** 本部のお支払いの指定を、メニューごとの上書きの行にする。決済をつないでいない店のオンライン先払いはお店で払うにする。既定は行を持たない。 */
+export function bookingPaymentSetting(paymentMode:unknown,connected:boolean):{mode:string;provider:string}|null {
+ if(paymentMode===undefined||paymentMode==='default')return null;
+ return paymentMode==='online'&&connected?{mode:'online',provider:'stripe'}:{mode:'onsite',provider:'onsite'};
+}
+export function bookingPaymentStatement(menuId:string,accountId:string,payment:{mode:string;provider:string}|null):HqTemplateStatement {
+ if(!payment)return {sql:'DELETE FROM booking_payment_menu_settings WHERE menu_id=? AND line_account_id=?',bindings:[menuId,accountId]};
+ return {sql:`INSERT INTO booking_payment_menu_settings(menu_id,line_account_id,mode,provider,created_at,updated_at) VALUES(?,?,?, ?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(menu_id) DO UPDATE SET mode=excluded.mode,provider=excluded.provider,updated_at=excluded.updated_at`,bindings:[menuId,accountId,payment.mode,payment.provider]};
+}
+/** 予約メニューに書く値。店のタグは配る前の確かめと同じく、店の中の同名の有効なタグ1件に解決する。 */
+export function bookingMenuData(settings:Record<string,unknown>,refs:readonly CatalogReference[]):Record<string,string|number|null> {
+ const tagId=settings.autoTagName?refs.find(r=>r.sourceId===`tag:${settings.autoTagName}`)!.targetId:null;
+ return {...Object.fromEntries(bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)).map(k=>[k,settings[k] as string|number|null])),auto_tag_id:tagId};
+}
+/** 景品に書く値。公開処理・タグ・シナリオは店の中のIDへ置き換え、引換コードは扱わない。 */
+export function rewardDraftValues(settings:Record<string,unknown>,refs:readonly CatalogReference[]) {
+ const actionId=refs.find(r=>r.sourceId==='commonActionName')?.targetId??null;
+ const remap=(v:unknown):unknown=>{if(Array.isArray(v))return v.map(remap);if(!own(v))return v;if(typeof v.type==='string'&&['tag_exists','tag_not_exists','tag_all','tag_not_all','scenario_subscribed'].includes(v.type)){const kind=v.type==='scenario_subscribed'?'scenario':'tag',map=(x:unknown)=>refs.find(r=>r.sourceId===`${kind}:${x}`)?.targetId??x;return {...v,value:Array.isArray(v.value)?v.value.map(map):map(v.value)};}return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,remap(x)]));};
+ return validateMileageRewardDraft({...settings,commonActionVersionId:actionId,targetConditions:remap(settings.targetConditions)} as unknown as MileageRewardDraftInput);
+}
+export type RewardDraftValues=ReturnType<typeof rewardDraftValues>;
+export const rewardVersionColumns=['required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','target_conditions'] as const;
+export function rewardVersionValues(d:RewardDraftValues):Array<string|number|null> {
+ return [d.requiredMiles,d.stockLimit,d.perFriendLimit,d.startsAt,d.endsAt,d.benefitExpiresDays,d.commonActionVersionId,d.failurePolicy,d.customerMessage,d.targetConditions?JSON.stringify(d.targetConditions):null];
+}
+/** 対応表の指紋に使う形。DB から読んだ行と同じ列名にそろえる。 */
+export function rewardRecordSource(name:string,d:RewardDraftValues):Record<string,unknown> {
+ return {name,description:d.description,image_url:d.imageUrl,reward_kind:d.rewardKind,required_miles:d.requiredMiles,per_friend_limit:d.perFriendLimit,starts_at:d.startsAt,ends_at:d.endsAt,benefit_expires_days:d.benefitExpiresDays,common_action_version_id:d.commonActionVersionId,failure_policy:d.failurePolicy,customer_message:d.customerMessage,target_conditions:d.targetConditions??null};
+}
+export async function planCatalog(accountId:string,def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType,resolutions:readonly HqTemplateResolution[],origin?:{templateId:string;versionId:string;tenantId:string}) {
  const snap=JSON.parse(snapshot) as Snapshot,items=inspectCatalog(def,snapshot,type),root=items[0],selected=resolutions.find(r=>r.sourceId===type);
  if(!selected||resolutions.length!==items.length||!root.allowedModes.includes(selected.mode)||items.slice(1).some(i=>!resolutions.some(r=>r.sourceId===i.sourceId&&r.mode==='overwrite')))throw new HqTemplateError('SELECTION_REQUIRED',409);
  const id=selected.mode==='overwrite'?root.targetId!:crypto.randomUUID(),name=selected.mode==='alias'?nextAlias(def.settings.name,snap.targets.map(r=>String(r.name))):def.settings.name;
  const existing=snap.targets.find(r=>r.id===id),s={...def.settings,name} as unknown as Record<string,unknown>;
- const statements:HqTemplateStatement[]=[{sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]}];
+ const statements:HqTemplateStatement[]=[catalogSnapshotGuard(accountId,type,snapshot)];
  const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});
- const refs=items.slice(1),tagId=s.autoTagName?refs.find(r=>r.sourceId===`tag:${s.autoTagName}`)!.targetId:null;
+ const refs=items.slice(1);
+ let record:Record<string,unknown>;
  if(type==='booking_menu') {
   if((JSON.parse(snapshot) as {style?:string}).style==='ec')throw new HqTemplateError('BOOKING_NOT_USED',422);
-  const data:Record<string,string|number|null>={...Object.fromEntries(bookingKeys.filter(k=>!['autoTagName','paymentMode'].includes(k)).map(k=>[k,s[k] as string|number|null])),auto_tag_id:tagId};
+  const data=bookingMenuData(s,refs),payment=bookingPaymentSetting(s.paymentMode,Boolean((JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected));
+  record={...data,payment_mode:payment?.mode??null,payment_provider:payment?.provider??null};
   if(existing){const keys=Object.keys(data);add(`UPDATE menus SET ${keys.map(k=>`${k}=?`).join(',')},version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[...keys.map(k=>data[k]),id,accountId]);}
   else {const keys=Object.keys(data);add(`INSERT INTO menus(id,line_account_id,${keys.join(',')},is_active) VALUES (?,?,${keys.map(()=>'?').join(',')},0)`,[id,accountId,...keys.map(k=>data[k])]);}
   if(origin)add('UPDATE menus SET hq_template_id=?,hq_template_version_id=?,hq_customized=0 WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
-  if(s.paymentMode!=='default')add(`INSERT INTO booking_payment_menu_settings(menu_id,line_account_id,mode,provider,created_at,updated_at) VALUES(?,?,?, ?,strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')) ON CONFLICT(menu_id) DO UPDATE SET mode=excluded.mode,provider=excluded.provider`,[id,accountId,s.paymentMode==='online'&&(JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected?'online':'onsite',s.paymentMode==='online'&&(JSON.parse(snapshot) as {paymentConnected?:number}).paymentConnected?'stripe':'onsite']);
-  add(`INSERT INTO menu_versions(id,menu_id,version_number,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,rules_json) SELECT ?,id,version,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,json_object('concurrent_capacity',concurrent_capacity,'booking_window_days',booking_window_days,'cutoff_hours_before',cutoff_hours_before,'cancel_deadline_hours_before',cancel_deadline_hours_before,'intake_question',intake_question) FROM menus WHERE id=? AND line_account_id=?`,[crypto.randomUUID(),id,accountId]);
+  if(payment)statements.push(bookingPaymentStatement(id,accountId,payment));
+  add(menuVersionSnapshotSql,[crypto.randomUUID(),id,accountId]);
  } else {
-  const actionId=refs.find(r=>r.sourceId==='commonActionName')?.targetId??null;
-  const remap=(v:unknown):unknown=>{if(Array.isArray(v))return v.map(remap);if(!own(v))return v;if(typeof v.type==='string'&&['tag_exists','tag_not_exists','tag_all','tag_not_all','scenario_subscribed'].includes(v.type)){const kind=v.type==='scenario_subscribed'?'scenario':'tag',map=(x:unknown)=>refs.find(r=>r.sourceId===`${kind}:${x}`)?.targetId??x;return {...v,value:Array.isArray(v.value)?v.value.map(map):map(v.value)};}return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,remap(x)]));};
-  const d=validateMileageRewardDraft({...s,commonActionVersionId:actionId,targetConditions:remap(s.targetConditions)} as unknown as MileageRewardDraftInput);
+  const d=rewardDraftValues(s,refs);record=rewardRecordSource(name,d);
   const previous=snap.versions.find(v=>v.id===existing?.current_draft_version_id),versionId=previous?String(previous.id):crypto.randomUUID();
   if(existing)add(`UPDATE mileage_rewards SET name=?,description=?,image_url=?,reward_kind=?,current_draft_version_id=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND line_account_id=?`,[name,d.description,d.imageUrl,d.rewardKind,versionId,id,accountId]);
   else add(`INSERT INTO mileage_rewards(id,line_account_id,program_id,name,description,image_url,reward_kind,status,current_draft_version_id) VALUES (?,?,'default',?,?,?,?,'draft',?)`,[id,accountId,name,d.description,d.imageUrl,d.rewardKind,versionId]);
-  const vals=[d.requiredMiles,d.stockLimit,d.perFriendLimit,d.startsAt,d.endsAt,d.benefitExpiresDays,d.commonActionVersionId,d.failurePolicy,d.customerMessage,d.targetConditions?JSON.stringify(d.targetConditions):null];
-  const cols=['required_miles','stock_limit','per_friend_limit','starts_at','ends_at','benefit_expires_days','common_action_version_id','failure_policy','customer_message','target_conditions'];
+  if(origin)add('UPDATE mileage_rewards SET hq_template_id=?,hq_template_version_id=? WHERE id=? AND line_account_id=?',[origin.templateId,origin.versionId,id,accountId]);
+  const vals=rewardVersionValues(d),cols=rewardVersionColumns;
   if(previous)add(`UPDATE mileage_reward_versions SET ${cols.map(k=>`${k}=?`).join(',')},revision=revision+1 WHERE id=? AND reward_id=? AND status='draft'`,[...vals,versionId,id]);
   else add(`INSERT INTO mileage_reward_versions(id,reward_id,version_number,status,${cols.join(',')}) VALUES (?,?,(SELECT COALESCE(MAX(version_number),0)+1 FROM mileage_reward_versions WHERE reward_id=?),'draft',${cols.map(()=>'?').join(',')})`,[versionId,id,id,...vals]);
  }
+ // 確定した作成・上書き・別名と同じ batch で、対応表に配った店の物と中身の指紋を残す。
+ if(origin)statements.push(...bindingRecordStatements({tenantId:origin.tenantId,templateId:origin.templateId,versionId:origin.versionId,accountId,kind:type,targetId:id,snapshotHash:await catalogRecordHash(type,catalogRecord(type,record))}));
  return {statements,resolutions:[{...selected,targetId:id,aliasName:selected.mode==='alias'?name:undefined},...refs.map(r=>({sourceId:r.sourceId,itemKind:r.itemKind,mode:'overwrite' as const,targetId:r.targetId??undefined,expectedRevision:r.expectedRevision??undefined}))],counts:{created:selected.mode==='create'?1:0,overwritten:selected.mode==='overwrite'?1:0,aliased:selected.mode==='alias'?1:0}};
 }
+/** 予約メニューを書いた後の中身を版として残す。既にある予約は予約時の控えを持つので値段は変わらない。 */
+export const menuVersionSnapshotSql=`INSERT INTO menu_versions(id,menu_id,version_number,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,rules_json) SELECT ?,id,version,name,category_label,description,duration_minutes,buffer_after_minutes,base_price,price_mode,sort_order,is_active,json_object('concurrent_capacity',concurrent_capacity,'booking_window_days',booking_window_days,'cutoff_hours_before',cutoff_hours_before,'cancel_deadline_hours_before',cancel_deadline_hours_before,'intake_question',intake_question) FROM menus WHERE id=? AND line_account_id=?`;
 
 export function catalogWarnings(def:HqCatalogTemplateDefinition,snapshot:string,type:HqCatalogTemplateType){
  const s=JSON.parse(snapshot) as {style:string;paymentConnected:number;targets:Row[]},settings=def.settings as unknown as Record<string,unknown>;
@@ -129,7 +172,7 @@ export function createBookingMenuHqAdapter(db:D1Database,authority:import('./con
   async buildCommitPlan(context,input){
    const version=await db.prepare('SELECT template_id FROM hq_template_versions WHERE id=? AND tenant_id=? AND definition_json=?').bind(input.templateVersionId,authority.tenantId,input.definitionJson).first<{template_id:string}>();if(!version)throw new HqTemplateError('VERSION_CONFLICT',409);
    const snapshot=await catalogSnapshot(db,context.targetAccountId,'booking_menu'),digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(snapshot))),n=>n.toString(16).padStart(2,'0')).join('');if(`hqts1.${digest}`!==context.snapshotToken)throw new HqTemplateError('VERSION_CONFLICT',409);
-   const plan=planCatalog(context.targetAccountId,parseCatalogDefinition('booking_menu',JSON.parse(input.definitionJson)),snapshot,'booking_menu',context.resolutions,{templateId:version.template_id,versionId:input.templateVersionId});
+   const plan=await planCatalog(context.targetAccountId,parseCatalogDefinition('booking_menu',JSON.parse(input.definitionJson)),snapshot,'booking_menu',context.resolutions,{templateId:version.template_id,versionId:input.templateVersionId,tenantId:authority.tenantId});
    return ok({tenantId:authority.tenantId,targetAccountId:context.targetAccountId,preflightId:context.preflightId,idempotencyFingerprint:context.idempotencyFingerprint,snapshotToken:context.snapshotToken,mode:context.mode,resolutions:plan.resolutions,stage:[],dbCommit:plan.statements,compensateOnDbFailure:[],reconcile:[]});
   },
  };

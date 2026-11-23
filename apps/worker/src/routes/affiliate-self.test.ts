@@ -422,6 +422,7 @@ describe('LIFF mileage rewards — verified account and real limits', () => {
   it('does not say redeemable after the per-person limit is reached', async () => {
     dbMocks.listMileageRewards.mockResolvedValueOnce([{
       id: 'reward-1',
+      hqTemplateId: 'hq-private',
       rewardKind: 'coupon',
       availableCodeCount: 2,
       currentVersion: {
@@ -437,6 +438,7 @@ describe('LIFF mileage rewards — verified account and real limits', () => {
     const response = await call('/api/liff/mileage/rewards?lineAccessToken=tok-alice');
     expect(response.status).toBe(200);
     const body = await response.json() as { rewards: Array<{ canRedeem: boolean; unavailableReason: string }> };
+    expect(body.rewards[0]).not.toHaveProperty('hqTemplateId');
     expect(body.rewards[0]).toMatchObject({
       canRedeem: false,
       unavailableReason: 'この使い道の交換上限に達しています',

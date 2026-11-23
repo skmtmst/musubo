@@ -1,9 +1,13 @@
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
-import { publishMileageReward } from '@line-crm/db';
+import { getMileageReward, publishMileageReward } from '@line-crm/db';
 import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
+import { scoring } from './scoring.js';
+import booking from './booking.js';
 import type { Env } from '../worker-env.js';
 import type { HqCatalogTemplateType } from '@line-crm/shared';
 let f:SqliteD1,app:Hono<Env>,staff:Env['Variables']['staff'];
@@ -21,7 +25,7 @@ beforeEach(()=>{
  f.raw.exec("INSERT INTO mileage_programs(id,code,name,status,created_at,updated_at) VALUES('default','default','マイル','active','2026-10-15','2026-10-15')");
  f.raw.exec("INSERT INTO tenants(id,name) VALUES('t','HQ'),('other','Other'); INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','Owner','owner','unused','t'); INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('a','Store','a','x','x','t'),('b','Store2','b','x','x','t'),('other','Hidden','other','x','x','other')");
  staff={id:'owner',name:'Owner',role:'owner',tenantId:'t',readOnly:false};
- app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);
+ app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',staff);await next();});app.route('/',hqTemplates);app.route('/',scoring);app.route('/',booking);
  vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('No external requests');}));
 });
 afterEach(()=>{f.raw.close();vi.useRealTimers();vi.unstubAllGlobals();});
@@ -108,6 +112,22 @@ test('HQT-03 HQT-14: 予約を使わない店は配らない、代理も配れ�
  const id=await create('booking_menu');f.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('a','ec',datetime('now'))");const p=await check(id);expect((p.stores[0] as any).warnings).toContain('booking_not_used');expect((await run(id,p)).body.data.status).toBe('failed');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
  const im=new Hono<Env>();im.use('*',async(c,next)=>{c.set('staff',staff);c.set('impersonation',{id:'im',tenantId:'t',mode:'write',piiRevealed:true,startedAt:'2026-10-16'});await next();});im.route('/',hqTemplates);const r=await im.request(`/api/hq/templates/${id}/preflight`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountIds:['a']})},{DB:f.db} as Env['Bindings']);expect(r.status).toBe(403);
 });
+test('HQT-07: 統括からのメニューは担当が決まるまで受付開始できない',async()=>{
+ const id=await create('booking_menu');expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const menu=f.raw.prepare('SELECT id,version FROM menus').get() as {id:string;version:number};
+ const enable=()=>app.request(`/api/booking/admin/menus/${menu.id}?account_id=a`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'初回相談',duration_minutes:60,base_price:3000,is_active:true,expectedVersion:menu.version})},{DB:f.db} as Env['Bindings']);
+ const blocked=await enable();expect(blocked.status).toBe(400);expect(await blocked.json()).toMatchObject({error:'staff_selection_required'});
+ expect(f.raw.prepare('SELECT is_active FROM menus WHERE id=?').get(menu.id)).toEqual({is_active:0});
+ f.raw.exec("INSERT INTO staff(id,line_account_id,name,display_name) VALUES('staff','a','担当','担当')");
+ f.raw.prepare('INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES(?,?,1)').run('staff',menu.id);
+ const enabled=await enable();expect(enabled.status).toBe(200);expect(f.raw.prepare('SELECT is_active FROM menus WHERE id=?').get(menu.id)).toEqual({is_active:1});expect(fetch).not.toHaveBeenCalled();
+});
+test.each(['booking_menu','mileage_reward'] as const)('HQT-18: %s の配布前確認は30分有効',async type=>{
+ const id=await create(type),before=Date.now();
+ const result=await call<Preflight & {expiresAt:string}>(`/${id}/preflight`,'POST',{accountIds:['a']});
+ const after=Date.now(),expires=Date.parse(result.body.data.expiresAt);
+ expect(result.status).toBe(200);expect(expires).toBeGreaterThanOrEqual(before+30*60_000);expect(expires).toBeLessThanOrEqual(after+30*60_000);
+});
 
 test('HQT-09: 配られたクーポン景品はコードがなければ公開できない',async()=>{
  const id=await create('mileage_reward');expect((await run(id,await check(id))).body.data.status).toBe('completed');
@@ -159,4 +179,58 @@ test('HQT-18: 予約メニューの確認は29分後でも有効',async()=>{
 test('HQT-18: 予約メニューの確認は30分後に期限切れ',async()=>{
  const id=await create('booking_menu'),p=await check(id);vi.setSystemTime(new Date('2026-11-16T00:30:00Z'));
  const r=await run(id,p);expect(r.body.data.stores[0].status).toBe('version_conflict');expect(f.raw.prepare('SELECT COUNT(*) n FROM menus').get()).toEqual({n:0});
+});
+
+test('HQT-22: 景品のひな形を削除しても店の景品と版と出所を残し再配布を止める',async()=>{
+ const id=await create('mileage_reward');
+ expect((await run(id,await check(id))).body.data.status).toBe('completed');
+ const before=f.raw.prepare('SELECT id,hq_template_id,hq_template_version_id FROM mileage_rewards').get() as {id:string;hq_template_id:string|null;hq_template_version_id:string|null};
+ expect(before.hq_template_id).toBe(id);expect(before.hq_template_version_id).toBeTruthy();
+ expect((await getMileageReward(f.db,{id:before.id,lineAccountId:'a'}))?.hqTemplateId).toBe(id);
+ const readReward=async()=>app.request(`/api/mileage/rewards/${before.id}?accountId=a`,{}, {DB:f.db} as Env['Bindings']);
+ const beforeResponse=await readReward();expect(beforeResponse.status).toBe(200);expect(await beforeResponse.json()).toMatchObject({data:{hqTemplateId:id}});
+ const versions=f.raw.prepare('SELECT * FROM mileage_reward_versions WHERE reward_id=?').all(before.id);
+ const detail=await call<Detail>(`/${id}`);
+ expect((await call(`/${id}`,'DELETE',{expectedRevision:detail.body.data.template.revision})).status).toBe(200);
+ expect(f.raw.prepare('SELECT hq_template_id,hq_template_version_id FROM mileage_rewards WHERE id=?').get(before.id)).toEqual({hq_template_id:id,hq_template_version_id:before.hq_template_version_id});
+ expect((await getMileageReward(f.db,{id:before.id,lineAccountId:'a'}))?.hqTemplateId).toBeNull();
+ const afterResponse=await readReward();expect(afterResponse.status).toBe(200);expect(await afterResponse.json()).toMatchObject({data:{hqTemplateId:null}});
+ expect(f.raw.prepare('SELECT archived_at IS NOT NULL archived FROM hq_templates WHERE id=?').get(id)).toEqual({archived:1});
+ expect((await call(`/${id}/preflight`,'POST',{accountIds:['a']})).status).toBe(404);
+ expect(f.raw.prepare('SELECT * FROM mileage_reward_versions WHERE reward_id=?').all(before.id)).toEqual(versions);
+});
+
+test('HQT-22: 既存の成功した配布だけ出所を復元する',()=>{
+ const legacy=new Database(':memory:');
+ try {
+  legacy.exec(`CREATE TABLE mileage_rewards(id TEXT PRIMARY KEY,line_account_id TEXT);
+   CREATE TABLE hq_templates(id TEXT,tenant_id TEXT,archived_at TEXT);
+   CREATE TABLE hq_template_versions(id TEXT,template_id TEXT,tenant_id TEXT);
+   CREATE TABLE line_accounts(id TEXT,tenant_id TEXT);
+   CREATE TABLE hq_template_preflight_resolutions(preflight_id TEXT,tenant_id TEXT,template_id TEXT,template_version_id TEXT,target_account_id TEXT,item_kind TEXT,target_id TEXT);
+   CREATE TABLE hq_template_distribution_results(preflight_id TEXT,tenant_id TEXT,status TEXT,finished_at TEXT);
+   INSERT INTO line_accounts VALUES('a','t'); INSERT INTO hq_templates VALUES('hq','t','deleted');
+   INSERT INTO hq_template_versions VALUES('v','hq','t'); INSERT INTO mileage_rewards VALUES('r','a'),('unrelated','a');
+   INSERT INTO hq_template_preflight_resolutions VALUES('p','t','hq','v','a','mileage_reward','r'),('failed','t','hq','v','a','mileage_reward','unrelated');
+   INSERT INTO hq_template_distribution_results VALUES('p','t','succeeded','2026-01-01'),('failed','t','failed','2026-01-02');`);
+  legacy.exec(readFileSync(new URL('../../../../packages/db/migrations/782_hq_reward_origin.sql',import.meta.url),'utf8'));
+  expect(legacy.prepare('SELECT id,hq_template_id,hq_template_version_id FROM mileage_rewards ORDER BY id').all()).toEqual([
+   {id:'r',hq_template_id:'hq',hq_template_version_id:'v'}, {id:'unrelated',hq_template_id:null,hq_template_version_id:null}]);
+ } finally {legacy.close();}
+});
+
+test('HQT-22: 配布途中に削除したら残りの店へ配らない',async()=>{
+ const id=await create('mileage_reward'),p=await check(id,['a','b']);
+ const original=f.db.batch.bind(f.db);let archived=false;
+ f.db.batch=async <T=unknown>(statements:D1PreparedStatement[]):Promise<D1Result<T>[]>=>{
+  const result=await original(statements) as D1Result<T>[];
+  if(!archived&&f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() && (f.raw.prepare("SELECT COUNT(*) n FROM hq_template_distribution_results WHERE status='succeeded'").get() as {n:number}).n===1){
+   archived=true;f.raw.prepare("UPDATE hq_templates SET archived_at='2026-11-16T00:00:00Z' WHERE id=?").run(id);
+  }
+  return result;
+ };
+ const result=await run(id,p);
+ expect(archived).toBe(true);expect(result.body.data.status).toBe('partial');
+ expect(result.body.data.stores.map(s=>s.status).sort()).toEqual(['failed','succeeded']);
+ expect(f.raw.prepare('SELECT line_account_id FROM mileage_rewards').all()).toHaveLength(1);
 });
