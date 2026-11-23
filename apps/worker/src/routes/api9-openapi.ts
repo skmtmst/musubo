@@ -277,6 +277,14 @@ Object.assign(api9Paths, {
       { lineAccountId: string },
     ),
   },
+  '/api/instagram/connections': {
+    get: operation(
+      '同じLINEアカウントのInstagram接続を全件、画面に出す順で読む。合鍵は返さない',
+      [],
+      undefined,
+      { lineAccountId: string },
+    ),
+  },
   '/api/instagram/oauth/start': {
     post: operation(
       '操作者・アカウントを固定した10分のOAuthを開始。owner/adminのみ',
