@@ -558,8 +558,8 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
             {googleStatus !== null ? <>
               <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
-              <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
-              {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
+              <div className={styles.googleHoursLink}><Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button></div>
+              {hours ? <ul className={styles.googleHoursList}>{WEEK_ORDER.map((weekday) => <li key={weekday}>{WEEKDAY_LABEL[weekday]}曜日：{periodsText(hours.find((d) => d.weekday === weekday))}</li>)}</ul> : null}
             </> : hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0
