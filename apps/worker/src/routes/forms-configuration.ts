@@ -581,8 +581,6 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     if ('error' in normalized) {
       return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
     }
-    try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout)); }
-    catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
     if (c.get('impersonation')) {
       const previous = await getFormById(c.env.DB, id);
       if (!previous) return fail(c, 404, 'FORM_NOT_FOUND');
@@ -590,12 +588,14 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
         const inputs = collectInputs(value);
         const bookings = inputs.filter(block => block.type === 'booking' && block.booking?.routing != null).map(block => ({id:block.id,routing:block.booking?.routing}));
         const questionIds = new Set(bookings.flatMap(block => block.routing?.rules.flatMap(rule => rule.conditions.map(condition => condition.questionId)) ?? []));
-        const questions = inputs.filter(block => questionIds.has(block.id)).sort((a,b) => a.id.localeCompare(b.id));
+        const questions = inputs.filter(block => questionIds.has(block.id)).map(({id,name,type,choices}) => ({id,name,type,choices})).sort((a,b) => a.id.localeCompare(b.id));
         return {bookings,questions};
       };
       if (JSON.stringify(routes(parseLayout(previous.layout, previous.fields))) !== JSON.stringify(routes(JSON.parse(normalized.layout))))
         return c.json({success:false,error:'代理ログイン中は行き先を変更できません'},403);
     }
+    try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout),{validateTargets:!c.get('impersonation')}); }
+    catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
     if (!await validateFormReferences(c.env, await getFormAccountIds(c.env.DB, id), JSON.parse(normalized.layout), false)) {
       return inputError(c, { success: false, error: '同じ店の参照を選び直してください' }, 422, ['layout.references']);
     }

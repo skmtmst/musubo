@@ -52,9 +52,14 @@ test('閲覧のみと代理ログインでは振り分けを保存できない',
 
 test('代理ログインで振り分け以外を編集しても、既存ルールは変わらない',async()=>{
  const {forms}=await import('./forms.js');
+ d.raw.exec("UPDATE menus SET is_active=0 WHERE id='menu'");
+ const before=layout();
  const draft=layout();draft.sections[0].name='編集後';
+ const question=draft.sections[0].blocks[0];if(question.kind!=='input')throw Error('fixture');question.label='新しい説明';
  const r=await gapCall(gapApp(d,[forms],gapOwner,true),'/api/forms/form?account_id=a','PUT',{layout:draft,expectedContentRevision:1});
  expect(r.status).toBe(200);
+ const saved=JSON.parse((d.raw.prepare("SELECT layout FROM forms WHERE id='form'").get() as {layout:string}).layout);
+ expect(saved.sections[0].blocks[1].booking.routing).toEqual((before.sections[0].blocks[1] as any).booking.routing);
 });
 
 test('代理ログインでは振り分けが使う質問の変更もできない',async()=>{
