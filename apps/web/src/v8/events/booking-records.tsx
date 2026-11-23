@@ -64,9 +64,9 @@ function RecordSummary({ accountId, eventId, revision }: Pick<Props, 'accountId'
     action={<Button onClick={() => setRetry((value) => value + 1)}>件数を読み直す</Button>} />
   const activeSeats = summary.activeSeats ?? (summary.confirmedSeats ?? summary.confirmed) + (summary.requestedSeats ?? summary.requested) + (summary.offeredSeats ?? 0)
   return <>
-    <p>{`全開催回：承認待ち ${summary.requested}件・確定 ${summary.confirmed}件・拒否 ${summary.rejected ?? '—'}件・キャンセル ${summary.cancelled ?? '—'}件・期限切れ ${summary.expired ?? '—'}件・参加済 ${summary.attended ?? '—'}件・無断 ${summary.noShow ?? '—'}件`}</p>
-    <p>{describeBookingCapacity(activeSeats, summary.totalCapacity ?? null)}</p>
-    <p>{summary.requested > 0 ? `対応が必要：${summary.requested}件を確認してください` : '確認待ちはありません'}。{summary.cancelled > 0 ? '空いた枠を確認してください' : 'キャンセルはありません'}。</p>
+    <p className="text-body">{`全開催回：承認待ち ${summary.requested}件・確定 ${summary.confirmed}件・拒否 ${summary.rejected ?? '—'}件・キャンセル ${summary.cancelled ?? '—'}件・期限切れ ${summary.expired ?? '—'}件・参加済 ${summary.attended ?? '—'}件・無断 ${summary.noShow ?? '—'}件`}</p>
+    <p className="text-body">{describeBookingCapacity(activeSeats, summary.totalCapacity ?? null)}</p>
+    <p className="text-body">{summary.requested > 0 ? `対応が必要：${summary.requested}件を確認してください` : '確認待ちはありません'}。{summary.cancelled > 0 ? '空いた枠を確認してください' : 'キャンセルはありません'}。</p>
   </>
 }
 
@@ -135,7 +135,7 @@ function Records({ accountId, eventId, occurrenceId, questionsJson, revision, re
             </EventRosterRow>
           })}
         </EventRosterTable>
-        <p>{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件 / 全{formatNumber(total)}件</p>
+        <p className="text-body">{(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件 / 全{formatNumber(total)}件</p>
         <Pagination page={page} pageCount={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} ariaLabel="申込記録のページ送り" />
       </>}
   </>

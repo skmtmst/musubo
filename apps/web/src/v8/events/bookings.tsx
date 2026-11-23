@@ -791,15 +791,15 @@ function Bookings({ eventId }: { eventId: string }) {
         </span> : null}</>
       }}>
         {ready ? <>
-          <p>{`申込 ${confirmedSeats + requestedSeats}人（確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人）・キャンセル待ち ${waitingSeats}人・案内中 ${offeredSeats}人 / ${capacity === null ? '定員の上限なし' : occurrence && occurrence.activeSeats >= capacity ? `満席（定員 ${capacity}人）` : `残席 ${Math.max(0, capacity - (occurrence?.activeSeats ?? 0))}席（定員 ${capacity}人）`}`}</p>
+          <p className="text-body">{`申込 ${confirmedSeats + requestedSeats}人（確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人）・キャンセル待ち ${waitingSeats}人・案内中 ${offeredSeats}人 / ${capacity === null ? '定員の上限なし' : occurrence && occurrence.activeSeats >= capacity ? `満席（定員 ${capacity}人）` : `残席 ${Math.max(0, capacity - (occurrence?.activeSeats ?? 0))}席（定員 ${capacity}人）`}`}</p>
           {attendance ? attendance.entries.length ? <EventRosterTable kind="cancel" label="当日の受付記録" headings={['友だち', '結果', '記録日時']}>
             {attendance.entries.map((entry) => <EventRosterRow key={entry.id}>
               <span role="cell" className={styles.cellName}>{entry.displayName ?? '友だちは未取得'}</span>
               <span role="cell">{chip(entry.status)}</span>
               <span role="cell" className={styles.cellText}>{jstShort(entry.markedAt)}</span>
             </EventRosterRow>)}
-          </EventRosterTable> : null : <p>受付の記録はまだ読み込めていません。</p>}
-          {applicants?.waitlistHistory === undefined ? <p>履歴はまだ読み込めていません。</p> : null}
+          </EventRosterTable> : null : <p className="text-body">受付の記録はまだ読み込めていません。</p>}
+          {applicants?.waitlistHistory === undefined ? <p className="text-body">履歴はまだ読み込めていません。</p> : null}
           {rows.filter((row) => row.source === 'waitlist').map((row) => <Field key={row.id} label={row.displayName ?? '友だちは未取得'}>
             <Button href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>個別トーク</Button>
             {row.status === 'waiting' ? <Button onClick={() => {
