@@ -41,6 +41,11 @@ const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsCreateDraft = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
+const routingTargets = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api/helpers/gap2', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/helpers/gap2')>()
+  return {...actual, formRoutingApi:{...actual.formRoutingApi, targets:routingTargets}}
+})
 const menuStaff = vi.hoisted(()=>vi.fn(async (_accountId: string, _menuId: string): Promise<{ staff: Array<{ id: string; display_name: string }> }> => ({staff:[]})))
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
 
@@ -48,7 +53,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
-    fetchApi: vi.fn(async () => ({ success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] })),
+    // フォームの一覧は「この店だけで使うフォーム」として返す（振り分けの区画が店を確かめるため）。
+    fetchApi: vi.fn(async (path: string) => String(path).startsWith('/api/forms?account_id=')
+      ? { success: true, data: [{ id: 'form-1', usedByAccounts: [{ id: 'acc-1' }] }] }
+      : { success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] }),
     bookingApi: {
       ...actual.bookingApi,
       listMenus: vi.fn(async () => ({ menus: [{ id: 'bm-1', name: 'トリミング（小型犬）', duration_minutes: 60, is_active: 1 }] })),
@@ -107,6 +115,7 @@ const render = async (query: string) => {
 
 beforeEach(() => {
   account.id = 'acc-1'
+  routingTargets.mockReset().mockResolvedValue({success:true,data:{menus:[],staff:[],groups:[]}})
   forcedRole.value = null
   staffMe.mockReset().mockResolvedValue({ success: true, data: { role: 'owner' } })
   document.documentElement.dataset.theme = 'v8'
@@ -977,4 +986,199 @@ describe('新しいフォームは最初の保存で作成する', () => {
     expect(navigation.replace).not.toHaveBeenCalled()
     expect(readCreatedFormDraft('acc-2', 'old-store-draft')).toBeNull()
   })
+})
+
+it('振り分け先ごとのメニューについて担当候補を読み込む', async () => {
+  const data = structuredClone(formData)
+  const block = data.layout.sections[1].blocks[0]
+  if (block.kind !== 'input' || !block.booking) throw new Error('fixture')
+  block.booking.routing = {enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'ご相談'}],target:{menuId:'bm-2'}}],fallback:{menuId:'bm-3'}}
+  formsGet.mockResolvedValue({success:true,data})
+  menuStaff.mockClear().mockResolvedValue({staff:[]})
+  await render('id=form-1')
+  await waitFor(() => expect(menuStaff.mock.calls.map((call) => call[1])).toEqual(expect.arrayContaining(['bm-1','bm-2','bm-3'])))
+})
+
+it('代理ログイン中は振り分けを閲覧・試行できるが編集できない', async () => {
+  const { rememberSessionSnapshot, forgetSessionSnapshot } = await import('@/lib/session-snapshot')
+  const data=structuredClone(formData)
+  const block=data.layout.sections[1].blocks[0]
+  if(block.kind!=='input'||!block.booking) throw new Error('fixture')
+  block.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  rememberSessionSnapshot({stepUpMethod:'totp',unfamiliarAt:null,impersonation:{mode:'write'} as never})
+  try {
+    await render('id=form-1')
+    expect(await screen.findByRole('button',{name:'試しに答える'})).toBeTruthy()
+    expect(screen.queryByRole('button',{name:'行き先を追加'})).toBeNull()
+    expect(screen.queryByRole('button',{name:'どれにも当たらないときの出すメニュー'})).toBeNull()
+  } finally { forgetSessionSnapshot() }
+})
+
+it('フォーム権限の候補一覧を使い、振り分け先の担当と組を表示する', async () => {
+  const data=structuredClone(formData)
+  const block=data.layout.sections[1].blocks[0]
+  if(block.kind!=='input'||!block.booking)throw new Error('fixture')
+  block.booking.routing={enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'ご相談'}],target:{menuId:'routing-menu',staffGroupId:'group-1'}}],fallback:{menuId:'routing-menu'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'routing-menu',name:'フォーム向け相談',durationMinutes:30}],staff:[{id:'p',name:'担当P',menuId:'routing-menu'}],groups:[{id:'group-1',name:'相談の組'}]}})
+  await render('id=form-1')
+  await waitFor(() => expect(routingTargets).toHaveBeenCalledWith('acc-1','form-1'))
+  expect((await screen.findByRole('button',{name:'1 行目の出すメニュー'})).parentElement?.textContent).toContain('フォーム向け相談')
+  expect(screen.getByRole('button',{name:'1 行目の担当'}).parentElement?.textContent).toContain('相談の組')
+})
+
+
+it('アカウント変更後に前の店の予約先候補が届いても表示しない', async () => {
+  const data=structuredClone(formData)
+  const block=data.layout.sections[1].blocks[0]
+  if(block.kind!=='input'||!block.booking)throw new Error('fixture')
+  block.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  let finishOld!: (value:{success:true;data:{menus:Array<{id:string;name:string;durationMinutes:number}>;staff:never[];groups:never[]}}) => void
+  routingTargets.mockImplementation((accountId:string) => accountId==='acc-1'
+    ? new Promise(resolve => {finishOld=resolve})
+    : Promise.resolve({success:true,data:{menus:[{id:'bm-1',name:'新しい店の相談',durationMinutes:30}],staff:[],groups:[]}}))
+  await render('id=form-1')
+  await waitFor(() => expect(routingTargets).toHaveBeenCalledWith('acc-1','form-1'))
+  account.id='acc-2'
+  await render('id=form-1')
+  await waitFor(() => expect(routingTargets).toHaveBeenCalledWith('acc-2','form-1'))
+  await act(async () => {finishOld({success:true,data:{menus:[{id:'bm-1',name:'前の店の相談',durationMinutes:30}],staff:[],groups:[]}})})
+  expect(screen.queryByText('前の店の相談')).toBeNull()
+})
+
+it('他機能の閲覧権限がなくてもフォームを開いて振り分けを編集できる', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  vi.mocked(fetchApi).mockImplementation((async (path:string) => {
+    if(path.startsWith('/api/tags')) throw new ApiError(403,'権限がありません')
+    return {success:true,data:[]}
+  }) as typeof fetchApi)
+  const data=structuredClone(formData)
+  data.onSubmitTagId='keep-tag'
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  try {
+    await render('id=form-1')
+    expect(await screen.findByText(/権限のない候補は表示されません/)).toBeTruthy()
+    expect(screen.getByRole('heading',{name:'答えで予約の行き先を分ける'})).toBeTruthy()
+    fireEvent.click(screen.getByRole('switch',{name:'答えで予約の行き先を分ける'}))
+    fireEvent.click(getPageAction({name:'下書きを保存'}))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledWith('form-1','acc-1',expect.objectContaining({onSubmitTagId:'keep-tag'})))
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
+})
+
+it('候補の通信障害は権限不足と区別して保存を止める', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  vi.mocked(fetchApi).mockRejectedValue(new Error('offline'))
+  try {
+    await render('id=form-1')
+    expect(await screen.findByText('フォームを読み込めませんでした')).toBeTruthy()
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(screen.queryByText(/権限のない候補は表示されません/)).toBeNull()
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
+})
+
+it('振り分けを変更して移動すると未保存の確認を出す', async () => {
+  const data=structuredClone(formData)
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  const previousUrl=window.location.href
+  window.history.replaceState({}, '', '/form-submissions/edit?id=form-1')
+  await render('id=form-1')
+  const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'})
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout']})
+  try {
+    fireEvent.click(toggle)
+    fireEvent.click(screen.getByRole('link',{name:'キャンセル'}))
+    expect(screen.getByRole('dialog',{name:'保存していない変更があります'})).toBeTruthy()
+    expect(formsUpdate).not.toHaveBeenCalled()
+  } finally { vi.useRealTimers(); window.history.replaceState({}, '', previousUrl) }
+})
+
+it('振り分けの保存が失敗しても変更を残す', async () => {
+  const data=structuredClone(formData)
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  formsUpdate.mockRejectedValueOnce(new ApiError(503,'保存できません'))
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  await render('id=form-1')
+  const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'})
+  fireEvent.click(toggle)
+  fireEvent.click(getPageAction({name:'下書きを保存'}))
+  await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  expect(await screen.findByText(/保存に失敗しました/)).toBeTruthy()
+})
+
+it('答えが1つの質問に同時に満たせない条件が重なった振り分けは、保存の前に止める', async () => {
+  const data=structuredClone(formData)
+  const booking=data.layout.sections[1].blocks[0]
+  if(booking.kind!=='input'||!booking.booking)throw new Error('fixture')
+  booking.booking.routing={enabled:true,rules:[{conditions:[{questionId:'q1',op:'is',value:'トリミング'},{questionId:'q1',op:'is',value:'ご相談'}],target:{menuId:'bm-1'}}],fallback:{menuId:'bm-1'}}
+  formsGet.mockResolvedValue({success:true,data})
+  routingTargets.mockResolvedValue({success:true,data:{menus:[{id:'bm-1',name:'相談',durationMinutes:30}],staff:[{id:'s1',name:'担当',menuId:'bm-1'}],groups:[]}})
+  await render('id=form-1')
+  await screen.findByRole('heading',{name:'答えで予約の行き先を分ける'})
+  fireEvent.click(getPageAction({name:'下書きを保存'}))
+  expect((await screen.findAllByText('1 行目の「今日のご来店の目的は？」の条件は同時に満たせません。どちらかを外すか、行を分けてください。')).length).toBeGreaterThan(0)
+  // 保存は非同期で進むため、送るまでの間を待ってから送っていないことを確かめる。
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+  expect(formsUpdate).not.toHaveBeenCalled()
+})
+
+it('ほかの店でも使うフォームは振り分けをオンにさせず、この店だけと確かめたフォームならオンにできる', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  const stores={value:[{id:'acc-1'},{id:'acc-2'}]}
+  vi.mocked(fetchApi).mockImplementation((async (path:string) => path==='/api/forms?account_id=acc-1'
+    ? {success:true,data:[{id:'other-form',usedByAccounts:[{id:'acc-1'}]},{id:'form-1',usedByAccounts:stores.value}]}
+    : {success:true,data:[]}) as typeof fetchApi)
+  try {
+    await render('id=form-1')
+    const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+    expect(await screen.findByText(/ほかの店でも使うフォームのため、答えで予約の行き先は分けられません/)).toBeTruthy()
+    expect(toggle.disabled).toBe(true)
+    act(() => { root.unmount() })
+    root=createRoot(host)
+    stores.value=[{id:'acc-1'}]
+    await render('id=form-1')
+    const single=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+    await waitFor(() => expect(single.disabled).toBe(false))
+    expect(screen.queryByText(/ほかの店でも使うフォーム/)).toBeNull()
+    fireEvent.click(single)
+    expect(single.getAttribute('aria-checked')).toBe('true')
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
+})
+
+it('フォームを使う店を確かめられない時は「この店だけ」とみなさず、振り分けをオンにさせない', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  const listed={value:'missing' as 'missing'|'failed'}
+  vi.mocked(fetchApi).mockImplementation((async (path:string) => {
+    if(path!=='/api/forms?account_id=acc-1') return {success:true,data:[]}
+    if(listed.value==='failed') throw new ApiError(503,'一時的に使えません')
+    return {success:true,data:[{id:'other-form',usedByAccounts:[{id:'acc-1'}]}]}
+  }) as typeof fetchApi)
+  try {
+    for (const state of ['missing','failed'] as const) {
+      listed.value=state
+      act(() => { root.unmount() })
+      root=createRoot(host)
+      await render('id=form-1')
+      const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+      expect(await screen.findByText(/このフォームを使う店を確かめられないため、今は行き先を分けられません/)).toBeTruthy()
+      expect(toggle.disabled).toBe(true)
+    }
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
 })

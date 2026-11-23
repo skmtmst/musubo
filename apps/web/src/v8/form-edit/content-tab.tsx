@@ -36,12 +36,14 @@ CalendarCheck,
 Plus,
 X
 } from 'lucide-react';
-import { useEffect,useMemo,useRef,useState,type DragEvent,type KeyboardEvent,type ReactNode } from 'react';
+import { useEffect,useMemo,useRef,useState,useSyncExternalStore,type DragEvent,type KeyboardEvent,type ReactNode } from 'react';
+import { readPermissionSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot';
 import styles from './edit.module.css';
 import { useFormEditAttempted } from './field-issues';
 import { blockKindLine,blockTitleKind,blockTitleLine,inputTypeLabel,isChoiceType } from './model';
-import type { FormRouting } from './routing-model';
+import type { FormRouting, RoutingStoreScope } from './routing-model';
 import RoutingSection from './routing-section';
+import { formRoutingApi } from '@/lib/api/helpers/gap2';
 
 /*
  * 「中身」のタブ（・・・・ の左の列）。
@@ -60,6 +62,7 @@ type Props = {
   selectedBlockId: string | null
   inputCount: number
   accountId: string | null
+  formId?: string
   /** 統括のひな形（host.ts）：配った先の ID に直せない画像（登録メディア・画像の URL）は足せない。 */
   portable?: boolean
   onSelectPage: (index: number) => void
@@ -76,6 +79,9 @@ type Props = {
   onRemoveBlock: (id: string) => void
   /** 答えで予約の行き先を分ける（B6）。決まりは回答フォームの版に含める。 */
   routing?: FormRouting
+  routingRefs?: Pick<FormRefs, 'routingMenus'|'routingMenuStaff'|'bookingGroups'|'bookingGroupsError'>
+  /** このフォームを使う店（行き先のメニューは店ごとに違うため、ほかの店でも使うフォームでは行き先を分けられない）。 */
+  routingStores?: RoutingStoreScope
   onChangeRouting?: (next: FormRouting) => void
   /** 公開用の参照（F2）。保存は layout ごと送るため、一覧だけを編集画面へ返す。 */
   references?: FormReferenceDefinition[]
@@ -84,8 +90,13 @@ type Props = {
   onChangeReferences?: (next: FormReferenceDefinition[]) => void
 }
 
+const subscribeSession = (callback: () => void) => { window.addEventListener(SESSION_SNAPSHOT_CHANGED, callback); return () => window.removeEventListener(SESSION_SNAPSHOT_CHANGED, callback) }
+const serverSession = () => null
+
 export function ContentTab(props: Props) {
   const { layout, page, blocks } = props
+  const routingBlocks = useMemo(() => [...layout.header, ...layout.sections.flatMap((section) => section.blocks)], [layout.header, layout.sections])
+  const permissionSession = useSyncExternalStore(subscribeSession, readPermissionSessionSnapshot, serverSession)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
   const section = layout.sections[page]
@@ -137,7 +148,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      {props.onChangeRouting ? <RoutingSection blocks={layout.sections.flatMap((s) => s.blocks)} refs={props.refs} routing={props.routing} readOnly={props.readOnly} onChange={props.onChangeRouting} /> : null}
+      {props.onChangeRouting ? <RoutingSection blocks={routingBlocks} refs={{...props.refs, ...props.routingRefs}} routing={props.routing} readOnly={props.readOnly || Boolean(permissionSession?.impersonation)} stores={props.routingStores} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>

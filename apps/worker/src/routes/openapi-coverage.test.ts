@@ -291,6 +291,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   "GET /api/booking/admin/menus/preview-as",
   "GET /api/booking/admin/menus/{id}/meeting-url",
   "GET /api/booking/admin/routing-staff-groups",
+  "GET /api/forms/{id}/routing/targets",
   "GET /api/booking/admin/series/{id}",
   "GET /api/booking/admin/staff/{id}/calendar-sync",
   "GET /api/booking/admin/staff/{id}/meeting-url",

@@ -3,7 +3,7 @@ import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { FormReferenceAccessError, formReferenceAccount, resolveFormReferences, publicReferenceLayout, validateFormReferences, createFormDraftOnce, FormDraftCreateError } from '../features/forms/index.js';
 import { formWebhookTarget } from '../services/public-https-request.js';
 import { webhookUrlBlockReason } from '../services/outgoing-webhook-delivery.js';
-import { validateLayoutRouting } from '../features/forms/form-routing/index.js';
+import { RoutingConditionsConflict, validateLayoutRouting } from '../features/forms/form-routing/index.js';
 import { GapError } from '../services/gap-common.js';
 import { normalizeLayoutInput } from './form-layout-input.js';
 import { hasDeliveryAccess } from '@line-crm/shared';
@@ -20,7 +20,7 @@ import { buildOffsetListResponse, parseOffsetPaging, type ListSort } from '../li
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { legacyFormFieldTypeError, parseLayout, validateFormForPublish, DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { legacyFormFieldTypeError, parseLayout, collectInputs, validateFormForPublish, DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { formMatchesListFilter, formMatchesListQuery, sortFormListItems } from '@line-crm/shared';
 import { serializeForm, validFormListFilter, validFormListSort, FORM_LIST_PAGE_FALLBACK_LIMIT, stoppedPublicFormResponse, readFormTestToken, verifyFormTestToken, serializePublicForm, canUseFormFromAccount, requireFormManage, FORM_TEST_TOKEN_MAX_ACTIVE, FORM_TEST_TOKEN_TTL_MS, sha256Hex, authorizedDeleteImpact } from './forms-definition.js';
 import type { Context } from 'hono';
@@ -30,6 +30,10 @@ async function createFormIfCoursesExist(...args: Parameters<typeof createForm>) 
   catch (error) { if (error instanceof Error && error.message === 'restaurant_course_unavailable') return null; throw error; }
 }
 
+function routingConflictResponse(c: Context<Env>, e: RoutingConditionsConflict) {
+  const message = `${e.row + 1} 行目の「${e.questionLabel}」の条件は同時に満たせません。どちらかを外すか、行を分けてください。`;
+  return inputError(c, { success: false, code: e.code, error: message, fields: { [`layout.blocks.${e.blockId}.routing.rules.${e.row}.conditions.${e.questionId}`]: message } }, 400);
+}
 function validWebhookTemplate(value: string): boolean {
   try { return !webhookUrlBlockReason(formWebhookTarget(value, {})); } catch { return false; }
 }
@@ -363,7 +367,7 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
   }
   if (normalized && !('error' in normalized) && normalized.layout) {
     try { await validateLayoutRouting(c.env.DB, body.accountId, JSON.parse(normalized.layout)); }
-    catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
+    catch(e) { if(e instanceof RoutingConditionsConflict)return routingConflictResponse(c,e); if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
   }
 
   if (normalized && !await validateFormReferences(c.env, [body.accountId], JSON.parse(normalized.layout), hasDeliveryAccess(c.get('staff'), 'forms', 'publish'))) {
@@ -485,6 +489,7 @@ export const post__api_forms_id_duplicate_8 = async (c: Context<Env, "/api/forms
 };
 
 export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => {
+  if (c.get('staff')?.readOnly) return c.json({success:false,error:'閲覧のみの権限では変更できません'},403);
   const id = c.req.param('id');
   const putGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
   if (putGate) return putGate;
@@ -580,8 +585,21 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     if ('error' in normalized) {
       return inputError(c, { success: false, error: normalized.error }, 400, ["layout"]);
     }
-    try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout)); }
-    catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
+    if (c.get('impersonation')) {
+      const previous = await getFormById(c.env.DB, id);
+      if (!previous) return fail(c, 404, 'FORM_NOT_FOUND');
+      const routes = (value: ReturnType<typeof parseLayout>) => {
+        const inputs = collectInputs(value);
+        const bookings = inputs.filter(block => block.type === 'booking' && block.booking?.routing != null).map(block => ({id:block.id,routing:block.booking?.routing}));
+        const questionIds = new Set(bookings.flatMap(block => block.routing?.rules.flatMap(rule => rule.conditions.map(condition => condition.questionId)) ?? []));
+        const questions = inputs.filter(block => questionIds.has(block.id)).map(({id,name,type,choices}) => ({id,name,type,choices})).sort((a,b) => a.id.localeCompare(b.id));
+        return {bookings,questions};
+      };
+      if (JSON.stringify(routes(parseLayout(previous.layout, previous.fields))) !== JSON.stringify(routes(JSON.parse(normalized.layout))))
+        return c.json({success:false,error:'代理ログイン中は行き先を変更できません'},403);
+    }
+    try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout),{validateTargets:!c.get('impersonation')}); }
+    catch(e) { if(e instanceof RoutingConditionsConflict)return routingConflictResponse(c,e); if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
     if (!await validateFormReferences(c.env, await getFormAccountIds(c.env.DB, id), JSON.parse(normalized.layout), false)) {
       return inputError(c, { success: false, error: '同じ店の参照を選び直してください' }, 422, ['layout.references']);
     }

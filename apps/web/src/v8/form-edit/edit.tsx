@@ -49,7 +49,8 @@ import { FormPhone } from './phone';
 import styles from './edit.module.css';
 import { useCreatedDraft } from './use-created-draft'
 import { readFormDraftCreation, rememberFormDraftCreation } from '@/lib/form-draft-session'
-import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
+import { formRoutingApi } from '@/lib/api/helpers/gap2';
+import { hasBookingBlock, routingError, routingOf, withRouting, type FormRouting, type RoutingStoreScope } from './routing-model';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -108,6 +109,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
+  const [routingRefs, setRoutingRefs] = useState<(Pick<FormRefs, 'routingMenus'|'routingMenuStaff'|'bookingGroups'|'bookingGroupsError'> & {key:string}) | null>(null)
+  const [routingStores, setRoutingStores] = useState<{ key: string; scope: Exclude<RoutingStoreScope, 'checking'> } | null>(null)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -120,7 +123,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [bookingStaffErrors,setBookingStaffErrors]=useState<Record<string, boolean>>({})
   const bookingStaffAccount = useRef(selectedAccountId)
+  const scopedRoutingRefs = routingRefs?.key === JSON.stringify([selectedAccountId,id]) ? routingRefs : undefined
+  /* まだ保存していない新しいフォームは、選んでいる店だけで作られる。 */
+  const routingStoreScope: RoutingStoreScope = host || !id ? 'single' : routingStores?.key === JSON.stringify([selectedAccountId, id]) ? routingStores.scope : 'checking'
+  const hasBooking = hasBookingBlock([...layout.header, ...layout.sections.flatMap((section) => section.blocks)])
   const [referencesError,setReferencesError]=useState(false)
+  const [referencesRestricted,setReferencesRestricted]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
@@ -297,12 +305,17 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         // 参照一覧は選んでいる公式アカウントに絞る（別アカウントのタグ等を混ぜない）。
         const tagPath = selectedAccountId ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}` : '/api/tags'
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
+        setReferencesRestricted(false)
+        const permitMissing = async <T,>(request: Promise<T>): Promise<T | {success:true;data:never[]}> => request.catch((cause) => {
+          if (cause instanceof ApiError && cause.status === 403) { setReferencesRestricted(true); return {success:true,data:[]} }
+          throw cause
+        })
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
-          fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
-          selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
-          api.scenarios.list(accountFilter),
-          api.reminders.list(accountFilter),
-          api.templates.list(undefined, selectedAccountId ?? undefined),
+          permitMissing(fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath)),
+          permitMissing(selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] })),
+          permitMissing(api.scenarios.list(accountFilter)),
+          permitMissing(api.reminders.list(accountFilter)),
+          permitMissing(api.templates.list(undefined, selectedAccountId ?? undefined)),
         ])
         if(!tagRes.success || !ffRes.success || !scenarioRes.success || !reminderRes.success || !templateRes.success){setReferencesError(true);throw new Error('references unavailable')}
         setRefs({
@@ -312,6 +325,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           reminders: reminderRes.data.map((r) => ({ id: r.id, name: r.name })),
           templates: templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType })),
           bookingMenus: [],
+          bookingGroups: [],
           bookingMenuStaff: {},
         })
         // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせない。読めなくても欄は置ける。
@@ -359,14 +373,47 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }
   }, [selectedAccountId])
 
+  // Form viewers can choose routing destinations without broader booking permissions.
+  useEffect(() => {
+    if (host || !selectedAccountId || !id) return
+    let cancelled = false
+    void formRoutingApi.targets(selectedAccountId, id).then((result) => {
+      if (cancelled) return
+      const routingMenuStaff: NonNullable<FormRefs['routingMenuStaff']> = {}
+      for (const menu of result.data.menus) routingMenuStaff[menu.id] = []
+      for (const staff of result.data.staff) routingMenuStaff[staff.menuId]?.push({id:staff.id,name:staff.name})
+      setRoutingRefs({key:JSON.stringify([selectedAccountId,id]), routingMenus:result.data.menus, routingMenuStaff, bookingGroups:result.data.groups, bookingGroupsError:false})
+    }).catch(() => { if (!cancelled) setRoutingRefs({key:JSON.stringify([selectedAccountId,id]),bookingGroups:[],bookingGroupsError:true}) })
+    return () => { cancelled = true }
+  }, [host, selectedAccountId, id])
+
+  // 行き先のメニューは店ごとに違い、保存はフォームを使う全部の店で行き先を確かめる。
+  // フォームを使う店を一覧の利用先（保存の検査と同じ対応表）から読む。読めない・一覧に無い時は「この店だけ」とみなさない。
+  useEffect(() => {
+    if (host || !selectedAccountId || !id || !hasBooking) return
+    let cancelled = false
+    const key = JSON.stringify([selectedAccountId, id])
+    const settle = (scope: Exclude<RoutingStoreScope, 'checking'>) => setRoutingStores((prev) => (scope === 'unknown' && prev?.key === key ? prev : { key, scope }))
+    void fetchApi<{ success: boolean; data: Array<{ id: string; usedByAccounts?: Array<{ id: string }> }> }>(`/api/forms?account_id=${encodeURIComponent(selectedAccountId)}`)
+      .then((res) => {
+        if (cancelled) return
+        const stores = res.success && Array.isArray(res.data) ? res.data.find((row) => row.id === id)?.usedByAccounts : undefined
+        settle(!Array.isArray(stores) || stores.length === 0 ? 'unknown' : stores.length > 1 ? 'shared' : 'single')
+      })
+      .catch(() => { if (!cancelled) settle('unknown') })
+    return () => { cancelled = true }
+  }, [host, selectedAccountId, id, hasBooking])
+
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
     if (hostRef.current || !selectedAccountId) return
     const menuIds = new Set<string>()
-    for (const section of layout.sections) {
-      for (const b of section.blocks) {
-        if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) menuIds.add(b.booking.menuId)
-      }
+    for (const b of [...layout.header, ...layout.sections.flatMap((section) => section.blocks)]) {
+      if (b.kind !== 'input' || b.type !== 'booking' || !b.booking) continue
+      if (b.booking.menuId) menuIds.add(b.booking.menuId)
+      const routing = b.booking.routing
+      if (routing?.fallback?.menuId) menuIds.add(routing.fallback.menuId)
+      for (const rule of routing?.rules ?? []) if (rule.target.menuId) menuIds.add(rule.target.menuId)
     }
     const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined && !bookingStaffErrors[menuId])
     if (missing.length === 0) return
@@ -585,7 +632,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
     if (parseFormReferences(layout.references ?? []) === null) return { message: '公開用の参照の形が正しくありません。中身のタブで対応付けを直してください', tab: 'content' }
-    const routingProblem = routingError(routingOf(layout))
+    const routingProblem = routingError(routingOf(layout), allBlocks)
     if (routingProblem) return { message: routingProblem.message }
     const ogImageError = ogImageUrlError(ogImageUrl)
     if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
@@ -1011,6 +1058,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
         {host?.notice}
+        {referencesRestricted ? <Notice tone="warn">権限のない候補は表示されません。設定済みの内容はそのまま残ります。</Notice> : null}
         {referencesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>{setReferencesError(false);setError('');setReloadKey(value=>value+1)}}/>:null}
         {Object.keys(bookingStaffErrors).length > 0 ? <ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffErrors({})}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
@@ -1030,6 +1078,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             selectedBlockId={selectedBlockId}
             inputCount={inputCount}
             accountId={host ? null : selectedAccountId}
+            formId={id}
             portable={Boolean(host)}
             onSelectPage={selectPage}
             onAddPage={addSection}
@@ -1044,6 +1093,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onDuplicateBlock={duplicateBlock}
             onRemoveBlock={removeBlock}
             routing={routingOf(layout)}
+            routingRefs={scopedRoutingRefs}
+            routingStores={routingStoreScope}
             onChangeRouting={host ? undefined : patchRouting}
             references={layout.references ?? []}
             referenceStates={publishedReferences}
