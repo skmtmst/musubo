@@ -44,6 +44,7 @@
 .rowIn:hover .actions, .rowOut:hover .actions, .actions:focus-within { opacity: 1; pointer-events: auto; }
 @media (hover: none) { .actions { opacity: 1; pointer-events: auto; } }
 .quoteBtn:hover { color: var(--color-action); text-decoration: underline; }
+.quoteBtn:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .quoted {
   margin-bottom: var(--tpl-inbox-chip-gap);
   padding-left: var(--tpl-inbox-chead-gap);

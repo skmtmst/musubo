@@ -1,6 +1,6 @@
 'use client'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
-import Card from '@/components/shared/card'
+import { DetailPreview } from '@/components/shared/detail-content'
 import { Tabs } from '@/components/shared/tabs'
 import SegmentedControl from '@/components/shared/segmented'
 
@@ -385,7 +385,9 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
           卓の変更は保存しました。最新の予約を読み込めなかったため、止める確認を開けていません。
         </Notice>
       ) : null}
-      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<Card variant="aside" padding="default"><header className={styles.listHeading}><h2>卓一覧</h2><Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button></header><Tabs label="卓一覧の階・エリア" size="compact" items={[{label:"すべて",current:floorFilter==='all',onClick:()=>setFloorFilter('all')},...floors.map(f=>({label:f.name,current:floorFilter===f.id,onClick:()=>setFloorFilter(f.id)}))]} actions={<SegmentedControl aria-label="卓の状態" size="small" fit="content" value={statusFilter} onChange={setStatusFilter} options={[{value:'all',label:'全状態'},{value:'active',label:'受付中'},{value:'suspended',label:'停止中'}]}/>}/>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓一覧を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title="卓一覧" titleActions={<Button presentation="restaurant" disabled={!selectedAccountId || !store || !snapshotAccountCurrent} onClick={() => setAutomationOpen(true)}><Settings2 size={15} aria-hidden="true" />自動配席の設定</Button>}>
+          <Tabs label="卓一覧の階・エリア" size="compact" items={[{label:"すべて",current:floorFilter==='all',onClick:()=>setFloorFilter('all')},...floors.map(f=>({label:f.name,current:floorFilter===f.id,onClick:()=>setFloorFilter(f.id)}))]} />
+          <SegmentedControl aria-label="卓の状態" size="small" fit="content" value={statusFilter} onChange={setStatusFilter} options={[{value:'all',label:'全状態'},{value:'active',label:'受付中'},{value:'suspended',label:'停止中'}]} />
           <ul className={styles.detailList}>
             {visibleRows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
@@ -400,7 +402,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
               </li>
             ))}
           </ul>
-        </Card>} asideLayout="detail">
+        </DetailPreview>} asideLayout="detail">
         <RestaurantFloorPanel>
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version,t.label,t.min_capacity,t.max_capacity,t.shape,t.width,t.height,t.smoking_policy,t.shoes_allowed,t.visible_on_map,t.chair_arrangement,t.chair_side,t.is_active]))} resources={rows.map(t=>({id:t.id,label:t.label,capacity:t.max_capacity,active:!!t.is_active}))} existingCodes={rows.map(t=>t.code)} canEdit={canEdit} onSelect={setSelectedId} onCreate={openNew} selectedId={selectedId} duplicateRequest={duplicateRequest} onCreated={async()=>{await ctx.reload()}}/>:null}
         </RestaurantFloorPanel>

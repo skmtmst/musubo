@@ -450,6 +450,6 @@
 
 /* Googleビジネスにつないでいる時の営業時間。本文の大きさで、月曜から並べる。 */
 .googleHoursLink { display: flex; justify-content: flex-start; }
-.googleHoursList { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--color-ink); font-size: var(--text-body); line-height: 1.6; }
+.googleHoursList { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; color: var(--color-ink); font-size: var(--text-body); line-height: 1.6; }
 .tableGroup { display:flex; flex-direction:column; gap:var(--space-8); }
 .tableGroup h3 { margin:0; font-size:var(--text-caption); color:var(--color-ink-secondary); }
