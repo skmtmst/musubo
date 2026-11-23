@@ -245,5 +245,5 @@ export default function InboxFilterPanel({
       </section>
     </div>
   )
-  return anchorRef ? <MenuPortal open={open} align="start" getAnchor={() => anchorRef.current} onClose={onClose}>{panel}</MenuPortal> : panel
+  return anchorRef ? <MenuPortal open={open} align="start" getAnchor={() => anchorRef.current} onClose={onClose} keepOpenOnModal>{panel}</MenuPortal> : panel
 }

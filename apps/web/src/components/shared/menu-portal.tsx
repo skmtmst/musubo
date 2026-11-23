@@ -37,6 +37,7 @@ export type MenuPortalPlacement = 'down' | 'up'
 export type MenuPortalProps = {
   /** 絞り込みの窓など、開いた面の最初の操作へ焦点を移して戻す。 */
   focusPanel?: boolean
+  keepOpenOnModal?: boolean
   /** 操作メニューの閉じる時間（提案Fは80ms）。候補欄の既定は変えない。 */
   exitDuration?: number
   /** 開いている間だけ body へ出す。閉じたら何も描かない。 */
@@ -151,6 +152,7 @@ export default function MenuPortal({
   children,
   exitDuration,
   focusPanel = false,
+  keepOpenOnModal = false,
   placement: forcedPlacement,
 }: MenuPortalProps) {
   const leaving = useV8Leave(open, exitDuration)
@@ -172,10 +174,10 @@ export default function MenuPortal({
     if (!open) return
     const modal = topModal()
     if (modal && !belongsToModal(anchorRef.current(), modal)) { closeRef.current(); return }
-    const closeForModal = () => closeRef.current()
+    const closeForModal = () => { if (!keepOpenOnModal) closeRef.current() }
     document.addEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
     return () => document.removeEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
-  }, [open])
+  }, [open, keepOpenOnModal])
   const positionRef = useRef(getPositionRect)
   positionRef.current = getPositionRect
 
