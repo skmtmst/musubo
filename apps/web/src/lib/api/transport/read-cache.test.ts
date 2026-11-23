@@ -193,3 +193,31 @@ it.each(['retry-first', 'late-first'])('時間切れの便を再試行へ回さ�
   expect(await fetchApi('/api/line-accounts')).toEqual(fresh)
   expect(net).toHaveBeenCalledTimes(2)
 })
+
+it.each([
+  '/api/getting-started?account_id=a&version=v8',
+  '/api/restaurant-test/stores?account_id=a',
+  '/api/restaurant-test/store-context?account_id=a',
+  '/api/rich-menu-groups?accountId=a&limit=1&page=1',
+  '/api/restaurant-test/setup-progress?account_id=a&storeId=one',
+])('初期画面の %s は同条件の連続取得をまとめ、1秒後は読み直す', async path => {
+  let now = 1_000
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  await Promise.all([fetchApi(path), fetchApi(path)])
+  await fetchApi(path)
+  expect(net).toHaveBeenCalledTimes(1)
+  now += 1000
+  await fetchApi(path)
+  expect(net).toHaveBeenCalledTimes(2)
+})
+
+it('初期画面の対象や店舗を変えたときと保存後は共有しない', async () => {
+  const url = (account: string, store: string) => `/api/restaurant-test/setup-progress?account_id=${account}&storeId=${store}`
+  await fetchApi(url('a', 'one'))
+  await fetchApi(url('a', 'two'))
+  await fetchApi(url('b', 'one'))
+  expect(net).toHaveBeenCalledTimes(3)
+  await fetchApi('/api/restaurant-test/stores/selection', { method: 'POST', body: '{}' })
+  await fetchApi(url('a', 'one'))
+  expect(net).toHaveBeenCalledTimes(5)
+})
