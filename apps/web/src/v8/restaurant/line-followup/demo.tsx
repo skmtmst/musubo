@@ -32,10 +32,10 @@ export function RestaurantFollowupDemo({ phase }: { phase: number }) {
       <div className={styles.actions}><span className={phase === 3 ? styles.target : undefined}><Button variant="primary">保存して作る</Button>{phase === 3 && <Hand className={styles.hand} size={22} />}</span></div>
       {editing && <div className={styles.overlay}><Card layout="vertical" padding="default" gap="normal">
         <strong>前日の確認を変える</strong>
-        <div className={styles.columns}><div className={styles.fields}><Field label="だれに（きっかけ）"><TextInput readOnly value="予約が完了した人" /></Field><Field label="いつ送るか"><TextInput readOnly value="予約の前日" /></Field><Field label="送るもの"><TextInput readOnly value="明日はご予約の日です。お待ちしています。" /></Field></div><div className={styles.phone}><strong>届き方</strong><p>明日はご予約の日です。お待ちしています。</p></div></div>
+        <div className={styles.columns}><div className={styles.fields}><Field label="だれに（きっかけ）"><TextInput readOnly value="予約が完了した人" /></Field><Field label="いつ送るか"><TextInput readOnly value="予約の前日" /></Field><Field label="送るもの"><TextInput readOnly value="明日はご予約の日です。お待ちしています。" /></Field></div><div className={styles.phone}><strong>届き方</strong><p className="text-body">明日はご予約の日です。お待ちしています。</p></div></div>
         <div className={styles.actions}><Button variant="primary">この内容でオンにする</Button></div>
       </Card></div>}
-      {saved && <div className={styles.overlay}><Card layout="vertical" padding="default" gap="normal"><strong>保存の結果</strong><p>まだ送っていません。テスト送信と承認のあと送り始めます。</p><ul className={styles.results}>{FOLLOWUP_ORDER.map(trigger => <li className={styles.head} key={trigger}><span>{FOLLOWUP_NAMES[trigger]}</span><span>{trigger === 'reservation_24h' ? 'リマインダに下書きを作りました' : 'オフのまま保存しました'}</span></li>)}</ul></Card></div>}
+      {saved && <div className={styles.overlay}><Card layout="vertical" padding="default" gap="normal"><strong>保存の結果</strong><p className="text-body">まだ送っていません。テスト送信と承認のあと送り始めます。</p><ul className={styles.results}>{FOLLOWUP_ORDER.map(trigger => <li className={styles.head} key={trigger}><span>{FOLLOWUP_NAMES[trigger]}</span><span>{trigger === 'reservation_24h' ? 'リマインダに下書きを作りました' : 'オフのまま保存しました'}</span></li>)}</ul></Card></div>}
     </div>
     <p className={styles.note}>{phase < 2 ? '8枚のカードから送り方を選びます。' : editing ? '前日の確認の送り方を窓で変えます。' : phase === 3 ? '保存して送り方を作ります。' : '保存の結果を確認します。まだ送信されていません。'} 見本のため実際の設定は変わりません。</p>
   </div>
