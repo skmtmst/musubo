@@ -15,6 +15,7 @@ import { messageListFacts } from './message-list-facts.js';
 import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
+import { planRedistribution } from './redistribution.js';
 import {
   beginHqTemplateDistributionRun, getHqTemplate, listHqTemplateDisplaySources, HQ_TEMPLATE_TYPES, validRestaurantCoursesSql,
   type HqTemplate, type HqTemplatePreflight, type HqTemplatePreflightResolution,
@@ -223,7 +224,9 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
       statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
     }
     const targetVersion = await targetDistributionVersion(db, authority.tenantId, id, account.id, latest.version);
-    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion,...(catalogDefinition?{warnings:catalogWarnings(catalogDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqCatalogTemplateType)}:{}), ...(form ? {warnings: await formTemplateWarnings(db, account.id, input)} : {}), ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
+    // 対応表に記録がある店は、配り直しのジョブで名前ではなく対応表の店の物に当てる。その見込みを返す（ここでは書かない）。
+    const redistribution = catalogDefinition ? await planRedistribution(db, { tenantId: authority.tenantId, templateId: id, kind: template.template_type as import('@line-crm/shared').HqCatalogTemplateType, accountId: account.id, candidate: { id: template.current_version_id!, version: latest.version, definition: catalogDefinition } }) : null;
+    stores.push({ accountId: account.id, accountName: account.name, items, targetVersion,...(redistribution?{redistribution:{bound:redistribution.outcome!=='unbound',outcome:redistribution.outcome,code:redistribution.code,notices:redistribution.notices}}:{}),...(catalogDefinition?{warnings:catalogWarnings(catalogDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqCatalogTemplateType)}:{}), ...(form ? {warnings: await formTemplateWarnings(db, account.id, input)} : {}), ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
   if (initial) statements.push({ sql: 'UPDATE hq_template_preflights SET initial_insert=1 WHERE tenant_id=? AND idempotency_fingerprint=?', bindings: [authority.tenantId, preflightId] });
@@ -325,6 +328,8 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     return distributionResult(db, authority, templateId, runId, bucket);
   }
   const definition = JSON.parse(version.definition_json);
+  // 配り直しのジョブに使った確かめでは、名前で選ぶ今の配布をしない。1つの確かめで店へ2通りに書かない。
+  if (isCatalogType(template.template_type) && await db.prepare(`SELECT 1 AS used FROM hq_template_distribution_job_items WHERE tenant_id=? AND preflight_id IN (${preflights.map(() => '?').join(',')}) LIMIT 1`).bind(authority.tenantId, ...preflights.map(p => p.id)).first()) throw new HqTemplateError('PREFLIGHT_CONSUMED', 409);
   const storeSnapshot = isCatalogType(template.template_type) ? (db:D1Database,accountId:string)=>catalogSnapshot(db,accountId,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : isDeliveryType(template.template_type) ? (db:D1Database,accountId:string)=>deliverySnapshot(db,accountId,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType) : template.template_type === 'scenario' ? scenarioSnapshot : tagSnapshot;
   await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: preflights[0].template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   // 店舗への書込前に選択全体を確保し、同時要求や最初の店舗で中断した実行も同じ判断に固定する。
@@ -350,7 +355,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
           await adapter.verifyReferences(context,refs.value);const commit=await adapter.buildCommitPlan(context,input,{});if(commit.kind!=='OK')throw new HqTemplateError('UNSUPPORTED',422);
           plan={statements:[...commit.value.dbCommit],resolutions:[...commit.value.resolutions],counts:{created:1,overwritten:0,aliased:0}};
         }
-        else if(isCatalogType(template.template_type)) plan = planCatalog(p.target_account_id,parseCatalogDefinition(template.template_type,definition),snapshot,template.template_type,selected,{templateId,versionId:p.template_version_id});
+        else if(isCatalogType(template.template_type)) plan = await planCatalog(p.target_account_id,parseCatalogDefinition(template.template_type,definition),snapshot,template.template_type,selected,{templateId,versionId:p.template_version_id,tenantId:authority.tenantId});
         else if(isDeliveryType(template.template_type)) plan = await planDelivery(db,p.target_account_id,await parseDeliveryDefinition(db,template.template_type,definition),snapshot,template.template_type,selected,p.initial_insert===1);
         else if (template.template_type === 'scenario') plan = planScenario(p.target_account_id,parseScenarioDefinition(definition),snapshot,selected);
         else {
@@ -370,6 +375,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     }
     const persist = async (finalStatus: string, commit: HqTemplateStatement[], resolutions: readonly HqTemplateResolution[]) => {
       const statements = [guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='ready') AND NOT EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?)`, [p.id, authority.tenantId, runId, authority.tenantId, p.target_account_id])];
+      if (isCatalogType(template.template_type) && commit.length) statements.push(guard(`NOT EXISTS(SELECT 1 FROM hq_template_distribution_job_items WHERE tenant_id=? AND preflight_id=?)`, [authority.tenantId, p.id]));
       if (finalStatus === 'succeeded') statements.push(guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p.id]));
       // 各店舗の原子的トランザクション内でも統括の所有権を確認する。
       statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [p.target_account_id, authority.tenantId]));
