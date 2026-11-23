@@ -450,6 +450,7 @@
 - [cleanup-q01w1-1019.md](qa/cleanup-q01w1-1019.md)
 - [cleanup-q01w4-1019.md](qa/cleanup-q01w4-1019.md)
 - [README.md](../packages/db/README.md)
+- [順番待ちのマイグレーション（新しいコードを配り終えてから当てる分）](../packages/db/migrations-pending/README.md)
 
 ## セキュリティ
 
@@ -497,6 +498,8 @@
 - [LINEアカウント登録と開店準備ガイドの改善](release-log/unreleased/193-masato-line-opening-setup.md) — 反映履歴、確認 2026-11-23。
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
+
+- [GoogleビジネスとInstagramの複数接続（第1段）](release-log/unreleased/137-kenta-sns-multi-connections.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 

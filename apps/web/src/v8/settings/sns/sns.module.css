@@ -1,6 +1,11 @@
-/* 設定 › SNS 連携（複数接続 第1段／F1 tIRy5 広い画面・F2 VH2Ga 細い画面・F7 未接続・F8 閲覧のみ／2026-11-16 承認 v7）。
+/* 設定 › SNS 連携（複数接続 第1段／F1 tIRy5 広い画面・F2 VH2Ga 細い画面・F6 JvuLH 解除の確認・F7 未接続・F8 liCQN 閲覧のみ／2026-11-16 承認 v10）。
    寸法は globals.css の --tpl-e1-* と --text-* だけを使う。板の頭は型（PageHeading）が持つ。
-   広い画面の値は 1024px 以上で当てる（設定の他の画面と同じ境目）。 */
+   広い画面の値は 1024px 以上で当てる（設定の他の画面と同じ境目）。
+   型・共通部品の見た目は、この画面の板（[data-design-node='y3GGTs']）の中だけで差し替える。
+   他の画面と共通部品の作りは変えない（この束は @layer の外なので、共通部品の @layer components より強い）。
+   板そのものに当てる値（題の大きさ・頭の左右の余白・解除の窓の押しボタン）は、
+   CSS Module の決まり（どの規則にも画面の名前を1つ入れる）に合わないので、隣の sns-board.css
+   （globals.css から読み込む）へ置く。画面の名前で絞るので他の画面には当たらない。 */
 
 .body {
   display: flex;
@@ -12,6 +17,32 @@
 /* 本文の縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
 :global(:root) .body > :global([data-design-part='notice']) {
   margin-block: 0;
+}
+
+/* F8 liCQN 閲覧のみの帯。共有の ReadOnlyNotice の作りは変えず、この画面の中だけ絵の色・印にする。 */
+:global(:root) .body > :global([data-read-only-notice]) {
+  padding: var(--tpl-e1-sns-ro-pad);
+  border: 1px solid var(--tpl-e1-sns-ro-edge);
+  border-radius: var(--tpl-e1-sns-ro-radius);
+  background: var(--tpl-e1-sns-ro-bg);
+  box-shadow: none;
+  color: var(--tpl-e1-sns-ro-ink);
+  font-size: var(--tpl-e1-sns-ro-size);
+  font-weight: 600;
+}
+
+/* 共有の帯は青い丸で知らせる。絵は「ⓘ」なので、丸の置き場所をたたんで文のはじめに印を出す。
+   どちらも読み上げの対象外（aria-hidden）なので、伝わる内容は変わらない。 */
+:global(:root) .body > :global([data-read-only-notice] > div > span:first-child) {
+  display: none;
+}
+
+:global(:root) .body > :global([data-read-only-notice]) :global([data-notice-message])::before {
+  content: 'ⓘ';
+  margin-right: var(--tpl-e1-sns-ro-icon-gap);
+  color: var(--tpl-e1-sns-ro-ink);
+  font-size: var(--tpl-e1-sns-ro-icon-size);
+  font-weight: 700;
 }
 
 /* 段の頭：公式ロゴ・題・（余白）・連携の個数・「接続を追加する」の横並び。 */
@@ -70,10 +101,14 @@
   min-width: 0;
 }
 
+/* 行の中は桝目で組む。操作の置き場所が画面幅で変わる（広い画面は名前と同じ段、
+   細い画面は控えめな1行の下）ので、同じ押しどころを2つ置かずに場所だけ入れ替える。
+   横の隙間は 0 にして、実際に置いた物の margin で空ける（空の桝で隙間が出ないように）。 */
 .conn {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e1-sns-conn-gap);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: var(--polish-space-none);
+  row-gap: var(--tpl-e1-sns-conn-gap);
   padding: var(--tpl-e1-sns-conn-pad);
   min-width: 0;
 }
@@ -83,7 +118,7 @@
   box-shadow: var(--tpl-e1-sns-conn-divider);
 }
 
-/* 行の1段目：接続の名前・状態の札・（余白）・この行の操作。 */
+/* 行の1段目：接続の名前と状態の札。右端の「⋯」は .rowMenu で同じ段に置く。 */
 .nameRow {
   display: flex;
   flex-wrap: wrap;
@@ -101,8 +136,31 @@
   min-width: 0;
 }
 
+/* 「⋯」。絵（F1 `daB2Q`・F2 `JtSq9`）はどちらの幅でも名前と同じ段の右端。 */
+.rowMenu {
+  display: flex;
+  align-items: center;
+  grid-row: 1;
+  grid-column: 3;
+  margin-left: var(--tpl-e1-sns-row-gap);
+}
+
+/* 行の中の操作（［主連携にする］［つなぎ直す］）。細い画面は絵（F2 `u1kzKR`）のとおり
+   控えめな1行の下に置き、広い画面は下の @media で名前と同じ段（F1）へ戻す。
+   中の押しどころは共通の押しどころ部品、「⋯」は共通の行メニュー部品のまま。
+   この入れ物は置き場所だけを決め、行の右端の操作そのものは持たない。 */
+.connOps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e1-sns-row-gap);
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 /* 行の2段目：取り込んだ日時・接続した日などの控えめな1行。 */
 .meta {
+  grid-column: 1 / -1;
   margin: var(--polish-space-none);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
@@ -111,8 +169,9 @@
   min-width: 0;
 }
 
-/* 行の3段目：行の中の移動（「営業時間へ →」）。 */
+/* 行の最後の段：行の中の移動（「営業時間へ →」）。 */
 .btnRow {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -195,12 +254,29 @@
 .addWide { display: none; }
 .addNarrow { display: block; }
 
+/* 枠の話は、細い画面では板のいちばん下（F2 VH2Ga）。文の順を変えずに置き場所だけ下げる。 */
+.slotFoot { order: 1; }
+
+/* 細い画面だけ、カードを板の端（x=16・幅358）までのばす（F2 VH2Ga）。
+   頭の左右の余白は sns-board.css で同じ境目に合わせている。 */
+@media (max-width: 1023.98px) {
+  .body { padding: var(--tpl-e1-sns-body-pad-narrow); }
+}
+
 @media (min-width: 1024px) {
+  /* 広い画面は絵（F1 tIRy5）のとおり枠の話を題のすぐ下に置く。題の大きさは sns-board.css 側。 */
+  .slotFoot { order: 0; }
   .count { line-height: var(--tpl-e1-sns-count-lh-wide); }
   .conn { padding: var(--tpl-e1-sns-conn-pad-wide); }
   .nameRow { gap: var(--tpl-e1-sns-name-gap-wide); }
   .name { font-size: var(--tpl-e1-sns-name-size-wide); line-height: var(--tpl-e1-sns-name-lh-wide); }
   .meta { line-height: var(--tpl-e1-sns-meta-lh-wide); }
+  /* 広い画面は絵（F1 `vGV4d`・`WRn2M`）のとおり操作を名前と同じ段の「⋯」の左へ戻す。 */
+  .connOps {
+    grid-row: 1;
+    grid-column: 2;
+    margin-left: var(--tpl-e1-sns-row-gap);
+  }
   .addWide { display: block; }
   .addNarrow { display: none; }
 }
