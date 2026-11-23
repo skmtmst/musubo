@@ -89,7 +89,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
   }
 
   if (!loaded)
- return <SaveErrorScope errors={saveErrors}><p role="status">前払い情報を読み込み中…</p></SaveErrorScope>
+ return <SaveErrorScope errors={saveErrors}><p className="text-body" role="status">前払い情報を読み込み中…</p></SaveErrorScope>
   if (loadError) return <SaveErrorScope errors={saveErrors}><Notice tone="danger"><p>前払い情報を読み込めませんでした</p><Button onClick={reload}>もう一度読み込む</Button></Notice></SaveErrorScope>
   if (!decision?.prepayOnly) return null
   const dates = decision.recentDates.map(jstMonthDay).filter((text) => text !== '')
