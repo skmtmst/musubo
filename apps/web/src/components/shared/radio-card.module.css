@@ -390,3 +390,5 @@ html:root .locked:is(.card, .row) .radio { cursor: not-allowed; border-color: va
 html:root .locked:is(.card, .row) .radio:checked { background: radial-gradient(circle, var(--color-ink-secondary) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 html:root .locked.checked:not(.row):not(:has(.radio:focus-visible)) { outline: var(--choice-card-ring) solid var(--color-ink-secondary); }
 html:root .locked.row, html:root .locked.row:is(:hover, :active) { background: transparent; }
+
+html:root .card.short:not(.row) { padding-bottom: 6px; }

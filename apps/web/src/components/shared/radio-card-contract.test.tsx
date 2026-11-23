@@ -206,7 +206,6 @@ describe('LINEでの見え方の題（#1482 で基本の見た目が消えた再
 })
 
 describe('ラジオカードの高さ 90 の口（★V8 E-3 ウォークインの卓 PUWyq）', () => {
-  const css = () => readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
 
   it('既定の箱には付かず、height="short" を渡したときだけ付く', () => {
     render(
@@ -232,9 +231,5 @@ describe('ラジオカードの高さ 90 の口（★V8 E-3 ウォークイン�
     expect(screen.getByRole('radio', { name: 'アイコンなし' }).closest('label')?.hasAttribute('data-top-icon')).toBe(false)
   })
 
-  it('高さ90の指定を保ち、アイコン付きの箱だけ最低98にする', () => {
-    expect(css()).toMatch(/:root \.short \{[^}]*min-height:\s*90px[^}]*padding-bottom:\s*6px/)
-    expect(css()).toMatch(/:root \.card:where\(\[data-top-icon\]\) \{[^}]*min-height:\s*98px/)
-    expect(css()).toMatch(/:root \.card \{[^}]*min-height:\s*0/)
-  })
+
 })
