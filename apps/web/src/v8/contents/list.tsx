@@ -1249,11 +1249,11 @@ export default function MediaLibraryListV8() {
         }
       >
         {bulkContext ? <OperationTargetSummary accounts={bulkContext.accounts.map(id => ({ id }))} /> : null}
-        <p>
+        <p className="text-body">
           使われている場所があるものは、はじめから選べません。消したあとは元に戻せません。
         </p>
         {bulkBusy && bulkProgress ? (
-          <p aria-live="polite">
+          <p className="text-body" aria-live="polite">
             処理中…（{bulkProgress.done}/{formatNumber(bulkProgress.total)} 件）
           </p>
         ) : null}

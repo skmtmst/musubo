@@ -193,7 +193,7 @@ function ImageReferenceDialog({ accountId, initialAlt, onClose, onConfirm }: { a
       onCancel={onClose}
     >
       {versionsError ? <ListState kind="error" title="版を読み込めませんでした" onRetry={() => void loadVersions(picked)} /> : null}
-      {!versionsError && !versions ? <p>版を読み込んでいます…</p> : null}
+      {!versionsError && !versions ? <p className="text-body">版を読み込んでいます…</p> : null}
       {versions ? (
         <div className={styles.dialogBody}>
           <div className={styles.field}>
@@ -237,7 +237,7 @@ function StoreReferenceDialog({ accountId, initial, onClose, onConfirm }: { acco
   if (!accountId) {
     return (
       <Dialog open title="共通情報を選ぶ" onCancel={onClose}>
-        <p>店を選んでから対応付けてください。</p>
+        <p className="text-body">店を選んでから対応付けてください。</p>
       </Dialog>
     )
   }
@@ -251,7 +251,7 @@ function StoreReferenceDialog({ accountId, initial, onClose, onConfirm }: { acco
       onCancel={onClose}
     >
       {failed ? <ListState kind="error" title="共通情報を読み込めませんでした" onRetry={() => setReloadKey((value) => value + 1)} /> : null}
-      {!failed && !variables ? <p>読み込んでいます…</p> : null}
+      {!failed && !variables ? <p className="text-body">読み込んでいます…</p> : null}
       {variables ? <div className={styles.dialogBody}>{STORE_INFORMATION_FIELDS.map((field) => (
         <div key={field} className={styles.field}>
           <span className={styles.fieldLabel}>{FIELD_LABEL[field]}</span>

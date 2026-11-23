@@ -109,8 +109,8 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
             <GridCell role="cell"><TruncatedText value={`${entry.by ?? '自動'}${entry.pr ? ` #${entry.pr}` : ''}`} /></GridCell>
           </GridRow>)}
         </GridTable>}
-      {hiddenCount > 0 ? <p>続きが{formatNumber(hiddenCount)}件あります。</p> : null}
-      {pendingCount > 0 ? <p>まだ画面に入っていない変更が{formatNumber(pendingCount)}件あります。</p> : null}
+      {hiddenCount > 0 ? <p className="text-body">続きが{formatNumber(hiddenCount)}件あります。</p> : null}
+      {pendingCount > 0 ? <p className="text-body">まだ画面に入っていない変更が{formatNumber(pendingCount)}件あります。</p> : null}
     </>}
   </Dialog>
 }

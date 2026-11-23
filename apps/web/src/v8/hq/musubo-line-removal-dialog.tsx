@@ -83,7 +83,7 @@ export default function MusuboLineRemovalDialog({ lineId, onClose, onChanged }: 
         : state.phase !== 'choose' ? <Notice tone="info">
           決済サービスとの料金照合を確認しています。少し待ってから再読み込みしてください。</Notice>
         : <>
-          <p>残すLINEは「{state.otherLineName}」です。終了日を選んでください。</p>
+          <p className="text-body">残すLINEは「{state.otherLineName}」です。終了日を選んでください。</p>
           <RadioCardGroup className={styles.choices} legend="利用終了日">
             <RadioCard name="line-removal" value="schedule" checked={selection === 'schedule'}
               onChange={() => { setSelection('schedule'); setConfirmNow(false) }}

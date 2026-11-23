@@ -120,7 +120,7 @@ export default function BulkRoutesDialog({
         </DialogActions>)}
     >
       <OperationTargetSummary accounts={[{ id: '', label: '受付先アカウント', name: '不明' }]} />
-      <p>受付先の全アカウントは確認できません。</p>
+      <p className="text-body">受付先の全アカウントは確認できません。</p>
       {result ? (
         <div className="space-y-3">
           <p className="text-ink text-sm">

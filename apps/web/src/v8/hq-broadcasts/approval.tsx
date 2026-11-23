@@ -273,7 +273,7 @@ export function HqTestSendDialog({
       onConfirm={() => send()}
     >
       {chosen && <OperationTargetSummary accounts={[{ id: chosen, name: accounts.find(account => account.id === chosen)?.name }]} />}
-      {recipients?.scope === renderedScope ? <p>送信先 {formatNumber(recipients.count)} 人：{recipients.recipients.map(person => person.displayName || '名前未設定').join('、')}</p> : <p>{recipientsError ? 'テスト送信の宛先を確認できません。' : 'テスト送信の宛先を確認しています。'}</p>}
+      {recipients?.scope === renderedScope ? <p className="text-body">送信先 {formatNumber(recipients.count)} 人：{recipients.recipients.map(person => person.displayName || '名前未設定').join('、')}</p> : <p className="text-body">{recipientsError ? 'テスト送信の宛先を確認できません。' : 'テスト送信の宛先を確認しています。'}</p>}
       {accounts.length === 0 ? <p className="text-ink-faint text-xs">先に送るアカウントを選んでください。</p> : (
         <HqAccountSelectField label="テストを送るアカウント" accounts={accounts} value={chosen} onChange={setAccountId} disabled={busy} />
       )}

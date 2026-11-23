@@ -56,7 +56,7 @@ export default function LinkedAccountRemovalModal(props: Props) {
 
   if (!result || !dateText) return <Dialog open title="料金を表示できません" size="medium" onCancel={props.onBack}
     footer={<DialogActions><Button type="button" variant="secondary" onClick={props.onBack}>戻る</Button></DialogActions>}>
-      <p>連携数、料金、または次回の請求日を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+      <p className="text-body">連携数、料金、または次回の請求日を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
   </Dialog>
 
   const label = serviceName(props.service)

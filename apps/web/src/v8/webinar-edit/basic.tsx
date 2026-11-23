@@ -212,7 +212,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         onConfirm={() => runTest()}
       >
         <OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
-        <p>{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p>
+        <p className="text-body">{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p>
         {dirty ? <p className={styles.cardNote}>変えた基本設定を保存してから送ります。</p> : null}
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

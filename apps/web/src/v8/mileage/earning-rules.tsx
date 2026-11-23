@@ -944,13 +944,13 @@ export default function EarningRulesTab() {
           onCancel={() => setViewTarget(null)}
         >
           {viewTarget ? <>
-            <p>{viewTarget.publishedVersion == null
+            <p className="text-body">{viewTarget.publishedVersion == null
               ? `${viewTarget.draft.name}・${ruleEventLabel(viewTarget.draft.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.draft.amount)}マイル`
               : `${viewTarget.published.name}・${ruleEventLabel(viewTarget.published.eventType, EVENT_LABELS)}・${formatMileageNumber(viewTarget.published.amount)}マイル`}</p>
-            <p>{viewTarget.publishedVersion == null
+            <p className="text-body">{viewTarget.publishedVersion == null
               ? `下書き 第${viewTarget.draftVersion}版・${formatMileageDate(viewTarget.draftUpdatedAt)} に保存・まだ公開版はありません`
               : `公開中の第${viewTarget.publishedVersion}版・${formatMileageDate(viewTarget.published.updatedAt)} に反映`}</p>
-            <p>{viewTarget.draft.targetConditions
+            <p className="text-body">{viewTarget.draft.targetConditions
               ? `利用対象：条件 ${viewTarget.draft.targetConditions.rules.length + (viewTarget.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き 第${viewTarget.draftVersion}版`
               : `利用対象：すべての友だち・下書き 第${viewTarget.draftVersion}版`}</p>
           </> : null}

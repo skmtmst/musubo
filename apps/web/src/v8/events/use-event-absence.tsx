@@ -119,7 +119,7 @@ function AbsenceDialog({ accountId, target, allowed, lockedReason, onCancel, onS
       dirty={dirty} busy={busy} confirmDisabled={!allowed || loadState !== 'ready' || missingReason}
       confirmDisabledReason={missingReason ? '振替を渡す理由を入れると欠席にできます' : undefined} confirmLockedReason={lockedReason} error={error}>
       <OperationTargetSummary accounts={[{ id: accountId }]} />
-      {loadState === 'loading' ? <p role="status">振替の決まりを確認しています…</p> : loadState === 'error' ? <Notice tone="warn" message="振替の決まりを読み込めませんでした。欠席はまだ受け付けていません。"
+      {loadState === 'loading' ? <p className="text-body" role="status">振替の決まりを確認しています…</p> : loadState === 'error' ? <Notice tone="warn" message="振替の決まりを読み込めませんでした。欠席はまだ受け付けていません。"
         action={<Button onClick={() => setAttempt(value => value + 1)}>もう一度読み込む</Button>} /> : rule ? <>
         <SaveErrorField names={['grantMakeup', 'grant_makeup']}><ToggleField checked={grant} disabled={!allowed || busy || !rule.enabled} onChange={setGrant}>振替を1回渡す</ToggleField></SaveErrorField>
         <Notice tone="info">{!rule.enabled ? 'このクラスは振替を使いません。' : late ? '連絡の締め切りを過ぎています。振替を渡す場合は理由が必要です。' : '連絡の締め切り内です。振替先は欠席の後に選べます。'}{rule.enabled ? ` 振替の期限は元の回から${rule.validDays}日間です。今月の上限に達している場合は振替が付きません。` : ''}</Notice>

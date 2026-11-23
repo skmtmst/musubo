@@ -44,6 +44,6 @@ export default function BannerDialogFrame({
   return <Dialog open={open} title={title} description={inset && typeof description === 'string' ? description : undefined} onCancel={onClose} busy={busy} error={error} designNode={designNode}
     tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation contentLayout={contentLayout} layout={inset ? 'inset' : undefined} footer={actions ? <DialogActions>{actions}</DialogActions> : undefined} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
     designWidth={kind === 'confirm' ? 480 : kind === 'detail' ? 960 : 560} designTop={kind === 'reference' ? 16 : undefined} fitViewport={kind === 'reference' || undefined}>
-    {description && (!inset || typeof description !== 'string') ? <p>{description}</p> : null}{children}
+    {description && (!inset || typeof description !== 'string') ? <p className="text-body">{description}</p> : null}{children}
   </Dialog>
 }

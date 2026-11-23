@@ -319,13 +319,13 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       ) : null}
       {refundRow ? (
         <Dialog open title="返金について" description={`${withHonorific(refundRow.name, 'さま')}・${refundRow.time}`} onCancel={() => setRefundRow(null)}>
-          <p>この画面から返金はできません。</p>
+          <p className="text-body">この画面から返金はできません。</p>
         </Dialog>
       ) : null}
       {classRow ? (
         <Dialog open title="休講について" description={`${classRow.name}・${classRow.time}${classRow.endTime ?? ''}・${classRow.sub ?? ''}`} onCancel={() => setClassRow(null)}>
-          <p>この画面から休講にはできません。</p>
-          <p>予約の変更や返金、LINE での連絡は行われません。</p>
+          <p className="text-body">この画面から休講にはできません。</p>
+          <p className="text-body">予約の変更や返金、LINE での連絡は行われません。</p>
         </Dialog>
       ) : null}
       {resultRow ? <ResultDialog row={resultRow} busy={busy === 'result'} onClose={() => setResultRow(null)} onSave={(outcome) => void saveResult(resultRow, outcome)} /> : null}

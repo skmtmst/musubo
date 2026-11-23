@@ -35,7 +35,7 @@ function Attachment({ file }: { file: FormFileAnswer }) {
       {file.filename || '書類'}
     </Button>
     <Dialog open={open} title={file.filename || '書類'} designWidth={720} onCancel={() => setOpen(false)} cancelLabel="閉じる">
-      {error ? <p role="alert">{error}</p> : url ? pdf ? <iframe src={url} title={file.filename || 'PDF'} className={styles.document} /> : <img src={url} alt={file.filename || '書類'} className={styles.image} /> : <p>読み込んでいます…</p>}
+      {error ? <p className="text-body" role="alert">{error}</p> : url ? pdf ? <iframe src={url} title={file.filename || 'PDF'} className={styles.document} /> : <img src={url} alt={file.filename || '書類'} className={styles.image} /> : <p className="text-body">読み込んでいます…</p>}
     </Dialog>
   </>
 }

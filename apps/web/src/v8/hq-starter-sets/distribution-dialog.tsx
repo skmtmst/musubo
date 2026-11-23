@@ -21,7 +21,7 @@ export function DistributionDialog({share,lockedReason}:{share:ReturnType<typeof
       <RadioCard variant="row" name="starter-edited" value="notify" checked={draft.editedAction==='notify'} onChange={()=>share.setDraft({...draft,editedAction:'notify'})} title="上書きせず、新しい版があると知らせる（おすすめ）"/>
       <RadioCard variant="row" name="starter-edited" value="new_copy" checked={draft.editedAction==='new_copy'} onChange={()=>share.setDraft({...draft,editedAction:'new_copy'})} title="上書きせず、新しく写して入れる"/>
     </RadioCardGroup>
-    <p>{share.preview?`対象 ${share.preview.accountCount} アカウント・確認が必要な物 ${share.preview.editedCount} 件`:'配る先を確かめています…'}</p>
-    <p>配った後も、自動応答は停止、テンプレート・クーポン・フォーム・メニューは未公開です。</p>
+    <p className="text-body">{share.preview?`対象 ${share.preview.accountCount} アカウント・確認が必要な物 ${share.preview.editedCount} 件`:'配る先を確かめています…'}</p>
+    <p className="text-body">配った後も、自動応答は停止、テンプレート・クーポン・フォーム・メニューは未公開です。</p>
   </Dialog>
 }

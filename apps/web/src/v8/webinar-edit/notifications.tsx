@@ -444,7 +444,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
 
       <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" confirmDisabled={!testRecipients.preview || testRecipients.preview.count === 0} busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} error={testResult || undefined} onSuccess={() => setTestOpen(false)} onConfirm={() => runTest()}>
         <OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
-        <p>{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p>
+        <p className="text-body">{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p>
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

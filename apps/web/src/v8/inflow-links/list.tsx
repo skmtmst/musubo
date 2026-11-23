@@ -920,7 +920,7 @@ export default function InflowListV8({
           }}
         >
           <OperationTargetSummary accounts={[{ id: stopTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} externalTarget={{ label: '対象件数', name: stopTarget ? '1件' : null }} />
-          <p>受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
+          <p className="text-body">受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
         </ConfirmDialog>
         <ConfirmDialog
           open={deleteTarget !== null}
@@ -943,7 +943,7 @@ export default function InflowListV8({
           }}
         >
           <OperationTargetSummary accounts={[{ id: deleteTarget?.routeAccountId ?? '', label: '経路の所属LINEアカウント' }]} externalTarget={{ label: '対象件数', name: deleteTarget ? '1件' : null }} />
-          <p>受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
+          <p className="text-body">受付先のすべてのアカウントは確認できません。リンクの設定や利用時の指定によって変わります。</p>
           <Field required label={`完全削除するには「${deleteTarget?.name ?? ''}」と入力`}>
             <TextField required value={deleteName} onChange={event => setDeleteName(event.target.value)} autoComplete="off" />
           </Field>

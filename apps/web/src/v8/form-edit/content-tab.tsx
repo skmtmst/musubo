@@ -193,8 +193,8 @@ export function ContentTab(props: Props) {
         }}
         onCancel={() => setRemoving(false)}
       >
-        <p>集まった回答は消えません。</p>
-        <p>このページへの分岐{section ? formJumpsInto(layout, section.id) : 0}件は「次へ進む」に戻します。</p>
+        <p className="text-body">集まった回答は消えません。</p>
+        <p className="text-body">このページへの分岐{section ? formJumpsInto(layout, section.id) : 0}件は「次へ進む」に戻します。</p>
       </Dialog>
     </>
   )

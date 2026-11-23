@@ -291,8 +291,8 @@ export default function OnboardingPricing({ condition = DEFAULT_CONDITION, initi
                 {formatCount(secondFriendBlock)}〜{formatCount(secondExampleEnd)}人 → 2枠分 +{yen(condition.schedule.extraFriendBlockYen * 2)}／月</div>}
             <p>各LINEでGoogleマイビジネスとInstagramはそれぞれ1個まで基本料金内です。多いほうの2個目から追加料金を数えます。複数LINEの追加連携枠は、それぞれの連携前に料金を確認します。</p>
           </div>
-          <p>年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
-          <p>無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はクレジットカード登録済みでも請求しません。</p>
+          <p className="text-body">年払いはLINE基本料金のみ10%割引。友だち超過・追加連携枠は毎月別請求です。</p>
+          <p className="text-body">無料体験は最初のLINE有効化日から{trialLabel(condition.trialPeriod)}。有効化前はクレジットカード登録済みでも請求しません。</p>
       </Dialog>
     </PageContent>
   </ListPage>

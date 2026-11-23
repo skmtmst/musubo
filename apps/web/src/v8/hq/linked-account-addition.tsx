@@ -40,7 +40,7 @@ export default function LinkedAccountAddition({ lineName, service, before, slotU
 
   if (!result) return <Dialog open title="料金を表示できません" size="medium" onCancel={onBack}
     footer={<DialogActions><Button type="button" variant="secondary" onClick={onBack}>戻る</Button></DialogActions>}>
-    <p>連携数または料金を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
+    <p className="text-body">連携数または料金を確認できませんでした。画面を閉じて、もう一度お試しください。</p>
   </Dialog>
 
   const addedSlot = result.addedSlots > 0

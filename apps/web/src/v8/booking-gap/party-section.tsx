@@ -106,7 +106,7 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
         <OperationTargetSummary accounts={[{ id: confirmedScope?.accountId ?? '' }]} />
         {confirmedScope !== targetScope.current && canOperate ? <Notice tone="warn">{cancellable.length === 0 ? '取り消せる予約がなくなりました。' : <>組の内容が更新されました。最新の内容を確認してください。<ul>{cancellable.map(member => <li key={member.bookingId}>{member.label || member.personName}・{member.menuName}・{member.staffName ?? '担当未設定'}・{hm(member.startsAt)}〜{hm(member.endsAt)}</li>)}</ul><Button onClick={() => setConfirmedScope(targetScope.current)}>最新の内容を確認しました</Button></>}</Notice> : null}
         <Field label="取り消す理由" required><TextField aria-label="取り消す理由" value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} /></Field>
-        <p>取り消すと元に戻せません。来店済み・取消済みの予約は変えません。この操作ではLINEを自動送信しません。必要な連絡は受信箱から行ってください。</p>
+        <p className="text-body">取り消すと元に戻せません。来店済み・取消済みの予約は変えません。この操作ではLINEを自動送信しません。必要な連絡は受信箱から行ってください。</p>
         {error && reload ? <Button onClick={reload}>この組を読み直す</Button> : null}
       </Dialog>
       {preparing.dialog}
