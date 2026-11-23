@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Tabs } from '@/components/shared/tabs'
 import Notice from '@/components/shared/notice'
@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 
 type Channel = 'all' | 'line' | 'instagram' | 'email'
 type Connection = 'idle' | 'loading' | 'connected' | 'disconnected' | 'error'
@@ -18,7 +19,10 @@ export function InboxChannelTabs() {
   const { selectedAccountId, selectedAccount, loading, error, refreshAccounts } = useAccount()
   const role = useStaffRole()
   const requested = params.get('channel')
-  const current: Channel = requested === 'line' || requested === 'instagram' || requested === 'email' ? requested : 'all'
+  const current: Channel = requested === 'line' || requested === 'email' ? requested : 'all'
+  const requestedInstagram = requested === 'instagram'
+  const preparing = usePreparingDialog()
+  const directNoticeShown = useRef(false)
   const [connection, setConnection] = useState<Connection>('idle')
   const [attempt, setAttempt] = useState(0)
   const [pending, setPending] = useState<Channel | null>(null)
@@ -26,8 +30,9 @@ export function InboxChannelTabs() {
 
   useEffect(() => { setConnection('idle'); setPending(null); setMessage('') }, [selectedAccountId])
   useEffect(() => { setMessage('') }, [current])
+  useEffect(() => { directNoticeShown.current = false }, [requested, selectedAccountId])
   useEffect(() => {
-    if (pending !== 'instagram' && current !== 'instagram') return
+    if (pending !== 'instagram' && !requestedInstagram) return
     if (!selectedAccountId) return
     let active = true
     setConnection('loading')
@@ -37,7 +42,7 @@ export function InboxChannelTabs() {
       setConnection(result.data.connections.some(item => item.state === 'connected') ? 'connected' : 'disconnected')
     }).catch(() => { if (active) setConnection('error') })
     return () => { active = false }
-  }, [selectedAccountId, pending === 'instagram' || current === 'instagram', attempt])
+  }, [selectedAccountId, pending === 'instagram' || requestedInstagram, attempt])
 
   const select = (channel: Channel) => {
     const query = new URLSearchParams(params.toString())
@@ -54,12 +59,16 @@ export function InboxChannelTabs() {
     router.push('/settings/sns')
   }
   useEffect(() => {
-    if (pending !== 'instagram' && current !== 'instagram') return
-    if (pending === 'instagram' && connection === 'connected') select('instagram')
+    if (pending !== 'instagram' && !requestedInstagram) return
+    if (connection === 'connected' && (pending === 'instagram' || !directNoticeShown.current)) {
+      directNoticeShown.current = true
+      setPending(null)
+      preparing.open('Instagram の会話')
+    }
     if (connection === 'disconnected') notConnected(pending === 'instagram')
   // The pending request is resolved against the latest account and role.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, current, connection, role])
+  }, [pending, requestedInstagram, connection, role])
   useEffect(() => {
     if (current !== 'email' || loading || !selectedAccountId) return
     if (error || !selectedAccount || selectedAccount.emailInboxEnabled === undefined) {
@@ -77,7 +86,7 @@ export function InboxChannelTabs() {
     setMessage('')
     if (channel === 'instagram') {
       if (loading || !selectedAccountId) { setMessage(loading ? '接続状態を確認しています。' : 'LINE アカウントを選んでください。'); return }
-      if (connection === 'connected') select(channel)
+      if (connection === 'connected') preparing.open('Instagram の会話')
       else if (connection === 'disconnected') notConnected()
       else { setPending(channel); if (connection === 'error') setAttempt(value => value + 1) }
       return
@@ -94,8 +103,9 @@ export function InboxChannelTabs() {
     <Tabs label="受信経路" size="compact" items={([
       ['all', 'すべて'], ['line', 'LINE'], ['instagram', 'Instagram'], ['email', 'メール'],
     ] as const).map(([id, label]) => ({ label, current: current === id, onClick: () => choose(id) }))} />
-    {(pending === 'instagram' || current === 'instagram') && connection === 'loading' ? <Notice tone="info" message="Instagram の接続状態を確認しています。" /> : null}
-    {(pending === 'instagram' || current === 'instagram') && connection === 'error' ? <Notice tone="warn" message="Instagram の接続状態を読み込めませんでした。" action={<Button variant="text" size="inline" onClick={() => setAttempt(value => value + 1)}>読み直す</Button>} /> : null}
+    {(pending === 'instagram' || requestedInstagram) && connection === 'loading' ? <Notice tone="info" message="Instagram の接続状態を確認しています。" /> : null}
+    {(pending === 'instagram' || requestedInstagram) && connection === 'error' ? <Notice tone="warn" message="Instagram の接続状態を読み込めませんでした。" action={<Button variant="text" size="inline" onClick={() => setAttempt(value => value + 1)}>読み直す</Button>} /> : null}
     {message ? <Notice tone="info" message={message} action={message === 'この受信経路はつながっていません。' ? <Button variant="text" size="inline" onClick={() => router.push('/settings/sns')}>設定へ</Button> : (error || message === 'メールの接続状態を読み込めませんでした。') ? <Button variant="text" size="inline" onClick={() => void refreshAccounts()}>読み直す</Button> : undefined} /> : null}
+    {preparing.dialog}
   </>
 }

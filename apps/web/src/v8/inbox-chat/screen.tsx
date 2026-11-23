@@ -10,8 +10,7 @@ import Notice from '@/components/shared/notice';
 import type { InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import Button from '@/components/shared/button';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
-import { InboxPage, InboxConversationPane } from '@/components/templates/inbox-page';
-import ListState from '@/components/shared/list-state';
+import { InboxPage } from '@/components/templates/inbox-page';
 import { useAccount } from '@/contexts/account-context';
 import { api,fetchApi,type ChatDetailMessage } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
@@ -54,8 +53,6 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const router = useRouter()
 
   const params = useSearchParams()
-  const instagramSelected = params.get('channel') === 'instagram'
-
   // URLが指す保存検索のID。再読込・URL共有からの復元元(N-021)。
   const savedViewParam = (params.get(SAVED_VIEW_URL_KEY) ?? '').trim()
 
@@ -64,10 +61,10 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
-  const visibleThreadId = emailInboxEnabled && !instagramSelected && channel !== 'line' ? selectedThreadId : null
+  const visibleThreadId = emailInboxEnabled && channel !== 'line' ? selectedThreadId : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const visibleChatId = instagramSelected || channel === 'email' ? null : selectedChatId
+  const visibleChatId = channel === 'email' ? null : selectedChatId
 
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
@@ -825,7 +822,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
-        {instagramSelected ? <InboxConversationPane selected={false}><ListState kind="empty" emptyPreset="readonly" title="Instagram の会話" description="Instagram の会話表示は準備中です。" /></InboxConversationPane> : <InboxConversation {...{
+        <InboxConversation {...{
           operators, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
           loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
@@ -844,13 +841,13 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
           imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
           overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
-        }} />}
+        }} />
 
         <InboxCustomerPanel
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
           selectedChatId={visibleChatId}
-          selectedThreadId={instagramSelected ? null : visibleThreadId}
+          selectedThreadId={visibleThreadId}
           wideInfoPanel={inlineInfoPanel}
           setShowFriendInfo={setShowFriendInfo}
           customerPanelRef={customerPanelRef}

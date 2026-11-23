@@ -8,16 +8,16 @@ import Notice from './notice'
  * 会話とメールが両方失敗しても、知らせとボタンは1つにまとめる（押せば失敗した物を全部読み直す）。
  * 知らせには「何が読めて何が読めないか」を書く。読めた方の一覧はそのまま使える。
  */
-export function InboxListEmpty({ filtered, onClear, channel = 'all' }: { filtered: boolean; onClear: () => void; channel?: 'all' | 'line' | 'email' | 'instagram' }) {
+export function InboxListEmpty({ filtered, onClear, channel = 'all' }: { filtered: boolean; onClear: () => void; channel?: 'all' | 'line' | 'email' }) {
   return (
     <div data-inbox-list-state={filtered ? 'filtered-empty' : 'empty'}>
       <ListState
         kind="empty"
         emptyPreset={filtered ? 'filtered' : 'readonly'}
         icon={<MessageCircle aria-hidden="true" size={20} />}
-        title={channel === 'instagram' ? 'Instagram の会話' : filtered ? '条件に一致する会話がありません' : 'まだ会話がありません'}
-        description={channel === 'instagram' ? 'Instagram の会話は、準備ができしだいここに出ます。' : filtered ? '条件を変えるか、絞り込みを外してください。' : channel === 'email' ? 'メールが届くとここに出ます。' : 'LINE で話しかけられるとここに出ます。'}
-        action={filtered && channel !== 'instagram' ? <Button onClick={onClear}>絞り込みを外す</Button> : undefined}
+        title={filtered ? '条件に一致する会話がありません' : 'まだ会話がありません'}
+        description={filtered ? '条件を変えるか、絞り込みを外してください。' : channel === 'email' ? 'メールが届くとここに出ます。' : 'LINE で話しかけられるとここに出ます。'}
+        action={filtered ? <Button onClick={onClear}>絞り込みを外す</Button> : undefined}
       />
     </div>
   )
