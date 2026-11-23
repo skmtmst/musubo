@@ -13,7 +13,7 @@ it('営業時間の開始後に未割当を一度だけ再割当する',async()=
  await processInboxOpeningAssignments(d.db,new Date());
  expect(d.raw.prepare('SELECT count(*) n FROM inbox_assignment_logs').get()).toEqual({n:1});
 });
-it('営業時間前は割り当てず開始時刻まで待つ',async()=>{
+it('営業時間外は割り当てず開始時刻まで待つ',async()=>{
  vi.setSystemTime(new Date('2026-10-15T23:59:00Z'));await processInboxOpeningAssignments(d.db,new Date());
  expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
  vi.setSystemTime(new Date('2026-10-16T00:01:00Z'));await processInboxOpeningAssignments(d.db,new Date());
