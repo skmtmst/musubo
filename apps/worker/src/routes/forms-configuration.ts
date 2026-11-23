@@ -3,7 +3,7 @@ import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { FormReferenceAccessError, formReferenceAccount, resolveFormReferences, publicReferenceLayout, validateFormReferences, createFormDraftOnce, FormDraftCreateError } from '../features/forms/index.js';
 import { formWebhookTarget } from '../services/public-https-request.js';
 import { webhookUrlBlockReason } from '../services/outgoing-webhook-delivery.js';
-import { validateLayoutRouting } from '../features/forms/form-routing/index.js';
+import { RoutingConditionsConflict, validateLayoutRouting } from '../features/forms/form-routing/index.js';
 import { GapError } from '../services/gap-common.js';
 import { normalizeLayoutInput } from './form-layout-input.js';
 import { hasDeliveryAccess } from '@line-crm/shared';
@@ -30,6 +30,10 @@ async function createFormIfCoursesExist(...args: Parameters<typeof createForm>) 
   catch (error) { if (error instanceof Error && error.message === 'restaurant_course_unavailable') return null; throw error; }
 }
 
+function routingConflictResponse(c: Context<Env>, e: RoutingConditionsConflict) {
+  const message = `${e.row + 1} 行目の「${e.questionLabel}」の条件は同時に満たせません。どちらかを外すか、行を分けてください。`;
+  return inputError(c, { success: false, code: e.code, error: message, fields: { [`layout.blocks.${e.blockId}.routing.rules.${e.row}.conditions.${e.questionId}`]: message } }, 400);
+}
 function validWebhookTemplate(value: string): boolean {
   try { return !webhookUrlBlockReason(formWebhookTarget(value, {})); } catch { return false; }
 }
@@ -363,7 +367,7 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
   }
   if (normalized && !('error' in normalized) && normalized.layout) {
     try { await validateLayoutRouting(c.env.DB, body.accountId, JSON.parse(normalized.layout)); }
-    catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
+    catch(e) { if(e instanceof RoutingConditionsConflict)return routingConflictResponse(c,e); if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
   }
 
   if (normalized && !await validateFormReferences(c.env, [body.accountId], JSON.parse(normalized.layout), hasDeliveryAccess(c.get('staff'), 'forms', 'publish'))) {
@@ -595,7 +599,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
         return c.json({success:false,error:'代理ログイン中は行き先を変更できません'},403);
     }
     try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout),{validateTargets:!c.get('impersonation')}); }
-    catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
+    catch(e) { if(e instanceof RoutingConditionsConflict)return routingConflictResponse(c,e); if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
     if (!await validateFormReferences(c.env, await getFormAccountIds(c.env.DB, id), JSON.parse(normalized.layout), false)) {
       return inputError(c, { success: false, error: '同じ店の参照を選び直してください' }, 422, ['layout.references']);
     }

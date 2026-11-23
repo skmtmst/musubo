@@ -2,6 +2,9 @@ import {collectInputs,parseLayout,type FormLayout,type BookingRouting,type Routi
 
 
 import {GapError} from '../../services/gap-common.js';
+export class RoutingConditionsConflict extends GapError {
+ constructor(public blockId:string, public row:number, public questionId:string, public questionLabel:string){super('routing_conditions_conflict');}
+}
 export async function routingTargetUsable(db:D1Database,a:string,t:RoutingTarget){
  if(!t||typeof t.menuId!=='string'||(t.meetingMode!==undefined&&!['online','in_person'].includes(t.meetingMode)))return false;
  const m=await db.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND is_active=1 AND deleted_at IS NULL AND addon_only=0').bind(t.menuId,a).first();if(!m)return false;
@@ -24,6 +27,21 @@ export async function validateLayoutRouting(db:D1Database,a:string,layout:FormLa
     if(cond.op==='is'&&typeof cond.value!=='string')throw new GapError(`routing_condition_invalid:${index}`);
     if(cond.op==='in'&&(!Array.isArray(cond.value)||!cond.value.length||cond.value.some(x=>typeof x!=='string')))throw new GapError(`routing_condition_invalid:${index}`);
     if(cond.op==='between'&&(q.type!=='rating'||!Array.isArray(cond.value)||cond.value.length!==2||cond.value.some(x=>typeof x!=='number'||!Number.isFinite(x))||Number(cond.value[0])>Number(cond.value[1])))throw new GapError(`routing_condition_invalid:${index}`);
+   }
+   if(r.enabled) for(const questionId of new Set(row.conditions.map(cond=>cond.questionId))){
+    const q=inputs.find(input=>input.id===questionId),conditions=row.conditions.filter(cond=>cond.questionId===questionId);
+    if(!q||q.type==='checkbox'||conditions.length<2)continue;
+    let conflict=false;
+    if(q.type==='rating'){
+     if(conditions.every(cond=>cond.op==='between'&&Array.isArray(cond.value))){
+      const ranges=conditions.map(cond=>cond.value as number[]);
+      conflict=Math.max(...ranges.map(range=>range[0]))>Math.min(...ranges.map(range=>range[1]));
+     }
+    }else{
+     const sets=conditions.map(cond=>cond.op==='is'?[cond.value as string]:cond.op==='in'?cond.value as string[]:null);
+     if(sets.every((set):set is string[]=>set!==null)) conflict=!sets[0].some(value=>sets.every(set=>set.includes(value)));
+    }
+    if(conflict)throw new RoutingConditionsConflict(block.id,index,q.id,q.label);
    }
    if(r.enabled&&options.validateTargets!==false&&!await routingTargetUsable(db,a,row.target))throw new GapError(`routing_target_invalid:${index}`);
   }

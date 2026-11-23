@@ -36,6 +36,31 @@ test('B6-06: 公開の版を読んで下書きの変更を混ぜない',async()=
 });
 
 const saveRouting=async(l:FormLayout,revision=1)=>gapCall(gapApp(d,[forms]),'/api/forms/form?account_id=a','PUT',{layout:l,expectedContentRevision:revision});
+test.each(['POST','PUT'] as const)('両立しない単一選択条件は%sで項目ごとの理由を返し保存しない',async(method)=>{
+ const l=layout(),routing=(l.sections[0].blocks[1] as any).booking.routing;
+ routing.rules[0].conditions=[{questionId:'q',op:'is',value:'転職'},{questionId:'q',op:'is',value:'就職'}];
+ const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
+ const count=(d.raw.prepare('SELECT COUNT(*) n FROM forms').get() as {n:number}).n;
+ const r=await gapCall(gapApp(d,[forms]),method==='POST'?'/api/forms?account_id=a':'/api/forms/form?account_id=a',method,method==='POST'?{name:'新規',accountId:'a',layout:l}:{layout:l,expectedContentRevision:1});
+ expect(r.status).toBe(400);expect(await r.json()).toMatchObject({fields:{'layout.blocks.book.routing.rules.0.conditions.q':'1 行目の「内容」の条件は同時に満たせません。どちらかを外すか、行を分けてください。'}});
+ expect(d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get()).toEqual(before);expect((d.raw.prepare('SELECT COUNT(*) n FROM forms').get() as {n:number}).n).toBe(count);
+});
+test('一致する選択肢の積集合と重なる評価範囲、複数選択は許可し、重ならない評価範囲は拒否する',async()=>{
+ const l=layout(),blocks=l.sections[0].blocks as any[],routing=blocks[1].booking.routing;
+ routing.rules[0].conditions=[{questionId:'q',op:'in',value:['転職','就職']},{questionId:'q',op:'is',value:'転職'}];
+ await expect(validateLayoutRouting(d.db,'a',l)).resolves.toBeUndefined();
+ blocks[0].type='checkbox';routing.rules[0].conditions=[{questionId:'q',op:'is',value:'転職'},{questionId:'q',op:'is',value:'就職'}];
+ await expect(validateLayoutRouting(d.db,'a',l)).resolves.toBeUndefined();
+ blocks[0].type='rating';routing.rules[0].conditions=[{questionId:'q',op:'between',value:[1,3]},{questionId:'q',op:'between',value:[3,5]}];
+ await expect(validateLayoutRouting(d.db,'a',l)).resolves.toBeUndefined();
+ routing.rules[0].conditions[1].value=[4,5];await expect(validateLayoutRouting(d.db,'a',l)).rejects.toThrow('routing_conditions_conflict');
+});
+test('プルダウンで候補の共通部分がない条件は拒み、振り分けを停止中なら保存できる',async()=>{
+ const l=layout(),blocks=l.sections[0].blocks as any[],routing=blocks[1].booking.routing;
+ blocks[0].type='select';routing.rules[0].conditions=[{questionId:'q',op:'in',value:['就職','独立']},{questionId:'q',op:'is',value:'転職'}];
+ const rejected=await saveRouting(l);expect(rejected.status).toBe(400);expect(await rejected.json()).toMatchObject({code:'routing_conditions_conflict'});
+ routing.enabled=false;const accepted=await saveRouting(l);expect(accepted.status,await accepted.clone().text()).toBe(200);
+});
 test('B6-01: 行き先がない場合はフォームを保存しない',async()=>{
  const l=layout();const routing=(l.sections[0].blocks[1] as any).booking.routing;routing.rules=[];delete routing.fallback;
  const before=d.raw.prepare("SELECT layout,content_revision FROM forms WHERE id='form'").get();
