@@ -295,8 +295,7 @@ export function draftKeyOf(accountId: string | null | undefined, chatId: string 
 }
 export const CHANNELS = [{ key: 'all', label: 'すべて' }, { key: 'line', label: 'LINE' }, { key: 'email', label: 'メール' }] as const
 
-export function resolveInboxChannel(requested: string | null, emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
-  if (!emailInboxEnabled) return 'line'
+export function resolveInboxChannel(requested: string | null, _emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
   return requested === 'line' || requested === 'email' ? requested : 'all'
 }
 export const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'

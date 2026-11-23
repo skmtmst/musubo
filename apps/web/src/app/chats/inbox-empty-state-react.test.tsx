@@ -69,6 +69,18 @@ async function eventually(check: () => void, timeout = 1000) {
   }
 }
 async function click(label: string) {
+  if (label === '要返信' || label === '1時間以上待ち') {
+    let control = document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')
+    if (!control) {
+      const open = document.querySelector<HTMLButtonElement>('button[aria-label="絞り込み"]')!
+      await act(async () => { open.click() })
+      control = document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')
+    }
+    await act(async () => { control!.click() })
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(el => el.textContent?.trim().startsWith(label))!
+    await act(async () => { option.querySelector('button')!.click() })
+    return
+  }
   const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === label || item.textContent?.trim().startsWith(label))
   expect(button, label).toBeTruthy()
   await act(async () => { button!.click() })

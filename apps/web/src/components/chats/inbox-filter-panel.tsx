@@ -60,6 +60,7 @@ export default function InboxFilterPanel({
   assigneeUnread = null,
   assigneeUnreadStatus = 'loading',
   slaEnabled = false,
+  quickCounts,
   emailInboxEnabled = true,
   auxiliaryActions,
   anchorRef,
@@ -77,6 +78,7 @@ export default function InboxFilterPanel({
   assigneeUnreadStatus?: 'error' | 'ready' | 'loading'
   /** 実際の対応期限を使う場合は「期限超過」、それ以外は「1時間以上待ち」。 */
   slaEnabled?: boolean
+  quickCounts?: { all: number; reply: number; overdue: number | null } | null
   emailInboxEnabled?: boolean
   /** 対応ルールなど、画面が持つ補助操作。 */
   auxiliaryActions?: ReactNode
@@ -185,9 +187,9 @@ export default function InboxFilterPanel({
                 value={value.quickFilter}
                 onChange={(next) => set({ quickFilter: next as InboxFilterValue['quickFilter'] })}
                 options={[
-                  { value: 'all', label: 'すべて' },
-                  { value: 'reply', label: '要返信' },
-                  { value: 'overdue', label: slaEnabled ? '期限超過' : '1時間以上待ち' },
+                  { value: 'all', label: `すべて${quickCounts ? ` (${quickCounts.all})` : ''}` },
+                  { value: 'reply', label: `要返信${quickCounts ? ` (${quickCounts.reply})` : ''}` },
+                  { value: 'overdue', label: `${slaEnabled ? '期限超過' : '1時間以上待ち'}${quickCounts?.overdue != null ? ` (${quickCounts.overdue})` : ''}` },
                 ]}
               />
             </div>
