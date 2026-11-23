@@ -269,3 +269,34 @@ it('使う店を確かめている間と確かめられない時は、行き先�
   fireEvent.click(toggle())
   expect(onChange.mock.calls[1][0].enabled).toBe(false)
 })
+
+// 質問名と答えは同じ段に置く。狭いときは質問名だけを1行で省略し、全文は title に残す。
+it('条件の質問名は答えの欄と同じ段に置き、省略されても全文を title に残す', () => {
+  const longLabel='今日のご来店の目的を、いちばん近いものからひとつ選んでください'
+  const blocks=[
+    {id:'q',kind:'input',type:'radio',name:'purpose',label:longLabel,choices:[{id:'x',label:'ご相談'},{id:'y',label:'トリミング'}]},
+    {id:'r',kind:'input',type:'rating',name:'score',label:'担当の対応はいかがでしたか？'},
+    {id:'book',kind:'input',type:'booking'},
+  ] as never
+  const routing={enabled:true,rules:[{conditions:[{questionId:'q',op:'is' as const,value:'ご相談'},{questionId:'r',op:'between' as const,value:[3,5]}],target:{menuId:'m'}}],fallback:{menuId:'m'}}
+  const refs={bookingMenus:[{id:'m',name:'シャンプーとカットのセット（大型犬・長毛）',durationMinutes:150}]} as never
+  const {rerender}=render(<RoutingSection blocks={blocks} refs={refs} routing={routing} onChange={() => {}} />)
+  const line=(label:string) => screen.getByTitle(label).parentElement!
+  // 質問名の後ろに「：」を足さず、全文を title に入れる。
+  expect(screen.getByTitle(longLabel).textContent).toBe(longLabel)
+  const question=line(longLabel)
+  expect(question.contains(screen.getByRole('button',{name:'1 行目の条件 1 の答え'}))).toBe(true)
+  expect(question.contains(screen.getByRole('button',{name:'1 行目の条件 1 を外す'}))).toBe(true)
+  const range=line('担当の対応はいかがでしたか？')
+  expect(range).not.toBe(question)
+  expect(range.contains(screen.getByRole('button',{name:'1 行目の範囲の始まり'}))).toBe(true)
+  expect(range.contains(screen.getByRole('button',{name:'1 行目の範囲の終わり'}))).toBe(true)
+  // どれにも当たらない行も同じ形の段に置き、行の高さをそろえる。
+  const fallback=line('どれにも当たらない')
+  expect(fallback.textContent).toContain('消せない')
+  expect(fallback.className).toBe(question.className)
+  // 閲覧のみでも、質問名と答えは同じ段。行き先の名前も1行で省略し、全文を title に残す。
+  rerender(<RoutingSection blocks={blocks} refs={refs} routing={routing} readOnly onChange={() => {}} />)
+  expect(line(longLabel).textContent).toBe(`${longLabel}〈ご相談〉`)
+  expect(screen.getAllByTitle('シャンプーとカットのセット（大型犬・長毛）')).toHaveLength(2)
+})

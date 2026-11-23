@@ -15,8 +15,13 @@
 .headRow { --gap2-40: 40px; min-height: var(--gap2-40); background: var(--color-table-head); color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; }
 .row { --gap2-52: 52px; min-height: var(--gap2-52); border-bottom: 1px solid var(--color-hairline); font-size: var(--text-body); }
 .row[data-fallback] { background: var(--color-canvas-sunken); }
-.cond { --gap2-4: 4px; --gap2-8: 8px; display: flex; flex-direction: column; align-items: flex-start; gap: var(--gap2-4); min-width: 0; padding: var(--gap2-8) 0; color: var(--color-ink); font-weight: 500; white-space: nowrap; }
-.cond > :first-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cond { --gap2-4: 4px; --gap2-8: 8px; display: flex; flex-direction: column; gap: var(--gap2-4); min-width: 0; padding: var(--gap2-8) 0; color: var(--color-ink); font-weight: 500; white-space: nowrap; }
+/* 1つの条件＝1段。どれにも当たらない行も同じ段の高さにして、行の高さをそろえる。 */
+.condition { --gap2-8: 8px; --question-min: 2em; display: flex; align-items: center; gap: var(--gap2-8); min-width: 0; min-height: var(--control-h); }
+/* 幅が足りないときは質問名だけを縮めて省略する。答えの欄は縮めず、質問名の最低2字ぶんを残す幅を上限にする。 */
+.question { flex: 0 1 auto; min-width: 0; }
+.value { --gap2-8: 8px; display: inline-flex; flex: none; align-items: center; gap: var(--gap2-8); min-width: 0; max-width: calc(100% - var(--question-min) - var(--gap2-8)); }
+.answer { flex: 0 1 auto; width: auto; min-width: 0; }
 .cell { --gap2-6: 6px; min-width: 0; padding: var(--gap2-6) 0; }
 .cell > * { width: 100%; min-width: 0; }
 .grip, .more { display: inline-flex; align-items: center; justify-content: center; color: var(--color-ink-faint); }

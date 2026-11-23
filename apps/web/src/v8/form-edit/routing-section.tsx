@@ -18,6 +18,7 @@ import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
+import TruncatedText from '@/components/shared/truncated-text'
 import type { FormRefs } from '@/components/forms/form-refs'
 import { choiceModeLabel, type FormRouting, type RoutingRule, type RoutingStoreScope, type RoutingTarget, emptyRouting, hasBookingBlock, MAX_ROUTING_ROWS, newRule, nextCondition, routingError, routingQuestions, ruleAnswer } from './routing-model'
 import styles from './routing-section.module.css'
@@ -97,9 +98,9 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, stores
   const staffOptions = (target: RoutingTarget) => [{ value: '', label: '全員' }, ...(refs.bookingGroups ?? []).filter((group) => !group.menuIds || group.menuIds.includes(target.menuId) || group.id === target.staffGroupId).map((group) => ({ value: `group:${group.id}`, label: `組：${group.name}` })), ...(target.staffGroupId && !(refs.bookingGroups ?? []).some((group) => group.id === target.staffGroupId) ? [{ value: `group:${target.staffGroupId}`, label: '担当の組（登録済み）' }] : []), ...(menuStaff?.[target.menuId] ?? []).map((staff) => ({ value: `staff:${staff.id}`, label: staff.name }))]
 
   const targetCells = (target: RoutingTarget, update: (next: RoutingTarget) => void, label: string, invalid: boolean) => <>
-    <Td>{readOnly ? <span>{menus.find((m) => m.id === target.menuId)?.name ?? '—'}</span> : <EntitySelect size="full" aria-label={`${label}の出すメニュー`} invalid={invalid} value={target.menuId} options={menuOptions} onChange={(v) => update(setTarget(target, { menuId: v }))} />}</Td>
-    <Td>{readOnly ? <span>{target.staffGroupId ? (refs.bookingGroups ?? []).find((group) => group.id === target.staffGroupId)?.name ?? '担当の組（登録済み）' : target.staffId ? (menuStaff?.[target.menuId] ?? []).find((s) => s.id === target.staffId)?.name : '全員'}</span> : <EntitySelect size="full" aria-label={`${label}の担当`} value={target.staffGroupId ? `group:${target.staffGroupId}` : target.staffId ? `staff:${target.staffId}` : ''} options={staffOptions(target)} onChange={(v) => update(setTarget(target, v.startsWith('group:') ? { staffGroupId: v.slice(6), staffId: undefined } : { staffId: v.startsWith('staff:') ? v.slice(6) : undefined, staffGroupId: undefined }))} disabled={!target.menuId} />}</Td>
-    <Td>{readOnly ? <span>{MODES.find((m) => m.value === (target.meetingMode ?? ''))?.label}</span> : <Select size="full" aria-label={`${label}の会い方`} value={target.meetingMode ?? ''} options={MODES} onChange={(v) => update(setTarget(target, { meetingMode: (v || undefined) as RoutingTarget['meetingMode'] }))} />}</Td>
+    <Td>{readOnly ? <TruncatedText value={menus.find((m) => m.id === target.menuId)?.name ?? '—'} /> : <EntitySelect size="full" aria-label={`${label}の出すメニュー`} invalid={invalid} value={target.menuId} options={menuOptions} onChange={(v) => update(setTarget(target, { menuId: v }))} />}</Td>
+    <Td>{readOnly ? <TruncatedText value={(target.staffGroupId ? (refs.bookingGroups ?? []).find((group) => group.id === target.staffGroupId)?.name ?? '担当の組（登録済み）' : target.staffId ? (menuStaff?.[target.menuId] ?? []).find((s) => s.id === target.staffId)?.name : '全員') ?? ''} /> : <EntitySelect size="full" aria-label={`${label}の担当`} value={target.staffGroupId ? `group:${target.staffGroupId}` : target.staffId ? `staff:${target.staffId}` : ''} options={staffOptions(target)} onChange={(v) => update(setTarget(target, v.startsWith('group:') ? { staffGroupId: v.slice(6), staffId: undefined } : { staffId: v.startsWith('staff:') ? v.slice(6) : undefined, staffGroupId: undefined }))} disabled={!target.menuId} />}</Td>
+    <Td>{readOnly ? <TruncatedText value={MODES.find((m) => m.value === (target.meetingMode ?? ''))?.label ?? ''} /> : <Select size="full" aria-label={`${label}の会い方`} value={target.meetingMode ?? ''} options={MODES} onChange={(v) => update(setTarget(target, { meetingMode: (v || undefined) as RoutingTarget['meetingMode'] }))} />}</Td>
   </>
 
   return (
@@ -138,7 +139,8 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, stores
           {preview ? <strong>{preview.matchedIndex === -1 ? 'どれにも当たらないとき' : `${preview.matchedIndex + 1} 行目`}：{menus.find((menu) => menu.id === preview.target.menuId)?.name ?? '行き先'}{preview.fellBack ? '（元の行き先が使えないため既定の行き先）' : ''}（保存はされません）</strong> : null}
           {previewError ? <Notice tone="danger" role="alert">{previewError}</Notice> : null}
         </div> : null}
-        <DataTable aria-label="行き先の表" grid={{ columns: '40px minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 40px', padding: '0', headPadding: '0', gap: 'var(--tpl-sb-ec-gap)' }}>
+        {/* 会い方は「指定しない」、担当は「全員」が入る幅で止める。条件は「どれにも当たらない」と、質問名2字＋5段階の範囲＋外すが入る幅を下限にし、残りを条件とメニューへ配る。右に見本が並ぶ狭い板ではメニュー名を先に残す。 */}
+        <DataTable aria-label="行き先の表" grid={{ columns: '40px minmax(185px, 2.38fr) minmax(0, 2.33fr) minmax(76px, 1fr) 114px 32px', compactColumns: '40px minmax(185px, 1fr) minmax(0, 1.06fr) minmax(76px, 0.41fr) 114px 32px', padding: '0', headPadding: '0', gap: 'var(--tpl-sb-ec-gap)' }}>
           <thead><TableHeadRow><Th aria-label="並べ替え" /><Th>条件</Th><Th grow>出すメニュー</Th><Th>担当の組</Th><Th>会い方</Th><Th aria-label="操作" /></TableHeadRow></thead><tbody>
           {(readOnly ? ruled : reorder.shown).map((rule, index) => {
             const invalid = problem?.row === index || unavailableTarget(rule.target)
@@ -146,13 +148,14 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, stores
             return (
               <Tr key={rule.id} selected={hit === index} data-invalid={invalid || undefined} {...reorder.rowProps(rule.id)}>
                 <HandleCell>{readOnly ? null : <ReorderHandle look="icon" label={`${index + 1} 行目`} {...reorder.handle(rule.id)} {...reorder.handleProps(rule.id)} />}</HandleCell>
-                <Td><div className={styles.cond}>{rule.conditions.map((condition, i) => <div key={i} title={`${questions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：${String(condition.value)}`}>
-                  {`${trialQuestions.find((q) => q.id === condition.questionId)?.label ?? '質問'}：`}
-                  {condition.op === 'between' && Array.isArray(condition.value) && !readOnly ? <>
-                    <Select aria-label={`${index + 1} 行目の範囲の始まり`} size="full" value={String(condition.value[0])} options={[1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setRule(rule.id, { conditions: rule.conditions.map((c, j) => j === i ? { ...c, value: [Number(v), Number(condition.value[1])] } : c) })} />
-                    <Select aria-label={`${index + 1} 行目の範囲の終わり`} size="full" value={String(condition.value[1])} options={[1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setRule(rule.id, { conditions: rule.conditions.map((c, j) => j === i ? { ...c, value: [Number(condition.value[0]), Number(v)] } : c) })} />
-                  </> : condition.op === 'is' && !readOnly && trialQuestions.find((q) => q.id === condition.questionId)?.choices?.length ? <Select aria-label={`${index + 1} 行目の条件 ${i + 1} の答え`} size="full" value={String(condition.value)} options={(trialQuestions.find((q) => q.id === condition.questionId)?.choices ?? []).map((choice) => ({value:choice.label,label:choice.label}))} onChange={(v) => setRule(rule.id, {conditions:rule.conditions.map((c,j) => j === i ? {...c,value:v} : c)})} /> : <>〈{Array.isArray(condition.value) ? condition.value.join('・') : condition.value}〉</>}
-                  {!readOnly && rule.conditions.length > 1 ? <Button variant="text" size="inline" aria-label={`${index + 1} 行目の条件 ${i + 1} を外す`} onClick={() => setRule(rule.id, {conditions:rule.conditions.filter((_,j) => j !== i)})}>外す</Button> : null}
+                {/* 質問名と答えは同じ段。狭いときは質問名だけを1行で省略し、全文は title と吹き出しで見せる。 */}
+                <Td><div className={styles.cond}>{rule.conditions.map((condition, i) => <div key={i} className={styles.condition}>
+                  <TruncatedText className={styles.question} value={trialQuestions.find((q) => q.id === condition.questionId)?.label ?? '質問'} />
+                  <div className={styles.value}>{condition.op === 'between' && Array.isArray(condition.value) && !readOnly ? <>
+                    <Select className={styles.answer} aria-label={`${index + 1} 行目の範囲の始まり`} size="full" value={String(condition.value[0])} options={[1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setRule(rule.id, { conditions: rule.conditions.map((c, j) => j === i ? { ...c, value: [Number(v), Number(condition.value[1])] } : c) })} />
+                    <Select className={styles.answer} aria-label={`${index + 1} 行目の範囲の終わり`} size="full" value={String(condition.value[1])} options={[1,2,3,4,5].map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setRule(rule.id, { conditions: rule.conditions.map((c, j) => j === i ? { ...c, value: [Number(condition.value[0]), Number(v)] } : c) })} />
+                  </> : condition.op === 'is' && !readOnly && trialQuestions.find((q) => q.id === condition.questionId)?.choices?.length ? <Select className={styles.answer} aria-label={`${index + 1} 行目の条件 ${i + 1} の答え`} size="full" value={String(condition.value)} options={(trialQuestions.find((q) => q.id === condition.questionId)?.choices ?? []).map((choice) => ({value:choice.label,label:choice.label}))} onChange={(v) => setRule(rule.id, {conditions:rule.conditions.map((c,j) => j === i ? {...c,value:v} : c)})} /> : <TruncatedText className={styles.answer} value={`〈${Array.isArray(condition.value) ? condition.value.join('・') : condition.value}〉`} />}
+                  {!readOnly && rule.conditions.length > 1 ? <Button variant="text" size="inline" aria-label={`${index + 1} 行目の条件 ${i + 1} を外す`} onClick={() => setRule(rule.id, {conditions:rule.conditions.filter((_,j) => j !== i)})}>外す</Button> : null}</div>
                 </div>)}</div></Td>
                 {targetCells(rule.target, (target) => setRule(rule.id, { target }), `${index + 1} 行目`, invalid)}
                 <ActionCell>{readOnly ? null : <RowMenu appearance="box" size="row" label={`${index + 1} 行目のそのほかの操作`} open={openMenu === rule.id} onOpenChange={(o) => setOpenMenu(o ? rule.id : null)}
@@ -162,7 +165,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, stores
           })}
           <Tr data-fallback selected={hit === -1} data-invalid={(problem?.row === value.rules.length || unavailableTarget(value.fallback)) || undefined}>
             <HandleCell />
-            <Td><span className={styles.cond}><span>どれにも当たらない</span><StatusBadge size="compact" dot={false}>消せない</StatusBadge></span></Td>
+            <Td><div className={styles.cond}><div className={styles.condition}><TruncatedText className={styles.question} value="どれにも当たらない" /><StatusBadge size="compact" dot={false}>消せない</StatusBadge></div></div></Td>
             {targetCells(value.fallback, (fallback) => set({ fallback }), 'どれにも当たらないとき', problem?.row === value.rules.length || unavailableTarget(value.fallback))}
             <ActionCell>—</ActionCell>
           </Tr>
