@@ -63,7 +63,7 @@ export default function TableAutoAssignmentDialog({ accountId, storeId, canEdit,
       titleIcon={<Settings2 size={17} aria-hidden="true" />} titleRow="mark" plainTitle designNode="qu2Fq" busy={saving}
       actionsPlacement="footer" bodyGap={20} bodyOffset={0} contentPadding="20px clamp(20px, 3vw, 28px) 0" footerNote="既存の予約の卓は変わりません。" footerNotePlacement="inline" onCancel={close}
       actions={<><Button presentation="restaurant" onClick={close} disabled={saving}>キャンセル</Button><Button presentation="restaurant" variant="primary" busy={saving} disabled={loading || !saved || !dirty || conflict} lockedReason={!canEdit ? '設定を変更する権限がありません' : undefined} onClick={() => void save()}>変更を保存</Button></>}>
-      {loading ? <p role="status">設定を読み込んでいます…</p> : null}
+      {loading ? <p role="status" className="text-body">設定を読み込んでいます…</p> : null}
       {error ? <Notice tone="danger" action={<Button onClick={() => void load(saved !== null)} disabled={loading || saving}>再試行</Button>}>{error}</Notice> : null}
       {conflict ? <Notice tone="warn" action={<Button onClick={() => void load(true)} disabled={loading || saving}>最新を確認する</Button>}>ほかの人が設定を変更しました。入力は残っています。最新を確認してから保存してください。</Notice> : null}
       {saved ? <>

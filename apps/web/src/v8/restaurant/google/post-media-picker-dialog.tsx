@@ -96,7 +96,7 @@ export function PostMediaPickerDialog({ target, accountId, onClose, onSelect }: 
     designContentPadding="22px 24px 24px"
     busy={confirming} busyLabel="画像を読み込み中…"
     onCancel={onClose}
-    footer={<DialogActions leadingAction={<span>選択後、切り取り位置を確認します。</span>}>
+    footer={<DialogActions leadingAction="選択後、切り取り位置を確認します。">
 
       <Button onClick={onClose} disabled={confirming}>キャンセル</Button>
       <Button variant="primary" onClick={() => void applySelection()} disabled={!selected || loading || confirming} busy={confirming} busyLabel="画像を読み込み中…">切り取り位置を確認</Button>

@@ -66,8 +66,8 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
             alt={preview.name} data-size={preview.size} width={2500} height={preview.size === 'compact' ? 843 : 1686} />
             : <figcaption>{preview.name}</figcaption>}
         </figure> : null}
-        {preview.state === 'multiple' ? <p>一覧から公開する下書きを選べます。</p> : null}
-        {preview.state === 'empty' ? <p>リッチメニューの一覧から状況を確認できます。</p> : null}
+        {preview.state === 'multiple' ? <p className="text-body">一覧から公開する下書きを選べます。</p> : null}
+        {preview.state === 'empty' ? <p className="text-body">リッチメニューの一覧から状況を確認できます。</p> : null}
       </div>
     </Dialog>
   )

@@ -418,7 +418,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
           }}>削除する</Button>
         </>}>
         {deleteScope?.scope.accountId && store && <OperationTargetSummary showEnvironment={false} accounts={[{ id: deleteScope.scope.accountId, name: accounts.find(account => account.id === deleteScope.scope.accountId)?.name }]} store={{ id: store.id, name: store.name }} />}
-        <p>{deleting?.code}・{deleting?.label}</p>
+        <p className="text-body">{deleting?.code}・{deleting?.label}</p>
         <DialogNote>予約や設定で使われていない卓だけ削除できます。元に戻せません。</DialogNote>
         {deleteError ? <Notice tone="danger">{deleteError}</Notice> : null}
       </RsDialog>

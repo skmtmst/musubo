@@ -756,7 +756,7 @@ function InflowDetailContent() {
         >
           <div className={styles.deleteBody}>
             <OperationTargetSummary accounts={[{ id: '', label: '受付先アカウント' }]} />
-            <p>受付先の全アカウントは確認できません。</p>
+            <p className="text-body">受付先の全アカウントは確認できません。</p>
             <Notice tone="warn" role="alert" message="削除すると、次のことが起きます">
               <ul className={styles.deleteEffects}>
                 <li>貼り付けたURL・QRコード：このURLを置いた投稿や広告から開けなくなります（差し替えが必要）</li>

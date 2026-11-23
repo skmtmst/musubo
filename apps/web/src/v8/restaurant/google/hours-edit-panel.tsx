@@ -97,7 +97,7 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
     {question?<Notice tone="info">{question}</Notice>:null}{parseError?<Notice tone="danger">{parseError}</Notice>:null}
     {parsed?<HoursTextProposal change={parsed} data={data} workspace={workspace} holidays={holidays} onEditDates={onEditDates}/>:null}
   </>}
-  {panel.kind==='dates'&&dateValue?.remove?<p>通常の営業時間に戻します。</p>:null}
+  {panel.kind==='dates'&&dateValue?.remove?<p className="text-body">通常の営業時間に戻します。</p>:null}
   </div>
  </Drawer><Dialog open={deleteOpen} title={`${service.label}の営業時間を削除しますか？`} description="変更内容を確認してからGoogleに反映します。" confirmLabel="削除する" cancelLabel="キャンセル" onCancel={()=>setDeleteOpen(false)} onConfirm={()=>{onDraft({...workspace,services:workspace.services.filter(s=>s.id!==service.id),draft:{...workspace.draft,serviceIds:[...new Set([...workspace.draft.serviceIds,service.googleTypeId?`remove:${service.googleTypeId}`:service.id])],reviewIds:[]}});setDeleteOpen(false);onClose()}} /></>
 }

@@ -1171,7 +1171,7 @@ export default function MediaLibraryListV8() {
           </DialogActions>
         ) : undefined}
       >
-        <div data-design-node="YfTfJ">
+        <div className="text-body" data-design-node="YfTfJ">
         {deleting ? <OperationTargetSummary accounts={[{ id: deleting.lineAccountId ?? '' }]} /> : null}
         {impactPhase === 'loading' ? (
           <p>使われている場所を確認しています…</p>

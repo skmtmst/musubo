@@ -43,7 +43,7 @@ export function FollowupTemplatePicker({accountId,storeName,onCancel,onPick}:{ac
  return <EntityPickerDialog title="テンプレートから選ぶ" searchPlaceholder="テンプレート名・本文で探す" query={query} onQueryChange={value=>{setQuery(value);setPage(1)}}
   items={[...assets.filter(item=>!query||item.name.includes(query)).map(item=>({id:`asset:${item.id}`,name:item.name,meta:'配信用の素材'})),...templates.map(item=>({id:item.id,name:item.name,folderId:item.folderId,keywords:item.messageContent,meta:'公開済みのテンプレート'}))]}
   state={loading?<p role="status">読み込んでいます…</p>:error?<Notice tone="danger">{error}</Notice>:undefined} busy={busy||loading} confirmDisabled={!!error}
-  listFooter={total>100?<><Button disabled={page<=1||loading} onClick={()=>setPage(value=>value-1)}>前の100件</Button><span>{page}ページ目</span><Button disabled={page*100>=total||loading} onClick={()=>setPage(value=>value+1)}>次の100件</Button></>:undefined}
+  listFooter={total>100?<><Button disabled={page<=1||loading} onClick={()=>setPage(value=>value-1)}>前の100件</Button><span className="text-body">{page}ページ目</span><Button disabled={page*100>=total||loading} onClick={()=>setPage(value=>value+1)}>次の100件</Button></>:undefined}
   preview={item=>item?<FollowupMessageSample bubbles={preview(item.id)} storeName={storeName}/>:null}
   createHref="/templates" createLabel="新しく作る →" onCancel={onCancel} onConfirm={id=>void select(id)}/>
 }

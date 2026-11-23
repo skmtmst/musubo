@@ -835,7 +835,7 @@ const EmergencyControlV8 = (
           {confirmMode === 'stop' ? (
             <>
               <Card surface="muted" corner="control" contentPadding="var(--polish-space-field)" gap="tight">
-                <p>止める対象：{selectedTargets.map((key) => `${targetLabels[key].label} ${impactText(key)}`).join('・')}</p>
+                <p className="text-body">止める対象：{selectedTargets.map((key) => `${targetLabels[key].label} ${impactText(key)}`).join('・')}</p>
               </Card>
               <DialogFormRow><Field label="止める理由" htmlFor="emergency-reason-v8" required><SaveErrorField names={["reason"]}><TextField
                 id="emergency-reason-v8"
@@ -873,7 +873,7 @@ const EmergencyControlV8 = (
             </>
           )}
           <DialogFormRow>
-            <p>確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力してください</p>
+            <p className="text-body">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力してください</p>
             <Field label="確認の文字" required><SaveErrorField names={["confirmWord","confirm_word"]}><TextField
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
