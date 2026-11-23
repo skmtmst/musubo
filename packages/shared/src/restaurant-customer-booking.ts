@@ -17,7 +17,7 @@ export interface RestaurantCustomerConfirmInput extends RestaurantCustomerDetail
 }
 
 export interface RestaurantCustomerCourse {
-  id: string; name: string; durationMinutes: number; price: number; allergens: string[];
+  id: string; name: string; durationMinutes: number; price: number; allergens: string[]; photoUrl?: string | null;
 }
 export interface RestaurantReferralCandidate {
   storeId: string; storeName: string; distanceKm: number; startsAt: string; endsAt: string; bookingUrl: string;
