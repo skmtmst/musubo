@@ -94,6 +94,25 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     vi.restoreAllMocks()
   })
 
+  it('未ログインの確認中とログイン画面への移動中はメニューやロゴを出さない', async () => {
+    currentPath = '/friends'
+    let finishSession!: (response: Response) => void
+    fetchSpy.mockImplementation(async (url: unknown) => String(url).includes('/api/auth/session')
+      ? new Promise<Response>((resolve) => { finishSession = resolve })
+      : sessionOk())
+    await act(async () => {
+      root.render(<AuthGuard><aside data-sidebar>メニュー</aside><div>musubo</div></AuthGuard>)
+    })
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+    expect(host.querySelector('[data-sidebar]')).toBeNull()
+    expect(host.querySelector('img')).toBeNull()
+    expect(host.textContent).not.toContain('musubo')
+    await act(async () => { finishSession(new Response(null, { status: 401 })) })
+    expect(replaceMock).toHaveBeenCalledWith('/login')
+    expect(host.querySelector('[data-sidebar]')).toBeNull()
+    expect(host.querySelector('img')).toBeNull()
+  })
+
   it('初回は /api/auth/session を確認して中身を出す', async () => {
     await render()
     await settle()
