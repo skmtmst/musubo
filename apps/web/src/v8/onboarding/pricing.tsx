@@ -302,7 +302,7 @@ function QuoteRequired() {
   return <div className={styles.quoteRequired}>
     <span className={styles.quoteBadge}>個別見積もり</span>
     <h2 id="cost-heading">料金は個別にご案内します</h2>
-    <p>連携数と使い方を確認し、御社に合う料金と利用開始の手順をお伝えします。</p>
+    <p className="text-body">連携数と使い方を確認し、御社に合う料金と利用開始の手順をお伝えします。</p>
     <div className={styles.quoteDivider} />
     <h3>お問い合わせ後の流れ</h3>
     <Steps label="お問い合わせ後の流れ" layout="guidance" steps={[

@@ -7,6 +7,7 @@
 .lineList, .invoiceList { list-style: none; padding: 0; margin: 0; }
 .lineRow, .invoiceRow { display: flex; align-items: center; justify-content: space-between; gap: var(--mp-px-16); padding: var(--mp-px-13) 0; border-bottom: 1px solid var(--mp-color-e8eeec); }
 .lineRow:last-child, .invoiceRow:last-child { border-bottom: 0; }
+.itemName { font-size: var(--mp-px-14); }
 .active { color: var(--mp-color-087c43); font-size: var(--mp-px-13); white-space: nowrap; }
 .lineActions { display: inline-flex; align-items: center; gap: var(--mp-px-12); }
 .removeLink { border: 0; background: none; color: var(--mp-color-087c43); padding: var(--mp-px-4); font: inherit; font-size: var(--mp-px-13); font-weight: 700; white-space: nowrap; cursor: pointer; }

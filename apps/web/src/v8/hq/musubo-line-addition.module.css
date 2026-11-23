@@ -6,6 +6,7 @@
 .priceRows span, .explanation { color: var(--mp-color-59687b); font-size: var(--mp-px-14); line-height: 1.7; }
 .priceRows strong { text-align: right; color: var(--mp-color-202428); }
 .due { display: flex; justify-content: space-between; align-items: baseline; gap: var(--mp-px-18); color: var(--mp-color-58667a); }
+.due > span { font-size: var(--mp-px-14); }
 .due strong { font-size: var(--mp-px-31); color: var(--mp-color-087c43); }
 .explanation { margin: 0; }
 .flow { display: grid; gap: var(--mp-px-16); padding-inline-start: var(--mp-px-25); margin: 0; line-height: 1.6; }

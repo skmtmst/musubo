@@ -60,7 +60,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
       <Card as="section" layout="vertical" padding="default" gap="normal">
         <div className={styles.cardHead}><h3>有効なLINEアカウント</h3><strong>{pricing.activeLines.length}個</strong></div>
         {pricing.activeLines.length ? <ul className={styles.lineList}>{pricing.activeLines.map((line) =>
-          <li className={styles.lineRow} key={line.id}><span>{line.name}</span><span className={styles.lineActions}>
+          <li className={styles.lineRow} key={line.id}><span className={styles.itemName}>{line.name}</span><span className={styles.lineActions}>
             <span className={styles.active}>{pricing.lineRemoval?.lineAccountId === line.id
               ? '利用終了予約中' : '利用中'}</span>
             {canManagePayment && pricing.activeLines.length === 2 && !pricing.quoteId
@@ -102,7 +102,7 @@ export default function MusuboBilling({ pricing, invoices, invoiceFailed, onRetr
       <h2 className={styles.heading}>支払い履歴</h2>
       {invoiceFailed ? <div className={styles.historyState}>支払い履歴を読み込めませんでした。<Button type="button" variant="text" onClick={onRetry}>再読み込み</Button></div>
         : invoices?.length ? <ul className={styles.invoiceList}>{invoices.map((invoice) =>
-          <li className={styles.invoiceRow} key={invoice.id}><span>{invoice.description ?? invoice.number ?? '請求'}</span>
+          <li className={styles.invoiceRow} key={invoice.id}><span className={styles.itemName}>{invoice.description ?? invoice.number ?? '請求'}</span>
             <strong>{formatYen(invoice.amountYen)}</strong>
             {invoice.hostedUrl ? <TextLink external href={invoice.hostedUrl}>明細を見る</TextLink> : null}</li>)}</ul>
           : <p className={styles.muted}>まだお支払いはありません。</p>}
