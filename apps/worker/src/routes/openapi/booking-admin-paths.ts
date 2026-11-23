@@ -1,5 +1,16 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingAdminPaths = {
+  '/api/booking/admin/requests/{id}/assignment-review': {
+    post: {
+      tags: ['Booking'], summary: '自動で決まった担当を確認する',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['lock_version'], properties: { lock_version: { type: 'integer', minimum: 0 } } } } } },
+      responses: { '200': { description: '確認を記録' }, '400': { description: '入力不正' }, '403': { description: '編集権限なし' }, '409': { description: '予約が変更された、または確認対象外' } },
+    },
+  },
   // ── Booking detail edit / retry / audit  ─────────────
   '/api/booking/admin/bookings.csv': {
     get: {

@@ -197,6 +197,10 @@ export interface StaffMenuMatrix {
 
 export interface BookingRequest {
   id: string;
+  assignment_method: 'unknown' | 'designated' | 'automatic' | 'manual';
+  /** 自動で決まった担当者を店員が確認した時刻。 */
+  assignment_reviewed_at: string | null;
+  lock_version: number;
   friend_id: string | null;
   booking_customer_id: string | null;
   starts_at: string;

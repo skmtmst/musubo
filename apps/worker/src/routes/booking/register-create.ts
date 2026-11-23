@@ -206,7 +206,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   }
 
   // staff が同じ account に属することを保証（別 tenant の staff への予約を防ぐ）。
-  if (await needsAutoAssignment(c,accountId,body.staff_id)) {
+  const automaticallyAssigned = await needsAutoAssignment(c,accountId,body.staff_id);
+  if (automaticallyAssigned) {
     const assigned = await autoAssignBookingStaff(c,accountId,body.menu_id,body.starts_at,false);
     if (!assigned) return c.json({ error: 'auto_assignment_unavailable' }, 409);
     body.staff_id = assigned;
@@ -215,6 +216,9 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   if (!(await assertStaffInAccount(c.env.DB, body.staff_id, accountId))) {
     return c.json({ error: 'staff_not_found' }, 404);
   }
+
+  const assignmentStaff = await c.env.DB.prepare('SELECT is_designation_optional FROM staff WHERE id=? AND line_account_id=?').bind(body.staff_id,accountId).first<{is_designation_optional:number}>();
+  const assignmentMethod = assignmentStaff?.is_designation_optional === 1 ? 'unknown' : automaticallyAssigned ? 'automatic' : 'manual';
 
   const menuRow = await c.env.DB
     .prepare(
@@ -323,8 +327,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at,
          source, created_by_staff_id, notification_policy_snapshot,
-         menu_version_number, menu_snapshot_json)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+         menu_version_number, menu_snapshot_json, assignment_method)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -369,6 +373,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       notificationPolicy,
       menuSnapshot.version,
       menuSnapshot.json,
+      assignmentMethod,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),

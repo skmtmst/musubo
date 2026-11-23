@@ -487,6 +487,12 @@
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
 
+- [予約受付での担当確認と要対応](release-log/unreleased/139-kenta-c25-assign.md) — 反映履歴、確認 2026-11-20。
+
+- [手渡し景品と予約受付管理の画面](release-log/unreleased/134-kenta-c25-screens.md) — 反映履歴、確認 2026-11-20。
+
+- [手渡し景品の交換と取消](release-log/unreleased/128-kenta-c25-handgift.md) — 反映履歴、確認 2026-11-20。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [新しいLINEアカウントのLIFF自動作成](release-log/unreleased/153-masato-liff-auto-create.md) — 反映履歴、確認 2026-11-22。

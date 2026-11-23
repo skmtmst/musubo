@@ -1,5 +1,7 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {formRouting} from './form-routing.js';
+import booking from './booking.js';
+import {useSqliteClock} from '../test-utils/sqlite-clock.js';
 import {forms} from './forms.js';
 import {loadRoutingLayout,validateLayoutRouting,resolveRouting,issueRoutingToken,verifyRoutingToken} from '../features/forms/form-routing.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
@@ -28,6 +30,17 @@ test('B6-10: 署名・本人・店・期限・指定担当を守り改ざんを�
  const token=await issueRoutingToken(d.db,{account:'a',friend:'f',formId:'form',versionId:version,blockId:'book',target,matchedIndex:0,exp:Date.now()+60000});
  await expect(verifyRoutingToken(d.db,'a','f',token,'menu','bs')).resolves.toMatchObject({matchedIndex:0});
  for(const [a,f,t,m,s] of [['a','f2',token,'menu','bs'],['b','f',token,'menu','bs'],['a','f',token+'x','menu','bs'],['a','f',token,'other','bs'],['a','f',token,'menu','bs2']])await expect(verifyRoutingToken(d.db,a,f,t,m,s)).rejects.toThrow('routing_token_invalid');
+});
+test.each(['fixed','group'])('振り分け（%s）の予約は自動割当として記録する',async kind=>{
+ useSqliteClock(d.raw,()=>new Date());
+ d.raw.exec("UPDATE booking_settings SET approval_mode='automatic',cutoff_minutes_before=0; INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES('shift','bs','2026-11-20','09:00','18:00'); INSERT INTO booking_routing_staff_groups(id,line_account_id,name,staff_ids_json) VALUES('group','a','担当','[\"bs\"]')");
+ const {publishFormVersion}=await import('@line-crm/db');await publishFormVersion(d.db,'form',1);
+ const version=(d.raw.prepare("SELECT current_published_version_id id FROM forms WHERE id='form'").get() as any).id;
+ const destination=kind==='fixed'?{menuId:'menu',staffId:'bs'}:{menuId:'menu',staffGroupId:'group'};
+ const token=await issueRoutingToken(d.db,{account:'a',friend:'f',formId:'form',versionId:version,blockId:'book',target:destination,matchedIndex:0,exp:Date.now()+60000});
+ const a=gapApp(d,[booking]);const result=await a.request('/api/liff/booking/requests?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':`routing-${kind}`},body:JSON.stringify({menu_id:'menu',starts_at:'2026-11-20T05:00:00Z',routingToken:token})},undefined,{waitUntil:()=>{},passThroughOnException:()=>{}} as any);
+ expect(result.status,await result.clone().text()).toBe(201);
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings').get()).toEqual({assignment_method:'automatic'});
 });
 test('B6-06: 公開の版を読んで下書きの変更を混ぜない',async()=>{
  const {publishFormVersion}=await import('@line-crm/db');await publishFormVersion(d.db,'form',1);const l=layout();(l.sections[0].blocks[1] as any).booking.routing.rules=[];d.raw.prepare("UPDATE forms SET layout=? WHERE id='form'").run(JSON.stringify(l));

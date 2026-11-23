@@ -536,7 +536,7 @@ export async function getMileageFriendsV6(
 
 export async function getMileageRewardReachMetrics(db: D1Database, lineAccountId: string) {
   const rows = await db.prepare(
-    `SELECT r.id, r.name, r.reward_kind, v.required_miles,
+    `SELECT r.id, r.name, CASE WHEN EXISTS (SELECT 1 FROM mileage_handgift_rewards h WHERE h.reward_id = r.id) THEN 'handgift' ELSE r.reward_kind END AS reward_kind, v.required_miles,
             COUNT(DISTINCT CASE WHEN w.available >= v.required_miles THEN w.beneficiary_key END) AS reachable_count,
             COUNT(DISTINCT CASE WHEN mr.status = 'succeeded' THEN mr.beneficiary_key END) AS redeemed_friend_count
        FROM mileage_rewards r

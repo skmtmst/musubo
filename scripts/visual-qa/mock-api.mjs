@@ -27,6 +27,7 @@ import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
+import { respondBookingRequests } from './booking-reception-mock.mjs'
 import { paymentGet, paymentWrite } from './payment-fixtures.mjs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -6734,25 +6735,7 @@ const server = createServer((req, res) => {
   }
 
   if (method === 'GET' && url.pathname === '/api/booking/admin/requests') {
-    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)))
-    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
-    const status = url.searchParams.get('status') || 'requested'
-    const query = url.searchParams.get('query') || ''
-    const menuName = url.searchParams.get('menu_name')
-    const from = url.searchParams.get('from')
-    const to = url.searchParams.get('to')
-    const pool = from && from.startsWith('2026-09-30T15') ? [...BOOKING_REQUESTS, ...BOOKING_TODAY_REQUESTS] : BOOKING_REQUESTS
-    const filtered = pool.filter((item) =>
-      (status === 'all' || item.status === status)
-      && (!query || (item.friend_name || '').includes(query))
-      && (!menuName || item.menu_name === menuName)
-      && (!from || item.starts_at >= from)
-      && (!to || item.starts_at < to),
-    )
-    res.writeHead(200).end(JSON.stringify({
-      requests: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset,
-    }))
-    return
+    return respondBookingRequests(req, res, url, BOOKING_REQUESTS, BOOKING_TODAY_REQUESTS)
   }
 
   if (method === 'GET' && url.pathname === '/api/conversions/export') {

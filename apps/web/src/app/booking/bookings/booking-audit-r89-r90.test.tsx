@@ -44,7 +44,10 @@ vi.mock('@/lib/api', async () => ({
   },
   bookingApi: {
     ...(await import('@/test-utils/booking-visit-api-mock')).bookingVisitApiMock(),
-    listRequests: fixture.listRequests,
+    // 受付は独立した集計 API。台帳とカレンダーの取得回数には含めない。
+    listRequests: (account: string, status: string, params?: Record<string, unknown>) => params?.reception
+      ? Promise.resolve({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 0 })
+      : fixture.listRequests(account, status, params),
     requestsSummary: fixture.requestsSummary,
     listMenus: fixture.listMenus,
     listStaff: fixture.listStaff,
@@ -244,7 +247,7 @@ describe('監査 R89: 状態変更の後は集計・カレンダーも更新す�
    it('WEB296：期間の取得失敗から再試行したら、その期間を読み直す', async () => {
      let rangeCalls = 0
      fixture.listRequests.mockImplementation(async (_a: string, _s: string, params: Record<string, unknown>) => {
-       if (params?.from && ++rangeCalls === 1) throw new Error('network')
+       if (_s === 'all' && params?.from && ++rangeCalls === 1) throw new Error('network')
        return { requests: [], total: 0 }
      })
      render(<BookingsPage />)

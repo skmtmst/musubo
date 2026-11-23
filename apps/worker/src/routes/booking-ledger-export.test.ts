@@ -84,6 +84,7 @@ type StaffLike = {
   readOnly: boolean;
   permissionKeys?: string[];
   viewPermissionKeys?: string[];
+  hqRole?: 'operator' | 'viewer';
 };
 
 function makeApp(db: D1Database, staff: StaffLike = { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false }) {
@@ -206,6 +207,75 @@ describe('GET /api/booking/admin/requests の担当者・種別絞り込み (N-3
     );
     const bySourceBody = await bySource.json() as { requests: Array<{ id: string }> };
     expect(bySourceBody.requests.map((r) => r.id)).toEqual(['B2']);
+  });
+
+  test('受付は自動割当の未確認と承認待ちを重複なく数え、確認後は未確認から外す', async () => {
+    insertBooking(sqlite, { id: 'auto', friend: 'f1', status: 'confirmed' });
+    insertBooking(sqlite, { id: 'both', friend: 'f1', status: 'requested' });
+    insertBooking(sqlite, { id: 'old', friend: 'f1', status: 'confirmed' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id IN ('auto','both')");
+    const { app, env } = makeApp(db);
+    const url = '/api/booking/admin/requests?account_id=acc1&reception=attention';
+    const response = await app.request(url, {}, env);
+    const body = await response.json() as { total: number; requestedCount: number; unassignedCount: number; attentionCount: number; requests: Array<{ id: string }> };
+    expect(response.status).toBe(200);
+    expect([body.total, body.requestedCount, body.unassignedCount, body.attentionCount]).toEqual([2, 1, 2, 2]);
+    const reviewed = await app.request('/api/booking/admin/requests/auto/assignment-review?account_id=acc1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lock_version: 0 }) }, env);
+    expect(reviewed.status).toBe(200);
+    expect((await app.request('/api/booking/admin/requests/auto/assignment-review?account_id=acc1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lock_version: 0 }) }, env)).status).toBe(409);
+    const after = await (await app.request(url, {}, env)).json() as { total: number; unassignedCount: number };
+    expect([after.total, after.unassignedCount]).toEqual([1, 1]);
+  });
+
+  test('受付は記録前・確認済・取消・期間前を未割り当てに数えず、権限と版を確認する', async () => {
+    for (const id of ['auto', 'unknown', 'designated', 'manual', 'reviewed', 'cancelled', 'past']) insertBooking(sqlite, { id, friend: 'f1', status: id === 'cancelled' ? 'cancelled' : 'confirmed', startsAt: id === 'past' ? '2026-09-01T02:00:00.000Z' : undefined });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id IN ('auto','reviewed','cancelled','past'); UPDATE bookings SET assignment_method='designated' WHERE id='designated'; UPDATE bookings SET assignment_method='manual' WHERE id='manual'; UPDATE bookings SET assignment_reviewed_at='2026-10-01' WHERE id='reviewed'");
+    const { app, env } = makeApp(db);
+    const path = '/api/booking/admin/requests?account_id=acc1&reception=unassigned&from=2026-10-01T00%3A00%3A00.000Z';
+    const data = await (await app.request(path, {}, env)).json() as { requests: Array<{id:string}>; total:number; unassignedCount:number; unknownCount:number };
+    expect(data.requests.map(r => r.id)).toEqual(['auto']); expect(data.unassignedCount).toBe(1); expect(data.unknownCount).toBe(1);
+    const request = (id: string, version: number) => app.request(`/api/booking/admin/requests/${id}/assignment-review?account_id=acc1`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({lock_version: version}) }, env);
+    for (const id of ['unknown','designated','manual','reviewed','cancelled']) expect((await request(id,0)).status).toBe(409);
+    expect((await request('auto', 1)).status).toBe(409);
+    expect((await request('auto', 0)).status).toBe(200);
+    expect(sqlite.prepare("SELECT lock_version FROM bookings WHERE id='auto'").get()).toEqual({lock_version:1});
+    const viewer = makeApp(db, { id:'s1', name:'Viewer', role:'staff', readOnly:false, viewPermissionKeys:['/booking/bookings'] });
+    expect((await viewer.app.request('/api/booking/admin/requests/past/assignment-review?account_id=acc1', { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lock_version:0}) },viewer.env)).status).toBe(403);
+  });
+
+  test('記録前の予約は未割り当てに数えず、承認待ちなら要対応に残す', async () => {
+    insertBooking(sqlite, { id: 'old-confirmed', friend: 'f1', status: 'confirmed' });
+    insertBooking(sqlite, { id: 'old-requested', friend: 'f1', status: 'requested' });
+    insertBooking(sqlite, { id: 'new-auto', friend: 'f1', status: 'confirmed' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='new-auto'");
+    const { app, env } = makeApp(db);
+    const base = '/api/booking/admin/requests?account_id=acc1&from=2026-10-01T00%3A00%3A00.000Z&reception=';
+    const unassigned = await (await app.request(`${base}unassigned`, {}, env)).json() as { requests: Array<{id:string}>; unknownCount:number; unassignedCount:number; requestedCount:number; attentionCount:number };
+    expect(unassigned.requests.map(item => item.id)).toEqual(['new-auto']);
+    expect([unassigned.unknownCount, unassigned.unassignedCount, unassigned.requestedCount, unassigned.attentionCount]).toEqual([2, 1, 1, 2]);
+    const attention = await (await app.request(`${base}attention`, {}, env)).json() as { requests: Array<{id:string}> };
+    expect(new Set(attention.requests.map(item => item.id))).toEqual(new Set(['new-auto', 'old-requested']));
+  });
+
+  test('担当確認は他店舗の予約や閲覧専用の操作を拒否する', async () => {
+    insertBooking(sqlite, { id:'other', account:'acc2', friend:'f9', staff:'s9', menu:'m9' });
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='other'");
+    const request = { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lock_version:0}) };
+    const owner = makeApp(db);
+    expect((await owner.app.request('/api/booking/admin/requests/other/assignment-review?account_id=acc1', request, owner.env)).status).toBe(409);
+    expect(sqlite.prepare("SELECT assignment_reviewed_at,lock_version FROM bookings WHERE id='other'").get()).toEqual({assignment_reviewed_at:null,lock_version:0});
+  });
+
+  test('統括の運用担当は確認でき、閲覧担当は確認できない', async () => {
+    insertBooking(sqlite, {id:'hq',friend:'f1'});
+    sqlite.exec("UPDATE bookings SET assignment_method='automatic' WHERE id='hq'");
+    const request = {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lock_version:0})};
+    const viewer=makeApp(db,{id:'hq-view',name:'Viewer',role:'staff',readOnly:false,hqRole:'viewer'});
+    const path='/api/booking/admin/requests/hq/assignment-review?account_id=acc1';
+    expect((await viewer.app.request(path,request,viewer.env)).status).toBe(403);
+    const operator=makeApp(db,{id:'hq-operator',name:'Operator',role:'staff',readOnly:false,hqRole:'operator'});
+    expect((await operator.app.request(path,request,operator.env)).status).toBe(200);
+    expect(sqlite.prepare("SELECT lock_version FROM bookings WHERE id='hq'").get()).toEqual({lock_version:1});
   });
 
   test('CHECK外の種別値は条件にしない（0件化で誤解させない）', async () => {

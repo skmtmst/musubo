@@ -92,6 +92,23 @@ describe('tenant data retention purge', () => {
     return (row as { n: number }).n;
   }
 
+  test('手渡し景品と受渡し履歴を保護しつつ退会時に消す', async () => {
+    seedTenant('handgift', { anchor: jst(-91) });
+    sqlite.raw.exec(`INSERT OR IGNORE INTO mileage_programs (id,code,name,created_at,updated_at) VALUES ('default','default','マイル','x','x');
+      INSERT INTO mileage_rewards(id,line_account_id,name,reward_kind) VALUES('reward-h','acc-handgift','景品','tag');
+      INSERT INTO mileage_reward_versions(id,reward_id,version_number,required_miles,status) VALUES('version-h','reward-h',1,10,'published');
+      INSERT INTO mileage_redemptions(id,line_account_id,program_id,beneficiary_key,reward_id,reward_version_id,idempotency_key,request_fingerprint) VALUES('redemption-h','acc-handgift','default','friend:example','reward-h','version-h','request-h','fingerprint');
+      INSERT INTO mileage_handgift_rewards(reward_id) VALUES('reward-h');
+      INSERT INTO mileage_handgifts(redemption_id,reward_id,delivered_at,delivered_by) VALUES('redemption-h','reward-h','now','staff');`);
+    expect(() => sqlite.raw.prepare("DELETE FROM mileage_handgifts WHERE redemption_id='redemption-h'").run()).toThrow();
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.failedTenants).toBe(0);
+    expect(result.completed).toBe(1);
+    expect(count('mileage_handgifts', 'redemption_id = ?', 'redemption-h')).toBe(0);
+    expect(count('mileage_handgift_rewards', 'reward_id = ?', 'reward-h')).toBe(0);
+    expect(count('tenant_purge_guard', '1 = 1')).toBe(0);
+  });
+
   test('契約終了の統括は保護されたテンプレートも消し、許可を残さない', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('h1', 't1', 'tag', 'test')").run();

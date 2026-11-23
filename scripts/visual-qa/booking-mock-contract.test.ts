@@ -51,6 +51,25 @@ describe('予約の空き枠：偽 API と Worker の応答契約', () => {
     return response.json()
   }
 
+  it('予約受付の集計は絞り込み前の件数と絞り込み後の一覧を返す', async () => {
+    const read = async (query: string) => {
+      const response = await fetch(`${baseUrl}/api/booking/admin/requests?${query}`)
+      expect(response.status).toBe(200)
+      return response.json() as Promise<{ requests: Array<{ id: string; status: string }>; total: number; requestedCount: number; unassignedCount: number; attentionCount: number; unknownCount: number }>
+    }
+    const all = await read('reception=all&limit=100')
+    expect(all).toMatchObject({ total: 7, requestedCount: 1, unassignedCount: 0, attentionCount: 1, unknownCount: 7 })
+    expect(all.requests[0]).toMatchObject({ id: 'bk-6', status: 'requested' })
+    const requested = await read('reception=requested&limit=100')
+    expect(requested).toMatchObject({ total: 1, requestedCount: 1, unassignedCount: 0, attentionCount: 1, unknownCount: 7 })
+    expect(requested.requests.map(row => row.id)).toEqual(['bk-6'])
+    expect(await read('reception=unassigned')).toMatchObject({ requests: [], total: 0, unknownCount: 7 })
+    expect(await read('reception=attention')).toMatchObject({ total: 1, requestedCount: 1, unknownCount: 7 })
+    expect(await read('reception=all&from=2026-09-30T15%3A00%3A00.000Z')).toMatchObject({ total: 8, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 8 })
+    expect(await read('reception=all&from=2030-01-01T00%3A00%3A00.000Z')).toMatchObject({ requests: [], total: 0, requestedCount: 0, unassignedCount: 0, attentionCount: 0, unknownCount: 0 })
+    expect((await fetch(`${baseUrl}/api/booking/admin/requests?reception=invalid`)).status).toBe(400)
+  })
+
   it('イベント予約の全件を重複なく有限ページで返し、最終頁の次は空になる', async () => {
     const read = async (page: number) => {
       const response = await fetch(`${baseUrl}/api/events/admin/events/ev-1/bookings?page=${page}&limit=2`)

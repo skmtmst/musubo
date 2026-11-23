@@ -18,11 +18,11 @@ export const BOOKING_LEDGER_JOINS = `FROM bookings b
     LEFT JOIN friends f ON f.id = b.friend_id
     LEFT JOIN booking_customers bc ON bc.id = b.booking_customer_id`;
 
-export function bookingLedgerFilter(c: Context<Env>, accountId: string): { where: string; values: unknown[] } {
+export function bookingLedgerFilter(c: Context<Env>, accountId: string, ignoreStatus = false): { where: string; values: unknown[] } {
   const status = c.req.query('status') || 'requested';
   const conditions = ['b.line_account_id = ?'];
   const values: unknown[] = [accountId];
-  if (status !== 'all') { conditions.push('b.status = ?'); values.push(status); }
+  if (!ignoreStatus && status !== 'all') { conditions.push('b.status = ?'); values.push(status); }
   const customerQuery = c.req.query('query')?.trim();
   if (customerQuery) {
     conditions.push("LOWER(COALESCE(f.display_name, bc.display_name, '')) LIKE ? ESCAPE '\\'");

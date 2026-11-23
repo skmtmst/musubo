@@ -2218,6 +2218,14 @@
       "parentColumn": "id"
     }
   },
+  "mileage_handgift_rewards": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "reward_id", "parent": "mileage_rewards", "parentColumn": "id" }
+  },
+  "mileage_handgifts": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "reward_id", "parent": "mileage_handgift_rewards", "parentColumn": "reward_id" }
+  },
   "mileage_ledger": {
     "category": "purge",
     "scope": {

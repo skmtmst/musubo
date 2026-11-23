@@ -14,6 +14,12 @@ test('B5-04/06/08/14: 組は別の担当に同時・二重送信でも一組・�
  expect(body.data.bookings).toHaveLength(2);expect(body.data.total).toBe(16800);expect((await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input,'group')).status).toBe(201);
  expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:2});expect((await gapCall(app(),`/api/booking/admin/bookings/${body.data.bookings[0].id}/group?account_id=a`)).status).toBe(200);expect(fetch).not.toHaveBeenCalled();
 });
+test('LINEから担当を指定した組予約は指名として記録する',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>Response.json({sub:'Uf'})));
+ const result=await app().request('/api/liff/booking/requests?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':'liff-group'},body:JSON.stringify({members:input.members,starts_at:input.starts_at,startMode:'parallel'})},undefined,{waitUntil:()=>{},passThroughOnException:()=>{}} as any);
+ expect(result.status,await result.clone().text()).toBe(201);
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY group_index').all()).toEqual([{assignment_method:'designated'},{assignment_method:'designated'}]);
+});
 test('B5-07: 2人目の競合で1人目も組も残さない',async()=>{
  d.raw.exec("CREATE TRIGGER force_group_conflict BEFORE INSERT ON bookings WHEN NEW.group_index=1 BEGIN SELECT RAISE(ABORT,'CHECK constraint failed: concurrent'); END;");
  const r=await gapCall(app(),'/api/booking/admin/groups?account_id=a','POST',input);expect(r.status).toBe(409);expect(d.raw.prepare('SELECT count(*) n FROM bookings').get()).toEqual({n:0});expect(d.raw.prepare('SELECT count(*) n FROM booking_groups').get()).toEqual({n:0});
@@ -131,6 +137,7 @@ test('B5-02: 2人分と1人目の追加メニューの料金を合算する',asy
  expect(r.status,await r.clone().text()).toBe(201);
  const data=(await r.json() as any).data;expect(data.total).toBe(12500);
  expect(data.bookings.map((b:any)=>b.price_at_booking)).toEqual([7500,5000]);
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY group_index').all()).toEqual([{assignment_method:'manual'},{assignment_method:'manual'}]);
 });
 test('B5-05: 追加15分を含む同じ担当の75分と60分を続ける',async()=>{
  seedGroupAddon();
@@ -147,6 +154,7 @@ test('B5-06: 指名なしの2人には重ならない別々の担当を割り当
  expect(r.status,await r.clone().text()).toBe(201);
  const rows=(await r.json() as any).data.bookings;
  expect(rows).toHaveLength(2);expect(new Set(rows.map((b:any)=>b.staff_id))).toEqual(new Set(['bs','bs2']));
+ expect(d.raw.prepare('SELECT assignment_method FROM bookings ORDER BY group_index').all()).toEqual([{assignment_method:'automatic'},{assignment_method:'automatic'}]);
  expect(rows.map((b:any)=>new Date(b.starts_at).toISOString())).toEqual([input.starts_at,input.starts_at]);
 });
 test('B5-08: 同じキーでの組予約再送は同じ組と2人を返す',async()=>{
