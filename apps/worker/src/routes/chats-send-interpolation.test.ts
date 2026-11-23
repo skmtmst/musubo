@@ -297,6 +297,21 @@ describe('手動送信の差し込み(N-026)', () => {
     } });
   });
 
+  test('共通情報のプレビューは友だちのアカウントだけを使う', async () => {
+    sqlite.raw.exec(`
+      INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,is_active,tenant_id)
+        VALUES('acc-2','channel-acc-2','別のアカウント','token','secret',1,'tenant-1');
+      INSERT INTO friends(id,line_user_id,display_name,line_account_id)
+        VALUES('fr-2','U-3','利用者2','acc-2');
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value)
+        VALUES('cv-hours-2','acc-2','営業時間','hours','別の営業時間');
+    `);
+    const first = await postPreview({ content: '{{var.hours}}' }, 'fr-1');
+    const second = await postPreview({ content: '{{var.hours}}' }, 'fr-2');
+    expect(await first.json()).toMatchObject({ data: { content: '9-18時', unresolved: [] } });
+    expect(await second.json()).toMatchObject({ data: { content: '別の営業時間', unresolved: [] } });
+  });
+
   test('差し込みの無い本文はプレビューでそのまま返る', async () => {
     const res = await postPreview({ content: 'そのままの文' });
     expect(res.status).toBe(200);
