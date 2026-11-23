@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { BOOKING_MENUS_KEY } from '@line-crm/shared';
 import { processHqDistributionJobs } from '../services/hq-templates/distribution-jobs.js';
 import { readCatalogTarget } from '../services/hq-templates/catalog-target.js';
 import { catalogDefinitions, createCatalogFixture, type CatalogFixture, type RedistributionJobView } from '../test-utils/hq-catalog-fixture.js';
@@ -187,6 +188,23 @@ describe('対応表のある店への配り直し', () => {
     expect(status.body.data).toEqual({ bound: false, detached: 'template_archived' });
     expect((await storeMenu(String(b.id), 'hq-adopt', v2, 'b')).body.error).toBe('hq_template_unavailable');
     expect(fx.f.raw.prepare('SELECT duration_minutes,base_price,hq_template_id FROM menus WHERE id=?').get(b.id)).toEqual({ duration_minutes: 80, base_price: 3000, hq_template_id: null });
+  });
+
+  test('店のスタッフは予約メニューを編集できる権限があれば取り込め、見るだけの権限では取り込めない', async () => {
+    const id = await distributed(['b']);
+    const b = menuOf('b');
+    fx.f.raw.prepare('UPDATE menus SET duration_minutes=80 WHERE id=?').run(b.id);
+    const v2 = await fx.save(id, menu({ base_price: 9000 }));
+    expect((await fx.redistribute(id, [(await fx.check(id, ['b'])).preflightId])).status).toBe(201);
+    await processHqDistributionJobs(fx.f.db);
+    fx.setStaff({ role: 'staff', permissionKeys: [], viewPermissionKeys: [BOOKING_MENUS_KEY] });
+    expect((await storeMenu(String(b.id), 'hq-adopt', v2, 'b')).status).toBe(403);
+    expect((await storeMenu(String(b.id), 'hq-dismiss', v2, 'b')).status).toBe(403);
+    expect(fx.binding(id, 'b')!.pending_version_id).toBe(v2);
+    fx.setStaff({ permissionKeys: [BOOKING_MENUS_KEY], viewPermissionKeys: [] });
+    const adopted = await storeMenu(String(b.id), 'hq-adopt', v2, 'b');
+    expect(adopted.status, JSON.stringify(adopted.body)).toBe(200);
+    expect(fx.f.raw.prepare('SELECT duration_minutes,base_price FROM menus WHERE id=?').get(b.id)).toEqual({ duration_minutes: 60, base_price: 9000 });
   });
 
   test('閲覧のみ・担当外の店・代理ログインの読み取りでは取り込みも今のままもできない', async () => {
