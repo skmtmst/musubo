@@ -91,6 +91,8 @@ export async function scheduled(
       {name:'inbox first response deadlines',run:async()=>{
         const {processInboxSla}=await import('../services/inbox-sla.js');
         await processInboxSla(env.DB,new Date(event.scheduledTime));
+        const {processInboxSlaPush}=await import('../services/inbox-sla-push.js');
+        await processInboxSlaPush(env.DB,env,new Date());
       }},
     ]);
     return;

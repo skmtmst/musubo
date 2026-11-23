@@ -2,6 +2,9 @@ import type { D1Database, R2Bucket, Fetcher, Ai, ImagesBinding, SendEmail, Queue
 import type { CodexMentionQueueMessage } from './services/codex-cloud-types.js';
 
 export type WorkerBindings = {
+    /** 期限通知は検証環境で明示した担当者だけに送る。 */
+    INBOX_SLA_PUSH_ENABLED?:string;
+    INBOX_SLA_PUSH_TEST_STAFF_IDS?:string;
     OPERATOR_PUSH_VAPID_PUBLIC_KEY?:string;
     OPERATOR_PUSH_VAPID_PRIVATE_KEY?:string;
     OPERATOR_PUSH_VAPID_SUBJECT?:string;

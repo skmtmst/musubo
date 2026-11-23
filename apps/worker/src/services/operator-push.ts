@@ -36,7 +36,7 @@ export async function deliverOperatorPush(db:D1Database,env:Partial<Env['Binding
 
 /** 静かな時間の後に、同じ端末・種類を1通へまとめる。本文は台帳にも残さない。 */
 export async function sweepOperatorPush(db:D1Database,env:Partial<Env['Bindings']>,now=new Date(),send?:PushSender){
- const groups=(await db.prepare("SELECT d.subscription_id,d.kind,s.staff_id,MIN(d.line_account_id) account FROM operator_push_deliveries d JOIN operator_push_subscriptions s ON s.id=d.subscription_id WHERE d.status='suppressed_quiet' AND s.revoked_at IS NULL GROUP BY d.subscription_id,d.kind LIMIT 100").all<{subscription_id:string;kind:string;staff_id:string;account:string}>()).results;
+ const groups=(await db.prepare("SELECT d.subscription_id,d.kind,s.staff_id,MIN(d.line_account_id) account FROM operator_push_deliveries d JOIN operator_push_subscriptions s ON s.id=d.subscription_id WHERE d.status='suppressed_quiet' AND d.kind!='inbox_sla' AND s.revoked_at IS NULL GROUP BY d.subscription_id,d.kind LIMIT 100").all<{subscription_id:string;kind:string;staff_id:string;account:string}>()).results;
  for(const group of groups){
   const pref=await db.prepare('SELECT quiet_start,quiet_end,kinds_json FROM operator_push_preferences WHERE staff_id=?').bind(group.staff_id).first<{quiet_start:string;quiet_end:string;kinds_json:string}>();if(pushIsQuiet(pref?.quiet_start??'22:00',pref?.quiet_end??'08:00',now))continue;
   const staff=await db.prepare('SELECT * FROM staff_members WHERE id=? AND is_active=1').bind(group.staff_id).first();if(!staff)continue;
@@ -62,7 +62,7 @@ export async function sweepOperatorPush(db:D1Database,env:Partial<Env['Bindings'
 
 /** 明示的な429/5xx応答だけを再試行し、送達不明は送り直さない。 */
 export async function retryOperatorPush(db:D1Database,env:Partial<Env['Bindings']>,now=new Date(),send?:PushSender){
- const due=(await db.prepare(`SELECT d.*,s.endpoint,s.p256dh,s.auth,s.staff_id FROM operator_push_deliveries d JOIN operator_push_subscriptions s ON s.id=d.subscription_id WHERE s.revoked_at IS NULL AND d.status='failed' AND d.attempts<4 AND d.next_attempt_at IS NOT NULL AND julianday(d.next_attempt_at)<=julianday(?) LIMIT 100`).bind(now.toISOString()).all<{id:string;subscription_id:string;kind:string;ref_id:string;line_account_id:string|null;staff_id:string;endpoint:string;p256dh:string;auth:string;attempts:number}>()).results;
+ const due=(await db.prepare(`SELECT d.*,s.endpoint,s.p256dh,s.auth,s.staff_id FROM operator_push_deliveries d JOIN operator_push_subscriptions s ON s.id=d.subscription_id WHERE s.revoked_at IS NULL AND d.kind!='inbox_sla' AND d.status='failed' AND d.attempts<4 AND d.next_attempt_at IS NOT NULL AND julianday(d.next_attempt_at)<=julianday(?) LIMIT 100`).bind(now.toISOString()).all<{id:string;subscription_id:string;kind:string;ref_id:string;line_account_id:string|null;staff_id:string;endpoint:string;p256dh:string;auth:string;attempts:number}>()).results;
  for(const row of due){
   const member=await db.prepare('SELECT * FROM staff_members WHERE id=? AND is_active=1').bind(row.staff_id).first();if(!member)continue;
   const staff=toAuthenticatedStaff(member as never);if(row.kind!=='test'&&(!row.line_account_id||!await canAccessAllLineAccounts(db,staff,[row.line_account_id])||!(['owner','admin'].includes(staff.role)||staff.permissionKeys?.includes('/chats')||staff.viewPermissionKeys?.includes('/chats'))))continue;
