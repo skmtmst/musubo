@@ -640,6 +640,8 @@
   .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnToggle { display: flex; }
   .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnAside { display: none; flex-basis: auto; inline-size: auto; }
   .detailColumns[data-detail-columns='style-dashboard'] .detailColumnAside[data-expanded] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  /* 補助欄の中身が1つ（1枚のカード・日の一覧）なら、2列の片側に寄せず横いっぱいに置く。 */
+  .detailColumns[data-detail-columns='style-dashboard'] .detailColumnAside[data-expanded] > :only-child { grid-column: 1 / -1; }
   .detailColumns[data-detail-columns='style-roster'] .detailColumnAside[data-expanded] { display: flex; }
 }
 
