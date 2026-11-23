@@ -470,7 +470,7 @@
 
 ## 反映履歴
 
-- [ログイン確認中の表示](release-log/unreleased/PR-kenta-login-polish.md) — 反映履歴。
+- [ログイン確認中の表示](release-log/unreleased/175-kenta-login-polish.md) — 反映履歴。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
