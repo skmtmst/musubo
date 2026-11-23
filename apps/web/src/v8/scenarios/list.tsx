@@ -1,4 +1,5 @@
 'use client'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 
@@ -566,6 +567,7 @@ export default function ScenariosListV8() {
       isCurrent: () => currentScope() && toggleRun.current === ticket,
       request: async () => {
         let saved = 0
+        try {
         for (const id of ids) {
           if (!currentScope()) return
           if (!canWriteHere('publish')) { toggleFailure = stoppedMessage(saved, ids.length); throw new Error(toggleFailure) }
@@ -579,6 +581,7 @@ export default function ScenariosListV8() {
             throw failure
           }
         }
+        } finally { if (saved > 0) emitGuideSignal('setup.changed') }
       },
       revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       get failureMessage() { return toggleFailure },

@@ -1,4 +1,5 @@
 'use client'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 /*
  * ★V8 飲食店向け 店舗を追加（Pencil：①利用規約への同意 ・②店舗の基本情報 ）。
@@ -215,6 +216,7 @@ export default function StoreNewV8() {
     setSaving(true)
     try {
       await restaurantTestApi.selectStore(selectedAccountId, created.id)
+      emitGuideSignal('store.selected', selectedAccountId)
       router.push('/restaurant-test/dashboard')
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)

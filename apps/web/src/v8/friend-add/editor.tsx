@@ -1,4 +1,5 @@
 'use client'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 
 import { ActionsStep,PreviewStep } from './editor-actions-preview'
 import { BasicStep,RoutesStep,sharedPrefix } from './editor-basic-routes'
@@ -489,6 +490,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         setError('有効化できませんでした。状態を読み直してから、もう一度お試しください。')
         return
       }
+      emitGuideSignal('setup.changed', selectedAccountId)
       router.replace(`/friend-add-settings/publish?id=${encodeURIComponent(activeId)}&done=1`)
     } catch (saveFailure) {
       if (loadRequestRef.current !== request) return

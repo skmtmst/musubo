@@ -13,7 +13,7 @@ import { useLayoutEffect } from 'react'
 */
 
 const GUIDE_SIGNAL_EVENT = 'lh:v8:guide-signal'
-const SETUP_SAVE_SIGNALS = new Set(['tables.form', 'hours.confirm', 'menu.save', 'reception.save', 'followup.save'])
+const SETUP_SAVE_SIGNALS = new Set(['tables.form', 'hours.confirm', 'menu.save', 'reception.save', 'followup.save', 'reception.menuPublished', 'setup.changed'])
 
 /**
  * 手順が終わった合図を出す。`anchor` は guide-script.ts の anchor と同じ名前。

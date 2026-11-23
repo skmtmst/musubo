@@ -1,4 +1,5 @@
 'use client'
+import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -258,6 +259,7 @@ export default function ScenarioCreateV8() {
       folderId: folderId || null,
     })
     if (res.success && currentScope()) {
+      emitGuideSignal('setup.changed', selectedAccountId ?? undefined)
       created.current = { scope: renderedScope, id: res.data.id }
       setCreatedId(res.data.id)
     }
