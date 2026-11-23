@@ -153,7 +153,7 @@ function seedSavedView(id: string, query: string) {
     .run(id, '長文を保存した検索', 'chats', JSON.stringify(conditions), 'reader-a', 1, 'account-a');
 }
 
-describe('#625 シナリオ一覧 GET /api/scenarios', () => {
+describe('シナリオ一覧は長すぎる検索語を安全に処理する', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
     seedScenario('sc-1', '夏のキャンペーン');
     const app = appFor(scenarios);
@@ -194,7 +194,7 @@ describe('#625 シナリオ一覧 GET /api/scenarios', () => {
   });
 });
 
-describe('#625 イベント予約一覧 GET /api/events/admin/events', () => {
+describe('イベント予約一覧は長すぎる検索語を安全に処理する', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
     seedEvent('ev-1', '夏祭り説明会');
     const res = await appFor(events).request(
@@ -221,7 +221,7 @@ describe('#625 イベント予約一覧 GET /api/events/admin/events', () => {
   });
 });
 
-describe('#625 受信箱 GET /api/chats', () => {
+describe('受信箱は長すぎる検索語を安全に処理する', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
     seedLineThread('friend-1', { name: '見本' });
     const res = await appFor(chats).request(
@@ -258,7 +258,7 @@ describe('#625 受信箱 GET /api/chats', () => {
   });
 });
 
-describe('#625 受信箱タブ件数 GET /api/chats/quick-counts', () => {
+describe('受信箱のタブ件数は長すぎる検索語を安全に処理する', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
     seedLineThread('friend-1', { name: '見本' });
     seedEmailThread('mail-1', { name: '見本' });
@@ -297,7 +297,7 @@ describe('#625 受信箱タブ件数 GET /api/chats/quick-counts', () => {
   });
 });
 
-describe('#625 受信箱メール一覧 GET /api/support/inbox', () => {
+describe('受信箱のメール一覧は長すぎる検索語を安全に処理する', () => {
   test('2000文字の検索語でも500にならず0件で返り、SQLにLIKEを使わない', async () => {
     seedEmailThread('mail-1', { subject: '定期便の解約について' });
     const res = await appFor(supportInbox).request(
@@ -312,7 +312,7 @@ describe('#625 受信箱メール一覧 GET /api/support/inbox', () => {
   });
 });
 
-describe('#625 受信箱の保存検索 GET /api/inbox/saved-views', () => {
+describe('受信箱の保存検索は長い検索語でも一覧を返す', () => {
   test('長い検索語を保存した条件でも一覧全体が500にならない', async () => {
     // 保存条件の検索語は200字で切り詰められる。それでも48バイトは超える。
     seedSavedView('sv-1', 'x'.repeat(150));
@@ -332,7 +332,7 @@ describe('#625 受信箱の保存検索 GET /api/inbox/saved-views', () => {
   });
 });
 
-describe('#625 未対応一覧 computeUnansweredInbox', () => {
+describe('未対応一覧は長すぎる検索語を安全に処理する', () => {
   test('2000文字の検索語でも例外を投げず0件を返し、通常検索は当たる', async () => {
     seedLineThread('friend-1', { name: '見本', content: '導入相談' });
 

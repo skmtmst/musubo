@@ -29,7 +29,7 @@ async function sendCombinedOperation(): Promise<Operation> {
   return operation as Operation;
 }
 
-describe('結合送信の公開契約(N-022)', () => {
+describe('画像と本文の結合送信の入力と応答を公開仕様に載せる', () => {
   test('path引数idと本文（画像・本文・版）を受け付ける', async () => {
     const operation = await sendCombinedOperation();
     expect(operation.parameters).toContainEqual(

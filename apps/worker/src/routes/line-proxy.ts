@@ -478,8 +478,8 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     }
 
     // Proxy 経由の自動送信と、人間が行う個別返信を区別する。未指定は従来どおり
-    // external。manual は 1:1 push だけに限定し、一斉配信で未対応をまとめて消す
-    // 事故を防ぐ。独自ヘッダーは上流 LINE API には転送しない。
+    // external。manual は 1:1 push だけに限定し、一斉配信で未対応がまとめて
+    // 消えないようにする。独自ヘッダーは上流 LINE API には転送しない。
     const requestedSource = c.req.header('X-Line-Harness-Source');
     let logSource: ProxyLogSource = 'external';
     if (isMessageSend && requestedSource) {

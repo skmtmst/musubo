@@ -139,7 +139,7 @@ beforeEach(() => {
   seed();
 });
 
-describe('PATCH 承認の版契約(N-208)', () => {
+describe('成果の承認は期待する状態と版が一致するときに更新する', () => {
   test('版列の有無に応じて一覧・承認・確認付き取消を処理する', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     sqlite.raw.exec('ALTER TABLE conversion_events DROP COLUMN approval_revision');
@@ -277,7 +277,7 @@ describe('PATCH 承認の版契約(N-208)', () => {
   });
 });
 
-describe('PATCH 承認の権限(N-209)', () => {
+describe('成果の承認は権限とアカウントの範囲を確認する', () => {
   test('承認keyありstaffは通る', async () => {
     seedEvent('ev-1', 'cp-1', null);
     const res = await patch('ev-1', { status: 'approved', expectedStatus: 'pending' }, keyStaff);
@@ -312,7 +312,7 @@ describe('PATCH 承認の権限(N-209)', () => {
   });
 });
 
-describe('POST 一括承認の結果区分(N-213)', () => {
+describe('成果の一括承認は成功・競合・拒否・失敗を区別する', () => {
   test('成功・競合・拒否・失敗を分けて返し、途中失敗を全成功としない', async () => {
     seedEvent('ev-ok', 'cp-1', null);
     seedEvent('ev-taken', 'cp-1', 'approved');

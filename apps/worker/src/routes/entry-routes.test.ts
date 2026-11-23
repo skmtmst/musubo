@@ -94,7 +94,7 @@ function deleteRoute(id: string, confirmationName?: string) {
 }
 
 describe('POST /api/entry-routes', () => {
-  // R39: 作成は選択中アカウントの所属が必須。可視範囲の解決は
+  // 作成は選択中アカウントの所属が必須。可視範囲の解決は
   // getLineAccountScopeEntries のモックで acc-1 を見える状態にする。
   beforeEach(() => {
     mocks.getLineAccountScopeEntries.mockResolvedValue([

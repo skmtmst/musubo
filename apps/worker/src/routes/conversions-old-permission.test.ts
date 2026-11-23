@@ -103,7 +103,7 @@ beforeEach(() => {
   dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue(null);
 });
 
-describe('旧口3つの /conversions 権限 (#513 M1)', () => {
+describe('成果地点・成果・承認の一覧は閲覧権限を確認する', () => {
   it.each([
     ['/api/conversions/points'],
     ['/api/conversions/events'],
@@ -130,7 +130,7 @@ describe('旧口3つの /conversions 権限 (#513 M1)', () => {
   });
 });
 
-describe('承認 PATCH の監査は成功後だけ (#513 M7)', () => {
+describe('成果の承認は保存が成功したときだけ監査を残す', () => {
   it('入力不備の 400 では監査を残さない', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     try {

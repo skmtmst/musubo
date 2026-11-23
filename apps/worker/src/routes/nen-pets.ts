@@ -92,7 +92,7 @@ function petView(row: PetRow, products: FeedingProductRow[], today: Date, treatL
     neutered: row.neutered, activity_level: row.activity_level, feeding_product_id: row.feeding_product_id,
   }, products, today, treatLimitPercent);
   const product = pickProduct(products, row.feeding_product_id);
-  // 監査 R57: 「体重の更新」はプロフィール全体の更新日ではなく、体重を測った・
+  // 「体重の更新」はプロフィール全体の更新日ではなく、体重を測った・
   // 直した日だけを見る。日記や編集で体重が入った瞬間に weight_updated_at が立ち、
   // 名前だけの編集では動かない。未登録（NULL）の行だけ従来どおり updated_at。
   const weightRefreshed = row.weight_updated_at ?? row.updated_at;
@@ -150,8 +150,7 @@ nenPets.get('/api/nen/pets', async (c) => {
   const weight = c.req.query('weight') ?? '';
   const sort = c.req.query('sort') ?? 'updated_desc';
 
-  // 検索・絞り込み・件数・ページ分割はすべてSQL側で行う。かつて先頭3,000頭だけを
-  // 読んでからJSで絞っていたため、3,001頭以降は検索にも全件出力にも出なかった（監査 R60）。
+  // JSで絞ると読み込み上限より後ろが漏れるため、検索・絞り込み・件数・ページ分割はすべてSQL側で行う。
   const where: string[] = ['f.line_account_id = ?'];
   const binds: Array<string | number | null> = [accountId];
   if (q) {

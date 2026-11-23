@@ -388,7 +388,7 @@ describe('一部失敗からの再実行（FRIEND-34）', () => {
   });
 });
 
-describe('R114 書き出す項目の選択', () => {
+describe('友だちの書き出しは対応する項目だけを選べる', () => {
   it('未対応の項目は作らせず理由を返す', async () => {
     for (const columns of [['basic', 'tags_fields'], ['support'], ['basic', 'tags_fields', 'support']]) {
       const response = await appFor().fetch(post('/api/friends/exports', {

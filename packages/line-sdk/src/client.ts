@@ -166,7 +166,7 @@ export class LineClient {
     return {
       data,
       // Retry-Keyの409は、最初に受理した要求IDを別ヘッダーで返す。
-      // R343: 突き合わせに使うのは元の受理結果のため、accepted を優先する。
+      // 突き合わせに使うのは元の受理結果のため、accepted を優先する。
       requestId: headers.get('x-line-accepted-request-id') ?? headers.get('x-line-request-id'),
     };
   }
