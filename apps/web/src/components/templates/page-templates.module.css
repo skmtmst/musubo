@@ -723,3 +723,9 @@
 @media (min-width: 1024px) {
   :global(:root) .inboxSummaryPane:not([data-wide]) { top: 184px; bottom: 240px; height: auto; }
 }
+
+:global(:root) .inboxBack { flex: none; padding: var(--space-8) var(--space-16); }
+:global(:root) .inbox[data-inbox-narrow="list"] .inboxList { display: flex; width: 100%; border-right: 0; }
+:global(:root) .inbox[data-inbox-narrow="list"] .conversation,
+:global(:root) .inbox[data-inbox-narrow="list"] .inboxSummaryPane { display: none; }
+:global(:root) .inbox[data-inbox-narrow="detail"] .inboxList { display: none; }
