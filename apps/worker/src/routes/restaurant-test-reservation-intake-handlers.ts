@@ -1,3 +1,5 @@
+import { restaurantReservationAllergyLabels } from '@line-crm/shared';
+import { validateReservationAllergies, reservationAllergyProjection } from '../services/restaurant-reservation-allergies.js';
 import { phoneIntakeFailure } from '../services/restaurant-phone-intake.js';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
@@ -109,6 +111,9 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
   }
   const storeId = typeof body.storeId === 'string' ? body.storeId : '';
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
+  if (body.allergies !== undefined && body.allergyNote !== undefined) return inputError(c, { success:false, error:'アレルギーの指定が重複しています' }, 400, ['allergies']);
+  const allergyResult = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, body.allergies);
+  if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   const checked = validateInboundReservation({ ...body, externalId: `manual-${crypto.randomUUID()}` });
   if (!checked.ok) return inputError(c, { success: false, error: checked.error, field: checked.field }, 400, []);
   if (body.source === 'phone') {
@@ -144,11 +149,12 @@ export const post__api_restaurant_test_reservations_manual_3 = async (c: Context
     }
     const id = crypto.randomUUID();
     await capacity.commit([dbFor(c.env, storeId).prepare(`INSERT INTO rt_reservations
-      (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note${allergyResult?.ok ? ', allergies_json' : ''})
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${allergyResult?.ok ? ', ?' : ''})`).bind(
         id, storeId, body.source === 'phone' ? 'phone' : 'manual', checked.value.externalId, checked.value.customerName, checked.value.customerPhone,
         checked.value.lineUid, checked.value.guestCount, checked.value.startsAt, checked.value.endsAt,
-        tableId, checked.value.courseId, checked.value.status, checked.value.allergyNote, checked.value.note,
+        tableId, checked.value.courseId, checked.value.status, allergyResult?.ok ? restaurantReservationAllergyLabels(allergyResult.values).join('、') || null : checked.value.allergyNote, checked.value.note,
+        ...(allergyResult?.ok ? [JSON.stringify(allergyResult.values)] : []),
       )]);
     if (reservationSlotActive(checked.value.status)) {
       await adjustInventoryReservedCount(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.guestCount);
@@ -183,6 +189,9 @@ export const post__api_restaurant_test_reservations_walk_in_4 = async (c: Contex
   for (const key of ['customerName', 'customerPhone', 'lineUid']) {
     if (body[key] !== undefined && (typeof body[key] !== 'string' || String(body[key]).length > 200)) return inputError(c, { success: false, error: '連絡先の形式を確認してください' }, 400, [key]);
   }
+  if (body.allergies !== undefined && body.allergyNote !== undefined) return inputError(c, { success:false, error:'アレルギーの指定が重複しています' }, 400, ['allergies']);
+  const allergyResult = body.allergies === undefined ? null : await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, body.allergies);
+  if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
   const startsAt = new Date().toISOString();
   const checked = validateInboundReservation({ ...body, customerName: body.customerName || '予約なしの来店',
     startsAt, endsAt: new Date(Date.now() + DEFAULT_STAY_MINUTES * 60000).toISOString(), status: 'visited', externalId: `walk-in-${crypto.randomUUID()}` });
@@ -218,11 +227,12 @@ export const post__api_restaurant_test_reservations_walk_in_4 = async (c: Contex
     const db = dbFor(c.env, storeId);
     await capacity.commit([
       db.prepare(`INSERT INTO rt_reservations
-        (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+        (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note${allergyResult?.ok ? ', allergies_json' : ''})
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${allergyResult?.ok ? ', ?' : ''})`).bind(
           id, storeId, 'walk_in', checked.value.externalId, checked.value.customerName, checked.value.customerPhone,
           checked.value.lineUid, checked.value.guestCount, checked.value.startsAt, checked.value.endsAt,
-          tableId, checked.value.courseId, checked.value.status, checked.value.allergyNote, checked.value.note),
+          tableId, checked.value.courseId, checked.value.status, allergyResult?.ok ? restaurantReservationAllergyLabels(allergyResult.values).join('、') || null : checked.value.allergyNote, checked.value.note,
+          ...(allergyResult?.ok ? [JSON.stringify(allergyResult.values)] : [])),
       db.prepare(`INSERT INTO rt_seat_visit_marks
         (id,reservation_id,store_id,kind,marked_by_staff_id,marked_by_name,marked_at) VALUES(?,?,?,'visited',?,?,?)`)
         .bind(crypto.randomUUID(),id,storeId,c.get('staff')?.id??null,c.get('staff')?.name??null,startsAt),
@@ -248,7 +258,7 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     ).first<{
       id: string; store_id: string; customer_name: string; customer_phone: string | null;
       guest_count: number; starts_at: string; ends_at: string; table_id: string | null;
-      course_id: string | null; status: string; allergy_note: string | null; note: string | null; cancel_reason: string | null; hold_expires_at: string | null; customer_version: number;
+      course_id: string | null; status: string; allergy_note: string | null; allergies_json?: string | null; note: string | null; cancel_reason: string | null; hold_expires_at: string | null; customer_version: number;
     }>();
   if (!current) return c.json({ success: false, error: '予約が見つかりません' }, 404);
   if (!await storeBelongsTo(c, organization.id, current.store_id)) return c.json({success:false,error:'この店舗を操作する権限がありません'},403);
@@ -340,6 +350,13 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
       return inputError(c, { success: false, error: 'コースが正しくありません' }, 400, ["courseId"]);
     }
   }
+  const existingAllergies = reservationAllergyProjection(current).allergies ?? [];
+  const existingOptions = existingAllergies.filter(item => item.kind === 'option').map(item => item.value);
+  const existingOthers = existingAllergies.filter(item => item.kind === 'other').map(item => item.value);
+  const allergyResult = has('allergies') ? await validateReservationAllergies(dbFor(c.env), c.req.query('account_id') || organization.account_id, body.allergies, existingOptions, current.allergies_json == null ? current.allergy_note?.trim() : undefined, existingOthers) : null;
+  if (allergyResult && !allergyResult.ok) return inputError(c, { success: false, error: 'アレルギーを確認してください' }, 400, ['allergies']);
+  if (allergyResult?.ok && has('allergyNote')) return inputError(c, { success: false, error: 'アレルギーの指定が重複しています' }, 400, ['allergies']);
+  if (allergyResult?.ok) next.allergy_note = restaurantReservationAllergyLabels(allergyResult.values).join('、') || null;
   if (has('allergyNote')) {
     next.allergy_note = typeof body.allergyNote === 'string' && body.allergyNote.trim()
       ? body.allergyNote.trim()
@@ -371,10 +388,10 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
   if(capacity && !capacity.select({startsAt:next.starts_at,endsAt:next.ends_at,guestCount:next.guest_count,tableId:next.table_id}))return c.json({success:false,code:'availability_conflict',error:'未配席の予約を含め、人数が入る空き卓がありません'},409);
   const update = db.prepare(`UPDATE rt_reservations SET
     confirmation_revision = confirmation_revision + 1, customer_name = ?, customer_phone = ?, guest_count = ?, starts_at = ?, ends_at = ?,
-    table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?, customer_version=customer_version+1, updated_at = datetime('now')
+    table_id = ?, course_id = ?, status = ?, allergy_note = ?, note = ?, cancel_reason = ?${allergyResult?.ok ? ', allergies_json = ?' : ''}, customer_version=customer_version+1, updated_at = datetime('now')
     WHERE id = ? AND customer_version = ?`).bind(
       next.customer_name, next.customer_phone, next.guest_count, next.starts_at, next.ends_at,
-      next.table_id, next.course_id, next.status, next.allergy_note, next.note, next.cancel_reason, current.id, Number(body.expectedVersion),
+      next.table_id, next.course_id, next.status, next.allergy_note, next.note, next.cancel_reason, ...(allergyResult?.ok ? [JSON.stringify(allergyResult.values)] : []), current.id, Number(body.expectedVersion),
     );
   const statements = [update];
   if ((current.status === 'no_show' && next.status !== 'no_show') || (next.status === 'cancelled' && ['visited', 'seated'].includes(current.status))) {

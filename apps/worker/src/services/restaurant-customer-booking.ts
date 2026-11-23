@@ -1,3 +1,4 @@
+import { reservationAllergyProjection } from './restaurant-reservation-allergies.js';
 import { restaurantSeatCapacity } from './restaurant-seat-capacity.js';
 import { getBookingAdminSettings } from '@line-crm/db';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
@@ -30,6 +31,7 @@ export type CustomerReservationRow = {
   customer_phone: string | null;
   customer_name: string;
   allergy_note: string | null;
+  allergies_json?: string | null;
   seat_type: string | null;
   course_id?: string | null;
   course_name?: string | null;
@@ -37,7 +39,7 @@ export type CustomerReservationRow = {
 export function customerBooking(r: CustomerReservationRow): RestaurantCustomerBooking {
   return { id:r.id, storeId:r.store_id, startsAt:r.starts_at, endsAt:r.ends_at, guestCount:r.guest_count,
     status:r.status, version:r.customer_version, holdExpiresAt:r.hold_expires_at,
-    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, customerName:r.customer_name,allergyNote:r.allergy_note,seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
+    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, customerName:r.customer_name,allergyNote:r.allergy_note,...(typeof r.allergies_json === 'string' ? { allergies: reservationAllergyProjection(r).allergies } : {}),seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
 }
 /** 任意欄はUnicodeの文字数で検査。空欄・nullは保存済みの値を消す。 */
 export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown;customerName?:unknown;allergyNote?:unknown}): boolean {
