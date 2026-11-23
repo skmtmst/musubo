@@ -119,13 +119,10 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
   const css = () =>
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
 
-  it('上にアイコンがある箱は最低98・内側16・間8・角丸12を保つ', () => {
+  it('箱は内側16・間8・角丸12を保つ（最低の高さは下の「アイコン付きの箱だけ最低98」で見る）', () => {
     const blocks = [...css().matchAll(/:root\s*\.card\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(blocks.length, 'v8 の箱の指定がありません').toBeGreaterThan(0)
     // 値は複数の v8 ブロックに分かれる。どれかにあればよい（後勝ちで打ち消しなし）。
-    expect(css()).toMatch(/:root \.card:where\(\[data-top-icon\]\) \{[^}]*min-height:\s*98px/)
-    const heights = blocks.flatMap(block => [...block.matchAll(/min-height:\s*([^;}]+)/g)].map(match => match[1].trim()))
-    expect(heights.at(-1)).toBe('0')
     for (const re of [/padding:\s*var\(--polish-space-card\)/, /gap:\s*var\(--polish-space-row\)/, /border-radius:\s*var\(--polish-radius-card\)/]) {
       expect(blocks.some((b) => re.test(b)), `${re} が v8 の箱にありません`).toBe(true)
     }
@@ -188,8 +185,6 @@ describe('選ぶカードの行型（BHEl9・変わり形）', () => {
     expect(rowRadio, '行型の丸の指定がありません').toBeTruthy()
     expect(rowRadio![0]).toMatch(/width:\s*18px/)
     expect(rowRadio![0]).toMatch(/position:\s*static/)
-    // 箱はアイコン付きだけ最低98、行は箱の高さを継がない。
-    expect(css).toMatch(/:root \.card:where\(\[data-top-icon\]\) \{[^}]*min-height:\s*98px/)
   })
 })
 

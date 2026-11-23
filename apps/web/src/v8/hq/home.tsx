@@ -339,7 +339,7 @@ export default function HqHomeV8() {
     ? currentAccounts.reduce((sum, account) => sum + (attentionCounts[account.id] ?? 0), 0) : null
   const connectionTotal = knownConnectionTotal === 0 && connectionUnconfirmed > 0 ? null : knownConnectionTotal
   const connectionDetail = loadError || attentionError ? '読み込めませんでした'
-    // 未確認は2行目に足すと箱だけ背が伸びるので、右上の札にまとめる（2026-11-23 オーナー）。
+    // 未確認は2行目に足すと箱だけ背が伸びるので、右上の札にまとめる。
     : connectionUnconfirmed && connectionTotal !== null ? null
       : connectionUnconfirmed ? `未確認 ${formatNumber(connectionUnconfirmed)} 件`
       : connectionTotal === null ? '接続の問題を確認できません' : null
