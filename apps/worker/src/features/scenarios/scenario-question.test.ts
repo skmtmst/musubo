@@ -217,7 +217,7 @@ describe('押されたとき', () => {
   })
 })
 
-describe('N-042 型検証の接続(#702)', () => {
+describe('シナリオの質問への回答を保存先の型に合わせて検証する', () => {
   let db: D1Database
   let raw: Database.Database
   let client: LineClient
