@@ -284,6 +284,8 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/channel-close-tasks'],
   // Googleビジネス（★GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
+  // 一覧は1件版と同じ内容を全行返すだけなので、読める範囲も同じにする。
+  ['GET', '/api/restaurant-test/google/connections'],
   ['GET', '/api/restaurant-test/google/reviews'],
   ['POST', '/api/restaurant-test/google/reviews/sync'],
   // Googleビジネス第2段（GB-10〜GB-19）：担当者もプロフィールを読み、変更案を作れる。Googleへの送信は店舗管理者以上。

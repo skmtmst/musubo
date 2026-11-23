@@ -65,16 +65,19 @@ import { syncGoogleOpeningWeek } from '../services/restaurant-google-hours-sourc
 import {
   GoogleAiTimeout,
   accessTokenFor,
+  connectionFor,
   fail,
   googleAccessGuard,
   googleErrorResponse,
   googlePermissions,
   nowIso,
+  requestedConnectionId,
   requireConnectedStore,
   runGoogleAi,
   setConnectionStatus,
   storeFor,
   writeEnabled,
+  type ConnectionRef,
   type ConnectionRow,
   type StoreContext,
 } from './restaurant-google.js';
@@ -98,6 +101,8 @@ type ChangeStatus = 'draft' | 'pending_confirm' | 'accepted' | 'applied' | 'fail
 
 interface ProfileRow {
   store_id: string;
+  /** どのGoogle接続の写しか。772より前に取り込んだ行は空のまま残る。 */
+  connection_id: string | null;
   location_name: string;
   profile_json: string;
   fingerprint: string;
@@ -107,6 +112,8 @@ interface ProfileRow {
 interface ChangeRow {
   id: string;
   store_id: string;
+  /** どのGoogle接続へ送った案か。送信を始めた時点で入る。解除で接続が消えた行は NULL（772）。 */
+  connection_id: string | null;
   kind: ChangeKind;
   source: ChangeSource;
   summary: string;
@@ -195,25 +202,43 @@ interface ProfileExtras {
 }
 type CachedProfile = { profile: GoogleProfile; extras: ProfileExtras; fetchedAt: string };
 
-async function cachedProfile(c: Context<Env>, storeId: string): Promise<CachedProfile | null> {
-  const row = await dbFor(c.env, storeId).prepare('SELECT * FROM rt_google_profiles WHERE store_id = ? LIMIT 1').bind(storeId).first<ProfileRow>();
+/**
+ * 接続の写しを読む。
+ *
+ * 接続IDで厳密に引く。プロフィールは接続先の店舗（location）そのものなので、
+ * 別の接続の写しを混ぜて見せてはいけない。移行で接続が付かなかった行
+ * （connection_id が空）だけは、まだ接続が1件も無かった店舗の名残なので、
+ * 見つからなかったときの控えとして使う（並び順で後ろへ回す）。
+ */
+async function cachedProfile(c: Context<Env>, connection: ConnectionRef): Promise<CachedProfile | null> {
+  const row = await dbFor(c.env, connection.store_id)
+    .prepare(
+      `SELECT * FROM rt_google_profiles WHERE store_id = ? AND (connection_id = ? OR connection_id IS NULL)
+        ORDER BY CASE WHEN connection_id IS NULL THEN 1 ELSE 0 END LIMIT 1`,
+    )
+    .bind(connection.store_id, connection.id)
+    .first<ProfileRow>();
   if (!row) return null;
   const parsed = parseJson<{ profile?: GoogleProfile; extras?: ProfileExtras } | null>(row.profile_json, null);
   if (!parsed?.profile) return null;
   return { profile: parsed.profile, extras: parsed.extras ?? { photoCount: null, googleUpdates: null }, fetchedAt: row.fetched_at };
 }
 
-async function saveProfile(c: Context<Env>, storeId: string, locationName: string, profile: GoogleProfile, extras?: ProfileExtras): Promise<string> {
+async function saveProfile(c: Context<Env>, connection: ConnectionRef, locationName: string, profile: GoogleProfile, extras?: ProfileExtras): Promise<string> {
+  const storeId = connection.store_id;
   const fetchedAt = nowIso();
-  const keep = extras ?? (await cachedProfile(c, storeId))?.extras ?? { photoCount: null, googleUpdates: null };
+  const keep = extras ?? (await cachedProfile(c, connection))?.extras ?? { photoCount: null, googleUpdates: null };
   await dbFor(c.env, storeId)
     .prepare(
-      `INSERT INTO rt_google_profiles (store_id, location_name, profile_json, fingerprint, fetched_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(store_id) DO UPDATE SET location_name = excluded.location_name, profile_json = excluded.profile_json,
+      // 接続ごとに1行。移行で接続が付いていない行は店舗ごとに1行として残っているので、
+      // 一意鍵は COALESCE(connection_id, 'store:' || store_id)（772の式一意索引）に合わせる。
+      `INSERT INTO rt_google_profiles (store_id, connection_id, location_name, profile_json, fingerprint, fetched_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(COALESCE(connection_id, 'store:' || store_id)) DO UPDATE SET connection_id = excluded.connection_id,
+         location_name = excluded.location_name, profile_json = excluded.profile_json,
          fingerprint = excluded.fingerprint, fetched_at = excluded.fetched_at, updated_at = excluded.updated_at`,
     )
-    .bind(storeId, locationName, JSON.stringify({ profile, extras: keep }), profile.fingerprint, fetchedAt, fetchedAt)
+    .bind(storeId, connection.id, locationName, JSON.stringify({ profile, extras: keep }), profile.fingerprint, fetchedAt, fetchedAt)
     .run();
   await syncGoogleOpeningWeek(dbFor(c.env, storeId), storeId, locationName, profile);
   return fetchedAt;
@@ -230,12 +255,12 @@ async function refreshProfile(c: Context<Env>, store: StoreContext, connection: 
       photoCount: photos.status === 'fulfilled' ? photos.value.length : null,
       googleUpdates: updates.status === 'fulfilled' ? updates.value : null,
     };
-    const fetchedAt = await saveProfile(c, store.id, connection.location_name!, profile, extras);
-    if (connection.status !== 'connected') await setConnectionStatus(c, store.id, 'connected', null);
+    const fetchedAt = await saveProfile(c, connection, connection.location_name!, profile, extras);
+    if (connection.status !== 'connected') await setConnectionStatus(c, connection, 'connected', null);
     if (connection.status !== 'connected') await syncGoogleOpeningWeek(dbFor(c.env, store.id), store.id, connection.location_name!, profile);
     return { profile, extras, fetchedAt };
   } catch (error) {
-    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
     throw error;
   }
 }
@@ -247,7 +272,7 @@ async function profileFor(
   connection: ConnectionRow,
   force = false,
 ): Promise<(CachedProfile & { stale: boolean; refreshError: string | null }) | Response> {
-  const cached = await cachedProfile(c, store.id);
+  const cached = await cachedProfile(c, connection);
   const age = cached ? Date.now() - Date.parse(cached.fetchedAt) : Number.POSITIVE_INFINITY;
   if (cached && !force && age < PROFILE_STALE_AFTER_MS) return { ...cached, stale: false, refreshError: null };
   try {
@@ -429,14 +454,16 @@ async function changeFor(c: Context<Env>, storeId: string, id: string): Promise<
   return dbFor(c.env, storeId).prepare('SELECT * FROM rt_google_changes WHERE id = ? AND store_id = ? LIMIT 1').bind(id, storeId).first<ChangeRow>();
 }
 
-async function updateChange(c: Context<Env>, storeId: string, id: string, patch: { status: ChangeStatus; error?: string | null; requestId?: string | null; sentAt?: string | null; appliedAt?: string | null }): Promise<void> {
+async function updateChange(c: Context<Env>, storeId: string, id: string, patch: { status: ChangeStatus; connectionId?: string | null; error?: string | null; requestId?: string | null; sentAt?: string | null; appliedAt?: string | null }): Promise<void> {
   await dbFor(c.env, storeId)
     .prepare(
+      // connection_id は COALESCE で上書きしない。一度どの接続へ送ったか決まった案を、
+      // 後の状態更新で別の接続に付け替えないため。
       `UPDATE rt_google_changes
-       SET status = ?, error = ?, request_id = COALESCE(?, request_id), sent_at = COALESCE(?, sent_at), applied_at = COALESCE(?, applied_at), updated_at = ?
+       SET status = ?, connection_id = COALESCE(?, connection_id), error = ?, request_id = COALESCE(?, request_id), sent_at = COALESCE(?, sent_at), applied_at = COALESCE(?, applied_at), updated_at = ?
        WHERE id = ? AND store_id = ?`,
     )
-    .bind(patch.status, patch.error ?? null, patch.requestId ?? null, patch.sentAt ?? null, patch.appliedAt ?? null, nowIso(), id, storeId)
+    .bind(patch.status, patch.connectionId ?? null, patch.error ?? null, patch.requestId ?? null, patch.sentAt ?? null, patch.appliedAt ?? null, nowIso(), id, storeId)
     .run();
 }
 
@@ -1063,6 +1090,11 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
   if (!writeEnabled(c.env)) return fail(c, 403, 'この環境ではGoogleへ送信できません', { code: 'write_disabled' });
   if (row.status === 'applied' || row.status === 'accepted') return fail(c, 409, 'この変更はすでに送信済みです', { code: 'already_sent' });
   if (row.status === 'cancelled') return fail(c, 409, 'この変更は取り消されています', { code: 'cancelled' });
+  // 一度どのGoogle接続へ送った案かは変えない。別の接続のトークンで再送すると、
+  // 送り先のロケーションが変わって意図しない店舗情報を書き換えてしまう。
+  if (row.connection_id && row.connection_id !== connection.id) {
+    return fail(c, 409, 'この変更案は別のGoogle接続へ送信されています', { code: 'connection_mismatch' });
+  }
 
   let options: RequestOptions;
   try {
@@ -1075,9 +1107,9 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
   let latest: GoogleProfile;
   try {
     latest = await getProfile(options, connection.location_name!);
-    await saveProfile(c, store.id, connection.location_name!, latest);
+    await saveProfile(c, connection, connection.location_name!, latest);
   } catch (error) {
-    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
     return googleErrorResponse(c, error);
   }
 
@@ -1098,7 +1130,8 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
   }
 
   const requestId = crypto.randomUUID();
-  await updateChange(c, store.id, row.id, { status: 'pending_confirm', requestId, sentAt: nowIso() });
+  // 送信を始めた時点で宛先の接続を記録する。以降この案は同じ接続でしか扱わない。
+  await updateChange(c, store.id, row.id, { status: 'pending_confirm', connectionId: connection.id, requestId, sentAt: nowIso() });
   try {
     if (row.kind === 'photo') {
       const after = parseJson<{ action: 'add' | 'delete'; sourceUrl?: string; mediaName?: string }>(row.after_json, { action: 'add' });
@@ -1109,7 +1142,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
     } else {
       const patch = buildSendPatch(latest, row);
       const updated = await patchProfile(options, connection.location_name!, patch);
-      await saveProfile(c, store.id, connection.location_name!, updated);
+      await saveProfile(c, connection, connection.location_name!, updated);
       const applied = canonical(sliceOf(updated, row)) === canonical(expectedSlice(row));
       await updateChange(c, store.id, row.id, { status: applied ? 'applied' : 'accepted', appliedAt: applied ? nowIso() : null });
     }
@@ -1122,7 +1155,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/send', req
     const detail = error instanceof GoogleBusinessError && error.message && !error.message.startsWith('google_') ? error.message : null;
     if (!unknownResult) await updateChange(c, store.id, row.id, { status: 'failed', error: detail ?? kind });
     auditLog(c, 'restaurant.google.change.send', { id: row.id, kind: 'rt_google_change' }, { result: 'failed', lineAccountId: store.lineAccountId });
-    if (kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    if (kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');
     if (kind === 'invalid_request') {
       return fail(c, 400, `Googleに受け付けられない内容です${detail ? `（${detail}）` : ''}`, {
         code: 'invalid_request',
@@ -1144,7 +1177,10 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/from-closure',re
  if(row.version!==body.expectedVersion)return fail(c,409,'休業・貸切が変更されました。読み直してください',{code:'version_conflict'});
  if(row.kind==='private_event'&&body.includePrivateEvent!==true)return fail(c,409,'貸切は通常Googleの営業時間を変更しません。変更する場合は明示的に選んでください',{code:'private_event_not_selected'});
  if(JSON.parse(row.table_ids_json).length)return fail(c,409,'一部の卓の休業・貸切は店舗全体の営業時間にできません',{code:'partial_tables'});
- const cached=await cachedProfile(c,store.id);
+ // 写しは接続ごとなので、どの接続の営業時間を直すのかを先に決める（指定が無ければ既定の接続）。
+ const closureConnection=await connectionFor(c,store.id,requestedConnectionId(c));
+ if(!closureConnection)return fail(c,409,'先にGoogleの営業時間を読み込んでください',{code:'profile_not_loaded'});
+ const cached=await cachedProfile(c,closureConnection);
  if(!cached)return fail(c,409,'先にGoogleの営業時間を読み込んでください',{code:'profile_not_loaded'});
  if(storeClosed(cached.profile))return fail(c,409,'Google側で臨時休業または閉業になっています',{code:'store_closed'});
  const timeZone=await storeTimeZone(c,store.id),days:DayHours[]=[];

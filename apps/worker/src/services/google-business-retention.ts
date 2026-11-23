@@ -166,26 +166,73 @@ export function totalRetentionActions(result: GoogleRetentionResult): number {
  * 残すのは rt_google_write_log（自分たちの送信履歴。before_text は下で消す）と
  * rt_google_connections の行（status='disconnected' の記録）だけ。
  */
-export function deleteGoogleContentStatements(db: D1Database, storeId: string): D1PreparedStatement[] {
+/**
+ * 「この接続の行」と、店舗にこの接続しか残っていないときだけ「接続が空の引き継ぎ行」を指す条件。
+ *
+ * 772 より前に取り込んだ行は移行で接続が埋まるが、接続を削除した跡（ON DELETE SET NULL）や
+ * 接続が1件も無い店舗の行は connection_id が空のまま残る。読み取りはこの空の行を
+ * どの接続の画面にも見せているので、他の接続が残っているうちに消すと、残った接続の画面から
+ * 黙ってデータが減る。逆に、店舗の最後の接続を解除したときに残すと、
+ * 「解除したらGoogleから受け取ったものは残さない」という約束を破る。
+ * そこで「他に残っている接続が無いときだけ空の行も消す」にする。
+ * 既に解除済みの接続（status='disconnected'）は中身を消し終わっているので数に入れない。
+ *
+ * 置き場所の決まり: `?` は connection_id, store_id, connection_id の順。
+ */
+const CONNECTION_OR_ORPHAN_SQL =
+  `connection_id = ? OR (connection_id IS NULL AND NOT EXISTS (
+      SELECT 1 FROM rt_google_connections oc WHERE oc.store_id = ? AND oc.id <> ? AND oc.status <> 'disconnected'))`;
+
+export function connectionScopeSql(): string {
+  return ` AND (${CONNECTION_OR_ORPHAN_SQL})`;
+}
+
+export function connectionScopeBinds(storeId: string, connectionId: string): string[] {
+  return [connectionId, storeId, connectionId];
+}
+
+export function deleteGoogleContentStatements(
+  db: D1Database,
+  target: string | { storeId: string; connectionId?: string | null },
+): D1PreparedStatement[] {
+  const storeId = typeof target === 'string' ? target : target.storeId;
+  const connectionId = typeof target === 'string' ? null : (target.connectionId ?? null);
+  const scope = connectionId ? ` AND (${CONNECTION_OR_ORPHAN_SQL})` : '';
   const statements = [
-    'DELETE FROM rt_google_reviews WHERE store_id = ?',
-    'DELETE FROM rt_google_profiles WHERE store_id = ?',
-    'DELETE FROM rt_google_changes WHERE store_id = ?',
-    "DELETE FROM rt_google_posts WHERE store_id = ? AND origin = 'google'",
-    'DELETE FROM rt_google_metrics_daily WHERE store_id = ?',
-    'DELETE FROM rt_google_location_candidates WHERE store_id = ?',
-    'DELETE FROM rt_google_oauth_states WHERE store_id = ?',
+    `DELETE FROM rt_google_reviews WHERE store_id = ?${scope}`,
+    `DELETE FROM rt_google_profiles WHERE store_id = ?${scope}`,
+    `DELETE FROM rt_google_changes WHERE store_id = ?${scope}`,
+    `DELETE FROM rt_google_posts WHERE store_id = ?${scope} AND origin = 'google'`,
+    `DELETE FROM rt_google_metrics_daily WHERE store_id = ?${scope}`,
+    `DELETE FROM rt_google_location_candidates WHERE store_id = ?${scope}`,
     // 自分たちが作った投稿の記録は残すが、Googleが返した状態の写しは消す。
     // google_post_name は「どの投稿を送ったか」という自分たちの記録なので残す。
     `UPDATE rt_google_posts
         SET confirmation_revision = confirmation_revision + 1, google_state = NULL, search_url = NULL, google_create_time = NULL, google_update_time = NULL
-      WHERE store_id = ? AND origin = 'admin'`,
+      WHERE store_id = ?${scope} AND origin = 'admin'`,
     // 送信履歴の行は残す。Google由来の送信前スナップショットだけ消す。
-    'UPDATE rt_google_write_log SET before_text = NULL WHERE store_id = ?',
+    `UPDATE rt_google_write_log SET before_text = NULL WHERE store_id = ?${scope}`,
   ];
-  return statements.map((sql) => db.prepare(sql).bind(storeId));
+  const binds = connectionId ? [storeId, ...connectionScopeBinds(storeId, connectionId)] : [storeId];
+  return [
+    ...statements.map((sql) => db.prepare(sql).bind(...binds)),
+    // 進行中のOAuthの控えは厳密一致だけ。接続が空の行は「新しい接続を足している途中」なので、
+    // 他の接続の解除で壊さない（受信データと違い、残しても画面には出ない）。
+    connectionId
+      ? db.prepare('DELETE FROM rt_google_oauth_states WHERE store_id = ? AND connection_id = ?').bind(storeId, connectionId)
+      : db.prepare('DELETE FROM rt_google_oauth_states WHERE store_id = ?').bind(storeId),
+  ];
 }
 
 export async function deleteGoogleContentForStore(db: D1Database, storeId: string): Promise<void> {
   for (const statement of deleteGoogleContentStatements(db, storeId)) await statement.run();
+}
+
+/** 接続1件の解除・店舗切り替え。同じ店舗の他の接続のデータは消さない。 */
+export async function deleteGoogleContentForConnection(
+  db: D1Database,
+  storeId: string,
+  connectionId: string,
+): Promise<void> {
+  for (const statement of deleteGoogleContentStatements(db, { storeId, connectionId })) await statement.run();
 }
