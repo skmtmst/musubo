@@ -14,6 +14,8 @@
 .value { display: block; min-width: 0; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--polish-text-body); }
 .row small { display: block; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-micro--line-height); overflow-wrap: anywhere; }
 .note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.allergyNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.allergyError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
 .content, .more { min-width: 0; overflow-wrap: anywhere; }
 .options { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); }
 
@@ -64,3 +66,7 @@
 @media (hover: none) { :root .row dd > :nth-child(2) { opacity: 1; } }
 /* 受信箱の外側が左右24を持つので、内側で同じ余白を重ねない。 */
 :root .panel[data-label-width='wide'] { --tpl-customer-label: max-content; padding: 0; }
+
+.profileLink { flex: 1; min-width: 0; color: var(--color-ink); }
+.profileLink > span { display: flex; align-items: center; gap: var(--space-8); min-width: 0; overflow: hidden; }
+.profileLink .profileName { display: block; }

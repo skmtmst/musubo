@@ -39,25 +39,27 @@ export function HeadOperatorMenu({
   operators,
   onChange,
   ariaLabel = '担当者を変える',
+  compact = false,
 }: {
   /** 担当者ID。未割り当ては 'unassigned' */
   value: string
   operators: OperatorOption[]
   onChange: (next: string) => void
   ariaLabel?: string
+  compact?: boolean
 }) {
   const rows = buildOperatorRows(operators, false, value)
   return (
-    <SaveErrorField names={["value", "operatorId", "operator_id"]}><EntitySelect
+    <span data-compact-operator={compact || undefined} title={`担当：${rows.find(row => row.id === value)?.name ?? '未割り当て'}`} data-initial={(rows.find(row => row.id === value)?.name ?? '未').charAt(0)}><SaveErrorField names={["value", "operatorId", "operator_id"]}><EntitySelect
       aria-label={ariaLabel}
       label="担当"
-      width={OPERATOR_WIDTH}
+      width={compact ? 36 : OPERATOR_WIDTH}
       actionHidden
       valuePrefix="担当："
       value={value}
       onChange={onChange}
       options={rows.map((row) => ({ ...entityOptionMetadata(row), value: row.id, label: row.name, disabled: row.disabled }))}
-    /></SaveErrorField>
+    /></SaveErrorField></span>
   )
 }
 

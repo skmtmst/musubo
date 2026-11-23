@@ -111,6 +111,13 @@
 .tpCard[data-selected], .tpCard[aria-pressed='true'] { background: var(--polish-selection-bg); outline: var(--polish-selection-outline); outline-offset: var(--tpl-inbox-tp-card-on-offset); }
 .tpCardText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--tpl-inbox-row-line-gap); }
 .tpCardName { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+/*
+ * 名前に添える印（予約の知らせ用・ここでは入らない差し込みあり）。テンプレートの名前を必ず1行で読めるようにし、
+ * 印が名前の後ろに入り切らないときは名前の下の行へ回す（印で名前を押しつぶさない）。
+ */
+.tpCardHead { display: flex; flex-wrap: wrap; min-width: 0; align-items: center; column-gap: var(--space-8); row-gap: var(--space-4); }
+.tpCardHead > .tpCardName { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.tpCardBadges { display: inline-flex; flex: none; flex-wrap: wrap; max-width: 100%; align-items: center; gap: var(--space-4); }
 .tpCardBody { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .tpCardBody[data-lines='2'] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tpCardRow { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
@@ -151,6 +158,8 @@
   background: var(--polish-selection-bg);
   font-size: var(--text-caption);
 }
+/* 選んだものへの注意の帯（共通の Notice）。一覧と操作の間で、帯と同じ内側の余白にする。 */
+.tpNotice { width: 100%; padding: var(--tpl-inbox-tp-band-pad); }
 .tpBandLabel { flex: none; color: var(--color-ink); font-weight: 700; }
 .tpBandOrder { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink); text-overflow: ellipsis; white-space: nowrap; }
 .tpBandCount { flex: none; color: var(--color-ink); font-weight: 700; }

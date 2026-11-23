@@ -225,3 +225,8 @@
 :root .list[data-size='notification'] .tab.tab { align-items: flex-start; }
 
 :root .list .tab.tab { padding-block-start: var(--tpl-tabs-center-inset); }
+
+html:root .list .current.current {
+  background-color: transparent;
+  background-image: none;
+}

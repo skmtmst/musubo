@@ -200,9 +200,6 @@ export function formatByteSize(bytes: number): string {
 /** サーバーと同じ数え方(JSの .length)。差し込みは解決後の長さでサーバーが最終判定する。 */
 export const MESSAGE_MAX_LENGTH = 5000
 
-/** 入力欄の自動拡張の上限。text-sm(行の高さ約20px)の8行＋上下余白。 */
-export const TEXTAREA_MAX_HEIGHT_PX = 168
-
 /**
  * 設計 `xGLVe` は、返信を待たせている行だけ日付ではなく待ち時間を出す
  * （`1時間12分`）。上の帯の「最長 ◯◯待ち」と同じ物差し。
@@ -298,8 +295,7 @@ export function draftKeyOf(accountId: string | null | undefined, chatId: string 
 }
 export const CHANNELS = [{ key: 'all', label: 'すべて' }, { key: 'line', label: 'LINE' }, { key: 'email', label: 'メール' }] as const
 
-export function resolveInboxChannel(requested: string | null, emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
-  if (!emailInboxEnabled) return 'line'
+export function resolveInboxChannel(requested: string | null, _emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
   return requested === 'line' || requested === 'email' ? requested : 'all'
 }
 export const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'

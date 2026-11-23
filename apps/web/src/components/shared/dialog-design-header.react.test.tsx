@@ -16,6 +16,16 @@ afterEach(() => cleanup())
 const css = readFileSync(join(process.cwd(), 'src/components/shared/dialog.module.css'), 'utf8')
 
 describe('窓の頭の余白・高さを絵から渡す', () => {
+  it('確認と取消の優先度に応じた共通ボタンを使う', () => {
+    const props = { open: true, modal: false, title: '確認', confirmLabel: '確定', onCancel: vi.fn(), onConfirm: vi.fn() }
+    const view = render(<Dialog {...props} />)
+    expect(screen.getByRole('button', { name: '確定' }).getAttribute('data-variant')).toBe('primary')
+    view.rerender(<Dialog {...props} tone="destructive" />)
+    expect(screen.getByRole('button', { name: '確定' }).getAttribute('data-variant')).toBe('danger')
+    view.rerender(<Dialog {...props} primaryAction="cancel" />)
+    expect(screen.getByRole('button', { name: '確定' }).getAttribute('data-variant')).toBe('secondary')
+    expect(screen.getByRole('button', { name: 'キャンセル' }).getAttribute('data-variant')).toBe('primary')
+  })
   it('任意の印を題と説明の左に置き、説明を読み上げに結び付ける', () => {
     render(<Dialog open modal={false} title="新しく作る" headerIcon={<svg data-testid="app-icon" />} description="名前を入力してください。" onCancel={vi.fn()} />)
     const panel = screen.getByRole('dialog', { name: '新しく作る' })

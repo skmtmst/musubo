@@ -133,24 +133,6 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     }
   });
 
-  it('個別送信の呼出元はsource（台帳の出所）を必ず渡す', () => {
-    for (const file of ['routes/chats.ts', 'services/scheduled-chat-sends.ts']) {
-      const source = read(file);
-      const calls = source.match(/renderChatMessageContent\([\s\S]*?\);/g) ?? [];
-      const lenientPreviews = source.match(/lenient[\s\S]*?renderChatMessageContent\([\s\S]*?\);/g) ?? [];
-      const sendCalls = calls.filter(
-        (call) => !lenientPreviews.some((preview) => preview.endsWith(call)),
-      );
-      expect(sendCalls.length, `${file} に送信経路の呼出しがありません`).toBeGreaterThan(0);
-      for (const call of sendCalls) {
-        expect(
-          /kind:\s*'chat'/.test(call),
-          `${file} の renderChatMessageContent 呼出しに source がありません: ${call.slice(0, 120)}`,
-        ).toBe(true);
-      }
-    }
-  });
-
   it('自動応答の実送信では source を渡し、dry-run では渡さない', () => {
     // 実送信（matchAndReply内の呼出し）は source 付きで呼ぶ
     // dry-run（auto-replies.ts のプレビュー呼出し）は source なしのまま

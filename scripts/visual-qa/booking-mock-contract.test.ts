@@ -51,6 +51,12 @@ describe('予約の空き枠：偽 API と Worker の応答契約', () => {
     return response.json()
   }
 
+  it('イベントの予約集計は画面が読む人数と定員を返す', async () => {
+    const response = await fetch(`${baseUrl}/api/events/admin/events/ev-1/bookings/summary`)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ confirmed: 3, confirmedSeats: 3, totalCapacity: 36, requested: 2, waitlist: 2, cancelled: 1 })
+  })
+
   it('イベント予約の全件を重複なく有限ページで返し、最終頁の次は空になる', async () => {
     const read = async (page: number) => {
       const response = await fetch(`${baseUrl}/api/events/admin/events/ev-1/bookings?page=${page}&limit=2`)

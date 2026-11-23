@@ -346,14 +346,14 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                       {content}
                     </button>
                   ) : (
-                    <span key={day} role="gridcell" className={`${styles.cell} ${tone === 'closed' ? styles.cellClosed : tone === 'private' ? styles.cellPrivate : ''}`} aria-label={label}>{content}</span>
+                    <span key={day} role="gridcell" className={`${styles.cell} ${past ? styles.cellPast : ''} ${tone === 'closed' ? styles.cellClosed : tone === 'private' ? styles.cellPrivate : ''}`} aria-label={label}>{content}</span>
                   )
                 })}
               </div>
             ))}
           </div>
           <p className={styles.note}>
-            {canWrite ? '日を押すと、その日を閉じる窓が開きます。' : ''}定休は「時間帯ごとの在庫」の営業時間で決まります。
+            {canWrite ? '今日から先の日を押すと、その日を閉じる窓が開きます。' : ''}定休は「時間帯ごとの在庫」の営業時間で決まります。
           </p>
         </section>
 

@@ -109,7 +109,7 @@ export interface RadioCardProps {
   /** 統括の生成パネルの小さい箱（題12/700、補足11）。 */
   compactTypography?: 'default' | 'banner'
   /**
-   * 箱（card）の高さ。既定は絵の「選ぶカード」の 98。
+   * 箱（card）の高さ。既定は上に印がある場合だけ最低 98。
    * `'short'` は高さ 90 の箱（★V8 E-3 ウォークインの卓のカード ：上に印・右上に丸・題・説明）。
    * `'fit'` は中身なりの高さ（LINE新規追加 v06 ①事前確認 GLA3C 52・f7UGE 78：
    * 題だけの選択肢を 98 の箱に入れると下が大きく空くため、最低高さだけ外す）。
@@ -169,6 +169,7 @@ export default function RadioCard({
         className,
       ].filter(Boolean).join(' ')}
       data-choice-card={variant !== 'row' || undefined}
+      data-top-icon={icon && variant !== 'form' ? '' : undefined}
       data-permission-locked={lockedReason ? '' : undefined}
       data-no-name-tip={lockedReason ? '' : undefined}
       data-variant={variant}

@@ -15,14 +15,15 @@ export const FIRST_RUN_WATCH_INTERVAL_MS = 10_000
 export const FIRST_RUN_WATCH_LIMIT_MS = 15 * 60_000
 
 /** ダッシュボードと設定の完了条件の正本は同じ V8 API。訪問・招待人数では判定しない。 */
-type FirstRunLoad = { steps: StepResult[]; firstRun: FirstRunTimes | null; starter: GettingStartedStarter | null }
+type FirstRunLoad = { steps: StepResult[]; firstRun: FirstRunTimes | null; starter: GettingStartedStarter | null; dismissed: boolean }
 
 export async function loadFirstRun(accountId: string | null): Promise<FirstRunLoad> {
   const res = await api.gettingStarted.get(accountId ?? undefined, 'v8')
   if (!res.success) throw new Error(res.error)
   const { firstRun, starter } = res.data
+  const dismissed = res.data.dismissed === true
   const steps = buildStepsFromApi(res.data.steps)
-  if (res.data.steps.some((step) => step.key === 'featureSet')) return { steps, firstRun, starter }
+  if (res.data.steps.some((step) => step.key === 'featureSet')) return { steps, firstRun, starter, dismissed }
   // 更新途中の Worker でも未取得は未確認。保存済みの機能設定だけで補う。
   let entry = null
   if (accountId) {
@@ -30,7 +31,7 @@ export async function loadFirstRun(accountId: string | null): Promise<FirstRunLo
     if (!features.success) throw new Error(features.error)
     entry = featureSetEntry({ forbidden: false, version: features.data.version ?? 0 })
   }
-  return { steps: insertFeatureSet(steps, entry), firstRun, starter }
+  return { steps: insertFeatureSet(steps, entry), firstRun, starter, dismissed }
 }
 
 export async function loadFirstRunSteps(accountId: string | null): Promise<StepResult[]> {
@@ -111,6 +112,7 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   return {
     steps: current?.status === 'ready' ? current.steps : [],
     firstRun: current?.status === 'ready' ? current.firstRun : null,
+    dismissed: current?.status === 'ready' ? current.dismissed : null,
     starter: current?.status === 'ready' ? current.starter : null,
     status: current?.status ?? 'loading' as const,
     error: current?.error ?? null,

@@ -292,18 +292,15 @@ async function openFriend(friendId: string) {
   await flush()
 }
 
-function textarea(): HTMLTextAreaElement | null {
-  return document.querySelector('textarea[aria-label="メッセージを入力"]')
+/** 返信欄（差し込みを札で見せる欄）。textarea と同じく value を読める。 */
+function textarea(): (HTMLElement & { value: string }) | null {
+  return document.querySelector('[aria-label="メッセージを入力"]')
 }
 
 async function typeMessage(text: string) {
   const el = textarea()
   if (!el) throw new Error('入力欄が見つからない')
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
-  await act(async () => {
-    setter.call(el, text)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+  await act(async () => { setTextControlValue(el, text) })
 }
 
 async function typeDatetime(text: string) {
@@ -341,6 +338,7 @@ async function typeDatetime(text: string) {
   await click(Array.from(dialog()!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '確定')!)
 }
 import { setTimeControl } from '@/test-utils/time-control'
+import { setTextControlValue } from '@/test-utils/text-control'
 
 async function eventually(check: () => void) {
   for (let attempt = 0; ; attempt++) {
@@ -403,7 +401,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     net.handler = baseHandler({ send: () => slow.promise })
     fixture.params = new URLSearchParams('friend=friend-a')
     await act(async () => root.render(<ChatsPage />))
-    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    await eventually(() => expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
     await typeMessage('確認の返信')
     const send = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '送信する')!
     await act(async () => { send.click(); send.click() })

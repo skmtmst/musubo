@@ -24,6 +24,7 @@
 }
 .formSample { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card); }
 .formSample h3, .formSample p { margin: 0; }
+.formSample p { font-size: var(--text-caption); }
 .row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field); }
 .list { display: flex; flex-direction: column; gap: var(--polish-space-field); margin: 0; padding: 0; list-style: none; }
 .preview { display: flex; justify-content: center; min-width: 0; }

@@ -1,7 +1,9 @@
 'use client'
 
 import { useInboxPreview } from './use-reservation-warning'
-import TruncatedText from '@/components/shared/truncated-text'
+import { InboxResolvedText, InboxUnresolvedNotice } from './send-preview'
+import { CHAT_INSERT_TOKENS } from './chat-inserts'
+import { InsertText } from '@/components/shared/insert-text-field'
 import { terms } from '@/lib/terms'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
@@ -10,7 +12,7 @@ import Button from '@/components/shared/button';
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
 import { canEditFeature } from '@/lib/staff-capability';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import { InboxComposerActions, InboxComposerBottom, InboxComposerTools, InboxDraftArea, InboxDraftCount, InboxInputBox, InboxToolButton } from '@/components/shared/inbox-composer';
+import { InboxComposerActions, InboxComposerBottom, InboxComposerTools, InboxDraftCount, InboxDraftEditor, InboxInputBox, InboxToolButton } from '@/components/shared/inbox-composer';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import Notice from '@/components/shared/notice';
@@ -28,9 +30,9 @@ import { Clock3, FileText, NotebookPen, Send, Settings2, X } from 'lucide-react'
 import type { Props as ConversationProps } from './inbox-conversation-view-types';
 import { MESSAGE_MAX_LENGTH, formatByteSize, formatJstScheduledAt, isoToJstDatetimeLocal } from './inbox-model';
 import { TextArea as SharedTextArea } from '@/components/shared/text-field'
-type Props = Pick<ConversationProps, 'dropOver' | 'setDropOver' | 'handlePickAttachment' | 'chatPollStalled' | 'setChatPollRetryKey' | 'setShowTemplatePicker' | 'showComposerOptions' | 'setShowComposerOptions' | 'showMemoEditor' | 'setShowMemoEditor' | 'sendMode' | 'setSendMode' | 'memoPopoverRef' | 'memoDraft' | 'setMemoDraft' | 'memoError' | 'closeMemoEditor' | 'handleSaveMemo' | 'memoSaving' | 'chatDetail' | 'quotedMessage' | 'setQuotedMessage' | 'pendingImage' | 'setImagePreviewOpen' | 'pendingImageMeta' | 'imageInputRef' | 'imageUploading' | 'clearPendingImage' | 'pendingAttachment' | 'sending' | 'scheduling' | 'clearPendingAttachment' | 'retryAttachment' | 'textareaRef' | 'messageContent' | 'setMessageContent' | 'handleKeyDown' | 'isComposingRef' | 'messageOverLimit' | 'messageLength' | 'selectedChatId' | 'imageError' | 'staffRole' | 'selectedAccountId' | 'senderId' | 'setSenderId' | 'setShowSchedulePanel' | 'showSchedulePanel' | 'scheduledSends' | 'handleSendMessage' | 'scheduleInput' | 'setScheduleInput' | 'handleScheduleSend' | 'sendError' | 'error' | 'scheduledSendsFailed' | 'loadScheduledSends' | 'handleReschedule' | 'handleCancelScheduled' | 'showTemplatePicker' | 'setPendingPack' | 'pendingPack' | 'handleSendPack'>
-export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, chatDetail, quotedMessage, setQuotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, textareaRef, messageContent, setMessageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, selectedChatId, imageError, staffRole, selectedAccountId, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, sendError, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack }: Props) {
-  const { preview, warning: reservationWarning } = useInboxPreview(selectedChatId, messageContent)
+type Props = Pick<ConversationProps, 'dropOver' | 'setDropOver' | 'handlePickAttachment' | 'chatPollStalled' | 'setChatPollRetryKey' | 'setShowTemplatePicker' | 'showComposerOptions' | 'setShowComposerOptions' | 'showMemoEditor' | 'setShowMemoEditor' | 'sendMode' | 'setSendMode' | 'memoPopoverRef' | 'memoDraft' | 'setMemoDraft' | 'memoError' | 'closeMemoEditor' | 'handleSaveMemo' | 'memoSaving' | 'chatDetail' | 'quotedMessage' | 'setQuotedMessage' | 'pendingImage' | 'setImagePreviewOpen' | 'pendingImageMeta' | 'imageInputRef' | 'imageUploading' | 'clearPendingImage' | 'pendingAttachment' | 'sending' | 'scheduling' | 'clearPendingAttachment' | 'retryAttachment' | 'textareaRef' | 'tokenNames' | 'messageContent' | 'setMessageContent' | 'handleKeyDown' | 'isComposingRef' | 'messageOverLimit' | 'messageLength' | 'selectedChatId' | 'imageError' | 'staffRole' | 'selectedAccountId' | 'senderId' | 'setSenderId' | 'setShowSchedulePanel' | 'showSchedulePanel' | 'scheduledSends' | 'handleSendMessage' | 'scheduleInput' | 'setScheduleInput' | 'handleScheduleSend' | 'sendError' | 'error' | 'scheduledSendsFailed' | 'loadScheduledSends' | 'handleReschedule' | 'handleCancelScheduled' | 'showTemplatePicker' | 'setPendingPack' | 'pendingPack' | 'handleSendPack'>
+export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, chatDetail, quotedMessage, setQuotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, textareaRef, tokenNames, messageContent, setMessageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, selectedChatId, imageError, staffRole, selectedAccountId, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, sendError, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack }: Props) {
+  const preview = useInboxPreview(selectedChatId, messageContent)
   const friendId = chatDetail?.id === selectedChatId ? chatDetail.friendId : null
   const scheduleContext = useRef({ accountId: selectedAccountId, chatId: selectedChatId, friendId, generation: 0 })
   if (scheduleContext.current.accountId !== selectedAccountId || scheduleContext.current.chatId !== selectedChatId || scheduleContext.current.friendId !== friendId) {
@@ -85,7 +87,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         </button>
       </p>
     )}
-    {reservationWarning ? <Notice tone="warn" message={reservationWarning} /> : null}
+    <InboxUnresolvedNotice preview={preview} tokenNames={tokenNames} />
     {/* 上段 */}
     {/*
                   U010: テンプレート・送信の設定・内部メモは横に収まらなければ
@@ -321,21 +323,24 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
       {/* 中段 */}
       {/*
                     INBOX-20: この入力欄に textareaRef を付ける。
-                    外れていると自動拡張と「引用を選んだら入力へ戻る」が
-                    動かなかった。
+                    外れていると「引用を選んだら入力へ戻る」が動かなかった。
+                    差し込み（テンプレートの {{…}}）は札で見せ、送る値・下書きは {{…}} の文字のまま。
+                    札は Backspace 1回で消え、カーソルは札をまたぎ、コピーすると元の {{…}} に戻る。
                   */}
-      <InboxDraftArea
+      <InboxDraftEditor
         ref={textareaRef}
         value={messageContent}
-        onChange={(e) => setMessageContent(e.target.value)}
+        onValueChange={setMessageContent}
         onKeyDown={handleKeyDown}
         onCompositionStart={() => { isComposingRef.current = true }}
         onCompositionEnd={() => { isComposingRef.current = false }}
-        rows={2}
         placeholder="メッセージを入力"
         aria-label="メッセージを入力"
-        aria-invalid={messageOverLimit} />
-      {preview !== null ? <Notice tone="info" heading="送るとこうなります："><TruncatedText value={preview} /></Notice> : null}
+        aria-invalid={messageOverLimit}
+        tokenNames={tokenNames}
+        extraTokens={CHAT_INSERT_TOKENS}
+        markUnknown />
+      <InboxResolvedText preview={preview} content={messageContent} tokenNames={tokenNames} scope={selectedChatId} />
 
       <InboxDraftCount
       >
@@ -404,6 +409,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
             targetStale={!scheduleScope || scheduleScope.generation !== scheduleContext.current.generation || !selectedChatId || !friendId}
             onClose={() => { scheduleScopeRef.current = null; setShowSchedulePanel(false) }}
             content={messageContent}
+            tokenNames={tokenNames}
             hasImage={Boolean(pendingImage)}
             attachmentLabel={pendingAttachment?.status === 'ready' ? `${pendingAttachment.kind === 'video' ? '動画' : 'ファイル'}「${pendingAttachment.name}」` : undefined}
             value={scheduleInput}
@@ -457,7 +463,8 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
               {pendingPack.texts.map((text, index) => (
                 <li key={index} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
                   <span className="mr-1 font-semibold text-ink">{index + 1}.</span>
-                  <span className="whitespace-pre-wrap break-words">{text.length > 200 ? `${text.slice(0, 200)}…` : text}</span>
+                  {/* 差し込みは返信欄と同じ札で読む（送る値は {{…}} のまま）。途中で切ると記号の切れ端が出るので全文を一覧の中で送る。 */}
+                  <span className="whitespace-pre-wrap break-words"><InsertText value={text} tokenNames={tokenNames} extraTokens={CHAT_INSERT_TOKENS} markUnknown /></span>
                 </li>
               ))}
             </ol>

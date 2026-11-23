@@ -7,6 +7,8 @@ import type { SavedViewDraft, SavedViewSaveResult } from '@/components/chats/sav
 import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary';
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
 import Notice from '@/components/shared/notice';
+import type { InsertTextFieldHandle } from '@/components/shared/insert-text-field';
+import Button from '@/components/shared/button';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { InboxPage } from '@/components/templates/inbox-page';
 import { useAccount } from '@/contexts/account-context';
@@ -15,15 +17,17 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { useInsertTokenNames } from '@/lib/use-insert-token-names';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,resolveInboxChannel,statusFilters,type OldestAttentionTarget } from './inbox-model';
+import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,inboxSortFromParam,resolveInboxChannel,statusFilters,type OldestAttentionTarget } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
 import InboxList from './inbox-list-view';
 import InstagramConversation from './instagram-conversation';
+import InstagramCustomerInfo from './instagram-customer-info';
 import { savedViewFailureMessage } from './saved-view-failure';
 import { useInboxActions } from './use-inbox-actions';
 import { useInboxConversation } from './use-inbox-conversation';
@@ -35,6 +39,7 @@ import { useInboxScroll } from './use-inbox-scroll';
 import { useInboxSearch } from './use-inbox-search';
 import { useInboxSend } from './use-inbox-send';
 import { useInboxStats } from './use-inbox-stats';
+import { useInstagramThread } from './use-instagram-thread';
 import { useInboxSubscription } from './use-inbox-subscription';
 
 import { useInboxDeepLink } from './use-inbox-deep-link';
@@ -51,21 +56,32 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const router = useRouter()
 
   const params = useSearchParams()
-
   // URLが指す保存検索のID。再読込・URL共有からの復元元(N-021)。
   const savedViewParam = (params.get(SAVED_VIEW_URL_KEY) ?? '').trim()
 
   const { selectedAccountId, loading: accountsLoading } = useAccount()
 
+  /*
+   * 受信経路のタブ（?channel=）。Instagram は LINE と同じ会話の一覧（会話の口の channel）で読み、
+   * 開いた会話は Instagram 用の中央と右の欄で見る。タブを移っても選んだ会話は消さず、見せる・隠すだけ。
+   */
+  const socialChannel: 'all' | 'line' | 'instagram' = params.get('channel') === 'instagram' ? 'instagram' : channel === 'line' ? 'line' : 'all'
+
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
-  const visibleThreadId = emailInboxEnabled ? selectedThreadId : null
+  const visibleThreadId = emailInboxEnabled && channel !== 'line' && socialChannel !== 'instagram' ? selectedThreadId : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const visibleChatId = channel === 'email' || socialChannel === 'instagram' ? null : selectedChatId
+  // 開いている Instagram の会話。LINE のトーク・メールと排他。
   const [selectedInstagram, setSelectedInstagram] = useState<ChatListItem | null>(null)
-  const [socialChannel, setSocialChannel] = useState<'all' | 'line' | 'instagram'>('all')
+  // 店舗を切り替えた直後の1描画でも、前の店舗の会話を出さない（全店舗を見ている時は店舗を問わない）。
+  const instagramInAccount = selectedInstagram && (!selectedAccountId || selectedInstagram.lineAccountId === selectedAccountId) ? selectedInstagram : null
+  const visibleInstagram = channel === 'email' || socialChannel === 'line' ? null : instagramInAccount
   useEffect(() => { setSelectedInstagram(null) }, [selectedAccountId])
+  // URL の指定などで LINE・メールが開いたら、Instagram の会話は閉じる。
+  useEffect(() => { if (selectedChatId || selectedThreadId) setSelectedInstagram(null) }, [selectedChatId, selectedThreadId])
 
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
@@ -93,6 +109,12 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
 
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  // Instagram の会話には対応状況・担当が無い。Instagram のタブへ入ったら、その2つの絞り込みは外す（0件に見せない）。
+  useEffect(() => {
+    if (socialChannel !== 'instagram') return
+    setStatusFilter('all')
+    setAssigneeFilter('all')
+  }, [socialChannel])
 
   const [filterOpen, setFilterOpen] = useState(false)
 
@@ -144,7 +166,10 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   const isComposingRef = useRef(false)
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // 返信の文の欄（札の入る欄）。引用・AIの下書き・訂正のあとに焦点を戻す。
+  const textareaRef = useRef<InsertTextFieldHandle>(null)
+  // 返信の札の名前（友だち情報・共通情報）。会話ごとに作り直す返信欄で取り直さないよう、アカウントごとに1回読む。
+  const tokenNames = useInsertTokenNames(selectedAccountId)
 
   // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
@@ -262,6 +287,9 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     setError,
   })
 
+  // 開いている Instagram の会話の読み書き。中央の会話と右の欄が同じ値を見る。
+  const instagramThread = useInstagramThread(visibleInstagram, staffRole, () => { void loadChatsQuietly() })
+
   // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
   const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
 
@@ -288,6 +316,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     handleScheduleSend,
     handleCancelScheduled,
   } = useInboxSchedule({
+    tokenNames,
     detailAccountRef,
     selectedChatIdRef,
     selectedChatId,
@@ -452,7 +481,20 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     // 手動で解除したので、URLの保存検索IDも外す(N-021)。
     dropSavedViewParam()
   }
-  const { wideInfoPanel, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef } = useInboxPanel()
+  const { inlineInfoPanel, narrowDesktop, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef } = useInboxPanel()
+  const [narrowList, setNarrowList] = useState(true)
+  const previousSelection = useRef({ account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId, instagram: selectedInstagram?.id ?? null })
+  const narrowFocus = useRef<'back' | 'row' | null>(null)
+  const narrowBackRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const previous = previousSelection.current
+    const instagramId = selectedInstagram?.id ?? null
+    previousSelection.current = { account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId, instagram: instagramId }
+    if (previous.account !== selectedAccountId) setNarrowList(true)
+    else if (previous.chat !== selectedChatId || previous.thread !== selectedThreadId || previous.instagram !== instagramId) {
+      setNarrowList(!(selectedChatId || selectedThreadId || instagramId))
+    }
+  }, [selectedAccountId, selectedChatId, selectedThreadId, selectedInstagram])
   const {
     deepLinkNotice,
     setDeepLinkNotice,
@@ -471,7 +513,31 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     savedViewParam,
   })
 
+  const narrowMode = narrowDesktop ? (deepLinkNotice ? 'detail' : narrowList || !(visibleChatId || visibleThreadId || visibleInstagram) ? 'list' : 'detail') : undefined
+  useEffect(() => {
+    if (!narrowMode) narrowFocus.current = null
+    if (narrowMode === 'detail' && narrowFocus.current === 'back') {
+      narrowBackRef.current?.focus()
+      narrowFocus.current = null
+    } else if (narrowMode === 'list' && narrowFocus.current === 'row') {
+      const row = panesRef.current?.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"] [aria-current="true"]')
+        ?? panesRef.current?.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"] button')
+      row?.focus()
+      narrowFocus.current = null
+    }
+  }, [narrowMode, panesRef])
+
+  const clearConversationParams = () => {
+    const query = new URLSearchParams(params.toString())
+    query.delete('friend')
+    query.delete('friendId')
+    query.delete('thread')
+    const suffix = query.toString()
+    router.replace(suffix ? `/chats?${suffix}` : '/chats')
+  }
   const handleSelectChat = (chatId: string) => {
+    setNarrowList(false)
+    if (narrowDesktop) { if (narrowMode === 'list') narrowFocus.current = 'back'; setShowFriendInfo(true) }
     // 手選びはURL指定を上書きする。古い案内とURL状態を残さない。
     // friend / thread を残すと、再読込で手選び前の会話へ戻る(#673)。
     // 世代も進める。進めないと、走っている友だち照会が後から
@@ -484,12 +550,13 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
       setSelectedChatId(null)
       setSelectedThreadId(null)
       setSelectedInstagram(selected)
+      clearConversationParams()
       return
     }
     setSelectedInstagram(null)
     setSelectedChatId(chatId)
     // friend は外すが、一覧条件の savedView は残す(N-021)。
-    router.replace(buildInboxUrl(channel, savedViewParam || null))
+    clearConversationParams()
     // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
     setChats((prev) => prev.map((chat) => (
       chat.id === chatId ? { ...chat, isUnread: false } : chat
@@ -512,6 +579,8 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   // メールの行（一覧）と中央の行き先（ID27）で共用する開き方。
   const handleSelectEmail = (threadId: string) => {
+    setNarrowList(false)
+    if (narrowDesktop) { if (narrowMode === 'list') narrowFocus.current = 'back'; setShowFriendInfo(true) }
     // LINEの選択を外す。両方開いていると中央に何を
     // 出すのか決まらない。URL指定の案内とURL状態も外す。
     // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
@@ -521,7 +590,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     setSelectedChatId(null)
     setSelectedInstagram(null)
     setSelectedThreadId(threadId)
-    router.replace(buildInboxUrl(channel, savedViewParam || null))
+    clearConversationParams()
     setEmailItems((prev) => prev.map((email) => (
       email.threadId === threadId ? { ...email, isUnread: false } : email
     )))
@@ -604,6 +673,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     handleSendPack,
     handleKeyDown,
   } = useInboxSend({
+    tokenNames,
     selectedChatId,
     sending,
     sendLockRef,
@@ -743,10 +813,9 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     pendingMessages,
     selectedChatId,
     chatDetail,
-    textareaRef,
-    messageContent,
   })
 
+  // 顧客情報は選択中の会話と同じ友だちを対象にする。
   const lineContent = (<FriendInfoSidebarBoundary resetKey={`${selectedAccountId ?? ''}:${activeFriendId ?? ''}`}><FriendInfoSidebar
             lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
             friendId={activeFriendId}
@@ -777,46 +846,34 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {savedViewNotice ? <Notice tone="info" message={savedViewNotice} /> : null}
-      <InboxPage elementRef={panesRef} boardId="eovoG" composed>
-        {/* Left Panel: Chat List */}
-        {/* 設計 `ListPane` 360px。 */}
-        {/*
-          顧客情報を開いている間は一覧を 288px に留める(#982 LAY-01)。
-          以前は 2xl で 420px へ急拡大し、一覧+トーク+顧客情報の3列が
-          1536px でちょうど収まらなくなっていた。顧客情報を閉じた
-          2列だけのときだけ 420px へ広げる。
-        */}
-        {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
-            メールを開いたときも同じ。ここが LINE だけを見ていたので、
-            メールを開いても一覧が残って中央が半分のままだった。 */}
+      <InboxPage elementRef={panesRef} boardId="eovoG" composed narrowMode={narrowMode} narrowBack={<Button ref={narrowBackRef} onClick={() => { narrowFocus.current = 'row'; if (deepLinkNotice) clearDeepLink(); setNarrowList(true) }}>‹ 一覧を表示</Button>}>
         <InboxList {...{
-          unreadOnly, selectedChatId: selectedInstagram?.id ?? selectedChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
+          unreadOnly, selectedChatId: visibleInstagram?.id ?? visibleChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
           setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
           savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
           savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
           dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
-          setAssigneeFilter, setUnreadOnly, channel, socialChannel, setSocialChannel: (value: 'all' | 'line' | 'instagram') => { setSocialChannel(value); setSelectedInstagram(null); setSelectedChatId(null); setSelectedThreadId(null); setStatusFilter('all'); setAssigneeFilter('all'); setQuickFilter('all'); if (channel === 'email') router.replace(buildInboxUrl('all', savedViewParam || null)) }, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
+          setAssigneeFilter, setUnreadOnly, channel, socialChannel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
           assigneeUnread, listScrollRef,
           emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
           handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
-        {/* Right Panel: Chat Detail */}
-        {/*
-          `min-w-0 flex-1` だけにして、トーク列は残り幅いっぱいに伸縮させる。
-          以前の `xl:min-w-xl`（576px）は min-w-0 を上書きして 1280〜1536px
-          で右の顧客情報を画面外へ押し出していた(#982 LAY-01)。
-          顧客情報は狭い幅では列ではなくドロワーで開く（下の aside 参照）。
-        */}
-        {selectedInstagram ? <InstagramConversation key={selectedInstagram.id} chat={selectedInstagram} role={staffRole} onChanged={() => void loadChats()} /> : <InboxConversation {...{
-          operators, selectedChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
+        {visibleInstagram ? <InstagramConversation
+          key={visibleInstagram.id}
+          chat={visibleInstagram}
+          thread={instagramThread}
+          panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
+          onBack={() => setSelectedInstagram(null)}
+        /> : <InboxConversation {...{
+          operators, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
           loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
           openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef,
           messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage,
-          textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming,
+          textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming,
           dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey,
           setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor,
           setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError,
@@ -827,62 +884,30 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput,
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
-          imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
-          overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
+          imagePreviewOpen, sendError, pendingMessages, slaEnabled, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
+          // 未選択の中央の件数は LINE の対応状況・期限の数。Instagram のタブでは出さない（別の媒体の数を混ぜない）。
+          quickCountsNow: socialChannel === 'instagram' ? null : quickCountsNow,
+          statusCountsNow: socialChannel === 'instagram' ? null : statusCountsNow,
+          overdueTotal: socialChannel === 'instagram' ? null : overdueTotal,
         }} />}
 
-        {/*
-          友だち詳細。3列に収まる幅（1536px〜）では右列として常設し、
-          それより狭い幅ではトークの上に重ねるドロワーにする(#982)。
-          以前は `hidden xl:block` だけで、1280px未満では開閉ボタンを
-          押しても何も出ず、1280〜1536pxでは `xl:min-w-xl` と固定幅の
-          積み上げで右に切れていた。
-
-          friendId は **現在の選択** を優先する。chatDetail の読み込み中は
-          一覧にある chat.friendId を使い、読み込み後は同じ会話の
-          chatDetail.friendId を使う。会話IDと友だちIDは別物なので混同しない。
-        */}
-        {/*
-          友だち詳細。メールでも出したいが、メールのスレッドは友だちに
-          紐づいていない（support_email_threads は customer_email しか
-          持たない）。メールアドレスから友だちを引く口が要る。
-
-          いまはメールを開いているときは案内を出す。空の枠を出すより、
-          なぜ出ないかが分かる方がよい。
-        */}
-        {!selectedInstagram && <InboxCustomerPanel
+        <InboxCustomerPanel
+          instagramContent={visibleInstagram ? <InstagramCustomerInfo chat={visibleInstagram} thread={instagramThread} /> : null}
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
-          selectedChatId={selectedChatId}
+          selectedChatId={visibleChatId}
           selectedThreadId={visibleThreadId}
-          wideInfoPanel={wideInfoPanel}
+          wideInfoPanel={inlineInfoPanel}
           setShowFriendInfo={setShowFriendInfo}
           customerPanelRef={customerPanelRef}
           emailItems={emailItems}
 
-        />}
+        />
       </InboxPage>
     </div></SaveErrorScope>
   )
 }
 
-/**
- * 受信箱（設計 `V2 2-1 受信箱`）。
- *
- * 設計に上部タブは無い。チャネル（すべて / LINE / メール）は
- * 画面内の絞り込みチップとして扱う。タブにすると「LINEの受信箱」と
- * 「メールの受信箱」が別物に見えるが、実際は1つの受信箱で、
- * 出どころが違うだけ。設計が1画面にまとめているのはそのため。
- *
- * ただし中身の作りが LINE とメールで大きく違うので、いまは
- * チップで表示を切り替える形にしている。将来1つの一覧に混ぜるときも、
- * 画面の入口は変わらない。
- */
-// 受信箱のチャネル。
-//
-// /api/support/inbox は channel を 'all' | 'line' | 'email' で受け取り、
-// どちらの出どころも同じ形（id / channel / customerName / preview /
-// lastIncomingAt）で返す。つまり1つの一覧に混ぜられる。
 function ChatsPageHost() {
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading } = useAccount()

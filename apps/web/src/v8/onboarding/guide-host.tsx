@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { useStaffRole } from '@/lib/staff-role'
@@ -13,7 +13,8 @@ import { GuideMenuPicker } from './guide-menu-picker'
 import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
-import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
+import { useGuideSignal } from './guide-signal'
+import { useSetupMutationRefresh } from './use-setup-mutation-refresh'
 
 /*
   開店準備ガイドの入れ物。全画面で1つ。画面側は置かない。
@@ -22,8 +23,7 @@ import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
   案内する手順の対象（卓を作る・メニューを保存する…）は、はじめにやることの画面ではなく
   それぞれの設定画面にあるので、重ね表示はダッシュボードではなくアプリ全体に1つ置く。
 
-  案内中・一時停止中でない時は、はじめにやることの実測を読まない
-  （関係ない画面に読み込みを増やさない）。
+  進み具合は全画面で共有する。
 */
 
 export function GuideHost({ children }: { children: ReactNode }) {
@@ -65,9 +65,12 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     const frame = window.requestAnimationFrame(() => setQrOpen(new URLSearchParams(window.location.search).get('qr') === 'base'))
     return () => window.cancelAnimationFrame(frame)
   }, [pathname])
-  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: armed || pathname === '/', watchFirstMessage })
+  const watchers = useRef(new Set<symbol>())
+  const [sharedWatch, setSharedWatch] = useState(false)
+  const setWatch = useCallback((id: symbol, enabled: boolean) => { if (enabled) watchers.current.add(id); else watchers.current.delete(id); setSharedWatch(watchers.current.size > 0) }, [])
+  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: true, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch })
   const { guide, summary } = first
-  const shared = useMemo<SharedGuide>(() => ({ guide, summary }), [guide, summary])
+  const shared = useMemo<SharedGuide>(() => ({ guide, summary, dismissed: first.dismissed, setup: { accountId, run: first.runState, progress: first.styleProgress, setWatch } }), [guide, summary, first.dismissed, first.runState, first.styleProgress, accountId, setWatch])
 
   const index = summary?.steps.findIndex(step => step.key === guide.stepKey) ?? -1
   const step = index >= 0 ? summary?.steps[index] ?? null : null
@@ -127,8 +130,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     guide.phase === 'active',
     () => { if (procedure?.anchor !== 'reception.save') advance() },
   )
-  useSetupSaveSignal(scripted && armed, first.refresh)
-  useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
+  useSetupMutationRefresh(accountId, first.refresh)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.richMenuPublished === true
   const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished

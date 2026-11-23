@@ -4,7 +4,9 @@ import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Armchair, Check, X } from 'lucide-react'
-import type { RestaurantOpeningDay, RestaurantOpeningHours } from '@line-crm/shared'
+import type { RestaurantFloor, RestaurantOpeningDay, RestaurantOpeningHours } from '@line-crm/shared'
+import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
+import { groupTablesByFloor } from './table-groups'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -34,7 +36,7 @@ import { ApiError, fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantInventory, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { BoundaryBanner, QuietError, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
-import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrder, WEEK_ORDER, WEEKDAY_LABEL } from './format'
+import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, WEEK_ORDER, WEEKDAY_LABEL } from './format'
 import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
 import { Field } from '@/components/shared/form-controls'
@@ -94,6 +96,11 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
     () => (store ? data.tables.filter((item) => item.store_id === store.id) : data.tables),
     [data.tables, store],
   )
+  const [floors, setFloors] = useState<RestaurantFloor[]>([])
+  const [floorError, setFloorError] = useState(false)
+  const [floorRetry, setFloorRetry] = useState(0)
+  useEffect(() => { setFloors([]); setFloorError(false) }, [selectedAccountId, storeId])
+  useEffect(() => { let active = true; setFloorError(false); if (selectedAccountId && storeId) void reservationBoardApi.floors(selectedAccountId, storeId).then(result => { if (active) setFloors(result.data) }).catch(() => { if (active) setFloorError(true) }); return () => { active = false } }, [selectedAccountId, storeId, data.tables, floorRetry])
   const [asideExpanded, setAsideExpanded] = useState(false)
   const [date, setDate] = useState(() => storeToday(store?.timezone))
   const [dayRows, setDayRows] = useState<RestaurantInventory[] | null>(null)
@@ -383,7 +390,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const occupiedIds = selected ? occupiedOf(selected.row) : new Set<string>()
   const freeTables = activeTables.filter((item) => !occupiedIds.has(item.id))
   const bestTable = freeTables.slice().sort((a, b) => b.max_capacity - a.max_capacity)[0] ?? null
-  const gridTables = tables.slice().sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || tableOrder(a, b))
+  const tableGroups = groupTablesByFloor(tables, floors)
   /* 閉じる先は、メール転送で今も予約が届いている媒体（受付を各媒体の管理画面で閉じるもの）。 */
   const closingChannels = channels.filter((channel) => channel.receiveMethod === 'email_forward' && channel.status === 'receiving')
   const canCloseNote = Boolean(selected && lowSlot(selected) && !closedSlots.includes(selected.row.id))
@@ -414,11 +421,12 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
       ) : null}
       <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={selected ? `${selected.time} の卓` : '空席の状況'} description={'赤＝埋まっている・白＝空き・灰＝停止中'} actions={{primary: ((selected) ? <Button variant="primary" title={`予約台帳で ${selected.time} を見る`} aria-label={`予約台帳を見る（${selected.time}）`} href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}>予約台帳</Button> : null),secondary: ((selected) && (canCloseNote) ? <Button variant="secondary" lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button> : null)}}>
           <DetailSection>
+            {floorError?<Notice tone="warn" action={<Button variant="text" size="inline" onClick={()=>setFloorRetry(value=>value+1)}>もう一度読み込む</Button>}>階・エリアを読み込めませんでした。</Notice>:null}
 
-            {gridTables.length === 0 ? (
+            {tables.length === 0 ? (
               <ListState kind="empty" emptyPreset="readonly" title="卓がありません。座席・卓管理で追加してください。" description="卓を追加すると、ここに空きと利用状況が出ます。" action={<Button href="/restaurant-test/tables">座席・卓管理を開く</Button>} />
-            ) : <ul className={styles.tablesGrid}>
-              {gridTables.map((item) => {
+            ) : tableGroups.map(group => <section key={group.id} className={styles.tableGroup}>{group.name?<h3>{group.name}</h3>:null}<ul className={styles.tablesGrid}>
+              {group.tables.map((item) => {
                 const occupied = occupiedIds.has(item.id)
                 return (
                   <li key={item.id}>
@@ -427,7 +435,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                   </li>
                 )
               })}
-            </ul>}
+            </ul></section>)}
             {selected ? (
               <div className={styles.freeInfo}>
                 {bestTable ? (
@@ -558,8 +566,8 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
             {googleStatus !== null ? <>
               <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
-              <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
-              {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
+              <div className={styles.googleHoursLink}><Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button></div>
+              {hours ? <ul className={styles.googleHoursList}>{WEEK_ORDER.map((weekday) => <li key={weekday}>{WEEKDAY_LABEL[weekday]}曜日：{periodsText(hours.find((d) => d.weekday === weekday))}</li>)}</ul> : null}
             </> : hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0
