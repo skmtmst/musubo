@@ -1,7 +1,6 @@
 import { ImageIcon } from 'lucide-react'
 import LinePreview, { LinePreviewCarousel, LinePreviewMessage } from '@/components/shared/line-preview'
 import MusuboMark from '@/components/shared/musubo-mark'
-import { BroadcastButtonsPreview } from '@/components/broadcasts/broadcast-text-bubble'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import styles from './phone.module.css'
@@ -44,24 +43,35 @@ export default function BroadcastPhone({
     return (
       <LinePreview title={null} accountName={previewName} caption={chip}>
         <LinePreviewCarousel columns={carousel} />
-        <BroadcastButtonsPreview buttons={broadcast.messageOptions?.buttons ?? []} />
       </LinePreview>
     )
   }
   return (
     <LinePreview title={null} accountName={previewName} caption={chip}>
-      {plainText || photo ? <LinePreviewMessage accountName={previewName} avatar={initial} time={time} bare={Boolean(photo)}>
-        {plainText ? (broadcast.messageContent || 'テキストを入力すると表示されます') : photo?.url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- LINE に送る画像の見本（外部の URL）
-          <img width={200} height={200} className={styles.photo} src={photo.url} alt="送る写真" />
-        ) : <span className={`${styles.photo} ${styles.photoEmpty}`}><ImageIcon aria-hidden="true" />写真</span>}
-      </LinePreviewMessage> : <BroadcastMessagePreview
-        bubbles={broadcast.messageBubbles}
-        messageType={broadcast.messageType}
-        messageContent={broadcast.messageContent}
-        buttons={broadcast.messageOptions?.buttons}
-      />}
-      {photo ? <BroadcastButtonsPreview buttons={broadcast.messageOptions?.buttons ?? []} /> : null}
+      <LinePreviewMessage accountName={previewName} avatar={initial} time={time} bare={Boolean(photo)}>
+                {plainText ? (
+                  <p className={styles.bubble}>{broadcast.messageContent}</p>
+                ) : photo ? (
+                  photo.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- LINE に送る画像の見本（外部の URL）
+                    <img width={200} height={200} className={styles.photo} src={photo.url} alt="送る写真" />
+                  ) : (
+                    <span className={`${styles.photo} ${styles.photoEmpty}`}>
+                      <ImageIcon aria-hidden="true" />
+                      写真
+                    </span>
+                  )
+                ) : (
+                  <div className={styles.rich}>
+                    <BroadcastMessagePreview
+                      bubbles={broadcast.messageBubbles}
+                      messageType={broadcast.messageType}
+                      messageContent={broadcast.messageContent}
+                      buttons={broadcast.messageOptions?.buttons}
+                    />
+                  </div>
+                )}
+      </LinePreviewMessage>
     </LinePreview>
   )
 }

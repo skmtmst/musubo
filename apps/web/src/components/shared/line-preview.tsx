@@ -185,7 +185,7 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
 
 /**
  * カルーセル：写真・題・短い文・押す所のカードを横に並べ、はみ出した分は横へ送る。
- * 見本なので押す所は押せない文字にする。写真が無いカードは画像欄を省く。
+ * 見本なので押す所は押せない文字にする。写真が無いカードは灰の地。
  */
 export function LinePreviewCarousel({ columns, time }: {
   columns: Array<{ title: string; text: string; imageUrl?: string | null; actions: string[] }>; time?: string
@@ -193,12 +193,12 @@ export function LinePreviewCarousel({ columns, time }: {
   return <div className={styles.cardRow}>
     <div className={styles.carouselTrack}>
       {columns.map((column, index) => <div key={index} className={`${styles.productCard} ${styles.carouselCard}`}>
-        {column.imageUrl ? <div className={styles.productImage} role="img" aria-label={fillPreviewSample(column.title || 'カードの写真').text} style={{ backgroundImage: `url(${JSON.stringify(column.imageUrl)})` }} /> : null}
+        <div className={styles.productImage} role="img" aria-label={column.title || 'カードの写真'} style={column.imageUrl ? { backgroundImage: `url(${JSON.stringify(column.imageUrl)})` } : { background: 'var(--color-canvas-sunken)' }} />
         <div className={styles.productCopy}>
-          {column.title ? <span className={styles.productTitle} title={fillPreviewSample(column.title).text}>{fillPreviewSample(column.title).text}</span> : null}
-          {column.text ? <span className={styles.productDescription} title={fillPreviewSample(column.text).text}>{fillPreviewSample(column.text).text}</span> : null}
+          {column.title ? <span className={styles.productTitle} title={column.title}>{column.title}</span> : null}
+          {column.text ? <span className={styles.productDescription} title={column.text}>{column.text}</span> : null}
         </div>
-        {column.actions.map((label) => <span key={label} className={styles.productAction}>{fillPreviewSample(label).text}</span>)}
+        {column.actions.map((label) => <span key={label} className={styles.productAction}>{label}</span>)}
       </div>)}
     </div>
     {time ? <span className={styles.messageTime}>{time}</span> : null}
@@ -206,4 +206,4 @@ export function LinePreviewCarousel({ columns, time }: {
 }
 
 /** Flex はトーク枠内で描く。JSON の検査・安全な描画は既存レンダラーに任せる。 */
-export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWidth?: number }) { return <FlexPreview content={content} maxWidth={maxWidth} sample /> }
+export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWidth?: number }) { return <FlexPreview content={content} maxWidth={maxWidth} /> }

@@ -7,13 +7,8 @@
  * テーマ指定にかかわらず、現役のLINEの吹き出しを描く。
  */
 import type { BroadcastMessageButton } from '@/lib/api'
-import { LinePreviewMessage, LinePreviewFlex } from '@/components/shared/line-preview'
+import { LinePreviewMessage } from '@/components/shared/line-preview'
 import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '../templates/template-preview-model'
-
-export function BroadcastButtonsPreview({ buttons }: { buttons: BroadcastMessageButton[] }) {
-  if (!buttons.length) return null
-  return <div style={{ paddingLeft: 40 }}><LinePreviewFlex maxWidth={210} content={JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: buttons.map(button => ({ type: 'button', action: { type: button.type, label: button.label || 'ボタン' } })) } })} /></div>
-}
 
 export default function BroadcastTextBubble({ text, buttons, accountName, time = '' }: {
   text: string
@@ -28,7 +23,11 @@ export default function BroadcastTextBubble({ text, buttons, accountName, time =
       <LinePreviewMessage accountName={name} avatar={name.slice(0, 1)} time={time}>
         {buildTemplatePreview(text, EMPTY_TEMPLATE_REFERENCES).content || 'テキストを入力すると表示されます'}
       </LinePreviewMessage>
-      <BroadcastButtonsPreview buttons={buttons} />
+      {buttons.map((button) => (
+        <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 ml-10 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>
+          {button.label || 'ボタン'}
+        </div>
+      ))}
     </div>
   )
 }

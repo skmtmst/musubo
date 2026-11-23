@@ -1,6 +1,5 @@
 import { LinePreviewFlex } from '@/components/shared/line-preview'
 import { MapPin } from 'lucide-react'
-import { fillPreviewSample } from '@/components/shared/preview-sample'
 
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import { contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
@@ -49,7 +48,7 @@ export default function BroadcastMessagePreview({
           )}
           {item.type === 'text' ? (
             <p className="whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-card">
-              {fillPreviewSample(item.text || 'テキストを入力すると表示されます').text}
+              {item.text || 'テキストを入力すると表示されます'}
             </p>
           ) : item.type === 'flex' ? <LinePreviewFlex content={item.text} /> : item.location ? (
             <div className="rounded-card bg-canvas p-3 text-sm shadow-card">
@@ -69,10 +68,17 @@ export default function BroadcastMessagePreview({
               {contentExcerpt(item.type, item.text) || messageTypeLabel(item.type)}
             </p>
           )}
-
+          {index === 0 && (buttons ?? []).map((button) => (
+            <p
+              key={`${button.label}-${button.value}`}
+              className="mt-1 truncate rounded-control bg-accent-deep px-3 py-2 text-center text-xs font-medium text-on-accent"
+              title={button.value}
+            >
+              {button.label || 'ボタン'}
+            </p>
+          ))}
         </div>
       ))}
-      {buttons?.length ? <LinePreviewFlex maxWidth={210} content={JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: buttons.map(button => ({ type: 'button', action: { type: button.type, label: button.label || 'ボタン' } })) } })} /> : null}
     </div>
   )
 }
