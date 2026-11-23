@@ -58,7 +58,7 @@ export function retentionTableNames(): string[] {
 export function purgeTablesChildFirst(): string[] {
   const depth = new Map<string, number>();
   /** その表の行を選ぶために、まだ残っていないといけない表。 */
-  const dependsOn = (name: string): string[] => {
+  const scopeDependencies = (name: string): string[] => {
     // 第2弾の参照を残したまま親の組・申込を先に消さない。
     if (name === 'bookings') return ['booking_series','booking_groups'];
     if (name === 'hq_store_comparison_export_jobs') return ['staff_members'];
@@ -84,6 +84,27 @@ export function purgeTablesChildFirst(): string[] {
     if (scope.by === 'workflow' || (scope.by === 'lineAccount' && name !== 'line_accounts')) return ['line_accounts'];
     return [];
   };
+  // 所属をたどる親とは別に、版を参照する削除対象を先に消す。
+  // 保持対象は含めない。保持行の扱いは別途決めてから追加する。
+  const versionDependencies: Record<string, string[]> = {
+    automation_runs: ['automation_versions'],
+    friend_scores: ['action_score_rule_versions'],
+    mileage_redemptions: ['mileage_reward_versions'],
+    mileage_reward_codes: ['mileage_reward_versions'],
+    automation_run_steps: ['common_action_versions'],
+    common_action_bindings: ['common_action_versions'],
+    common_action_binding_migration_events: ['common_action_versions'],
+    mileage_reward_versions: ['common_action_versions'],
+    broadcasts: ['common_action_versions'],
+    hq_template_owned_r2_keys: ['hq_template_distribution_results'],
+    hq_template_distribution_results: ['hq_template_distribution_runs', 'hq_template_preflights'],
+    hq_template_distribution_runs: ['hq_template_versions'],
+    hq_template_preflights: ['hq_template_versions'],
+    style_starter_catalog_items: ['hq_template_versions'],
+  };
+  const dependsOn = (name: string): string[] => [
+    ...scopeDependencies(name), ...(versionDependencies[name] ?? []),
+  ];
   const measure = (name: string, seen: Set<string>): number => {
     const cached = depth.get(name);
     if (cached !== undefined) return cached;

@@ -92,6 +92,50 @@ describe('tenant data retention purge', () => {
     return (row as { n: number }).n;
   }
 
+  test('外部キー有効時にひな形と現在の版を消し、別の統括は残す', async () => {
+    sqlite.raw.pragma('foreign_keys = ON');
+    for (const id of ['t1', 't2']) {
+      seedTenant(id, id === 't1' ? { anchor: jst(-91) } : { planStatus: 'active' });
+      sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES (?, ?, 'tag', 'test')").run(`h-${id}`, id);
+      sqlite.raw.prepare("INSERT INTO hq_template_versions (id, tenant_id, template_id, version, definition_json, content_hash) VALUES (?, ?, ?, 1, '{}', 'hash')").run(`v-${id}`, id, `h-${id}`);
+      sqlite.raw.prepare('UPDATE hq_templates SET current_version_id = ? WHERE id = ?').run(`v-${id}`, `h-${id}`);
+    }
+    sqlite.raw.prepare("INSERT INTO hq_template_distribution_runs(id,tenant_id,template_id,template_version_id,idempotency_fingerprint,status) VALUES('run','t1','h-t1','v-t1','fp','completed')").run();
+    sqlite.raw.exec(`INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,expires_at) VALUES('pre','t1','h-t1','v-t1','acc-t1','create','fp','snap','ready','2099');
+      INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status) VALUES('run','t1','h-t1','v-t1','acc-t1','pre','fp','snap','succeeded');
+      INSERT INTO hq_template_owned_r2_keys(run_id,tenant_id,target_account_id,object_key,owner_token,state) VALUES('run','t1','acc-t1','key','owner','committed')`);
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.failedTenants).toBe(0);
+    expect(result.completed).toBe(1);
+    expect(count('hq_template_owned_r2_keys', 'tenant_id = ?', 't1')).toBe(0);
+    expect(count('hq_template_distribution_results', 'tenant_id = ?', 't1')).toBe(0);
+    expect(count('hq_template_preflights', 'tenant_id = ?', 't1')).toBe(0);
+    expect(count('hq_template_distribution_runs', 'tenant_id = ?', 't1')).toBe(0);
+    expect(count('hq_templates', 'tenant_id = ?', 't1')).toBe(0);
+    expect(count('hq_template_versions', 'tenant_id = ?', 't1')).toBe(0);
+    expect(count('hq_templates', "tenant_id = ? AND current_version_id = 'v-t2'", 't2')).toBe(1);
+    expect(count('hq_template_versions', 'tenant_id = ?', 't2')).toBe(1);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
+  test.each([
+    ['action_score', `INSERT INTO action_score_rule_sets(id,line_account_id) VALUES('p','acc-t1'); INSERT INTO action_score_rule_versions(id,rule_set_id,version_number) VALUES('v','p',1); UPDATE action_score_rule_sets SET current_draft_version_id='v' WHERE id='p'; INSERT INTO friends(id,line_user_id,line_account_id) VALUES('f','u','acc-t1'); INSERT INTO friend_scores(id,friend_id,line_account_id,score_change,rule_version_id) VALUES('h','f','acc-t1',1,'v')`],
+    ['automation', `INSERT INTO automation_definitions(id,line_account_id,name) VALUES('p','acc-t1','x'); INSERT INTO automation_versions(id,automation_id,version_number,trigger_type) VALUES('v','p',1,'x'); UPDATE automation_definitions SET current_draft_version_id='v' WHERE id='p'; INSERT INTO automation_runs(id,line_account_id,automation_id,automation_version_id,source_event_id,idempotency_key) VALUES('h','acc-t1','p','v','e','k')`],
+    ['common_action', `INSERT INTO common_actions(id,line_account_id,name) VALUES('p','acc-t1','x'); INSERT INTO common_action_versions(id,common_action_id,version_number) VALUES('v','p',1); UPDATE common_actions SET current_draft_version_id='v' WHERE id='p'; INSERT INTO common_action_bindings(id,line_account_id,common_action_id,common_action_version_id,consumer_type,consumer_id) VALUES('h','acc-t1','p','v','x','c')`],
+    ['mileage', `INSERT INTO mileage_programs(id,code,name,created_at,updated_at) VALUES('p0','p0','x','x','x'); INSERT INTO mileage_rewards(id,line_account_id,program_id,name,reward_kind) VALUES('p','acc-t1','p0','x','tag'); INSERT INTO mileage_reward_versions(id,reward_id,version_number,required_miles) VALUES('v','p',1,1); UPDATE mileage_rewards SET current_draft_version_id='v' WHERE id='p'; INSERT INTO mileage_redemptions(id,line_account_id,program_id,beneficiary_key,reward_id,reward_version_id,idempotency_key,request_fingerprint) VALUES('h','acc-t1','p0','f','p','v','key','hash')`],
+    ['banner', `INSERT INTO banner_projects(id,tenant_id,name) VALUES('p','t1','x'); INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,line_account_id) VALUES('m','image','x','x',1,'key','acc-t1'); INSERT INTO banner_generations(id,tenant_id,project_id,mode,preset_key,aspect_ratio,api_size,quality,final_prompt) VALUES('g','t1','p','banner','x','x','x','low','x'); INSERT INTO banner_images(id,tenant_id,project_id,generation_id,media_id) VALUES('i','t1','p','g','m'); UPDATE banner_generations SET reference_image_id='i' WHERE id='g'`],
+    ['staff', `INSERT INTO staff_members(id,name,role,api_key,tenant_id,assigned_line_account_id) VALUES('s','x','staff','key','t1','acc-t1'); UPDATE line_accounts SET created_by_staff_id='s' WHERE id='acc-t1'`],
+    ['webinar', `INSERT INTO webinars(id,account_id,title,slug,created_at,updated_at) VALUES('w','acc-t1','x','x','x','x'); INSERT INTO webinar_video_assets(id,webinar_id,created_at,updated_at) VALUES('v','w','x','x'); UPDATE webinars SET video_asset_id='v' WHERE id='w'`],
+  ])('外部キー有効の相互参照 %s を消去できる', async (_name, fixture) => {
+    sqlite.raw.pragma('foreign_keys = ON');
+    seedTenant('t1', { anchor: jst(-91) });
+    sqlite.raw.exec(fixture);
+    const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(result.failedTenants).toBe(0);
+    expect(result.completed).toBe(1);
+    expect(sqlite.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+
   test('契約終了の統括は保護されたテンプレートも消し、許可を残さない', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     sqlite.raw.prepare("INSERT INTO hq_templates (id, tenant_id, template_type, name) VALUES ('h1', 't1', 'tag', 'test')").run();
