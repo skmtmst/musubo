@@ -69,7 +69,7 @@ function BookingStatus({ accountId, eventId, refreshKey }: { accountId: string; 
     {loadError ? <Notice tone="warn" message="一部を読み込めませんでした。読み込めなかった数は「—」で表示しています。"
       action={<Button onClick={() => setReloadSeq((value) => value + 1)}>読み直す</Button>} /> : null}
     <KpiBand>
-      <KpiCard title="予約 / 定員" value={summary?.confirmedSeats ?? summary?.confirmed} valueText={!loading && summary ? `${summary.confirmedSeats ?? summary.confirmed} / ${summary.totalCapacity ?? '—'}` : undefined} unit="人" detail={null} loading={loading} />
+      <KpiCard title="予約 / 定員" value={summary?.confirmedSeats ?? summary?.confirmed} valueText={!loading && summary ? `${summary.confirmedSeats ?? summary.confirmed ?? '—'} / ${summary.totalCapacity ?? '—'}` : undefined} unit="人" detail={null} loading={loading} />
       <KpiCard title="承認待ち" value={summary?.requested} unit="件" detail="申請した時点から席を使います" loading={loading} />
       <KpiCard title="キャンセル待ち" value={summary?.waitlist} unit="件" detail="空きが出たら順に案内します" loading={loading} />
       <KpiCard title="キャンセル" value={summary?.cancelled} unit="件" detail="申込の履歴は残ります" loading={loading} />
@@ -80,7 +80,6 @@ function BookingStatus({ accountId, eventId, refreshKey }: { accountId: string; 
 function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string; eventId: string; onChanged: () => void }) {
   const saveErrors = useSaveFormErrors()
   const [lifecycle, setLifecycle] = useState<EventLifecycleStatus | null>(null)
-  const [hasFuture, setHasFuture] = useState<boolean | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadSeq, setLoadSeq] = useState(0)
   const [pending, setPending] = useState<(typeof NEXT_LIFECYCLE)['draft'][number] | null>(null)
@@ -92,14 +91,11 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
   useEffect(() => {
     const request = requests.start('lifecycle', true)
     if (!request) return
-    setLifecycle(null); setHasFuture(null); setLoadFailed(false)
+    setLifecycle(null); setLoadFailed(false)
     void eventsApi.getEvent(accountId, eventId).then(detail => {
       if (request.isCurrent()) setLifecycle(detail.lifecycle_status ?? (detail.is_published === 1 ? 'published' : 'draft'))
     }).catch(() => { if (request.isCurrent()) setLoadFailed(true) }).finally(() => { request.finish() })
-    const slotsRequest = requests.start('lifecycle-slots', true)
-    if (slotsRequest) void eventsApi.listSlots(accountId, eventId).then(slots => {
-      if (slotsRequest.isCurrent()) setHasFuture(slots.items.some(slot => slot.is_active === 1 && Date.parse(slot.starts_at) >= Date.now()))
-    }).catch(() => {}).finally(() => { slotsRequest.finish() })
+
   }, [accountId, eventId, loadSeq, requests])
   async function runSwitch() {
     if (!pending || busy || (pending.needsReason && reason.trim() === '')) return
@@ -124,7 +120,7 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
     } finally { if (request.isCurrent()) setBusy(false); request.finish() }
   }
   return <SaveErrorScope errors={saveErrors}><span className={styles.lifecycle}>
-    {lifecycle ? <StatusBadge tone={lifecycle === 'published' ? 'success' : 'neutral'}>{lifecycle === 'published' && hasFuture === false ? '終了' : LABELS[lifecycle]}</StatusBadge> : null}
+    {lifecycle ? <StatusBadge tone={lifecycle === 'published' ? 'success' : 'neutral'}>{LABELS[lifecycle]}</StatusBadge> : null}
     {lifecycle && NEXT_LIFECYCLE[lifecycle][0] ? <Button disabled={busy} onClick={() => requestUnsavedAction(() => { setReason(''); setError(''); setPending(NEXT_LIFECYCLE[lifecycle][0]) })}>{NEXT_LIFECYCLE[lifecycle][0].label}</Button> : null}
     {lifecycle && NEXT_LIFECYCLE[lifecycle].length > 1 ? <RowMenu label="公開状態の操作" items={NEXT_LIFECYCLE[lifecycle].slice(1).map(option => ({ id: option.to, label: option.label, disabled: busy, onSelect: () => requestUnsavedAction(() => { setReason(''); setError(''); setPending(option) }) }))} /> : null}
     {lifecycle === null ? loadFailed ? <><span role="alert">公開の状態を読み込めませんでした。</span><Button onClick={() => setLoadSeq((value) => value + 1)}>読み直す</Button></> : <span role="status">状態を読み込んでいます…</span> : null}

@@ -8,7 +8,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ getEvent: vi.fn(), setEventLifecycle: vi.fn() }))
+const net = vi.hoisted(() => ({ getEvent: vi.fn(), getBookingSummary: vi.fn(), setEventLifecycle: vi.fn() }))
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'ev-1' : null) }),
@@ -27,7 +27,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     eventsApi: {
       ...actual.eventsApi,
       getEvent: (...args: unknown[]) => net.getEvent(...args),
-      getBookingSummary: async () => ({ confirmed: 1, totalCapacity: 10, requested: 0, waitlist: 0, cancelled: 0 }),
+      getBookingSummary: (...args: unknown[]) => net.getBookingSummary(...args),
       listSlots: async () => ({ items: [] }),
       setEventLifecycle: (...args: unknown[]) => net.setEventLifecycle(...args),
     },
@@ -41,6 +41,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-18T00:00:00.000Z'))
   document.documentElement.dataset.theme = 'v8'
   net.getEvent.mockReset()
+  net.getBookingSummary.mockReset()
+  net.getBookingSummary.mockResolvedValue({ confirmed: 1, totalCapacity: 10, requested: 0, waitlist: 0, cancelled: 0 })
   net.setEventLifecycle.mockReset()
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.useRealTimers() })
@@ -61,6 +63,30 @@ describe('公開の状態（WEB318/319）', () => {
     expect(heading.textContent).toContain('下書き')
     expect(document.querySelector('[data-template-region="stats"]')?.textContent).not.toContain('下書き')
   })
+  it('予約数が取得できない場合は未取得として示し、undefined を表示しない', async () => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'draft', is_published: 0 })
+    net.getBookingSummary.mockResolvedValue({ totalCapacity: null, requested: 0, waitlist: 0, cancelled: 0 })
+    render(<EditEventPage />)
+    await waitFor(() => expect(document.querySelector('[data-template-region="stats"]')?.textContent).toContain('— / —'))
+    expect(document.querySelector('[data-template-region="stats"]')?.textContent).not.toContain('undefined')
+  })
+
+  it.each([['ended', '終了'], ['cancelled', '中止']])('%s の札には公開状態を変える操作を出さない', async (lifecycle_status, label) => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status, is_published: 1 })
+    render(<EditEventPage />)
+    const heading = document.querySelector('[data-template-region="heading"]')!
+    await waitFor(() => expect(heading.textContent).toContain(label))
+    expect(screen.queryByRole('button', { name: '一時停止する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '公開状態の操作' })).toBeNull()
+  })
+
+  it('公開中の札と操作は開催枠が過去でも同じ公開状態から決まる', async () => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'published', is_published: 1 })
+    render(<EditEventPage />)
+    const pause = await screen.findByRole('button', { name: '一時停止する' })
+    expect(pause.closest('[data-template-region="heading"]')?.textContent).toContain('公開中')
+  })
+
   it('状態が読めなかったら、読み直しを出す', async () => {
     net.getEvent.mockRejectedValue(new Error('down'))
     render(<EditEventPage />)
