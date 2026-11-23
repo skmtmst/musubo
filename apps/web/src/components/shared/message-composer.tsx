@@ -1,5 +1,6 @@
 'use client'
 
+import { fillPreviewSample } from './preview-sample'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { useRef, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, Plus, Save, Trash2, MessageSquare, Image, Video, Music, Smile, GalleryHorizontal, MapPin, FileText, Pencil, Bookmark } from 'lucide-react'
@@ -143,13 +144,14 @@ export default function MessageComposer(props: MessageComposerProps) {
 
 /** LINE の小さなカルーセル見本も、実際に入れたカードと操作から描く。 */
 export function ComposerCarouselPreview({ bubble }: { bubble: BroadcastBubble }) {
-  let columns: Array<{ title?: string; thumbnailImageUrl?: string; actions?: Array<{ label?: string }> }> = []
+  let columns: Array<{ title?: string; text?: string; thumbnailImageUrl?: string; actions?: Array<{ label?: string }> }> = []
   try { const parsed: unknown = JSON.parse(String(bubble.content.columnsJson ?? '[]')); if (Array.isArray(parsed)) columns = parsed.filter(column => column && typeof column === 'object') } catch { /* 編集途中のJSONは空の見本にする。 */ }
   return <div className={styles.carouselPreview} aria-label="カルーセルのプレビュー">
     {columns.length ? columns.map((column, index) => <div className={styles.previewCard} key={index}>
       {column.thumbnailImageUrl ? <img width={160} height={62} src={column.thumbnailImageUrl} alt="" /> : null}
-      {column.title ? <strong title={column.title}>{column.title}</strong> : null}
-      {(Array.isArray(column.actions) ? column.actions : []).map((action, i) => <span className={styles.previewAction} key={i}>{action?.label || 'ボタン'}</span>)}
+      {column.title ? <strong title={fillPreviewSample(column.title).text}>{fillPreviewSample(column.title).text}</strong> : null}
+      {column.text ? <p>{fillPreviewSample(column.text).text}</p> : null}
+      {(Array.isArray(column.actions) ? column.actions : []).map((action, i) => <span className={styles.previewAction} key={i}>{fillPreviewSample(action?.label || 'ボタン').text}</span>)}
     </div>) : <span>カードを作ると表示されます</span>}
   </div>
 }

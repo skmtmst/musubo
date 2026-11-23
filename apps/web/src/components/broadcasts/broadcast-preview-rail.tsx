@@ -2,6 +2,7 @@
 
 import type { AccountWithStats } from '@/contexts/account-context'
 import type { Tag } from '@line-crm/shared'
+import { BroadcastButtonsPreview } from './broadcast-text-bubble'
 import { BubblePreview } from './broadcast-preview-model'
 
 
@@ -78,7 +79,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const people = (value: number | null | undefined) => (value === null || value === undefined ? null : `${formatNumber(value)} 人`)
   const messagePreview = <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
           <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
-            <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} time={scheduledLabel?.match(/\b\d{2}:\d{2}\b/)?.[0]} buttons={index === 0 ? messageButtons : []} />)}</div>
+            <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} time={scheduledLabel?.match(/\b\d{2}:\d{2}\b/)?.[0]} />)}<BroadcastButtonsPreview buttons={messageButtons} /></div>
           </LinePreview>
         </div>
   return (<aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label={reach ? '届く人' : 'LINEの見え方'}>

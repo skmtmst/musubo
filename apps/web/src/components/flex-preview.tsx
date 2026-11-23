@@ -6,6 +6,8 @@
  * Covers: text, button, separator, image, box, icon, spacer, span.
  */
 
+import { fillPreviewSample } from './shared/preview-sample'
+
 interface FlexNode {
   type: string
   text?: string
@@ -111,7 +113,7 @@ function FlexText({ node }: { node: FlexNode }) {
 
 function FlexButton({ node }: { node: FlexNode }) {
   const isPrimary = node.style === 'primary'
-  const isLink = node.style === 'link'
+  const isLink = !node.style || node.style === 'link'
   const btnColor = node.color || (isPrimary ? 'var(--color-accent)' : undefined)
   const style: React.CSSProperties = {
     display: 'block',
@@ -119,12 +121,12 @@ function FlexButton({ node }: { node: FlexNode }) {
     padding: '10px 16px',
     borderRadius: 'var(--radius-control)',
     fontSize: '14px',
-    fontWeight: 600,
+    fontWeight: isLink ? 400 : 600,
     textAlign: 'center',
     cursor: 'default',
-    border: isPrimary || isLink ? 'none' : '1px solid #ccc',
-    backgroundColor: isPrimary ? btnColor : 'transparent',
-    color: isPrimary ? '#fff' : isLink ? (btnColor || 'var(--color-accent)') : '#333',
+    border: 'none',
+    backgroundColor: isPrimary ? btnColor : isLink ? 'transparent' : '#f5f5f5',
+    color: isPrimary ? '#fff' : isLink ? (btnColor || 'var(--tpl-rt-rich-link)') : '#333',
   }
   return <div style={style}>{node.action?.label || 'Button'}</div>
 }
@@ -224,6 +226,9 @@ function FlexBubble({ bubble, maxWidth }: { bubble: FlexNode; maxWidth?: number 
   return (
     <div style={{
       width: w,
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      flexShrink: 0,
       backgroundColor: 'var(--color-canvas)',
       borderRadius: 'var(--radius-card)',
       overflow: 'hidden',
@@ -332,7 +337,46 @@ function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
   )
 }
 
-export default function FlexPreview({ content, maxWidth }: { content: string; maxWidth?: number }) {
+/** 画面に表示する文字だけを置き換え、操作先や元のデータは変えない。 */
+function sampleFlexText(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sampleFlexText)
+  if (!value || typeof value !== 'object') return value
+  const source = value as Record<string, unknown>
+  return Object.fromEntries(Object.entries(source).map(([key, item]) => [key,
+    typeof item === 'string' && (key === 'text' || key === 'label' || key === 'title')
+      ? fillPreviewSample(item).text : sampleFlexText(item),
+  ]))
+}
+
+function TemplatePreview({ value, maxWidth }: { value: Record<string, unknown>; maxWidth?: number }) {
+  if ((value.type === 'carousel' || value.type === 'image_carousel') && Array.isArray(value.columns)) {
+    return <div style={{ display: 'flex', gap: 8, overflowX: 'auto', maxWidth: '100%' }}>{value.columns.map((column, index) => {
+      if (!column || typeof column !== 'object') return null
+      const card = column as Record<string, unknown>
+      if (value.type === 'image_carousel') {
+        const image = typeof card.imageUrl === 'string' ? safeFlexAssetUrl(card.imageUrl) : null
+        const label = typeof (card.action as Record<string, unknown> | undefined)?.label === 'string' ? String((card.action as Record<string, unknown>).label) : ''
+        return image ? <div key={index} style={{ position: 'relative', width: maxWidth || 210, flexShrink: 0, overflow: 'hidden', borderRadius: 12 }}><img src={image} alt="" width={210} height={210} style={{ display: 'block', width: '100%', aspectRatio: '1', objectFit: 'cover' }} referrerPolicy="no-referrer" />{label ? <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', textAlign: 'center', color: '#fff', background: 'rgba(0,0,0,.45)' }}>{label}</span> : null}</div> : null
+      }
+      return <div key={index} style={{ flexShrink: 0 }}><TemplatePreview value={{ ...card, type: 'buttons' }} maxWidth={maxWidth} /></div>
+    })}</div>
+  }
+  const actions = Array.isArray(value.actions) ? value.actions : []
+  const horizontal = value.type === 'confirm'
+  const image = typeof value.thumbnailImageUrl === 'string' ? safeFlexAssetUrl(value.thumbnailImageUrl) : null
+  return <div style={{ width: maxWidth || 210, maxWidth: '100%', overflow: 'hidden', borderRadius: 12, background: '#fff', color: '#111' }}>
+    {image ? <img src={image} alt="" width={210} height={140} style={{ width: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" /> : null}
+    <div style={{ padding: '12px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+      {typeof value.title === 'string' && value.title ? <strong>{value.title}</strong> : null}
+      <div>{typeof value.text === 'string' ? value.text : ''}</div>
+    </div>
+    <div style={{ display: 'flex', flexDirection: horizontal ? 'row' : 'column', borderTop: '1px solid #e0e0e0' }}>
+      {actions.map((item, index) => <div key={index} style={{ flex: 1, minWidth: 0, padding: '12px 4px', color: 'var(--tpl-rt-rich-link)', textAlign: 'center', borderTop: !horizontal && index ? '1px solid #e0e0e0' : undefined, borderLeft: horizontal && index ? '1px solid #e0e0e0' : undefined, overflowWrap: 'anywhere' }}>{item && typeof item === 'object' && 'label' in item ? String(item.label) : ''}</div>)}
+    </div>
+  </div>
+}
+
+export default function FlexPreview({ content, maxWidth, sample = false }: { content: string; maxWidth?: number; sample?: boolean }) {
   let parsed: unknown
   try {
     parsed = JSON.parse(content)
@@ -340,6 +384,10 @@ export default function FlexPreview({ content, maxWidth }: { content: string; ma
     return <FlexUnavailable raw={content} />
   }
 
+  if (sample) parsed = sampleFlexText(parsed)
+  const source = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+  const template = source?.type === 'template' && source.template && typeof source.template === 'object' ? source.template as Record<string, unknown> : source
+  if (template && (template.type === 'buttons' || template.type === 'confirm' || ((template.type === 'carousel' || template.type === 'image_carousel') && Array.isArray(template.columns)))) return <TemplatePreview value={template} maxWidth={maxWidth} />
   const container = normalizeFlexContainer(parsed)
 
   if (container?.type === 'bubble') {

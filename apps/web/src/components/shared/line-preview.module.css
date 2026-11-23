@@ -227,7 +227,7 @@
 :root .bubbleBody { position: relative; z-index: 1; display: flex; align-items: flex-start; min-height: 94px; width: 176px; padding: 8px 10px; border-radius: 16px; background: var(--color-canvas); color: var(--color-ink); font-size: 11.5px; font-weight: 400; line-height: 18px; }
 :root .messageTime { font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 9px; font-weight: 400; line-height: 14px; color: var(--v8-line-time); white-space: nowrap; }
 :root .sampleNote { font-size: 9px; font-weight: 500; line-height: 14px; color: var(--v8-line-time); white-space: nowrap; }
-:root .cardRow { display: flex; flex-shrink: 0; align-items: flex-end; gap: 4px; width: 100%; padding-left: 40px; }
+:root .cardRow { display: flex; flex-shrink: 0; align-items: flex-end; gap: 4px; width: 100%; min-width: 0; box-sizing: border-box; padding-left: 40px; }
 :root .productCard { display: flex; flex-direction: column; flex-shrink: 0; width: 186px; border-radius: 16px; background: var(--color-canvas); overflow: hidden; }
 :root .productImage { width: 100%; height: 104px; flex-shrink: 0; background-position: center; background-size: cover; }
 :root .productCopy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px 8px; }
@@ -236,11 +236,11 @@
 :root .priceRow { display: flex; align-items: flex-end; gap: 4px; padding-top: 2px; }
 :root .price { font-family: var(--font-inter), Inter, system-ui, sans-serif; color: var(--color-ink); font-size: 14px; font-weight: 700; line-height: 21px; }
 :root .tax { color: var(--v8-line-muted); font-size: 9.5px; font-weight: 400; line-height: 14px; }
-:root .productAction { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 34px; padding: 0; border: 0; border-top: 1px solid var(--v8-line-hairline); background: transparent; color: var(--color-accent); font-family: inherit; font-size: 12px; font-weight: 700; line-height: 18px; cursor: pointer; }
+:root .productAction { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 34px; padding: 0; border: 0; border-top: 1px solid var(--v8-line-hairline); background: transparent; color: var(--tpl-rt-rich-link); font-family: inherit; font-size: 12px; font-weight: 400; line-height: 18px; cursor: pointer; }
 :root .secondaryAction { color: var(--color-action); }
 :root .productAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -3px; }
 /* カルーセル：カードを横に並べ、トークの右端を越えた分は横へ送る（見本の板では右が切れて見える）。 */
-:root .carouselTrack { display: flex; gap: 8px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+:root .carouselTrack { display: flex; gap: 8px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 :root .carouselCard { width: 186px; }
 :root .carouselCard .productTitle, :root .carouselCard .productDescription { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
