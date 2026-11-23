@@ -21,7 +21,7 @@
     "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
     "fingerprint": "c0178aae0089713fec33ad0891ed0d193156f4d3b5b8cd3fd58421750bb9b575",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "EntityPickerDialog の候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/broadcasts/broadcast-schedule-step.tsx",
@@ -33,7 +33,7 @@
     "file": "apps/web/src/components/chats/friend-info-sections.tsx",
     "fingerprint": "85306de98ba6d67d90d7e27200906c655b52453fb79eaee0228bfa85a99a6b6f",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "customer-panel.module.css の .profileSection p が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/flex-preview.tsx",
@@ -165,7 +165,7 @@
     "file": "apps/web/src/components/shared/customer-look-preview.tsx",
     "fingerprint": "0f4f6af6fdb736d3c28a686a50a2072cbb45d9865d78a4c9deb734294ad05220",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "customer-look-preview.module.css の .content が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-preview.tsx",
@@ -177,7 +177,7 @@
     "file": "apps/web/src/components/shared/customer-look-preview.tsx",
     "fingerprint": "7dd368026be2792a716e40d14f3dc63f8a18f7d7f63b9cf9b6acd73bde434056",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "customer-look-preview.module.css の .content が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-preview.tsx",
@@ -297,7 +297,7 @@
     "file": "apps/web/src/components/shared/message-composer.tsx",
     "fingerprint": "03b4be97c1a75976c8e31d2e4df2e27d92b681d290d2e3b827e236178e4bec55",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "message-composer.module.css の .choice p が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/message-composer.tsx",
@@ -321,7 +321,7 @@
     "file": "apps/web/src/components/shared/message-composer.tsx",
     "fingerprint": "cae457e855080f9e124ee21be6dc26ba4c3b94112302359bb58f2b141209b043",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "message-composer.module.css の .choice p が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/message-composer.tsx",
@@ -759,7 +759,7 @@
     "file": "apps/web/src/v8/events/list.tsx",
     "fingerprint": "21259d400a1764bb4a2e1ada9d4a4d18867f2f4ae1763c4e1a2382db5ae000bb",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
   },
   {
     "file": "apps/web/src/v8/forms/list.tsx",
@@ -777,7 +777,7 @@
     "file": "apps/web/src/v8/friend-add/list.tsx",
     "fingerprint": "4ba5ad406a83bf77f9c8b6c8ab1b06211e8488f8ff9734440757b43e7423339f",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
   },
   {
     "file": "apps/web/src/v8/friends/merged/merged.tsx",
@@ -801,7 +801,7 @@
     "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
     "fingerprint": "1ef4fe1781b6901f5a48d74657e1ef938d4e9c024ada6fb51d03bd47e46458f3",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "MessageComposer の .content が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
@@ -825,7 +825,7 @@
     "file": "apps/web/src/v8/hq-deliveries/console.tsx",
     "fingerprint": "5c5d1a868d82987f5d2d47d33d119fd7a25fdcb4739d49b01e33dcca2ed8ea3d",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "DistributionProgress の .progressPanel が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-starter-sets/legacy-details.tsx",
@@ -837,7 +837,7 @@
     "file": "apps/web/src/v8/hq-store-compare/list.tsx",
     "fingerprint": "3686a11de15b902b10d22a18580e39af487c23f339d0eb912bc56e3344157946",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "DetailContent が値の文字サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-templates/attribute-distribution.tsx",
@@ -849,7 +849,7 @@
     "file": "apps/web/src/v8/hq-templates/attribute-distribution.tsx",
     "fingerprint": "7a151ab058dd82f24064382a82f0ba88609872d6785c6e187deb75adfbccc36e",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通の表のセルが本文サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-templates/tag-editor.tsx",
@@ -1029,31 +1029,31 @@
     "file": "apps/web/src/v8/mileage/score-rules.tsx",
     "fingerprint": "16726f6b6790ee09b1962a761c97a98ec3ac915a1fcae19d605462a9eaaa6130",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通 Notice が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/mileage/score-rules.tsx",
     "fingerprint": "4e4a7546fb86851a9dcef620a55c7f393e5d336d4037b1d7286371a5967e6476",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通 Notice が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/mileage/score-rules.tsx",
     "fingerprint": "54ae6c6818443215d4ae24499969265e7bd3e0e250a425e23f9af6f159cd65b8",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通 Notice が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/mileage/score-rules.tsx",
     "fingerprint": "76c70162f7a0560a7ebb67b79483e79893621eab959d05581a20c4522699bdb5",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通 Notice が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/mileage/score-rules.tsx",
     "fingerprint": "cb465ecd7779bfc569f93543469b7ebf8003fdcd8d8efad3cf03420bb2df3575",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通 Notice が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/nen-health/summary.tsx",
@@ -1281,7 +1281,7 @@
     "file": "apps/web/src/v8/restaurant/google/google.tsx",
     "fingerprint": "085d091f8419e281eec9a02b983e6bdc52bea338c29d60aac5e22be36599c081",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "Google 接続の案内は別の変更で対応中"
   },
   {
     "file": "apps/web/src/v8/restaurant/google/hours-confirm.tsx",
@@ -1467,7 +1467,7 @@
     "file": "apps/web/src/v8/rich-menus/new/create.tsx",
     "fingerprint": "a39a26a3cd534bd8d4889c69f6f84c471215654c1cf0b51792cc276125ee8a0f",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
   },
   {
     "file": "apps/web/src/v8/rich-menus/new/create.tsx",
@@ -1557,7 +1557,7 @@
     "file": "apps/web/src/v8/tag-edit/edit-form.tsx",
     "fingerprint": "8cd9c17b34d38a0fdc4398bb061ffb9c527941b3194e4ea3615ba63fdc748807",
     "count": 2,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通 HelpTip が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/tags/field-editor.tsx",
@@ -1575,6 +1575,6 @@
     "file": "apps/web/src/v8/webinar-edit/chrome.tsx",
     "fingerprint": "5d7d9953453e345631442aec5bfe00b1269c7fd49ea6fcc1639b05feb71c88cb",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
   }
 ]
