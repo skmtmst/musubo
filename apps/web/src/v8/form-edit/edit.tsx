@@ -50,7 +50,7 @@ import styles from './edit.module.css';
 import { useCreatedDraft } from './use-created-draft'
 import { readFormDraftCreation, rememberFormDraftCreation } from '@/lib/form-draft-session'
 import { formRoutingApi } from '@/lib/api/helpers/gap2';
-import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
+import { hasBookingBlock, routingError, routingOf, withRouting, type FormRouting, type RoutingStoreScope } from './routing-model';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -110,6 +110,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
   const [routingRefs, setRoutingRefs] = useState<(Pick<FormRefs, 'routingMenus'|'routingMenuStaff'|'bookingGroups'|'bookingGroupsError'> & {key:string}) | null>(null)
+  const [routingStores, setRoutingStores] = useState<{ key: string; scope: Exclude<RoutingStoreScope, 'checking'> } | null>(null)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -123,6 +124,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [bookingStaffErrors,setBookingStaffErrors]=useState<Record<string, boolean>>({})
   const bookingStaffAccount = useRef(selectedAccountId)
   const scopedRoutingRefs = routingRefs?.key === JSON.stringify([selectedAccountId,id]) ? routingRefs : undefined
+  /* まだ保存していない新しいフォームは、選んでいる店だけで作られる。 */
+  const routingStoreScope: RoutingStoreScope = host || !id ? 'single' : routingStores?.key === JSON.stringify([selectedAccountId, id]) ? routingStores.scope : 'checking'
+  const hasBooking = hasBookingBlock([...layout.header, ...layout.sections.flatMap((section) => section.blocks)])
   const [referencesError,setReferencesError]=useState(false)
   const [referencesRestricted,setReferencesRestricted]=useState(false)
   const savedSnapshot = useRef<string | null>(null)
@@ -382,6 +386,23 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }).catch(() => { if (!cancelled) setRoutingRefs({key:JSON.stringify([selectedAccountId,id]),bookingGroups:[],bookingGroupsError:true}) })
     return () => { cancelled = true }
   }, [host, selectedAccountId, id])
+
+  // 行き先のメニューは店ごとに違い、保存はフォームを使う全部の店で行き先を確かめる。
+  // フォームを使う店を一覧の利用先（保存の検査と同じ対応表）から読む。読めない・一覧に無い時は「この店だけ」とみなさない。
+  useEffect(() => {
+    if (host || !selectedAccountId || !id || !hasBooking) return
+    let cancelled = false
+    const key = JSON.stringify([selectedAccountId, id])
+    const settle = (scope: Exclude<RoutingStoreScope, 'checking'>) => setRoutingStores((prev) => (scope === 'unknown' && prev?.key === key ? prev : { key, scope }))
+    void fetchApi<{ success: boolean; data: Array<{ id: string; usedByAccounts?: Array<{ id: string }> }> }>(`/api/forms?account_id=${encodeURIComponent(selectedAccountId)}`)
+      .then((res) => {
+        if (cancelled) return
+        const stores = res.success && Array.isArray(res.data) ? res.data.find((row) => row.id === id)?.usedByAccounts : undefined
+        settle(!Array.isArray(stores) || stores.length === 0 ? 'unknown' : stores.length > 1 ? 'shared' : 'single')
+      })
+      .catch(() => { if (!cancelled) settle('unknown') })
+    return () => { cancelled = true }
+  }, [host, selectedAccountId, id, hasBooking])
 
   // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
   useEffect(() => {
@@ -1073,6 +1094,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onRemoveBlock={removeBlock}
             routing={routingOf(layout)}
             routingRefs={scopedRoutingRefs}
+            routingStores={routingStoreScope}
             onChangeRouting={host ? undefined : patchRouting}
             references={layout.references ?? []}
             referenceStates={publishedReferences}

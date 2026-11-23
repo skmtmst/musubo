@@ -53,7 +53,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
-    fetchApi: vi.fn(async () => ({ success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] })),
+    // フォームの一覧は「この店だけで使うフォーム」として返す（振り分けの区画が店を確かめるため）。
+    fetchApi: vi.fn(async (path: string) => String(path).startsWith('/api/forms?account_id=')
+      ? { success: true, data: [{ id: 'form-1', usedByAccounts: [{ id: 'acc-1' }] }] }
+      : { success: true, data: [{ id: 'tag-1', name: 'アンケート回答' }] }),
     bookingApi: {
       ...actual.bookingApi,
       listMenus: vi.fn(async () => ({ menus: [{ id: 'bm-1', name: 'トリミング（小型犬）', duration_minutes: 60, is_active: 1 }] })),
@@ -1132,4 +1135,50 @@ it('答えが1つの質問に同時に満たせない条件が重なった振り
   // 保存は非同期で進むため、送るまでの間を待ってから送っていないことを確かめる。
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
   expect(formsUpdate).not.toHaveBeenCalled()
+})
+
+it('ほかの店でも使うフォームは振り分けをオンにさせず、この店だけと確かめたフォームならオンにできる', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  const stores={value:[{id:'acc-1'},{id:'acc-2'}]}
+  vi.mocked(fetchApi).mockImplementation((async (path:string) => path==='/api/forms?account_id=acc-1'
+    ? {success:true,data:[{id:'other-form',usedByAccounts:[{id:'acc-1'}]},{id:'form-1',usedByAccounts:stores.value}]}
+    : {success:true,data:[]}) as typeof fetchApi)
+  try {
+    await render('id=form-1')
+    const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+    expect(await screen.findByText(/ほかの店でも使うフォームのため、答えで予約の行き先は分けられません/)).toBeTruthy()
+    expect(toggle.disabled).toBe(true)
+    act(() => { root.unmount() })
+    root=createRoot(host)
+    stores.value=[{id:'acc-1'}]
+    await render('id=form-1')
+    const single=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+    await waitFor(() => expect(single.disabled).toBe(false))
+    expect(screen.queryByText(/ほかの店でも使うフォーム/)).toBeNull()
+    fireEvent.click(single)
+    expect(single.getAttribute('aria-checked')).toBe('true')
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
+})
+
+it('フォームを使う店を確かめられない時は「この店だけ」とみなさず、振り分けをオンにさせない', async () => {
+  const {fetchApi}=await import('@/lib/api')
+  const original=vi.mocked(fetchApi).getMockImplementation()
+  const listed={value:'missing' as 'missing'|'failed'}
+  vi.mocked(fetchApi).mockImplementation((async (path:string) => {
+    if(path!=='/api/forms?account_id=acc-1') return {success:true,data:[]}
+    if(listed.value==='failed') throw new ApiError(503,'一時的に使えません')
+    return {success:true,data:[{id:'other-form',usedByAccounts:[{id:'acc-1'}]}]}
+  }) as typeof fetchApi)
+  try {
+    for (const state of ['missing','failed'] as const) {
+      listed.value=state
+      act(() => { root.unmount() })
+      root=createRoot(host)
+      await render('id=form-1')
+      const toggle=await screen.findByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+      expect(await screen.findByText(/このフォームを使う店を確かめられないため、今は行き先を分けられません/)).toBeTruthy()
+      expect(toggle.disabled).toBe(true)
+    }
+  } finally { if(original)vi.mocked(fetchApi).mockImplementation(original) }
 })

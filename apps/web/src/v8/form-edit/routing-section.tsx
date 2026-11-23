@@ -19,7 +19,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import type { FormRefs } from '@/components/forms/form-refs'
-import { choiceModeLabel, type FormRouting, type RoutingRule, type RoutingTarget, emptyRouting, hasBookingBlock, MAX_ROUTING_ROWS, newRule, nextCondition, routingError, routingQuestions, ruleAnswer } from './routing-model'
+import { choiceModeLabel, type FormRouting, type RoutingRule, type RoutingStoreScope, type RoutingTarget, emptyRouting, hasBookingBlock, MAX_ROUTING_ROWS, newRule, nextCondition, routingError, routingQuestions, ruleAnswer } from './routing-model'
 import styles from './routing-section.module.css'
 
 const MODES = [{ value: '', label: '指定しない' }, { value: 'in_person', label: 'お店で' }, { value: 'online', label: 'オンライン' }]
@@ -28,12 +28,16 @@ const MODES = [{ value: '', label: '指定しない' }, { value: 'in_person', la
  * 回答フォーム 編集 › 中身 の区画「答えで予約の行き先を分ける」（B6-1・BGoRL）。
  * 表の 1 行 1 決まり・上から順に当てる・最後の行は消せない。「試しに答える」は保存せず、当たった行を緑で光らせる。
  * 閲覧のみの人には編集を出さず、試しだけ使える（何も変えないため）。決まりは回答フォームの版に含める。
+ * 行き先のメニューは店ごとに違い、保存はフォームを使う全部の店で行き先を確かめる。この店だけで使うと確かめられた時だけオンにでき、
+ * ほかの店でも使う・確かめられない時は押せない形と理由を出す（確かめている間はスイッチを出さない）。オフにする操作はいつでもできる。
  */
-export default function RoutingSection({ blocks, refs, routing, readOnly, onChange, onPreview }: {
+export default function RoutingSection({ blocks, refs, routing, readOnly, stores = 'single', onChange, onPreview }: {
   blocks: FormBlock[]
   refs: FormRefs
   routing: FormRouting | undefined
   readOnly?: boolean
+  /** このフォームを使う店。 */
+  stores?: RoutingStoreScope
   onChange: (next: FormRouting) => void
   onPreview?: (answers: Record<string, unknown>) => Promise<{ matchedIndex: number; target: RoutingTarget; fellBack: boolean }>
 }) {
@@ -56,6 +60,12 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
   const reorder = useReorder({ items: ruled, idOf: (r) => r.id, disabledReason: readOnly ? '閲覧のみのため並べ替えられません' : null, onReorder: ({ ids }) => onChange({ ...value, rules: ids.map((id) => value.rules[Number(id.slice(1))]) }) })
   const problem = routingError(value, blocks)
   if (!hasBookingBlock(blocks)) return null
+  const storeNotice = readOnly ? null
+    : stores === 'shared' ? (value.enabled
+      ? { tone: 'warn' as const, text: 'ほかの店でも使うフォームのため、行き先を分けたままでは保存できません。オフにしてから保存してください。' }
+      : { tone: 'info' as const, text: 'ほかの店でも使うフォームのため、答えで予約の行き先は分けられません（予約のメニューは店ごとに違います）。使うときは、この店だけのフォームを新しく作ってください。' })
+    : stores === 'unknown' && !value.enabled ? { tone: 'warn' as const, text: 'このフォームを使う店を確かめられないため、今は行き先を分けられません。画面を読み直してください。' }
+    : null
 
   const hit = trying ? preview?.matchedIndex ?? null : null
   const runPreview = async (next: Record<string, string | string[] | number>) => {
@@ -101,9 +111,11 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
         </span>
         <span className={styles.actions}>
           {value.enabled ? <Button variant="secondary" icon={<Play size={16} aria-hidden="true" />} onClick={() => { setTrying((v) => !v); previewSequence.current++; setAnswers({}); setPreview(null); setPreviewError('') }} aria-expanded={trying} aria-controls="routing-trial">試しに答える</Button> : null}
-          {readOnly ? null : <Toggle label="答えで予約の行き先を分ける" checked={value.enabled} onChange={(enabled) => set({ enabled })} />}
+          {/* 確かめている間は押せない部品を置かず、確かめてから出す。 */}
+          {readOnly || (stores === 'checking' && !value.enabled) ? null : <Toggle label="答えで予約の行き先を分ける" checked={value.enabled} disabled={!value.enabled && stores !== 'single'} describedBy={storeNotice ? 'fe-routing-stores' : undefined} onChange={(enabled) => set({ enabled })} />}
         </span>
       </div>
+      {storeNotice ? <Notice id="fe-routing-stores" tone={storeNotice.tone}>{storeNotice.text}</Notice> : null}
       {value.enabled ? <>
         {unavailableRows.length ? <Notice tone="warn">{unavailableRows.join('・')}の行き先が使えません。行き先を選び直してください。</Notice> : null}
         {refs.bookingGroupsError ? <Notice tone="warn">予約先の候補を読み込めませんでした。権限を確認して画面を読み直してください。</Notice> : null}

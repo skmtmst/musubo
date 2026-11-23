@@ -11,6 +11,11 @@ export type FormRouting = BookingRouting
 export type RoutingRule = BookingRouting['rules'][number]
 export { type RoutingTarget }
 export const MAX_ROUTING_ROWS = 50
+/**
+ * このフォームを使う店。行き先のメニューは店ごとに違い、保存はフォームを使う全部の店で行き先を確かめる。
+ * single＝この店だけ／shared＝ほかの店でも使う／checking＝確かめている／unknown＝確かめられなかった。
+ */
+export type RoutingStoreScope = 'single' | 'shared' | 'checking' | 'unknown'
 export const emptyTarget = (): RoutingTarget => ({ menuId: '' })
 export const emptyRouting = (): FormRouting => ({ enabled: false, rules: [], fallback: emptyTarget() })
 

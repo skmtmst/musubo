@@ -41,7 +41,7 @@ import { readPermissionSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/s
 import styles from './edit.module.css';
 import { useFormEditAttempted } from './field-issues';
 import { blockKindLine,blockTitleKind,blockTitleLine,inputTypeLabel,isChoiceType } from './model';
-import type { FormRouting } from './routing-model';
+import type { FormRouting, RoutingStoreScope } from './routing-model';
 import RoutingSection from './routing-section';
 import { formRoutingApi } from '@/lib/api/helpers/gap2';
 
@@ -80,6 +80,8 @@ type Props = {
   /** 答えで予約の行き先を分ける（B6）。決まりは回答フォームの版に含める。 */
   routing?: FormRouting
   routingRefs?: Pick<FormRefs, 'routingMenus'|'routingMenuStaff'|'bookingGroups'|'bookingGroupsError'>
+  /** このフォームを使う店（行き先のメニューは店ごとに違うため、ほかの店でも使うフォームでは行き先を分けられない）。 */
+  routingStores?: RoutingStoreScope
   onChangeRouting?: (next: FormRouting) => void
   /** 公開用の参照（F2）。保存は layout ごと送るため、一覧だけを編集画面へ返す。 */
   references?: FormReferenceDefinition[]
@@ -146,7 +148,7 @@ export function ContentTab(props: Props) {
         </div>
       </Card>
 
-      {props.onChangeRouting ? <RoutingSection blocks={routingBlocks} refs={{...props.refs, ...props.routingRefs}} routing={props.routing} readOnly={props.readOnly || Boolean(permissionSession?.impersonation)} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
+      {props.onChangeRouting ? <RoutingSection blocks={routingBlocks} refs={{...props.refs, ...props.routingRefs}} routing={props.routing} readOnly={props.readOnly || Boolean(permissionSession?.impersonation)} stores={props.routingStores} onChange={props.onChangeRouting} onPreview={props.accountId && props.formId ? async (answers) => (await formRoutingApi.preview(props.accountId!, props.formId!, answers, undefined, layout)).data : undefined} /> : null}
 
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-blocks-title">
         <div className={styles.cardHeadText}>

@@ -163,6 +163,31 @@ it('答えが1つの質問に同時に満たせない条件が重なった行は
   expect(screen.getByRole('button',{name:'1 行目の条件 1 の答え'}).closest('[data-invalid]')).toBeNull()
 })
 
+it('ほかの店でも使うフォームでは、行き先を分けるをオンにさせず理由を出す', () => {
+  const onChange=vi.fn()
+  render(<RoutingSection blocks={[{id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},{id:'book',kind:'input',type:'booking'}] as never}
+    refs={{} as never} routing={{enabled:false,rules:[],fallback:{menuId:''}}} stores="shared" onChange={onChange} />)
+  const toggle=screen.getByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+  expect(toggle.disabled).toBe(true)
+  expect(toggle.getAttribute('aria-describedby')).toContain('fe-routing-stores')
+  expect(document.getElementById('fe-routing-stores')?.textContent).toContain('ほかの店でも使うフォームのため、答えで予約の行き先は分けられません')
+  fireEvent.click(toggle)
+  expect(onChange).not.toHaveBeenCalled()
+})
+
+it('ほかの店でも使うフォームで行き先を分けていたら、オフにして保存するよう知らせる', () => {
+  const onChange=vi.fn()
+  const props={blocks:[{id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},{id:'book',kind:'input',type:'booking'}] as never,
+    refs:{} as never, routing:{enabled:true,rules:[],fallback:{menuId:'m'}}, stores:'shared' as const, onChange}
+  const {rerender}=render(<RoutingSection {...props} />)
+  expect(screen.getByText(/行き先を分けたままでは保存できません。オフにしてから保存してください/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('switch',{name:'答えで予約の行き先を分ける'}))
+  expect(onChange.mock.calls[0][0].enabled).toBe(false)
+  // 閲覧のみ（代理ログインを含む）は行き先を変えられないため、保存の知らせは出さない。
+  rerender(<RoutingSection {...props} readOnly />)
+  expect(document.getElementById('fe-routing-stores')).toBeNull()
+})
+
 it('数値の範囲を変更すると数値としてルールに反映する', () => {
   const onChange=vi.fn()
   render(<RoutingSection blocks={[{id:'q',kind:'input',type:'rating',name:'score',label:'満足度'},{id:'book',kind:'input',type:'booking'}] as never} refs={{} as never}
@@ -216,4 +241,31 @@ it('担当できる人がいなくなった組の行き先を知らせる', () =
     refs={{routingMenus:[{id:'m',name:'相談',durationMinutes:30}],routingMenuStaff:{m:[{id:'s',name:'別の担当'}]},bookingGroups:[{id:'g',name:'相談組',menuIds:[]}]} as never}
     routing={{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'相談'}],target:{menuId:'m',staffGroupId:'g'}}],fallback:{menuId:'m'}}} readOnly onChange={() => {}} />)
   expect(screen.getByText(/1 行目の行き先が使えません/)).toBeTruthy()
+})
+
+it('使う店を確かめている間と確かめられない時は、行き先を分けるをオンにさせない。オフにはできる', () => {
+  const onChange=vi.fn()
+  const blocks=[{id:'q',kind:'input',type:'radio',name:'subject',label:'相談内容',choices:[{id:'x',label:'相談'}]},{id:'book',kind:'input',type:'booking'}] as never
+  const off={enabled:false,rules:[],fallback:{menuId:''}}
+  const {rerender}=render(<RoutingSection blocks={blocks} refs={{} as never} routing={off} stores="checking" onChange={onChange} />)
+  const toggle=() => screen.getByRole('switch',{name:'答えで予約の行き先を分ける'}) as HTMLButtonElement
+  // 確かめている間は押せないスイッチを置かない（押せない部品を置かない決まり）。
+  expect(screen.queryByRole('switch',{name:'答えで予約の行き先を分ける'})).toBeNull()
+  expect(document.getElementById('fe-routing-stores')).toBeNull()
+  rerender(<RoutingSection blocks={blocks} refs={{} as never} routing={off} stores="unknown" onChange={onChange} />)
+  expect(toggle().disabled).toBe(true)
+  expect(document.getElementById('fe-routing-stores')?.textContent).toContain('このフォームを使う店を確かめられないため、今は行き先を分けられません')
+  fireEvent.click(toggle())
+  expect(onChange).not.toHaveBeenCalled()
+  // この店だけと確かめられたらオンにできる（対照）。
+  rerender(<RoutingSection blocks={blocks} refs={{} as never} routing={off} stores="single" onChange={onChange} />)
+  expect(toggle().disabled).toBe(false)
+  expect(document.getElementById('fe-routing-stores')).toBeNull()
+  fireEvent.click(toggle())
+  expect(onChange.mock.calls[0][0].enabled).toBe(true)
+  // すでに分けている行き先は、確かめられない時もオフにできる（保存の検査に任せ、止めない）。
+  rerender(<RoutingSection blocks={blocks} refs={{} as never} routing={{enabled:true,rules:[],fallback:{menuId:'m'}}} stores="unknown" onChange={onChange} />)
+  expect(document.getElementById('fe-routing-stores')).toBeNull()
+  fireEvent.click(toggle())
+  expect(onChange.mock.calls[1][0].enabled).toBe(false)
 })
