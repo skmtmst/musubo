@@ -226,6 +226,17 @@ export const broadcastsPaths = {
       responses: { '200': { description: '知らせ直した' }, '409': { description: '依頼中でない' } },
     },
   },
+  '/api/broadcasts/{id}/correction': {
+    post: {
+      tags: ['Broadcasts'],
+      summary: '送信済み配信から訂正の下書きを作る',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: { '201': { description: '下書きを作成' }, '200': { description: '作成済みの下書き' }, '400': { description: 'キーが不正' }, '403': { description: '権限がない' }, '404': { description: '配信が見つからない' }, '409': { description: '送信状態または宛先を確認できない' } },
+    },
+  },
   '/api/broadcasts/{id}/recipients': {
     get: {
       tags: ['Broadcasts'],

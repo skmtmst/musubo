@@ -3,6 +3,7 @@ import type { BroadcastSendMode } from './broadcast-schedule'
 import { SEND_TIME_MISSING_MESSAGE } from './broadcast-step-gate'
 import { broadcastAbSendProblem } from './broadcast-ab-send-guard'
 
+import type { SendConfirmationPreview } from '@line-crm/shared'
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
 
@@ -21,6 +22,7 @@ type SaveBroadcastContext = {
   approvalNote: string
   approverId: string
   deliveryLimited?: boolean
+  correctionPreview?: { data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null }
   audienceCount: number | null
   bubbles: BroadcastBubble[]
   currentStep: BroadcastStepKey | null
@@ -42,7 +44,7 @@ type SaveBroadcastContext = {
   validate: () => string
 }
 
-export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
+export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited, correctionPreview, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
     if (saving || submittingRef.current) return
     const abProblem = broadcastAbSendProblem(ab.enabled, audienceCount)
     if (abProblem) { setError(abProblem); return }
@@ -63,7 +65,18 @@ export async function saveBroadcast({ ab, approvalConfigState, approvalCountInpu
     setSaving(true); setError('')
     const requestAccountId = selectedAccountIdRef.current || null
     try {
-      const saved = await persistDraft(
+      let saved: ApiBroadcast | null
+      if (correctionPreview) {
+        const { data, broadcast } = correctionPreview
+        if (!data || !broadcast || data.recipients !== audienceCount || (needsApprovalSingle && data.recipients !== Number(approvalCountInput))) { setError('送る人数をもう一度確認してください'); return }
+        if (sendMode === 'scheduled') {
+          const at = scheduledAtIso()
+          if (!at) { setError('予約日時を確認してください'); return }
+          const result = await api.broadcasts.update(broadcast.id, { scheduledAt: at, expectedVersion: Number(data.expectedVersion), confirmedRecipientCount: data.recipients }, true)
+          if (!result.success) { setError(result.error); return }
+          saved = result.data
+        } else saved = broadcast
+      } else saved = await persistDraft(
         scheduledAtIso(),
         false,
         needsApprovalSingle ? Number(approvalCountInput) : deliveryLimited ? audienceCount ?? undefined : undefined,
@@ -96,7 +109,7 @@ export async function saveBroadcast({ ab, approvalConfigState, approvalCountInpu
           onSuccess(saved)
           return
         }
-        const sent = await api.broadcasts.send(saved.id, deliveryLimited ? { expectedVersion:abVersion, confirmedRecipientCount:audienceCount! } : needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
+        const sent = await api.broadcasts.send(saved.id, (deliveryLimited || saved.correctionOfBroadcastId) ? { expectedVersion:abVersion, confirmedRecipientCount: needsApprovalSingle ? Number(approvalCountInput) : audienceCount! } : needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
         if ((selectedAccountIdRef.current || null) !== requestAccountId) return
         if (!sent.success) { setError(sent.error); return }
         setConfirmOpen(false)

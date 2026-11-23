@@ -6,7 +6,7 @@ import { buildSegmentWhere, type Broadcast, type SegmentCondition } from '@line-
 import { getBroadcastApprovalThreshold } from '../features/broadcasts/broadcast-approval/index.js';
 
 /** 人数だけをSQLで集計する。本文・全宛先はWorkerへ読み出さない。 */
-export async function sendAudienceCounts(db: D1Database, accountId: string, condition?: SegmentCondition) {
+export async function sendAudienceCounts(db: D1Database, accountId: string, condition?: SegmentCondition, fixedBroadcastId?: string) {
   const where = condition ? buildSegmentWhere(condition) : { sql: '1=1', bindings: [] };
   const row = await db.prepare(`SELECT COUNT(*) matched,
     COALESCE(SUM(NOT f.is_following),0) blocked,
@@ -14,7 +14,7 @@ export async function sendAudienceCounts(db: D1Database, accountId: string, cond
     COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (f.line_user_id IS NULL OR trim(f.line_user_id)='')),0) missing,
     COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND trim(COALESCE(f.line_user_id,''))!='' AND NOT (${DELIVERY_CONSENT_ALLOWED_SQL})),0) optedOut,
     COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND trim(COALESCE(f.line_user_id,''))!='' AND (${DELIVERY_CONSENT_ALLOWED_SQL})),0) recipients
-    FROM friends f WHERE f.line_account_id=? AND (${where.sql})`).bind(accountId, ...where.bindings)
+    FROM friends f WHERE f.line_account_id=? AND (${where.sql})${fixedBroadcastId ? ' AND EXISTS (SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=? AND c.friend_id=f.id)' : ''}`).bind(accountId, ...where.bindings, ...(fixedBroadcastId ? [fixedBroadcastId] : []))
     .first<{matched:number;blocked:number;hidden:number;missing:number;optedOut:number;recipients:number}>();
   if (!row) throw new Error('send_preview_unavailable');
   return {recipients:row.recipients, excluded:{blocked:row.blocked, optedOut:row.optedOut, duplicate:0, hidden:row.hidden, missingDestination:row.missing}};
@@ -25,7 +25,7 @@ export async function broadcastSendPreview(db: D1Database, broadcast: Broadcast)
     ? {operator:'AND',rules:[{type:'tag_exists',value:broadcast.target_tag_id!}]}
     : broadcast.target_type==='segment' ? JSON.parse(broadcast.segment_conditions!) : undefined;
   if (broadcast.target_type==='segment' && !condition?.rules) throw new Error('invalid_preview_conditions');
-  const counts=await sendAudienceCounts(db,broadcast.line_account_id,condition);
+  const counts=await sendAudienceCounts(db,broadcast.line_account_id,condition,broadcast.correction_of_broadcast_id ? broadcast.id : undefined);
   const limited=await limitedDeliveryPlan(db,broadcast,{requireConfirmation:false});
   const recipients=limited?.recipientCount??counts.recipients;
   return {...counts,recipients,...(limited?{deliveryLimit:{candidateCount:limited.candidateCount,recipientCount:recipients,random:true}}:{}),purpose:'marketing' as const,scheduledAt:broadcast.scheduled_at??null,quietHoursShiftTo:await broadcastQuietHoursShift(db,broadcast.line_account_id,broadcast.scheduled_at??new Date().toISOString()),

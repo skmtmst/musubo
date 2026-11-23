@@ -91,6 +91,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
     if(await simulationContext(c.env.DB,id)){const result=await scheduleSimulation(c.env.DB,id,sendBody??{},c.req.header('Idempotency-Key')??'');await processBroadcastSimulation(c.env.DB,id);return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,id)}});}
     const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
+    if (existing.correction_of_broadcast_id && sendBody?.expectedVersion === undefined) return c.json({success:false,error:'送る前の確認が必要です'},409);
     if(sendBody?.expectedVersion!==undefined) {
       const current=await broadcastSendPreview(c.env.DB,existing);
       if(sendBody.expectedVersion!==current.expectedVersion||sendBody.confirmedRecipientCount!==current.recipients||current.recipients===0)
@@ -209,10 +210,12 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     const scoped = scopeSegmentQuery({ sql, bindings }, accountId
       ? { allowedAccountIds: [accountId], canSeeUnassigned: false }
       : scope);
+    const fixedAudience = existing.correction_of_broadcast_id
+      ? ' WHERE EXISTS (SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=? AND c.friend_id=q.id)' : '';
     const audience = await c.env.DB.prepare(`SELECT COUNT(*) AS total,
       SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-      FROM (${scoped.sql}) q`)
-      .bind(...scoped.bindings)
+      FROM (${scoped.sql}) q${fixedAudience}`)
+      .bind(...scoped.bindings, ...(existing.correction_of_broadcast_id ? [id] : []))
       .first<{ total: number; missing_name: number | null }>();
 
     // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
@@ -223,7 +226,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       }, 400, ["name"]);
     }
 
-    const total = Number(audience?.total ?? 0);
+    const total = existing.correction_of_broadcast_id ? Number(existing.total_count ?? 0) : Number(audience?.total ?? 0);
     const lockResult = await c.env.DB.prepare(
       `UPDATE broadcasts
             SET status = 'sending', batch_offset = 0, total_count = ?
@@ -537,6 +540,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
   if (storedDeliveryLimit(existing)) return c.json({success:false,error:'上限付きの配信は、送信前の確認から送ってください。'},409);
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
+  if (existing.correction_of_broadcast_id) return c.json({ success: false, error: '送る前の確認から送信してください' }, 409);
   const body = await c.req.json<{ conditions: SegmentCondition }>();
 
   if (!body.conditions || !body.conditions.operator || !Array.isArray(body.conditions.rules)) {
@@ -544,6 +548,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
   }
 
   const segmentAudienceChanged = existing.target_type !== 'segment' || !sameJsonMeaning(existing.segment_conditions, body.conditions);
+  if (existing.correction_of_broadcast_id && segmentAudienceChanged) return c.json({ success: false, error: '訂正の宛先は変更できません' }, 409);
   /*
    * 二者承認のゲート。絞り込み送信も人数で判定する。
    * 送る条件は行に無いので、今回の条件を重ねた行で数える。

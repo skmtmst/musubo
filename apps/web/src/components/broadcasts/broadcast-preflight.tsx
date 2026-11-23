@@ -6,7 +6,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
 type RunBroadcastPreflightContext = {
-  preflightRequestBody: () => { deliveryLimit?: import('@line-crm/shared').BroadcastDeliveryLimit; targetType: "tag" | "segment"; targetTagId: string | null; segmentConditions: SegmentCondition | null; lineAccountId: string | null; messageContent: string; scheduledAt: string | null; messageCount: number; }
+  preflightRequestBody: () => { correctionDraftId?: string; deliveryLimit?: import('@line-crm/shared').BroadcastDeliveryLimit; targetType: "tag" | "segment"; targetTagId: string | null; segmentConditions: SegmentCondition | null; lineAccountId: string | null; messageContent: string; scheduledAt: string | null; messageCount: number; }
   preflightSeq: RefObject<number>
   saveErrors: ReturnType<typeof useSaveFormErrors>
   setError: Dispatch<SetStateAction<string>>

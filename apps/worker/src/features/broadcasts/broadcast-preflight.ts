@@ -29,6 +29,7 @@ export interface PreflightResult {
 
 export interface PreflightInput {
   targetType: string;
+  fixedBroadcastId?: string;
   targetTagId?: string | null;
   lineAccountId?: string | null;
   /** multi-account-dedup のときの対象アカウント */
@@ -87,6 +88,10 @@ export async function previewAudience(
     const ids = scopedFriendIds(await storedBroadcastFriendScope(db, null));
     where.push(`f.id IN (${ids.sql})`);
     binds.push(...ids.bindings);
+  }
+  if (input.fixedBroadcastId) {
+    where.push('EXISTS (SELECT 1 FROM broadcast_send_claims c WHERE c.broadcast_id=? AND c.friend_id=f.id)');
+    binds.push(input.fixedBroadcastId);
   }
   if (input.targetType === 'tag') {
     where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');

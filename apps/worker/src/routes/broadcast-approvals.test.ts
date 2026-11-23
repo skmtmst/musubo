@@ -283,6 +283,58 @@ describe('二者承認の依頼・承認・差し戻し', () => {
     expect(again.status).toBe(409);
   });
 
+  it('訂正の予約は確認した人数・版で作り、二者承認後に台帳の人へ送る', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-16T00:00:00Z'));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    try {
+      seedStaff(testDb, 'owner-1', 'オーナー', 'owner', ['/broadcasts']);
+      testDb.raw.exec(`UPDATE broadcasts SET target_type='segment',status='sent',total_count=2,success_count=1 WHERE id='b1';
+        INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) VALUES('b1','friend-1','account-1','sent'),('b1','friend-2','account-1','failed')`);
+      const id='c4522a8a-a40e-43eb-860a-38238f24f131';
+      expect((await app(testDb.db,sender).request('/api/broadcasts/b1/correction',{method:'POST',headers:{'Idempotency-Key':id}})).status).toBe(201);
+      expect((await app(testDb.db,owner).request('/api/broadcasts/approval-threshold?lineAccountId=account-1',json('PUT',{lineAccountId:'account-1',threshold:1}))).status).toBe(200);
+      const body={expectedVersion:1,confirmedRecipientCount:1,scheduledAt:'2026-11-16T01:00:00Z'};
+      expect((await app(testDb.db,sender).request(`/api/broadcasts/${id}`,{...json('PUT',body),headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'}})).status).toBe(200);
+      expect((await app(testDb.db,sender).request(`/api/broadcasts/${id}/approval-request`,json('POST',{approverStaffId:'owner-1'}))).status).toBe(201);
+      const stepped=await steppedUpSession(testDb,'owner-1','owner-scheduled-approval-token');
+      expect((await app(testDb.db,owner).request(`/api/broadcasts/${id}/approval-approve`,{...json('POST',{expectedVersion:2}),headers:{'Content-Type':'application/json',...stepped}})).status).toBe(200);
+      vi.setSystemTime(new Date('2026-11-16T01:01:00Z'));
+      const {processScheduledBroadcasts,processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+      await processScheduledBroadcasts(testDb.db,{} as never); await processQueuedBroadcasts(testDb.db,{} as never);
+      expect(testDb.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(id)).toEqual([{friend_id:'friend-1',state:'sent'}]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('訂正を別の担当者が承認した後、確認した版と人数で台帳の相手にだけ送る', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-16T01:00:00Z'));
+    const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      seedStaff(testDb, 'owner-1', 'オーナー', 'owner', ['/broadcasts']);
+      testDb.raw.exec(`UPDATE broadcasts SET target_type='segment',status='sent',total_count=2,success_count=1 WHERE id='b1';
+        INSERT INTO broadcast_send_claims(broadcast_id,friend_id,line_account_id,state) VALUES('b1','friend-1','account-1','sent'),('b1','friend-2','account-1','failed')`);
+      const correctionId='c4522a8a-a40e-43eb-860a-38238f24f131';
+      const created=await app(testDb.db,sender).request('/api/broadcasts/b1/correction',{method:'POST',headers:{'Idempotency-Key':correctionId}});
+      expect(created.status).toBe(201);
+      const threshold=await app(testDb.db,owner).request('/api/broadcasts/approval-threshold?lineAccountId=account-1',json('PUT',{lineAccountId:'account-1',threshold:1}));
+      expect(threshold.status).toBe(200);
+      const requested=await app(testDb.db,sender).request(`/api/broadcasts/${correctionId}/approval-request`,json('POST',{approverStaffId:'owner-1'}));
+      expect(requested.status).toBe(201);
+      const stepped=await steppedUpSession(testDb,'owner-1','owner-approval-token');
+      const approved=await app(testDb.db,owner).request(`/api/broadcasts/${correctionId}/approval-approve`,{...json('POST',{expectedVersion:1}),headers:{'Content-Type':'application/json',...stepped}});
+      expect(approved.status).toBe(200);
+      const sending=await app(testDb.db,owner).request(`/api/broadcasts/${correctionId}/send`,{...json('POST',{expectedVersion:1,confirmedRecipientCount:1}),headers:{'Content-Type':'application/json','X-Confirm-Irreversible':'broadcast-send'}});
+      expect(sending.status).toBe(202);
+      const {processQueuedBroadcasts}=await import('../features/broadcasts/broadcast.js');
+      await processQueuedBroadcasts(testDb.db,{} as never);
+      expect(testDb.raw.prepare('SELECT friend_id,state FROM broadcast_send_claims WHERE broadcast_id=?').all(correctionId)).toEqual([{friend_id:'friend-1',state:'sent'}]);
+      const calls=fetchMock.mock.calls.filter(([url])=>String(url).includes('/message/'));
+      expect(calls).toHaveLength(1);
+      const payload=JSON.parse(String(calls[0][1]?.body));
+      expect(payload.to === 'Ufriend-1' || (Array.isArray(payload.to) && payload.to.length===1 && payload.to[0]==='Ufriend-1')).toBe(true);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('自分の依頼は承認できない（API で拒否）', async () => {
     await app(testDb.db, owner)
       .request('/api/broadcasts/approval-threshold?lineAccountId=account-1', json('PUT', {

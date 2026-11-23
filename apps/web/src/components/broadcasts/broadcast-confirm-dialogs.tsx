@@ -4,7 +4,7 @@ import type { BroadcastSendMode } from './broadcast-schedule'
 import type { UnsavedLeaveTarget } from '@/lib/use-unsaved-guard'
 
 
-import { ApprovalRequestFields } from '@/components/broadcasts/broadcast-approval'
+import { ApprovalRequestFields, SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -23,6 +23,9 @@ import type { Dispatch,SetStateAction, ReactNode } from 'react'
 import { BROADCAST_ONLY_CONDITION_AXES,STANDARD_CONDITION_AXES,TYPE_LABELS } from './broadcast-form-model'
 
 type RenderBroadcastConfirmDialogsContext = {
+  correction: boolean
+  approvalCountInput: string
+  setApprovalCountInput: Dispatch<SetStateAction<string>>
   bDraftUnsupported: boolean
   canConfirm: boolean
   confirmationBlocked: boolean
@@ -80,7 +83,7 @@ type RenderBroadcastConfirmDialogsContext = {
   title: string
 }
 
-export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
+export function renderBroadcastConfirmDialogs({ correction, approvalCountInput, setApprovalCountInput, bDraftUnsupported, canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
   return (<><UnsavedLeaveDialog
       open={leaveTarget !== null}
       subject="配信の変更"
@@ -158,33 +161,33 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
 
     {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
     <SendConfirmDialog
-      open={confirmOpen && !needsApprovalSingle}
+      open={confirmOpen && (!needsApprovalSingle || correction)}
       subtitle={`${title.trim() || '新しい一斉配信'}・${confirmAudienceLabel}`}
       scheduled={sendMode === 'scheduled'}
-      state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
+      state={(currentStep || correction) ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
       block={(broadcastRole === 'viewer' || broadcastRole === 'staff') && !canSendBroadcast ? 'no-permission' : null}
       hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
       unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
-      onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
-      recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
-      recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
+      onRetry={() => ((currentStep || correction) ? setPreviewSeq((value) => value + 1) : void runPreflight())}
+      recipients={(currentStep || correction) ? (sendPreview.data?.recipients ?? null) : audienceCount}
+      recipientsNote={(currentStep || correction) && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
       purpose="marketing"
-      whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
+      whenLabel={(currentStep || correction) && sendPreview.data?.quietHoursShiftTo
         ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
         : sendWhenLabel ?? '送る時間は未設定'}
-      whenNote={currentStep && sendPreview.data?.quietHoursShiftTo
+      whenNote={(currentStep || correction) && sendPreview.data?.quietHoursShiftTo
         ? '夜の静かな時間（21〜8 時）のため、次の 8:00 に送ります'
         : concurrentBroadcasts.length > 0
           ? '同じ時刻の前後 1 時間に別の予約配信があります'
           : sendMode === 'scheduled' ? '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます' : undefined}
-      sender={currentStep ? sendPreview.data?.sender ?? null : null}
-      bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
+      sender={(currentStep || correction) ? sendPreview.data?.sender ?? null : null}
+      bodyHead={((currentStep || correction) && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
       bubbleCount={bubbles.length}
       allRecipients={targetMode === 'all' && !sendPreview.data?.stoppable}
       extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
-      approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
-      confirmationFields={confirmationFields}
-      approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
+      approval={needsApproval && !needsApprovalSingle && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
+      confirmationFields={<>{confirmationFields}{needsApprovalSingle && correction && sendPreview.data ? <SingleOperatorFields recipientCount={sendPreview.data.recipients} value={approvalCountInput} onChange={setApprovalCountInput} /> : null}</>}
+      approvalFields={needsApproval && !needsApprovalSingle && approvalConfig && audienceCount !== null ? (
         <ApprovalRequestFields
           bare
           recipientCount={audienceCount}
@@ -197,15 +200,15 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
           onNoteChange={setApprovalNote}
         />
       ) : undefined}
-      primaryDisabled={!canConfirm || confirmationBlocked || (needsApproval && approverId === '')}
-      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
-        const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
-        const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
+      primaryDisabled={!canConfirm || confirmationBlocked || (needsApproval && !needsApprovalSingle && approverId === '') || (correction && (!sendPreview.data || (needsApprovalSingle && (approvalCountInput.trim() === '' || Number(approvalCountInput) !== sendPreview.data.recipients))))}
+      primaryLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : (() => {
+        const n = (currentStep || correction) ? sendPreview.data?.recipients ?? null : audienceCount
+        const shifted = (currentStep || correction) ? sendPreview.data?.quietHoursShiftTo : null
         if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`
         const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
         return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
       })()}
-      onConfirm={() => (currentStep && !needsApproval ? confirmMessage() : save())}
+      onConfirm={() => ((currentStep || correction) && !needsApproval ? confirmMessage() : save())}
       onBack={() => { if (!saving) setConfirmOpen(false) }}
       error={error || undefined}
     /></>)

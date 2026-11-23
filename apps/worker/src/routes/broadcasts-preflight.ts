@@ -28,6 +28,7 @@ export const post__api_broadcasts_preflight_1 = async (c: Context<Env, "/api/bro
     scheduledAt?: unknown;
     messageCount?: unknown;
     deliveryLimit?: unknown;
+    correctionDraftId?: unknown;
   }>();
 
   let deliveryLimit: ReturnType<typeof parseBroadcastDeliveryLimit>;
@@ -59,8 +60,19 @@ export const post__api_broadcasts_preflight_1 = async (c: Context<Env, "/api/bro
       return inputError(c, { success: false, error: segmentError instanceof Error ? segmentError.message : 'invalid segmentConditions' }, 400, ["targetType","segmentConditions"]);
     }
   }
+  let fixedBroadcastId: string | undefined;
+  if (body.correctionDraftId !== undefined) {
+    if (typeof body.correctionDraftId !== 'string') return inputError(c, { success: false, error: '下書きを確認できません' }, 400, ['correctionDraftId']);
+    const fixed = await getBroadcastById(c.env.DB, body.correctionDraftId);
+    if (!fixed || !fixed.correction_of_broadcast_id || fixed.line_account_id !== body.lineAccountId || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [fixed.line_account_id])) return fail(c, 404, 'BROADCAST_NOT_FOUND');
+    if (deliveryLimit || targetType !== 'segment') return inputError(c, { success: false, error: '訂正の宛先は変更できません' }, 409, []);
+    segmentConditions = fixed.segment_conditions ? JSON.parse(fixed.segment_conditions) as SegmentCondition : null;
+    if (!segmentConditions) return inputError(c, { success: false, error: '訂正の宛先を確認できません' }, 409, []);
+    fixedBroadcastId = fixed.id;
+  }
   const preview = await previewAudience(c.env.DB, {
     targetType,
+    fixedBroadcastId,
     targetTagId: body.targetTagId ? String(body.targetTagId) : null,
     lineAccountId: body.lineAccountId ? String(body.lineAccountId) : null,
     accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,

@@ -1,3 +1,4 @@
+import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { countLimitedAudience, storedDeliveryLimit, limitedDeliveryPlan } from './broadcast-delivery-limit.js';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -131,6 +132,12 @@ export async function countApprovalRecipients(
   db: D1Database,
   broadcast: Broadcast,
 ): Promise<number> {
+  if (broadcast.correction_of_broadcast_id) {
+    const row = await db.prepare(`SELECT COUNT(*) n FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id
+      WHERE c.broadcast_id=? AND f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0
+      AND trim(COALESCE(f.line_user_id,''))!='' AND (${DELIVERY_CONSENT_ALLOWED_SQL})`).bind(broadcast.id, broadcast.line_account_id).first<{ n: number }>();
+    return Number(row?.n ?? 0);
+  }
   if (storedDeliveryLimit(broadcast)) return (await countLimitedAudience(db,broadcast)).candidateCount;
   const raw = broadcast as unknown as Record<string, unknown>;
   if (broadcast.target_type === 'multi-account-dedup') {
@@ -366,7 +373,7 @@ export async function checkScheduledBroadcastApproval(
   const status = (fresh?.approval_status ?? 'none') as ReturnType<typeof readApprovalStatus>;
   if (gate.singleOperator) {
     const limited = await limitedDeliveryPlan(db,broadcast);
-    if (limited ? limited.recipientCount <= Number(fresh.approval_confirmed_count) : Number(fresh.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
+    if (limited ? limited.recipientCount <= Number(fresh.approval_confirmed_count) : broadcast.correction_of_broadcast_id ? gate.recipientCount > 0 && gate.recipientCount <= Number(fresh.approval_confirmed_count) : Number(fresh.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
     // 人数が変わったまま時刻が来た。送らず期限切れにし、依頼主に知らせる。
     const claimed = await db.prepare(
       `UPDATE broadcasts SET approval_status = 'expired'
