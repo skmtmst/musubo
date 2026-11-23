@@ -6,12 +6,6 @@
     "reason": "apps/web/src/components/auth/application-auth.module.css: .heading p { font-size: 13px }"
   },
   {
-    "file": "apps/web/src/components/broadcasts/broadcast-asset-manager.tsx",
-    "fingerprint": "c0178aae0089713fec33ad0891ed0d193156f4d3b5b8cd3fd58421750bb9b575",
-    "count": 1,
-    "reason": "選択ダイアログの候補欄が本文サイズを指定"
-  },
-  {
     "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
     "fingerprint": "3c8761bce1c067fa6c6a0525d399987fba12db95b02ef18c2bab7c3f96ea88af",
     "count": 1,
@@ -314,12 +308,6 @@
   {
     "file": "apps/web/src/components/shared/message-composer.tsx",
     "fingerprint": "03b4be97c1a75976c8e31d2e4df2e27d92b681d290d2e3b827e236178e4bec55",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/components/shared/message-composer.tsx",
-    "fingerprint": "30cb63a62bb5993c857809f6e48def7b1a78d39f363f6d29ebdbba917ba73b4c",
     "count": 1,
     "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
@@ -700,12 +688,6 @@
     "fingerprint": "f65fe3c462613278a9983911c9ca1c0fc41fb0d480fed8c631d9cf02b043ba89",
     "count": 1,
     "reason": "確認結果の枠が補足の文字サイズを指定"
-  },
-  {
-    "file": "apps/web/src/v8/booking/prepay-badge.tsx",
-    "fingerprint": "7456d1919b4b872a65f53019a9b5d587304f46424a47f359d4a1c1d5d026e17d",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/v8/booking/prepay-badge.tsx",
@@ -1393,12 +1375,6 @@
   },
   {
     "file": "apps/web/src/v8/restaurant/line-followup/followup-board.tsx",
-    "fingerprint": "d2a3124c7e36c8bea11cbf391806ac640b4722f431c8a6cb9b225ddde6abbe7e",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/restaurant/line-followup/followup-board.tsx",
     "fingerprint": "ddf8f058f8316081accb0953dca1a564c6e241c18bfc35741966dccbebb98098",
     "count": 1,
     "reason": "apps/web/src/v8/restaurant/line-followup/board.module.css: .timing p { font-size: var(--text-label) }"
@@ -1408,18 +1384,6 @@
     "fingerprint": "14d0101ee6e58f7f01c0bf426b955573e970ecdea14e2af342021f533db84678",
     "count": 1,
     "reason": "選択ダイアログの候補欄が本文サイズを指定"
-  },
-  {
-    "file": "apps/web/src/v8/restaurant/line-followup/line-followup.tsx",
-    "fingerprint": "3089128ab87777d2904bffc8d12ee945844b89fef5d6b1d42a3d67bdf51aca09",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/restaurant/line-followup/line-followup.tsx",
-    "fingerprint": "d2a3124c7e36c8bea11cbf391806ac640b4722f431c8a6cb9b225ddde6abbe7e",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
