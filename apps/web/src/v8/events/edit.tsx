@@ -159,7 +159,7 @@ function EditEntry() {
   if (!id) return <TargetMissing kind="unspecified" title="編集するイベントが指定されていません" description="一覧から、編集するイベントを選び直してください。" backHref="/events" backLabel="イベント一覧へ戻る" />
   if (!selectedAccountId) return <ListState kind="empty" title="アカウントを選択してください。" />
   const scope = JSON.stringify([selectedAccountId, id])
-  return <DetailPage title={name || 'イベントの編集'}
+  return <DetailPage title={name || 'イベントの編集'} dividers="none"
     help={<>イベント・クラスの中身と予約枠、公開、お支払いの方法を決めます。</>}
     summary={<div className={styles.side}>
       <PaymentSideCard title="決済をつないでいない店のとき">「お支払い」の段は出さず、「先払いを受けるには お支払いをつなぐ →」の 1 行だけ出します（押せない形にしない）。</PaymentSideCard>
