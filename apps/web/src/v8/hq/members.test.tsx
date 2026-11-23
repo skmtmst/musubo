@@ -102,6 +102,8 @@ describe('統括の設定の配置', () => {
     const frame = host.querySelector('[data-page-template="list"]')!
     expect(frame).toBeTruthy()
     expect(frame.querySelector('[data-template-region="heading"]')?.textContent).toContain('メンバー')
+    expect(frame.querySelector('[data-template-region="heading"] button')).toBeTruthy()
+    expect(frame.querySelector('[data-content-surface="board"]')).toBeTruthy()
     const menu = screen.getByRole('navigation', { name: '統括の設定' })
     expect(menu.closest('[data-template-region="folders"]')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'メンバー' }).getAttribute('aria-current')).toBe('page')

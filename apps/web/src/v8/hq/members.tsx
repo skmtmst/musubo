@@ -213,7 +213,7 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage boardId="r4ARpV" title="メンバー" folders={<HqSettingsNavV8 active="members" />} folderWidth={200} folderNav={settingsNav}>
+    <SaveErrorScope errors={saveErrors}><ListPage boardId="r4ARpV" title="メンバー" help="統括に入るメンバーの招待や権限を管理します。" contentSurface="board" folders={<HqSettingsNavV8 active="members" />} folderWidth={200} folderNav={settingsNav}>
       <div className={styles.layout}>
         <div className={styles.main}>
         {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}

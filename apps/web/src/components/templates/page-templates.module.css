@@ -57,6 +57,8 @@
 :global(:root) .main { min-width: 0; flex: 1; }
 /* 表の塊は白。フォルダの列は板の地のまま。 */
 :global(:root) .split > .main:has([data-shared-part='list-table']) { background: var(--color-canvas); }
+/* カードを載せる本文は、表があっても板と同じ地にする。 */
+:global(:root) .split > .main[data-content-surface='board'] { background: var(--color-board-tint); }
 /* ：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global(:root) .folders + .main { border-left: 0; }
 :global(:root) .explanation { width: 100%; }
