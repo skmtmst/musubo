@@ -140,20 +140,6 @@ li.photo > .choice[data-shared-button][role='checkbox'] {
   font-size: var(--text-caption);
 }
 
-.footer {
-  display: grid;
-  gap: calc(var(--space-24) + var(--space-12));
-  padding: var(--space-16) var(--space-24) var(--space-24);
-  border-block-start: 1px solid var(--color-hairline);
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-10);
-  inline-size: 100%;
-}
-
 .cancel { min-inline-size: calc(var(--space-24) * 5 - var(--space-2)); }
 .apply { min-inline-size: calc(var(--space-24) * 6 + var(--space-14)); }
 
@@ -183,8 +169,7 @@ li.photo > .choice[data-shared-button][role='checkbox'] {
     display: block;
   }
 
-  .body,
-  .footer {
+  .body {
     gap: var(--space-12);
     padding: var(--space-12) var(--space-16) var(--space-16);
   }

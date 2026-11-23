@@ -154,19 +154,16 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
     designWidth={960} exactDesignWidth designMinHeight={804} contentLayout="form"
     designNode="Go9Us" designContentPadding="0"
     headerAction={<span className={styles.desktopUpload}>{fileAction}</span>}
-    footer={<div className={styles.footer}>
+    footer={<DialogActions summary={(
       <div className={styles.selection}><strong>選択中 {selection.length} / {available}枚{selection.length >= available ? '（上限）' : ''}</strong>
         <span>{fromFiles > 0 ? `登録メディア ${selection.length - fromFiles}枚 ＋ ファイルから登録 ${fromFiles}枚` : 'コースに追加する写真は合計5枚まで。'}</span>
       </div>
-      <DialogActions padding="none">
-        <div className={styles.actions}>
-          <Button size="large" className={styles.cancel} onClick={onClose}>キャンセル</Button>
-          <Button size="large" className={styles.apply} variant="primary" disabled={selection.length === 0} onClick={() => onAdd(selection.slice(0, available).map(photo => photo.id))}>
-            {selection.length ? `${selection.length}枚を追加` : '写真を追加'}
-          </Button>
-        </div>
-      </DialogActions>
-    </div>}
+    )}>
+      <Button size="large" className={styles.cancel} onClick={onClose}>キャンセル</Button>
+      <Button size="large" className={styles.apply} variant="primary" disabled={selection.length === 0} onClick={() => onAdd(selection.slice(0, available).map(photo => photo.id))}>
+        {selection.length ? `${selection.length}枚を追加` : '写真を追加'}
+      </Button>
+    </DialogActions>}
   >
     <div className={styles.body}>
       <div className={styles.mobileUpload}><Button size="large" onClick={openUpload} disabled={remaining === 0 || checking} fullWidth>ファイルから追加</Button></div>
