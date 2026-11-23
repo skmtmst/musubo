@@ -5,7 +5,7 @@ import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'luc
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import AccountSwitchMenu, { type AccountSwitchMenuHq } from './account-switch-menu'
 import type { MenuPortalRect } from './menu-portal'
-import { ACCOUNT_SWITCH_OPEN_EVENT, SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
+import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Avatar from './avatar'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -199,16 +199,6 @@ export default function TopBar({
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  useEffect(() => {
-    const openAccountSwitch = () => {
-      if (!showAccountSwitcher) return
-      setSwitchOpen(true)
-      switchRef.current?.focus()
-    }
-    window.addEventListener(ACCOUNT_SWITCH_OPEN_EVENT, openAccountSwitch)
-    return () => window.removeEventListener(ACCOUNT_SWITCH_OPEN_EVENT, openAccountSwitch)
-  }, [showAccountSwitcher])
-
   return (
     <header ref={rootRef} className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
@@ -301,7 +291,7 @@ export default function TopBar({
             自前のドロップダウンにしないのは、キーボードと読み上げが
             ブラウザの実装のまま使えるほうが確かなため。
           */}
-          <span className={styles.accountPill}>
+          <span className={styles.accountPill} data-unselected={!hq && !selectedAccountId || undefined}>
             <Avatar
               name={hq ? hq.name : current?.label ?? ''}
               src={hq ? hq.iconUrl ?? null : current?.iconUrl ?? null}
@@ -322,11 +312,11 @@ export default function TopBar({
                     <span className={`${styles.accountName}`} data-part="account-name" title={hq.name}>{hq.name}</span>
                   </>
                 ) : (
-                  <span className={styles.accountName} data-part="account-name" title={current?.label ?? 'LINE公式アカウントを選んでください'}>{current?.label ?? '未選択'}</span>
+                  <span className={styles.accountName} data-part="account-name" title={current?.label ?? 'LINE公式アカウントを選ぶと、ほかの機能が出ます'}>{current?.label ?? '未選択'}</span>
                 )}
               </span>
             ) : (
-              <span className={styles.accountName} data-part="account-name" title={current?.label ?? 'LINE公式アカウントを選んでください'}>{current?.label ?? '未選択'}</span>
+              <span className={styles.accountName} data-part="account-name" title={current?.label ?? 'LINE公式アカウントを選ぶと、ほかの機能が出ます'}>{current?.label ?? '未選択'}</span>
             )}
             <span className={styles.switchChevron} data-open={switchOpen || undefined} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronsUpDown size={16} /> : <ChevronIcon />}</span>
 
@@ -340,6 +330,7 @@ export default function TopBar({
               type="button"
               className={`${styles.accountSelect}`}
               aria-label="アカウントを切り替える"
+              title={!hq && !selectedAccountId ? "LINE公式アカウントを選ぶと、ほかの機能が出ます" : undefined}
               aria-haspopup="menu"
               aria-expanded={switchOpen}
               onClick={(event) => { event.preventDefault(); setSwitchOpen((current) => !current) }}

@@ -148,14 +148,10 @@ describe('V8-1085-KEYBOARD-01: ⌘\\ は1回だけ畳む', () => {
     expect(isCollapsed()).toBe(true)
   })
 
-  it('未選択の案内から上のアカウント選択を開く', async () => {
+  it('未選択の案内を左メニューに表示しない', () => {
     fixture.selected = null
     renderShell()
-    expect(document.body.textContent).toContain('LINE公式アカウントを選ぶと、ほかの機能が出ます')
-    const choose = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === '選ぶ')
-    expect(choose).toBeTruthy()
-    await act(async () => { choose!.click() })
-    expect(document.querySelector('button[aria-label="アカウントを切り替える"]')?.getAttribute('aria-expanded')).toBe('true')
+    expect(document.body.textContent).not.toContain('LINE公式アカウントを選ぶと、ほかの機能が出ます')
   })
 
   it('畳むボタン1回で1回だけ畳む', async () => {

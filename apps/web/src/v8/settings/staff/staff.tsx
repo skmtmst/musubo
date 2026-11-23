@@ -6,7 +6,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import TotpQr from '@/components/shared/totp-qr'
 
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
-import ListToolbar from '@/components/shared/list-toolbar'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { avatarInitials } from '@/components/shared/avatar';
@@ -1130,28 +1130,19 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             </>
           ) : (
             <>
-              <ListToolbar
-                search={{ width: 220, label: '名前・メールで探す', placeholder: '名前・メールで探す', value: query, onChange: setQuery }}
-                filters={tab === 'members' ? (
-                  <SegmentedControl<'active' | 'suspended' | 'all'>
-                    aria-label="利用状態で絞り込む"
-                    fit="content"
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={[
-                      { value: 'active', label: '有効', count: summaryReady ? activeCount : undefined },
-                      { value: 'suspended', label: '止めた', count: summaryReady ? suspendedCount : undefined },
-                      { value: 'all', label: 'すべて' },
-                    ]}
-                  />
-                ) : null}
-                trailing={administrator ? (
-                  <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
-                ) : (
-                  /* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */
-                  <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>
-                )}
-              />
+              <ListToolbarFrame singleRow><ListToolbarRow>
+                <ListToolbarSearchSlot width={180} search={{ label: '名前・メールで探す', placeholder: '名前・メールで探す', value: query, onChange: setQuery }} />
+                {tab === 'members' ? <SegmentedControl<'active' | 'suspended' | 'all'>
+                  aria-label="利用状態で絞り込む" fit="content" value={statusFilter} onChange={setStatusFilter}
+                  options={[
+                    { value: 'active', label: '有効', count: summaryReady ? activeCount : undefined },
+                    { value: 'suspended', label: '止めた', count: summaryReady ? suspendedCount : undefined },
+                    { value: 'all', label: 'すべて' },
+                  ]}
+                /> : null}
+                {administrator ? <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
+                  : <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>}
+              </ListToolbarRow></ListToolbarFrame>
               {resendError ? <Notice tone="danger" message={resendError} /> : null}
               {tab === 'roles' ? (
                 <div className={styles.roleCards}>

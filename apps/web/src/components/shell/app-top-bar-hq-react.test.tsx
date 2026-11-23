@@ -13,7 +13,6 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { UNSAVED_ACTION_EVENT } from '@/lib/unsaved-action'
-import { ACCOUNT_SWITCH_OPEN_EVENT } from '@/lib/events'
 import { api } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
@@ -398,18 +397,18 @@ describe('アカウント未選択の共通の呼び名', () => {
     const view = render(<TopBar title="友だち" accounts={[]} selectedAccountId="" onAccountChange={vi.fn()} roleLabel={roleLabel} userName="確認担当" onLogout={vi.fn()} v8Chrome showIdentity={false} />)
     const label = view.container.querySelector('[data-part="account-name"]')!
     expect(label.textContent).toBe('未選択')
-    expect(label.getAttribute('title')).toBe('LINE公式アカウントを選んでください')
+    expect(label.closest('[data-unselected]')).toBeTruthy()
+    expect(label.getAttribute('title')).toBe('LINE公式アカウントを選ぶと、ほかの機能が出ます')
     expect(view.container.textContent).not.toContain('店舗を選択')
     expect(view.getByRole('button', { name: 'アカウントを切り替える' })).toBeTruthy()
   })
 
-  it('左メニューからの選択要求で上のアカウント一覧が開く', () => {
-    const view = render(<TopBar title="友だち" accounts={[{ id: 'one', label: '店' }]} selectedAccountId=""
-      onAccountChange={vi.fn()} roleLabel="オーナー" userName="確認担当" onLogout={vi.fn()} v8Chrome />)
-    const button = view.getByRole('button', { name: 'アカウントを切り替える' })
-    expect(button.getAttribute('aria-expanded')).toBe('false')
-    act(() => window.dispatchEvent(new Event(ACCOUNT_SWITCH_OPEN_EVENT)))
-    expect(button.getAttribute('aria-expanded')).toBe('true')
+  it('選択済みと統括では未選択の印を出さない', () => {
+    const props = { title: '友だち', accounts: [{ id: 'one', label: '店' }], onAccountChange: vi.fn(), roleLabel: 'オーナー', userName: '担当', onLogout: vi.fn(), v8Chrome: true }
+    const view = render(<TopBar {...props} selectedAccountId="one" />)
+    expect(view.container.querySelector('[data-unselected]')).toBeNull()
+    view.rerender(<TopBar {...props} selectedAccountId="" hq={{ name: '統括' }} />)
+    expect(view.container.querySelector('[data-unselected]')).toBeNull()
   })
 
   it('利用開始中はホームとサイドバー切替を表示せず、現在地だけを残す', () => {
