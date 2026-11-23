@@ -4,6 +4,7 @@ import { LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared'
 import { useRunningVersion } from '@/lib/use-running-version'
 
 import { operationFailureText } from './health-error'
+import { ExternalCleanupSection } from './external-cleanup'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
@@ -560,6 +561,7 @@ export function HealthPanelV8({
             </div>
           </section>
         ) : null}
+        <ExternalCleanupSection accountId={accountId} reloadRequest={manualRunRequest} />
         <GridTable label="確かめていること" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-sb-hc-col-judge) var(--tpl-sb-hc-col-time) var(--tpl-sb-hc-col-how)', gap: 'var(--tpl-sb-ec-gap)', rowPadding: 'var(--tpl-sb-hc-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)', fontSize: 'var(--tpl-sb-band-text)', headFontSize: 'var(--tpl-sb-row-sub)', headLineHeight: 'var(--tpl-sb-row-sub-lh)', headBackground: 'var(--color-surface-pearl)' }}>
           <div role="rowgroup">
             <GridHeadRow>

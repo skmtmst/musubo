@@ -80,7 +80,7 @@ calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 
       refreshToken: body.refreshToken,
       apiKey: body.apiKey,
     }, scope, c.env.GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY);
-    if (!conn) return c.json({ success: false, error: 'Forbidden account' }, 403);
+    if (!conn) return c.json({ success: false, error: 'meeting_disconnect_in_progress', message: '解除の処理中です。少し待ってからつなぎ直してください。' }, 409);
     return c.json({
       success: true,
       data: { id: conn.id, calendarId: conn.calendar_id, authType: conn.auth_type, isActive: Boolean(conn.is_active), createdAt: conn.created_at },

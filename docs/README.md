@@ -487,6 +487,8 @@
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
 
+- [オンライン会議の自動作成と Outlook 連携](release-log/unreleased/132-kenta-c6c7-meeting.md) — 反映履歴、確認 2026-11-20。
+
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 
 - [新しいLINEアカウントのLIFF自動作成](release-log/unreleased/153-masato-liff-auto-create.md) — 反映履歴、確認 2026-11-22。

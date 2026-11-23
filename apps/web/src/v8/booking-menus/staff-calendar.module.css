@@ -13,7 +13,9 @@
 .name { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-bm-4); }
 .name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .span2 { grid-column: span 2; display: flex; justify-content: flex-end; }
-.providerRow { grid-template-columns: minmax(0, 1fr) auto auto; min-height: var(--tpl-bm-48); }
+.providerRow { grid-template-columns: minmax(0, 1fr) auto; min-height: var(--tpl-bm-48); }
+.outlookSection { margin-top: var(--tpl-bm-12); }
+.fixedUrl { margin-top: var(--tpl-bm-16); }
 .providerRow label { white-space: nowrap; }
 .urlLine { display: flex; align-items: center; gap: var(--tpl-bm-8); }
 .urlLine > :first-child { flex: 1 1 auto; min-width: 0; }

@@ -111,3 +111,12 @@ it('keeps booking details readable when damaged legacy policy prevents a safe pr
   });
  }finally{log.mockRestore();}
 });
+it('会議の自動URLは予約の版が変わっても案内し、手入力を優先する',async()=>{
+ item.raw.exec(`UPDATE bookings SET meeting_mode='online',meeting_url='https://example.test/fixed',meeting_url_source='menu' WHERE id='b';
+ INSERT INTO booking_meeting_links(id,booking_id,provider,external_meeting_id,meeting_url,status,idempotency_key,created_at,updated_at)
+ VALUES('link','b','zoom','remote','https://example.test/automatic','active','key','now','now');
+ UPDATE bookings SET lock_version=lock_version+1 WHERE id='b';`);
+ expect(await previewBookingConfirmation(item.db,'b','a',NOW)).toContain('https://example.test/automatic');
+ item.raw.exec("UPDATE bookings SET meeting_url='https://example.test/manual',meeting_url_source='manual' WHERE id='b'");
+ expect(await previewBookingConfirmation(item.db,'b','a',NOW)).toContain('https://example.test/manual');
+});

@@ -3,14 +3,11 @@
 import { RadioGroup } from '@/components/shared/radio'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Video } from 'lucide-react'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Radio from '@/components/shared/radio'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
-import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { bookingCalendarApi } from '@/lib/api/helpers/gap1'
 import { fetchApi } from '@/lib/api'
 import styles from './meeting-mode.module.css'
@@ -18,7 +15,6 @@ import styles from './meeting-mode.module.css'
 /*
  * 予約メニューの「会い方」（B7・絵 ELruS）：オンライン／対面／お客さまが選ぶ と、会議の URL。
  * 会い方は今ある口（styleApi.saveMenu の meetingMode・メニューの版つき）、固定の URL は gap1 の口（版つき）。
- * 会議の自動発行（Meet・Zoom・Teams）は次の段（口が 409 automatic_meeting_not_available）→ 押すと共通の準備中。
  */
 
 export type MeetingMode = 'online' | 'in_person' | 'customer_choice'
@@ -27,19 +23,22 @@ export function useMenuMeeting(accountId: string | null, menuId: string | null, 
   const [savedMode, setSavedMode] = useState<MeetingMode>(initialMode ?? 'in_person')
   const [mode, setMode] = useState<MeetingMode>(initialMode ?? 'in_person')
   const [url, setUrl] = useState<{ value: string; saved: string; version: number } | null>(null)
+  const [issuance, setIssuance] = useState<'manual' | 'automatic'>('manual')
+  const [savedIssuance, setSavedIssuance] = useState<'manual' | 'automatic'>('manual')
   useEffect(() => { setSavedMode(initialMode ?? 'in_person'); setMode(initialMode ?? 'in_person') }, [initialMode, menuId])
   useEffect(() => {
     if (!accountId) { setUrl(null); return }
     /* 作る画面：空の URL から始め、メニューができてから同じ口へ送る（版 0）。 */
-    if (!menuId) { setUrl({ value: '', saved: '', version: 0 }); return }
+    if (!menuId) { setUrl({ value: '', saved: '', version: 0 }); setIssuance('manual'); setSavedIssuance('manual'); return }
+    setUrl(null)
     let alive = true
     void Promise.resolve().then(() => bookingCalendarApi.getMenuUrl(accountId, menuId))
-      .then((response) => { if (alive) setUrl({ value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version }) })
+      .then((response) => { if (alive) { setUrl({ value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version }); setIssuance(response.data.issuance ?? 'manual'); setSavedIssuance(response.data.issuance ?? 'manual') } })
       .catch(() => { if (alive) setUrl(null) })
     return () => { alive = false }
   }, [accountId, menuId])
   const urlDirty = url !== null && url.value.trim() !== url.saved
-  const dirty = mode !== savedMode || urlDirty
+  const dirty = mode !== savedMode || urlDirty || issuance !== savedIssuance
   const urlInvalid = url !== null && url.value.trim() !== '' && !/^https:\/\/\S+$/.test(url.value.trim())
   /** メニューを保存したあとに呼ぶ（メニューの版を受け取り、新しい版を返す）。 */
   const save = useCallback(async (id: string, menuVersion: number): Promise<number> => {
@@ -51,51 +50,50 @@ export function useMenuMeeting(accountId: string | null, menuId: string | null, 
       version = response.data.version
       setSavedMode(mode)
     }
-    if (url && urlDirty && !urlInvalid) {
-      const response = await bookingCalendarApi.saveMenuUrl(accountId, id, url.value.trim() || null, url.version)
+    if (url && (urlDirty || issuance !== savedIssuance) && !urlInvalid) {
+      const response = await bookingCalendarApi.saveMenuUrl(accountId, id, url.value.trim() || null, version, issuance)
       setUrl({ value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version })
+      setSavedIssuance(issuance)
+      version = response.data.version
     }
     return version
-  }, [accountId, mode, savedMode, url, urlDirty, urlInvalid])
-  return { mode, setMode, url, setUrl, dirty, urlInvalid, save, reset: () => { setMode(savedMode); if (url) setUrl({ ...url, value: url.saved }) } }
+  }, [accountId, mode, savedMode, url, urlDirty, urlInvalid, issuance, savedIssuance])
+  return { mode, setMode, url, setUrl, issuance, setIssuance, dirty, urlInvalid, save, reset: () => { setMode(savedMode); setIssuance(savedIssuance); if (url) setUrl({ ...url, value: url.saved }) } }
 }
 export type MenuMeetingState = ReturnType<typeof useMenuMeeting>
 
 export function MeetingModeCard({ state, readOnly }: { state: MenuMeetingState; readOnly: boolean }) {
-  const preparing = usePreparingDialog()
   const online = state.mode !== 'in_person'
   if (readOnly) {
-    return <Card variant="form" gap="normal"><CardHeader size="stacked" title="会い方" /><p className={styles.readValue}>{state.mode === 'online' ? 'オンライン' : state.mode === 'customer_choice' ? 'お客さまが選ぶ' : '対面'}{state.url?.saved ? `・${state.url.saved}` : ''}</p></Card>
+    return <Card variant="form" gap="normal"><CardHeader size="stacked" title="会い方" /><p className={styles.readValue}>{state.mode === 'online' ? 'オンライン' : state.mode === 'customer_choice' ? 'お客さまが選ぶ' : '対面'}{state.url ? `・${state.issuance === 'automatic' ? '自動で発行' : '手で入れる'}` : ''}{state.url?.saved ? `・${state.url.saved}` : ''}</p></Card>
   }
   return (
     <Card variant="form" gap="normal">
       <CardHeader size="stacked" title="会い方" help={<HelpTip label="会い方の説明">オンラインのときは、予約が決まったら会議の URL をお客さまに LINE で送ります。確定の前と取り消しのあとは URL を出しません。</HelpTip>} />
-      <RadioCardGroup legend="会い方" columns={3}>
+      <RadioGroup label="会い方" className={styles.urlChoice}>
         {([
-          ['online', 'オンライン', '会議の URL を送る'],
-          ['in_person', '対面', 'お店・部屋で会う'],
-          ['customer_choice', 'お客さまが選ぶ', '予約のときに選んでもらう'],
-        ] as const).map(([value, title, note]) => (
-          <RadioCard key={value} name="menu-meeting-mode" value={value} title={title} note={note} checked={state.mode === value} onChange={() => state.setMode(value)} />
+          ['in_person', '対面'],
+          ['online', 'オンライン'],
+          ['customer_choice', 'お客さまが選ぶ'],
+        ] as const).map(([value, title]) => (
+          <Radio key={value} name="menu-meeting-mode" value={value} checked={state.mode === value} onChange={() => state.setMode(value)}>{title}</Radio>
         ))}
-      </RadioCardGroup>
+      </RadioGroup>
       {online ? (
         <>
           <RadioGroup className={styles.urlChoice} label="会議の URL">
             <span className={styles.label}>会議の URL</span>
-            <Radio name="menu-meeting-url" checked onChange={() => undefined}>手で入れる（決まった URL）</Radio>
-            <Radio name="menu-meeting-url" checked={false} onChange={() => preparing.open('会議の自動発行')}>自動で発行（予約が決まったら作る）</Radio>
+            <Radio name="menu-meeting-url" disabled={!state.url} checked={state.issuance === 'manual'} onChange={() => state.setIssuance('manual')}>手で入れる</Radio>
+            <Radio name="menu-meeting-url" disabled={!state.url} checked={state.issuance === 'automatic'} onChange={() => state.setIssuance('automatic')}>自動で発行</Radio>
           </RadioGroup>
-          <div className={styles.infoBox}><Video size={16} aria-hidden="true" /><span><strong>担当の固定の URL を先に使います</strong><span className={styles.minor}>担当に URL が無いときは、このメニューの URL を使います。</span></span></div>
-          <Field label="メニューの固定の URL（担当に固定の URL が無いとき・作れなかったときに使います）" optional error={state.urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
+          {state.issuance === 'automatic' ? <><p className={styles.minor}>担当者がつないだ Meet・Zoom・Teams から作成します。</p><p className={styles.minor}>予約が確定した時に発行します。</p></> : null}
+          <p className={styles.minor}>固定 URL を使う場合は担当の URL を優先し、なければメニューの URL を使います。</p>
+          <Field label={state.issuance === 'automatic' ? '作れなかったときに使う URL' : 'メニューの固定の URL'} optional error={state.urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
             <TextField aria-label="メニューの固定の URL" value={state.url?.value ?? ''} placeholder="https://zoom.us/j/…" disabled={state.url === null}
               onChange={(event) => state.url && state.setUrl({ ...state.url, value: event.target.value })} />
           </Field>
-          <p className={styles.minor}>作れなかったときも予約は受けます。固定の URL も無いときは、予約の詳細に「未発行」と出て、お客さまには「前日までにお送りします」と伝えます。日時を変えたら作り直し、取り消したら消します。</p>
-          <p className={styles.sample}>リマインドの見本： 明日 13:00 からです。参加はこちら → <span className={styles.token}>会議の URL</span></p>
         </>
       ) : null}
-      {preparing.dialog}
     </Card>
   )
 }

@@ -22,5 +22,5 @@ export interface BookingCancellationCharge {
  status:'pending'|'processing'|'succeeded'|'failed'|'unknown'|'waived'|'refunded';version:number;
  actor_staff_id:string|null;reason:string|null;test_mode:1;
 }
-export interface BookingCalendarSwitch {readEnabled:boolean;writeEnabled:boolean;version:number;effectiveReadEnabled?:boolean;effectiveWriteEnabled?:boolean;connected?:boolean;futureEventCount?:number}
+export interface BookingCalendarSwitch {readEnabled:boolean;writeEnabled:boolean;version:number;effectiveReadEnabled?:boolean;effectiveWriteEnabled?:boolean;connected?:boolean;futureEventCount?:number;health?:{last_success_at:string|null;failed_since:string|null;error_code:string|null}|null}
 export interface BookingCalendarSwitchWrite {readEnabled:boolean;writeEnabled:boolean;expectedVersion:number;confirmed?:boolean;removeFutureEvents?:boolean;includeBacklog?:boolean}

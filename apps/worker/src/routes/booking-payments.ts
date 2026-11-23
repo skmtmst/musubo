@@ -1,3 +1,6 @@
+import {calendarCredentialsForEnv} from '../features/booking/booking-outlook-busy-runtime/index.js';
+import {syncOutlookBookingForEnv} from '../features/booking/booking-outlook-sync-runtime/index.js';
+import { meetingCreatorForBooking } from '../features/booking/booking-meeting-runtime/index.js';
 import { readBodyWithinLimit } from '../services/stripe-signature.js';
 import { externalBookingStripeObject } from '../features/booking/booking-stripe-webhooks/index.js';
 import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
@@ -238,8 +241,9 @@ async function bookingPaymentStatusPayload(
   db: D1Database,
   lineAccountId: string,
   bookingId: string,
+  env: Env['Bindings'],
 ) {
-  const record = await expireBookingPaymentIfHeld(db, lineAccountId, bookingId);
+  const record = await expireBookingPaymentIfHeld(db, lineAccountId, bookingId, id=>meetingCreatorForBooking(env,id),id=>syncOutlookBookingForEnv(env,id),calendarCredentialsForEnv(env));
   const checkpoint=await getWorkflowStep(db,{scopeId:`line:${lineAccountId}`,processKind:'booking_payment_start',subjectId:bookingId,stepKey:'start'});
   return { payment: customerPaymentRecord(record),...(checkpoint?.status==='unknown'?{operation_status:'unknown',action_required:true}:{}) };
 }
@@ -317,7 +321,7 @@ bookingPayments.get('/api/liff/booking/payments/by-booking', async (c) => {
     `SELECT id FROM bookings WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
   ).bind(bookingId, friendId, accountId).first<{ id: string }>();
   if (!booking) return liffBookingJson(c, { error: '対象が見つかりません' }, 404);
-  return liffBookingJson(c, await bookingPaymentStatusPayload(c.env.DB, accountId, bookingId));
+  return liffBookingJson(c, await bookingPaymentStatusPayload(c.env.DB, accountId, bookingId, c.env));
 });
 
 // GET /api/booking/payments/by-booking — 支払いの状態（仮押さえの期限切れもここで落とす）
@@ -335,7 +339,7 @@ bookingPayments.get(
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
     const record = await expireBookingPaymentIfHeld(
-      c.env.DB, booking.line_account_id, bookingId,
+      c.env.DB, booking.line_account_id, bookingId, id=>meetingCreatorForBooking(c.env,id), id=>syncOutlookBookingForEnv(c.env,id), calendarCredentialsForEnv(c.env),
     );
     return c.json({ success: true, data: { payment: record } });
   },
@@ -403,9 +407,7 @@ bookingPayments.post(
     if (outcome.status==='paid' && ['paid','duplicate'].includes(result.status)) {
       const payment=await c.env.DB.prepare('SELECT id FROM booking_payments WHERE provider=? AND provider_payment_id=?')
         .bind(providerName,outcome.providerPaymentId).first<{id:string}>();
-      if (payment) await reconcilePaidBookingPayment(c.env.DB,payment.id,new Date(),false,{
-        email:c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-      });
+      if (payment) await reconcilePaidBookingPayment(c.env.DB,payment.id,new Date(),false,calendarCredentialsForEnv(c.env), id=>meetingCreatorForBooking(c.env,id), id=>syncOutlookBookingForEnv(c.env,id));
     }
     return c.json({ success: true, status: result.status });
   },

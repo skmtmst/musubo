@@ -1,13 +1,11 @@
+import {calendarCredentialsForEnv} from '../../features/booking/booking-outlook-busy-runtime/index.js';
 import type { Env } from '../../worker-env.js';
 import { getAccountTimeZone, getAvailability, tzDateStr, tzHHMM } from '../../services/availability.js';
 
 export const BOOKING_CONFIRMED_AUTOMATION_EVENT = 'calendar_booked' as const;
 
 export function googleCredentials(env: Env['Bindings']) {
-  return {
-    email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-  };
+  return calendarCredentialsForEnv(env);
 }
 
 export type BookingConflictSource = 'internal_booking' | 'google_calendar' | 'schedule';

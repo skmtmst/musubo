@@ -417,3 +417,12 @@ it.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z'])('日本時間の月初
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({ summary: { impersonationsThisMonth: 1 } });
 });
+it('削除済み店舗の外部解除の要確認は運営マスターのみ閲覧・記録できる',async()=>{
+ testDb.raw.prepare("INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,retry_key,input_json,result_json,error_code,created_at,updated_at) VALUES('global:meeting-revoke-queue','booking_meeting_deleted_revoke','review','current','unknown','review',NULL,?,'manual',1,1)").run(JSON.stringify({provider:'google_calendar',tenantId:'tenant-a',accountId:'deleted-account',staffId:'deleted-staff',credentialEnc:'must-not-leak'}));
+ const url='/api/ops/meeting-deletion-reviews';expect((await app(tenantOwner).request(url,{},environment())).status).toBe(403);
+ const response=await app(readOnlyMaster).request(url,{},environment());expect(response.status).toBe(200);const data=await response.json();expect(JSON.stringify(data)).not.toContain('must-not-leak');expect(data).toMatchObject({data:[{id:'review',detail:{provider:'google_calendar',tenantId:'tenant-a'}}]});
+ expect((await app(readOnlyMaster).request(`${url}/review/resolve`,json({reason:'外部の設定を確認しました'}),environment())).status).toBe(403);
+ expect((await app(master).request(`${url}/review/resolve`,json({reason:'外部の設定を確認しました'}),environment())).status).toBe(200);
+ expect(testDb.raw.prepare("SELECT status,input_json,result_json FROM workflow_steps WHERE subject_id='review'").get()).toEqual({status:'succeeded',input_json:null,result_json:null});
+ expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='booking.meeting.deleted_connection_review_resolved' AND actor_principal_id='master-1'").get()).toEqual({n:1});
+});

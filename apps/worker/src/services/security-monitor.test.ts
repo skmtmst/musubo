@@ -54,6 +54,14 @@ describe('security detection using actual audit SQL and durable alerts', () => {
     expect(alerts()[0].status).toBe('open');
   });
 
+  it('外部接続の解除に要確認が出たら運営へ知らせ、秘密を含めない', async () => {
+    audit('booking.meeting.deleted_connection_review', { result: 'failed' });
+    await runSecurityMonitor(env(), NOW, fetcher);
+    expect(alerts()).toEqual([expect.objectContaining({rule_key:'meeting_revoke_review',status:'open'})]);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(String(fetcher.mock.calls[0][1]?.body)).not.toContain('private@example.test');
+  });
+
   it('counts UTC, JST offsets and legacy JST consistently; excludes old and future records', async () => {
     for (const at of ['2026-10-16T15:55:00.000Z', '2026-10-16T15:55:00Z', '2026-10-17T00:55:00+09:00', '2026-10-17T00:55:00.000']) audit('auth.fail', { at, result: 'failed' });
     for (const at of ['2026-10-16T15:45:00Z', '2026-10-17T00:44:59.999', '2026-10-16T16:00:01Z']) audit('auth.fail', { at, result: 'failed' });

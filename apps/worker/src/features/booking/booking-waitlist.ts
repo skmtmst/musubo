@@ -1,3 +1,4 @@
+import {calendarCredentialsForEnv} from './booking-outlook-busy-runtime.js';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import { restaurantTestEnabled } from '../../lib/environment-features.js';
@@ -33,7 +34,7 @@ export async function promoteBookingWaitlist(db: D1Database, slot: WaitlistSlot,
   const next = await db.prepare(`SELECT * FROM booking_waitlist WHERE line_account_id=? AND staff_id=? AND julianday(starts_at)=julianday(?) AND status='waiting' ORDER BY created_at,rowid LIMIT 1`).bind(slot.lineAccountId, slot.staffId, slot.startsAt).first<WaitlistEntry>();
   if (!next) return { promoted: false, reason: 'empty' };
   const tz = await getAccountTimeZone(db, slot.lineAccountId), date = tzDateStr(tz, new Date(next.starts_at));
-  const available = await getAvailability(db, { lineAccountId: slot.lineAccountId, menuId: next.menu_id, staffId: slot.staffId, from: date, to: date, now: new Date(), minLeadTimeMinutes: 0, applyStoreRules: true, waitlistOffer: true, googleCredentials: env ? { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } : undefined });
+  const available = await getAvailability(db, { lineAccountId: slot.lineAccountId, menuId: next.menu_id, staffId: slot.staffId, from: date, to: date, now: new Date(), minLeadTimeMinutes: 0, applyStoreRules: true, waitlistOffer: true, googleCredentials: env ? calendarCredentialsForEnv(env) : undefined });
   const start = Date.parse(next.starts_at);
   const found = available.by_staff.find(s => s.staff_id === slot.staffId)?.slots.some(s => Date.parse(s.startUtc) === start && s.remaining > 0);
   // 空き枠の開始instantと照合し、夏時間や店舗タイムゾーンの違いでずらさない。

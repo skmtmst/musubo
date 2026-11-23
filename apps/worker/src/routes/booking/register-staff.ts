@@ -6,6 +6,7 @@ import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_MENUS_KEY } from 
 import { requirePermission } from '../../middleware/role-guard.js';
 import { resolveAccountIdAdmin, assertStaffInAccount } from './identity.js';
 import { staffMenusReplaceStatements, StaffMenuAssignment } from './staff-input.js';
+import { queueDeletedMeetingConnections,queueDeletedGoogleCalendars } from '@line-crm/db';
 
 export function registerStaff(booking: Hono<Env>): void {
 booking.get('/api/booking/admin/staff', async (c) => {
@@ -169,14 +170,17 @@ booking.delete('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTING
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
-  await c.env.DB
-    .prepare(
+  await c.env.DB.batch([
+    queueDeletedMeetingConnections(c.env.DB,{whereSql:"c.line_account_id=? AND c.staff_id=? AND EXISTS(SELECT 1 FROM staff s WHERE s.id=c.staff_id AND s.line_account_id=c.line_account_id AND s.deleted_at IS NULL)",params:[accountId,id],source:'staff'}),
+    queueDeletedGoogleCalendars(c.env.DB,{whereSql:"c.line_account_id=? AND c.staff_id=? AND EXISTS(SELECT 1 FROM staff s WHERE s.id=c.staff_id AND s.line_account_id=c.line_account_id AND s.deleted_at IS NULL)",params:[accountId,id],source:'staff'}),
+    c.env.DB.prepare("UPDATE google_calendar_connections SET is_active=0,access_token=NULL,refresh_token=NULL,api_key=NULL WHERE line_account_id=? AND staff_id=? AND EXISTS(SELECT 1 FROM staff WHERE id=? AND line_account_id=? AND deleted_at IS NULL)").bind(accountId,id,id,accountId),
+    c.env.DB.prepare(
       `UPDATE staff
           SET deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE id = ? AND line_account_id = ?`,
+        WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`,
     )
-    .bind(id, accountId)
-    .run();
+    .bind(id, accountId),
+  ]);
   return c.json({ ok: true });
 });
 

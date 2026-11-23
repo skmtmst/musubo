@@ -2,6 +2,7 @@ import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { type LineAccountLifecycleErrorCode, type LineAccount, type LineAccountArchiveBlocker, type LineAccountInactiveReason } from './line-accounts-types.js';
 import { getLineAccountById } from './line-accounts-reads.js';
+import { queueDeletedMeetingConnections,queueDeletedGoogleCalendars } from './booking-meeting-deletion-queue.js';
 
 
 export class LineAccountLifecycleError extends Error {
@@ -118,15 +119,20 @@ export async function archiveLineAccount(
     throw new LineAccountLifecycleError('ACCOUNT_IN_TRAFFIC_POOL');
   }
   const now = jstNow();
-  await db
-    .prepare(
+  await db.batch([
+    queueDeletedMeetingConnections(db,{whereSql:"c.line_account_id=? AND EXISTS(SELECT 1 FROM line_accounts x WHERE x.id=c.line_account_id AND x.archived_at IS NULL)",params:[id],source:'account'}),
+    queueDeletedGoogleCalendars(db,{whereSql:"c.line_account_id=? AND EXISTS(SELECT 1 FROM line_accounts x WHERE x.id=c.line_account_id AND x.archived_at IS NULL)",params:[id],source:'account'}),
+    db.prepare('UPDATE google_calendar_connections SET is_active=0,access_token=NULL,refresh_token=NULL,api_key=NULL WHERE line_account_id=? AND EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND archived_at IS NULL)').bind(id,id),
+    db.prepare('DELETE FROM booking_meeting_oauth_states WHERE line_account_id=? AND EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND archived_at IS NULL)').bind(id,id),
+    db.prepare('DELETE FROM booking_meeting_connections WHERE line_account_id=? AND EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND archived_at IS NULL)').bind(id,id),
+    db.prepare(
       `UPDATE line_accounts
           SET is_active = 0, is_default = 0,
               archived_at = ?, archived_by = ?, archived_reason = ?, updated_at = ?
         WHERE id = ? AND archived_at IS NULL`,
     )
-    .bind(now, archivedBy, reason, now, id)
-    .run();
+    .bind(now, archivedBy, reason, now, id),
+  ]);
   return getLineAccountById(db, id);
 }
 

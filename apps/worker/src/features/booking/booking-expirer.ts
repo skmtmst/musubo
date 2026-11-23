@@ -3,7 +3,8 @@ import type { AccountStyle } from '@line-crm/shared';
 
 
 import { recoverExpiredBookingPayments, recoverPaidBookingPayments, recoverOrphanedOnlineBookings } from './booking-payment-recovery.js';
-import { recoverConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
+import { recoverConfirmedBookingSideEffects, type OutlookSyncCallback } from './booking-confirmed-effects.js';
+import type { MeetingCreator } from './booking-meeting-create.js';
 import type { GoogleServiceAccountCredentials } from '../../services/google-service-account.js';
 import type { BookingNotificationSender } from './booking-notifier.js';
 import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
@@ -32,14 +33,16 @@ export interface RunExpirerParams {
   now: Date;
   sender: BookingNotificationSender;
   credentials?: GoogleServiceAccountCredentials;
+  meetingCreatorForBooking?: (bookingId:string)=>Promise<MeetingCreator|null|'deferred'|'unavailable'>;
+  outlookSyncBooking?: OutlookSyncCallback;
 }
 
 export async function runExpirer(
   db: D1Database,
   params: RunExpirerParams,
 ): Promise<{ expired: number; idempotencyPurged: number }> {
-  await recoverPaidBookingPayments(db, params.now, params.credentials);
-  await recoverConfirmedBookingSideEffects(db, { now: params.now, credentials: params.credentials });
+  await recoverPaidBookingPayments(db, params.now, params.credentials, params.meetingCreatorForBooking, params.outlookSyncBooking);
+  await recoverConfirmedBookingSideEffects(db, { now: params.now, credentials: params.credentials, meetingCreatorForBooking: params.meetingCreatorForBooking, outlookSyncBooking:params.outlookSyncBooking });
   await recoverExpiredBookingPayments(db, params.now);
   await recoverOrphanedOnlineBookings(db, params.now);
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();

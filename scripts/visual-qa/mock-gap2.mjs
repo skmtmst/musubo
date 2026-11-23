@@ -2,6 +2,7 @@
  * ③-2 第2弾（B4 繰り返し・B5 同伴・B6 答えで行き先を分ける）の撮影の見本。
  * 形は docs/v8-requirements/gap-features/B4〜B6 の「データと API の形の案」のとおり。口（Worker）が出来たら外す。
  * 保存はしない（POST でも毎回同じ形を返す）。回数・間隔・日時は送られた値から作る。
+ * 外部の予定・会議の確認（運用状態）は空の一覧だけを返し、記録は断る。
  */
 const DAY = 86_400_000
 const jst = (iso) => new Date(new Date(iso).getTime() + 9 * 3_600_000)
@@ -60,5 +61,8 @@ export function gap2Respond(method, pathname, body = {}) {
       { bookingId: 'bk-party-2', label: 'マロン', menuName: 'トリミング（中型犬）', staffName: '佐々木', startsAt: '2026-10-01T04:00:00.000Z', endsAt: '2026-10-01T05:30:00.000Z', status: 'confirmed' },
     ] } : null)
   }
+  /* 外部の予定・会議の確認（運用状態の健全性チェック）。空の一覧なので段は出ない。記録は見本でも行わない。 */
+  if (method === 'GET' && pathname === '/api/booking/admin/external-cleanup') return ok({ items: [] })
+  if (method === 'POST' && /^\/api\/booking\/admin\/external-cleanup\/[^/]+\/resolve$/.test(pathname)) return [405, { success: false, error: '画面確認用のため、更新はできません' }]
   return null
 }

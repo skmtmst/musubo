@@ -7,6 +7,7 @@ const BASE = `SELECT tenant_id, line_account_id, category, action, result, after
   security_created_at_jd AS utc_at FROM audit_events INDEXED BY idx_audit_events_security_utc
   WHERE security_created_at_jd > julianday(?) AND security_created_at_jd <= julianday(?)`;
 const CONDITIONS: Record<Exclude<SecurityRuleKey, 'impersonation' | 'export_records'>, string> = {
+  meeting_revoke_review: `action = 'booking.meeting.deleted_connection_review'`,
   login_failures: `category = 'auth' AND (action = 'auth.fail' OR (action IN ('auth.login', 'auth.mfa.verify') AND result != 'success'))`,
   api_mutations: `category = 'business' AND action GLOB 'api.*'`,
   export_requests: `action IN ('data.export', 'form_document.download', 'auth.export') AND result = 'success'`,

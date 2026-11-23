@@ -25,6 +25,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 
 import Notice from '@/components/shared/notice'
+import { MeetingReviewSection } from '@/v8/booking-gap/public/meeting-review-section'
 
 import Select from '@/components/shared/select'
 
@@ -207,6 +208,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                   ) : detail.calendarSync === 'pending' ? '反映処理中' : '未設定'}
               </Row>
             </section>
+            {selectedAccountId ? <MeetingReviewSection accountId={selectedAccountId} bookingId={detail.id} canOperate={canOperate} /> : null}
 
             {/* ---- 予約した時の内容の写し (T) ---- */}
             {(() => {

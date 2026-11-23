@@ -260,7 +260,7 @@ describe('共有の工程記録の退会後削除', () => {
     try {
       sqlite.exec("INSERT INTO tenants(id,name) VALUES('workflow-tenant-a','A'),('workflow-tenant-b','B')");
       sqlite.exec("INSERT INTO line_accounts(id,tenant_id,name,channel_id,channel_access_token,channel_secret) VALUES('workflow-account-a','workflow-tenant-a','A','workflow-channel-a','test','test'),('workflow-account-b','workflow-tenant-b','B','workflow-channel-b','test','test')");
-      const scopes=['tenant:workflow-tenant-a','line:workflow-account-a','tenant:workflow-tenant-b','line:workflow-account-b'];
+      const scopes=['tenant:workflow-tenant-a','line:workflow-account-a','tenant:workflow-tenant-b','line:workflow-account-b','global:meeting-revoke-queue'];
       const insert=sqlite.prepare(`INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,retry_key,created_at,updated_at) VALUES(?,'test','retention','test','key',0,0)`);
       for(const scope of scopes)insert.run(scope);
       const rows=sqlite.prepare(`SELECT scope_id FROM workflow_steps WHERE ${tenantScopeCondition('workflow_steps')} ORDER BY scope_id`).all('workflow-tenant-a');

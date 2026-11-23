@@ -110,6 +110,11 @@
   box-shadow: var(--card-shadow);
 }
 
+/* 要確認のカード（開いている異常・LINE受信の失敗・外部の予定・会議の確認）が続くときは 16 空ける。 */
+.alerts + .alerts {
+  margin-top: var(--polish-space-card);
+}
+
 .alertsTitle {
   margin: 0;
   color: var(--color-ink);

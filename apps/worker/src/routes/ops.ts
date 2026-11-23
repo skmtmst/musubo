@@ -20,6 +20,7 @@ import {
   listPlatformAudit,
   PLATFORM_AUDIT_ACTIONS,
   recordPlatformAudit,
+  auditEventStatement,
   revealPiiForImpersonation,
   setPlatformAdminActive,
   startImpersonation,
@@ -48,6 +49,29 @@ import { parseFeaturePacks } from './tenants.js';
 export const ops = new Hono<Env>();
 
 ops.use('/api/ops/*', requirePlatformAdmin());
+
+/** 店や統括の消去後も、外部接続の手動確認は運営マスターが確認できる。秘密は返さない。 */
+ops.get('/api/ops/meeting-deletion-reviews', async c=>{
+ const rows=await dbFor(c.env).prepare(`SELECT subject_id,result_json,error_code,updated_at FROM workflow_steps
+  WHERE scope_id='global:meeting-revoke-queue' AND process_kind='booking_meeting_deleted_revoke' AND status='unknown' ORDER BY updated_at ASC,subject_id LIMIT 100`).all<{subject_id:string;result_json:string|null;error_code:string|null;updated_at:number}>();
+ return c.json({success:true,data:rows.results.map(row=>{let detail:Record<string,string|null>={};try{const value=JSON.parse(row.result_json??'null') as Record<string,unknown>|null;for(const key of ['provider','authType','tenantId','accountId','staffId'])if(typeof value?.[key]==='string')detail[key]=value[key] as string;}catch{/* 不正な内容は返さない */}return {id:row.subject_id,detail,reason:row.error_code,updatedAt:row.updated_at};})});
+});
+ops.post('/api/ops/meeting-deletion-reviews/:id/resolve', requirePlatformAdminWrite(), inputJsonBoundary(), async c=>{
+ let body:unknown;try{body=await c.req.json();}catch{return c.json({success:false,error:'invalid_input'},400);}
+ const note=reasonFrom(body);if(!note)return c.json({success:false,error:'invalid_reason'},400);
+ const id=c.req.param('id'),db=dbFor(c.env),staff=c.get('staff');
+ const current=await db.prepare("SELECT result_json FROM workflow_steps WHERE scope_id='global:meeting-revoke-queue' AND process_kind='booking_meeting_deleted_revoke' AND subject_id=? AND step_key='current' AND status='unknown'").bind(id).first<{result_json:string|null}>();
+ if(!current)return c.json({success:false,error:'not_found'},404);
+ let tenantId:string|undefined;try{const value=JSON.parse(current.result_json??'null') as {tenantId?:unknown}|null;if(typeof value?.tenantId==='string')tenantId=value.tenantId;}catch{/* 不正な内容は監査へ含めない */}
+ const guard="EXISTS(SELECT 1 FROM workflow_steps WHERE scope_id='global:meeting-revoke-queue' AND process_kind='booking_meeting_deleted_revoke' AND subject_id=? AND step_key='current' AND status='unknown')";
+ const results=await db.batch([
+  auditEventStatement(db,{tenantId,category:'business',action:'booking.meeting.deleted_connection_review_resolved',actorPrincipalId:staff.id,actorRole:staff.role,targetKind:'meeting_connection',targetId:id,result:'success',retentionClass:'security',reason:note},{sql:guard,params:[id]}),
+  db.prepare(`DELETE FROM notifications WHERE id=? AND ${guard}`).bind(`deleted-meeting-review:${id}`,id),
+  db.prepare("UPDATE workflow_steps SET status='succeeded',input_json=NULL,result_json=NULL,error_code=NULL,updated_at=? WHERE scope_id='global:meeting-revoke-queue' AND process_kind='booking_meeting_deleted_revoke' AND subject_id=? AND step_key='current' AND status='unknown'").bind(Date.now(),id),
+ ]);
+ if(results[2].meta.changes!==1)return c.json({success:false,error:'not_found'},404);
+ return c.json({success:true});
+});
 const TENANT_STATUSES = new Set<TenantStatus>(['active', 'suspended', 'archived']);
 
 function reasonFrom(body: unknown): string | null {

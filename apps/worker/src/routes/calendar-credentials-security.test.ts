@@ -30,6 +30,16 @@ function fixture() {
 afterEach(() => { opened.splice(0).forEach(db => db.raw.close()); vi.clearAllMocks(); });
 
 describe('S21 calendar credentials at rest and at Google boundary', () => {
+  it('Google 解除中は OAuth カレンダーの保存を止め、期限後は保存できる', async () => {
+    const db = fixture(), now = Date.now();
+    db.raw.prepare("INSERT INTO workflow_steps(scope_id,process_kind,subject_id,step_key,status,lease_owner,lease_expires_at,retry_key,created_at,updated_at) VALUES('global:meeting-revoke','booking_meeting_revoke_lock','google_meet','lock','running','owner',?,'key',?,?)").run(now + 120000, now, now);
+    const input = { accountId: 'account-a', calendarId: 'calendar', authType: 'oauth', accessToken: 'fixture-access' };
+    const request = () => db.app.request('/api/integrations/google-calendar/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }, { DB: db.db, GOOGLE_CALENDAR_CREDENTIAL_ENCRYPTION_KEY: key });
+    expect((await request()).status).toBe(409);
+    expect(db.raw.prepare('SELECT count(*) AS n FROM google_calendar_connections').get()).toEqual({ n: 0 });
+    db.raw.prepare("UPDATE workflow_steps SET lease_expires_at=? WHERE process_kind='booking_meeting_revoke_lock'").run(now - 1);
+    expect((await request()).status).toBe(201);
+  });
   it('encrypts all three credentials before D1 receives them, with fresh IVs', async () => {
     const db = fixture();
     const input = { calendarId: 'fixture-calendar', authType: 'oauth', lineAccountId: 'account-a',

@@ -96,8 +96,11 @@ export async function runSixHourlyHeavyJobs(
     {
       name: 'booking expirer',
       run: async () => {
-        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification,
-          credentials: { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } });
+        const {meetingCreatorForBooking}=await import('../features/booking/booking-meeting-runtime/index.js');
+        const {syncOutlookBookingForEnv}=await import('../features/booking/booking-outlook-sync-runtime/index.js');
+        const {calendarCredentialsForEnv}=await import('../features/booking/booking-outlook-busy-runtime/index.js');
+        const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification, meetingCreatorForBooking: id=>meetingCreatorForBooking(env,id), outlookSyncBooking:id=>syncOutlookBookingForEnv(env,id),
+          credentials: calendarCredentialsForEnv(env) });
         logger.log("src_index_log");
       },
     },

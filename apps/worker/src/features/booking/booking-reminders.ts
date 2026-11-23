@@ -83,7 +83,7 @@ export async function processDueReminders(
     .prepare(
       `SELECT r.id, r.booking_id, r.kind, r.retry_count, r.last_error,
               r.retry_key, r.recipient_line_user_id, r.messages_json,
-              b.line_account_id, b.starts_at, b.meeting_mode, b.meeting_url,b.policy_snapshot_json,
+              b.line_account_id, b.starts_at, b.meeting_mode, CASE WHEN b.meeting_url_source='manual' THEN b.meeting_url ELSE COALESCE((SELECT ml.meeting_url FROM booking_meeting_links ml WHERE ml.booking_id=b.id AND b.status='confirmed' AND ml.status='active' LIMIT 1),b.meeting_url) END AS meeting_url,b.policy_snapshot_json,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,

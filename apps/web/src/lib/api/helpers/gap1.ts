@@ -35,14 +35,26 @@ export const bookingCancellationApi={
  quote:(liffId:string,bookingId:string,idToken:string)=>fetchApi<Result<BookingCancellationQuote>>(`/api/liff/booking/cancellation-quote?${new URLSearchParams({liffId,booking_id:bookingId})}`,{headers:{Authorization:`Bearer ${idToken}`}}),
  setup:(liffId:string,input:{menuId:string;policyAccepted:true},idToken:string,key:string)=>fetchApi<Result<{setupIntentId:string;url:string;status:'pending'|'ready';testMode:true}>>(`/api/liff/booking/setup-intent?${new URLSearchParams({liffId})}`,{...json('POST',input,key),headers:{Authorization:`Bearer ${idToken}`,'Idempotency-Key':key}}),
 };
+/** お客さまのデータを削除したあと、相手先の予定・会議を人が確かめる1件。外部のIDやお客さまの情報は含まない。 */
+export type BookingExternalCleanupItem={id:string;provider:'google_calendar'|'google_meet'|'zoom'|'teams'|'outlook'|null;staffId:string|null;startsAt:string|null};
 export const bookingCalendarApi={
+ connection:(id:string,staffId:string,provider:'google_meet'|'zoom'|'teams'|'outlook')=>fetchApi<Result<{state:'ready'|'refreshing'|'unknown'|'missing';preferred:boolean;mode:'configured'|'mock'}>>(account(`/api/booking/admin/staff/${e(staffId)}/connections/${provider}`,id)),
+ connect:(id:string,staffId:string,provider:'google_meet'|'zoom'|'teams'|'outlook')=>fetchApi<Result<{mode:'configured'|'mock';authorizationUrl:string|null}>>(account(`/api/booking/admin/staff/${e(staffId)}/connections/${provider}/connect`,id),json('POST',{})),
+ disconnect:(id:string,staffId:string,provider:'google_meet'|'zoom'|'teams'|'outlook')=>fetchApi<Result<{disconnected:true}>>(account(`/api/booking/admin/staff/${e(staffId)}/connections/${provider}`,id),{method:'DELETE'}),
+ prefer:(id:string,staffId:string,provider:'google_meet'|'zoom'|'teams')=>fetchApi<Result<{preferred:true}>>(account(`/api/booking/admin/staff/${e(staffId)}/connections/${provider}/prefer`,id),json('POST',{})),
+ meetingReviews:(id:string,bookingId:string)=>fetchApi<Result<{items:Array<{id:string;provider:string;staff_name:string|null;starts_at:string|null;ends_at:string|null}>}>>(account(`/api/booking/admin/bookings/${e(bookingId)}/meeting-links`,id)),
+ resolveMeetingReview:(id:string,bookingId:string,linkId:string)=>fetchApi<Result<{resolved:true}>>(account(`/api/booking/admin/bookings/${e(bookingId)}/meeting-links/${e(linkId)}/resolve`,id),json('POST',{confirmed:true})),
+ listExternalCleanups:(id:string)=>fetchApi<Result<{items:BookingExternalCleanupItem[]}>>(account('/api/booking/admin/external-cleanup',id)),
+ resolveExternalCleanup:(id:string,cleanupId:string,reason?:string)=>fetchApi<Result<{resolved:true}>>(account(`/api/booking/admin/external-cleanup/${e(cleanupId)}/resolve`,id),json('POST',{confirmed:true,...(reason?{reason}:{})})),
+ meetingStatus:(id:string,bookingId:string)=>fetchApi<Result<{state:'none'|'active'|'failed'|'unknown';provider:'google_meet'|'zoom'|'teams'|null;version:number;hasFixedUrl:boolean}>>(account(`/api/booking/admin/bookings/${e(bookingId)}/meeting-status`,id)),
+ retryMeeting:(id:string,bookingId:string,key:string)=>fetchApi<Result<{outcome:'created'|'failed'|'unknown'|'in_progress'|'unavailable'}>>(account(`/api/booking/admin/bookings/${e(bookingId)}/meeting-retry`,id),json('POST',{},key)),
  rewrite:(id:string,bookingId:string,expectedVersion:number)=>fetchApi<Result<{queued:true;version:number}>>(account(`/api/booking/admin/bookings/${e(bookingId)}/calendar/rewrite`,id),json('POST',{expectedVersion})),
  retryJobs:(id:string)=>fetchApi<Result<{queued:number}>>(account('/api/booking/admin/calendar-sync/retry',id),json('POST',{})),
  getSwitches:(id:string,staffId?:string)=>fetchApi<Result<BookingCalendarSwitch>>(account(staffId?`/api/booking/admin/staff/${e(staffId)}/calendar-sync`:'/api/booking/admin/calendar-sync',id)),
  saveSwitches:(id:string,input:BookingCalendarSwitchWrite,staffId?:string)=>fetchApi<Result<BookingCalendarSwitch>>(account(staffId?`/api/booking/admin/staff/${e(staffId)}/calendar-sync`:'/api/booking/admin/calendar-sync',id),json('PUT',input)),
  getStaffUrl:(id:string,staffId:string)=>fetchApi<Result<{url:string|null;version:number}>>(account(`/api/booking/admin/staff/${e(staffId)}/meeting-url`,id)),
  saveStaffUrl:(id:string,staffId:string,url:string|null,expectedVersion:number)=>fetchApi<Result<{url:string|null;version:number}>>(account(`/api/booking/admin/staff/${e(staffId)}/meeting-url`,id),json('PUT',{url,expectedVersion})),
- getMenuUrl:(id:string,menuId:string)=>fetchApi<Result<{url:string|null;version:number}>>(account(`/api/booking/admin/menus/${e(menuId)}/meeting-url`,id)),
- saveMenuUrl:(id:string,menuId:string,url:string|null,expectedVersion:number)=>fetchApi<Result<{url:string|null;version:number}>>(account(`/api/booking/admin/menus/${e(menuId)}/meeting-url`,id),json('PUT',{url,expectedVersion})),
+ getMenuUrl:(id:string,menuId:string)=>fetchApi<Result<{url:string|null;version:number;issuance:'manual'|'automatic'}>>(account(`/api/booking/admin/menus/${e(menuId)}/meeting-url`,id)),
+ saveMenuUrl:(id:string,menuId:string,url:string|null,expectedVersion:number,issuance?:'manual'|'automatic')=>fetchApi<Result<{url:string|null;version:number;issuance:'manual'|'automatic'}>>(account(`/api/booking/admin/menus/${e(menuId)}/meeting-url`,id),json('PUT',{url,expectedVersion,...(issuance?{issuance}:{})})),
  setBookingUrl:(id:string,bookingId:string,input:{action:'set_manual';url:string;expectedVersion:number}|{action:'refresh_fixed';expectedVersion:number})=>fetchApi<Result<{url:string|null;source:'staff'|'menu'|'manual';version:number}>>(account(`/api/booking/admin/bookings/${e(bookingId)}/meeting`,id),json('POST',input)),
 };
