@@ -1,3 +1,4 @@
+import { styleRestaurantBookingAck } from './style-restaurant-booking-ack.js';
 import { styleStarterDistribution } from './style-starter-distribution.js';
 import { Hono } from 'hono';
 
@@ -56,6 +57,7 @@ styles.use('/api/hq/style*', requireRole('owner', 'admin'), async (c, next) => {
   await hq(c, c.req.path === '/api/hq/style-attention');
   await next();
 });
+styles.route('/', styleRestaurantBookingAck);
 styles.route('/', group1);
 styles.route('/', group2);
 styles.route('/', group3);

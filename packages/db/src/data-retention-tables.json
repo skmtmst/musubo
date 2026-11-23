@@ -3003,6 +3003,18 @@
       "parentColumn": "id"
     }
   },
+  "restaurant_booking_ack_operations": {
+    "category": "purge",
+    "scope": { "by": "lineAccount", "column": "line_account_id" }
+  },
+  "restaurant_booking_ack_operation_items": {
+    "category": "purge",
+    "scope": { "by": "parent", "column": "operation_id", "parent": "restaurant_booking_ack_operations", "parentColumn": "id" }
+  },
+  "restaurant_booking_acknowledgements": {
+    "category": "purge",
+    "scope": { "by": "lineAccount", "column": "line_account_id" }
+  },
   "rt_approval_requests": {
     "category": "retain",
     "scope": {

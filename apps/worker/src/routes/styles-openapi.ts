@@ -45,6 +45,8 @@ const definitions: Array<[string,string,string]> = [
   ["get", "/api/dashboard/style/classes/{id}", "レッスン枠"],
   ["patch", "/api/dashboard/style/restaurant-reservations/{id}", "席の予約"],
   ["get", "/api/dashboard/style/summary", "予約のまとめ"],
+  ["post", "/api/dashboard/style/new-bookings/acknowledgements", "新着予約の確認"],
+  ["post", "/api/dashboard/style/new-bookings/acknowledgements/{operationId}/undo", "新着予約の確認を元に戻す"],
   ["get", "/api/dashboard/style/analytics", "予約の集計"],
   ["get", "/api/dashboard/style/bookings", "予約一覧"],
   ["get", "/api/dashboard/style/people", "お客さま一覧"],
@@ -65,6 +67,13 @@ for(const [method,path,summary] of definitions) {
   }
   if(liff)operation.security=[];
   if(!['get','delete'].includes(method))operation.requestBody={required:true,content:{'application/json':{schema:{type:'object'}}}};
+  if(path.includes('/new-bookings/acknowledgements')) {
+    const undo=path.endsWith('/undo');
+    operation.description += undo ? ' 自分が行った操作の確認だけを戻す。' : ' bookingId に予約IDを指定すると1件、nullを指定するとその時点の未確認を最大1000件まで一括確認する。同じoperationIdの再送は対象を増やさない。';
+    operation.requestBody={required:true,content:{'application/json':{schema:{type:'object',required:undo?['storeId']:['storeId','operationId','bookingId'],properties:{storeId:{type:'string'},...(!undo?{operationId:{type:'string',format:'uuid'},bookingId:{type:'string',nullable:true}}:{})}}}}};
+    operation.responses['200'].description=undo?'operationId、undoneCount、state、replayedを返す。':'operationId、acknowledgedCount、state、replayedを返す。';
+    operation.responses['422'].description='一括対象が1000件を超える、または入力を使えない。';
+  }
   (paths[path]??={})[method]=operation;
 }
 export const stylePaths=paths;

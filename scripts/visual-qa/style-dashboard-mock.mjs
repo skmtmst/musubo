@@ -261,7 +261,7 @@ const iso = (date, hm) => `${date}T${hm}:00+09:00`
 const metric = (value, unit = '件', formula = '見本') => ({ value, status: 'available', formula, unit })
 const rate = (value, numerator, denominator, formula = '見本') => ({ value, numerator, denominator, status: 'available', formula, unit: '' })
 const STATUS = { 来店済み: 'visited', 着席中: 'seated', 予約中: 'confirmed', 承認待ち: 'requested', 取消: 'cancelled', 施術中: 'seated', 確定: 'confirmed', 実施: 'completed', 済み: 'completed', '': 'confirmed' }
-const booking = (o) => ({ id: o.id, version: 1, updatedAt: '2026-10-15T00:00:00.000Z', kind: o.kind ?? 'booking', friendId: null, personKey: o.id, name: o.name, startsAt: o.startsAt, endsAt: o.endsAt, requestedAt: o.startsAt, status: o.status, staffId: o.staffId ?? null, menuId: null, storeId: null, slotId: null, partySize: o.partySize ?? 1, price: o.price ?? 0, visited: Boolean(o.visited), attendance: o.attendance ?? null, held: false, meetingMode: o.meetingMode ?? null, meetingUrl: o.meetingUrl ?? null, location: o.location ?? null, outcome: null, source: o.source ?? 'line', entryPoint: null, refCode: null, designation: o.designated ? 'designated' : null, cancelledAt: null, confirmedResponse: null, participationMode: null })
+const booking = (o) => ({ id: o.id, version: 1, updatedAt: '2026-10-15T00:00:00.000Z', kind: o.kind ?? 'booking', friendId: null, personKey: o.id, name: o.name, startsAt: o.startsAt, endsAt: o.endsAt, requestedAt: o.requestedAt ?? o.startsAt, status: o.status, staffId: o.staffId ?? null, menuId: null, storeId: o.storeId ?? null, slotId: null, partySize: o.partySize ?? 1, price: o.price ?? 0, visited: Boolean(o.visited), attendance: o.attendance ?? null, held: false, meetingMode: o.meetingMode ?? null, meetingUrl: o.meetingUrl ?? null, location: o.location ?? null, outcome: null, source: o.source ?? 'line', entryPoint: null, refCode: null, designation: o.designated ? 'designated' : null, cancelledAt: null, confirmedResponse: null, participationMode: null })
 const yenOf = (t) => Number(String(t ?? '').replace(/[^0-9]/g, '')) || 0
 
 function scheduleFor(style, query) {
@@ -313,15 +313,19 @@ const METRICS = {
   lesson: { now: { classes: metric(6, '回'), capacity: metric(64, '人'), unlimitedClasses: metric(0, '回'), attendancePending: metric(2, '回'), classroomOccupancy: rate(0.72, 48, 66), onlineOccupancy: rate(0.61, 22, 36), trialConversion: rate(0.37, 7, 19), visits: metric(42, '人'), noShowRate: rate(0.03, 2, 66) }, prev: { classes: metric(5, '回'), classroomOccupancy: rate(0.66, 44, 66), visits: metric(38, '人'), trialConversion: rate(0.3, 6, 20) } },
 }
 
+const NEW_REQUESTED = ['09:05', '11:40', '10:20']
+const NEW_SOURCES = ['line', 'hotpepper', 'manual']
+
 function snapshotFor(style, query) {
   const date = query.get('date') || '2026-10-15'
   const m = METRICS[style]
   const fresh = TODAY[style].side.find((c) => c.id === 'new')?.rows ?? []
+  // 予約が入った順（requestedAt）は来店の順と変えて、経路も別々にする（右欄の「最新」と経路の札を確かめるため）。
   const newBookings = fresh.map((r, i) => {
-    const [md, hm] = r.label.split(' ')
-    const day = `2026-${md.slice(0, 2)}-${md.slice(3, 5)}`
+    const [, month, dayOfMonth, hm] = /^(\d{2})\/(\d{2}).*?(\d{2}:\d{2})?$/.exec(r.label) ?? []
+    const day = `2026-${month}-${dayOfMonth}`
     const [name, extra] = r.value.split('さま')
-    return booking({ id: `new-${i}`, name: name.trim(), startsAt: iso(day, hm ?? '10:00'), endsAt: iso(day, hm ?? '10:00'), status: 'confirmed', partySize: Number((extra ?? '').replace(/[^0-9]/g, '')) || 1 })
+    return booking({ id: `new-${i}`, name: name.trim(), startsAt: iso(day, hm ?? '10:00'), endsAt: iso(day, hm ?? '10:00'), requestedAt: iso(date, NEW_REQUESTED[i % NEW_REQUESTED.length]), source: NEW_SOURCES[i % NEW_SOURCES.length], storeId: style === 'restaurant' ? 'qa-store' : null, status: 'confirmed', partySize: Number((extra ?? '').replace(/[^0-9]/g, '')) || 1 })
   })
   return { style, asOf: new Date().toISOString(), timeZone: TZ, from: iso(date, '00:00'), to: iso(date, '23:59'), dateBasis: 'visit', range: query.get('range') || 'today', metrics: m.now, previous: m.prev, items: [], newBookings, resultId: 'qa-result' }
 }
@@ -347,12 +351,14 @@ const CARDS = {
 }
 let styleVersion = 1
 let qaEmpty = false
+const acknowledgementOps = new Map()
+const acknowledged = new Map()
 
 /** 業種ダッシュボードの口の見本。当たらなければ null。 */
 export function styleDashboardMock(method, pathname, query, body) {
   const root = '/api/dashboard/style'
   if (pathname === root) {
-    if (method === 'PUT') { if (body?.style) accountStyle = body.style; qaEmpty = Boolean(body?.qaEmpty); styleVersion += 1 }
+    if (method === 'PUT') { if (body?.style) accountStyle = body.style; qaEmpty = Boolean(body?.qaEmpty); if (body?.qaResetAck) { acknowledgementOps.clear(); acknowledged.clear() } styleVersion += 1 }
     const selection = { style: accountStyle, styleSelected: accountStyle !== 'standard', version: styleVersion, styleMode: STYLE_SETUP_STATE.styleMode }
     if (method === 'PUT') return { success: true, data: { ...selection, changedAnswers: {}, bookingSettingsChanges: [], inserted: [] } }
     const cards = (CARDS[accountStyle] ?? []).map((id) => ({ id, visible: true }))
@@ -362,8 +368,27 @@ export function styleDashboardMock(method, pathname, query, body) {
     } }
   }
   if (!pathname.startsWith(root + '/')) return null
+  const account = query.get('accountId') || 'qa-account'
+  if (method === 'POST' && pathname === root + '/new-bookings/acknowledgements') {
+    const key = `${account}:${body.operationId}`
+    const existing = acknowledgementOps.get(key)
+    if (existing) return { success: true, data: { operationId: body.operationId, acknowledgedCount: existing.ids.length, state: existing.state, replayed: true } }
+    const ids = body.bookingId === null ? snapshotFor('restaurant', query).newBookings.map(row => row.id).filter(id => !acknowledged.has(`${account}:${id}`)) : [body.bookingId]
+    for (const id of ids) acknowledged.set(`${account}:${id}`, body.operationId)
+    acknowledgementOps.set(key, { ids, state: 'active' })
+    return { success: true, data: { operationId: body.operationId, acknowledgedCount: ids.length, state: 'active', replayed: false } }
+  }
+  const undoMatch = pathname.match(/\/new-bookings\/acknowledgements\/([^/]+)\/undo$/)
+  if (method === 'POST' && undoMatch) {
+    const op = acknowledgementOps.get(`${account}:${decodeURIComponent(undoMatch[1])}`)
+    let count = 0
+    if (op && op.state === 'active') for (const id of op.ids) if (acknowledged.get(`${account}:${id}`) === decodeURIComponent(undoMatch[1])) { acknowledged.delete(`${account}:${id}`); count++ }
+    const replayed = !op || op.state === 'undone'
+    if (op) op.state = 'undone'
+    return { success: true, data: { operationId: decodeURIComponent(undoMatch[1]), undoneCount: count, state: 'undone', replayed } }
+  }
   const style = query.get('style') || accountStyle
-  if (method === 'GET' && pathname === root + '/summary') { if (!TODAY[style]) return null; const d = snapshotFor(style, query); return { success: true, data: qaEmpty ? { ...d, newBookings: [], metrics: Object.fromEntries(Object.entries(d.metrics).map(([k, m]) => [k, m.denominator !== undefined ? m : { ...m, value: 0 }])) } : d } }
+  if (method === 'GET' && pathname === root + '/summary') { if (!TODAY[style]) return null; const d = snapshotFor(style, query); if (style === 'restaurant') { d.newBookings = d.newBookings.filter(row => !acknowledged.has(`${account}:${row.id}`)); d.unconfirmedNewBookingsCount = d.newBookings.length } return { success: true, data: qaEmpty ? { ...d, newBookings: [], unconfirmedNewBookingsCount: 0, metrics: Object.fromEntries(Object.entries(d.metrics).map(([k, m]) => [k, m.denominator !== undefined ? m : { ...m, value: 0 }])) } : d } }
   if (method === 'GET' && pathname === root + '/schedule') { if (!TODAY[style]) return null; const d = scheduleFor(style, query); return { success: true, data: qaEmpty ? { ...d, entries: [], days: d.days.map((x) => ({ ...x, entryIds: [], bookings: 0, people: 0 })), closures: [] } : d } }
   if (method === 'GET' && pathname === root + '/analytics') return TODAY[style] ? { success: true, data: analyticsFor(style, query) } : null
   if (pathname === root + '/cards' && (method === 'PUT' || method === 'DELETE')) {
