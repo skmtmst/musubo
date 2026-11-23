@@ -12,6 +12,7 @@ import InventoryPage from './inventory'
 
 const state = vi.hoisted(() => ({ account: 'account-1', role: 'owner' as string | null }))
 const api = vi.hoisted(() => ({ snapshot: vi.fn(), openingHours: vi.fn(), inventoryDay: vi.fn(), saveOpeningHours: vi.fn(), saveInventoryAllocation: vi.fn(), generateInventory: vi.fn(), updateInventory: vi.fn() }))
+vi.mock('@/lib/api/helpers/reservation-board', async importOriginal => { const original = await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>(); return { ...original, reservationBoardApi: { ...original.reservationBoardApi, floors: vi.fn(async () => ({ success: true, data: [] })) } } })
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, accounts: [] }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => state.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))

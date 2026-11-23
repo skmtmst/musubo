@@ -1,5 +1,5 @@
 'use client'
-import { compareRestaurantTables } from '@/lib/restaurant-test-api'
+import { compareRestaurantTables } from '@/lib/restaurant-table-order'
 import { useLedgerFloor } from './use-ledger-floor'
 import LedgerEmpty from './ledger-empty'
 import ListState from '@/components/shared/list-state'
