@@ -1086,12 +1086,6 @@
     "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
-    "file": "apps/web/src/v8/nen-campaigns/column-intros.tsx",
-    "fingerprint": "e7cd8ff543ee8d1acd674742b38edd5bbda4fdf682d4257a05437761f9ecfba7",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/v8/nen-health/summary.tsx",
     "fingerprint": "213002b27b0a326f30a4a84e3720cb2c04045c1d2de717e78429b367b9531bde",
     "count": 1,
@@ -1618,12 +1612,6 @@
     "fingerprint": "270aa809e028de5c8f371679a314f4fa071a59a2123024eedcf49ec77434482b",
     "count": 1,
     "reason": "画面のヘルプ部品が補足サイズを指定"
-  },
-  {
-    "file": "apps/web/src/v8/template-edit/rich-video.tsx",
-    "fingerprint": "defaba7125984f0fc4eaf4068ed2b37eaf7512cf5f34317fc8bf78364e80f014",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/v8/visit-stamps/qr.tsx",
