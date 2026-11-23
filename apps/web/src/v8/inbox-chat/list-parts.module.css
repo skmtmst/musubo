@@ -97,6 +97,10 @@
   gap: var(--tpl-inbox-head-tools-gap);
 }
 
+:global(:root) .rowDeadline:not(:empty) {
+  margin-top: var(--space-4, 4px);
+}
+
 :global(:root) .channelBadge {
   height: var(--tpl-inbox-auto);
   min-width: 0;

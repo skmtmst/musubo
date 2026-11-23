@@ -563,7 +563,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                             </span>
                             <span className="ml-auto shrink-0"><StatusPill tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusPill></span>
                           </div>
-                          <div className="flex justify-end"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></div>
+                          <div className={`flex justify-end ${styles.rowDeadline}`}><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></div>
                         </div>
                       </div>
                     </InboxListRow>
