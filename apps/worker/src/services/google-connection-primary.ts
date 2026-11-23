@@ -10,7 +10,9 @@
  * 画面に出す一覧（`connectionsFor`）と、接続IDを省略したときの操作対象（`connectionForEnv`）と、
  * 営業時間・写しの読み取りが、同じ1件を指すことを仕組みで保証する。
  *
- * 並べ方: 主連携 → `sort_order` → `connected_at`（空は後ろ） → `id`。
+ * 並べ方: 主連携 → `sort_order` → `connected_at`（昇順。`COALESCE` で空は先） → `id`。
+ * 772 から使っている `connectionForEnv()` と同じ順序に揃えてある。
+ * `sort_order` が同じなら、つないだ日時が記録されていない接続が先に来る。
  * 主連携は列を持たず `account_settings` に置く（`sns-connection-ports.ts` と同じ鍵）。
  */
 
