@@ -64,28 +64,19 @@ async function openFixture(page, { width = 1440, height = 1000, initialGuide, fi
   })
 }
 
-test('初回だけウェルカムを出し、スキップ後は再読込しても開店準備から始まる', async ({ page }, testInfo) => {
+test('店舗に初めて入ったときは開店準備から始まる', async ({ page }) => {
   await openFixture(page)
-  const idle = { phase: 'idle', stepKey: null, procedureIndex: 1 }
-  let seenAt = null
   await page.route('**/api/getting-started/guide?**', async route => {
-    if (route.request().method() === 'PUT') {
-      expect(route.request().postDataJSON()).toEqual({ ...idle, acknowledgeWelcome: true })
-      seenAt = '2026-11-20T00:00:00Z'
-    }
-    await route.fulfill({ json: { success: true, data: { ...idle, updatedAt: seenAt } } })
+    if (route.request().method() !== 'GET') return route.fallback()
+    await route.fulfill({ json: { success: true, data: { phase: 'idle', stepKey: null, procedureIndex: 1, updatedAt: null } } })
   })
   await page.goto(base)
-  const welcome = page.getByRole('dialog', { name: 'ようこそ' })
-  await expect(welcome.getByRole('img', { name: 'musubo' })).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('guide-welcome.png') })
-  await welcome.getByRole('button', { name: 'タップでスキップ' }).click()
   const popup = page.getByRole('dialog', { name: '開店準備を始めましょう' })
   await expect(popup).toBeVisible()
-  await expect.poll(() => seenAt).not.toBeNull()
+  await expect(page.getByRole('dialog', { name: 'ようこそ' })).toHaveCount(0)
   await page.reload()
   await expect(popup).toBeVisible()
-  await expect(welcome).toHaveCount(0)
+  await expect(page.getByRole('dialog', { name: 'ようこそ' })).toHaveCount(0)
 })
 
 test('接続済みなら設定を残してリッチメニューから始められる', async ({ page }) => {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type GettingStartedFirstRun, type GettingStartedStarter } from '@/lib/api'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
-import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
+import { FEATURE_SETTINGS_UPDATED_EVENT, type FeatureSettingsUpdate } from '@/lib/feature-settings-event'
 import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
 import { buildStepsFromApi, featureSetEntry, insertFeatureSet, type StepResult } from '@/v8/settings/public/steps/index'
 
@@ -73,8 +73,12 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
     return () => { generation.current += 1 }
   }, [accountId, enabled, tick])
   useEffect(() => {
-    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, reload)
-    return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, reload)
+    const featureSaved = (event: Event) => {
+      // スタイルの保存は、下のアカウント別の合図で表示を保ったまま読み直す。
+      if ((event as CustomEvent<FeatureSettingsUpdate>).detail?.source !== 'account-style') reload()
+    }
+    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, featureSaved)
+    return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, featureSaved)
   }, [reload])
   useEffect(() => {
     const styleSaved = (event: Event) => { if ((event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) refresh() }

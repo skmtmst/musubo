@@ -8,5 +8,5 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
   onClose: () => void
   quietWhenUnavailable?: boolean
 }) {
-  return <NoticeLineDialog open={open} onClose={onClose} quietWhenUnavailable={quietWhenUnavailable} />
+  return <NoticeLineDialog open={open} onClose={onClose} quietWhenUnavailable={quietWhenUnavailable} closeWhenLinked />
 }

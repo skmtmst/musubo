@@ -338,8 +338,8 @@ describe('LINEアカウント作成ウィザード', () => {
       loginChannelId: '2007123456',
       loginChannelSecret: 'synthetic-login-secret',
     }), undefined)
-    expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toBe('/accounts/detail?id=new-account')
-    expect(screen.getByRole('link', { name: '統括コンソールへ戻る' }).getAttribute('href')).toBe('/hq')
+    expect(screen.queryByText('次にすること')).toBeNull()
+    expect(screen.getByRole('link', { name: '管理画面へ' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')
     await waitFor(() => expect(notices.lineRegistration).toHaveBeenCalled())
     expect(screen.getByText('案内を読み込んでいます…')).toBeTruthy()
