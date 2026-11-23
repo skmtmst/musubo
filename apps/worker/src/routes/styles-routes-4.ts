@@ -2,15 +2,16 @@ import {styleMeetUpdates} from './style-meet-updates.js';
 import { validateReminderDraft } from '../services/reminder-draft.js';
 import {
   resourceTables,
-  resourceSnapshot,
+  snapshotSql,
 } from '../services/style-starter-resource.js';
 import {
   automationRevisionToken,
   publishAutomationDraft,
 } from '../features/automations/automation-drafts/index.js';
 
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import { starter } from '../services/style-starter-set.js';
+import { STARTER_ITEM_KINDS } from '../services/style-starter-definition.js';
 
 import {
   getReminderDraftVersion,
@@ -27,20 +28,6 @@ import { validRestaurantDate } from '../services/restaurant-booking.js';
 import { accountOpeningHours, openingDay } from '../services/account-opening-hours.js';
 import { base, account, json, edit, text, oneOf } from './styles-common.js';
 export const styles = new Hono<Env>();
-
-/** タグの見本はタグの表に行を持たないので、見本の名前を今の初期セットの組から読む。 */
-async function heldTagSet(c: Context<Env>, a: string, key: string) {
-  const p = await profile(c.env.DB, a);
-  if (!p) return null;
-  try {
-    const set = await starter(c.env.DB, c.get('staff')?.tenantId ?? null, p.style);
-    return set.definition.items.find((i) => i.key === key && i.kind === 'tag_set') ?? null;
-  } catch (error) {
-    // 統括の組が読めない形でも、一覧そのものは返す。
-    if (error instanceof StyleError) return null;
-    throw error;
-  }
-}
 
 // 空きの例外設定を使い、既存予約を取り消さない。
 styles.post(base + '/closures', async (c) => {
@@ -143,175 +130,66 @@ styles.get(base + '/starter-items', async (c) => {
   const a = await account(c);
   const staff = c.get('staff');
   const includeContents = Boolean(staff && !staff.readOnly && (['owner', 'admin'].includes(staff.role) || staff.hqRole === 'operator'));
-  const rows = (
-    await c.env.DB.prepare(
-      'SELECT * FROM style_starter_items WHERE line_account_id=? ORDER BY applied_at,item_key',
-    )
-      .bind(a)
-      .all<Record<string, unknown>>()
-  ).results;
+  // All dynamic identifiers come from the fixed resource table map, not from a request.
+  const names = Object.entries(resourceTables).map(([kind, table]) =>
+    `WHEN '${kind}' THEN (SELECT name FROM ${table.table} WHERE id=i.target_id AND ${table.account}=i.line_account_id)`).join(' ');
+  const snapshots = STARTER_ITEM_KINDS.map((kind) => {
+    let index = 0;
+    const expression = snapshotSql(kind).replace(/\?/g, () =>
+      index++ === 0 && kind !== 'dashboard' ? 'i.target_id' : 'i.line_account_id');
+    return `WHEN '${kind}' THEN ${expression}`;
+  }).join(' ');
+  const details = includeContents ? `,
+    CASE i.kind ${snapshots} END AS _snapshot,
+    CASE i.kind
+      WHEN 'rich_menu' THEN (SELECT json_group_array(json_object('label',x.label,'actionType',x.actionType,'actionData',x.actionData)) FROM (SELECT a.label,a.action_type actionType,a.action_data actionData FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id WHERE p.group_id=i.target_id AND p.group_id IN(SELECT id FROM rich_menu_groups WHERE account_id=i.line_account_id) ORDER BY p.order_index,a.bounds_y,a.bounds_x) x)
+      WHEN 'reminder' THEN (SELECT json_group_array(json_object('offsetMinutes',x.offsetMinutes,'offsetDays',x.offsetDays,'sendAtTime',x.sendAtTime,'text',x.text)) FROM (SELECT s.offset_minutes offsetMinutes,s.offset_days offsetDays,s.send_at_time sendAtTime,s.message_content text FROM reminder_version_steps s JOIN reminders r ON r.current_draft_version_id=s.reminder_version_id WHERE r.id=i.target_id AND r.line_account_id=i.line_account_id ORDER BY s.position) x)
+      WHEN 'scenario' THEN (SELECT json_group_array(json_object('delayMinutes',x.delayMinutes,'text',x.text)) FROM (SELECT s.delay_minutes delayMinutes,s.message_content text FROM scenario_steps s JOIN scenarios r ON r.id=s.scenario_id WHERE r.id=i.target_id AND r.line_account_id=i.line_account_id ORDER BY s.step_order) x)
+    END AS _definition` : '';
+  type Extra = { _name: string | null; _status: string | null; _automation: string | null; _reminder_revision: string | null; _snapshot?: string | null; _definition?: string | null };
+  const rows = (await c.env.DB.prepare(`SELECT i.*,
+    CASE i.kind WHEN 'form' THEN (SELECT f.name FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=i.target_id AND a.line_account_id=i.line_account_id LIMIT 1) ${names} END AS _name,
+    CASE i.kind
+      WHEN 'automation' THEN COALESCE((SELECT status FROM automation_definitions WHERE id=i.target_id AND line_account_id=i.line_account_id),'missing')
+      WHEN 'form' THEN COALESCE((SELECT CASE WHEN is_active=1 AND current_published_version_id IS NOT NULL THEN 'active' ELSE 'draft' END FROM forms f WHERE id=i.target_id AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=i.line_account_id) AND f.status!='archived'),'missing')
+      WHEN 'reminder' THEN COALESCE((SELECT lifecycle_status FROM reminders WHERE id=i.target_id AND line_account_id=i.line_account_id),'missing')
+      WHEN 'booking_menu' THEN CASE WHEN (SELECT is_active FROM menus WHERE id=i.target_id AND line_account_id=i.line_account_id) THEN 'active' ELSE 'stopped' END
+      WHEN 'rich_menu' THEN COALESCE((SELECT status FROM rich_menu_groups WHERE id=i.target_id AND account_id=i.line_account_id),'missing')
+      WHEN 'scenario' THEN CASE WHEN (SELECT is_active FROM scenarios WHERE id=i.target_id AND line_account_id=i.line_account_id) THEN 'active' ELSE 'stopped' END
+      WHEN 'tag_set' THEN 'held'
+      WHEN 'friend_add_rule' THEN COALESCE((SELECT CASE WHEN EXISTS(SELECT 1 FROM friend_add_rule_versions v WHERE v.rule_id=r.id AND v.status='draft') THEN 'draft' ELSE r.status END FROM friend_add_rules r WHERE r.id=i.target_id AND r.line_account_id=i.line_account_id),'missing')
+    END AS _status,
+    CASE WHEN i.kind='automation' THEN (SELECT json_object('current_draft_version_id',d.current_draft_version_id,'trigger_type',v.trigger_type,'trigger_config',v.trigger_config,'condition_config',v.condition_config,'action_config',v.action_config) FROM automation_definitions d LEFT JOIN automation_versions v ON v.id=d.current_draft_version_id WHERE d.id=i.target_id AND d.line_account_id=i.line_account_id) END AS _automation,
+    CASE WHEN i.kind='reminder' THEN (SELECT current_draft_version_id FROM reminders WHERE id=i.target_id AND line_account_id=i.line_account_id) END AS _reminder_revision
+    ${details}
+    FROM style_starter_items i WHERE i.line_account_id=? ORDER BY i.applied_at,i.item_key`).bind(a).all<Record<string, unknown> & Extra>()).results;
+  // The same set supplies all tag entries; do not read the profile once per item.
+  let tagItems: Awaited<ReturnType<typeof starter>>['definition']['items'] = [];
+  if (rows.some(item => item.kind === 'tag_set')) {
+    const p = await profile(c.env.DB, a);
+    if (p) try { tagItems = (await starter(c.env.DB, staff?.tenantId ?? null, p.style)).definition.items; }
+    catch (error) { if (!(error instanceof StyleError)) throw error; }
+  }
   const items = [];
-  for (const item of rows) {
-    let status: unknown = null,
-      draftRevision: string | null = null;
-    let blockedConfirmation =
-      item.kind === 'automation' && item.item_key === 'reminder';
-    if (item.kind === 'automation') {
-      const row = await c.env.DB.prepare(
-        `SELECT d.status,d.current_draft_version_id,v.trigger_type,v.trigger_config,v.condition_config,v.action_config FROM automation_definitions d LEFT JOIN automation_versions v ON v.id=d.current_draft_version_id WHERE d.id=? AND d.line_account_id=?`,
-      )
-        .bind(item.target_id, a)
-        .first<{
-          status: string;
-          current_draft_version_id: string | null;
-          trigger_type: string;
-          trigger_config: string;
-          condition_config: string;
-          action_config: string;
-        }>();
-      status = row?.status ?? 'missing';
-      blockedConfirmation =
-        blockedConfirmation || row?.trigger_type === 'calendar_booked';
-      if (includeContents && row?.current_draft_version_id)
-        draftRevision = await automationRevisionToken(
-          row.current_draft_version_id,
-          row,
-        );
-    } else if(item.kind==='form') {
-      status=(await c.env.DB.prepare(`SELECT CASE WHEN is_active=1 AND current_published_version_id IS NOT NULL THEN 'active' ELSE 'draft' END status FROM forms f WHERE id=? AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?) AND f.status!='archived'`).bind(item.target_id,a).first<{status:string}>())?.status??'missing';
-    } else if (item.kind === 'reminder') {
-      const row = await c.env.DB.prepare(
-        'SELECT lifecycle_status status,current_draft_version_id FROM reminders WHERE id=? AND line_account_id=?',
-      )
-        .bind(item.target_id, a)
-        .first<{ status: string; current_draft_version_id: string | null }>();
-      status = row?.status ?? 'missing';
-      draftRevision = row?.current_draft_version_id ?? null;
-    } else if (item.kind === 'booking_menu')
-      status = (
-        await c.env.DB.prepare(
-          'SELECT is_active FROM menus WHERE id=? AND line_account_id=?',
-        )
-          .bind(item.target_id, a)
-          .first<{ is_active: number }>()
-      )?.is_active
-        ? 'active'
-        : 'stopped';
-    else if (item.kind === 'rich_menu')
-      status =
-        (
-          await c.env.DB.prepare(
-            'SELECT status FROM rich_menu_groups WHERE id=? AND account_id=?',
-          )
-            .bind(item.target_id, a)
-            .first<{ status: string }>()
-        )?.status ?? 'missing';
-    else if (item.kind === 'scenario')
-      status =
-        (
-          await c.env.DB.prepare(
-            'SELECT is_active FROM scenarios WHERE id=? AND line_account_id=?',
-          )
-            .bind(item.target_id, a)
-            .first<{ is_active: number }>()
-        )?.is_active
-          ? 'active'
-          : 'stopped';
-    else if (item.kind === 'tag_set') status = 'held';
-    else if (item.kind === 'friend_add_rule')
-      // 受け皿に下書きがある間は「下書き」。公開は友だち追加の画面の確認窓からだけ。
-      status =
-        (
-          await c.env.DB.prepare(
-            "SELECT CASE WHEN EXISTS(SELECT 1 FROM friend_add_rule_versions v WHERE v.rule_id=r.id AND v.status='draft') THEN 'draft' ELSE r.status END status FROM friend_add_rules r WHERE r.id=? AND r.line_account_id=?",
-          )
-            .bind(item.target_id, a)
-            .first<{ status: string }>()
-        )?.status ?? 'missing';
+  for (const row of rows) {
+    const { _name, _status, _automation, _reminder_revision, _snapshot, _definition, ...item } = row;
+    if (includeContents && !STARTER_ITEM_KINDS.includes(item.kind as typeof STARTER_ITEM_KINDS[number])) throw new StyleError('invalid_resource');
+    const automation = _automation ? JSON.parse(_automation) as {current_draft_version_id:string|null;trigger_type:string;trigger_config:string;condition_config:string;action_config:string} : null;
+    const blockedConfirmation = item.kind === 'automation' && (item.item_key === 'reminder' || automation?.trigger_type === 'calendar_booked');
+    let draftRevision: string | null = item.kind === 'reminder' ? _reminder_revision : null;
+    if (includeContents && automation?.current_draft_version_id) draftRevision = await automationRevisionToken(automation.current_draft_version_id, automation);
+    const tag = item.kind === 'tag_set' ? tagItems.find(i => i.key === item.item_key && i.kind === 'tag_set') : null;
+    const name = _name ?? tag?.name ?? null;
     const requiresActivation = ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)) && !blockedConfirmation;
     const activationAllowed = !blockedConfirmation && !['form', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind));
-    const table = resourceTables[String(item.kind)];
-    const resource = item.kind==='form' ? await c.env.DB.prepare('SELECT f.name FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=?').bind(item.target_id,a).first<{name:string}>() : table
-      ? await c.env.DB.prepare(
-          `SELECT name FROM ${table.table} WHERE id=? AND ${table.account}=?`,
-        )
-          .bind(item.target_id, a)
-          .first<{ name: string }>()
-      : null;
     if (!includeContents) {
-      // 本文の権限を持たない人には、進み具合に必要なメタ情報だけを返す。
-      items.push({
-        target_id: item.target_id,
-        kind: item.kind,
-        key: item.item_key,
-        name: resource?.name ?? (item.kind === 'tag_set' ? (await heldTagSet(c, a, String(item.item_key)))?.name ?? null : null),
-        is_sample: item.is_sample,
-        isSample: !!item.is_sample,
-        status,
-        draftRevision: null,
-        requiresActivation,
-        activationAllowed,
-      });
+      items.push({ target_id:item.target_id, kind:item.kind, key:item.item_key, name, is_sample:item.is_sample, isSample:!!item.is_sample, status:_status, draftRevision:null, requiresActivation, activationAllowed });
       continue;
     }
-    const definition =
-      item.kind === 'rich_menu'
-        ? {
-            buttons: (
-              await c.env.DB.prepare(
-                `SELECT a.label,a.action_type actionType,a.action_data actionData FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id WHERE p.group_id=? AND p.group_id IN(SELECT id FROM rich_menu_groups WHERE account_id=?) ORDER BY p.order_index,a.bounds_y,a.bounds_x`,
-              )
-                .bind(item.target_id, a)
-                .all()
-            ).results,
-          }
-        : item.kind === 'reminder'
-          ? {
-              steps: (
-                await c.env.DB.prepare(
-                  `SELECT s.offset_minutes offsetMinutes,s.offset_days offsetDays,s.send_at_time sendAtTime,s.message_content text FROM reminder_version_steps s JOIN reminders r ON r.current_draft_version_id=s.reminder_version_id WHERE r.id=? AND r.line_account_id=? ORDER BY s.position`,
-                )
-                  .bind(item.target_id, a)
-                  .all()
-              ).results,
-            }
-          : item.kind === 'scenario'
-            ? {
-                steps: (
-                  await c.env.DB.prepare(
-                    `SELECT s.delay_minutes delayMinutes,s.message_content text FROM scenario_steps s JOIN scenarios r ON r.id=s.scenario_id WHERE r.id=? AND r.line_account_id=? ORDER BY s.step_order`,
-                  )
-                    .bind(item.target_id, a)
-                    .all()
-                ).results,
-              }
-            : item.kind === 'tag_set'
-              ? { tags: (await heldTagSet(c, a, String(item.item_key)))?.tags ?? [] }
-              : null;
-    items.push({
-      ...item,
-      definition,
-      key: item.item_key,
-      name: resource?.name ?? (item.kind === 'tag_set' ? (await heldTagSet(c, a, String(item.item_key)))?.name ?? null : null),
-      isSample: !!item.is_sample,
-      setId: item.set_id,
-      setVersion: item.set_version,
-      pendingUpdate: item.pending_update
-        ? JSON.parse(String(item.pending_update))
-        : null,
-      requiresActivation,
-      // ごあいさつの公開・タグにする・シナリオを動かすは［まとめて動かす］に混ぜない。
-      activationAllowed,
-      href: item.kind==='form' ? `/form-submissions/edit?id=${encodeURIComponent(String(item.target_id))}&tab=basic` : item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
-      currentSnapshot: await resourceSnapshot(
-        c.env.DB,
-        a,
-        String(item.kind),
-        String(item.target_id),
-      ),
-      status,
-      draftRevision,
-    });
+    const definition = item.kind === 'rich_menu' ? { buttons: JSON.parse(_definition ?? '[]') } : item.kind === 'reminder' || item.kind === 'scenario' ? { steps: JSON.parse(_definition ?? '[]') } : item.kind === 'tag_set' ? { tags:tag?.tags ?? [] } : null;
+    items.push({ ...item, definition, key:item.item_key, name, isSample:!!item.is_sample, setId:item.set_id, setVersion:item.set_version, pendingUpdate:item.pending_update ? JSON.parse(String(item.pending_update)) : null, requiresActivation, activationAllowed,
+      href:item.kind==='form' ? `/form-submissions/edit?id=${encodeURIComponent(String(item.target_id))}&tab=basic` : item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
+      currentSnapshot:_snapshot ?? null, status:_status, draftRevision });
   }
   return c.json({ success: true, data: { items } });
 });
