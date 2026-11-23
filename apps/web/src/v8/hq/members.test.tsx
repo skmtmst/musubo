@@ -97,6 +97,19 @@ afterEach(async () => {
   vi.useRealTimers()
 })
 
+describe('統括の設定の配置', () => {
+  it('題と設定メニューを共通の一覧の型へ置く', () => {
+    const frame = host.querySelector('[data-page-template="list"]')!
+    expect(frame).toBeTruthy()
+    expect(frame.querySelector('[data-template-region="heading"]')?.textContent).toContain('メンバー')
+    expect(frame.querySelector('[data-template-region="heading"] button')).toBeTruthy()
+    expect(frame.querySelector('[data-content-surface="board"]')).toBeTruthy()
+    const menu = screen.getByRole('navigation', { name: '統括の設定' })
+    expect(menu.closest('[data-template-region="folders"]')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'メンバー' }).getAttribute('aria-current')).toBe('page')
+  })
+})
+
 describe('V8 統括のメンバーの窓', () => {
   it('本人の二段階認証設定を一覧の下に表示する', () => {
     expect(screen.getByText('統括の設定')).toBeTruthy()
