@@ -9,7 +9,7 @@
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
 - [LINEプレビューの利用箇所と届き方](line-preview-inventory.md)
-- [LINEプレビューの見え方の修正履歴](release-log/unreleased/pending-kenta-line-preview-1123.md)
+- [LINEプレビューの見え方の修正履歴](release-log/unreleased/PR-kenta-line-preview.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
