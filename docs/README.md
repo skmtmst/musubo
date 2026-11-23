@@ -8,7 +8,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [イベント編集の文字表示を修正](release-log/unreleased/PR-kenta-bare-text-size.md)
+- [イベント編集の文字表示を修正](release-log/unreleased/209-kenta-bare-text-size.md)
 - [イベント編集の操作と予約URLを修正](release-log/unreleased/200-kenta-event-edit.md)
 - [削除ボタンの表示を統一](release-log/unreleased/203-kenta-delete-button-rule.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
