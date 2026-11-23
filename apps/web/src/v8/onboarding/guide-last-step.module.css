@@ -46,6 +46,19 @@
   gap: var(--space-20);
 }
 
+.qrError {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-12);
+  text-align: center;
+}
+
+.qrError p {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+}
+
 .qr {
   inline-size: min(100%, var(--tpl-guide-qr-size));
   block-size: auto;

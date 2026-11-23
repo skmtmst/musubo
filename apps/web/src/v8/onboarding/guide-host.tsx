@@ -57,7 +57,8 @@ export function GuideHost({ children }: { children: ReactNode }) {
 
 function GuideSession({ accountId, armed, watchFirstMessage, children }: { accountId: string | null; armed: boolean; watchFirstMessage: boolean; children: ReactNode }) {
   const role = useStaffRole()
-  const channelId = useOptionalAccount()?.selectedAccount?.channelId
+  const account = useOptionalAccount()
+  const basicId = account?.selectedAccount?.basicId
   const style = useAccountStyle(accountId)
   const pathname = usePathname()
   const [qrOpen, setQrOpen] = useState(false)
@@ -121,12 +122,17 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     router.push(targetHref)
   }, [guide.phase, guide.stepKey, place, targetHref, onTargetScreen, router])
 
-  /* 保存できた時・入力がそろった時に進む手順は、画面側の合図で進める。 */
+  /* 店舗設定の完了は保存の合図で再取得し、実測を確認してから進める。 */
+  const procedureSignal = procedure?.anchor
+  const followupCanConfirm = guide.stepKey === 'followup' && (guide.procedureIndex === 2 || guide.procedureIndex === 3)
   useGuideSignal(
-    procedure?.trigger === 'event' || procedure?.trigger === 'valid' ? procedure.anchor : null,
+    (procedure?.trigger === 'event' || procedure?.trigger === 'valid') && procedureSignal !== 'followup.confirm' ? procedureSignal ?? null : null,
     guide.phase === 'active',
-    () => { if (procedure?.anchor !== 'reception.save') advance() },
+    () => { if (procedureSignal !== 'reception.save' && procedureSignal !== 'menu.save' && procedureSignal !== 'followup.save') advance() },
+    procedureSignal === 'followup.start' ? accountId ?? undefined : undefined,
   )
+  useGuideSignal('followup.confirm', Boolean(accountId && followupCanConfirm && guide.phase === 'active'),
+    () => advance(false, 4), accountId ?? undefined)
   useSetupSaveSignal(scripted && armed, first.refresh)
   useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
@@ -138,7 +144,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   const reviewingHours = guide.stepKey === 'hours'
   const showComplete = scripted && Boolean(summary?.total && summary.done === summary.total) &&
     (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours && !menuPickerStep
-  const showReceive = firstMessageStep && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen && channelId
+  const showReceive = firstMessageStep && accountId && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen
   const showMenuPicker = menuPickerStep && guide.phase === 'active' && pathname === '/' &&
     accountId && style.data?.styleSelected && !style.stale
   const dismissComplete = () => { guide.complete?.(); first.dismissArrived() }
@@ -164,9 +170,9 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
       {showMenuPicker && summary && style.data ? <GuideMenuPicker key={accountId} accountId={accountId}
         version={style.data.version} step={index + 1} total={summary.total} onLater={advance} onSaved={advance}
         onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
-      {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} channelId={channelId}
+      {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} basicId={basicId}
         step={index + 1} total={summary.total} watchExpired={first.watchExpired}
-        richMenuPublished={Boolean(first.progress?.richMenuPublished)}
+        onReload={account?.refreshAccounts}
         onRewatch={first.rewatch} onLater={pause} /> : null}
       {showComplete ? <GuideSetupComplete onClose={dismissComplete}
         onHome={() => { dismissComplete(); router.push('/') }} /> : null}

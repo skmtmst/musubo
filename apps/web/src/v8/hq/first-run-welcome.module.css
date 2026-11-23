@@ -7,7 +7,7 @@
 
 .content {
   position: absolute;
-  inset-block-start: 42%;
+  inset-block-start: calc(50% - var(--first-run-welcome-logo-center-offset));
   inset-inline-start: 50%;
   transform: translate(-50%, -50%);
   animation: welcome-enter var(--motion-welcome-enter) var(--motion-ease-out) both;
@@ -31,25 +31,6 @@
   display: block;
   width: 100%;
   height: auto;
-}
-
-.skip {
-  position: absolute;
-  inset-inline: 0;
-  inset-block-end: calc(10% - var(--first-run-welcome-skip-offset));
-  display: flex;
-  justify-content: center;
-  height: var(--first-run-welcome-skip-height);
-}
-
-.skipButton {
-  width: var(--first-run-welcome-skip-width);
-}
-
-.skipLabel {
-  font-family: var(--font-noto-sans-jp), "Noto Sans JP", sans-serif;
-  font-size: var(--polish-control-text);
-  font-weight: var(--polish-control-weight);
 }
 
 @media (max-width: 600px) {

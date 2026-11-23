@@ -16,7 +16,7 @@ export type GuideProcedureTrigger =
   | 'click'
   /** 必須入力がそろった時（入力有効）。押さずに次の手順へ移る。 */
   | 'valid'
-  /** 有効な入力を確認してガイドの「次へ」を押す。 */
+  /** 内容を確認してガイドの「次へ」を押す。 */
   | 'confirm-input'
   /** 保存や接続の成功イベント */
   | 'event'
@@ -26,6 +26,7 @@ export type GuideProcedure = {
   index: number
   title: string
   body: string
+  mobileBody?: string
   /**
    * スポットライトを当てる対象の `data-guide-anchor` の値。
    * null は対象を光らせない手順（枠 04-3 n7yEY はスポットライト無し）。
@@ -99,22 +100,22 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 1,
         title: 'まずコースを作りましょう',
-        body: '「メニューを作る」から作成画面を開きます。名前と値段を入力してください。写真はあとから追加できます。',
+        body: '「メニューを作る」から作成画面を開きます。名前・値段・所要時間を入力します。写真はあとから追加できます。',
         anchor: 'menu.create',
         trigger: 'click',
       },
       {
         index: 2,
         title: '基本を入力',
-        body: '名前・1名の値段・所要時間を入力し、「次へ」を押します。提供時間帯と写真は任意です。',
+        body: '「コースの名前」「1名の値段」「所要時間」を入力します。',
         anchor: 'menu.form',
         href: '/restaurant-test/menu/edit',
-        trigger: 'confirm-input',
+        trigger: 'valid',
       },
       {
         index: 3,
         title: '保存して完了',
-        body: '「保存する状態」で「公開」を選び、「保存して追加する」を押します。確認画面で「公開して追加する」を押すと予約で使えるようになります。',
+        body: '「保存して追加する」を押すと、次の設定へ進みます。',
         anchor: 'menu.save',
         href: '/restaurant-test/menu/edit',
         trigger: 'event',
@@ -142,13 +143,36 @@ const SCRIPT: readonly GuideStepScript[] = [
     ],
   },
   {
-    // ⑧ 来店フォロー（枠14 wcvyI）
     stepKey: 'followup',
     procedures: [
       {
         index: 1,
-        title: '内容を確認して保存',
-        body: '使う送り方を「保存して作る」で下書きにします。送信はテストと承認のあと始められます。使わない場合は「今は使わない」を選びます。',
+        title: '予約したときをオンにする',
+        body: 'スイッチを押して、本文を確認します。',
+        anchor: 'followup.start',
+        trigger: 'event',
+      },
+      {
+        index: 2,
+        title: '送る時期と本文を確認する',
+        body: 'いつ送るかと、お客さまに届く本文を確認してください。',
+        mobileBody: 'いつ送るかと、本文を確認します。',
+        anchor: 'followup.body',
+        trigger: 'confirm-input',
+      },
+      {
+        index: 3,
+        title: 'この内容でオンにする',
+        body: '確認した内容で送り方をオンにします。次の画面で保存します。',
+        mobileBody: '確認した内容でオンにします。次に一覧で保存します。',
+        anchor: 'followup.confirm',
+        trigger: 'event',
+      },
+      {
+        index: 4,
+        title: '保存して作る',
+        body: '「保存して作る」で下書きができます。メッセージの送信は、テスト送信と承認のあとに始めます。',
+        mobileBody: 'この設定を保存すると、送り方の下書きができます。',
         anchor: 'followup.save',
         trigger: 'event',
       },

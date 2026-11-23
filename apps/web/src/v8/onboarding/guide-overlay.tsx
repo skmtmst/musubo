@@ -42,7 +42,7 @@ export type GuideOverlayProps = {
   /** 9項目それぞれの済み。実データ計測の値をそのまま渡す（ガイドで済みにしない）。 */
   segments: readonly boolean[]
   /** 「この手順をスキップ」と進行トリガーの両方から呼ぶ、次の手順へ。 */
-  onAdvanceProcedure: () => void
+  onAdvanceProcedure: (skipRemainingProcedures?: boolean) => void
   /** 帯の「一時停止」・ESC・対象外画面への移動から呼ぶ。 */
   onPause: () => void
   scripted?: boolean
@@ -55,6 +55,16 @@ function readRect(element: Element): Rect {
   return { left: box.left, top: box.top, width: box.width, height: box.height }
 }
 
+function readVisibleRect(element: Element, container: Element): Rect | null {
+  const box = element.getBoundingClientRect()
+  const area = container.getBoundingClientRect()
+  const left = Math.max(box.left, area.left)
+  const top = Math.max(box.top, area.top)
+  const width = Math.min(box.right, area.right) - left
+  const height = Math.min(box.bottom, area.bottom) - top
+  return width > 0 && height > 0 ? { left, top, width, height } : null
+}
+
 export function GuideOverlay({
   active, showOverlay = true, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
   segments, onAdvanceProcedure, onPause, scripted = true, nextLabel, showProcedure = true,
@@ -64,7 +74,11 @@ export function GuideOverlay({
     台本に無い手順番号（古い保存値など）でも案内を消さない。
     台本が分かっている段なら最後の手順に寄せて見せる。段そのものが分からない時だけ何も出さない。
   */
-  const safeIndex = total > 0 ? Math.min(Math.max(procedureIndex, 1), total) : procedureIndex
+  const [courseReady, setCourseReady] = useState(false)
+  const courseEditorStep = scripted && stepKey === 'friendAdd' && procedureIndex >= 2
+  const safeIndex = courseEditorStep
+    ? (courseReady ? 3 : 2)
+    : total > 0 ? Math.min(Math.max(procedureIndex, 1), total) : procedureIndex
   const procedure = scripted && showProcedure ? guideProcedure(stepKey, safeIndex) : null
   const anchorName = procedure?.anchor ?? null
 
@@ -95,7 +109,9 @@ export function GuideOverlay({
       readRect(narrow ? element.closest('[data-shared-part="sticky-bar"]') ?? element : element),
     ).filter(box => box.height > 0 && box.top < height &&
       (narrow ? box.top + box.height >= height - 32 : box.top > height - 160))
-    setBottomOffset(Math.max(0, ...reserved.map(box => height - box.top + 8)))
+    setBottomOffset(narrow && anchorName === 'menu.form'
+      ? 0 : Math.max(0, ...reserved.map(box => height - box.top + 8)))
+    if (courseEditorStep) setCourseReady(Boolean(document.querySelector('[data-guide-anchor="menu.form"][data-guide-ready]')))
     const selector = `[data-guide-anchor="${anchorName}"]`
     const slotSelector = `[data-guide-slot="${anchorName}"]${width >= 1152 ? ':not([data-guide-narrow])' : ''}`
     const nextSlot = anchorName ? Array.from(document.querySelectorAll<HTMLElement>(slotSelector)).at(-1) ?? null : null
@@ -117,10 +133,11 @@ export function GuideOverlay({
     setTableDialog(previous => previous && tableBox && previous.left === tableBox.left && previous.top === tableBox.top &&
       previous.width === tableBox.width && previous.height === tableBox.height ? previous : tableBox)
     const highlight = tableSave ?? (anchorName === 'tables.form' ? dialog ?? element : element)
-    const next = highlight ? readRect(highlight) : null
+    const clippingContainer = anchorName === 'followup.body' ? highlight?.closest('[data-dialog-content]') : null
+    const next = highlight && (clippingContainer ? readVisibleRect(highlight, clippingContainer) : readRect(highlight))
     setTarget(previous => previous && next && previous.left === next.left && previous.top === next.top &&
       previous.width === next.width && previous.height === next.height ? previous : next)
-  }, [anchorName])
+  }, [anchorName, courseEditorStep])
 
   /* スクロール追従・リサイズ再計算（枠14 izsr5）。 */
   useEffect(() => {
@@ -131,15 +148,22 @@ export function GuideOverlay({
       if (frame) return
       frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
+    const onDialogTransitionEnd = (event: TransitionEvent) => {
+      if (event.propertyName === 'transform' && event.target instanceof Element && event.target.matches('[role=dialog]')) {
+        scheduleMeasure()
+      }
+    }
     const observer = new MutationObserver(scheduleMeasure)
     observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save', 'data-guide-ready'] })
     window.addEventListener('scroll', scheduleMeasure, true)
     window.addEventListener('resize', scheduleMeasure)
+    window.addEventListener('transitionend', onDialogTransitionEnd, true)
     return () => {
       observer.disconnect()
       window.cancelAnimationFrame(frame)
       window.removeEventListener('scroll', scheduleMeasure, true)
       window.removeEventListener('resize', scheduleMeasure)
+      window.removeEventListener('transitionend', onDialogTransitionEnd, true)
     }
   }, [active, procedure, onTargetScreen, measure])
 
@@ -265,6 +289,7 @@ export function GuideOverlay({
   const overlay = (
     <div className={styles.root} data-guide-dialog={inDialog || undefined}
       data-inline-guide={inlineGuide || undefined} data-guide-table-editor={Boolean(desktopTable) || undefined}
+      data-guide-followup-editor={inlineGuide && (anchorName === 'followup.body' || anchorName === 'followup.confirm') || undefined}
       data-guide-course-basics={courseBasics || undefined} data-guide-table-complete={tablesComplete || undefined}
       style={{ '--guide-save-clearance': `${bottomOffset}px` } as CSSProperties}>
       {panels.map((panel, index) => (
@@ -298,15 +323,18 @@ export function GuideOverlay({
           <p className={styles.body}>{tablesComplete ? procedure.body
             : stepKey === 'attributes' && safeIndex === 3 ? '受付中の卓を1件以上用意してください。追加を見送る場合は、この手順をスキップできます。'
             : anchorName === 'menu.save' && actionLabel && inDialog ? `内容を確認して「${actionLabel}」を押します。`
-            : anchorName === 'menu.save' && actionLabel && actionLabel !== '保存して追加する' ? `「保存する状態」で「公開」を選び、「${actionLabel}」を押します。確認画面で内容を確かめて公開します。`
-            : inlineGuide && anchorName === 'followup.save' ? '使わない場合は「今は使わない」を押します。'
+            : anchorName === 'menu.save' && actionLabel ? `「${actionLabel}」を押すと、次の設定へ進みます。`
+            : inlineGuide && (anchorName === 'followup.start' || anchorName === 'followup.save') && actionLabel === '今は使わない' ? '使わない場合は「今は使わない」を押します。'
             : inlineGuide && anchorName === 'hours.confirm' && inDialog ? '営業時間を見直して「変更内容を確認」を押します。'
             : (anchorName === 'reception.lineSeats' || anchorName === 'reception.save') && actionLabel === 'この日の枠を作る' ? '選んだ日にはまだ予約枠がありません。「この日の枠を作る」を押してください。休みの日は営業日を選んでください。'
             : anchorName === 'hours.confirm' && applyingHours ? '変更内容を確かめて、「Googleに反映する」または「設定を保存する」を押します。'
-            : procedure.body}</p>
+            : viewport.width <= NARROW_GUIDE_WIDTH ? procedure.mobileBody ?? procedure.body : procedure.body}</p>
           <div className={styles.balloonFooter}>
-            <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
-            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={onAdvanceProcedure}>次へ</Button> : null}
+            <Button presentation="quiet-text" onClick={() => {
+              if (courseEditorStep || (stepKey === 'followup' && safeIndex !== 2)) onAdvanceProcedure(true)
+              else onAdvanceProcedure()
+            }}>この手順をスキップ</Button>
+            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={() => onAdvanceProcedure()}>次へ</Button> : null}
           </div>
         </div> : null}
         {tablesComplete ? (
@@ -319,7 +347,7 @@ export function GuideOverlay({
                 {nextLabel ? ` ・ 次は「${nextLabel}」です` : null}
               </span>
             </div>
-            <Button size="compact" variant="primary" onClick={onAdvanceProcedure}>次へ進む</Button>
+            <Button size="compact" variant="primary" onClick={() => onAdvanceProcedure()}>次へ進む</Button>
           </div>
         ) : null}
         <div className={styles.bar} data-guide-bar="">
@@ -333,7 +361,7 @@ export function GuideOverlay({
             ))}
           </div>
           <span className={styles.caption}>{caption}</span>
-          {!procedure && stepLabel ? <div className={styles.barHeader}><Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button></div> : null}
+          {!procedure && stepLabel ? <div className={styles.barHeader}><Button presentation="quiet-text" onClick={() => onAdvanceProcedure()}>この手順をスキップ</Button></div> : null}
         </div>
       </div>
     </div>

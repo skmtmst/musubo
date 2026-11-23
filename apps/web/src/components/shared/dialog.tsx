@@ -101,6 +101,8 @@ export type DialogProps = {
   confirmLockedReason?: string
   actionWidthReserve?: 'states' | 'idle'
   guideSlot?: string
+  /** 広い画面用の案内を本文に置く場合、フッター側は狭い画面だけで使う。 */
+  guideSlotNarrow?: boolean
   confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
@@ -190,6 +192,7 @@ export default function Dialog({
   confirmLockedReason,
   actionWidthReserve,
   guideSlot,
+  guideSlotNarrow,
   confirmPlacement,
   onConfirm,
   onCancel,
@@ -359,7 +362,7 @@ export default function Dialog({
       {error || automaticError ? <Notice tone="danger" role="alert">
         {error || automaticError}
       </Notice> : null}
-      {open && guideSlot ? <div data-guide-slot={guideSlot} style={{ display: 'contents' }} /> : null}
+      {open && guideSlot ? <div data-guide-slot={guideSlot} data-guide-narrow={guideSlotNarrow || undefined} style={{ display: 'contents' }} /> : null}
       <div className={styles.footer} data-window-actions>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
