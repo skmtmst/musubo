@@ -447,3 +447,6 @@
 .manualFields { display: flex; flex-direction: column; gap: var(--tpl-rs-dlg-gap); }
 
 .hoursError, .hoursErrorNoticePlacement { margin: 0; }
+
+.tableGroup { display:flex; flex-direction:column; gap:var(--space-8); }
+.tableGroup h3 { margin:0; font-size:var(--text-caption); color:var(--color-ink-secondary); }

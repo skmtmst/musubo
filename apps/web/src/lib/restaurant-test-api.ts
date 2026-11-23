@@ -1,3 +1,5 @@
+import { compareRestaurantTables } from './restaurant-table-order'
+export { compareRestaurantTables } from './restaurant-table-order'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosurePreview, RestaurantClosureSaveResult, RestaurantSeatAvailability } from '@line-crm/shared'
 export type { RestaurantClosure, RestaurantClosureInput, RestaurantClosurePreview, RestaurantClosureSaveResult, RestaurantSeatAvailability } from '@line-crm/shared'
 import type { RestaurantInventoryRules, RestaurantInventoryRulesInput, RestaurantChannelCloseTask } from '@line-crm/shared'
@@ -44,14 +46,6 @@ export type RestaurantTable = {
   shape?: 'rectangle'|'circle'|'long'|'counter'|'sofa'; width?:number; height?:number; rotation?:number;
   smoking_policy?:'non_smoking'|'smoking'|'heated_tobacco'; partition_type?:'open'|'semi_private'|'private'; shoes_allowed?:number;
   visible_on_map?:number; chair_arrangement?:'both'|'one'|'all'; chair_side?:'top'|'right'|'bottom'|'left'|null; seat_detail_type?:string|null
-}
-export function compareRestaurantTables(a: Pick<RestaurantTable, 'id' | 'store_id' | 'code' | 'label'>, b: Pick<RestaurantTable, 'id' | 'store_id' | 'code' | 'label'>): number {
-  const store = a.store_id.localeCompare(b.store_id, 'ja', { numeric: true })
-  if (store) return store
-  const aNumber = /[0-9０-９]/.test(a.code), bNumber = /[0-9０-９]/.test(b.code)
-  if (aNumber !== bNumber) return aNumber ? -1 : 1
-  const compare = (left: string, right: string) => left.localeCompare(right, 'ja', { numeric: true })
-  return (aNumber ? compare(a.code, b.code) : compare(a.label, b.label)) || compare(a.code, b.code) || compare(a.id, b.id)
 }
 export type RestaurantRotation = {date:string;activeTables:number;departedGroups:number;turnover:number|null;utilization:number|null;averageStayMinutes:number|null;noShowRate:number|null;unmeasuredVisits:number};
 
