@@ -300,13 +300,6 @@ export function RestaurantGuestChoices({label, value, onChange}: {label:string; 
   </>
 }
 
-/** 日付の札。空きがない日は選べない。 */
-export function RestaurantDayChoices({options, value, onChange}: {options:{date:string;top:string;bottom:string;unavailable:boolean}[];value:string;onChange:(date:string)=>void}) {
-  return <div className="flex gap-2 overflow-x-auto" role="radiogroup" aria-label="日にち">{options.map(day =>
-    <Button key={day.date} variant="day" selected={value===day.date} role="radio" aria-checked={value===day.date} disabled={day.unavailable} onClick={()=>onChange(day.date)}>{day.top} {day.bottom}</Button>
-  )}</div>
-}
-
 export function RestaurantTimeChoices({ options, value, onChange }: {
   options: { value: string; label: string; accessibleLabel: string; available: boolean }[];
   value: string | null;

@@ -41,12 +41,12 @@ import {
   type DayChip,
 } from '../../lib/seat-reserve.js';
 import SeatWaitlistSheet from '../../components/seat-waitlist-sheet.js';
-import SeatPick, { type DaySlots } from './seat-pick.js';
+import SeatPick from './seat-pick.js';
 import SeatConfirm from './seat-confirm.js';
 import SeatDone from './seat-done.js';
 import SeatMine from './seat-mine.js';
 
-import type { View, Course, Store } from './seat-reserve-types.js';
+import type { View, Course, Store, DaySlots } from './seat-reserve-types.js';
 
 const STEPS = ['人数・日時', 'コース', '確認'];
 const DEFAULT_GUESTS = 2;
@@ -79,6 +79,7 @@ export default function SeatReserve() {
   const [today, setToday] = useState('');
   const [chips, setChips] = useState<DayChip[]>([]);
   const [days, setDays] = useState<Record<string, DaySlots>>({});
+  const daysRef = useRef(days); daysRef.current = days;
   /* 空きが無い日の理由と、店の遅れたときの決まり（空きの口が返す）。 */
   const [reasons, setReasons] = useState<Record<string, RestaurantUnavailableReason | undefined>>({});
   const [late, setLate] = useState<RestaurantLateArrivalPolicy | null>(null);
@@ -148,6 +149,11 @@ export default function SeatReserve() {
     },
     [fetchDay],
   );
+
+  const loadVisibleDays = useCallback((dates: string[], retry = false) => {
+    if (!store) return;
+    for (const d of dates) if (daysRef.current[d] === undefined || (retry && daysRef.current[d] === 'error')) void fetchDay(store, d, guestCount, generation.current);
+  }, [store, guestCount, fetchDay]);
 
   const loadMine = useCallback(async (s: Store) => {
     const r = await restaurantBookingApi.mine(s.id);
@@ -413,14 +419,14 @@ export default function SeatReserve() {
 
   if (loadState === 'loading') return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
+      <LiffHeader title="ご予約" />
       <div className="mx-auto w-full max-w-md px-4 pt-3"><LoadingView /></div>
     </LiffLookScope>
   );
   if (loadState === 'missing')
     return (
       <LiffLookScope className="min-h-screen bg-canvas">
-        <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
+        <LiffHeader title="ご予約" />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <StatusView
             icon="calendar-x"
@@ -433,7 +439,7 @@ export default function SeatReserve() {
   if (loadState === 'error' || !store)
     return (
       <LiffLookScope className="min-h-screen bg-canvas">
-        <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
+        <LiffHeader title="ご予約" />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <LoadErrorView note="ご予約はなくなっていません。" onRetry={() => void load()} />
         </div>
@@ -443,15 +449,16 @@ export default function SeatReserve() {
   const minutes = cancelMinutes ?? 0;
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title={view==='confirm'?'確認':store.reservationForm?.definition.title??'ご予約'} />
+      <LiffHeader title="ご予約" />
       <div className={`mx-auto w-full max-w-md ${view==='done'?'px-6 pt-0':`px-4 ${view==='pick'||view==='course'||view==='confirm'?'pt-4':'pt-3'}`}`}>
       {(view === 'pick' || view === 'course' || view === 'confirm') && (
         <Stepper steps={STEPS} current={view === 'pick' ? 0 : view === 'course' ? 1 : 2} />
       )}
-        <div key={view} className={`liff-step ${view==='pick'||view==='course'||view==='confirm'?'mt-3 space-y-3 pb-28':''}`}>
+        <div key={view} className={`liff-step ${view==='pick'||view==='course'||view==='confirm'?'mt-3 space-y-3 pb-40':''}`}>
           {view === 'pick' && (
             <>
             <SeatPick
+              formTitle={store.reservationForm?.definition.title}
               guestLabel={store.reservationForm?.definition.fields.find(field=>field.id==='guestCount')?.label}
               dateLabel={store.reservationForm?.definition.fields.find(field=>field.id==='dateTime')?.label}
               timeZone={store.timezone}
@@ -467,6 +474,7 @@ export default function SeatReserve() {
               onDate={pickDate}
               onTime={pickTime}
               onRetry={() => void fetchDay(store, date, guestCount, generation.current)}
+              onRequestDates={loadVisibleDays}
             />
             {currentSlots?.filter(s => !s.available && (!s.unavailableReason || s.unavailableReason === 'full') && !reasons[date]?.includes('closed') && reasons[date] !== 'private_event' && Date.parse(s.startsAt) > Date.now() + 3600000).map(s => <Button key={s.startsAt} variant="notify-text" aria-label={`${zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる`} onClick={() => setWaitlistSlot({ startsAt: s.startsAt, guestCount })}>{zonedParts(s.startsAt, store.timezone).hm} 空いたら知らせる</Button>)}
             {waitlistSlot && <SeatWaitlistSheet storeId={store.id} storeName={store.name} startsAt={waitlistSlot.startsAt} guestCount={waitlistSlot.guestCount} onClose={() => setWaitlistSlot(null)} />}
@@ -495,8 +503,8 @@ export default function SeatReserve() {
             <section className="space-y-3.5" aria-label="コース選択">
               <h2 className="text-xl font-bold text-ink">コースを選んでください</h2>
               <ul className="space-y-3.5">
-                <li><MenuChoiceCard name="席のみ" selected={courseId === null} disabled={busy} onSelect={() => selectCourse(null)} details={<span className="font-semibold text-ink">120分</span>} /></li>
-                {courses.map(course => <li key={course.id}><MenuChoiceCard name={course.name} imageUrl={course.photoUrl} selected={courseId === course.id} disabled={busy} onSelect={() => selectCourse(course.id)} details={<><span className="font-semibold text-ink">{course.durationMinutes}分</span><span className="ml-2 font-bold text-liff-primary">{formatYen(course.price)}</span></>} /></li>)}
+                <li><MenuChoiceCard emptyImagePlaceholder={false} name="席のみ" selected={courseId === null} disabled={busy} onSelect={() => selectCourse(null)} details={<span className="font-semibold text-ink">120分</span>} /></li>
+                {courses.map(course => <li key={course.id}><MenuChoiceCard emptyImagePlaceholder={false} name={course.name} imageUrl={course.photoUrl} selected={courseId === course.id} disabled={busy} onSelect={() => selectCourse(course.id)} details={<><span className="font-semibold text-ink">{course.durationMinutes}分</span><span className="ml-2 font-bold text-liff-primary">{formatYen(course.price)}</span></>} /></li>)}
               </ul>
               {!slot && days[date] !== 'loading' && <p role="status">このコースでは選んだ時刻を利用できません。日時を選び直してください。</p>}
               {error && <FieldError>{error}</FieldError>}

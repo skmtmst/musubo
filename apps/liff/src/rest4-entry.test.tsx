@@ -77,7 +77,7 @@ for (const entry of ['apps', 'worker'] as const) {
     fireEvent.click(screen.getByRole('button', { name: 'コースを選んで進む' }));
     await screen.findByText(/送信できませんでした/);
     failHold = false; fireEvent.click(screen.getByRole('button', { name: 'コースを選んで進む' }));
-    await screen.findByText('ご予約の内容');
+    await screen.findByText('内容を確かめてください');
     const profileName = entry === 'worker' ? 'Workerの本人' : '予約の本人';
     expect(screen.getByRole('textbox', { name: /お名前/ })).toHaveProperty('value', profileName);
     expect(screen.getByRole('textbox', { name: /お名前/ })).toHaveProperty('required', true);
