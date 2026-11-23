@@ -1352,3 +1352,4 @@
 - [開店準備の進み具合の表示](release-log/unreleased/205-kenta-setup-chip.md)
 
 - [開店準備の進み具合が変わる操作](../apps/web/src/v8/onboarding/setup-chip-progress.md) — 更新対象の説明。
+- [ウォークインの階・エリア切り替え](release-log/unreleased/210-kenta-walkin-floor-tabs.md)
