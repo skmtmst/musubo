@@ -68,3 +68,5 @@
 
 .noticeWithLegend{display:flex;align-items:center;gap:var(--space-8)}
 .noticeWithLegend>:first-child{flex:1;min-width:0}
+
+.toolbarEnd{display:flex;align-items:center;gap:var(--space-6);margin-inline-start:auto;min-width:0}
