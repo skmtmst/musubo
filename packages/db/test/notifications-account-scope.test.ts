@@ -27,6 +27,8 @@ function setup() {
       metadata TEXT, line_account_id TEXT, category TEXT NOT NULL DEFAULT 'info',
       created_at TEXT NOT NULL
     );
+    CREATE TABLE staff_members (id TEXT PRIMARY KEY, role TEXT, is_active INTEGER, invite_status TEXT);
+    CREATE TABLE operator_notification_teams (id TEXT PRIMARY KEY, line_account_id TEXT, staff_ids TEXT, archived_at TEXT);
     INSERT INTO notification_rules
       (id, name, event_type, line_account_id, created_at, updated_at)
     VALUES
@@ -48,7 +50,7 @@ describe('notification rule account scope', () => {
     expect((await getNotificationRules(db, 'account-a')).map((item) => item.id)).toEqual(['rule-a']);
     expect((await getActiveNotificationRulesByEvent(db, 'booking_created', 'account-a'))
       .map((item) => item.id)).toEqual(['rule-a']);
-    expect((await getNotifications(db, { lineAccountId: 'account-a', status: 'failed' }))
+    expect((await getNotifications(db, { lineAccountId: 'account-a', status: 'failed', staffId:'staff-a' }))
       .map((item) => item.id)).toEqual(['notice-a']);
     expect(await getNotificationRuleById(db, 'rule-b', 'account-a')).toBeNull();
     sqlite.close();
