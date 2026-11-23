@@ -1090,7 +1090,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             return (
               <GridRow key={user.id}>
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
-                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}{me?.id === user.id ? '（自分）' : ''}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><span className={styles.personNameLine}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}{me?.id === user.id ? '（自分）' : ''}</button>{user.status === 'active' && user.mfaEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</span>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastLoginAt ? formatStaffDate(user.lastLoginAt) : undefined}>{lastLoginDay(user.lastLoginAt)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
@@ -1153,6 +1153,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 )}
               />
               {resendError ? <Notice tone="danger" message={resendError} /> : null}
+              {tab === 'members' && summaryReady && missing > 0 ? <Notice tone="warn" message={`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`} /> : null}
               {tab === 'roles' ? (
                 <div className={styles.roleCards}>
                   {accessRoles.map((role) => (
@@ -1165,7 +1166,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 </div>
               ) : null}
               {listCard}
-              {tab === 'members' && missing > 0 ? <p className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</p> : null}
               {!loading && !error ? (
                 <div className={styles.listFoot}>
                   <p>{`ユーザー ${formatNumber(filteredUsers.length)} 人中 ${formatNumber(shown.length)} 人を表示${usersTotal > accessUsers.length ? `（全${formatNumber(usersTotal)} 人中${formatNumber(accessUsers.length)} 人まで読み込み）` : ''}`}</p>

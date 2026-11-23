@@ -98,6 +98,14 @@ afterEach(async () => {
 })
 
 describe('V8 統括のメンバーの窓', () => {
+  it('未設定の有効メンバーを一覧より前の知らせと行の札で示す', () => {
+    const table = screen.getByRole('table', { name: '権限者の一覧' })
+    const notice = screen.getByText(/二段階認証が未設定の人が 1人/)
+    expect(notice.textContent).toContain('要確認')
+    expect(notice.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(table.textContent).toContain('二段階認証なし')
+  })
+
   it('本人の二段階認証設定を一覧の下に表示する', () => {
     expect(screen.getByText('統括の設定')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'メンバー' }).getAttribute('aria-current')).toBe('page')

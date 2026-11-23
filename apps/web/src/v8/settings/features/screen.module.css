@@ -52,7 +52,11 @@
   align-items: center;
   gap: var(--tpl-sb-group-head-gap);
   padding: var(--tpl-sb-group-head-pad);
-  background: var(--color-table-head);
+  background: var(--color-canvas);
+}
+
+.groupHead:hover {
+  background: var(--color-canvas-sunken);
 }
 
 .groupToggle {

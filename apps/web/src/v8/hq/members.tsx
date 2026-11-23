@@ -235,6 +235,7 @@ function MembersInner() {
               <SegmentedControl aria-label="利用状態で絞り込む" fit="content" value={filter} onChange={value => { setFilter(value); setPage(1) }} options={[{ value: 'active', label: '有効', count: activeCount }, { value: 'suspended', label: '止めた', count: suspendedCount }, { value: 'all', label: 'すべて' }]} />
               <Button variant="primary" disabled={!canManage} onClick={openInvite}><UserPlus aria-hidden="true" className={styles.buttonIcon} />招待する</Button>
             </ListToolbarRow></ListToolbarFrame>
+            {missingMfa > 0 ? <Notice tone="warn" message={`二段階認証が未設定の人が ${missingMfa}人 います。高い権限の人から設定してください。`} /> : null}
             <section className={styles.listCard}>
               <h2 className={styles.listTitle}>メンバー</h2><p className={styles.listCount}>{members.length}人</p>
             <GridTable label="権限者の一覧" columnSizing="content" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-hq-col-role) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
@@ -248,7 +249,7 @@ function MembersInner() {
                 const isSelf = member.id === me?.id
                 return (
                   <GridRow key={member.id}>
-                    <GridNameCell folder={false} name={<span className={styles.identity}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
+                    <GridNameCell folder={false} name={<span className={styles.identity}><span className={styles.identityLine}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong>{memberStatus(member) === 'active' && member.twoFactorEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</span><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
                     <GridCell><StatusBadge tone={member.role === 'viewer' ? 'neutral' : member.role === 'staff' ? 'info' : 'success'}>{ROLE_WORDS[member.role] ?? member.role}</StatusBadge></GridCell>
                     <GridCell><span className={styles.shortText}>{lastLoginShort(lastLogins[member.id])}</span></GridCell>
                     <GridCell align="right">
@@ -258,7 +259,6 @@ function MembersInner() {
                 )
               })}
             </GridTable></section>
-            {missingMfa > 0 ? <p className={styles.warning}>二段階認証が未設定の人が {missingMfa}人 います。高い権限の人から設定してください。</p> : null}
             <div className={styles.listFoot}><span>メンバー {filteredRows.length}人中 {visibleRows.length}人を表示</span><Pagination page={Math.min(page, pageCount)} pageCount={pageCount} onPageChange={setPage} /></div>
 
           </>

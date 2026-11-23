@@ -18,7 +18,6 @@
 .identity strong, .identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .identity strong { color: var(--color-ink); font-size: var(--text-caption); }
 .identity small { color: var(--color-ink-faint); font-size: var(--text-micro); }
-.warning { color: var(--color-warning); font-size: var(--text-caption); font-weight: 600; }
 .listFoot { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-card); color: var(--color-ink-faint); font-size: var(--text-micro); }
 @media (max-width: 1339.98px) { .layout { grid-template-columns: minmax(0, var(--tpl-settings-nav-width)) minmax(0, 1fr); } .securityAside { grid-column: 2; border-left: 0; border-top: 1px solid var(--color-divider); } }
 @media (max-width: 899.98px) { .layout { display: flex; flex-direction: column; } .settingsNav { display: none; } }
@@ -134,3 +133,7 @@
 }
 .confirmLabel { width: var(--tpl-hq-confirm-label); flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .confirmValue { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-caption); }
+
+.identityLine { display: flex; align-items: center; gap: var(--space-4, 4px); min-width: 0; }
+.identityLine > strong { min-width: 0; }
+.identityLine > [data-tone] { flex-shrink: 0; }

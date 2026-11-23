@@ -3,7 +3,7 @@
  * 監査 WEB203：ログインユーザーが200人より多いとき、続きを読み込める。
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ users: vi.fn() }))
@@ -132,4 +132,22 @@ test('役割と権限では名前と役割を分けて一度ずつ表示し、�
   expect(row.textContent?.match(/架空 花子/g)).toHaveLength(1)
   expect(row.textContent?.match(/管理者/g)).toHaveLength(1)
   expect(row.querySelector('button[aria-label="架空 花子の操作"]')).toBeTruthy()
+})
+
+
+test('未設定の有効ユーザーに知らせと札を出す', async () => {
+  net.users.mockResolvedValue({ success: true, data: {
+    items: [user(1), { ...user(2), mfaEnabled: true }, { ...user(3), status: 'suspended' }],
+    pagination: { total: 3, limit: 200, offset: 0 },
+    summary: { active: 2, suspended: 1, mfaEnabled: 1, invited: 0 },
+  } })
+  render(<StaffV8 />)
+  const table = await screen.findByRole('table', { name: 'ユーザーの一覧' })
+  const notice = await screen.findByText(/二段階認証が未設定の人が 1人/)
+  expect(notice.textContent).toContain('要確認')
+  expect(notice.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  const row = within(table).getByRole('button', { name: '利用者1の中身を見る' }).closest('[role="row"]')!
+  expect(within(row as HTMLElement).getByText('二段階認証なし')).toBeTruthy()
+  const enabled = within(table).getByRole('button', { name: '利用者2の中身を見る' }).closest('[role="row"]')!
+  expect(within(enabled as HTMLElement).queryByText('二段階認証なし')).toBeNull()
 })
