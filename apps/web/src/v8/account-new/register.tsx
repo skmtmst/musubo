@@ -720,6 +720,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
           <Steps
             label="登録の進捗"
             summaryLayout="aligned"
+            hideSummaryChangeKeys={['1']}
             summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
             /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
@@ -771,6 +772,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
               touchedFields={touchedFields}
               acks={acks}
               onUpdate={update}
+              onBackTo={(step) => { setError(''); setSub(step) }}
               onTouchField={(key) => setTouchedFields((current) => ({ ...current, [key]: true }))}
               onValidateField={validateChannelField}
               onToggleAck={toggleAck}
@@ -892,7 +894,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
 
 
         </StepContent>
-        {!(currentStep === 3 && sub === 2) && <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
+        {!(currentStep === 3 && sub === 2) && <StickyBar actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
             <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'} onClick={event => {
               if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
@@ -908,6 +910,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
+            {currentStep === 2 && <Button href="/hq">途中保存して閉じる</Button>}
             {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} disabledReason={currentStep === 3 && sub === 1 && !providerConfirmed ? PROVIDER_CONFIRMATION_REASON : missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
           </>} />}
       </form>
