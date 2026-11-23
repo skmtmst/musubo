@@ -179,11 +179,13 @@
 
 .itemHead {
   position: relative;
+  min-inline-size: 0;
+}
+
+.itemRow {
   display: grid;
   grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr) auto auto;
-  grid-template-areas:
-    'title help . action chevron'
-    'summary summary summary summary chevron';
+  grid-template-areas: 'title help . action chevron';
   align-items: center;
   min-inline-size: 0;
 }
@@ -268,7 +270,6 @@
 }
 
 .itemSummary {
-  grid-area: summary;
   display: flex;
   align-items: center;
   gap: var(--space-6);

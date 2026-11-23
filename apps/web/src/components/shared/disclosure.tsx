@@ -115,15 +115,17 @@ export function DisclosureItem({
   return (
     <section className={styles.item} id={id} data-open={open || undefined}>
       <div className={styles.itemHead}>
-        <Heading className={styles.itemTitle}>
-          <button type="button" className={styles.itemToggle} data-disclosure-toggle aria-expanded={open} aria-controls={bodyId}
-            aria-describedby={shownSummary ? summaryId : undefined} title={title} onClick={() => onOpenChange(!open)}>
-            {title}
-          </button>
-        </Heading>
-        {help ? <span className={styles.itemHelp}>{help}</span> : null}
-        {action && !open ? <span className={styles.itemAction} data-disclosure-action="head">{action}</span> : null}
-        <ChevronDown aria-hidden="true" className={styles.itemChevron} />
+        <div className={styles.itemRow} data-center-row>
+          <Heading className={styles.itemTitle} data-center-row-part="title">
+            <button type="button" className={styles.itemToggle} data-disclosure-toggle aria-expanded={open} aria-controls={bodyId}
+              aria-describedby={shownSummary ? summaryId : undefined} title={title} onClick={() => onOpenChange(!open)}>
+              {title}
+            </button>
+          </Heading>
+          {help ? <span className={styles.itemHelp} data-center-row-part="help">{help}</span> : null}
+          {action && !open ? <span className={styles.itemAction} data-disclosure-action="head" data-center-row-part="action">{action}</span> : null}
+          <ChevronDown aria-hidden="true" className={styles.itemChevron} data-center-row-part="icon" />
+        </div>
         {shownSummary ? (
           <p id={summaryId} className={styles.itemSummary} data-empty={empty || undefined} title={shownSummary}>
             {tone ? <span className={styles.itemDot} data-tone={tone} aria-hidden="true" /> : null}
