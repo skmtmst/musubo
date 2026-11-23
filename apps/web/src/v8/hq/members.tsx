@@ -1,7 +1,7 @@
 'use client'
 
 import { loadStaffIdentity, useTenantAdministratorAccess } from '@/lib/staff-role'
-import { PageFrame } from '@/components/templates/page-frame'
+import { ListPage } from '@/components/templates'
 import { UserPlus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -13,7 +13,7 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
 import { api, ApiError } from '@/lib/api'
 import StatusBadge from '@/components/shared/status-badge'
 import { canResendInvite, lastLoginShort, memberStatus, sortMembersByRole } from '@/lib/hq-members'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -60,6 +60,7 @@ export default function HqMembersV8() {
 
 function MembersInner() {
   const saveErrors = useSaveFormErrors()
+  const settingsNav = useHqSettingsFolderNav('members')
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
@@ -212,9 +213,8 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="r4ARpV">
+    <SaveErrorScope errors={saveErrors}><ListPage boardId="r4ARpV" title="メンバー" folders={<HqSettingsNavV8 active="members" />} folderWidth={200} folderNav={settingsNav}>
       <div className={styles.layout}>
-        <aside className={styles.settingsNav}><HqSettingsNavV8 active="members" /></aside>
         <div className={styles.main}>
         {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -308,6 +308,6 @@ function MembersInner() {
           onClose={() => setStepUp(null)}
         />
       ) : null}
-    </PageFrame></SaveErrorScope>
+    </ListPage></SaveErrorScope>
   )
 }
