@@ -83,7 +83,8 @@ for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons 
   // ログインの 1 段目も、二段階認証と同じ公式ロゴと手順を出す。
   await expect(page.locator('[data-auth-head]')).toContainText('1 / 2')
   const brandSrc = await page.locator('[data-auth-head] img[alt="musubo"]').getAttribute('src')
-  expect(brandSrc).toBe('/brand/musubo-color.png')
+  expect(brandSrc).toBe('/brand/musubo-color-188-1x.png')
+  await expect(page.locator('[data-auth-head] img[alt="musubo"]')).toHaveAttribute('srcset', '/brand/musubo-color-188-1x.png 1x, /brand/musubo-color-188-2x.png 2x, /brand/musubo-color-188-3x.png 3x')
   await page.goto('/password/reset?token=fixture-reset')
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await openPrimaryAuthenticatedChallenge(page, '/login/two-factor', 'fixture-challenge', 'password')
