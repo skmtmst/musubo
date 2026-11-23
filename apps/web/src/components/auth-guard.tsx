@@ -240,7 +240,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
   }
 
   return <>
-    <div key={contentEpoch} hidden={!checked} inert={!checked} aria-hidden={!checked || undefined} style={checked ? { display: 'contents' } : undefined}>
+    <div key={contentEpoch} hidden={!checked} inert={!checked} aria-hidden={!checked || undefined} style={{ display: checked ? 'contents' : 'none' }}>
       <TenantAccessProvider status={tenantStatus}><OnboardingAccessContext.Provider value={onboardingPath}>{children}</OnboardingAccessContext.Provider></TenantAccessProvider>
     </div>
     {!checked && (isMobileShellPath(pathname) ? <div role="status" aria-busy="true" aria-label="読み込み中" /> : <AuthPendingShell />)}

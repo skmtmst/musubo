@@ -182,6 +182,7 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
     expect(host.querySelector('[data-child]')).toBe(original)
     expect(original?.closest('[hidden][inert]')).not.toBeNull()
+    expect((original?.closest('[hidden][inert]') as HTMLElement).style.display).toBe('none')
     await act(async () => { finish(sessionOk()) }); await settle()
     expect(host.querySelector('[data-child]')).toBe(original)
     expect(original?.closest('[hidden]')).toBeNull()
