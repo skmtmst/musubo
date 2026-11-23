@@ -9,13 +9,13 @@ import Card from './card'
 import Notice from './notice'
 import { ReorderHandle, RowMenu, useReorder } from './row-actions'
 import styles from './display-items-dialog.module.css'
-export type DisplayItem = {key: string; label: string; group: string}
+export type DisplayItem = {key: string; label: string; group: string; note?: string}
 
 /** 一覧と顧客情報の欄が共通で使う。取消では保存せず、順序は選んだ順。 */
-export default function DisplayItemsDialog({title = '表示項目を編集', items, selected, maxSelected, manageHref, presentation, onCancel, onConfirm}: {
+export default function DisplayItemsDialog({title = '表示項目を編集', items, selected, maxSelected, manageHref, presentation, hierarchy = false, onCancel, onConfirm}: {
   title?: string; items: DisplayItem[]; selected: string[]; maxSelected?: number;
   manageHref?: string; onCancel: () => void; onConfirm: (keys: string[]) => void;
-  presentation?: 'columns';
+  presentation?: 'columns'; hierarchy?: boolean;
 }) {
   const limitId = useId()
   const ChosenFrame = presentation === 'columns' ? Card : 'div'
@@ -23,6 +23,11 @@ export default function DisplayItemsDialog({title = '表示項目を編集', ite
   const [search, setSearch] = useState('')
   const chosen = keys.map(key => items.find(item => item.key === key)!).filter(Boolean)
   const reorder = useReorder({items: chosen, idOf: item => item.key, onReorder: change => setKeys(change.ids)})
+  const parents = chosen.filter(item => !item.key.startsWith('fixed:'))
+  const children = chosen.filter(item => item.key.startsWith('fixed:'))
+  const parentReorder = useReorder({ items: parents, idOf: item => item.key, onReorder: change => setKeys([...change.ids, ...children.map(item => item.key)]) })
+  const childReorder = useReorder({ items: children, idOf: item => item.key, onReorder: change => setKeys([...parents.map(item => item.key), ...change.ids]) })
+  const shown = hierarchy ? parents.flatMap(item => item.key === 'names' ? [item, ...children] : [item]).concat(parents.some(item => item.key === 'names') ? [] : children) : chosen
   const available = items.filter(item => !keys.includes(item.key) && `${item.label} ${item.group}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
   const groups = useMemo(() => [...new Set(available.map(item => item.group))], [available])
   const full = maxSelected !== undefined && chosen.length >= maxSelected
@@ -50,11 +55,12 @@ export default function DisplayItemsDialog({title = '表示項目を編集', ite
           : <h3 className={styles.heading}>表示する項目（{chosen.length}{maxSelected === undefined ? '' : ` / ${maxSelected}`}）</h3>}
         <ChosenFrame {...(columns ? { padding: 'rows' as const, surface: 'bordered' as const } : {})} className={styles.chosen} aria-label="選択した列">
           {columns ? <div className={styles.fixedRow} data-fixed-display-name><span><Lock size={16} role="img" aria-label="いつも表示する列" />友だち（名前）</span><span>いつも出ます</span></div> : null}
-          {chosen.map(item => <div key={item.key} className={styles.row} {...reorder.rowProps(item.key)}>
-            <ReorderHandle label={item.label} {...reorder.handleProps(item.key)} onMove={direction => reorder.moveBy(item.key, direction)} />
+          {shown.map(item => { const activeReorder = hierarchy ? (item.key.startsWith('fixed:') ? childReorder : parentReorder) : reorder; return <div key={item.key} data-child={hierarchy && item.key.startsWith('fixed:') || undefined} className={styles.row} {...activeReorder.rowProps(item.key)}>
+            <ReorderHandle label={item.label} {...activeReorder.handleProps(item.key)} onMove={direction => activeReorder.moveBy(item.key, direction)} />
             <Checkbox checked onCheckedChange={() => setKeys(current => current.filter(key => key !== item.key))}>{item.label}</Checkbox>
-            <RowMenu label={`${item.label}の順序`} items={reorder.menuItems(item.key)} />
-          </div>)}
+            {item.note ? <span className={styles.note}>{item.note}</span> : null}
+            <RowMenu label={`${item.label}の順序`} items={activeReorder.menuItems(item.key)} />
+          </div>})}
           {!chosen.length ? <p className={styles.note}>下から表示する項目を選んでください</p> : null}
         </ChosenFrame>
       </div>

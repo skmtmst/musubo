@@ -53,7 +53,7 @@ export function useInboxPanel() {
     if (!showFriendInfo || wideInfoPanel) return
     customerPanelRef.current?.focus()
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setFriendInfoChoice(false)
+      if (event.key === 'Escape' && !event.defaultPrevented) setFriendInfoChoice(false)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)

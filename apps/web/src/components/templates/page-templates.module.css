@@ -727,3 +727,7 @@
 }
 
 :global(:root) .titleRow:has([data-help-reserving]) { align-items: flex-start; }
+
+@media (min-width: 1024px) {
+  :global(:root) .inboxSummaryPane:not([data-wide]) { top: 184px; bottom: 240px; height: auto; }
+}

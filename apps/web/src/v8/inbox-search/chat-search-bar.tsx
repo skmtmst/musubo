@@ -1,13 +1,11 @@
 'use client'
 import { useEffect, useRef, type KeyboardEvent } from 'react'
-import { ChevronDown, ChevronUp, Search, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import IconButton from '@/components/shared/icon-button'
 import { CHAT_SEARCH_MAX_CHARS, type ChatSearch } from './use-chat-search'
 import styles from './chat-search-bar.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-import { Field } from '@/components/shared/form-controls'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { TextField as SharedTextField } from '@/components/shared/text-field'
+import SearchField from '@/components/shared/search-field'
 
 
 /*
@@ -53,20 +51,19 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
 
   return (
     <div className={styles.band} role="search" aria-label="会話の中を探す" data-design-node="f64Ok">
-      <Field label={<><Search aria-hidden="true" className={styles.fieldIcon} /></>}><SaveErrorField names={["query","search.query"]}><SharedTextField
-          ref={inputRef}
-          type="search"
-          className={styles.input}
-          value={search.query}
-          maxLength={CHAT_SEARCH_MAX_CHARS}
-          placeholder="会話の中を探す"
-          aria-label="会話の中を探す"
-          onChange={(event) => search.setQuery(event.target.value)}
-          onKeyDown={onKeyDown}
-        /></SaveErrorField></Field>
+      <SearchField
+        ref={inputRef}
+        className={styles.field}
+        value={search.query}
+        maxLength={CHAT_SEARCH_MAX_CHARS}
+        placeholder="会話の中を探す"
+        aria-label="会話の中を探す"
+        updateMode="immediate"
+        onChange={search.setQuery}
+        onKeyDown={onKeyDown}
+      />
       <span className={styles.count} role="status" aria-live="polite">{count}</span>
       <IconButton
-        className={styles.button}
         aria-label="前の当たりへ（古い方）"
         disabled={!ready || busy || search.index <= 0}
         onClick={search.older}
@@ -74,14 +71,13 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
         <ChevronUp aria-hidden="true" />
       </IconButton>
       <IconButton
-        className={styles.button}
         aria-label="次の当たりへ（新しい方）"
         disabled={!ready || busy || search.index >= search.total - 1}
         onClick={search.newer}
       >
         <ChevronDown aria-hidden="true" />
       </IconButton>
-      <IconButton className={styles.button} aria-label="探すのをやめる" onClick={search.close}>
+      <IconButton aria-label="探すのをやめる" onClick={search.close}>
         <X aria-hidden="true" />
       </IconButton>
     </div>

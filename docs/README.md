@@ -10,6 +10,7 @@
 
 - [統括のアカウントの数の帯の未確認をまとめる](release-log/unreleased/181-kenta-hq-kpi-unconfirmed.md)
 - [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)
+- [受信箱の検索と顧客情報の修正](release-log/unreleased/196-kenta-inbox-search-field.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
