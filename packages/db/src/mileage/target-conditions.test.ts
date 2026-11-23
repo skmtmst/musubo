@@ -14,11 +14,8 @@ import {
 } from './admin-operations.js';
 
 /**
- * 付与ルールの対象条件が公開・実行処理に届かず、対象外へマイルが付く。
- * 下書きに残した対象条件は公開版の content_json へ引き継ぎ、
- * 実行時（キュー消化）に条件外の友だちを付けないことを固定する。
- * bootstrap.sql を流した実SQLiteで、監査の再現手順
- * （名前条件 OnlyEligible／表示名 OutsideTarget の友だちで booking_created）をなぞる。
+ * 対象外の友だちに付与しないため、下書きの条件を公開版へ引き継ぎ、
+ * キュー処理でも条件を判定することを実SQLiteで確かめる。
  */
 
 const packageRoot = join(import.meta.dirname, '../..');

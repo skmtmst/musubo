@@ -191,7 +191,7 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), inputJsonBo
       couponAudience?: 'new_friends' | 'all_friends';
       runAccountFriendAddScenarios?: boolean;
       isActive?: boolean;
-      /** R39: 画面のヘッダーで選んだ所属。機能強制ミドルウェアが読む鍵と同名で受ける。 */
+      /** 画面のヘッダーで選んだ所属。機能強制ミドルウェアが読む鍵と同名で受ける。 */
       lineAccountId?: string | null;
       line_account_id?: string | null;
       accountId?: string | null;
@@ -210,7 +210,7 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), inputJsonBo
       return inputError(c, { success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400, ["genre","name"]);
     }
     const staff = c.get('staff');
-    // R39: 送りに所属が無いと機能強制で止まる。担当アカウント制の職員は
+    // 送りに所属が無いと機能強制で止まる。担当アカウント制の職員は
     // 自分の所属へ倒し、それでも無ければ作らせない。
     const lineAccountId = body.lineAccountId?.trim()
       || body.line_account_id?.trim()

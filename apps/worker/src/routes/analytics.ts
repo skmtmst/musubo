@@ -345,8 +345,7 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
     }
-    // 監査 R72: 検索語はSQL側で絞る。取得済みの上位200件の中だけを探していた時期は、
-    // それより先のURLに辿り着けなかった。
+    // 上位200件より後のURLも検索できるよう、検索語はSQL側で絞る。
     const query = (c.req.query('query') ?? '').trim().slice(0, 200) || undefined;
     return c.json({
       success: true,

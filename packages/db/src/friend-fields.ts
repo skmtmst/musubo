@@ -913,8 +913,8 @@ export function validateFriendFieldValue(
     if (typeof raw !== 'string') return { ok: false, error: '電話番号は数字10〜15桁で入力してください' };
     const text = raw.trim();
     /*
-     * 記号だけ（--------）が旧い検査を通っていた。移行プレビュー・
-     * 本人特定と同じく数字の桁数で見る。入力の見た目（ハイフン等）は
+     * 記号だけの入力を避けるため、移行プレビュー・本人特定と同じく
+     * 数字の桁数で見る。入力の見た目（ハイフン等）は
      * 残し、保存する形は変えない。
      */
     const digits = text.replace(/\D/g, '');

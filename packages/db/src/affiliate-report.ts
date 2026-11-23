@@ -12,7 +12,7 @@ import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 // `IN (?, ?, …)` bind list (D1 caps bind vars at ~100; see
 // feedback-d1-no-large-in-clauses).
 //
-// Timestamp comparison note (Task 4 boundary-bug lesson):
+// Timestamp comparison:
 //   ref_tracking.created_at / friends.created_at can be JST ISO (+09:00) or a
 //   SQLite datetime('now') space-separated UTC string. Raw string comparison
 //   mixes formats and produces boundary errors. Every window / ordering check

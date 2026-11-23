@@ -169,7 +169,7 @@ describe('runVerify', () => {
     expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 
-  // Regression: worker bundles released before the public /api/health
+  // Worker bundles released before the public /api/health
   // route existed answer 401 (auth middleware) or 404 to the health probe.
   // Any response below 500 proves the Worker booted and is routing — it
   // must NOT fail verify (which would trigger a pointless rollback).

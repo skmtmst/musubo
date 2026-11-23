@@ -82,7 +82,7 @@ beforeEach(() => {
   dbMocks.markApprovalNotified.mockResolvedValue(true);
 });
 
-describe('POST /api/conversions/approvals/bulk (R353)', () => {
+describe('成果の一括承認は途中の失敗を分けて残りを処理する', () => {
   it('途中で保存に失敗しても処理済みと失敗の一覧を返す', async () => {
     dbMocks.syncAffiliateConversionMileage.mockImplementation(
       async (_db: unknown, eventId: string) => {
@@ -132,7 +132,7 @@ describe('POST /api/conversions/approvals/bulk (R353)', () => {
   });
 });
 
-describe('POST /api/conversions/approvals/bulk (R354)', () => {
+describe('成果の一括承認の再試行は未送信の通知だけを送る', () => {
   it('再試行（already_set）で欠けた通知を1回だけ送る', async () => {
     dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
     const res = await req('/api/conversions/approvals/bulk', bulkItems(['ce-1']));

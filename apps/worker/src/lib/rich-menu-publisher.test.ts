@@ -329,7 +329,7 @@ describe('validateRichMenuGroupForPublish', () => {
       .toThrow('ページ「クーポン」の「ボタン」: 送信テキストを入力してください');
   });
 
-  describe('#827: 読み上げラベルと行き先', () => {
+  describe('公開前にボタンの読み上げラベルと行き先を検証する', () => {
     it.each([
       ['未設定', undefined],
       ['空文字', ''],
@@ -1241,7 +1241,7 @@ describe('intent の入力チェック', () => {
   });
 });
 
-describe('段階公開 (E-08 #621 案A)', () => {
+describe('リッチメニューの段階公開と切替失敗時の復旧を扱う', () => {
   const group = {
     id: 'gid12345-aaaa', size: 'large' as const, chatBarText: 'm', isDefaultForAll: false,
     pages: [{

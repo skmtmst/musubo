@@ -1,7 +1,7 @@
 
 
 export interface FutureEventSlotSummary {
-  /** 今後の有効な開催枠の数（R79: イベント数ではなく枠数）。 */
+  /** 今後の有効な開催枠の数（イベント数ではなく枠数）。 */
   upcoming_slots: number;
   /** 今後の枠への有効な申込席数（requested+confirmed+offered+accepted）。 */
   upcoming_active: number;
@@ -20,7 +20,7 @@ export interface FutureEventSlotSummary {
 }
 
 /**
- * 今後の開催枠だけを数える（R79/R80）。
+ * 今後の開催枠だけを数える。
  *
  * 目安の決めごとは画面の summarizeEventAttention と同じ:
  * あと少しで満席 = 残り1〜3席、申し込みが少ない = 7日以内で定員の半分未満。

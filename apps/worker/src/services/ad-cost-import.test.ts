@@ -29,7 +29,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('広告費の取り込み (#818)', () => {
+describe('広告費を日ごとに取り込み成功と失敗を記録する', () => {
   it('媒体の応答を最小通貨単位にして台帳へ載せ、成功を残す', async () => {
     const testDb = createTestD1();
     seed(testDb);

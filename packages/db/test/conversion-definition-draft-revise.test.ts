@@ -12,15 +12,8 @@ import {
 } from '../src/conversion-definitions/index.js';
 
 /*
- * CONVERSION-07: 下書きの成果地点の正常編集が常に409で失敗していた回帰。
- *
- * 事前検査は allowDraft で下書きの編集を許すのに、UPDATE のCAS条件が
- * `status = 'active'` だけを通していた。下書きを編集すると必ず0件更新に
- * なり、後段が version_conflict(409) を返していた。
- *
- * ここでは「下書きを編集できる・真の競合だけ409・停止済みは拒否」を
- * 実SQLiteで固定する。停止を無条件に許す緩和ではなく、認可・版・状態の
- * 検査はそのまま残す。
+ * 下書きの編集を許しつつ、認可・版・状態の検査を保つ。
+ * 下書きは更新条件にも含め、競合だけを409とし、停止済みは拒否する。
  */
 
 const SCOPE = { allowedAccountIds: ['acc-1'], includeUnassigned: false };
