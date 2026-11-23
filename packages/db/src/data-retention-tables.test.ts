@@ -43,6 +43,40 @@ function columnsOf(table: string): Set<string> {
 }
 
 describe('保存期限の分類表', () => {
+  it('月謝と回数券の通知は参照先より先に消す', () => {
+    const order = purgeTablesChildFirst();
+    for (const name of ['booking_monthly_failure_notices','booking_monthly_notice_cap','booking_pass_notice_cap']) {
+      expect(RETENTION_TABLES[name]?.category).toBe('purge');
+      expect(tenantScopeCondition(name)).toContain('line_accounts');
+    }
+    expect(order.indexOf('booking_monthly_notice_cap')).toBeLessThan(order.indexOf('booking_monthly_failure_notices'));
+    expect(order.indexOf('booking_monthly_failure_notices')).toBeLessThan(order.indexOf('friends'));
+    expect(order.indexOf('booking_pass_notice_cap')).toBeLessThan(order.indexOf('booking_entitlement_notices'));
+    expect(order.indexOf('booking_entitlement_notices')).toBeLessThan(order.indexOf('friends'));
+  });
+  it('通知の削除対象は指定された統括のものだけ', () => {
+    const foreignKeys=sqlite.pragma('foreign_keys', {simple:true});
+    sqlite.pragma('foreign_keys = OFF'); // scopeの照合に必要な親だけを用意する
+    sqlite.exec('SAVEPOINT monthly_notice_scope');
+    try {
+      sqlite.exec(`INSERT INTO tenants(id,name) VALUES('notice-a','A'),('notice-b','B');
+        INSERT INTO line_accounts(id,tenant_id,name,channel_id,channel_access_token,channel_secret) VALUES
+          ('account-notice-a','notice-a','A','channel-notice-a','test','test'),('account-notice-b','notice-b','B','channel-notice-b','test','test');
+        INSERT INTO friends(id,line_account_id,line_user_id) VALUES('friend-notice-a','account-notice-a','Ua'),('friend-notice-b','account-notice-b','Ub');
+        INSERT INTO booking_monthly_failure_notices(cycle_id,audience,account_id,friend_id,created_at) VALUES
+          ('cycle-a','friend','account-notice-a','friend-notice-a','2026-11-20'),('cycle-b','friend','account-notice-b','friend-notice-b','2026-11-20');
+        INSERT INTO booking_monthly_notice_cap(cycle_id,audience,account_id,friend_id,day_jst,reserved_at) VALUES
+          ('cycle-a','friend','account-notice-a','friend-notice-a','2026-11-20','now'),('cycle-b','friend','account-notice-b','friend-notice-b','2026-11-20','now');
+        INSERT INTO booking_entitlement_notices(id,line_account_id,friend_id,entitlement_id,plan_id,kind,dedupe_key,messages_json,scheduled_at) VALUES
+          ('pass-a','account-notice-a','friend-notice-a','ent-a','plan-a','remaining_one','once','[]','now'),('pass-b','account-notice-b','friend-notice-b','ent-b','plan-b','remaining_one','once','[]','now');
+        INSERT INTO booking_pass_notice_cap(notice_id,account_id,friend_id,day_jst,reserved_at) VALUES
+          ('pass-a','account-notice-a','friend-notice-a','2026-11-20','now'),('pass-b','account-notice-b','friend-notice-b','2026-11-20','now');`);
+      for (const [table,column] of [['booking_monthly_failure_notices','cycle_id'],['booking_monthly_notice_cap','cycle_id'],['booking_pass_notice_cap','notice_id']]) {
+        const rows=sqlite.prepare(`SELECT ${column} AS id FROM ${table} WHERE ${tenantScopeCondition(table)}`).all('notice-a');
+        expect(rows).toEqual([{id:table==='booking_pass_notice_cap'?'pass-a':'cycle-a'}]);
+      }
+    } finally { sqlite.exec('ROLLBACK TO monthly_notice_scope; RELEASE monthly_notice_scope'); sqlite.pragma(`foreign_keys = ${foreignKeys ? 'ON' : 'OFF'}`); }
+  });
   it('同じ表の分類を複数書かない', () => {
     const duplicates = sqlite.prepare(`SELECT key, count(*) AS count FROM json_each(?) GROUP BY key HAVING count(*) > 1 ORDER BY key`);
     expect(duplicates.all('{"same":1,"same":2}')).toEqual([{ key: 'same', count: 2 }]);

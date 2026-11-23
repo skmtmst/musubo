@@ -321,7 +321,7 @@ function HoldersDialog({ accountId, plan, onClose }: { accountId: string; plan: 
   )
 }
 
-/** 残り 1 回・期限の 14 日前の知らせ（試験運転：LINE へは送らず、送る予定を記録するだけ）。 */
+/** 残り 1 回・期限の 14 日前の知らせ。 */
 function NoticeDialog({ accountId, plan, onClose }: { accountId: string; plan: BookingPassPlan; onClose: () => void }) {
   const [settings, setSettings] = useState<PassNoticeSettings | null>(null)
   const [remainingOne, setRemainingOne] = useState(false)
@@ -367,7 +367,7 @@ function NoticeDialog({ accountId, plan, onClose }: { accountId: string; plan: B
         {status === 'ready' ? (
           <>
             {message ? <Notice tone="danger" message={message} /> : null}
-            <p className={styles.note}>今は試験運転です。LINE へは送らず、送る予定だけを記録します。</p>
+            <p className={styles.note}>{settings?.deliveryAvailable ? '検証中です。登録したテスト宛先にだけ LINE で知らせます。' : '今は試験運転です。LINE へは送らず、送る予定だけを記録します。'}</p>
             <span className={styles.picked}><Toggle checked={remainingOne} onChange={setRemainingOne} label="残りが 1 回になったら知らせる" /><span>残りが 1 回になったら知らせる</span></span>
             <span className={styles.picked}><Toggle checked={expiry} onChange={setExpiry} label="期限の 14 日前に知らせる" /><span>期限の 14 日前に知らせる</span></span>
           </>

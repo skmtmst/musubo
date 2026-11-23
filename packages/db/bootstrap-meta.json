@@ -680,8 +680,10 @@
     "765_ec_auto_line_cap.sql",
     "769_musubo_contracted_linked_slots.sql",
     "770_onboarding_guide_progress.sql",
+    "772_monthly_failure_notices.sql",
+    "773_monthly_notice_cap.sql",
     "786_restaurant_course_gallery.sql",
     "789_limit_legacy_folder_update_triggers.sql"
   ],
-  "migrationCount": 682
+  "migrationCount": 684
 }
