@@ -80,6 +80,47 @@ describe('common variable usage impact', () => {
     raw.close();
   });
 
+  it('送信開始時の版は対象アカウントの写しから読み、別アカウントの版を使わない', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('a1','c1','A1','t','s'), ('a2','c2','A2','t','s');
+      INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, line_account_id, account_ids, common_var_snapshot)
+      VALUES ('b', '配信', 'text', '{{var.shop_hours}}', 'multi-account-dedup', 'sending', 'a1', '["a1","a2"]',
+      '{"accounts":{"a1":{"entries":[{"varKey":"shop_hours","version":3}]},"a2":{"entries":[{"varKey":"shop_hours","version":9}]}}}');`);
+    expect((await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a1')).items[0].fixed_version).toBe(3);
+    expect((await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a2')).items[0].fixed_version).toBe(9);
+    raw.close();
+  });
+
+  it('下書きの固定版をアカウント別に読み、削除の使用先として残す', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('a1','c1','店','t','s'),('a2','c2','別','t','s');
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value,version) VALUES ('v1','a1','営業時間','shop_hours','新',2),('v2','a2','営業時間','shop_hours','別',1);
+      INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('old','v1',1,'営業時間','旧','変更');
+      INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id,account_ids) VALUES ('b','案内','text','{{var.shop_hours}}','multi-account-dedup','draft','a1','["a1","a2"]');
+      INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('b','v1','old');`);
+    const first = await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a1');
+    expect(first.items.find((item) => item.source_id === 'b')).toMatchObject({ fixed_version: 1, fixed_value: '旧' });
+    expect(first.blockingTotal).toBe(1);
+    expect((await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a2')).items.find((item) => item.source_id === 'b')?.fixed_version).toBeUndefined();
+    raw.close();
+  });
+
+  it('アーカイブ済みの情報に結びついた固定は現在の固定と表示しない', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('a','c','店','t','s');
+      INSERT INTO common_vars(id,line_account_id,name,var_key,value,archived_at) VALUES ('old','a','旧','shop_hours','旧','2026-01-01');
+      INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('old-v','old',1,'旧','旧','変更');
+      INSERT INTO broadcasts(id,title,message_type,message_content,target_type,status,line_account_id) VALUES ('b','案内','text','{{var.shop_hours}}','all','draft','a');
+      INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('b','old','old-v');`);
+    const impact = await getCommonVarUsageImpact(asD1(raw), 'shop_hours', 'a');
+    expect(impact.items.find((item) => item.source_id === 'b')?.fixed_version).toBeUndefined();
+    raw.close();
+  });
+
   it('does not hide a failed scan as zero usages', async () => {
     const db = {
       prepare: vi.fn(() => ({

@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { getCommonVarUsageCounts } from '../src/common-vars/index.js'
+import { getCommonVarUsageCounts, getCommonVarUsageSummaries, getCommonVarUsageImpact } from '../src/common-vars/index.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 let sqlite: Database.Database
@@ -91,5 +91,22 @@ describe('getCommonVarUsageCounts', () => {
       ['shop_hours', 1],
       ['unused', 0],
     ]))
+  })
+})
+
+
+describe('構造化された使用先の数', () => {
+  it('所属不明の使用先を含め、別アカウントの使用先は混ぜない', async () => {
+    const layout = JSON.stringify({ references: [{ varKey: 'shop_hours' }] })
+    sqlite.prepare('INSERT INTO forms (id, name, layout) VALUES (?, ?, ?)').run('unknown', '未割当', layout)
+    sqlite.prepare('INSERT INTO forms (id, name, layout) VALUES (?, ?, ?)').run('other', '別店舗', layout)
+    sqlite.prepare('INSERT INTO form_accounts (form_id, line_account_id) VALUES (?, ?)').run('other', 'account-2')
+    const summary = await getCommonVarUsageSummaries(db, ['shop_hours', 'unused'], 'account-1')
+    const impact = await getCommonVarUsageImpact(db, 'shop_hours', 'account-1')
+    expect(summary.get('shop_hours')?.total).toBe(1)
+    expect(summary.get('shop_hours')?.byKind.form).toBe(1)
+    expect(summary.get('unused')?.total).toBe(0)
+    expect(impact.unscopedFormTotal).toBe(1)
+    expect(impact.blockingTotal).toBe(1)
   })
 })

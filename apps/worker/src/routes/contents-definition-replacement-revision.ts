@@ -591,5 +591,5 @@ function commonVarUsageStatus(item: CommonVarUsageItem): string {
 
 export /** 保存・削除でこの使用先が変わるか。送信済みと値が固定済みの配信中は変わらない。 */
 function commonVarUsageChangesOnSave(item: CommonVarUsageItem): boolean {
-  return item.is_historical !== 1 && item.source_status !== 'sending_fixed';
+  return item.is_historical !== 1 && item.source_status !== 'sending_fixed' && item.fixed_version == null;
 }

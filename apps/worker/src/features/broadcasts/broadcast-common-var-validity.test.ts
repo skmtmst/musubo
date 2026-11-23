@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import * as openingHours from '../../services/account-opening-hours.js';
 import type { Env } from '../../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 
@@ -24,7 +25,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 }));
 
 const { processScheduledBroadcasts } = await import('./broadcast.js');
-const { prepareBroadcastCommonVarSnapshot } = await import('../../services/common-var-snapshot.js');
+const { prepareBroadcastCommonVarSnapshot, validateSavedPins } = await import('../../services/common-var-snapshot.js');
 const { broadcasts } = await import('../../routes/broadcasts.js');
 
 function broadcastApp(db: D1Database) {
@@ -477,4 +478,127 @@ describe('N-188 予約配信の共通情報snapshot', () => {
       accounts: { 'account-a': { values: { shop_name: '競合後' }, entries: [{ version: 2 }] } },
     });
   });
+  it.each(['active', 'stopped', 'expired'] as const)('固定版を送信し状態が%sなら送信可否を判定する', async (state) => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedVar(store.raw, { id: 'var-pin', accountId: 'account-a', value: '新しい値', version: 2 });
+    seedScheduled(store.raw, 'broadcast-pin', 'account-a');
+    store.raw.prepare(`INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('old-version','var-pin',1,'店舗名','固定した値','変更')`).run();
+    store.raw.prepare(`INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('broadcast-pin','var-pin','old-version')`).run();
+    store.raw.pragma('foreign_keys = ON');
+    expect(() => store.raw.prepare("DELETE FROM common_var_versions WHERE id='old-version'").run()).toThrow();
+    if (state === 'stopped') store.raw.prepare(`UPDATE common_vars SET status='stopped' WHERE id='var-pin'`).run();
+    if (state === 'expired') store.raw.prepare(`UPDATE common_vars SET valid_until='2026-09-16T01:59:00.000Z' WHERE id='var-pin'`).run();
+    await processScheduledBroadcasts(store.db, {} as never);
+    if (state === 'active') {
+      expect(line.broadcasts).toHaveLength(1);
+      expect(sentText()).toBe('店舗=固定した値');
+    } else {
+      expect(line.broadcasts).toHaveLength(0);
+      expect(store.raw.prepare(`SELECT status FROM broadcasts WHERE id='broadcast-pin'`).get()).toEqual({ status: 'draft' });
+      expect(store.raw.prepare(`SELECT reason FROM common_var_resolution_failures WHERE source_id='broadcast-pin'`).get()).toEqual({ reason: state });
+    }
+  });
+
+  it('固定済み配信の再試行前に停止された共通情報は送らない', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedVar(store.raw, { id: 'var-retry-pin', accountId: 'account-a', value: '現在', version: 2 });
+    seedScheduled(store.raw, 'broadcast-retry-pin', 'account-a');
+    store.raw.prepare(`INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('retry-version','var-retry-pin',1,'店舗','固定値','変更')`).run();
+    store.raw.prepare(`INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('broadcast-retry-pin','var-retry-pin','retry-version')`).run();
+    line.failuresRemaining = 1;
+    await processScheduledBroadcasts(store.db, {} as never);
+    expect(line.broadcasts).toHaveLength(1);
+    store.raw.prepare(`UPDATE common_vars SET status='stopped' WHERE id='var-retry-pin'`).run();
+    store.raw.prepare(`UPDATE broadcasts SET status='scheduled', scheduled_at='2026-09-16T01:00:00.000Z' WHERE id='broadcast-retry-pin'`).run();
+    await processScheduledBroadcasts(store.db, {} as never);
+    expect(line.broadcasts).toHaveLength(1);
+    expect(store.raw.prepare(`SELECT status, stopped_at FROM broadcasts WHERE id='broadcast-retry-pin'`).get()).toMatchObject({ status: 'sending', stopped_at: expect.any(String) });
+    expect(store.raw.prepare(`SELECT reason FROM common_var_resolution_failures WHERE source_id='broadcast-retry-pin'`).get()).toEqual({ reason: 'stopped' });
+  });
+
+  it('固定後にGoogle連携された営業時間は送らず要確認にする', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedVar(store.raw, { id: 'var-google-pin', accountId: 'account-a', value: '旧営業時間' });
+    store.raw.prepare("UPDATE common_vars SET var_key='business_hours' WHERE id='var-google-pin'").run();
+    seedScheduled(store.raw, 'broadcast-google-pin', 'account-a');
+    store.raw.prepare("UPDATE broadcasts SET message_content='{{var.business_hours}}' WHERE id='broadcast-google-pin'").run();
+    store.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('google-version','var-google-pin',1,'営業時間','旧営業時間','変更')").run();
+    store.raw.prepare("INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('broadcast-google-pin','var-google-pin','google-version')").run();
+    vi.spyOn(openingHours, 'accountOpeningHours').mockResolvedValue({ source: 'google_unavailable', profile: null });
+    await processScheduledBroadcasts(store.db, {} as never);
+    expect(line.broadcasts).toHaveLength(0);
+    expect(store.raw.prepare("SELECT status FROM broadcasts WHERE id='broadcast-google-pin'").get()).toEqual({ status: 'draft' });
+    expect(store.raw.prepare("SELECT reason FROM common_var_resolution_failures WHERE source_id='broadcast-google-pin'").get()).toEqual({ reason: 'missing' });
+  });
+
+  it('送信直前に固定情報が停止されたらLINEへ出さず停止する', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedVar(store.raw, { id: 'var-last', accountId: 'account-a', value: '現在' });
+    seedScheduled(store.raw, 'broadcast-last', 'account-a');
+    store.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('last-version','var-last',1,'店舗','固定値','変更')").run();
+    store.raw.prepare("INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('broadcast-last','var-last','last-version')").run();
+    const prepare = store.db.prepare.bind(store.db);
+    let reads = 0;
+    vi.spyOn(store.db, 'prepare').mockImplementation((sql: string) => {
+      const statement = prepare(sql);
+      if (!sql.includes('LEFT JOIN common_var_versions v ON v.id = p.version_id')) return statement;
+      const bind = statement.bind.bind(statement);
+      statement.bind = (...args: unknown[]) => {
+        const bound = bind(...args);
+        const all = bound.all.bind(bound);
+        bound.all = async (...params: Parameters<typeof bound.all>) => {
+          if (++reads === 2) store.raw.prepare("UPDATE common_vars SET status='stopped' WHERE id='var-last'").run();
+          return all(...params);
+        };
+        return bound;
+      };
+      return statement;
+    });
+    await processScheduledBroadcasts(store.db, {} as never);
+    expect(reads).toBeGreaterThanOrEqual(2);
+    expect(line.broadcasts).toHaveLength(0);
+    expect(store.raw.prepare("SELECT status, stopped_at FROM broadcasts WHERE id='broadcast-last'").get()).toMatchObject({ status: 'sending', stopped_at: expect.any(String) });
+  });
+
+  it('送信直前にGoogle連携へ変わった固定営業時間は送らず停止する', async () => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedVar(store.raw, { id: 'var-late-google', accountId: 'account-a', value: '旧営業時間' });
+    store.raw.prepare("UPDATE common_vars SET var_key='business_hours' WHERE id='var-late-google'").run();
+    seedScheduled(store.raw, 'broadcast-late-google', 'account-a');
+    store.raw.prepare("UPDATE broadcasts SET message_content='{{var.business_hours}}' WHERE id='broadcast-late-google'").run();
+    store.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('late-google-version','var-late-google',1,'営業時間','旧営業時間','変更')").run();
+    store.raw.prepare("INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('broadcast-late-google','var-late-google','late-google-version')").run();
+    let reads = 0;
+    vi.spyOn(openingHours, 'accountOpeningHours').mockImplementation(async () => ++reads < 3 ? { source: 'manual', profile: null } : { source: 'google_unavailable', profile: null });
+    await processScheduledBroadcasts(store.db, {} as never);
+    expect(reads).toBeGreaterThanOrEqual(3);
+    expect(line.broadcasts).toHaveLength(0);
+    expect(store.raw.prepare("SELECT status,stopped_at FROM broadcasts WHERE id='broadcast-late-google'").get()).toMatchObject({ status: 'sending', stopped_at: expect.any(String) });
+  });
+
+  it.each(['archived', 'wrong_version'] as const)('固定の再確認で%sは別の値へ切り替えず止める', async (kind) => {
+    const store = createTestD1();
+    seedAccount(store.raw, 'account-a');
+    seedVar(store.raw, { id: 'var-integrity', accountId: 'account-a', value: '固定値' });
+    seedScheduled(store.raw, 'broadcast-integrity', 'account-a');
+    store.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('valid-version','var-integrity',1,'店舗','固定値','変更')").run();
+    store.raw.prepare("INSERT INTO broadcast_common_var_pins(broadcast_id,common_var_id,version_id) VALUES ('broadcast-integrity','var-integrity','valid-version')").run();
+    const broadcast = store.raw.prepare("SELECT * FROM broadcasts WHERE id='broadcast-integrity'").get() as { id: string; line_account_id: string; common_var_snapshot: string | null; common_var_snapshot_at: string | null };
+    const snapshot = await prepareBroadcastCommonVarSnapshot(store.db, broadcast, '{{var.shop_name}}');
+    expect(snapshot).not.toBeNull();
+    if (kind === 'archived') store.raw.prepare("UPDATE common_vars SET archived_at='2026-09-16T02:00:00Z' WHERE id='var-integrity'").run();
+    else {
+      store.raw.prepare("INSERT INTO common_vars(id,line_account_id,name,var_key,value) VALUES ('other-var','account-a','別','other_key','別値')").run();
+      store.raw.prepare("INSERT INTO common_var_versions(id,common_var_id,version_no,name,value,change_reason) VALUES ('other-version','other-var',1,'別','別値','変更')").run();
+      store.raw.prepare("UPDATE broadcast_common_var_pins SET version_id='other-version' WHERE broadcast_id='broadcast-integrity'").run();
+    }
+    await expect(validateSavedPins(store.db, 'broadcast-integrity', snapshot!, ['shop_name'], new Date().toISOString())).rejects.toThrow();
+    expect(store.raw.prepare("SELECT reason FROM common_var_resolution_failures WHERE source_id='broadcast-integrity'").get()).toEqual({ reason: 'missing' });
+  });
+
 });

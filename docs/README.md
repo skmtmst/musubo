@@ -486,6 +486,9 @@
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
+- [共通情報の差し替えと使用先の確認](release-log/unreleased/129-kenta-c21-common-vars.md) — 反映履歴、確認 2026-11-20。
+
+- [一斉配信の共通情報を版で固定](release-log/unreleased/135-kenta-c21-pinned-broadcast.md) — 反映履歴、確認 2026-11-20。
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 

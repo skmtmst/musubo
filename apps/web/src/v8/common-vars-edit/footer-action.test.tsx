@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer', account: 'a', impact: vi.fn(), remove: vi.fn(), setStatus: vi.fn() }))
+const state = vi.hoisted(() => ({ role: 'owner' as 'owner' | 'viewer', account: 'a', impact: vi.fn(), remove: vi.fn(), setStatus: vi.fn(), detail: vi.fn(), pin: vi.fn(), broadcast: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams('id=var-1') }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
@@ -12,15 +12,20 @@ vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
     folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
+    broadcasts: { ...actual.api.broadcasts, get: state.broadcast },
     commonVars: { ...actual.api.commonVars,
-      detail: async () => ({ success: true, data: { id: 'var-1', name: '営業時間', key: 'hours', type: 'text', value: '10時', memo: '', status: 'active', validFrom: null, validUntil: null, version: 1, usages: [], history: [], usageCount: 0, usagePage: { total: 0, shown: 0 } } }),
+      detail: state.detail, pinBroadcast: state.pin,
       schedules: async () => ({ success: true, data: [] }), deleteImpact: state.impact, delete: state.remove, setStatus: state.setStatus,
     },
   } }
 })
 import Editor from './edit'
+import { ApiError } from '@/lib/api'
 
 beforeEach(() => {
+  state.detail.mockReset().mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'hours', type: 'text', value: '10時', memo: '', status: 'active', validFrom: null, validUntil: null, version: 1, usages: [], history: [{ id: 'version-1', version: 1 }], usageCount: 0, usagePage: { total: 0, shown: 0 } } })
+  state.pin.mockReset().mockResolvedValue({ success: true })
+  state.broadcast.mockReset().mockResolvedValue({ success: true, data: { version: 4 } })
   state.role = 'owner'
   state.account = 'a'
   state.impact.mockReset().mockResolvedValue({ success: true, data: {
@@ -135,4 +140,161 @@ it('アカウントを切り替えて戻しても古い削除確定は送らな�
   state.account = 'a'; view.rerender(<Editor />)
   await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: target, target })
   expect(state.remove).not.toHaveBeenCalled()
+})
+
+it('送信開始時に固定した配信を、変更が反映される件数に含めない', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 3, blockingTotal: 1,
+    historicalTotal: 1, sendingFixedTotal: 1, unscopedFormTotal: 0, canDelete: false,
+    byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-10-14T00:00:00+09:00', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  expect(await screen.findByRole('button', { name: '1か所に反映して保存' })).toBeTruthy()
+  expect(screen.getByText(/送信開始時に固定した配信と届いた文は変わりません/)).toBeTruthy()
+})
+
+it('所属不明の使用先があるときは反映先の数を断定しない', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 2, blockingTotal: 2,
+    historicalTotal: 0, sendingFixedTotal: 0, unscopedFormTotal: 1, canDelete: false,
+    byKind: {}, items: [], unavailableReferences: [], checkedAt: '2026-10-14T00:00:00+09:00', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  expect(await screen.findByText(/所属を確認できない使用先があります/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /か所に反映して保存/ })).toBeNull()
+})
+
+it('確認できた使用先がない場合は、変更が反映される場所がないと示す', async () => {
+  render(<Editor />)
+  expect(await screen.findByText(/確認できた使用先に変わる場所はありません/)).toBeTruthy()
+})
+
+it('使用先ごとに参照方法と確かめられた版を表示する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 2, blockingTotal: 1,
+    historicalTotal: 0, sendingFixedTotal: 1, unscopedFormTotal: 0, canDelete: false, byKind: {},
+    items: [
+      { kind: 'template', kindLabel: 'テンプレート', name: '案内', status: '使われています', href: '/templates/1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 5 },
+      { kind: 'broadcast', kindLabel: '一斉配信', name: '送信中', status: '配信中', href: '/broadcasts/1', blocksDeletion: false, currentPreview: '9時', referenceMode: 'pinned', referencedVersion: 3 },
+    ], unavailableReferences: [], checkedAt: '2026-10-14T00:00:00+09:00', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  const table = await screen.findByRole('table', { name: '使っている場所' })
+  expect(within(table).getByText('最新の値')).toBeTruthy()
+  expect(within(table).getByText('使用中')).toBeTruthy()
+  expect(within(table).getByText('版 3 で固定')).toBeTruthy()
+  expect(within(table).getByText('版 5')).toBeTruthy()
+  expect(within(table).getByTitle('版 3')).toBeTruthy()
+})
+
+it('一斉配信の下書きに現在の版を固定できる', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '案内の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '版 1 で固定' }))
+  const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
+  expect(within(dialog).getByText(/承認が取り消されます/)).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: '固定する' }))
+  await waitFor(() => expect(state.pin).toHaveBeenCalledWith('b-1', 'var-1', { accountId: 'a', versionId: 'version-1', expectedVersion: 4 }))
+})
+
+it('固定に失敗したときは技術的なエラーを出さずに案内する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  state.pin.mockRejectedValue(new ApiError(500))
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '案内の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '版 1 で固定' }))
+  const dialog = await screen.findByRole('dialog', { name: 'この版で固定しますか' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '固定する' }))
+  expect(await within(dialog).findByText('版の固定に失敗しました。時間をおいて、もう一度お試しください。')).toBeTruthy()
+  expect(screen.queryByText('API error: 500')).toBeNull()
+})
+
+it('Google連携の値は固定を押せず理由を示す', async () => {
+  state.detail.mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'business_hours', type: 'text', value: '10時', memo: '', status: 'active', version: 1, usages: [], history: [{ id: 'version-1', version: 1 }], usagePage: { total: 0, shown: 0 }, pinDisabledReason: 'Google と連携した値は、いつも最新を使います' } })
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'business_hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '案内の操作' }))
+  const button = await screen.findByRole('menuitem', { name: /版 1 で固定/ })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(button)
+  expect((await screen.findByRole('tooltip')).textContent).toContain('Google と連携した値は、いつも最新を使います')
+  expect(state.pin).not.toHaveBeenCalled()
+})
+
+it('固定済みの下書きは変更件数に含めず版を表示する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    sendingFixedTotal: 0, unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '旧', referenceMode: 'pinned', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  const table = await screen.findByRole('table', { name: '使っている場所' })
+  expect(within(table).getByText('版 1 で固定')).toBeTruthy()
+  expect(within(table).getByText('版 1')).toBeTruthy()
+  expect(screen.getByRole('button', { name: /0か所に反映して保存/ })).toBeTruthy()
+  fireEvent.click(within(table).getByRole('button', { name: '案内の操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '最新の値に戻す' }))
+  const dialog = await screen.findByRole('dialog', { name: '最新の値に戻しますか' })
+  expect(state.pin).not.toHaveBeenCalled()
+  fireEvent.click(within(dialog).getByRole('button', { name: '最新の値に戻す' }))
+  await waitFor(() => expect(state.pin).toHaveBeenCalledWith('b-1', 'var-1', { accountId: 'a', versionId: null, expectedVersion: 4 }))
+  expect(within(table).queryByRole('button', { name: '版 1 で固定し直す' })).toBeNull()
+})
+
+it('使用先の見出しに全件数と送信済みの補足を示す', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 8, blockingTotal: 1, historicalTotal: 1,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '過去の案内', status: '送信済み・変わりません', href: '/broadcasts/detail?id=b-1', blocksDeletion: false, currentPreview: '10時', referenceMode: 'pinned', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  expect(await screen.findByRole('heading', { name: '使用先 8か所' })).toBeTruthy()
+  expect(screen.getByTitle('送信済み')).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: '使用先' })).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: '版' })).toBeTruthy()
+  expect(screen.getByText('送信済み・完了済みの内容は、値を変えても変わりません。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '過去の案内の操作' }))
+  expect((await screen.findByRole('menuitem', { name: /版 1 で固定/ })).getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(screen.getByRole('menuitem', { name: /版 1 で固定/ }))
+  expect((await screen.findByRole('tooltip')).textContent).toContain('送信済み・完了済みの配信は変更できません')
+})
+
+it('Google連携後の固定は理由を示し、手動で最新に戻せる', async () => {
+  state.detail.mockResolvedValue({ success: true, data: { id: 'var-1', name: '営業時間', key: 'business_hours', type: 'text', value: '10時', memo: '', status: 'active', version: 2, usages: [], history: [{ id: 'version-2', version: 2 }], usagePage: { total: 0, shown: 0 }, pinDisabledReason: 'Google と連携した値は、いつも最新を使います' } })
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'business_hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'broadcast', kindLabel: '一斉配信', name: '案内', status: '下書き', href: '/broadcasts/detail?id=b-1', blocksDeletion: true, currentPreview: '旧', referenceMode: 'pinned', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  const table = await screen.findByRole('table', { name: '使っている場所' })
+  expect(within(table).getByText('版 1 で固定')).toBeTruthy()
+  expect(screen.getByText('Google と連携した固定版は送らず要確認になります。下書きで「…」から最新の値に戻せます。')).toBeTruthy()
+  fireEvent.click(within(table).getByRole('button', { name: '案内の操作' }))
+  expect((await screen.findByRole('menuitem', { name: /版 2 で固定/ })).getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(screen.getByRole('menuitem', { name: /版 2 で固定/ }))
+  expect((await screen.findByRole('tooltip')).textContent).toContain('固定済みの場合は送らず要確認になります')
+  fireEvent.click(screen.getByRole('menuitem', { name: '最新の値に戻す' }))
+  expect(await screen.findByRole('dialog', { name: '最新の値に戻しますか' })).toBeTruthy()
+  expect(state.pin).not.toHaveBeenCalled()
+})
+
+it('一斉配信以外の使用先は固定できない理由を表示する', async () => {
+  state.impact.mockResolvedValue({ success: true, data: {
+    variable: { id: 'var-1', name: '営業時間', varKey: 'hours' }, total: 1, blockingTotal: 1, historicalTotal: 0,
+    unscopedFormTotal: 0, canDelete: false, byKind: {}, items: [{ kind: 'form', kindLabel: 'フォーム', name: '申込フォーム', status: '公開中', href: '/form-submissions/edit?id=f-1', blocksDeletion: true, currentPreview: '10時', referenceMode: 'live', referencedVersion: 1 }], unavailableReferences: [], checkedAt: '', recommendedAction: 'review_references',
+  } })
+  render(<Editor />)
+  fireEvent.click(await screen.findByRole('button', { name: '申込フォームの操作' }))
+  expect((await screen.findByRole('menuitem', { name: /版 1 で固定/ })).getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(screen.getByRole('menuitem', { name: /版 1 で固定/ }))
+  expect((await screen.findByRole('tooltip')).textContent).toContain('この使用先では固定できません')
+  expect(state.pin).not.toHaveBeenCalled()
 })

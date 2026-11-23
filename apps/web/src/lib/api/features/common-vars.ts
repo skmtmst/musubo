@@ -52,6 +52,10 @@ export const commonVarsMethods = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    pinBroadcast: (broadcastId: string, variableId: string, data: { accountId: string; versionId: string | null; expectedVersion: number }) =>
+      fetchApi<ApiResponse<{ versionId: string | null; version: number }>>(`/api/broadcasts/${encodeURIComponent(broadcastId)}/common-var-pins/${encodeURIComponent(variableId)}`, {
+        method: 'PUT', body: JSON.stringify(data),
+      }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。保存には影響確認の確認値が要る。 */
     update: (id: string, accountId: string, data: {
       name?: string

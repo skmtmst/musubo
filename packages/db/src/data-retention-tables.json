@@ -944,6 +944,15 @@
       "parentColumn": "id"
     }
   },
+  "broadcast_common_var_pins": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "common_var_id",
+      "parent": "common_vars",
+      "parentColumn": "id"
+    }
+  },
   "broadcast_insights": {
     "category": "purge",
     "scope": {
