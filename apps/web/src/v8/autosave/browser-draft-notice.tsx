@@ -72,9 +72,9 @@ export function ScenarioDraftStatus({ label }: { label: string | null | undefine
     </span>
     <Dialog open={open} onCancel={() => setOpen(false)} title="下書きを自動保存できませんでした" size="small" contentLayout="form"
       >
-      <p>入力内容はこの画面に残っています。画面を閉じる前に、必要な内容を控えてください。</p>
-      <p>通信状態を確かめて入力を続けると、入力が止まって{AUTOSAVE_DELAY_MS / 1000}秒後にもう一度自動保存します。</p>
-      <p>画面の保存・作成ボタンを押すと、この内容がそのまま保存されます。下書きだけを残す操作ではありません。配信中のシナリオでは、その後の配信にも反映されます。下書きだけを残す場合は、入力を変えて自動保存の完了を待ってください。</p>
+      <p className="text-body">入力内容はこの画面に残っています。画面を閉じる前に、必要な内容を控えてください。</p>
+      <p className="text-body">通信状態を確かめて入力を続けると、入力が止まって{AUTOSAVE_DELAY_MS / 1000}秒後にもう一度自動保存します。</p>
+      <p className="text-body">画面の保存・作成ボタンを押すと、この内容がそのまま保存されます。下書きだけを残す操作ではありません。配信中のシナリオでは、その後の配信にも反映されます。下書きだけを残す場合は、入力を変えて自動保存の完了を待ってください。</p>
     </Dialog>
   </>
 }

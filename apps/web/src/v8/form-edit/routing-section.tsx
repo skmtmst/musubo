@@ -78,7 +78,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
       {value.enabled ? <>
         <div className={styles.questionRow}>
           <span className={styles.label}>分ける質問</span>
-          {readOnly ? <span>{question?.label}</span> : <EntitySelect aria-label="分ける質問" value={questionId} options={questions.map((q) => ({ value: q.id, label: `${q.label}（${choiceModeLabel(q.type)}）` }))}
+          {readOnly ? <span className="text-body">{question?.label}</span> : <EntitySelect aria-label="分ける質問" value={questionId} options={questions.map((q) => ({ value: q.id, label: `${q.label}（${choiceModeLabel(q.type)}）` }))}
             onChange={(id) => { setPickedQuestion(id); set({ rules: [] }) }} />}
           <span className={styles.hint}>使える質問：1 つ選ぶ・いくつでも選ぶ・プルダウン</span>
         </div>

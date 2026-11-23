@@ -18,7 +18,7 @@ export default function HqMenuReferences({ areas, references }: {
     value: group.options.find(option => option.id === id)?.name ?? emptyValue('unknown'),
   })))
   return <CreateSummaryCard title="各アカウントで使うもの" rows={rows}>
-    {rows.length === 0 ? <p>{emptyValue('unconfigured')}</p> : null}
+    {rows.length === 0 ? <p className="text-body">{emptyValue('unconfigured')}</p> : null}
     <CreatePreviewNote>配った先の各アカウントで、同じ名前のものを使います。対応するものがあるかは、配る前に確かめます。</CreatePreviewNote>
   </CreateSummaryCard>
 }

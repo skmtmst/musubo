@@ -284,7 +284,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
             label: <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} aria-current={item.id === id ? 'page' : undefined} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</Link>,
             value: <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>,
           })) : []}>
-            {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
+            {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p className="text-body">これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p className="text-body">まだ問い合わせはありません。</p> : null}
           </CreateSummaryCard>
         </aside> : null}
       </PageContent>

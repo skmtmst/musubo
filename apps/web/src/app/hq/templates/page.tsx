@@ -25,5 +25,5 @@ function Content() {
 }
 
 export default function HqTemplatesPage() {
-  return <Suspense fallback={<p role="status">テンプレートを読み込み中…</p>}><Content /></Suspense>
+  return <Suspense fallback={<p role="status" className="text-body">テンプレートを読み込み中…</p>}><Content /></Suspense>
 }

@@ -312,7 +312,7 @@ export default function QuestionEditor({
 
   return (
     <div className="space-y-5">
-      {referenceError && <p role="alert">候補を読み込めませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
+      {referenceError && <p role="alert" className="text-body">候補を読み込めませんでした。<Button onClick={() => setReferenceRetry(value => value + 1)}>もう一度読み込む</Button></p>}
       {choiceOnly === undefined ? <>
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">

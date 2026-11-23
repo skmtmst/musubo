@@ -11,7 +11,7 @@
 .toolbar { display: flex; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; }
 .input { border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas-sunken); padding: 10px 12px; width: 100%; min-width: 0; color: var(--color-ink); }
 .search { max-width: 440px; }
-.field { display: block; margin-bottom: 16px; }
+.field { display: block; margin-bottom: 16px; font-size: var(--text-label); }
 .field > span { display: block; margin-bottom: 6px; font-weight: 600; }
 .grid { display: grid; grid-template-columns: minmax(0,1fr) 260px; gap: 16px; align-items: start; }
 .stack { display: grid; gap: 16px; min-width: 0; }

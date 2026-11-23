@@ -1,6 +1,6 @@
 @layer components {
 /* 統括の自動応答のひな形を作る。欄の並びと細かい決まりの行だけ。部品の見た目は共通部品が持つ。 */
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-card); }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-card); font-size: var(--text-body); }
 .talk { display: flex; flex-direction: column; gap: var(--space-12); }
 .note { margin: var(--polish-space-none); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--text-lh); }
 .choice { display: inline-flex; align-items: center; gap: var(--tpl-hq-auto-reply-gap-1); white-space: nowrap; }

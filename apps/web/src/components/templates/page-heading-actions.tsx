@@ -17,7 +17,7 @@ export default function PageHeadingActions({ children }: { children: ReactNode }
   const menus = nodes.filter((node): node is ReactElement<RowMenuProps> => isValidElement(node) && node.type === RowMenu)
   const extras = buttons.filter(node => node !== primary && node !== secondary)
   const other = nodes.filter(node => node !== primary && !buttons.includes(node as ReactElement<ButtonProps>) && !menus.includes(node as ReactElement<RowMenuProps>))
-  return <span data-page-heading-actions>
+  return <span className="text-body" data-page-heading-actions>
     {other}
     {secondary ? cloneElement(secondary, { variant: 'text' }) : null}
     {primary}

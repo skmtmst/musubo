@@ -2,7 +2,7 @@
 @layer components {
 .body { display: flex; width: 100%; height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); box-shadow: var(--tpl-inbox-line-top); }
 .side { display: grid; grid-template-rows: 1fr auto; flex: none; width: var(--tpl-folder-width); overflow-y: auto; }
-.list { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: stretch; gap: var(--tpl-inbox-composer-gap); padding: var(--tpl-inbox-tp-list-pad); overflow-y: auto; }
+.list { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: stretch; gap: var(--tpl-inbox-composer-gap); padding: var(--tpl-inbox-tp-list-pad); overflow-y: auto; font-size: var(--text-body); }
 .foot { display: flex; align-items: center; gap: var(--tpl-inbox-composer-gap); width: 100%; padding: var(--tpl-inbox-tp-foot-pad); box-shadow: var(--tpl-inbox-line-top); }
 @media (max-width: 540px) { .side { width: var(--tpl-folder-width); } }
 }

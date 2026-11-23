@@ -145,7 +145,7 @@ export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel, o
         <Field label="店舗コード" name="code" defaultValue={store?.code} required />
         <Field label="エリア" name="area" defaultValue={store?.area || ''} />
         <Field label="収容人数" name="capacity" type="number" defaultValue={String(store?.capacity ?? 24)} required />
-        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span>日本時間（Asia/Tokyo）</span><SaveErrorField names={["timezone"]}><input type="hidden" name="timezone" value="Asia/Tokyo" /></SaveErrorField></div>
+        <div className={styles.field}><span className={styles.fieldLabel}>タイムゾーン</span><span className="text-body">日本時間（Asia/Tokyo）</span><SaveErrorField names={["timezone"]}><input type="hidden" name="timezone" value="Asia/Tokyo" /></SaveErrorField></div>
         {store ? (
           <SharedField label={<><span className={styles.fieldLabel}>状態</span></>}><DefaultSelect name="status" ariaLabel="状態" defaultValue={store.status} options={[{ value: 'active', label: '有効' }, { value: 'paused', label: '停止中' }, { value: 'archived', label: 'アーカイブ' }]} /></SharedField>
         ) : null}

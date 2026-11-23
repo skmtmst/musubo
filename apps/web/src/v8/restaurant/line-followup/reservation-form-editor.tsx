@@ -18,10 +18,10 @@ const values={name:'見本 花子',phone:'090-0000-5678',dateTime:'11月1日 19:
 /** 実LIFFと同じ定義で、確認の手順の項目と必須を表示する。 */
 export function ReservationFormSample({definition,storeName,compact=false}:{definition:RestaurantReservationForm;storeName:string;compact?:boolean}){
  return <LiffPhoneFrame title={definition.title} accountName={storeName} scaleToFit={compact} compact={compact} step={2} steps={['人数・日時・コース','確認']} label="予約の回答フォームの見本">
-  <div className={styles.formSample}><h3>{definition.title}</h3><p>ご予約の内容（見本）</p>
+  <div className={styles.formSample}><h3>{definition.title}</h3><p className="text-body">ご予約の内容（見本）</p>
    {definition.fields.filter(field=>field.enabled).map(field=><Field key={field.id} label={field.label} required={field.required}><TextField value={values[field.id]} readOnly tabIndex={-1} /></Field>)}
    <Button variant="primary" disabled>予約する</Button>
-   <p>完了後：{definition.completionMessage}</p>
+   <p className="text-body">完了後：{definition.completionMessage}</p>
   </div>
  </LiffPhoneFrame>
 }

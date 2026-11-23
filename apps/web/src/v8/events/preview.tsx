@@ -102,8 +102,8 @@ function PreviewInner({ eventId }: { eventId: string }) {
       <Notice tone="info" message="お客様に見える内容です。オンラインのURLは、確定した申込にだけ見せます。" />
       <FormSection id="event-preview-summary" title={event.name} description={event.description}>
         {event.image_url ? <ImageFrame title="イベント画像" value={event.image_url} readOnly previewAlt="" fit="contain" /> : null}
-        {event.venue_name ? <p>会場：{event.venue_name}</p> : null}
-        {event.venue_url ? <p>
+        {event.venue_name ? <p className="text-body">会場：{event.venue_name}</p> : null}
+        {event.venue_url ? <p className="text-body">
           オンラインのURLは確定後に案内します
           <HelpTip label="オンラインのURLの説明">確定前の申込や、申し込んでいない人にはURLを渡しません。確定した人の予約履歴にだけ出ます。</HelpTip>
         </p> : null}

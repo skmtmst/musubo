@@ -919,7 +919,7 @@ function TagPicker({
           <span key={id} className="inline-flex items-center gap-1.5">
             <TagPill name={label(id)} color={tags.find((tag) => tag.id === id)?.color}
               onRemove={() => onChange(include, exclude.filter((value) => value !== id))} />
-            <span>以外</span>
+            <span className="text-caption">以外</span>
           </span>
         ))}</TagOverflow>
       </div>

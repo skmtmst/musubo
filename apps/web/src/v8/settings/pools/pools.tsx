@@ -315,7 +315,7 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
           setDeleteError('')
         }}
       >
-        {deleteContext?.accounts ? <OperationTargetSummary accounts={deleteContext.accounts.map(id => ({ id, name: accounts.find(account => account.id === id)?.name }))} showAccountCount /> : <p>{accountsLoading ? '所属アカウントを確認しています。' : '所属アカウントを確認できません。'}</p>}
+        {deleteContext?.accounts ? <OperationTargetSummary accounts={deleteContext.accounts.map(id => ({ id, name: accounts.find(account => account.id === id)?.name }))} showAccountCount /> : <p className="text-body">{accountsLoading ? '所属アカウントを確認しています。' : '所属アカウントを確認できません。'}</p>}
       </ConfirmDialog>
     </Card>
   )

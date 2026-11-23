@@ -95,7 +95,7 @@ export default function MessageComposer(props: MessageComposerProps) {
       <div className={styles.title}><h3>{`メッセージ（${bubbles.length} / ${MAX_BUBBLES}）`}</h3><HelpTip label="メッセージの説明">1回の配信に5つまで入れられます。上から順に届きます。</HelpTip></div>
       <div className={styles.actions}><Button size="composer" disabled={busy || Boolean(props.templateDisabledReason)} title={props.templateDisabledReason} onClick={() => onPickTemplate(0)}><FileText size={16} aria-hidden />テンプレートから選ぶ</Button><Button size="composer" disabled={busy || Boolean(props.templateDisabledReason)} title={props.templateDisabledReason} onClick={() => onSaveTemplate(0)}><Save size={16} aria-hidden />保存してテンプレートにする</Button></div>
     </div>}
-    {props.templateDisabledReason ? <p role="note">{props.templateDisabledReason}</p> : null}
+    {props.templateDisabledReason ? <p className="text-body" role="note">{props.templateDisabledReason}</p> : null}
     {bubbles.map((bubble, index) => {
       const tabs: ReadonlyArray<readonly [ComposerKind, string]> = unavailable.question ? [...COMPOSER_TYPES.slice(0, 10), ['question', '質問'], ...COMPOSER_TYPES.slice(10)] : COMPOSER_TYPES
       const activeType = tabs.some(([type]) => type === bubble.type) ? bubble.type : null
@@ -150,6 +150,6 @@ export function ComposerCarouselPreview({ bubble }: { bubble: BroadcastBubble })
       {column.thumbnailImageUrl ? <img width={160} height={62} src={column.thumbnailImageUrl} alt="" /> : null}
       {column.title ? <strong title={column.title}>{column.title}</strong> : null}
       {(Array.isArray(column.actions) ? column.actions : []).map((action, i) => <span className={styles.previewAction} key={i}>{action?.label || 'ボタン'}</span>)}
-    </div>) : <span>カードを作ると表示されます</span>}
+    </div>) : <span className="text-body">カードを作ると表示されます</span>}
   </div>
 }

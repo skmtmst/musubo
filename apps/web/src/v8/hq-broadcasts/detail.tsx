@@ -727,7 +727,7 @@ function HqBroadcastDetailBody() {
           onCancel={() => { setAsk(null); setError(''); if (actConflict) void load() }}
         >
           {ask.kind === 'send' && run ? <OperationTargetSummary accounts={run.targets.filter((target) => !target.excluded && target.blockedReasons.length === 0).map((target) => ({ id: target.accountId, name: target.accountName }))} showAccountCount /> : null}
-          {ask.kind === 'retry' || ask.kind === 'retry-all' ? <><OperationTargetSummary accounts={remainingRetryTargets.map(target => ({ id: target.accountId, name: target.accountName }))} compactAccounts /><p>{ask.kind === 'retry-all' ? `${n(remainingRetryTargets.length)}店・${retryCountText}` : retryCountText}</p></> : null}
+          {ask.kind === 'retry' || ask.kind === 'retry-all' ? <><OperationTargetSummary accounts={remainingRetryTargets.map(target => ({ id: target.accountId, name: target.accountName }))} compactAccounts /><p className="text-body">{ask.kind === 'retry-all' ? `${n(remainingRetryTargets.length)}店・${retryCountText}` : retryCountText}</p></> : null}
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
         </ConfirmDialog>
       ) : null}

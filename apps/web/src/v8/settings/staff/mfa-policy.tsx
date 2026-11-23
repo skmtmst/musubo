@@ -74,7 +74,7 @@ export default function MfaPolicy({ loginPath = '/login', accountMembers, compac
       {!compact ? <AuthHelp>{accountMembers !== undefined ? '必須設定は統括全体に適用されます。' : ''}切り替えられるのはオーナー（運営）だけです。切り替えは記録に残ります。</AuthHelp> : null}
       <ConfirmDialog open={turnOn} title="二段階認証をオンにする" description="全員が一度ログアウトします。まだ登録していない人は、次のログインで登録できます。" confirmLabel="オンにする" onConfirm={() => save(true)} onCancel={() => setTurnOn(false)} busy={busy} error={error} />
       <Dialog open={unregistered !== null} title="二段階認証が未登録の人" onCancel={() => setUnregistered(null)} cancelLabel="閉じる" error={peopleError}>
-        {peopleLoading ? <ListState kind="loading" /> : unregistered?.length ? <ul>{unregistered.map((name, index) => <li key={index}>{name}</li>)}</ul> : peopleError ? null : <p>未登録の人はいません</p>}
+        {peopleLoading ? <ListState kind="loading" /> : unregistered?.length ? <ul>{unregistered.map((name, index) => <li key={index}>{name}</li>)}</ul> : peopleError ? null : <p className="text-body">未登録の人はいません</p>}
       </Dialog>
       {stepUp.prompt}
     </FormSection>

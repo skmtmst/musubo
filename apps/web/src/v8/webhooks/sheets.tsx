@@ -247,7 +247,7 @@ export default function WebhooksSheetsV8() {
           onConfirm={() => handleDisconnect()}
           onCancel={() => { if (busy !== 'disconnect') setDisconnectFor(null) }}
         >
-          <p>このLINEアカウントの連携設定・同期の記録・Google側の許可を消します。</p>
+          <p className="text-body">このLINEアカウントの連携設定・同期の記録・Google側の許可を消します。</p>
           <OperationTargetSummary accounts={[{ id: disconnectFor?.id ?? '', name: disconnectFor?.label === disconnectFor?.id ? undefined : disconnectFor?.label }]} />
         </Dialog>
       )}

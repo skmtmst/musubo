@@ -368,8 +368,8 @@ function NoticeDialog({ accountId, plan, onClose }: { accountId: string; plan: B
           <>
             {message ? <Notice tone="danger" message={message} /> : null}
             <p className={styles.note}>今は試験運転です。LINE へは送らず、送る予定だけを記録します。</p>
-            <span className={styles.picked}><Toggle checked={remainingOne} onChange={setRemainingOne} label="残りが 1 回になったら知らせる" /><span>残りが 1 回になったら知らせる</span></span>
-            <span className={styles.picked}><Toggle checked={expiry} onChange={setExpiry} label="期限の 14 日前に知らせる" /><span>期限の 14 日前に知らせる</span></span>
+            <span className={styles.picked}><Toggle checked={remainingOne} onChange={setRemainingOne} label="残りが 1 回になったら知らせる" /><span className="text-body">残りが 1 回になったら知らせる</span></span>
+            <span className={styles.picked}><Toggle checked={expiry} onChange={setExpiry} label="期限の 14 日前に知らせる" /><span className="text-body">期限の 14 日前に知らせる</span></span>
           </>
         ) : null}
       </div>

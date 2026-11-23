@@ -499,7 +499,7 @@ function ReminderDetailV8() {
       <PageHeading title={data.reminder.name}
         help="登録した友だちごとに、基準日から決めた日時に通知を送ります。"
         explanationToggle={tab === 'registrants' ? <PageExplanationToggle /> : undefined}
-        crumbs={<><p>{meta}</p></>}
+        crumbs={<><p className="text-body">{meta}</p></>}
         tabs={<><Tabs
           label="リマインダの詳細"
           items={[

@@ -588,7 +588,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
                   options={[{ value: 'friends' as const, label: '友だちだけ' }, ...(initialPayload?.visibility === 'link' ? [{ value: 'link' as const, label: 'リンクを知っている人（保存済み）' }] : [])]}
                   value={couponVisibility}
                   onChange={setCouponVisibility}
-                /> : <span>友だちだけ</span>}</SaveErrorField>
+                /> : <span className="text-body">友だちだけ</span>}</SaveErrorField>
               </div>
             </Card>
 

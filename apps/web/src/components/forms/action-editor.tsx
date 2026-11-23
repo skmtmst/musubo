@@ -83,7 +83,7 @@ function formActionKind(action: FormAction): string {
   return KINDS.find(kind => kind.id === action.kind)?.label ?? action.kind
 }
 export function FormActionConfig({ action, refs, onChange, index = 0 }: { index?: number; action: FormAction; refs: FormRefs; onChange: (next: FormAction) => void }) {
-  if (action.kind === 'research_action') return <p>変更はリサーチの編集から行ってください。</p>
+  if (action.kind === 'research_action') return <p className="text-body">変更はリサーチの編集から行ってください。</p>
   const label = KINDS.find(kind => kind.id === action.kind)!.label
   return <>
     {action.kind === 'send_text' ? <SaveErrorField names={[`value.${index}.text`,"text","action.text"]}><TextField aria-label="送る文面" value={action.text} onChange={event => onChange({ ...action, text: event.target.value })} /></SaveErrorField>

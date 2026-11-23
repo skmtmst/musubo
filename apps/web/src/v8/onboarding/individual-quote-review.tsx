@@ -51,7 +51,7 @@ export default function IndividualQuoteReview({ quote, now, onAccept, onResumeCa
   }
 
   if (!result) return <div className={styles.page}><PageHeading title="お見積もりを表示できません" />
-    <p>見積もりの内容を確認できませんでした。担当者へお問い合わせください。</p></div>
+    <p className="text-body">見積もりの内容を確認できませんでした。担当者へお問い合わせください。</p></div>
 
   const { access, price } = result
   const firstLine = quote.plannedLinkedAccountsByLine[0]

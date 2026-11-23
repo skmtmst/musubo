@@ -13,6 +13,6 @@ export default function FormFileSettings({ block, onChange }: { block: FormInput
         <Checkbox key={option.kind} checked={kinds.includes(option.kind)} onCheckedChange={checked => onChange({ fileKinds: checked ? [...kinds, option.kind] : kinds.filter(kind => kind !== option.kind), fileBothSides: false })}>{option.label}</Checkbox>)}
     </Field>
     <Field label="枚数の上限" note="1〜10枚"><TextField aria-label="枚数の上限" type="number" min={1} max={10} value={block.fileMaxCount ?? 1} onChange={e => onChange({ fileMaxCount: Number(e.target.value) })} /></Field>
-    {savedKinds.includes('identity') ? <p role="status">この質問では本人確認書類を受け取れません。受け取る種類を写真かPDFへ変更してください。</p> : null}
+    {savedKinds.includes('identity') ? <p role="status" className="text-body">この質問では本人確認書類を受け取れません。受け取る種類を写真かPDFへ変更してください。</p> : null}
   </>
 }

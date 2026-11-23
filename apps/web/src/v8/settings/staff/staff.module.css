@@ -361,6 +361,7 @@
   gap: var(--tpl-sa-tool-gap);
   margin: 0;
   color: var(--color-ink);
+  font-size: var(--text-lead);
   font-weight: 600;
 }
 

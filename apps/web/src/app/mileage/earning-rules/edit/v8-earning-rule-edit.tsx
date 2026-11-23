@@ -351,7 +351,7 @@ function EditInner() {
                 <span className={formStyles.label}>開始日・終了日</span>
                 <span className={formStyles.inlineRow} {...fields.bind('period')}>
                   <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" invalid={fields.invalid('period')} aria-describedby={describedBy('period')} />
-                  <span aria-hidden="true">〜</span>
+                  <span className="text-body" aria-hidden="true">〜</span>
                   <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" invalid={fields.invalid('period')} aria-describedby={describedBy('period')} />
                 </span>
                 <FieldError id="er-period-error">{fields.error('period')}</FieldError>
@@ -390,7 +390,7 @@ function EditInner() {
           <section className={formStyles.card} aria-label="お客様への知らせ">
             <h2 className={formStyles.cardTitle}>お客様への知らせ</h2>
             <LinePreview caption="行動のあと、すぐに届く想定です">
-              <div>{messageTemplate}</div>
+              <div className="text-body">{messageTemplate}</div>
             </LinePreview>
             <Checkbox checked={notifyFriend} onCheckedChange={setNotifyFriend}>
               マイルが付いたら、この内容を自動で知らせる

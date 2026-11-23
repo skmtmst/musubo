@@ -127,7 +127,7 @@ export default function CarouselPicker({ value, onChange, accountId }: CarouselP
     return <p className="text-ink-faint py-6 text-center text-sm">読み込み中…</p>
   }
 
-  if (error) return <div role="alert">カルーセルを読み込めませんでした。<Button onClick={() => setRetry(value => value + 1)}>もう一度読み込む</Button></div>
+  if (error) return <div className="text-body" role="alert">カルーセルを読み込めませんでした。<Button onClick={() => setRetry(value => value + 1)}>もう一度読み込む</Button></div>
 
   if (items.length === 0) {
     return (

@@ -12,6 +12,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role, canManageRo
 vi.mock('@/components/shared/use-permission-lock-reason', () => ({ usePermissionLockReason: (allowed: boolean) => allowed ? undefined : 'オーナーか管理者に頼んでください。' }))
 vi.mock('@/components/shared/entity-select', () => ({ entityOptionMetadata: () => ({}), default: (props: { values: string[]; options: Array<{value: string; label: string}>; onChange: (ids: string[]) => void; 'aria-label': string; disabled?: boolean }) => <select multiple aria-label={props['aria-label']} value={props.values} disabled={props.disabled} onChange={e => props.onChange(Array.from(e.target.selectedOptions).map(option => option.value))}>{props.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select> }))
 import { MakeupRuleSection } from './makeup-rule-section'
+import { makeupRuleSummary } from './makeup-rule'
 
 const initial: EventMakeupRule = { enabled: true, cutoffHours: 3, validDays: 30, monthlyCap: 2, target: 'same_kind', targetIds: [] }
 const event = (rule = initial, version = 4) => ({ id: 'class-a', line_account_id: 'a', name: '教室', version, makeup_rule_json: JSON.stringify(rule) }) as EventDetail
@@ -152,4 +153,18 @@ it.each([undefined, '{bad'])('未取得・壊れた保存値を既定のオフ�
   render(view({ ...event(), makeup_rule_json: value }))
   fireEvent.click(screen.getByRole('button', { name: '振替の決まりを編集する' }))
   expect(screen.queryByRole('dialog')).toBeNull(); expect(mocks.save).not.toHaveBeenCalled()
+})
+
+it('振替を使わないときは条件を表示しない', () => {
+  render(view(event({ ...initial, enabled: false })))
+  expect(screen.getByText('使わない')).toBeTruthy()
+  expect(screen.queryByText(/開始の 3 時間前まで/)).toBeNull()
+})
+
+it('比較では振替を使わない場合も条件の違いが分かる', () => {
+  const a = makeupRuleSummary({ ...initial, enabled: false, cutoffHours: 3 })
+  const b = makeupRuleSummary({ ...initial, enabled: false, cutoffHours: 24 })
+  expect(a).toContain('開始の 3 時間前まで')
+  expect(b).toContain('開始の 24 時間前まで')
+  expect(a).not.toBe(b)
 })

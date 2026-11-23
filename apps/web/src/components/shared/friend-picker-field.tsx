@@ -60,6 +60,6 @@ function ScopedFriendPicker(props: Props) {
   return <>
     {props.multiple ? <EntityPickerField {...common} multiple value={props.value} maxSelected={props.maxSelected} onChange={(ids) => props.onChange(ids, { ...props.names, ...names.current })} />
       : <EntityPickerField {...common} value={props.value} onChange={props.onChange} />}
-    {props.error ? <p role="alert">{props.error}</p> : null}
+    {props.error ? <p role="alert" className="text-caption">{props.error}</p> : null}
   </>
 }

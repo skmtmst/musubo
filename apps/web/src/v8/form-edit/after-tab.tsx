@@ -49,8 +49,8 @@ export function AfterTab({ readOnly, options, refs, onSubmitTagId, onChangeOptio
   if (readOnly) return <>
     <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>答え終わったときの画面</h2>
-      <p>お礼の文：{options.thanksText || 'ご回答ありがとうございました。'}</p>
-      <p>終わったあと：{options.thanksUrl || 'お礼を出す'}</p>
+      <p className="text-body">お礼の文：{options.thanksText || 'ご回答ありがとうございました。'}</p>
+      <p className="text-body">終わったあと：{options.thanksUrl || 'お礼を出す'}</p>
     </Card>
     <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>答え終わったら行うこと</h2> <ActionEditor value={actions} refs={refs} onChange={setActions} readOnly/>

@@ -174,7 +174,7 @@ export function MessageStep({ definition, setDefinition, friendKind, scenarios, 
                   readOnly={!canEdit}
                   onChange={(next) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: next }) }))}
                 /></SaveErrorField>
-                <span aria-hidden="true">〜</span>
+                <span className="text-body" aria-hidden="true">〜</span>
                 <SaveErrorField names={["end","slot.end","definition"]}><TimeField
                   aria-label={`時間帯${index + 1}の終了`}
                   value={slot.end}

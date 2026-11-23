@@ -17,7 +17,7 @@ export default function TapExtrasField({ name, value, onChange, accountId, tags,
   const [expanded, setExpanded] = useState(hasTapExtras(value))
   useEffect(() => { if (hasTapExtras(value)) setExpanded(true) }, [value])
   const error = tapExtrasError(value) ?? serverError
-  if (readOnly) return hasTapExtras(value) ? <div className={styles.root}><TagPickerField label={`${name}の付けるタグ`} value={value?.tagIds ?? []} options={tags} accountId={accountId} onChange={() => {}} readOnly />{value?.scoreChange ? <span>スコア {value.scoreChange > 0 ? '+' : ''}{value.scoreChange}点</span> : null}</div> : null
+  if (readOnly) return hasTapExtras(value) ? <div className={styles.root}><TagPickerField label={`${name}の付けるタグ`} value={value?.tagIds ?? []} options={tags} accountId={accountId} onChange={() => {}} readOnly />{value?.scoreChange ? <span className="text-body">スコア {value.scoreChange > 0 ? '+' : ''}{value.scoreChange}点</span> : null}</div> : null
   if (unavailable) return <div className={styles.root}><p className={styles.note}>{unavailable}</p>{hasTapExtras(value) ? <Button variant="text" onClick={() => onChange({ tagIds: [], scoreChange: null })}><X size={16} />追加処理を外す</Button> : null}</div>
   if (!expanded) return <Button variant={addButtonVariant} onClick={() => setExpanded(true)}><Plus size={16} />{actionLabel === undefined ? '押されたときにあわせて行うことを足す' : `${actionLabel}を足す`}</Button>
   return <div className={styles.root} role="group" aria-label={`${name}の${actionLabel ?? '押されたときにあわせて行うこと'}`}>

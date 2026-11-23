@@ -292,7 +292,7 @@ export default function MergedPersonDetailViewV8({
           </DialogActions>)}
       >
         <OperationTargetSummary accounts={[{ id: m.unlinkTarget?.lineAccountId ?? '', name: m.unlinkTarget?.lineAccountId ? m.unlinkTarget.lineAccountName : '不明' }]} externalTarget={{ label: '友だち', name: m.unlinkTarget?.displayName }} />
-        <p style={{ fontSize: 13, color: 'var(--color-ink-secondary)', margin: '0 0 8px' }}>
+        <p className="text-body" style={{ color: 'var(--color-ink-secondary)', margin: '0 0 8px' }}>
           解除する友だち：<strong>{m.unlinkTarget?.displayName}</strong>
         </p>
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-ink)' }}>

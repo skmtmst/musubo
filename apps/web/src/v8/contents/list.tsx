@@ -1131,7 +1131,7 @@ export default function MediaLibraryListV8() {
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
               </Button>
-              <Button type="button" variant="danger" onClick={() => removeSelected()} busyLabel="処理中…">
+              <Button type="button" variant="text" textTone="danger" onClick={() => removeSelected()} busyLabel="処理中…">
                 選択したメディアを削除
                 {selected.size > 0 && <span>（{selected.size}）</span>}
               </Button>
@@ -1171,7 +1171,7 @@ export default function MediaLibraryListV8() {
           </DialogActions>
         ) : undefined}
       >
-        <div data-design-node="YfTfJ">
+        <div className="text-body" data-design-node="YfTfJ">
         {deleting ? <OperationTargetSummary accounts={[{ id: deleting.lineAccountId ?? '' }]} /> : null}
         {impactPhase === 'loading' ? (
           <p>使われている場所を確認しています…</p>
@@ -1249,11 +1249,11 @@ export default function MediaLibraryListV8() {
         }
       >
         {bulkContext ? <OperationTargetSummary accounts={bulkContext.accounts.map(id => ({ id }))} /> : null}
-        <p>
+        <p className="text-body">
           使われている場所があるものは、はじめから選べません。消したあとは元に戻せません。
         </p>
         {bulkBusy && bulkProgress ? (
-          <p aria-live="polite">
+          <p className="text-body" aria-live="polite">
             処理中…（{bulkProgress.done}/{formatNumber(bulkProgress.total)} 件）
           </p>
         ) : null}

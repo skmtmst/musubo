@@ -26,12 +26,12 @@ export default function HoursCopyDialog({ source, days, onCancel, onCopy }: {
     confirmLabel="上書きする曜日を確認する" confirmDisabled={selected.length === 0}
     confirmDisabledReason={eligible.length === 0 ? '写せる受付中の曜日がありません。' : '写す先の曜日を選んでください'} onConfirm={() => setConfirming(true)}>
     <div className="grid gap-3">
-      <p>{sourceLabel}：{source.intervals.map((interval) => `${interval.start}〜${interval.end}（同時${interval.capacity ?? 1}件）`).join('・')}</p>
+      <p className="text-body">{sourceLabel}：{source.intervals.map((interval) => `${interval.start}〜${interval.end}（同時${interval.capacity ?? 1}件）`).join('・')}</p>
       {eligible.length > 0 ? <DataTable>
         <thead><TableHeadRow><Th>写す先の曜日</Th></TableHeadRow></thead>
         <tbody>{eligible.map((day) => <Tr key={day.weekday}><Td><Checkbox
           checked={targets.includes(day.weekday)} onCheckedChange={(checked) => setTargets((current) => checked ? [...current, day.weekday] : current.filter((value) => value !== day.weekday))}>{day.label}</Checkbox></Td></Tr>)}</tbody>
-      </DataTable> : <p>ほかの曜日の受付を開けると、ここで写す先を選べます。</p>}
+      </DataTable> : <p className="text-body">ほかの曜日の受付を開けると、ここで写す先を選べます。</p>}
     </div>
   </Dialog>
 }

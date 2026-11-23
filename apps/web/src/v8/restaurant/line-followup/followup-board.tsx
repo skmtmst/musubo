@@ -111,7 +111,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
   lock.current=true;setBusy(true);setError('')
   try{assertCurrent();await followupBoardApi.notUsing(accountId,storeId,snapshot.page.setup?.version??0);if(alive.current){setNotUsing(false);await load();emitGuideSignal('followup.save')}}catch(e){if(alive.current)setError(describeSaveFailure(e))}finally{lock.current=false;if(alive.current)setBusy(false)}
  }
- if(loading&&!snapshot)return <p role="status">LINE来店フォローを読み込んでいます…</p>
+ if(loading&&!snapshot)return <p className="text-body" role="status">LINE来店フォローを読み込んでいます…</p>
  if(!snapshot||!form)return <Notice tone="danger" action={<Button variant="secondary" onClick={()=>void load().catch(()=>{})}>読み直す</Button>}>{error||'設定を読み込めませんでした'}</Notice>
  const testRow=rows.find(row=>row.trigger===test)
  const selectedOn=displayedRows.filter(row=>row.enabled).length
@@ -150,7 +150,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
   {testRow&&<TestStartDialog key={testRow.trigger} row={testRow} accountId={accountId} storeId={storeId} storeName={storeName} recipient={snapshot.board.testRecipient} canManage={canManage} lockedReason={lockedReason} onCancel={()=>{setTest(null);void load().catch(()=>{})}} onStarted={load}/>}
   {notUsing&&<Dialog open title="今は使わないと設定しますか" guideSlot="followup.save" description="この店の『LINE来店フォローを確認する』を済みにします。送り方はすべてオフのままです。" confirmLabel="今は使わない" onCancel={()=>setNotUsing(false)} onConfirm={()=>void decideNotUsing()} busy={busy}/>}
   {progress&&!editor&&!formEditor&&<Dialog open title={busy?'保存しています…':'保存の結果'} busy={busy} onCancel={()=>setProgress(null)}>
-   <div className={styles.stack}><Notice tone="info">作った場所と保存できた内容を確認してください。まだ送っていません。テスト送信と承認のあと送り始めます。</Notice><ul className={styles.list}>{progress.map(item=><li key={item.key}><strong>{item.name}</strong> <StatusBadge tone={item.state==='done'?'success':item.state==='failed'?'danger':'neutral'}>{item.state==='done'?'保存しました':item.state==='failed'?'保存できませんでした':'保存待ち'}</StatusBadge>{item.description&&<p>{item.description}</p>}</li>)}</ul></div>
+   <div className={styles.stack}><Notice tone="info">作った場所と保存できた内容を確認してください。まだ送っていません。テスト送信と承認のあと送り始めます。</Notice><ul className={styles.list}>{progress.map(item=><li key={item.key}><strong>{item.name}</strong> <StatusBadge tone={item.state==='done'?'success':item.state==='failed'?'danger':'neutral'}>{item.state==='done'?'保存しました':item.state==='failed'?'保存できませんでした':'保存待ち'}</StatusBadge>{item.description&&<p className="text-body">{item.description}</p>}</li>)}</ul></div>
   </Dialog>}
   <UnsavedLeaveDialog open={!editingFollowup&&guard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy}/>
  </div></SaveErrorScope>

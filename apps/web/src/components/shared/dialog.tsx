@@ -387,9 +387,8 @@ export default function Dialog({
               actionWording
               data-guide-anchor={guideSlot}
               data-guide-action-label={guideSlot ? confirmLabel : undefined}
-              data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
-              variant={confirmVariant ?? (primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? isDeleteConfirmation(confirmLabel) ? 'text' : 'secondary' : 'primary')}
-              textTone={tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? 'danger' : undefined}
+              data-dialog-action={confirmVariant === 'danger' || tone === 'destructive' ? 'danger' : primaryAction === 'cancel' ? 'secondary' : 'primary'}
+              variant={confirmVariant ?? (tone === 'destructive' ? 'danger' : primaryAction === 'cancel' ? 'secondary' : 'primary')}
               className={styles.designButton}
               widthReserve={actionWidthReserve}
               onClick={runConfirm}

@@ -281,6 +281,8 @@
 :global(:root) .preview { display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field); }
 :global(:root) .detailSummary { display: flex; flex-direction: column; gap: var(--polish-space-card); }
 :global(:root) [data-page-template='detail'] > .split { flex: 0 0 auto; align-items: flex-start; }
+:global(:root) [data-page-template='detail'] > .split[data-detail-dividers='none'] { border-top: 0; }
+:global(:root) [data-page-template='detail'] > .split[data-detail-dividers='none'] .preview { border-left: 0; }
 :global(:root) .heading[data-heading-size='large'] { gap: var(--tpl-large-gap); }
 :global(:root) .heading[data-heading-size='large'] .headingText { gap: var(--tpl-head-gap); }
 :global(:root) .heading[data-heading-size='large'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }

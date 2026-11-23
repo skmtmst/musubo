@@ -122,7 +122,7 @@ export default function IndividualQuoteEditor({ initialQuote, recipientEmail, on
       </section>
       <section className={styles.card} aria-labelledby="send-check-title">
         <h2 id="send-check-title">送信前の確認</h2>
-        <p>この見積もりをお客様に送ります。</p>
+        <p className="text-body">この見積もりをお客様に送ります。</p>
         <dl className={styles.compact}>
           <div><dt>会社</dt><dd>{draft.companyName}</dd></div>
           <div><dt>見積もり番号</dt><dd>{draft.quoteNumber}</dd></div>

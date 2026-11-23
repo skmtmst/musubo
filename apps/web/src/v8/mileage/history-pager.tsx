@@ -13,6 +13,6 @@ export default function HistoryPager({ spentOnly, total, page, pageSize, items, 
     <Pagination page={page} pageCount={Math.max(1, pageCount)} onPageChange={setPage} disabled={loading}
       range={!spentOnly || total !== null ? { total, first, last } : undefined}
       summary={spentOnly && total === null ? `—件のうち、使った・取り消し ${formatNumber(items.length)} 件` : undefined} />
-    {spentOnly && total !== null ? <span>{`このページのうち、使った・取り消し ${formatNumber(items.length)} 件`}</span> : null}
+    {spentOnly && total !== null ? <span className="text-body">{`このページのうち、使った・取り消し ${formatNumber(items.length)} 件`}</span> : null}
   </ListPagePagination>
 }

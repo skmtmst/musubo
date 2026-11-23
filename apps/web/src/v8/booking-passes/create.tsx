@@ -301,7 +301,7 @@ function PassCreateInner() {
           <Field label="券が無い人の予約">
             <span className={styles.picked}>
               <Toggle checked={form.allowWithoutPass} label="券が無い人も予約できる" onChange={(checked) => patch({ allowWithoutPass: checked })} />
-              <span>券が無い人も予約できる</span>
+              <span className="text-body">券が無い人も予約できる</span>
             </span>
           </Field>
           <div><Button variant="primary" onClick={() => setOpen(4)}>次へ</Button></div>

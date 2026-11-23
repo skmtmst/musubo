@@ -583,7 +583,7 @@ export default function MediaSlot({
           }}
         />
   )
-  if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
+  if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p className="text-caption" role="alert">{error}</p> : null}</>
 
   return (
     <div id={id} className={styles.root} data-has-help={extraHelp ? true : undefined} data-controls-below={controlsBelow || undefined} data-preview-actions-below={previewActionsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription}>

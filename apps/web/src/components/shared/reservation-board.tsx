@@ -53,7 +53,7 @@ export function ReservationDining({entry,dense=false,presentation,title='飲食'
  <div><dt>記念日</dt><dd>{entry.dining?.anniversary?.trim()?entry.dining?.anniversary:'—'}</dd></div>
  <div><dt>席の好み</dt><dd>{entry.dining?.seatPreference?.trim()?entry.dining?.seatPreference:'—'}</dd></div>
  <div><dt>コースの注意</dt><dd>{entry.dining?.courseAllergens?.join('・')||'—'}</dd></div>
- </dl><p>予約時点の注意情報（店舗で確認してください）</p></div>
+ </dl><p className="text-body">予約時点の注意情報（店舗で確認してください）</p></div>
 }
 export type ReservationBoardSlot={resourceId:string;startsAt:string;href?:string}
 /** 保存先による違いは表示型と変更契約に閉じ、すべての入口を同じ盤で描く。 */
@@ -136,7 +136,7 @@ export default function ReservationBoard({entries,resources,axis:controlledAxis=
  {legend||(!compact&&axis!=='list')?<div className={styles.stateLegend}>{legend?<span className={styles.sourceLegend}>{legend}</span>:null}{!compact&&axis!=='list'?<BookingVisibleLegend dense states={shownStates} inline={!!legend}/>:null}</div>:null}
  {error?<Notice tone="danger">{error}</Notice>:null}{notice}
  <div className={styles.screen}><CalendarPeriod period={axis==='month'?renderedDays[0].slice(0,7):axis==='resource'?renderedDays[0]:''} scope={axis}>{renderBody?renderBody(boardBody):boardBody}</CalendarPeriod></div>
- {printing?createPortal(<div data-reservation-print data-theme="v8" className={styles.print}><h2>{title}（{axisName[axis]}）</h2><p>{printContext??[...new Set((printRows??entries).map(e=>e.scopeId))].join('・')}</p><p>{renderedDays[0]}〜{renderedDays.at(-1)}</p>{axis!=='list'?<ReservationBoard kind={kind} entries={printRows??entries} resources={resources} axis={axis} floor={floor} dates={renderedDays} onOpen={()=>{}} title={title}/>:null}{list(printRows??entries,true)}</div>,document.body):null}
+ {printing?createPortal(<div data-reservation-print data-theme="v8" className={styles.print}><h2>{title}（{axisName[axis]}）</h2><p className="text-body">{printContext??[...new Set((printRows??entries).map(e=>e.scopeId))].join('・')}</p><p className="text-body">{renderedDays[0]}〜{renderedDays.at(-1)}</p>{axis!=='list'?<ReservationBoard kind={kind} entries={printRows??entries} resources={resources} axis={axis} floor={floor} dates={renderedDays} onOpen={()=>{}} title={title}/>:null}{list(printRows??entries,true)}</div>,document.body):null}
  </>
  const props={className:styles.board,'data-kind':kind,'data-columns':columns,'aria-label':title,'data-reservation-board':true,'data-list-skeleton':axis==='list'||compact?true:undefined,'data-print-active':printing?'true':undefined,'data-axis':axis}
  return renderBody||compact||kind==='people'&&timeDirection==='vertical'?<section {...props}>{contents}</section>:<Card frame="inset" overflow="hidden" {...props}>{contents}</Card>

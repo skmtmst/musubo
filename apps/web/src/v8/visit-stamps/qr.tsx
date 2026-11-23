@@ -123,7 +123,7 @@ export function StaffQr({card,accountId,shop,onClose}: {card:VisitStampCard;acco
     </div>
   </Dialog>
   return <QrDialog open onClose={close} accountName={`${shop}・${card.name}`} baseLink={qr?.url??''} routes={[]} direct={{title:'来店スタンプのQR',description:'LINEのカメラで読み取ってください。1回読まれると使えなくなります。',downloads:false,
-    qrContent:view==='result'?<Check size={64} aria-label="押印済み"/>:seconds===0?<span>次のQRに替えています…</span>:undefined,
-    content:<>{view==='result'&&result?<><h2 className={styles.resultTitle}>{`${withHonorific(result.friendName)}・${formatNumber(result.wallet.balance)} 個`}</h2><p>押印を確認しました。</p></>:<><strong className={styles.largeCount}>{`${qr?.count??count} 個`}</strong><div className={styles.timer}><progress max={30} value={seconds} aria-label="QRの残り時間"/><div className={styles.timerLabels}><span>30秒ごとに変わります</span><span>{`あと ${seconds} 秒`}</span></div></div><p className={styles.sub}>予約がある人は本人の来店済み予約を選びます。台帳と二重には押しません。</p></>}{error||image.error?<Notice tone="danger" message={error||image.error}/>:null}</>,
+    qrContent:view==='result'?<Check size={64} aria-label="押印済み"/>:seconds===0?<span className="text-body">次のQRに替えています…</span>:undefined,
+    content:<>{view==='result'&&result?<><h2 className={styles.resultTitle}>{`${withHonorific(result.friendName)}・${formatNumber(result.wallet.balance)} 個`}</h2><p className="text-body">押印を確認しました。</p></>:<><strong className={styles.largeCount}>{`${qr?.count??count} 個`}</strong><div className={styles.timer}><progress max={30} value={seconds} aria-label="QRの残り時間"/><div className={styles.timerLabels}><span>30秒ごとに変わります</span><span>{`あと ${seconds} 秒`}</span></div></div><p className={styles.sub}>予約がある人は本人の来店済み予約を選びます。台帳と二重には押しません。</p></>}{error||image.error?<Notice tone="danger" message={error||image.error}/>:null}</>,
     footer:view==='result'?<><Button variant="secondary" onClick={close}>閉じる</Button><Button variant="primary" busy={busy} onClick={()=>void more()}>続けて出す</Button></>:undefined}}/>;
 }

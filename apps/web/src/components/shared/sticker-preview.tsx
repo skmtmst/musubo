@@ -10,7 +10,7 @@ export default function StickerPreview({ stickerId, size = 96 }: { stickerId: st
 
 function StickerImage({ stickerId, size }: { stickerId: string; size: 80 | 96 }) {
   const [attempt, setAttempt] = useState(0)
-  if (attempt >= STICKER_IMAGE_PATHS.length) return <span>スタンプ</span>
+  if (attempt >= STICKER_IMAGE_PATHS.length) return <span className="text-body">スタンプ</span>
   // 公開の小さい画像は最適化せず、取得できなければ次の置き場を試す。
   // eslint-disable-next-line @next/next/no-img-element
   return <img width={size} height={size}

@@ -46,7 +46,7 @@ export default function DisplayItemsDialog({title = '表示項目を編集', ite
       {columns && maxSelected !== undefined ? null : <p className={styles.note}>{maxSelected === undefined ? '選んだ項目は、つまみで並べ替えられます。' : `友だちの名前はいつも表示します。ほかは${maxSelected}列まで選べます。`}</p>}
       <div className={styles.group}>
         {columns
-          ? <div className={styles.headRow}><h3 className={styles.heading}>いま出している列</h3><span>{chosen.length}{maxSelected === undefined ? '' : ` / ${maxSelected}`} 列</span></div>
+          ? <div className={styles.headRow}><h3 className={styles.heading}>いま出している列</h3><span className="text-caption">{chosen.length}{maxSelected === undefined ? '' : ` / ${maxSelected}`} 列</span></div>
           : <h3 className={styles.heading}>表示する項目（{chosen.length}{maxSelected === undefined ? '' : ` / ${maxSelected}`}）</h3>}
         <ChosenFrame {...(columns ? { padding: 'rows' as const, surface: 'bordered' as const } : {})} className={styles.chosen} aria-label="選択した列">
           {columns ? <div className={styles.fixedRow} data-fixed-display-name><span><Lock size={16} role="img" aria-label="いつも表示する列" />友だち（名前）</span><span>いつも出ます</span></div> : null}

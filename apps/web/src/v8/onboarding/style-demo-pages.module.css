@@ -1,7 +1,7 @@
 .root { display: flex; flex-direction: column; gap: var(--polish-space-card); min-width: 0; }
 .counter { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .heading { margin: 0; color: var(--color-ink); font-size: var(--tpl-style-demo-heading-size); line-height: 1.35; font-weight: 700; }
-.can { display: grid; gap: var(--polish-space-row); margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); }
+.can { display: grid; gap: var(--polish-space-row); margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); font-size: var(--text-body); }
 .can li { display: flex; align-items: flex-start; gap: var(--polish-space-row); }
 .check { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-accent-deep); margin-top: var(--tpl-style-demo-title-icon-offset); }
 .description { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-body); }

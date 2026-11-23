@@ -83,7 +83,7 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
       onConfirm={ready ? () => onSubmit(value) : undefined}
       onCancel={onCancel}
     >
-      {mfaOff ? <p>{isTotp ? '続けるには、あなたの認証アプリの6桁を入れてください。' : '続けるには、あなたのパスワードを入れてください。'}</p> : null}
+      {mfaOff ? <p className="text-body">{isTotp ? '続けるには、あなたの認証アプリの6桁を入れてください。' : '続けるには、あなたのパスワードを入れてください。'}</p> : null}
       {isTotp ? (
         <>
           <p id={labelId} className="mt-1 block text-sm font-medium text-ink">{mfaOff ? '認証コード（6桁）' : '認証アプリに表示された6桁コード'}</p>
@@ -118,7 +118,7 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
           </div>
         </>
       )}
-      {mfaOff ? <p>自分で登録した人には、オフのあいだも確かめが出ます。オンに戻すのは、いつでもできます。</p> : null}
+      {mfaOff ? <p className="text-body">自分で登録した人には、オフのあいだも確かめが出ます。オンに戻すのは、いつでもできます。</p> : null}
     </Dialog>
   )
 }

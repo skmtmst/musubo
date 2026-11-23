@@ -216,7 +216,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       </Card>
 
       <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" confirmDisabled={!testRecipients.preview || testRecipients.preview.count === 0} busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} error={notice || undefined} onSuccess={() => setNotifyConfirm(false)} onConfirm={() => testNotify()}><OperationTargetSummary accounts={[{ id: webinar.accountId ?? '' }]} />
-        <p>{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p></ConfirmDialog>
+        <p className="text-body">{testRecipients.preview ? `テスト受信者 ${testRecipients.preview.count} 人：${testRecipients.preview.recipients.map(person => person.displayName || '名前未設定').join('、')}` : testRecipients.error ? 'テスト受信者を確認できません。設定を確かめて開き直してください。' : 'テスト受信者を確認しています。'}</p></ConfirmDialog>
     </CreatePage></SaveErrorScope>
   )
 }

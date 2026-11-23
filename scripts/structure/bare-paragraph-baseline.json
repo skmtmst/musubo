@@ -1,0 +1,1580 @@
+[
+  {
+    "file": "apps/web/src/components/auth/auth-card.tsx",
+    "fingerprint": "3dceebc23707838d10a4005a577f1ff983ac63f17ef139bf11bca1ab69cf1d28",
+    "count": 1,
+    "reason": "apps/web/src/components/auth/application-auth.module.css: .heading p { font-size: 13px }"
+  },
+  {
+    "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
+    "fingerprint": "3c8761bce1c067fa6c6a0525d399987fba12db95b02ef18c2bab7c3f96ea88af",
+    "count": 1,
+    "reason": "apps/web/src/components/broadcasts/broadcast-form-v8.module.css: .checkRow p { font-size: 12px }"
+  },
+  {
+    "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
+    "fingerprint": "a34d2a1b70e9684804b250d2a1f23178eb150f95a9f2105bd40a4a046d739a71",
+    "count": 1,
+    "reason": "apps/web/src/components/broadcasts/broadcast-form-v8.module.css: .heading p { font-size: 12px }"
+  },
+  {
+    "file": "apps/web/src/components/broadcasts/broadcast-form.tsx",
+    "fingerprint": "c0178aae0089713fec33ad0891ed0d193156f4d3b5b8cd3fd58421750bb9b575",
+    "count": 1,
+    "reason": "EntityPickerDialog の候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/broadcasts/broadcast-schedule-step.tsx",
+    "fingerprint": "c97418f37886504882368fb412e4f83cf91a48b52a98077dea7960bd769f8b30",
+    "count": 1,
+    "reason": "apps/web/src/components/broadcasts/broadcast-form-v8.module.css: .quota p { font-size: 12px }"
+  },
+  {
+    "file": "apps/web/src/components/chats/friend-info-sections.tsx",
+    "fingerprint": "85306de98ba6d67d90d7e27200906c655b52453fb79eaee0228bfa85a99a6b6f",
+    "count": 1,
+    "reason": "customer-panel.module.css の .profileSection p が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/flex-preview.tsx",
+    "fingerprint": "f4d36135d601658f36140692310e6a4bf9631626ed3728cb50cc4ff1de8eddca",
+    "count": 1,
+    "reason": "メッセージ見本の style が指定サイズまたは 14px を設定"
+  },
+  {
+    "file": "apps/web/src/components/friend-fields/support-mark-rules-panel.tsx",
+    "fingerprint": "4ec99f4b9424d9fa3df4cbb193644de25da89ca1f33fff8c1af071597c8e2399",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/friend-fields/tag-csv-import-dialog.tsx",
+    "fingerprint": "2e03eae8d6b71b860ae3b0fac05ca0fc7f895872380e03ed061424c3566d4757",
+    "count": 1,
+    "reason": "styles.breakdown: 12px"
+  },
+  {
+    "file": "apps/web/src/components/friend-fields/tag-csv-import-dialog.tsx",
+    "fingerprint": "6e1891462131b7de783b3015640e59d66dadebbabb311b66f1d8fecb1f35d440",
+    "count": 1,
+    "reason": "styles.breakdown: 12px"
+  },
+  {
+    "file": "apps/web/src/components/friend-fields/tag-editor-v4.tsx",
+    "fingerprint": "c8dbe36a9b57d116ed1a6dcbd92f76f0e124e0461a5dfbc182966e5a830caad1",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/friends/bulk-run-dialog.tsx",
+    "fingerprint": "4ec99f4b9424d9fa3df4cbb193644de25da89ca1f33fff8c1af071597c8e2399",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/friends/saved-search-dialog.tsx",
+    "fingerprint": "b4367a99d78df5edff8a617f1c37e9b13c35f72013644bf5b6580b8432f9a2ec",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/friends/saved-search-dialog.tsx",
+    "fingerprint": "cc9e9127333fd1a40985c372eb66ae07892042fbf4b70443422e5a73a82e4ed3",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/friends/saved-search-dialog.tsx",
+    "fingerprint": "defaba7125984f0fc4eaf4068ed2b37eaf7512cf5f34317fc8bf78364e80f014",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/layout/sidebar-version.tsx",
+    "fingerprint": "5a1b790be2e8001bc75d2f7edb715827aeb914c74ed035026c8a36d0f22dd087",
+    "count": 1,
+    "reason": "utility text-caption"
+  },
+  {
+    "file": "apps/web/src/components/layout/sidebar-version.tsx",
+    "fingerprint": "79ca6893d11588cd1e3bc21a893de88f020703207f8ae009cb778cfd0051335c",
+    "count": 1,
+    "reason": "utility text-caption"
+  },
+  {
+    "file": "apps/web/src/components/layout/sidebar-version.tsx",
+    "fingerprint": "d726d947ea46a5ec9f16a37c8486281c339fdd6cc571c9319180c3a4fd7ee01a",
+    "count": 1,
+    "reason": "utility text-caption"
+  },
+  {
+    "file": "apps/web/src/components/reminders/test-recipient-guidance.tsx",
+    "fingerprint": "6609cd15a38f3f37553d718b3cf15149e42f0b5f41eacb2ee0acc040b7967cb0",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/components/reminders/test-recipient-guidance.tsx",
+    "fingerprint": "703a930ab28aea76db8be840812d068e45d9738bc354ec4c5291c52bf068085b",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/components/reminders/test-recipient-guidance.tsx",
+    "fingerprint": "7bd262e70f7ef1d1e84aa9c8f975c64683659dbb7a17d48c1f335ff58dbcd811",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/components/shared/aggregation-status.tsx",
+    "fingerprint": "631b84b83f491679b6445e27b1182d6fe50dcc767695e612e3819d5ad9e3cb60",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/aggregation-status.tsx",
+    "fingerprint": "c2515c193c87685f038ab33ffa99ea4395995b97bcc97f0ad7d57603525e72e8",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/aggregation-status.tsx",
+    "fingerprint": "e5153987473eeab375d6f07fe8e85f78c6235c7c3349855b9796307e70a0f120",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/aggregation-status.tsx",
+    "fingerprint": "efa9bfae5aac67f2c415be9a7c0c383a6ba6a93d059f77ec6fe7888d10b70f6d",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/composer-stickers.tsx",
+    "fingerprint": "277568c41bab938d2800faa5bca4adca883eb47d366ad850827cdbfb3383fe69",
+    "count": 1,
+    "reason": "スタンプの説明は共通部品の CSS が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/composer-stickers.tsx",
+    "fingerprint": "3dceebc23707838d10a4005a577f1ff983ac63f17ef139bf11bca1ab69cf1d28",
+    "count": 1,
+    "reason": "スタンプの説明は共通部品の CSS が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-preview.tsx",
+    "fingerprint": "0f4f6af6fdb736d3c28a686a50a2072cbb45d9865d78a4c9deb734294ad05220",
+    "count": 1,
+    "reason": "customer-look-preview.module.css の .content が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-preview.tsx",
+    "fingerprint": "6670fab1daa6d2af466f605306da54b8ba823a22219976911ee7a376cce78529",
+    "count": 1,
+    "reason": "styles.content: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-preview.tsx",
+    "fingerprint": "7dd368026be2792a716e40d14f3dc63f8a18f7d7f63b9cf9b6acd73bde434056",
+    "count": 1,
+    "reason": "customer-look-preview.module.css の .content が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-preview.tsx",
+    "fingerprint": "baf0c6a6a1c421caa245a3a3f18eb8d64b1bb0688e2d91e6536f33de088b2802",
+    "count": 1,
+    "reason": "styles.content: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-preview.tsx",
+    "fingerprint": "ed2a816af8c11a4272b429b0288af8e623bffe858a816a141b5418c06e69b850",
+    "count": 1,
+    "reason": "styles.content: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "2ad899d97b049a630e0b0779b8e44bdba8cbda5f8df59756b4b9823014856c13",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "2b3267db87e1c90746d5e70935cd921662ed7ed283bae9e6804953ac835d4d4a",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "56f7c377877f327965a533499bcc540863181cce06bd3c0a54c998bc19a47a3e",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "7ff1c9075f3428f52f9f772f4673bba11d3e57aa682b00540170c282f9cd9c41",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "891df848240fce913c4d39e640814766aad83f90ad4b7898b62d84e1094de69b",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "b20636234c5398193ce903ab38f97c270ff5e614f3ad62759aef27477468077c",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "cd40acbf89d5255be403d236940b6b13ed73a7af3bdf160f6eaedac0f2887d2a",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "e4ab0f9b515e32129bc872c7531019c6f25c426beaf772415e7ff38ae1a860d2",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "f57a463067e3fe971da79afea319b4ec8c60041768d63daa1ea2614517d4b60c",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/customer-look-stamp.tsx",
+    "fingerprint": "f6c9bb4e00e2fd8fcbd16d9d2eaa889ccd84d3828cab5e30c324574a399ca918",
+    "count": 1,
+    "reason": "見本の共通枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/entity-select.tsx",
+    "fingerprint": "220f6be6ed8087f43909eda4a1737fa6b812b4a76838f4bb2f3abfc545b73927",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/event-roster.tsx",
+    "fingerprint": "77215dd732539b9d3918026663289475ee836b9eb2a631b04fd69ebb9cd1eb09",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/event-roster.module.css: .heading p { font-size: var(--text-micro) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/friend-picker-field.tsx",
+    "fingerprint": "24643010d2e8ffea4ab11630db456c8efde6be183da062e2ffc8c450410c5c7d",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/friend-picker-field.tsx",
+    "fingerprint": "3a39247b5d5e1df8c94ef493a7dc14dbbd6b129f6135b0ecfce907bc8157a1ca",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/inbox-list-states.tsx",
+    "fingerprint": "28d2228cafeb729c4b7c922cb04d28b36b62feaf7ed2cfab8b444952ec9fcb9e",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/inbox-list-states.tsx",
+    "fingerprint": "7a72a436169df5048490a1087f9a8e13eb6f29088acf08440cd42653ee5bae03",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/media-slot-limit.tsx",
+    "fingerprint": "8ddd6030001796b729a952b38c1e3d9d31d02310e91c39cb2d1fe11dd9973a9c",
+    "count": 1,
+    "reason": "利用先の知らせの共通部品が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/message-composer.tsx",
+    "fingerprint": "03b4be97c1a75976c8e31d2e4df2e27d92b681d290d2e3b827e236178e4bec55",
+    "count": 1,
+    "reason": "message-composer.module.css の .choice p が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/message-composer.tsx",
+    "fingerprint": "39af0df876e4a64c39bdef2cb8389a6018f4fe73a48f477cb0be5239934dea4c",
+    "count": 1,
+    "reason": "styles.content: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/message-composer.tsx",
+    "fingerprint": "52c6fec9ab7b018eaa47c21f0eff6ffd286d666b42e47fd589b282aff73ac3ef",
+    "count": 1,
+    "reason": "styles.content: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/message-composer.tsx",
+    "fingerprint": "8ea81ea209ae38684284a89be566880aa854e0ae9f63b8b70bd71ece4a00b8e3",
+    "count": 1,
+    "reason": "styles.content: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/message-composer.tsx",
+    "fingerprint": "cae457e855080f9e124ee21be6dc26ba4c3b94112302359bb58f2b141209b043",
+    "count": 1,
+    "reason": "message-composer.module.css の .choice p が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/message-composer.tsx",
+    "fingerprint": "f892403dde2ac1d50c0921c192c22f42f3e1d9c652299c25837d57a2ce5dd32f",
+    "count": 1,
+    "reason": "styles.content: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/reply-template-picker.tsx",
+    "fingerprint": "1fa51bfaad9bd81810063dc49b90058ec03c70acbe6e89cc33f3705763ae1646",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .deleteSubject span { font-size: var(--text-micro) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/reply-template-picker.tsx",
+    "fingerprint": "26786c4d80d98b993bc59662387d0ccbdd3a9101bd4850906f6171904b59ad4d",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .previewCard p { font-size: var(--text-caption) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/reply-template-picker.tsx",
+    "fingerprint": "46e206ef96859e650a65f88a4b7441cf44c50efda0ea9f674cbf32748086d9f8",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .desktopHeader p { font-size: var(--text-micro) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/reply-template-picker.tsx",
+    "fingerprint": "4b70f2b52b2fba7d1d2bb5a763edd4068c8ea45924ee9370cad6bad988d6202f",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .desktopHeader p { font-size: var(--text-micro) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/reply-template-picker.tsx",
+    "fingerprint": "707ebccaaf4f8dbda45e8c3ea3dc93f87244ff6939b7f7f4c5e282494e654e4c",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .desktopHeader p { font-size: var(--text-micro) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/reply-template-picker.tsx",
+    "fingerprint": "903591c1a1a43614df36121b80245e72a5e70cd92cd4da4dd0365a7f99ffc57f",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .desktopHeader p { font-size: var(--text-micro) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-floor-editor.tsx",
+    "fingerprint": "3ec2f22d0ae2be2c7649ea60a549d1478b68b6ad4ed55f604e2caab31776bcdc",
+    "count": 1,
+    "reason": "styles.editor: 12px"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-floor-editor.tsx",
+    "fingerprint": "598361b16cc4034efdcc42d03e178274a62b4ee0be560e5d5e18a22880f32db5",
+    "count": 1,
+    "reason": "styles.editor: 12px"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-floor-editor.tsx",
+    "fingerprint": "9acde43b7c2828303422b4eab5a2107424f36c1e99edac005829281acf42e29a",
+    "count": 1,
+    "reason": "styles.editor: 12px"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-floor-editor.tsx",
+    "fingerprint": "a02d08e0442120fbc0bac6d105f5a7fa8a95324c67c11da05c019c41c8ba02da",
+    "count": 1,
+    "reason": "styles.editor: 12px"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-table-pen-editor.tsx",
+    "fingerprint": "0ed2dbaab7ac311823690389c1d4ceba24732f596fb42c15457faaa777a48f5e",
+    "count": 1,
+    "reason": "styles.columns: 13px"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-table-pen-editor.tsx",
+    "fingerprint": "96e7c59a4865ba7660f202416abeb69dd5f41933702630db2757c904557af574",
+    "count": 1,
+    "reason": "styles.previewTable: 11px"
+  },
+  {
+    "file": "apps/web/src/components/shared/restaurant-table-pen-editor.tsx",
+    "fingerprint": "a2e287c49095a3b2372582caa915c0e7a46d55768351f47094cc5bcf1daa2eb8",
+    "count": 1,
+    "reason": "styles.columns: 13px"
+  },
+  {
+    "file": "apps/web/src/components/shared/save-feedback.tsx",
+    "fingerprint": "16e9d12a986ec80e938f0d46434b39391819932b032d89fedd710586d0d5efb9",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/save-feedback.tsx",
+    "fingerprint": "4e8d26fda4ef22136a6e833096397f7c45d16099625b11088afb20f484425aa8",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/save-feedback.tsx",
+    "fingerprint": "5367e3cbb52f958b963b99f1d40f4b537495df05b0eb79062b0d5958dbc6ba98",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/save-feedback.tsx",
+    "fingerprint": "e5153987473eeab375d6f07fe8e85f78c6235c7c3349855b9796307e70a0f120",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/send-confirm-dialog.tsx",
+    "fingerprint": "6533288b558f75e70f096fced901cf10d956f58eb25bca5c8259e4a726e19185",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/send-confirm-dialog.tsx",
+    "fingerprint": "994f08ec6dec5f4b7d10bdd85d7d5f67c86bad479693f246b0e67af83304bbae",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/send-confirm-dialog.tsx",
+    "fingerprint": "a35469812f98f130dd3c1e8ceb264f7168674862a57eda802c2db9e30dcbef47",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/components/shared/tag-picker-field.tsx",
+    "fingerprint": "61b1109704bd9185d768d26d1992d423f7fa9ed3afc36e2bce729a061572e75c",
+    "count": 1,
+    "reason": "共通の選択窓の候補枠が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/tag-picker-field.tsx",
+    "fingerprint": "c04fc219b339283b52592f9995076c9c6733fd494e55ee9b8815041bc47757ae",
+    "count": 1,
+    "reason": "共通の選択窓の候補枠が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/components/shared/totp-qr.tsx",
+    "fingerprint": "6b0717eafb1ad6c94a5a589d51026bb979b9c624afc323b7c8bd609ba2e1ccfd",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/totp-qr.module.css: .instructions p { font-size: var(--polish-text-support) }"
+  },
+  {
+    "file": "apps/web/src/components/shared/totp-qr.tsx",
+    "fingerprint": "d376160b5f3c8a1565718be96b6481b8d9593fc8a1b6121bf05a330beaaf8790",
+    "count": 1,
+    "reason": "apps/web/src/components/shared/totp-qr.module.css: .instructions p { font-size: var(--polish-text-support) }"
+  },
+  {
+    "file": "apps/web/src/components/support/email-thread.tsx",
+    "fingerprint": "d8e515855bd8cbfd9db6791963b8fc65db17a90d66dbf4bbde888a304e648028",
+    "count": 1,
+    "reason": "utility text-sm"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/register.tsx",
+    "fingerprint": "40bbc9da35aed7388eed82916e9881b41a8962e023070097f4d0614ecc239616",
+    "count": 1,
+    "reason": "apps/web/src/v8/account-new/register.module.css: .receiptState p { font-size: var(--tpl-htn-text-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/register.tsx",
+    "fingerprint": "7429435a9de01b4a62694b1ab6c5cd278d129500e54a760badf0a579c7d10aaa",
+    "count": 1,
+    "reason": "styles.receiptInstructions: var(--tpl-htn-text-12)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/register.tsx",
+    "fingerprint": "af98a39f8ec0958b61ac9d2f3e54b6d8f23da0481fdcf9d5ab8ecf55078116cb",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/register.tsx",
+    "fingerprint": "d268eecb37b8e059ff15f0d6d7828c278471494b7d95ece9be3f61ce832a4034",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/register.tsx",
+    "fingerprint": "d2c11215b6a3ca3953f16eadaad9bc2a80cd895b0fb432ebde8e5e20b2424b31",
+    "count": 1,
+    "reason": "apps/web/src/v8/account-new/register.module.css: .receiptState p { font-size: var(--tpl-htn-text-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/register.tsx",
+    "fingerprint": "e9bacbaacf8a1dbc28bbd19c818a34b4334eb82f7db6e9aa887c829217bc1b9a",
+    "count": 2,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step1-precheck.tsx",
+    "fingerprint": "f3c0c64c2bddc458324b882c9447ea27889d5d61a18886bade25607491217a72",
+    "count": 2,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step2-connect.tsx",
+    "fingerprint": "51f3a9d21d50151851c1163a1f3edbb599d13ff1bdf4d9d688fb9a8e0fafcb3b",
+    "count": 1,
+    "reason": "apps/web/src/v8/account-new/register.module.css: .precheckNote { font-size: var(--tpl-htn-text-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step2-connect.tsx",
+    "fingerprint": "712e06f8e10d1805f07a53f545d71cd2690e88a2a24d3219d0ed172b47348544",
+    "count": 1,
+    "reason": "apps/web/src/v8/account-new/register.module.css: .precheckNote { font-size: var(--tpl-htn-text-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step2-connect.tsx",
+    "fingerprint": "7633e74d1439cef7a3008761465ca63bfeb774e7a8d204ac0df06afaf2d794a2",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step2-connect.tsx",
+    "fingerprint": "92df683ab46092e4ee7fd9bcec28e5045e1c77061539e116488022116c76e5ea",
+    "count": 1,
+    "reason": "apps/web/src/v8/account-new/register.module.css: .precheckNote { font-size: var(--tpl-htn-text-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step2-connect.tsx",
+    "fingerprint": "cccb116699db73de12a8a09696bd12f4be4dcc9186e434daea211c83e5b7f7a7",
+    "count": 1,
+    "reason": "apps/web/src/v8/account-new/register.module.css: .precheckNote { font-size: var(--tpl-htn-text-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step2-connect.tsx",
+    "fingerprint": "f5cf16b9b5e7f82b4cecf56f9efad26357d7e40615204f84e3a224b3dbc65762",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/account-new/step5-completion.tsx",
+    "fingerprint": "fdb4706a02c2cdeef47994a06c5f4d9a9510f4935c44911ec24a463a6f8139c2",
+    "count": 1,
+    "reason": "styles.noteBox: var(--tpl-htn-text-12)"
+  },
+  {
+    "file": "apps/web/src/v8/affiliates/payment-dialogs.tsx",
+    "fingerprint": "8513fa5c4c40f7a6751db28b3e662e1cfe626caab43cb2e072f15177959444c0",
+    "count": 1,
+    "reason": "styles.closeExcluded: var(--text-micro)"
+  },
+  {
+    "file": "apps/web/src/v8/affiliates/payment-dialogs.tsx",
+    "fingerprint": "ecfb13c0dd1d11972065e4b226e749be041363448f9840cf7564f975d48652b5",
+    "count": 1,
+    "reason": "styles.closeExcluded: var(--text-micro)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "0199cad035b3db5e706be82894577fdc1ac3e6dfe4227a74fe6033287c954d80",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "12a11f3b386b02eee7bd1c5064ad359acce0f9afe5de051c7119542bcca8325d",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "1846c6d898319f510bf9ce614bb03a5692668583473cf1c473eeb600b3c89088",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "34717211ea0cc3d355ff24e63df5764999b98eb738fb358a5902f54595132fc6",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "4a13375fff2ffcf8a2d8e34b0d4c535dfc5a2ec32dc644438e35daa83c8fe70c",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "4f930dc4ba9fc1f43d90ea0540a1c3a71c62b6550aa718e1a7adbde6b889e128",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/cross.tsx",
+    "fingerprint": "e68fe2693af47e9c4f23e65bff7d300cfd069a3cbb118f16a7279afedac029c6",
+    "count": 1,
+    "reason": "styles.waitBox: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/friends.tsx",
+    "fingerprint": "9be05b5445261be48fc0cd6a15a369fe813763f4a89cd9f190f591ae35cdceb6",
+    "count": 1,
+    "reason": "styles.emptyChart: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/analytics/friends.tsx",
+    "fingerprint": "c4e0eaac3baa03a6c74c359017d27c4146e605aaaa56802b9252ef46fe005994",
+    "count": 1,
+    "reason": "styles.emptyChart: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/auto-replies/edit/wizard-priority-step.tsx",
+    "fingerprint": "9f6b61a6cd0c8353d102b498de7924aadf18b95d81b18c030da764df1f3014e3",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/auto-replies/list-table.tsx",
+    "fingerprint": "2e1cc3b4a5b4a214052b33c9efdcc3e7695336121422c748f7a4d4b79a558b56",
+    "count": 1,
+    "reason": "共通DetailField: detail-content.module.css の .value font-size"
+  },
+  {
+    "file": "apps/web/src/v8/automations/common-action-new.tsx",
+    "fingerprint": "29a4ed90dbfb9f5a93abd6929ad6ca908ac85389bfec71a86f5c8166db415167",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/automations/create/automation-review.tsx",
+    "fingerprint": "e683f17931ef4bb8e0790c8e978f2423a15f407385a2f18a0b2598075dca919b",
+    "count": 1,
+    "reason": "styles.sideNote: var(--text-micro)"
+  },
+  {
+    "file": "apps/web/src/v8/booking-menus/tabs/holiday-bookings.tsx",
+    "fingerprint": "5211c1b2ec95b7f23fd44be5f39a07305ddbf00a2fc3291c80566461ea0dc4ac",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/booking-menus/tabs/hours-tab.tsx",
+    "fingerprint": "2f3764261c8980c9a926cd164c440c9f3a2e1d08e5b2f0b9865de6a9671262e9",
+    "count": 1,
+    "reason": "確認結果の枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/booking-menus/tabs/hours-tab.tsx",
+    "fingerprint": "48300bf7b69e127e26c874a80b72ea8a2353d3e107f30c681180e9509a24194d",
+    "count": 1,
+    "reason": "確認結果の枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/booking-menus/tabs/hours-tab.tsx",
+    "fingerprint": "f65fe3c462613278a9983911c9ca1c0fc41fb0d480fed8c631d9cf02b043ba89",
+    "count": 1,
+    "reason": "確認結果の枠が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/booking/prepay-badge.tsx",
+    "fingerprint": "fea958c5e7859f8447e85addcdbc184f723e1fa56fad489e8138f4fc26771bef",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/contents/list.tsx",
+    "fingerprint": "780820fbf2e2a8158d6a8ae80868682dd8614d28dae6fd86a0d60dc19b3ca51e",
+    "count": 1,
+    "reason": "窓の使用先の枠が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/contents/list.tsx",
+    "fingerprint": "95e9535c073732f61b04d89570863bd6fbc4932ff435365676e1f960384f0db8",
+    "count": 1,
+    "reason": "窓の使用先の枠が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/contents/list.tsx",
+    "fingerprint": "cb459d25e60fbec51db92ad868cdb10ec5c715ad68289eaed40072939817dfa8",
+    "count": 1,
+    "reason": "窓の使用先の枠が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/contents/list.tsx",
+    "fingerprint": "fdc3663691c8c3d57afc5563233d00896414d2ea0c24a944353070ba1743788a",
+    "count": 1,
+    "reason": "窓の使用先の枠が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/contents/media-upload-dialog.tsx",
+    "fingerprint": "09abe6f0db6c8e9440ec23e9207483a4350328317472ea672806950f808f8787",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/contents/media-upload-dialog.tsx",
+    "fingerprint": "222766f808946e221e6bfe8c88de66f8c00c63cdc8bf8f785058c63d4cb3f532",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/contents/media-upload-dialog.tsx",
+    "fingerprint": "64d271e53106a17bd3ed14b79dcb3af6a09362d40e57ebf108f49c4841c2f887",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/contents/media-upload-dialog.tsx",
+    "fingerprint": "7bce8c217419387aa2446feee3b439de0acd919326e858d7810b9df4df6e1ce8",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/events/application-preview.tsx",
+    "fingerprint": "371685576481c9257723444530be70e1d51d695a204740635a8a876804b74621",
+    "count": 1,
+    "reason": "styles.previewBody: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/events/application-preview.tsx",
+    "fingerprint": "5ef0f7455a92a8a9d2bdf848363aebbb8b3e3f298b59dee90990f07e5d1d9145",
+    "count": 1,
+    "reason": "styles.previewBody: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/events/application-preview.tsx",
+    "fingerprint": "b52695c58a25258b67345e16e36ebfd828ed750ba42405a89825e575a0404556",
+    "count": 1,
+    "reason": "styles.previewBody: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/events/application-preview.tsx",
+    "fingerprint": "d1c5959e0f1f1003ecb6151c0d32c8db7e2630cbb289bcb1ba7f9102e6ec54c6",
+    "count": 1,
+    "reason": "styles.previewBody: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/events/list.tsx",
+    "fingerprint": "21259d400a1764bb4a2e1ada9d4a4d18867f2f4ae1763c4e1a2382db5ae000bb",
+    "count": 1,
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
+  },
+  {
+    "file": "apps/web/src/v8/forms/list.tsx",
+    "fingerprint": "94962bdebd43962e487ef281aa42c08cfbed278303e87f885b27ccc3b9e092da",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/forms/list.tsx",
+    "fingerprint": "e60b6323e25a12e9c3c06cbff0b3a52d7fceed8a5e8a28767eebdf40baf8847d",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/friend-add/list.tsx",
+    "fingerprint": "4ba5ad406a83bf77f9c8b6c8ab1b06211e8488f8ff9734440757b43e7423339f",
+    "count": 1,
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
+  },
+  {
+    "file": "apps/web/src/v8/friends/merged/merged.tsx",
+    "fingerprint": "1835652d5dfe3f337e0482180db67c3ad2dfc0ff7c53c52ac5f2da63168550eb",
+    "count": 1,
+    "reason": "styles.accounts: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/friends/merged/merged.tsx",
+    "fingerprint": "608fcba689e8dbccde3af5b0db1a88de527356acb4df90d47a3ce26be82c35ec",
+    "count": 1,
+    "reason": "styles.accounts: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/friends/merged/merged.tsx",
+    "fingerprint": "69f03779f2425ea729f098daad0be45d46e3ac1dbe17286dea91226eefe23632",
+    "count": 1,
+    "reason": "styles.accounts: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
+    "fingerprint": "1ef4fe1781b6901f5a48d74657e1ef938d4e9c024ada6fb51d03bd47e46458f3",
+    "count": 1,
+    "reason": "MessageComposer の .content が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
+    "fingerprint": "27e3da620482faf0c7063cb46f3a69a00648f2aba07115196b05bee26ef7a393",
+    "count": 1,
+    "reason": "配信の確認欄が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
+    "fingerprint": "3c8761bce1c067fa6c6a0525d399987fba12db95b02ef18c2bab7c3f96ea88af",
+    "count": 1,
+    "reason": "配信の確認欄が補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-deliveries/action-resource-picker.tsx",
+    "fingerprint": "09bb755fc010d3663f5442b6213d003a05573c541ff274fcc2a8eff864e47bb0",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-deliveries/console.tsx",
+    "fingerprint": "5c5d1a868d82987f5d2d47d33d119fd7a25fdcb4739d49b01e33dcca2ed8ea3d",
+    "count": 1,
+    "reason": "DistributionProgress の .progressPanel が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-starter-sets/legacy-details.tsx",
+    "fingerprint": "5437c43e621cfe71f823ff470922c8ac12e2e9e5b4084d8f703643225d2a6287",
+    "count": 1,
+    "reason": "親の一覧が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-store-compare/list.tsx",
+    "fingerprint": "3686a11de15b902b10d22a18580e39af487c23f339d0eb912bc56e3344157946",
+    "count": 1,
+    "reason": "DetailContent が値の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-templates/attribute-distribution.tsx",
+    "fingerprint": "798e3e525e624cfd02fdd99816323bc4bd722dbc5c13b566d21e9ea82876d875",
+    "count": 1,
+    "reason": "共通Td: table.module.css の .cell font-size"
+  },
+  {
+    "file": "apps/web/src/v8/hq-templates/attribute-distribution.tsx",
+    "fingerprint": "7a151ab058dd82f24064382a82f0ba88609872d6785c6e187deb75adfbccc36e",
+    "count": 1,
+    "reason": "共通の表のセルが本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/hq-templates/tag-editor.tsx",
+    "fingerprint": "870cd4a5ef0b34034362ebd8d9d60b4162da5b7686388c55f857ca023b36e600",
+    "count": 1,
+    "reason": "styles.warning: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/hq/last-line-end.tsx",
+    "fingerprint": "3bcf177a9cc50b2ec71ff710cf9a3d5ef03e3d4fd872022805f7cb9d9fd48cd1",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/last-line-end.module.css: .confirmBox p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/last-line-end.tsx",
+    "fingerprint": "63eeef4e7a201b5233ec96a385d10711d8ef0881fb85a379bbdf94f97f24e234",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/last-line-end.module.css: .result p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/last-line-end.tsx",
+    "fingerprint": "ae828a74a8ca84fb75437b43a16bcb676190ad842d957b0480255ddcc70b4388",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/last-line-end.module.css: .result p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/last-line-end.tsx",
+    "fingerprint": "ecca2f19ca6169dc47024a9771604c8f981cb39af227c4652d4e09b3a5175531",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/last-line-end.module.css: .result p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "1f06b3918b03976e7f31af7434cbec2fe35f67e317651e6aa4e4dd8d0482dbd5",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .progressBox p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "3107a6de9eb21ed3050f00fe8c6420fe078f2d85a90c6e911b3ecc514a4a987a",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .progressBox p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "3dceebc23707838d10a4005a577f1ff983ac63f17ef139bf11bca1ab69cf1d28",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .statusCopy p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "44dd65ca673d5228ba1e890efaf23965c54bf08985f858e648549c25a36e8b22",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .footer p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "572d0c37f5799ea220badd063e0a1702ce62ba43d63d4627a0749fac33220ccf",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .progressBox p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "6e2dc37a4f86b21283f6e12516a64abddb94fd8cfe1fc7dd2cb58315618d69ad",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .progressBox p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "7bad56e4ada19b737f221db75343e953640b21da419a39c633d087c1fe5a1415",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .completeCard > p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "80f318d5265171af73e8b9e6b27b4d325cdf0e094cf7c9609b84f645eade8375",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .completeSummary p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "ac166a89d0ad2ceb26661fbde8d1273eafd5e9b90dae0c4000bbdb1801a16231",
+    "count": 2,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .progressBox p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/line-resumption.tsx",
+    "fingerprint": "fbd566da4002c7fe48ce1989a1f2213b9978ce3cd5fe677f83399575cf094256",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/line-resumption.module.css: .bottom p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/linked-account-addition.tsx",
+    "fingerprint": "fe32f5fa0019ca740fffa5e968a6518a412d6c864c18eaef574b2a74f568703e",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/linked-account-addition.module.css: .priceBox p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/linked-account-removal-modal.tsx",
+    "fingerprint": "a946ec4f79046b73583f681a94a6d4f3d261a4211b862e05cc939fc8d2338d6e",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/linked-account-addition.module.css: .priceBox p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/linked-account-removal.tsx",
+    "fingerprint": "6756c7f02c0b8e9ec0797e48eaa5910b52f56304fc0b309042bde7b4beb7a08f",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/linked-account-removal.module.css: .statusCopy p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/linked-addition-payment-failure.tsx",
+    "fingerprint": "b21fcfe0a630819b313b1e14ce720ec480d4e26e9ca100acb1095c64342cabec",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/musubo-payment-recovery.module.css: .statusCopy p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/musubo-line-removal-dialog.tsx",
+    "fingerprint": "0a107247375de666d8d79b9a55b72f9ef3917c7fe028fe8c91168eb60a80bb8d",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/musubo-line-removal-dialog.module.css: .result p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/musubo-line-removal-dialog.tsx",
+    "fingerprint": "8b83af36453a55c40261629df5216590e23adc486e046d7389c2025d59b5ce23",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/musubo-line-removal-dialog.module.css: .result p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/musubo-line-removal-dialog.tsx",
+    "fingerprint": "c6453617a259b83cf0a096b9e584730a7aaf59e81399edecf631225bb1698af5",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/musubo-line-removal-dialog.module.css: .summary p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/musubo-payment-recovery.tsx",
+    "fingerprint": "b10cc2208602273c58d73004a3ce940618289e45482a7637443643641c4bc041",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/musubo-payment-recovery.module.css: .footerBar p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/musubo-payment-recovery.tsx",
+    "fingerprint": "de679a4161a6e05108ea3e0890fe5ea2227bc515c5a1f5d5a4e2d6c5eda86b04",
+    "count": 1,
+    "reason": "apps/web/src/v8/hq/musubo-payment-recovery.module.css: .statusCopy p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/hq/notice-line-dialog.tsx",
+    "fingerprint": "0660e70a181a204f07fffe38ffeaa96062265312aac75861675bd5d0bb5ae014",
+    "count": 1,
+    "reason": "styles.step: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/hq/notice-line-dialog.tsx",
+    "fingerprint": "6050a2d50fab2b4e6c48a8bfdb853d1f5d9aef76782bd42b1b0d6320f6b8d7c6",
+    "count": 1,
+    "reason": "styles.step: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/hq/notice-line-dialog.tsx",
+    "fingerprint": "a9404f53bfef243ef5bd1dd651d9ed189f50c9dbc1606641fcdd4a24a96a56fe",
+    "count": 1,
+    "reason": "styles.state: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/inbox-chat/rules-popover.tsx",
+    "fingerprint": "5e41c3fb0551e6193d8935cd1edc4cd67a6dcd8d552caf2cc414b0b8316736ab",
+    "count": 1,
+    "reason": "styles.popError: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/login/two-factor-ops.tsx",
+    "fingerprint": "b93b618baa5167086906421baae0fca897aa4b0664bb7ebb779086739f0eab5e",
+    "count": 1,
+    "reason": "styles.helpChoices: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/mileage/score-rules.tsx",
+    "fingerprint": "16726f6b6790ee09b1962a761c97a98ec3ac915a1fcae19d605462a9eaaa6130",
+    "count": 1,
+    "reason": "共通 Notice が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/mileage/score-rules.tsx",
+    "fingerprint": "4e4a7546fb86851a9dcef620a55c7f393e5d336d4037b1d7286371a5967e6476",
+    "count": 1,
+    "reason": "共通 Notice が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/mileage/score-rules.tsx",
+    "fingerprint": "54ae6c6818443215d4ae24499969265e7bd3e0e250a425e23f9af6f159cd65b8",
+    "count": 1,
+    "reason": "共通 Notice が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/mileage/score-rules.tsx",
+    "fingerprint": "76c70162f7a0560a7ebb67b79483e79893621eab959d05581a20c4522699bdb5",
+    "count": 1,
+    "reason": "共通 Notice が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/mileage/score-rules.tsx",
+    "fingerprint": "cb465ecd7779bfc569f93543469b7ebf8003fdcd8d8efad3cf03420bb2df3575",
+    "count": 1,
+    "reason": "共通 Notice が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-health/summary.tsx",
+    "fingerprint": "213002b27b0a326f30a4a84e3720cb2c04045c1d2de717e78429b367b9531bde",
+    "count": 1,
+    "reason": "印刷面は印刷時に補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-health/summary.tsx",
+    "fingerprint": "37ca6b57c2c09f2beb8bfbe9718696c1c5dbf2a84a7fdeb2d3a33021b13b975d",
+    "count": 1,
+    "reason": "印刷面は印刷時に補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-health/summary.tsx",
+    "fingerprint": "6c29e7fa15171dfabc5c416467f141288bf8de494a6c52d4145f8e9692890006",
+    "count": 1,
+    "reason": "印刷面は印刷時に補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-health/summary.tsx",
+    "fingerprint": "d3d6e40a1dc354455d3d10b92e50a7a823a4cdeca0572593848a64b210abacf6",
+    "count": 1,
+    "reason": "印刷面は印刷時に補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-health/summary.tsx",
+    "fingerprint": "d593f670b3a8e0ee4c3ad0c24e66eee506be58dac86bb74629e93d0c24cab8ce",
+    "count": 1,
+    "reason": "印刷面は印刷時に補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-health/summary.tsx",
+    "fingerprint": "d699ec58af9fdf7801c957f0f7abb86d39a62ae4d68d7d1ab66111cfefdbb1e1",
+    "count": 1,
+    "reason": "印刷面は印刷時に補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/nen-posts/review-list.tsx",
+    "fingerprint": "78a308196dfc68687a410496633db04e2aef58ed3a93267221ce230d799d6831",
+    "count": 1,
+    "reason": "styles.fieldLabel: var(--tpl-nm-row-size)"
+  },
+  {
+    "file": "apps/web/src/v8/nen-posts/review.tsx",
+    "fingerprint": "131a9e4e64080c28720e0a9a7597be5cb741734e048a4560f1611395a6acfdfb",
+    "count": 1,
+    "reason": "styles.publicationHistory: var(--tpl-nm-row-size)"
+  },
+  {
+    "file": "apps/web/src/v8/nen-posts/review.tsx",
+    "fingerprint": "6bbc5712eb56c5159ad89d66e08c47214eca2b3d519773abd75759af1d19e00a",
+    "count": 1,
+    "reason": "styles.publicationHistory: var(--tpl-nm-row-size)"
+  },
+  {
+    "file": "apps/web/src/v8/nen-posts/review.tsx",
+    "fingerprint": "6edfe4ccac124e84e092afc556ba8e0a37a7b48e6a060ec06776b4547e1fb136",
+    "count": 1,
+    "reason": "styles.publicationHistory: var(--tpl-nm-row-size)"
+  },
+  {
+    "file": "apps/web/src/v8/nen-posts/review.tsx",
+    "fingerprint": "86b8829776cbacec28926fa92cf1875fdd413684243ef6723a2a13607265e28f",
+    "count": 1,
+    "reason": "styles.publicationHistory: var(--tpl-nm-row-size)"
+  },
+  {
+    "file": "apps/web/src/v8/nen-posts/review.tsx",
+    "fingerprint": "8bbb1a01871ec685912a8dc1d7d50dccf4e05c185daa41bb41a81cbe3c74747d",
+    "count": 1,
+    "reason": "styles.deliveryFailures: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/guide-publish-menu.tsx",
+    "fingerprint": "9d925578772eea3b15f0faaa402a2165dcde0f04e49490e50efacd2845a6bf45",
+    "count": 1,
+    "reason": "窓の補足欄の CSS が補足文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-inquiry.tsx",
+    "fingerprint": "36f6daa71602d185120e2d753cbf85ae40d8cebc017b149b744ddd12ccd5a195",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-inquiry.tsx",
+    "fingerprint": "673b63e3067b8b78a9bfd875b51b00120f93ee2c0c7afb41d81eaef2bee4904a",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/individual-quote-inquiry.module.css: .footer p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-inquiry.tsx",
+    "fingerprint": "d1bcd3f5d9ace5e24dfaadf2e32c622a56fdb095181dafdad9afb0317832a40e",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-review.tsx",
+    "fingerprint": "2627140eee176f668de6db98c0d215266f5bc51e8d1e53cee2ff5a5765f11eb4",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/individual-quote-review.module.css: .firstCharge p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-review.tsx",
+    "fingerprint": "5e3fedd001f4381ae78430097fea6ce562518085bc24982f6863637e55d4c51f",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/individual-quote-review.module.css: .info p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-review.tsx",
+    "fingerprint": "6d2f416ffa05dcba1a37b0bdc3cbe2a1fbebdea2c715646666706e47f8d3ef79",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/individual-quote-review.module.css: .info p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-review.tsx",
+    "fingerprint": "96eb7be0b100cd02f59fc7f0550be34f5fdb72b8bd38855e5155bb7a2466a3f0",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/individual-quote-review.module.css: .statusContent > p { font-size: var(--mp-px-14) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/individual-quote-review.tsx",
+    "fingerprint": "ed1efb0d1f8a98cd9a939439d61a1be46e6a05cdc2b97c1de69fca6acdd66fc0",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/individual-quote-review.module.css: .firstCharge p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/pricing.tsx",
+    "fingerprint": "316918965dee40a7669f677b8412681b0d0e5aadeb8ab4aa115e635440715777",
+    "count": 1,
+    "reason": "親の detailBlock が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/pricing.tsx",
+    "fingerprint": "8fe34910a45372bd2bc049c373be71e4e1252bce79147b241cbf78f0df40b441",
+    "count": 1,
+    "reason": "親の detailBlock が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/pricing.tsx",
+    "fingerprint": "a6dd83bfff95727599a43285b4950dca0be3486c77fc14265c140ad82a5a9688",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/pricing.module.css: .footer p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/pricing.tsx",
+    "fingerprint": "b28f1d6aa6805427e4619979de634d5734cad97b89868f4fdad304597ff6c35f",
+    "count": 1,
+    "reason": "親の detailBlock が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/pricing.tsx",
+    "fingerprint": "c5b2bef633a159d3f921ee7ef9e3bf527ed6b27a5c67a5f5c0f03bac1c1e9ee6",
+    "count": 1,
+    "reason": "親の detailBlock が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/pricing.tsx",
+    "fingerprint": "e7f426614850b2692886c455bb9a0ef484f48fb3672afde4151f12359a43e527",
+    "count": 1,
+    "reason": "親の detailBlock が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/onboarding/style-setting-demo.tsx",
+    "fingerprint": "193a0e881ed725848babe47de865e8a8d53e80c05d2686aece1de9fde6d85fca",
+    "count": 1,
+    "reason": "apps/web/src/v8/onboarding/style-setting-demo.module.css: .board p { font-size: var(--text-caption) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/application-detail.tsx",
+    "fingerprint": "33afbf8471d9ce814d9849242e36ce4cb7a895b434c5c21d1457ace62238c507",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/application-detail.module.css: .actionBand p { font-size: var(--text-caption) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/application-detail.tsx",
+    "fingerprint": "b06737eb9d165d5ac415acc6db836d3c6b925b5c144d88f68aabbeec4e81e392",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/application-detail.module.css: .heading p { font-size: var(--text-caption) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/application-detail.tsx",
+    "fingerprint": "be4088ebc98bdaac87856a8906de3f7063ce933ed55ecd71356e3d42e0bc49ab",
+    "count": 1,
+    "reason": "application-detail.module.css: .modalBody > p:first-of-type が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/ops/applications.tsx",
+    "fingerprint": "2d1c50c1e15e9d1950415f3a38a693f99f1f9fcba29926c24500839129e379be",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/applications.module.css: .panel header p { font-size: var(--text-body) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/billing-condition-editor.tsx",
+    "fingerprint": "0f102d5774fb387d8624eb3809cf440910f51bfffc4d56fa10d8399bcab70735",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/billing-condition-editor.module.css: .preview p { font-size: var(--mp-px-16) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/billing-condition-editor.tsx",
+    "fingerprint": "6cf5f12ce452d0319514a08a908103a12a9c218d8d3fa687b6f388c762d6fb61",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/billing-condition-editor.module.css: .priceSection p { font-size: var(--mp-px-12) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/billing-condition-editor.tsx",
+    "fingerprint": "81c4dd74a612277feec9a3d9173ec7104d3de24a268f25d0f8a3e46300f9b417",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/billing-condition-editor.module.css: .preview p { font-size: var(--mp-px-16) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/individual-quote-editor.tsx",
+    "fingerprint": "00423153011a626c6d485bfc16a8d551b139d40c13068f04259658ca0b7601e9",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/individual-quote-editor.module.css: .mailPreview p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/ops/individual-quote-editor.tsx",
+    "fingerprint": "143f937da6cd6d9ed1b76fa8fac7b7977ef91579999d428b06b583243b6ee5e0",
+    "count": 1,
+    "reason": "apps/web/src/v8/ops/individual-quote-editor.module.css: .mailPreview p { font-size: var(--mp-px-13) }"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/google.tsx",
+    "fingerprint": "085d091f8419e281eec9a02b983e6bdc52bea338c29d60aac5e22be36599c081",
+    "count": 1,
+    "reason": "Google 接続の案内は別の変更で対応中"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/hours-confirm.tsx",
+    "fingerprint": "ef5c3f9138add6e9e566676e46d8530c62f83de151a15705b1cecdf20cb6cdfe",
+    "count": 1,
+    "reason": "apps/web/src/v8/restaurant/google/hours.module.css: .bodyText { font-size: var(--polish-text-body) }"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/hours.tsx",
+    "fingerprint": "404b7f68299022e0b8705d217bd21011ad29612041cddeea8e63bfda34d1cc40",
+    "count": 1,
+    "reason": "styles.muted: var(--text-micro)"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/post-image-crop.tsx",
+    "fingerprint": "60d2faf7f43474df21db4740af64ed8aae16a26f6bb70ccb0b9fe9d99487b098",
+    "count": 1,
+    "reason": "apps/web/src/v8/restaurant/google/post-image-crop.module.css: .header p { font-size: var(--text-body) }"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/posts.tsx",
+    "fingerprint": "a64a5feab20af9a965792830dde0d61b132879218cc09da7f0aa4951c6812a1f",
+    "count": 1,
+    "reason": "styles.platformImageEmpty: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/profile-confirm.tsx",
+    "fingerprint": "0e9e493202fe3a8c8c8931652d85574e846a8307715d00282da4b414b223ca66",
+    "count": 1,
+    "reason": "変更の比較欄または知らせの共通部品が文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/profile-confirm.tsx",
+    "fingerprint": "4b2b35e934db884625a5e44390409111e5cceabf28ce60934068e925a4945cd6",
+    "count": 1,
+    "reason": "変更の比較欄または知らせの共通部品が文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/profile-confirm.tsx",
+    "fingerprint": "598e963a8ff73e525c33d076470e09b20339afd3785c057bcda0f5ffb154753e",
+    "count": 1,
+    "reason": "変更の比較欄または知らせの共通部品が文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/profile-confirm.tsx",
+    "fingerprint": "613234b31ab780d31b93452089656ec2f2ac2115c766b96baabcf1b0a4314325",
+    "count": 1,
+    "reason": "変更の比較欄または知らせの共通部品が文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/profile-confirm.tsx",
+    "fingerprint": "93e56ee35d03e1f1c571752f517f1a8ca15e7db30cfcb4dec42591008b76b4d4",
+    "count": 1,
+    "reason": "変更の比較欄または知らせの共通部品が文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/google/profile-confirm.tsx",
+    "fingerprint": "94810755a26808f6dd5af4054c3f291fc701e17cdb2d4c1bec296a8bcb39bee6",
+    "count": 1,
+    "reason": "変更の比較欄または知らせの共通部品が文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/line-followup/demo.tsx",
+    "fingerprint": "b9db6ba3aff9659d6c3e286f6b158d1e0272b4764fd12ecb16303787343c4806",
+    "count": 1,
+    "reason": "見本のカードが補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/line-followup/demo.tsx",
+    "fingerprint": "e5aab94542e1dd55704a6004e16902d12bcd4e9a3a3c1553ce940cebd1176a3f",
+    "count": 1,
+    "reason": "見本のカードが補足の文字サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/line-followup/followup-board.tsx",
+    "fingerprint": "b9db6ba3aff9659d6c3e286f6b158d1e0272b4764fd12ecb16303787343c4806",
+    "count": 1,
+    "reason": "apps/web/src/v8/restaurant/line-followup/board.module.css: .timing p { font-size: var(--text-label) }"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/line-followup/followup-board.tsx",
+    "fingerprint": "ddf8f058f8316081accb0953dca1a564c6e241c18bfc35741966dccbebb98098",
+    "count": 1,
+    "reason": "apps/web/src/v8/restaurant/line-followup/board.module.css: .timing p { font-size: var(--text-label) }"
+  },
+  {
+    "file": "apps/web/src/v8/restaurant/line-followup/followup-template-picker.tsx",
+    "fingerprint": "14d0101ee6e58f7f01c0bf426b955573e970ecdea14e2af342021f533db84678",
+    "count": 1,
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
+    "fingerprint": "1ad4afbff27328c93adda77c46dc10868f643eaf7259b72b9f183d0c9a4691a0",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
+    "fingerprint": "a6fd9f8642cc5d8d2cdff2d18691253670a64f73b756275f1caf7964cba07e3c",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menu-edit/schedules.tsx",
+    "fingerprint": "2085e14bee085453a492abbf313238d8e8d18c5f4a831381caa011f7852116a2",
+    "count": 1,
+    "reason": "共通Td: table.module.css の .cell font-size"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "164b063011a3c6eca5d164041266b00a09098807499f4d2381dbb9ed120d23df",
+    "count": 1,
+    "reason": "styles.impactDetail: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "1943d17bec3acbb4ea92aa3c238ed912bed872b26a7383cbf0844682df407b39",
+    "count": 1,
+    "reason": "styles.impactDetail: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "26ca49dcad356fc7e279b9b604479616b565f753997dd8cd2d49f029c75a6dfc",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "3f8e6c8cb9d35f5c84af633179ccae3814a552f6f2abae3104f394d0fc92cea9",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "471d7f6c7b168f534980021c55107df8616e066362b3607873308bd9be162dd4",
+    "count": 1,
+    "reason": "styles.impactDetail: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "60dfc7a0a845f9b8efdc175c91518ed3accb448335a5a2cbb0f509a587c8a37c",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "6d3f3dbedb2f5962dd812af45b53508e8d7fa882d399075b3c07c473fc43691f",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "a8df90103cf5bc06ed59524657c65635691db20cdf9a0bf156bfd0647385794a",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "c73ab4da5b8698e7c604dd72b26c9643756148e4e23303514418f5144d204f14",
+    "count": 1,
+    "reason": "styles.impactDetail: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "e6f04e6eb7b8e5e1472d1d49766198a142408ee753fbf795a900ba58db558886",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "f1a1e0ac0df05400444726723a2f7a2540b3226e8c3fdc916a9915ccaea3e86f",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/list.tsx",
+    "fingerprint": "ff5edd09cb381f9496b65ddb009abf30ec46677a545a397674d6803f44cea339",
+    "count": 1,
+    "reason": "styles.impact: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/new/create.tsx",
+    "fingerprint": "a39a26a3cd534bd8d4889c69f6f84c471215654c1cf0b51792cc276125ee8a0f",
+    "count": 1,
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/new/create.tsx",
+    "fingerprint": "b79ea9402cb2d8478b687a15c9d294ec4ea53e49410ffea7e7b98255845cdda1",
+    "count": 1,
+    "reason": "utility text-sm"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/new/create.tsx",
+    "fingerprint": "bc6325e0d507f7452fdb623a767c3b7e886ccb28abe50bcad13e502779431a8c",
+    "count": 1,
+    "reason": "utility text-sm"
+  },
+  {
+    "file": "apps/web/src/v8/rich-menus/new/create.tsx",
+    "fingerprint": "d665168487538918dca22d1d8190e772167c4de91ff2a5bcf84b221987f96211",
+    "count": 1,
+    "reason": "utility text-sm"
+  },
+  {
+    "file": "apps/web/src/v8/scenario-detail/scenario-detail-body.tsx",
+    "fingerprint": "836fd7dbcf847229f9e274f2a41513ba83fb4f91aaac9bc7b4fd8ce4d1621c11",
+    "count": 1,
+    "reason": "notice.module.css: .notice font-size: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/scenarios/delete-dialog.tsx",
+    "fingerprint": "44275ca6a287e9f2cc19062099db80da77a81121dbf44a743cfb9522b4a5b7af",
+    "count": 1,
+    "reason": "styles.deleteBody: var(--text-label)"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "1c7e9022aad49543e9355d265db15f6a582fdcc7da2ef3c9da657c1a69338a6e",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "1dd71587e3ee144947f307854684e8f4bd7d759c959107aaec2ff60a4ae3305e",
+    "count": 1,
+    "reason": "styles.listFoot: var(--text-caption)"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "29f2dad77e844f9d423b28bae30661423db4ab4c101b5382efbdc2ba3228565f",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "5b34e851ccbab1a795e96fb6c7deeabe6e53bba50a384a9ec40346f7457bff9b",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "857cf090163356d66b606a5e5580292ea619909b46822e49e5a973ba20e872e3",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "b9b4dee8189ea46b5faad703436c3938ab7d6bf128c4b5b24304a2eb0fad4b5c",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "c1a4195274e330c130c04e6f162a51c3673cadada2318aa01166c57d8f5424da",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "c5782db5b1991a8712ea521096eb6d03993f2d40adf0d3c95a493500e62ac2ef",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/settings/staff/staff.tsx",
+    "fingerprint": "d4fa13cee3c17152caa310cc7504da0d874727c9f0e9ce7b92c855bf0c6d1756",
+    "count": 1,
+    "reason": "utility text-xs"
+  },
+  {
+    "file": "apps/web/src/v8/tag-edit/edit-form.tsx",
+    "fingerprint": "8cd9c17b34d38a0fdc4398bb061ffb9c527941b3194e4ea3615ba63fdc748807",
+    "count": 2,
+    "reason": "共通 HelpTip が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/tags/field-editor.tsx",
+    "fingerprint": "270aa809e028de5c8f371679a314f4fa071a59a2123024eedcf49ec77434482b",
+    "count": 1,
+    "reason": "画面のヘルプ部品が補足サイズを指定"
+  },
+  {
+    "file": "apps/web/src/v8/visit-stamps/qr.tsx",
+    "fingerprint": "0ffbd6cea46b68db4ecbb23ab7356b9daca479a0ebb75e41697ea6092b143f3d",
+    "count": 1,
+    "reason": "styles.dialogBody: var(--tpl-e78-label-size)"
+  },
+  {
+    "file": "apps/web/src/v8/webinar-edit/chrome.tsx",
+    "fingerprint": "5d7d9953453e345631442aec5bfe00b1269c7fd49ea6fcc1639b05feb71c88cb",
+    "count": 1,
+    "reason": "PageHelp から HelpTip の補足サイズを継承"
+  }
+]

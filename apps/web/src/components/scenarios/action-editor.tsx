@@ -815,7 +815,7 @@ export default function ActionEditor({
           <CloseButton onClick={closeWhenSaved} />
         </div>
 
-        {pendingCount > 0 && <p role="status">保存しています…</p>}
+        {pendingCount > 0 && <p role="status" className="text-body">保存しています…</p>}
         {error && <Button onClick={() => { const retry = retryRef.current; setError(''); if (retry) void enqueue(retry, true); else setReload(value => value + 1) }}>もう一度試す</Button>}
         {editing ? (
           <div className="flex-1 px-6 pb-5 pt-0">

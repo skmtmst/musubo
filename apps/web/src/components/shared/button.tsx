@@ -387,7 +387,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     </button>
     {permissionLocked ? <><span id={reasonId} hidden>{lockedReason}</span>{tip ? <TooltipBubble id={tipId} text={lockedReason!} left={tip.left} top={tip.top} below={tip.below} /> : null}</> : null}
     {disabled && !buttonProps.hidden && !permissionLocked && !busyNow && disabledReason ? <span className={styles.disabledReason} role="status">{disabledReason}</span> : null}
-    {automaticError ? <span role="alert" data-button-error>{automaticError}</span> : null}
+    {automaticError ? <span className="text-caption" role="alert" data-button-error>{automaticError}</span> : null}
   </>)
 }
 
