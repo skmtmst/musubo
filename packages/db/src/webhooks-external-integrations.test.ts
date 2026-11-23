@@ -89,7 +89,7 @@ function insertAccount(sqlite: Database.Database, id: string): void {
 // LINE_CREDENTIAL_ENCRYPTION_KEY は base64 の32バイト鍵。
 const ENC = Buffer.from('0123456789abcdef0123456789abcdef').toString('base64');
 
-describe('Webhookの論理削除 (N-368)', () => {
+describe('Webhookの受け口や送り先を作成し削除後は対象から外す', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -170,7 +170,7 @@ describe('Webhookの論理削除 (N-368)', () => {
   });
 });
 
-describe('人が見つからなかった届物 (N-367)', () => {
+describe('未照合の届物を重複なく保存し担当アカウントで処理する', () => {
   let sqlite: Database.Database;
   let db: D1Database;
   let webhookId: string;
@@ -282,7 +282,7 @@ describe('人が見つからなかった届物 (N-367)', () => {
   });
 });
 
-describe('外部APIの鍵 (N-380)', () => {
+describe('外部APIの鍵を安全に保存し無効化・再開する', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

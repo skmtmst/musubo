@@ -12,9 +12,8 @@ import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 export // btoa は Latin-1 だけを受け付けるため、OAuth state は文字コードを変換してから符号化する。
-// multibyte query param (e.g. utm_campaign=夏キャンペーン) used to throw
-// InvalidCharacterError and turn the whole /auth/line request into a 500.
-// Encode via UTF-8 bytes instead. decodeState is byte-compatible with
+// Multibyte query params must be encoded as UTF-8 bytes to avoid
+// InvalidCharacterError. decodeState is byte-compatible with
 // states produced by the old plain btoa (ASCII-only payloads).
 function encodeState(state: string): string {
   return btoa(String.fromCharCode(...new TextEncoder().encode(state)));

@@ -608,11 +608,12 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
 
 .actionNote { grid-column: 1 / -1; flex-basis: 100%; min-height: var(--space-24); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--space-20); text-align: center; }
 
-/* ウェルカムのように画面全体を使う案内。 */
+/* 画面全体を使う案内では、パネルを縮めず本文で動きを指定する。 */
 :root .overlay[data-design-layout='fullscreen'] {
   padding: 0;
   background: transparent;
   backdrop-filter: none;
+  transition: none;
 }
 :root .panel[data-design-layout='fullscreen'] {
   position: relative;
@@ -622,6 +623,7 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  transition: none;
 }
 :root .panel[data-design-layout='fullscreen']:not(:focus-visible) { outline-color: transparent; }
 :root .panel[data-design-layout='fullscreen']:focus-visible {

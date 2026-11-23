@@ -13,11 +13,8 @@ vi.mock('./xserver-mail.js', () => ({ sendXServerMail: vi.fn(async () => undefin
 const { evaluateAlertRules, reportText } = await import('./analytics-reports.js');
 
 /**
- * R77: 「大きな変化をすぐ知らせる」が、設定値を写すだけで条件判定
- * していなかった。しきい値・最低件数・変化率を前期間と実際に比べる。
- *
- * R78: 見本の数値が通知本文に入らず、対象への行き先も無かった。
- * 選んだ節の数値と、レポート一覧への行き先を本文に入れる。
+ * 大きな変化を検出するため、しきい値・最低件数・変化率を前期間と比べる。
+ * 選んだ節の数値と、レポート一覧への行き先を通知本文に入れる。
  */
 
 const num = (value: number | null, state = 'available') => ({ value, state, reason: null });

@@ -35,7 +35,7 @@ export function deliveryWebhookSecret(
         ? env.RT_DELIVERY_DEMAECAN_WEBHOOK_SECRET
         : env.RT_DELIVERY_ROCKETNOW_WEBHOOK_SECRET;
   const secret = raw?.trim() ?? '';
-  // 短い鍵は事故のもとなので使わない（ec-integrations.ts と同じ 32 文字以上）。
+  // 鍵の強度を保つため、32文字未満は受け付けない（ec-integrations.ts と同じ下限）。
   return secret.length >= 32 ? secret : null;
 }
 
@@ -60,7 +60,7 @@ export function deliveryWebhookIpAllowlist(
     .map((entry) => entry.trim().toLowerCase())
     .filter((entry) => entry.length > 0);
   // 書き間違いで空だけが並んだときは「制限なし」ではなく「誰も通さない」にはしない。
-  // 設定の意図が読めないため、制限なしと同じ扱いに戻す（受信が全部止まる事故を避ける）。
+  // 意図が読めない空の設定では、受信がすべて止まらないよう制限なしにする。
   return entries.length > 0 ? entries : null;
 }
 

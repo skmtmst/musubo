@@ -409,7 +409,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
       }),
       loadOptions(c.env.DB, accountId),
       /*
-       * R31: まとめの数はすべて直近7日にそろえる。直近7日の友だち追加だけに
+       * まとめの数はすべて直近7日にそろえる。直近7日の友だち追加だけに
        * 期間を付け、ほかを通算にすると同じ期間の成果として比べられない。
        * 「送信成功」は配送処理の完了件数ではなく、実際に送った通数
        * (delivery_count の合計) とし、送信履歴の「累計配信」と同じ数え方に

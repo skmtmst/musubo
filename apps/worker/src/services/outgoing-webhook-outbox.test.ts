@@ -81,7 +81,7 @@ function stubFetch(responses: Array<{ status: number; retryAfter?: string } | 't
   return { fetchImpl, calls: () => calls };
 }
 
-describe('N-370: 台帳へ先に積む（durable outbox）', () => {
+describe('Webhook配送を台帳に保存し同じ要求を重複登録しない', () => {
   it('積んだ配送は pending で残り、冪等キーの重複は積み増さない', async () => {
     const testDb = createTestD1();
     seed(testDb);
@@ -113,7 +113,7 @@ describe('N-370: 台帳へ先に積む（durable outbox）', () => {
   });
 });
 
-describe('N-369: 再送は Worker 内 sleep でなく台帳のスケジュールで', () => {
+describe('Webhook配送の失敗は次の再送時刻と上限を台帳で管理する', () => {
   it('初回失敗は retry_wait で残り、次回は分単位の時刻へ積む', async () => {
     const testDb = createTestD1();
     seed(testDb);
@@ -182,7 +182,7 @@ describe('N-369: 再送は Worker 内 sleep でなく台帳のスケジュール
   });
 });
 
-describe('N-374: Retry-After を再送スケジュールでも尊重する', () => {
+describe('Webhookの再送は応答の待機指定と再試行可能な失敗を判定する', () => {
   it('429 の指定どおりに待ち、読めない指定だけ既定の指数待ちへ', () => {
     const queuedAt = NOW.toISOString();
     const respected = outgoingDeliveryNextRetryAt({
@@ -326,7 +326,7 @@ describe('sweep: 送り残しの回収', () => {
   });
 });
 
-describe('N-375: 連続失敗で自動停止して運用者へ通知する', () => {
+describe('Webhookの連続失敗は送り先を自動停止して運用者に通知する', () => {
   it('閾値に達した連続失敗で is_active を落とし通知センターへ1件残す', async () => {
     const testDb = createTestD1();
     seed(testDb);

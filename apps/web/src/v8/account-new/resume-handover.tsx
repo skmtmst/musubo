@@ -140,7 +140,7 @@ export default function ResumeFollowerHandover() {
         : state?.phase === 'not_started' && !skipped ? <ListState kind="error" title="引き継ぎが開始されていません" onRetry={() => void refresh()} />
         : <Step5Completion connection={connection} accountName={account?.name ?? ''} createdId={accountId}
           importRunning={running || !state} importFriends={!skipped} importState={state} handover={progress}
-          idleSeconds={idleSeconds} requestError={readError || stepError} restaurant={styleLabel === '飲食店'} onRefresh={() => void refresh()} refreshing={refreshing} />}
+          idleSeconds={idleSeconds} requestError={readError || stepError} onRefresh={() => void refresh()} refreshing={refreshing} />}
       <StickyBar presentation="account-registration" actions={<>
         {(readError || stepError || (running && idleSeconds >= 60)) && <Button type="button" variant="primary" busy={refreshing} busyLabel="確認中…" onClick={() => void refresh()}>状態を再確認</Button>}
         {complete && <Button type="button" variant="primary" onClick={enter}>アカウントに入る</Button>}

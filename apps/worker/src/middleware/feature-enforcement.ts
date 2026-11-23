@@ -8,6 +8,7 @@ import type { AuthenticatedStaff } from './auth/principal/auth.js';
 import { getVisibleLineAccountScope, restrictVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { accountFeatureAvailability, createFeatureAvailabilityRequestContext, type FeatureAvailability } from '../services/feature-enforcement.js';
+import { restaurantAccessMode } from '../services/tenant-features.js';
 
 export type RouteClassification =
   | { kind: 'feature'; featureId: FeatureId }
@@ -944,6 +945,14 @@ async function enforceAccounts(
     ),
   ));
   if (states.every((availability) => availabilityAllowsOperation(availability, c.req.method))) {
+    return next();
+  }
+  const selectedAccount = c.req.query('account_id');
+  if (classification.featureId === 'restaurant_test' && staff && selectedAccount
+    && accountIds.length === 1 && accountIds[0] === selectedAccount && states[0]?.reason === 'company_disabled'
+    && /^\/api\/restaurant-test\/(?!delivery(?:\/|$)|google(?:\/|$)|external-links(?:\/|$))/.test(c.req.path)
+    && await restaurantAccessMode(c, selectedAccount) === 'account') {
+    // 飲食店を選べば基本機能を使える。旧設定のオフで初回の案内を止めない。
     return next();
   }
   return unavailableResponse(

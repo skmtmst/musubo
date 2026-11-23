@@ -158,7 +158,7 @@ describe('048_chats_friend_unique.sql migration', () => {
 
   it('carries operator state from the most recently updated duplicate onto the kept row', () => {
     insertFriend(db, 'f-merge');
-    // オペレーターが最古行を「解決済」にした (updated_at が最新) — バグ報告の実シナリオ。
+    // 最古の行を更新した場合も、最新の担当状態を保持する。
     insertChatRow(db, {
       id: 'c-old',
       friendId: 'f-merge',

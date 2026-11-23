@@ -26,7 +26,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
   const { webinar } = auth;
 
   const now = nowEpoch();
-  // R99: 公開開始前・終了後は顧客の入口で止める。予約済み本人が
+  // 公開開始前・終了後は顧客の入口で止める。予約済み本人が
   // 終わった回を専用リンクで開く録画視聴だけは例外として通す。
   if (publicationWindowBlockReason(webinar)) {
     const requestedRaw = c.req.query('sessionStartAt');
@@ -41,7 +41,7 @@ export const get__api_liff_webinars_slug_1 = async (c: Context<Env, "/api/liff/w
       && await isWebinarMissedInWindow(c.env.DB, webinar.id, requestedStart, now);
     if (!replayEligible) return c.json({ error: 'not_found' }, 404);
   }
-  // R96: オンデマンドは枠を持たない。入場そのものを開始として録画の
+  // オンデマンドは枠を持たない。入場そのものを開始として録画の
   // 常設回を開く。申込の有無では止めない。
   if ((await resolveWebinarDeliveryKind(c.env.DB, webinar)) === 'on_demand') {
     const sessionStartAt = onDemandSessionStartAt(webinar, now);
@@ -379,7 +379,7 @@ export const post__api_liff_webinars_slug_heartbeat_3 = async (c: Context<Env, "
       sourceEventId: `${loaded.webinar.id}:${auth.friendId}:complete`,
       metadata: { webinarId: loaded.webinar.id, sessionStartAt },
     }).catch((err) => logger.error("webinars.liff_webinars_slug_heartbeat_post_failed")));
-    // R97: 保存した視聴後アクション（完了のきっかけ）を実行口へ接続する。
+    // 保存した視聴後アクション（完了のきっかけ）を実行口へ接続する。
     // 同じ視聴の再送は実行記録の冪等キーで1件にまとまる。
     c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
       webinarId: loaded.webinar.id,
@@ -420,7 +420,7 @@ export const post__api_liff_webinars_slug_comments_4 = async (c: Context<Env, "/
     loaded.webinar.duration_seconds,
     nowEpoch(),
   );
-  // R96: オンデマンドは枠を持たない。常設回への投稿だけ受ける。
+  // オンデマンドは枠を持たない。常設回への投稿だけ受ける。
   if ((await resolveWebinarDeliveryKind(c.env.DB, loaded.webinar)) === 'on_demand') {
     if (sessionStartAt !== onDemandSessionStartAt(loaded.webinar, nowEpoch())) {
       return c.json({ error: 'not_live' }, 409);
@@ -466,13 +466,13 @@ export const post__api_liff_webinars_slug_register_5 = async (c: Context<Env, "/
   const loaded = { webinar: auth.webinar };
   const { webinar } = loaded;
 
-  // R99: 公開開始前・終了後は新しい申込を受けない（録画視聴の例外は作らない）。
+  // 公開開始前・終了後は新しい申込を受けない（録画視聴の例外は作らない）。
   if (publicationWindowBlockReason(webinar)) return c.json({ error: 'not_found' }, 404);
 
   const body = await c.req.json<{ sessionStartAt?: unknown }>();
   const sessionStartAt = Number(body.sessionStartAt);
   const now = nowEpoch();
-  // R96: オンデマンドは枠を持たない。常設回への申込だけ受け、
+  // オンデマンドは枠を持たない。常設回への申込だけ受け、
   // 確認通知は送らない（入場そのものが開始のため）。
   if ((await resolveWebinarDeliveryKind(c.env.DB, webinar)) === 'on_demand') {
     const onDemandStart = onDemandSessionStartAt(webinar, now);
@@ -597,7 +597,7 @@ export const post__api_liff_webinars_slug_cta_click_6 = async (c: Context<Env, "
       ).catch((err) => logger.error("webinars.liff_webinars_slug_cta_click_post_failed")),
     );
   }
-  // R97: 保存した視聴後アクション（CTAクリックのきっかけ）を実行口へ接続する。
+  // 保存した視聴後アクション（CTAクリックのきっかけ）を実行口へ接続する。
   c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
     webinarId: loaded.webinar.id,
     friendId: auth.friendId,

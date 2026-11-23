@@ -75,7 +75,7 @@ describe('putWorkerScript metadata', () => {
     expect(metadata).not.toHaveProperty('compatibility_flags');
   });
 
-  // Regression: adoption/update flows re-send the bindings returned by
+  // Adoption/update flows re-send the bindings returned by
   // GET /bindings verbatim. That list contains secret_text entries WITHOUT
   // their values (CF never returns secret values), and the script upload
   // API rejects a textless secret_text binding with error 10021

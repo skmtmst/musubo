@@ -13,7 +13,7 @@ import {
 } from '../src/common-vars/index.js';
 import { asD1 } from './d1-test-helper.js';
 
-describe('#544 N6 フォルダの存在と種別の検証', () => {
+describe('共通情報は存在する同種のフォルダだけに作成・更新できる', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -54,7 +54,7 @@ describe('#544 N6 フォルダの存在と種別の検証', () => {
   });
 });
 
-describe('#544 N2 一覧の件数上限と総件数', () => {
+describe('共通情報の一覧は件数を制限しても総数を返す', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

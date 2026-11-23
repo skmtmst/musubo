@@ -72,7 +72,7 @@ export function dateOnly(value: unknown): string | null {
 export function feedingGuide(animalType: string, weightKg: number) {
   // NENの初期目安。主食商品の熱量・年齢・活動量・体調で調整する前提で、
   // LIFF画面にも必ず「医療判断ではない目安」と表示する。
-  // DEEP-24: 係数は犬・猫専用。「その他」に犬の式を当てず null を返す。
+  // 係数は犬・猫専用。「その他」に犬の式を当てず null を返す。
   if (!isFeedingSupportedAnimal(toPetAnimalType(animalType))) return null;
   const minPerKg = animalType === 'cat' ? 25 : 20;
   const maxPerKg = animalType === 'cat' ? 35 : 30;
@@ -385,7 +385,7 @@ export /**
  */
 function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = [], treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT) {
   const neutered = neuteredFromRow(row.neutered);
-  // DEEP-24: 「その他」の動物を犬へ変換しない。犬・猫専用の給与計算も対象外。
+  // 「その他」の動物を犬へ変換しない。犬・猫専用の給与計算も対象外。
   const animalType = toPetAnimalType(row.animal_type);
   const feedingSupported = isFeedingSupportedAnimal(animalType);
   const plan = planForPetRow({

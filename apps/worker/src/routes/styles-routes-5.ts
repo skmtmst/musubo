@@ -1,5 +1,5 @@
 import { starterCatalogRuntime } from './style-starter-runtime.js';
-import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
+import { restaurantEffectivelyEnabledForAccount } from '../services/tenant-features.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -80,7 +80,7 @@ styles.patch(base + '/restaurant-reservations/:id', async (c) => {
   edit(c);
   const a = await account(c),
     b = await json(c);
-  if (!(await restaurantEffectivelyEnabledForTenant(c)))
+  if (!(await restaurantEffectivelyEnabledForAccount(c, a)))
     throw new StyleError('not_found', 404);
   const staffId = text(b.staffId, 100);
   if (

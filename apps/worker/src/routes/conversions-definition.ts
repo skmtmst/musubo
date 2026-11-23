@@ -182,7 +182,7 @@ function readDefinitionInput(body: Record<string, unknown>, options: { requireAc
     || (valueMode === 'fixed' && (fixedValue === null || !Number.isFinite(fixedValue) || fixedValue < 0))
     || (attributionDays !== null && (!Number.isInteger(attributionDays) || attributionDays < 1 || attributionDays > 365))
     || (sourceType === 'url_reach' && (!targetUrl || !/^https?:\/\//.test(targetUrl)))
-    // R40: 壊れた数えない条件は保存させない。記録も試算も止まるか
+    // 壊れた数えない条件は保存させない。記録も試算も止まるか
     // 全件数えるかに倒れてしまうため、入口で断つ。
     || !isExclusionSavable(sourceConfig)) {
     return null;
@@ -646,7 +646,7 @@ async function notifyApprovalOnce(
     const state = await getApprovalNotificationState(db, eventId);
     if (!state.send || !state.approvedAt) return;
     const info = await getConversionApprovalNotifyInfo(db, eventId);
-    // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
+    // 紹介者が成果の通知を切っているときは送信処理に進まない。
     if (!info || !info.notifyOnConversion) return;
     const claimed = await markApprovalNotified(db, eventId, state.approvedAt);
     if (!claimed) return;
