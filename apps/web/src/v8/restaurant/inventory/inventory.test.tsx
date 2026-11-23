@@ -18,6 +18,7 @@ const fixture = vi.hoisted(() => ({
 const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+vi.mock('@/lib/api/helpers/reservation-board', async importOriginal => { const original = await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>(); return { ...original, reservationBoardApi: { ...original.reservationBoardApi, floors: vi.fn(async () => ({ success: true, data: [] })) } } })
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams(window.location.search) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
