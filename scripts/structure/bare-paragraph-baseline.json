@@ -1365,7 +1365,7 @@
     "file": "apps/web/src/v8/onboarding/guide-publish-menu.tsx",
     "fingerprint": "9d925578772eea3b15f0faaa402a2165dcde0f04e49490e50efacd2845a6bf45",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "窓の補足欄の CSS が補足文字サイズを指定"
   },
   {
     "file": "apps/web/src/v8/onboarding/individual-quote-inquiry.tsx",
