@@ -31,7 +31,7 @@ it('スマホの見本とPCでの差の注記を出し、閉じると焦点を�
   expect(screen.queryByRole('button', { name: 'PC' })).toBeNull()
   expect(container.querySelector(`.${styles.phonePreview}`)).not.toBeNull()
   expect(container.querySelector('[data-line-preview-part="device-frame"]')).not.toBeNull()
-  expect(screen.getByText('PC の LINE ではリッチメニューが出ないなど、見え方が少し変わります')).toBeTruthy()
+  expect(screen.getByText('PC の LINE では見え方が少し変わります')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
   expect(container.querySelector('aside')?.hasAttribute('data-open')).toBe(false)
   expect(document.activeElement).toBe(toggle.current)

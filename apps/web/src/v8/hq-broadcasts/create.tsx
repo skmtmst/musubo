@@ -819,7 +819,7 @@ export default function HqBroadcastCreate() {
                   {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
                 </div>
               </LinePreview>
-              <p className={formStyles.previewCaption}>PC の LINE ではリッチメニューが出ないなど、見え方が少し変わります</p>
+              <p className={formStyles.previewCaption}>PC の LINE では見え方が少し変わります</p>
             </div>
 
   const previewContent = (inDialog = false) => <>            <div className={formStyles.previewHead}>
