@@ -191,10 +191,10 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
     if (time && date && freeTables(tables, guests, startOf(date, time), dayRows).length === 0) setTime('')
   }, [guests, date, dayRows]) // eslint-disable-line react-hooks/exhaustive-deps
   const candidateTable = tableId === 'none' ? null : tableId === 'auto' ? candidates[0] ?? null : candidates.find((t) => t.id === tableId) ?? candidates[0] ?? null
-  const chosenTable = changingTable && floorId !== 'all' && candidateTable?.floor_id !== floorId ? null : candidateTable
+  const chosenTable = floorId !== 'all' && candidateTable?.floor_id !== floorId ? null : candidateTable
   useEffect(() => {
-    if (changingTable && floorId !== 'all' && candidateTable && candidateTable.floor_id !== floorId) setTableId('none')
-  }, [changingTable, floorId, candidateTable])
+    if (floorId !== 'all' && candidateTable && candidateTable.floor_id !== floorId) setTableId('none')
+  }, [floorId, candidateTable])
   const dirty = phone !== '' || name !== '' || memo !== '' || time !== '' || guests !== 2 || dayChoice !== 'today' || picked !== '' || tableId !== 'auto' || notify
 
   const choose = (item: Friend | null) => {
@@ -259,7 +259,11 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
     <SaveErrorScope errors={saveErrors}><Dialog open={open} designWidth={480} designTop={140} footerAlign="center" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onCancel={onClose}
       confirmLabel="予約を入れる" confirmIcon={<Check size={16} aria-hidden="true" />} onConfirm={save} confirmDisabled={canWrite && (!dayReady || !hours || !validTime || Boolean(inputReason) || !chosenTable)} confirmDisabledReason={disabledReason} confirmLockedReason={!canWrite ? '予約を入れる権限を確認してください。' : undefined}>
       <div className={styles.form} data-design-node="wEzuG">
+        <div className={styles.contactRow}>
         <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField {...fields.bind('phone')} type="tel" inputMode="tel" autoComplete="off" invalid={fields.invalid('phone')} aria-describedby={describedBy('phone')} value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField><FieldError id="e2-phone-error">{fields.error('phone')}</FieldError></Field>
+        <div className={styles.field}><Field label="お名前" htmlFor="e2-name" requirement={fields.requirement('name')}><SaveErrorField names={["name","customerName"]}><TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" /></SaveErrorField>
+<FieldError id="e2-name-error">{fields.error('name')}</FieldError></Field></div>
+        </div>
         {friends.length > 0 ? (
           <div className={styles.friendBox} role="group" aria-label="LINE の友だちの候補">
             <p className={styles.friendTitle}>LINE の友だちが見つかりました</p>
@@ -271,16 +275,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
             })}
           </div>
         ) : null}
-        <div className={styles.field}><Field label="お名前" htmlFor="e2-name" requirement={fields.requirement('name')}><SaveErrorField names={["name","customerName"]}><TextField {...fields.bind('name')} id="e2-name" invalid={fields.invalid('name')} aria-describedby={fields.invalid('name') ? 'e2-name-error' : undefined} value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" /></SaveErrorField>
-<FieldError id="e2-name-error">{fields.error('name')}</FieldError></Field></div>
-        <div className={styles.field}>
-          <span className={styles.label} id="e2-guests">人数</span>
-          <div className={styles.stepper} role="group" aria-labelledby="e2-guests">
-            <IconButton aria-label="人数を減らす" disabled={guests <= 1} onClick={() => setGuests((n) => Math.max(1, n - 1))}><Minus size={16} aria-hidden="true" /></IconButton>
-            <span className={styles.stepperValue} aria-live="polite">{`${guests} 名`}</span>
-            <IconButton aria-label="人数を増やす" disabled={guests >= MAX_GUESTS} onClick={() => setGuests((n) => Math.min(MAX_GUESTS, n + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
-          </div>
-        </div>
+        <div className={styles.peopleDateRow}>
         <div className={styles.field}>
           <span className={styles.label}>日付</span>
           <span className={styles.segment}>
@@ -301,6 +296,15 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
             </span>
           ) : null}
           <FieldError id="e2-date-error">{fields.error('date')}</FieldError>
+        </div>
+        <div className={styles.field}>
+          <span className={styles.label} id="e2-guests">人数</span>
+          <div className={styles.stepper} role="group" aria-labelledby="e2-guests">
+            <IconButton aria-label="人数を減らす" disabled={guests <= 1} onClick={() => setGuests((n) => Math.max(1, n - 1))}><Minus size={16} aria-hidden="true" /></IconButton>
+            <span className={styles.stepperValue} aria-live="polite">{`${guests} 名`}</span>
+            <IconButton aria-label="人数を増やす" disabled={guests >= MAX_GUESTS} onClick={() => setGuests((n) => Math.min(MAX_GUESTS, n + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
+          </div>
+        </div>
         </div>
         <div className={styles.field}>
           <span className={styles.label} id="e2-times">時刻（空いている時刻だけ）</span>
@@ -328,10 +332,10 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
             <span className={styles.tableValue}>
               {chosenTable
                 ? `${chosenTable.code}（${tableNote(chosenTable)}）を${tableId === 'auto' ? '自動で割り当て' : '選びました'}`
-                : time ? '人数が入る空いた卓がありません' : '時刻を選ぶと自動で割り当てます'}
+                : time ? candidates.length ? '卓を選んでください' : '人数が入る空いた卓がありません' : '時刻を選ぶと自動で割り当てます'}
             </span>
           </div>
-          {!changingTable ? <Button variant="text" disabled={!candidates.length} title={!candidates.length ? '空いている時刻を選ぶと卓を変えられます' : undefined} onClick={() => setChangingTable(true)}>変える</Button> : null}
+          <Button variant="text" disabled={!candidates.length} title={!candidates.length ? '空いている時刻を選ぶと卓を変えられます' : undefined} onClick={() => { if (changingTable) { setChangingTable(false); setFloorId('all') } else setChangingTable(true) }}>{changingTable ? '決める' : '変える'}</Button>
         </div>
         {changingTable && candidates.length > 0 ? <>
           {floorError && <Notice tone="warn" message="階・エリアを読み込めませんでした。卓はすべて表示しています。" />}
