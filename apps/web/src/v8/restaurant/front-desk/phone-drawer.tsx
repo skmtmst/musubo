@@ -17,6 +17,7 @@ import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
 import AvailableTables from './available-tables'
+import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
@@ -96,6 +97,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
   const [floors, setFloors] = useState<RestaurantFloor[]>([])
   const [floorError, setFloorError] = useState(false)
   const [memo, setMemo] = useState('')
+  const [allergies, setAllergies] = useState<string[]>([])
   const [notifyTarget, setNotifyTarget] = useState<string | null>(null)
   const notifyKey = JSON.stringify([accountId, storeId, friend?.lineUid])
   const notify = Boolean(friend?.lineUid) && notifyTarget === notifyKey
@@ -117,7 +119,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
     if (!open) return
     fields.reset()
     setPhone(''); setFriends([]); setFriend(null); setName(''); setGuests(2); setDayChoice('today'); setPicked('')
-    setTime(''); setTableId('auto'); setChangingTable(false); setFloorId('all'); setMemo(''); setNotify(false); setError('')
+    setTime(''); setTableId('auto'); setChangingTable(false); setFloorId('all'); setMemo(''); setAllergies([]); setNotify(false); setError('')
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
 
   useEffect(() => { setTime('') }, [date])
@@ -195,7 +197,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
   useEffect(() => {
     if (floorId !== 'all' && candidateTable && candidateTable.floor_id !== floorId) setTableId('none')
   }, [floorId, candidateTable])
-  const dirty = phone !== '' || name !== '' || memo !== '' || time !== '' || guests !== 2 || dayChoice !== 'today' || picked !== '' || tableId !== 'auto' || notify
+  const dirty = phone !== '' || name !== '' || memo !== '' || time !== '' || guests !== 2 || dayChoice !== 'today' || picked !== '' || tableId !== 'auto' || notify || allergies.length > 0
 
   const choose = (item: Friend | null) => {
     setNotifyTarget(null)
@@ -218,7 +220,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
 
   const save = async () => {
     setError('')
-    if (!canWrite || fields.submit().length > 0) return
+    if (!canWrite || allergies.length > 0 || fields.submit().length > 0) return
     const currentNow = new Date()
     if (toYmd(now) !== toYmd(currentNow) || date < toYmd(currentNow)) { setNow(currentNow); setError('日付が変わりました。予約日時を確認してください。'); return }
     if (!dayReady || !hours || !date || !time || !openTimes(date, hours, currentNow).includes(time) || !chosenTable) return
@@ -253,11 +255,11 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
 
   const validTime = Boolean(date && time && hours && openTimes(date, hours, new Date()).includes(time))
   const timeReason = time && !validTime ? '営業時間内の時刻を選んでください。' : undefined
-  const disabledReason = hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : timeReason || (!chosenTable ? '座る卓を選んでください。' : undefined))
+  const disabledReason = allergies.length > 0 ? 'アレルギーを含む予約はまだ保存できません。' : hoursFailure === scopeKey || (hoursData?.key === scopeKey && hoursData.hours === null) ? '営業時間を確認してください。' : closedDay ? 'この曜日は休みです。' : inputReason || (!dayReady || !hours ? '営業時間と予約を確認してください。' : timeReason || (!chosenTable ? '座る卓を選んでください。' : undefined))
 
   return (
     <SaveErrorScope errors={saveErrors}><Dialog open={open} designWidth={480} designTop={140} footerAlign="center" title="電話予約を入れる" dirty={dirty} busy={busy} error={error || undefined} onCancel={onClose}
-      confirmLabel="予約を入れる" confirmIcon={<Check size={16} aria-hidden="true" />} onConfirm={save} confirmDisabled={canWrite && (!dayReady || !hours || !validTime || Boolean(inputReason) || !chosenTable)} confirmDisabledReason={disabledReason} confirmLockedReason={!canWrite ? '予約を入れる権限を確認してください。' : undefined}>
+      confirmLabel="予約を入れる" confirmIcon={<Check size={16} aria-hidden="true" />} onConfirm={save} confirmDisabled={canWrite && (!dayReady || !hours || !validTime || Boolean(inputReason) || !chosenTable || allergies.length > 0)} confirmDisabledReason={disabledReason} confirmLockedReason={!canWrite ? '予約を入れる権限を確認してください。' : undefined}>
       <div className={styles.form} data-design-node="wEzuG">
         <div className={styles.contactRow}>
         <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField {...fields.bind('phone')} type="tel" inputMode="tel" autoComplete="off" invalid={fields.invalid('phone')} aria-describedby={describedBy('phone')} value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField><FieldError id="e2-phone-error">{fields.error('phone')}</FieldError></Field>
@@ -344,7 +346,10 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
             if (id !== 'all' && chosenTable?.floor_id !== id) setTableId('none')
           }} selected={chosenTable?.id ?? ''} onSelect={setTableId} guests={guests} disabled={busy} radioName="phone-table" heading={`選べる卓（${guests}名が座れる卓だけ）`} errorNames={['id', 'chosenTable?.id', 'tableId', 'chosen_table?.id', 'table_id']} />
         </> : null}
-        <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></SaveErrorField></Field>
+        <div className={styles.contactRow}>
+        <ReservationAllergySelect accountId={open ? accountId : null} role={staffRole} values={allergies} onChange={setAllergies} disabled={busy} />
+        <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="記念日など" /></SaveErrorField></Field>
+        </div>
         {friend?.lineUid ? (
           <div className={styles.notifyRow}>
             <SaveErrorField names={["notify"]}><Toggle checked={notify} onChange={setNotify} label="LINE で確認を送る" /></SaveErrorField>

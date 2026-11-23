@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
 const floorApi = vi.hoisted(() => ({ floors: vi.fn(async () => ({ data: [] })) }))
 vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: floorApi }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
+vi.mock('@/lib/api', async (original) => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, accountSettings: { ...actual.api.accountSettings, getAllergyOptions: vi.fn(async () => ({ success: true, data: { version: 1, options: ['卵', '乳'] } })) } } } })
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { reservation, tables } from '../booking-kit/test-data'
@@ -120,6 +121,22 @@ describe('電話予約（E-2）', () => {
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({
       source: 'phone', customerName: '見本 183', customerPhone: '09000005678', lineUid: 'U-1', guestCount: 2, tableId: 't1', notifyLine: true,
     }))
+  })
+
+  it('アレルギーを選んだ予約は保存を止める', async () => {
+    render(<PhoneReservationDrawer staffRole="owner" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '田中' } })
+    fireEvent.click(screen.getByText(/明日/))
+    fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
+    const box = screen.getByRole('combobox', { name: 'アレルギー' }) as HTMLInputElement
+    await waitFor(() => expect(box.disabled).toBe(false))
+    fireEvent.focus(box)
+    fireEvent.click(screen.getByRole('option', { name: '卵' }))
+    const submit = screen.getByRole('button', { name: /予約を入れる/ }) as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    expect(submit.getAttribute('aria-description')).toContain('まだ保存できません')
+    fireEvent.click(submit)
+    expect(api.createReservation).not.toHaveBeenCalled()
   })
 
   it('お名前も時刻も無い間は保存を止め、欄を離れた時の2つの理由も保つ', async () => {

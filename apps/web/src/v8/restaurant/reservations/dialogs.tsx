@@ -1,5 +1,6 @@
 'use client'
-import { normalizePhone, phoneProblem } from '@line-crm/shared';
+import { allergyValues, normalizePhone, phoneProblem } from '@line-crm/shared';
+import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
 
 import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
 
@@ -54,13 +55,15 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
+export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, accountId, staffRole, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
   reservation: RestaurantReservation | null
   missing?: boolean
   tables: RestaurantTable[]
   courses: RestaurantMenuItem[]
   busy: boolean
   canWrite: boolean
+  accountId?: string | null
+  staffRole?: string | null
   onClose: () => void
   onSave: (patch: ReservationPatch) => Promise<ReservationEditSaveResult> | void
   onCancelReservation: (id: string) => void
@@ -98,11 +101,12 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
   fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。', { required: true })
   if (!reservation) return null
+  const allergyChanged = JSON.stringify(allergyValues(draft.allergyNote)) !== JSON.stringify(allergyValues(reservation.allergy_note))
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
   const save = async () => {
     const { draft: input, canWrite: allowed, busy: working, changedElsewhere: stale, onSave: commit } = currentInput.current
-    if (saving.current || working || !allowed || stale) return
+    if (saving.current || working || !allowed || stale || allergyChanged) return
     if (fields.submit().length > 0) {
       requestAnimationFrame(() => {
         const target = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')
@@ -123,7 +127,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         endsAt: datetimeLocalJstToUtcIso(input.endsAt),
         tableId: input.tableId || null,
         courseId: input.courseId || null,
-        allergyNote: input.allergyNote || null,
+        allergyNote: reservation.allergy_note || null,
       })
       if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
     } catch (error) {
@@ -162,7 +166,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             )
           ) : null}
           <Button type="button" onClick={onClose} disabled={busy}>{canWrite && !hold ? 'キャンセル' : '閉じる'}</Button>
-          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || changedElsewhere}><Check aria-hidden="true" />保存する</Button> : null}
+          {canWrite && !hold ? <Button type="submit" variant="primary" disabled={busy || changedElsewhere || allergyChanged} disabledReason={allergyChanged ? "アレルギーの変更はまだ保存できません。" : undefined}><Check aria-hidden="true" />保存する</Button> : null}
         </>
       )}
     >
@@ -203,9 +207,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
               <SaveErrorField names={["courseId","draft.courseId","course_id","draft.course_id"]}><EntitySelect aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} /></SaveErrorField>
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
           </Field>
-          <Field label="アレルギー・特記事項" htmlFor="rs-edit-allergy">
-            <SaveErrorField names={["allergyNote","draft.allergyNote","allergy_note","draft.allergy_note"]}><TextField id="rs-edit-allergy" readOnly={!canWrite} value={draft.allergyNote} onChange={(event) => setDraft({ ...draft, allergyNote: event.target.value })} /></SaveErrorField>
-          </Field>
+          <ReservationAllergySelect accountId={accountId} role={staffRole} values={allergyValues(draft.allergyNote)} onChange={values => setDraft({ ...draft, allergyNote: values.length ? JSON.stringify(values) : '' })} disabled={!canWrite || busy} />
         </>
       )}
     </RsDialog></SaveErrorScope>

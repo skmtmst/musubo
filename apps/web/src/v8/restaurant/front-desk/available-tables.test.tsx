@@ -16,6 +16,8 @@ const fixtures = [
 const net = vi.hoisted(() => ({ floors: vi.fn(), reservationsDay: vi.fn() }))
 vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: { floors: net.floors } }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { reservationsDay: net.reservationsDay } }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'staff' }))
+vi.mock('@/lib/api', async original => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, accountSettings: { ...actual.api.accountSettings, getAllergyOptions: vi.fn(async () => ({ success: true, data: { version: 1, options: ['卵', '乳'] } })) } } } })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 it('階の順と卓番の数の順で表示し、人数に合う件数で絞り、隠れた選択を外す', async () => {

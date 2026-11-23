@@ -16,6 +16,8 @@ import { LogIn, Minus, Plus } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
+import ReservationAllergySelect from '@/components/shared/reservation-allergy-select'
+import { useStaffRole } from '@/lib/staff-role'
 import type { RestaurantFloor } from '@line-crm/shared'
 import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
 import AvailableTables, { tableGroups } from './available-tables'
@@ -55,6 +57,8 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
   onSaved: (result: { seated: boolean }) => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const role = useStaffRole()
+  const [allergies, setAllergies] = useState<string[]>([])
 
   const [now, setNow] = useState(() => new Date())
   const [guests, setGuests] = useState(2)
@@ -73,7 +77,7 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
 
   useEffect(() => {
     if (!open) return
-    setNow(new Date()); setGuests(2); setTableId(''); setFloorId('all'); setFloors([]); initialized.current = false; setError(''); setRows(null)
+    setNow(new Date()); setGuests(2); setTableId(''); setFloorId('all'); setFloors([]); setAllergies([]); initialized.current = false; setError(''); setRows(null)
   }, [open])
 
   useEffect(() => {
@@ -112,6 +116,7 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
   const waitUntil = currentRows && free.length === 0 ? nextFreeAt(tables, guests, currentRows, now.getTime()) : null
 
   const save = async () => {
+    if (allergies.length) return
     if (!tableId) { setError('座る卓を選んでください。'); return }
     setBusy(true); setError('')
     try {
@@ -140,8 +145,8 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
       error={error || undefined}
       confirmLabel="入店にする"
       confirmIcon={<LogIn size={16} aria-hidden="true" />}
-      confirmDisabled={!tableId || !currentRows || floorStatus === 'loading'}
-      confirmDisabledReason="座る卓を選んでください。"
+      confirmDisabled={!tableId || !currentRows || floorStatus === 'loading' || allergies.length > 0}
+      confirmDisabledReason={allergies.length ? 'アレルギーを含む予約はまだ保存できません。' : '座る卓を選んでください。'}
       onConfirm={() => save()}
       onCancel={onClose}
     >
@@ -154,6 +159,7 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
             <IconButton aria-label="人数を増やす" disabled={guests >= MAX_GUESTS || busy} onClick={() => setGuests((n) => Math.min(MAX_GUESTS, n + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
           </div>
         </div>
+        <ReservationAllergySelect accountId={open ? accountId : null} role={role} values={allergies} onChange={setAllergies} disabled={busy} />
         {floorStatus === 'error' && <Notice tone="warn" message="階・エリアを読み込めませんでした。卓はすべて表示しています。" />}
         {currentRows === null ? <p className={styles.hint}>空いている卓を調べています。</p> : <>
           <AvailableTables tables={free} floors={floors} floorId={floorId} onFloorChange={setFloorId} selected={tableId} onSelect={setTableId} guests={guests} disabled={busy} />

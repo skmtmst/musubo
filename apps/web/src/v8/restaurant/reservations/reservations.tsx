@@ -264,7 +264,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         preset={phone}
         onBack={() => onPhone(null)}
         onSave={(body) => save(() => (body.kind === 'hold'
-          ? restaurantTestApi.holdReservation(accountId, { storeId, startsAt: String(body.startsAt), endsAt: String(body.endsAt), guestCount: Number(body.guestCount), tableId: (body.tableId as string | null) ?? null, holdMinutes: Number(body.holdMinutes), note: String(body.allergyNote || '電話のお客さま用') })
+          ? restaurantTestApi.holdReservation(accountId, { storeId, startsAt: String(body.startsAt), endsAt: String(body.endsAt), guestCount: Number(body.guestCount), tableId: (body.tableId as string | null) ?? null, holdMinutes: Number(body.holdMinutes), note: String(body.note || '電話のお客さま用') })
           : restaurantTestApi.createReservation(accountId, body).then((res) => {
             if (body.notifyLine && !res.data.lineNotice.sent) setLineWarning('予約は保存しました。LINE の確認は送れていません。友だちの連携と送信の状態を確かめてください。')
             return res
@@ -344,6 +344,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onEdit={(id) => { setDetailId(''); setOpenId(id) }}
       />
       <EditReservationDialog
+        accountId={accountId} staffRole={role}
         key={editTarget?.sequence ?? 0}
         reservation={opened}
         missing={missing}
