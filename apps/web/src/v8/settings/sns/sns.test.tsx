@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
- * 設定 › SNS 連携の画面（★`設定SNS連携_複数接続_第1段_v7.pen` F1〜F8／2026-11-16 利用者承認）。
+ * 設定 › SNS 連携の画面（★`設定SNS連携_複数接続_第1段_v10.pen` の F1〜F8 が正本）。
  * 守るのは BEHAVIOR.md に書いた決めごと：
  *  - 段の頭に「連携 n個（契約枠 m個）」と［接続を追加する］を出す（接続が無いときは状態の札）。
  *  - 接続は一覧の行で出し、つなぎ直す・解除するは行の操作（`RowMenu`）の中。
@@ -13,9 +13,9 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InstagramConnectionStatus } from '@line-crm/shared'
-import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
+import type { GoogleConnection, GoogleConnectionData } from '@/lib/restaurant-google-api'
 import SnsSettingsPage from './sns'
 
 /** 閲覧のみに添える理由（sns.tsx の LOCKED_REASON と同じ文）。 */
@@ -25,6 +25,8 @@ const READ_ONLY_NOTICE = '閲覧のみの権限です。接続の追加・解除
 
 const fixture = vi.hoisted(() => ({
   googleConnection: vi.fn(),
+  googleConnections: vi.fn(),
+  igConnections: vi.fn(),
   googleConnectStart: vi.fn(),
   googleSelectLocation: vi.fn(),
   googleDisconnect: vi.fn(),
@@ -41,13 +43,14 @@ const fixture = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/restaurant-google-api', () => ({
-  restaurantGoogleApi: { connection: fixture.googleConnection, connectStart: fixture.googleConnectStart, selectLocation: fixture.googleSelectLocation, disconnect: fixture.googleDisconnect },
+  restaurantGoogleApi: { connection: fixture.googleConnection, connections: fixture.googleConnections, connectStart: fixture.googleConnectStart, selectLocation: fixture.googleSelectLocation, disconnect: fixture.googleDisconnect },
 }))
 
 vi.mock('@/lib/api', () => ({
   api: {
     instagram: {
       connection: fixture.igConnection,
+      connections: fixture.igConnections,
       start: fixture.igStart,
       disconnect: fixture.igDisconnect,
       refresh: fixture.igRefresh,
@@ -107,6 +110,8 @@ function status(state: InstagramConnectionStatus['state'], connection?: Instagra
 }
 
 const CONNECTED = {
+  /* 接続そのものの id。画面には出さないが、操作の宛先としてAPIへ渡す。 */
+  id: 'igc-1',
   pageId: 'page-1',
   instagramId: 'ig-1',
   pageName: '然カフェ',
@@ -136,6 +141,13 @@ function googleCard() {
 async function openIgMenu() {
   fireEvent.click(await igCard().findByRole('button', { name: '@nen_cafeの操作' }))
 }
+
+/* 既定は「一覧の口がまだ無い配備先」。その場合も1件ぶんの返事から1行を出して画面を止めない。
+   複数行を見る試験だけが、この既定を上書きして一覧の返事を渡す。 */
+beforeEach(() => {
+  fixture.googleConnections.mockRejectedValue(new Error('not found'))
+  fixture.igConnections.mockRejectedValue(new Error('not found'))
+})
 
 afterEach(() => {
   cleanup()
@@ -190,7 +202,8 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
 
     fireEvent.click(await igCard().findByRole('button', { name: '接続を確かめる' }))
 
-    await waitFor(() => expect(fixture.igRefresh).toHaveBeenCalledWith('acc-1'))
+    // 確かめる相手は「その行の接続」。既定の1件に任せない。
+    await waitFor(() => expect(fixture.igRefresh).toHaveBeenCalledWith('acc-1', 'igc-1'))
     // 認可画面には行かない（つなぎ直しとは別の操作）。
     expect(fixture.igStart).not.toHaveBeenCalled()
     // 確かめ終わったら状態を読み直す。
@@ -281,7 +294,8 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     expect(start.hasAttribute('disabled')).toBe(true)
     fireEvent.click(start)
     expect(fixture.igStart).toHaveBeenCalledTimes(1)
-    expect(fixture.igStart).toHaveBeenCalledWith('acc-1')
+    // 1件目は「増やす」ではなく今までどおりの接続開始（add を付けない）。
+    expect(fixture.igStart).toHaveBeenCalledWith('acc-1', { connectionId: null, add: false })
 
     rejectStart(new Error('offline'))
     await screen.findByText('Instagram のログイン画面を開けませんでした。もう一度お試しください。')
@@ -299,7 +313,8 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     const dialog = within(await screen.findByRole('dialog'))
     expect(dialog.getByText('Instagramの接続を解除しますか？')).toBeTruthy()
     fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
-    await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 3))
+    // 版だけでなく「押した行の接続」も渡す（渡さないと先頭の接続が消える）。
+    await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 3, 'igc-1'))
   })
 
   it('解除の小窓は対象と枠数の減りを示す（契約枠は変わらない）', async () => {
@@ -397,7 +412,8 @@ describe('Google のカード（★v7 F1・F7）', () => {
     expect((await googleCard().findAllByText('未接続')).length).toBe(1)
     expect(googleCard().getByText(/11個目からは個別見積もりです/)).toBeTruthy()
     fireEvent.click(googleCard().getByRole('button', { name: 'Google アカウントを接続する' }))
-    await waitFor(() => expect(fixture.googleConnectStart).toHaveBeenCalledWith('acc-1'))
+    // 1件目は add を付けない（付けると解除済みの行を再利用せず死んだ行が溜まる）。
+    await waitFor(() => expect(fixture.googleConnectStart).toHaveBeenCalledWith('acc-1', { connectionId: null, add: false }))
     expect(await screen.findByText('Google の許可画面を開けませんでした。もう一度お試しください。')).toBeTruthy()
     // 口コミ・投稿・プロフィールへの移動は接続していないときは出さない。
     expect(googleCard().queryByRole('link', { name: '口コミへ' })).toBeNull()
@@ -468,6 +484,236 @@ describe('Google のカード（★v7 F1・F7）', () => {
     fireEvent.click(await card.findByText('渋谷店'))
     fireEvent.click(card.getByRole('button', { name: 'この店舗を接続する' }))
     await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false, undefined))
+  })
+})
+
+/*
+ * 接続が2つ以上あるときに操作先を取り違えないための決めごと。
+ * 画面の見た目は v10 のまま。変えたのは「どの接続を相手にするか」を口へ渡すところだけ。
+ * 既定の1件に任せると、2件目の行を押しても先頭の接続が繋ぎ直され／解除される。
+ */
+describe('行の操作は押した行の接続をAPIへ渡す（複数接続・v10 F1・F2）', () => {
+  /** 先頭ではない2件目の接続。id も版も先頭（igc-1・版3）と変える。 */
+  const IG_SECOND = {
+    id: 'igc-2',
+    pageId: 'page-2',
+    instagramId: 'ig-2',
+    pageName: '然カフェ 2号店',
+    username: 'nen_cafe_2',
+    expiresAt: '2026-12-31T00:00:00.000Z',
+    dataAccessExpiresAt: null,
+    version: 7,
+    syncedAt: '2026-10-08T01:00:00.000Z',
+  }
+
+  it('Instagram の［つなぎ直す］は行の接続IDを渡し、追加の指示は付けない', async () => {
+    fixture.igStart.mockResolvedValue({ success: true, data: { url: 'https://example.test/ig', expiresAt: '' } })
+    setup('expired', IG_SECOND)
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'つなぎ直す' }))[0])
+
+    // つなぎ直しは「増やす」ではないので追加の指示は付かない（mode=add を送らない）。
+    await waitFor(() => expect(fixture.igStart).toHaveBeenCalledWith('acc-1', { connectionId: 'igc-2', add: undefined }))
+  })
+
+  it('Instagram の［解除する］は行の接続IDとその行の版を渡す', async () => {
+    fixture.igDisconnect.mockResolvedValue({ success: true })
+    setup('connected', IG_SECOND)
+
+    fireEvent.click(await igCard().findByRole('button', { name: '@nen_cafe_2の操作' }))
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
+
+    // 先頭の接続（igc-1・版3）ではなく、押した行（igc-2・版7）を相手にする。
+    await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 7, 'igc-2'))
+  })
+
+  it('Instagram の［接続を確かめる］も行の接続IDを渡す', async () => {
+    fixture.igRefresh.mockResolvedValue({ success: true })
+    setup('connected', IG_SECOND)
+
+    fireEvent.click(await igCard().findByRole('button', { name: '接続を確かめる' }))
+
+    await waitFor(() => expect(fixture.igRefresh).toHaveBeenCalledWith('acc-1', 'igc-2'))
+  })
+
+  it('Google の［つなぎ直す］は行の接続IDを渡す', async () => {
+    fixture.googleConnectStart.mockResolvedValue({ success: true, mode: 'reconnect', authorizeUrl: 'https://example.test/g' })
+    fixture.googleConnection.mockResolvedValue({
+      ...googleData(),
+      connection: { id: 'gc-2', confirmationRevision: 5, status: 'expired', locationName: 'locations/2', locationTitle: '然カフェ 2号店' },
+    })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'つなぎ直す' }))[0])
+
+    await waitFor(() => expect(fixture.googleConnectStart).toHaveBeenCalledWith('acc-1', { connectionId: 'gc-2', add: undefined }))
+  })
+
+  it('Google の［解除する］は行の接続IDとその行の確認版を渡し、1件だけ解除する', async () => {
+    fixture.googleDisconnect.mockResolvedValue({ success: true })
+    fixture.googleConnection.mockResolvedValue({
+      ...googleData(),
+      connection: { id: 'gc-2', confirmationRevision: 5, status: 'connected', locationName: 'locations/2', locationTitle: '然カフェ 2号店' },
+    })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+
+    fireEvent.click(await googleCard().findByRole('button', { name: '然カフェ 2号店の操作' }))
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
+
+    await waitFor(() => expect(fixture.googleDisconnect).toHaveBeenCalledWith('acc-1', {
+      expectedConnectionId: 'gc-2',
+      expectedConfirmationRevision: 5,
+    }))
+  })
+})
+
+/*
+ * 一覧の口から2件目の行を出すところ。承認済みデザイン v10 の F1 `tIRy5`・F2 `VH2Ga` は
+ * Google・Instagram とも「連携 2個」の一覧で、行の数だけが増える。
+ * 札・ことば・並びは v10 のままで、契約枠の数は別の担当の口が入るまで既定値。
+ */
+describe('一覧の口の返事を2行として出す（受入条件1・v10 F1・F2）', () => {
+  const GOOGLE_TWO: GoogleConnection[] = [
+    {
+      id: 'gc-1',
+      confirmationRevision: 4,
+      status: 'connected',
+      googleAccountEmail: 'shop@example.com',
+      locationName: 'locations/1',
+      locationTitle: '然カフェ 本店',
+      lastSyncedAt: '2026-10-07T01:00:00.000Z',
+    },
+    {
+      id: 'gc-2',
+      confirmationRevision: 5,
+      status: 'connected',
+      googleAccountEmail: 'shop@example.com',
+      locationName: 'locations/2',
+      locationTitle: '然カフェ 2号店',
+      lastSyncedAt: '2026-10-08T01:00:00.000Z',
+    },
+  ]
+
+  const IG_TWO = {
+    state: 'connected' as const,
+    connections: [
+      { ...CONNECTED, state: 'connected' as const },
+      {
+        id: 'igc-2',
+        state: 'expired' as const,
+        pageId: 'page-2',
+        instagramId: 'ig-2',
+        pageName: '然カフェ 2号店',
+        username: 'nen_cafe_2',
+        expiresAt: '2026-12-31T00:00:00.000Z',
+        dataAccessExpiresAt: null,
+        version: 7,
+        syncedAt: '2026-10-08T01:00:00.000Z',
+      },
+    ],
+  }
+
+  /** 一覧の口が両方そろっている配備先。1件ぶんの返事は先頭の接続を指す。 */
+  function setupTwo() {
+    fixture.googleConnection.mockResolvedValue({
+      ...googleData(),
+      connection: { id: 'gc-1', confirmationRevision: 4, status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+    })
+    fixture.googleConnections.mockResolvedValue({ success: true, store: googleData().store, connections: GOOGLE_TWO })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', CONNECTED) })
+    fixture.igConnections.mockResolvedValue({ success: true, data: IG_TWO })
+    render(<SnsSettingsPage />)
+  }
+
+  /* カードには注記の箇条書きも入るので、接続の行だけを目印で拾う。 */
+  async function connectionRows(service: 'google' | 'instagram'): Promise<HTMLElement[]> {
+    const card = screen.getByRole('region', { name: service === 'google' ? 'Google ビジネス' : 'Instagram' })
+    await waitFor(() => expect(card.querySelectorAll('[data-connection-id]').length).toBeGreaterThan(0))
+    return Array.from(card.querySelectorAll<HTMLElement>('[data-connection-id]'))
+  }
+
+  it('Google は2行出て、主連携の札は先頭の行だけに付く', async () => {
+    setupTwo()
+
+    const rows = await connectionRows('google')
+    expect(rows.map((row) => row.getAttribute('data-connection-id'))).toEqual(['gc-1', 'gc-2'])
+    expect(within(rows[0]!).getByText('主連携')).toBeTruthy()
+    expect(within(rows[1]!).queryByText('主連携')).toBeNull()
+    expect(googleCard().getByText('連携 2個（契約枠 1個）')).toBeTruthy()
+  })
+
+  it('Google は行ごとに営業時間への行き先を出す（店舗を選び終えた行だけ）', async () => {
+    fixture.googleConnection.mockResolvedValue({
+      ...googleData(),
+      connection: { id: 'gc-1', confirmationRevision: 4, status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+    })
+    fixture.googleConnections.mockResolvedValue({
+      success: true,
+      store: googleData().store,
+      connections: [GOOGLE_TWO[0]!, { ...GOOGLE_TWO[1]!, status: 'expired' as const }],
+    })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+
+    const rows = await connectionRows('google')
+    expect(within(rows[0]!).getByRole('link', { name: '営業時間へ' })).toBeTruthy()
+    // 期限切れの行は取り込みが止まっているので、営業時間の画面へは出さない。
+    expect(within(rows[1]!).queryByRole('link', { name: '営業時間へ' })).toBeNull()
+  })
+
+  it('Instagram は2行出て、札は行ごと。期限切れの行だけ［つなぎ直す］が行の中に出る', async () => {
+    setupTwo()
+
+    const rows = await connectionRows('instagram')
+    expect(rows.map((row) => row.getAttribute('data-connection-id'))).toEqual(['ig-1', 'ig-2'])
+    expect(within(rows[0]!).getByText('接続済み')).toBeTruthy()
+    expect(within(rows[1]!).getByText('接続の異常')).toBeTruthy()
+    expect(within(rows[0]!).queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
+    expect(within(rows[1]!).getByRole('button', { name: 'つなぎ直す' })).toBeTruthy()
+    expect(igCard().getByText('連携 2個（契約枠 1個）')).toBeTruthy()
+  })
+
+  it('2行目の［解除する］は2行目の接続IDと版を渡す（先頭を解除しない）', async () => {
+    fixture.igDisconnect.mockResolvedValue({ success: true })
+    setupTwo()
+
+    fireEvent.click(await igCard().findByRole('button', { name: '@nen_cafe_2の操作' }))
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
+
+    await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 7, 'igc-2'))
+  })
+
+  it('2行目の Google の［解除する］も2行目の接続を相手にする', async () => {
+    fixture.googleDisconnect.mockResolvedValue({ success: true })
+    setupTwo()
+
+    fireEvent.click(await googleCard().findByRole('button', { name: '然カフェ 2号店の操作' }))
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
+
+    await waitFor(() => expect(fixture.googleDisconnect).toHaveBeenCalledWith('acc-1', {
+      expectedConnectionId: 'gc-2',
+      expectedConfirmationRevision: 5,
+    }))
+  })
+
+  it('一覧の口が無い配備先では1行のまま画面が動く（失敗の表示は出さない）', async () => {
+    setup('connected', CONNECTED)
+
+    const rows = await connectionRows('instagram')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.getAttribute('data-connection-id')).toBe('ig-1')
+    expect(igCard().getByText('連携 1個（契約枠 1個）')).toBeTruthy()
+    expect(igCard().queryByRole('button', { name: 'もう一度試す' })).toBeNull()
   })
 })
 
