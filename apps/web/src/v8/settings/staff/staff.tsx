@@ -57,6 +57,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import EditorSurface from '@/components/shared/editor-surface'
 import { PageFooter } from '@/components/templates/page-footer'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import { useSearchParams } from 'next/navigation';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -772,7 +773,17 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const router = useRouter()
 
   const tab = useMergedTab(STAFF_TAB_KEYS, 'tab', 'members')
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, accounts } = useAccount()
+  const section = useSearchParams().get('section')
+  const sessionsRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (section !== 'sessions' || tab !== 'members') return
+    const details = sessionsRef.current
+    if (!details) return
+    details.open = true
+    const frame = requestAnimationFrame(() => details.scrollIntoView({ block: 'start' }))
+    return () => cancelAnimationFrame(frame)
+  }, [section, tab])
   const [members, setMembers] = useState<StaffMember[]>([])
   const [membersAccountId, setMembersAccountId] = useState<string | null>(null)
   const [accessUsers, setAccessUsers] = useState<AccessUserItem[]>([])
@@ -814,7 +825,14 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     setSummaryReady(false)
     try {
       const scope = selectedAccountId ?? undefined
-      if (!scope) throw new Error('アカウントを選択してください')
+      if (!scope) {
+        setMembers([])
+        setMembersAccountId(null)
+        setAccessUsers([])
+        setUsersTotal(0)
+        setAccessRoles([])
+        return
+      }
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
         api.staff.list(scope),
         loadStaffIdentity(),
@@ -1130,7 +1148,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             </>
           ) : (
             <>
-              <ListToolbar
+              {selectedAccountId ? <ListToolbar
                 search={{ width: 220, label: '名前・メールで探す', placeholder: '名前・メールで探す', value: query, onChange: setQuery }}
                 filters={tab === 'members' ? (
                   <SegmentedControl<'active' | 'suspended' | 'all'>
@@ -1151,7 +1169,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   /* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */
                   <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 )}
-              />
+              /> : null}
               {resendError ? <Notice tone="danger" message={resendError} /> : null}
               {tab === 'roles' ? (
                 <div className={styles.roleCards}>
@@ -1164,9 +1182,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   ))}
                 </div>
               ) : null}
-              {listCard}
+              {selectedAccountId ? listCard : <AccountRequiredState hasAccounts={(accounts?.length ?? 0) > 0} />}
               {tab === 'members' && missing > 0 ? <p className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</p> : null}
-              {!loading && !error ? (
+              {selectedAccountId && !loading && !error ? (
                 <div className={styles.listFoot}>
                   <p>{`ユーザー ${formatNumber(filteredUsers.length)} 人中 ${formatNumber(shown.length)} 人を表示${usersTotal > accessUsers.length ? `（全${formatNumber(usersTotal)} 人中${formatNumber(accessUsers.length)} 人まで読み込み）` : ''}`}</p>
                   {usersTotal > accessUsers.length ? (
@@ -1176,7 +1194,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} correctOutOfRange={!loading && !error} />
                 </div>
               ) : null}
-              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
+              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認" detailsRef={sessionsRef}><SessionsCard /></Disclosure> : null}
               {administrator && tab === 'roles' ? <MfaPolicy compact key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
             </>
           )}
