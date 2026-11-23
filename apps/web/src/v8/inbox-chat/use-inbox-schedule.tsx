@@ -10,6 +10,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PendingAttachment } from './inbox-model';
 import { MESSAGE_MAX_LENGTH, draftKeyOf, jstDatetimeLocalToIso } from './inbox-model';
 import { describeSendFailure } from './send-failure';
+import type { InsertTokenNames } from '@/components/shared/insert-tokens';
+
+const NO_TOKEN_NAMES: InsertTokenNames = {}
 
 type Options = {
   detailAccountRef: RefObject<string | null>
@@ -31,9 +34,11 @@ type Options = {
   quotedMessage: ChatDetailMessage | null
   sendKeysRef: RefObject<IdempotencyKeyStore>
   setQuotedMessage: Dispatch<SetStateAction<ChatDetailMessage | null>>
+  /** 失敗文の差し込みの名前（返信欄と同じ名前で言う）。 */
+  tokenNames?: InsertTokenNames
 }
 
-export function useInboxSchedule({ getFriendName, detailAccountRef, selectedChatIdRef, selectedChatId, messageContent, pendingImage, pendingAttachment, setError, selectedAccountId, dropSentDraft, pendingImageRef, setPendingImage, setPendingImageMeta, attachDraftsRef, putAttachment, setMessageContent, quotedMessage, sendKeysRef, setQuotedMessage }: Options) {
+export function useInboxSchedule({ getFriendName, detailAccountRef, selectedChatIdRef, selectedChatId, messageContent, pendingImage, pendingAttachment, setError, selectedAccountId, dropSentDraft, pendingImageRef, setPendingImage, setPendingImageMeta, attachDraftsRef, putAttachment, setMessageContent, quotedMessage, sendKeysRef, setQuotedMessage, tokenNames = NO_TOKEN_NAMES }: Options) {
 
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
@@ -205,7 +210,7 @@ export function useInboxSchedule({ getFriendName, detailAccountRef, selectedChat
       // 別の会話・アカウントへ切り替えたあとの古い失敗は、
       // 新しい画面へ出さない(A02-04)。
       if (detailAccountRef.current === schedulingAccountId && selectedChatIdRef.current === schedulingChatId) {
-        setError(describeSendFailure(scheduleError))
+        setError(describeSendFailure(scheduleError, new Date(), tokenNames))
       }
     } finally {
       setScheduling(false)

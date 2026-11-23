@@ -7,6 +7,7 @@ import type { SavedViewDraft, SavedViewSaveResult } from '@/components/chats/sav
 import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary';
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
 import Notice from '@/components/shared/notice';
+import type { InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { InboxPage } from '@/components/templates/inbox-page';
 import { useAccount } from '@/contexts/account-context';
@@ -15,6 +16,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
+import { useInsertTokenNames } from '@/lib/use-insert-token-names';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
@@ -140,7 +142,10 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   const isComposingRef = useRef(false)
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // 返信の文の欄（札の入る欄）。引用・AIの下書き・訂正のあとに焦点を戻す。
+  const textareaRef = useRef<InsertTextFieldHandle>(null)
+  // 返信の札の名前（友だち情報・共通情報）。会話ごとに作り直す返信欄で取り直さないよう、アカウントごとに1回読む。
+  const tokenNames = useInsertTokenNames(selectedAccountId)
 
   // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
@@ -283,6 +288,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     handleScheduleSend,
     handleCancelScheduled,
   } = useInboxSchedule({
+    tokenNames,
     detailAccountRef,
     selectedChatIdRef,
     selectedChatId,
@@ -589,6 +595,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     handleSendPack,
     handleKeyDown,
   } = useInboxSend({
+    tokenNames,
     selectedChatId,
     sending,
     sendLockRef,
@@ -728,8 +735,6 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     pendingMessages,
     selectedChatId,
     chatDetail,
-    textareaRef,
-    messageContent,
   })
 
   const lineContent = (<FriendInfoSidebarBoundary resetKey={`${selectedAccountId ?? ''}:${activeFriendId ?? ''}`}><FriendInfoSidebar
@@ -801,7 +806,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
           openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef,
           messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage,
-          textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming,
+          textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming,
           dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey,
           setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor,
           setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError,
