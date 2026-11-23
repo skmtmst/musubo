@@ -4724,18 +4724,36 @@ CREATE TABLE incoming_webhooks (
   '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, confirmation_revision INTEGER NOT NULL DEFAULT 1);
 
 CREATE TABLE "instagram_connections" (
- line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id), page_id TEXT NOT NULL,
- instagram_id TEXT NOT NULL, page_name TEXT NOT NULL, username TEXT,
- page_token_encrypted TEXT NOT NULL, user_token_encrypted TEXT NOT NULL,
- expires_at TEXT NOT NULL, data_access_expires_at TEXT, profile_json TEXT, posts_json TEXT,
- refreshed_at TEXT NOT NULL, synced_at TEXT, connected_by TEXT NOT NULL,
- version INTEGER NOT NULL DEFAULT 1, scopes TEXT NOT NULL DEFAULT ''
+  -- NOT NULL を付ける。SQLite は非INTEGERの主キーに NULL を通し、NULL同士は別物として扱うので、
+  -- id を渡さない既存の INSERT が黙って id=NULL の行をいくつも作ってしまう。止めるほうを選ぶ。
+  -- そのうえで既定値を置く。配備中の旧Workerの upsert は id を渡さず、SQLite は
+  -- ON CONFLICT の衝突解決より前に NOT NULL を見るので、既定値がないと既存行を
+  -- 更新するだけの経路でも `NOT NULL constraint failed` で落ちてしまう。
+  -- 既定値で埋めれば旧Workerの upsert は通り、id を明示 NULL で渡す書き方は今も弾かれる。
+  id TEXT PRIMARY KEY NOT NULL DEFAULT ('igc_' || lower(hex(randomblob(12)))),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  page_id TEXT NOT NULL,
+  instagram_id TEXT NOT NULL,
+  page_name TEXT NOT NULL,
+  username TEXT,
+  page_token_encrypted TEXT NOT NULL,
+  user_token_encrypted TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  data_access_expires_at TEXT,
+  profile_json TEXT,
+  posts_json TEXT,
+  refreshed_at TEXT NOT NULL,
+  synced_at TEXT,
+  connected_by TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  scopes TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0)
 );
 
 CREATE TABLE "instagram_messages" (
  id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
- content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(attachments_json)), received_at TEXT NOT NULL, created_at TEXT NOT NULL,
+ content TEXT NOT NULL, attachments_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(attachments_json)), received_at TEXT NOT NULL, created_at TEXT NOT NULL, connection_id TEXT REFERENCES instagram_connections(id) ON DELETE SET NULL,
  PRIMARY KEY(line_account_id,id)
 );
 
@@ -4743,7 +4761,7 @@ CREATE TABLE instagram_oauth_states (
  state_hash TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  staff_id TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('started','exchanging','selecting','connecting')),
  candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
-);
+, connection_id TEXT REFERENCES instagram_connections(id) ON DELETE SET NULL);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -7716,11 +7734,11 @@ CREATE TABLE rt_google_changes (
   sent_at TEXT,
   applied_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL);
 
-CREATE TABLE rt_google_connections (
+CREATE TABLE "rt_google_connections" (
   id TEXT PRIMARY KEY,
-  store_id TEXT NOT NULL UNIQUE REFERENCES rt_stores(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
   line_account_id TEXT REFERENCES line_accounts(id),
   google_account_email TEXT,
   location_name TEXT,
@@ -7739,41 +7757,38 @@ CREATE TABLE rt_google_connections (
   average_rating REAL,
   total_review_count INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, last_posts_synced_at TEXT, last_metrics_synced_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_posts_synced_at TEXT,
+  last_metrics_synced_at TEXT,
+  confirmation_revision INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0)
+);
 
-CREATE TABLE rt_google_location_candidates (
-  id TEXT PRIMARY KEY,
+CREATE TABLE "rt_google_location_candidates" (
+  id TEXT PRIMARY KEY NOT NULL,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL,
   location_name TEXT NOT NULL,
   location_title TEXT NOT NULL,
   address_text TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(store_id, location_name)
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE rt_google_metrics_daily (
+CREATE TABLE "rt_google_metrics_daily" (
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
-  date TEXT NOT NULL,                       -- YYYY-MM-DD（店舗所在地の暦日。Googleの日次区切りに従う）
-
-  -- プロフィール表示（Business Impressions）の内訳
+  connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
   impressions_desktop_maps INTEGER,
   impressions_desktop_search INTEGER,
   impressions_mobile_maps INTEGER,
   impressions_mobile_search INTEGER,
-
-  -- 行動（クリック等）
-  direction_requests INTEGER,               -- ルート検索
-  call_clicks INTEGER,                      -- 電話ボタンのクリック（通話成立数ではない）
-  website_clicks INTEGER,                   -- サイトへのクリック
-
-  -- 飲食店向け
-  menu_clicks INTEGER,                      -- メニュー閲覧
-  bookings INTEGER,                         -- Google経由の予約（連携サービス未対応の店舗は NULL）
-  food_orders INTEGER,                      -- 料理の注文（同上）
-
-  fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  PRIMARY KEY (store_id, date)
+  direction_requests INTEGER,
+  call_clicks INTEGER,
+  website_clicks INTEGER,
+  menu_clicks INTEGER,
+  bookings INTEGER,
+  food_orders INTEGER,
+  fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE rt_google_oauth_states (
@@ -7786,7 +7801,7 @@ CREATE TABLE rt_google_oauth_states (
   expires_at TEXT NOT NULL,
   used_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL);
 
 CREATE TABLE rt_google_posts (
   id TEXT PRIMARY KEY,
@@ -7847,10 +7862,11 @@ CREATE TABLE rt_google_posts (
   checked_at TEXT,
   deleted_at TEXT,
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1)), instagram_caption TEXT, instagram_status TEXT NOT NULL DEFAULT 'none' CHECK(instagram_status IN ('none','pending','published','failed','skipped')), instagram_media_id TEXT, instagram_permalink TEXT, instagram_error TEXT, instagram_published_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1);
+, instagram_enabled INTEGER NOT NULL DEFAULT 0 CHECK(instagram_enabled IN (0,1)), instagram_caption TEXT, instagram_status TEXT NOT NULL DEFAULT 'none' CHECK(instagram_status IN ('none','pending','published','failed','skipped')), instagram_media_id TEXT, instagram_permalink TEXT, instagram_error TEXT, instagram_published_at TEXT, confirmation_revision INTEGER NOT NULL DEFAULT 1, connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL);
 
-CREATE TABLE rt_google_profiles (
-  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
+CREATE TABLE "rt_google_profiles" (
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE CASCADE,
   location_name TEXT NOT NULL,
   profile_json TEXT NOT NULL,
   fingerprint TEXT NOT NULL,
@@ -7876,7 +7892,7 @@ CREATE TABLE rt_google_reviews (
   reply_comment TEXT,
   reply_update_time TEXT,
   first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL,
   UNIQUE(store_id, review_name)
 );
 
@@ -7892,7 +7908,7 @@ CREATE TABLE rt_google_write_log (
   result TEXT NOT NULL CHECK (result IN ('accepted', 'failed', 'unknown')),
   error TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL);
 
 CREATE TABLE rt_inbound_emails (
   id TEXT PRIMARY KEY,
@@ -10964,9 +10980,24 @@ CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, 
 
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
+CREATE INDEX idx_instagram_connections_account_772
+  ON instagram_connections(line_account_id, sort_order, id);
+
+CREATE UNIQUE INDEX idx_instagram_connections_account_compat_772
+  ON instagram_connections(line_account_id);
+
+CREATE UNIQUE INDEX idx_instagram_connections_account_ig_772
+  ON instagram_connections(line_account_id, instagram_id);
+
 CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(instagram_id);
 
 CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
+
+CREATE INDEX idx_instagram_messages_connection_772
+  ON instagram_messages(connection_id, received_at, id);
+
+CREATE INDEX idx_instagram_oauth_states_connection_772
+  ON instagram_oauth_states(connection_id);
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
@@ -11656,14 +11687,50 @@ CREATE INDEX idx_rt_followup_targets_approval ON rt_store_followup_targets(appro
 
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
 
+CREATE INDEX idx_rt_google_changes_connection_772
+  ON rt_google_changes(connection_id, created_at DESC);
+
 CREATE INDEX idx_rt_google_changes_status ON rt_google_changes(store_id, status);
 
 CREATE INDEX idx_rt_google_changes_store ON rt_google_changes(store_id, created_at DESC);
 
+CREATE UNIQUE INDEX idx_rt_google_connections_location_772
+  ON rt_google_connections(store_id, location_name) WHERE location_name IS NOT NULL;
+
+CREATE INDEX idx_rt_google_connections_store_772
+  ON rt_google_connections(store_id, sort_order, created_at);
+
+CREATE UNIQUE INDEX idx_rt_google_connections_store_compat_772
+  ON rt_google_connections(store_id);
+
+CREATE INDEX idx_rt_google_location_candidates_connection_772
+  ON rt_google_location_candidates(connection_id);
+
+CREATE UNIQUE INDEX idx_rt_google_location_candidates_key_772
+  ON rt_google_location_candidates(COALESCE(connection_id, 'store:' || store_id), location_name);
+
+CREATE INDEX idx_rt_google_location_candidates_store_772
+  ON rt_google_location_candidates(store_id);
+
+CREATE UNIQUE INDEX idx_rt_google_location_candidates_store_compat_772
+  ON rt_google_location_candidates(store_id, location_name);
+
+CREATE UNIQUE INDEX idx_rt_google_metrics_daily_key_772
+  ON rt_google_metrics_daily(COALESCE(connection_id, 'store:' || store_id), date);
+
 CREATE INDEX idx_rt_google_metrics_daily_store_date
   ON rt_google_metrics_daily(store_id, date DESC);
 
+CREATE UNIQUE INDEX idx_rt_google_metrics_daily_store_date_compat_772
+  ON rt_google_metrics_daily(store_id, date);
+
+CREATE INDEX idx_rt_google_oauth_states_connection_772
+  ON rt_google_oauth_states(connection_id);
+
 CREATE INDEX idx_rt_google_oauth_states_expires ON rt_google_oauth_states(expires_at);
+
+CREATE INDEX idx_rt_google_posts_connection_772
+  ON rt_google_posts(connection_id, status, created_at DESC);
 
 CREATE INDEX idx_rt_google_posts_fingerprint
   ON rt_google_posts(store_id, content_fingerprint) WHERE content_fingerprint IS NOT NULL;
@@ -11675,8 +11742,22 @@ CREATE INDEX idx_rt_google_posts_status ON rt_google_posts(store_id, status);
 
 CREATE INDEX idx_rt_google_posts_store ON rt_google_posts(store_id, created_at DESC);
 
+CREATE UNIQUE INDEX idx_rt_google_profiles_key_772
+  ON rt_google_profiles(COALESCE(connection_id, 'store:' || store_id));
+
+CREATE INDEX idx_rt_google_profiles_store_772 ON rt_google_profiles(store_id);
+
+CREATE UNIQUE INDEX idx_rt_google_profiles_store_compat_772
+  ON rt_google_profiles(store_id);
+
+CREATE INDEX idx_rt_google_reviews_connection_772
+  ON rt_google_reviews(connection_id, reply_status, create_time DESC);
+
 CREATE INDEX idx_rt_google_reviews_store
   ON rt_google_reviews(store_id, reply_status, create_time DESC);
+
+CREATE INDEX idx_rt_google_write_log_connection_772
+  ON rt_google_write_log(connection_id, created_at DESC);
 
 CREATE INDEX idx_rt_google_write_log_store ON rt_google_write_log(store_id, created_at DESC);
 
@@ -13032,6 +13113,14 @@ CREATE TRIGGER instagram_connection_tenant_insert BEFORE INSERT ON instagram_con
 
 CREATE TRIGGER instagram_connection_tenant_update BEFORE UPDATE OF instagram_id,line_account_id ON instagram_connections WHEN EXISTS(SELECT 1 FROM instagram_connections existing JOIN line_accounts old_account ON old_account.id=existing.line_account_id JOIN line_accounts new_account ON new_account.id=NEW.line_account_id WHERE existing.instagram_id=NEW.instagram_id AND existing.line_account_id<>NEW.line_account_id AND COALESCE(old_account.tenant_id,'00000000-0000-4000-8000-000000000001')<>COALESCE(new_account.tenant_id,'00000000-0000-4000-8000-000000000001')) BEGIN SELECT RAISE(ABORT,'instagram_cross_tenant'); END;
 
+CREATE TRIGGER instagram_messages_connection_account_insert BEFORE INSERT ON instagram_messages WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_messages_connection_account_update BEFORE UPDATE OF connection_id,line_account_id ON instagram_messages WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_oauth_states_connection_account_insert BEFORE INSERT ON instagram_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
+CREATE TRIGGER instagram_oauth_states_connection_account_update BEFORE UPDATE OF connection_id,line_account_id ON instagram_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections c WHERE c.id=NEW.connection_id AND c.line_account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'instagram_connection_account_mismatch'); END;
+
 CREATE TRIGGER line_account_tag_links_scope
 BEFORE INSERT ON line_account_tag_links
 WHEN NOT EXISTS (
@@ -13326,6 +13415,38 @@ CREATE TRIGGER rt_followup_store_connected AFTER UPDATE OF line_account_id ON rt
 CREATE TRIGGER rt_followup_target_event_receipt AFTER INSERT ON rt_reservation_events
  WHEN NEW.reservation_id IS NOT NULL AND NEW.event_type LIKE 'restaurant.reservation.%'
  BEGIN INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) VALUES(NEW.id,'followup_targets'); END;
+
+CREATE TRIGGER rt_google_changes_connection_store_insert BEFORE INSERT ON rt_google_changes WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_changes_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_changes WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_location_candidates_connection_store_insert BEFORE INSERT ON rt_google_location_candidates WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_location_candidates_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_location_candidates WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_metrics_daily_connection_store_insert BEFORE INSERT ON rt_google_metrics_daily WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_metrics_daily_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_metrics_daily WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_oauth_states_connection_store_insert BEFORE INSERT ON rt_google_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_oauth_states_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_oauth_states WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_posts_connection_store_insert BEFORE INSERT ON rt_google_posts WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_posts_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_posts WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_profiles_connection_store_insert BEFORE INSERT ON rt_google_profiles WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_profiles_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_profiles WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_reviews_connection_store_insert BEFORE INSERT ON rt_google_reviews WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_reviews_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_reviews WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_write_log_connection_store_insert BEFORE INSERT ON rt_google_write_log WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
+
+CREATE TRIGGER rt_google_write_log_connection_store_update BEFORE UPDATE OF connection_id,store_id ON rt_google_write_log WHEN NEW.connection_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM rt_google_connections c WHERE c.id=NEW.connection_id AND c.store_id=NEW.store_id) BEGIN SELECT RAISE(ABORT,'google_connection_store_mismatch'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE (store_id=OLD.store_id AND datetime(starts_at)<datetime(OLD.ends_at) AND datetime(starts_at, '+' || slot_minutes || ' minutes')>datetime(OLD.starts_at)); END;
 

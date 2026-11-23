@@ -17,10 +17,11 @@ import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/sta
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
-import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
+import { restaurantGoogleApi, type GoogleConnection, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
 import { api } from '@/lib/api'
+import type { InstagramConnectionList } from '@/lib/api/features/settings'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate, formatNumber } from '@/lib/format'
@@ -99,7 +100,10 @@ const GOOGLE_FLASH: Record<string, { tone: 'success' | 'warn' | 'danger'; text: 
 type DisconnectTicket = {
   scope: { id: string | null }
   service: SnsService
+  /** 画面の行を見分ける目印。API の宛先ではない。 */
   connectionId: string
+  /** API へ宛先として送る接続の id。古い返事で分からないときは null。 */
+  apiConnectionId: string | null
   version: number | null
   /** Google の版の口。版が無い接続は null（版の確認なしで解除する）。 */
   googleExpected: { expectedConnectionId: string; expectedConfirmationRevision: number } | null
@@ -119,6 +123,10 @@ export default function SnsSettingsPage() {
   const [googleError, setGoogleError] = useState<unknown>(null)
   const [instagram, setInstagram] = useState<InstagramConnectionStatus | null>(null)
   const [instagramError, setInstagramError] = useState<unknown>(null)
+  /* 一覧の口の返事。接続が何件あってもここに全部入る。
+     読めなかったときは null にして、1件ぶんの返事から行を作る。 */
+  const [googleList, setGoogleList] = useState<GoogleConnection[] | null>(null)
+  const [instagramList, setInstagramList] = useState<InstagramConnectionList | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const loadVersion = useRef(0)
   const [addPlan, setAddPlan] = useState<SnsAdditionPlan | null>(null)
@@ -166,6 +174,14 @@ export default function SnsSettingsPage() {
           setInstagramError(null)
         })
         .catch((caught) => { if (version === loadVersion.current) { setInstagram(null); setInstagramError(caught) } }),
+      /* 一覧の口。行の並びだけを受け取る（まとめ・候補・権限は上の1件ぶんの返事から読む）。
+         口が無い配備先では失敗するので、そのときは null のままにして画面を止めない。 */
+      restaurantGoogleApi.connections(accountId)
+        .then((res) => { if (version === loadVersion.current) setGoogleList(res?.connections ?? null) })
+        .catch(() => { if (version === loadVersion.current) setGoogleList(null) }),
+      api.instagram.connections(accountId)
+        .then((res) => { if (version === loadVersion.current) setInstagramList(res.success && res.data?.connections ? res.data : null) })
+        .catch(() => { if (version === loadVersion.current) setInstagramList(null) }),
     ])
     if (version === loadVersion.current) setLoadedAccountId(accountId)
   }, [accountId])
@@ -176,6 +192,8 @@ export default function SnsSettingsPage() {
   const visibleGoogleError = loadedAccountId === accountId ? googleError : null
   const visibleInstagram = loadedAccountId === accountId ? instagram : null
   const visibleInstagramError = loadedAccountId === accountId ? instagramError : null
+  const visibleGoogleList = loadedAccountId === accountId ? googleList : null
+  const visibleInstagramList = loadedAccountId === accountId ? instagramList : null
   const googleStatus = visibleGoogle?.connection.status ?? null
   const googleLocation = visibleGoogle?.connection.locationName
   useEffect(() => {
@@ -187,8 +205,8 @@ export default function SnsSettingsPage() {
      契約枠を返す API が入るまでは既定値。 */
   const slots: SnsSlotsView = {
     contracted: SNS_DEFAULT_CONTRACTED,
-    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' })),
-    instagram: instagramSlots(visibleInstagram, (iso) => formatDate(iso, { style: 'day' })),
+    googleBusiness: googleSlots(visibleGoogle, (iso) => formatDate(iso, { style: 'detail' }), visibleGoogleList),
+    instagram: instagramSlots(visibleInstagram, (iso) => formatDate(iso, { style: 'day' }), visibleInstagramList),
   }
   const canManageGoogle = canManage && (visibleGoogle?.permissions.canManageConnection ?? true)
 
@@ -204,18 +222,23 @@ export default function SnsSettingsPage() {
   )) disconnectTicket.current = null
   const renderedDisconnectTicket = disconnectTicket.current
 
-  /** 認可画面へ進む。Google は店舗（ロケーション）の選択まで Google 側で行う。 */
-  const beginConnect = async (service: SnsService) => {
+  /**
+   * 認可画面へ進む。Google は店舗（ロケーション）の選択まで Google 側で行う。
+   * `target` は宛先。行の「つなぎ直す」はその行の接続、「接続を追加する」は `add`。
+   * どちらも渡さないと、サーバーは接続が1件のときだけその1件を相手にする。
+   */
+  const beginConnect = async (service: SnsService, target?: { connection?: SnsConnectionView; add?: boolean }) => {
     if (!accountId) return
     setBusy(true)
     setActionError('')
     try {
+      const connectionId = target?.add ? null : target?.connection?.connectionId ?? null
       if (service === 'googleBusiness') {
-        const res = await restaurantGoogleApi.connectStart(accountId)
+        const res = await restaurantGoogleApi.connectStart(accountId, { connectionId, add: target?.add })
         window.location.assign(res.authorizeUrl)
         return
       }
-      const res = await api.instagram.start(accountId)
+      const res = await api.instagram.start(accountId, { connectionId, add: target?.add })
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
     } catch (saveFailure) {
@@ -232,13 +255,16 @@ export default function SnsSettingsPage() {
   /**
    * Instagram の接続を確かめ直す（前からある機能・`POST /api/instagram/refresh`）。
    * 認可はやり直さず、今の接続がまだ生きているかをサーバーに確かめて表示を更新する。
+   * 札はカードに1つなので、この段に見えている接続をすべて確かめる（承認デザイン F8 のまま）。
    */
   const checkInstagram = async () => {
     if (!accountId) return
     setBusy(true)
     setActionError('')
     try {
-      await api.instagram.refresh(accountId)
+      const targets = slots.instagram.connections
+      if (targets.length === 0) await api.instagram.refresh(accountId)
+      else for (const connection of targets) await api.instagram.refresh(accountId, connection.connectionId)
       await load()
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
@@ -252,7 +278,10 @@ export default function SnsSettingsPage() {
   const startAddition = (service: SnsService) => {
     if (!accountId) return
     const plan = planAddition(slots, service, BILLING)
-    if (plan.kind === 'within-quota') { void beginConnect(service); return }
+    // 1件目は「増やす」ではなく今までどおりの接続開始にする。こうすると解除済みの行を
+    // つなぎ直せて、使われない行が溜まらない。2件目からは必ず新しい行を足す（add）。
+    const add = slots[service].connections.length > 0
+    if (plan.kind === 'within-quota') { void beginConnect(service, { add }); return }
     if (plan.kind === 'billing-unknown') return
     setActionError('')
     setAddPlan(plan)
@@ -268,15 +297,16 @@ export default function SnsSettingsPage() {
   /** 解除の確認を開く。版を控え、LINEアカウントの切り替えで無効にする。 */
   const askDisconnect = (service: SnsService, connection: SnsConnectionView) => {
     if (!accountId || !canManage) return
-    const googleConnection = service === 'googleBusiness' ? visibleGoogle?.connection ?? null : null
-    const revision = googleConnection?.confirmationRevision
+    // 版の口は「押した行の接続」から作る。段の先頭の接続ではない。
+    const revision = connection.version
     disconnectTicket.current = {
       scope: accountScope.current,
       service,
       connectionId: connection.id,
+      apiConnectionId: connection.connectionId ?? null,
       version: connection.version,
-      googleExpected: googleConnection?.id && Number.isSafeInteger(revision) && (revision as number) >= 1
-        ? { expectedConnectionId: googleConnection.id, expectedConfirmationRevision: revision as number }
+      googleExpected: service === 'googleBusiness' && connection.connectionId && Number.isSafeInteger(revision) && (revision as number) >= 1
+        ? { expectedConnectionId: connection.connectionId, expectedConfirmationRevision: revision as number }
         : null,
     }
     setActionError('')
@@ -296,7 +326,7 @@ export default function SnsSettingsPage() {
           setActionError('接続の版を読み取れませんでした。画面を読み込み直してからもう一度お試しください。')
           return false
         }
-        await api.instagram.disconnect(accountId, ticket.version)
+        await api.instagram.disconnect(accountId, ticket.version, ticket.apiConnectionId)
       } else {
         await restaurantGoogleApi.disconnect(accountId, ticket.googleExpected ?? undefined)
       }
@@ -417,17 +447,18 @@ export default function SnsSettingsPage() {
             <GoogleConnectionSettings key={accountId} accountId={accountId} data={visibleGoogle} onChanged={() => { void load() }} />
           ) : slots.googleBusiness.connections.length ? (
             <>
-              <p className={styles.foot}>{`契約済みの枠数までは、そのまま接続を追加できます。枠を超えて追加する場合は料金の確認があります（1枠 月額${unitYen}・税込、無料期間中は0円）。11個目からは個別見積もりです。`}</p>
+              {/* 枠の話は広い画面では題のすぐ下（F1 tIRy5）、細い画面では板の最後（F2 VH2Ga）。並べ替えは CSS の order が持つ。 */}
+              <p className={`${styles.foot} ${styles.slotFoot}`}>{`契約済みの枠数までは、そのまま接続を追加できます。枠を超えて追加する場合は料金の確認があります（1枠 月額${unitYen}・税込、無料期間中は0円）。11個目からは個別見積もりです。`}</p>
               <SnsConnectionList
                 slots={slots.googleBusiness}
                 canManage={canManageGoogle}
                 lockedReason={LOCKED_REASON}
                 busyId={busyId}
-                onReconnect={() => { void beginConnect('googleBusiness') }}
+                onReconnect={(connection) => { void beginConnect('googleBusiness', { connection }) }}
                 onDisconnect={(connection) => askDisconnect('googleBusiness', connection)}
-                rowLink={(connection) => connection.state === 'connected' && visibleGoogle.connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
+                /* 行き先は行ごとに見る。店舗を選び終えた接続だけ営業時間の画面へ出す。 */
+                rowLink={(connection) => connection.state === 'connected' && connection.locationName ? { href: '/settings/google-hours', label: '営業時間へ' } : null}
               />
-              {addNarrow('googleBusiness')}
               {restaurantStyle ? (
                 <>
                   {/* 前からある件数の表と移動。店舗名と取り込んだ日時は行の中に出るので、ここでは繰り返さない。 */}
@@ -445,6 +476,8 @@ export default function SnsSettingsPage() {
                 </>
               ) : null}
               <p className={styles.foot}>主連携は、営業時間や店舗情報の正本となる接続です。予約枠や営業中の判定にはこの接続の情報を使います。「主連携にする」でいつでも切り替えられます。</p>
+              {/* 細い画面の「接続を追加する」は主連携の説明のあと（F2 VH2Ga）。広い画面では隠れ、題の隣の押しボタンが残る（F1 tIRy5）。 */}
+              {addNarrow('googleBusiness')}
               {capabilities('googleBusiness', true)}
             </>
           ) : (
@@ -485,7 +518,7 @@ export default function SnsSettingsPage() {
                 canManage={canManage}
                 lockedReason={LOCKED_REASON}
                 busyId={busyId}
-                onReconnect={() => { void beginConnect('instagram') }}
+                onReconnect={(connection) => { void beginConnect('instagram', { connection }) }}
                 onDisconnect={(connection) => askDisconnect('instagram', connection)}
               />
               {addNarrow('instagram')}
@@ -543,7 +576,7 @@ export default function SnsSettingsPage() {
           busy={busy}
           error={actionError || undefined}
           onCancel={() => { setAddPlan(null); setActionError('') }}
-          onConfirm={() => { void beginConnect(addPlan.service) }}
+          onConfirm={() => { void beginConnect(addPlan.service, { add: true }) }}
         />
       ) : null}
 

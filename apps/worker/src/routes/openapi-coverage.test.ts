@@ -630,6 +630,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auto-replies/unmatched-settings',
   'PUT /api/auto-replies/unmatched-settings',
   'GET /api/instagram/connection',
+  'GET /api/instagram/connections',
   'DELETE /api/instagram/connection',
   'POST /api/instagram/oauth/start',
   'GET /api/instagram/oauth/callback',
