@@ -14,4 +14,5 @@ test('SLA-12 SLA-13: Proxyの自動pushで時計を止めず、manualヘッダ�
  const send=(manual=false)=>a.request('/line-api/v2/bot/message/push',{method:'POST',headers:{Authorization:'Bearer test-token','Content-Type':'application/json','X-Line-Account-Id':'a',...(manual?{'X-Line-Harness-Source':'manual'}:{})},body:JSON.stringify({to:uid,messages:[{type:'text',text:'返信'}]})},{DB:d.db} as Env['Bindings']);
  expect((await send()).status).toBe(200);expect(d.raw.prepare('SELECT first_response_at,last_operator_message_at FROM chats WHERE id=?').get(chat.id)).toEqual({first_response_at:null,last_operator_message_at:null});
  expect((await send(true)).status).toBe(200);const row=d.raw.prepare('SELECT first_response_at,last_operator_message_at FROM chats WHERE id=?').get(chat.id) as any;expect(row.first_response_at).toBeTruthy();expect(row.first_response_at).toBe(row.last_operator_message_at);
+ expect(d.raw.prepare('SELECT responder_staff_id FROM inbox_response_samples WHERE chat_id=?').get(chat.id)).toEqual({responder_staff_id:null});
 });

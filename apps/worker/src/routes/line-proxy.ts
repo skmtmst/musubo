@@ -66,7 +66,7 @@ const BULK_DISPATCH_PATHS = new Set([
 const MAX_FRIEND_CREATIONS = 20;
 
 // D1 の約100バインド上限に収めるため、8引数の行を12行ずつ INSERT し、25文を batch にまとめて問い合わせ予算を守る。
-const ROWS_PER_INSERT = 12;
+const ROWS_PER_INSERT = 11;
 const STATEMENTS_PER_BATCH = 25;
 
 const AUTH_FAILED = {
@@ -266,14 +266,15 @@ async function insertLogRows(
   rows: LogRow[],
   source: ProxyLogSource,
   logKey?: string | null,
+  sentAt = jstNow(),
+  staffId: string | null = null,
 ): Promise<void> {
   if (rows.length === 0) return;
-  const now = jstNow();
   const statements: D1PreparedStatement[] = [];
   for (let i = 0; i < rows.length; i += ROWS_PER_INSERT) {
     const chunk = rows.slice(i, i + ROWS_PER_INSERT);
     const values = chunk
-      .map(() => `(?, ?, 'outgoing', ?, ?, NULL, NULL, ?, ?, ?, ?)`)
+      .map(() => `(?, ?, 'outgoing', ?, ?, NULL, NULL, ?, ?, ?, ?, ?)`)
       .join(', ');
     const params: unknown[] = [];
     for (const [index, row] of chunk.entries()) {
@@ -287,13 +288,14 @@ async function insertLogRows(
         row.deliveryType,
         source,
         row.lineAccountId,
-        now,
+        sentAt,
+        staffId,
       );
     }
     statements.push(
       db
         .prepare(
-          `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
+          `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at, sent_by_staff_id)
            VALUES ${values}`,
         )
         .bind(...params),
@@ -305,9 +307,9 @@ async function insertLogRows(
 }
 
 /** 1:1 push は operator 手動送信と同じ扱いでチャットを更新する (chats.ts:608 と同型)。 */
-async function touchChat(db: D1Database, friendId: string, manualReply: boolean): Promise<void> {
+async function touchChat(db: D1Database, friendId: string, manualReply: boolean, sentAt: string): Promise<void> {
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
-  await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: jstNow(), manualReply });
+  await updateChat(db, chat.id, { status: 'in_progress', lastMessageAt: sentAt, manualReply });
 }
 
 /** 上流では送信済みなので、履歴保存の失敗で200をエラーへ変えて再送を誘発しない。記録処理は例外を外へ投げない。 */
@@ -345,8 +347,10 @@ async function logProxySend(
         (knownPushRecipient !== undefined ? knownPushRecipient : await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
-      await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey);
-      await touchChat(db, friend.id, source === 'manual');
+      const sentAt=jstNow();
+      const staffId=source==='manual'&&caller.staff?.id ? (await db.prepare('SELECT id FROM staff_members WHERE id=?').bind(caller.staff.id).first<{id:string}>())?.id??null : null;
+      await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey, sentAt, staffId);
+      await touchChat(db, friend.id, source === 'manual',sentAt);
       return;
     }
 
