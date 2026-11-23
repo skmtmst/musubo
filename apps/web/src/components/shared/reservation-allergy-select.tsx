@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RestaurantReservationAllergy } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { canManageRole } from '@/lib/staff-role'
+import { canAdministerRole } from '@/lib/staff-role'
 import MultiSelect from './multi-select'
 import { Field } from './form-controls'
 import Button from './button'
@@ -35,7 +35,7 @@ export default function ReservationAllergySelect({ accountId, role, values, onCh
   const create = async (query: string) => {
     const value = query.trim()
     if (!current || !role || !value || value.length > 100 || values.length >= 32) return
-    if (!canManageRole(role)) { if (!values.some(item => item.kind === 'other' && item.value === value)) onChange([...values, { kind: 'other', value }]); return }
+    if (!canAdministerRole(role)) { if (!values.some(item => item.kind === 'other' && item.value === value)) onChange([...values, { kind: 'other', value }]); return }
     setSaving(true); setError('')
     try {
       const options = [...current.options, value]
@@ -52,7 +52,7 @@ export default function ReservationAllergySelect({ accountId, role, values, onCh
   const options = [...new Map(choices.map(item => [key(item), item])).values()].map(item => ({ value: key(item), label: item.kind === 'other' ? `その他：${item.value}` : item.value }))
   return <Field label="アレルギー">
     <MultiSelect aria-label="アレルギー" options={options} values={values.map(key)} onChange={keys => onChange(keys.map(item => JSON.parse(item) as RestaurantReservationAllergy))} disabled={disabled || !role || !current || saving} loading={Boolean(accountId && !current && !error)} placeholder="アレルギーを選ぶ" maxChips={32}
-      createLabel={query => canManageRole(role) ? `「${query}」を候補に追加` : `「その他：${query}」として追加`}
+      createLabel={query => canAdministerRole(role) ? `「${query}」を候補に追加` : `「その他：${query}」として追加`}
       onCreate={query => { void create(query) }} />
     {error && <p role="status">{error} <Button variant="text" size="inline" onClick={() => setRetry(value => value + 1)}>読み直す</Button></p>}
   </Field>

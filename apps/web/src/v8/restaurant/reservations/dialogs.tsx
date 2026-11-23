@@ -55,7 +55,7 @@ function ReadOnlyChoice({ label, value, options }: { label: string; value: strin
   return <SaveErrorField names={["shown"]}><TextField aria-label={label} value={shown} readOnly aria-readonly="true" title={shown} /></SaveErrorField>
 }
 
-export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, accountId, staffRole, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
+export function EditReservationDialog({ reservation, tables, courses, busy, canWrite, accountId, allergyAccountId, staffRole, onClose, onSave, onCancelReservation, onRestore, missing = false }: {
   reservation: RestaurantReservation | null
   missing?: boolean
   tables: RestaurantTable[]
@@ -63,6 +63,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   busy: boolean
   canWrite: boolean
   accountId?: string | null
+  allergyAccountId?: string | null
   staffRole?: string | null
   onClose: () => void
   onSave: (patch: ReservationPatch) => Promise<ReservationEditSaveResult> | void
@@ -211,7 +212,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
               <SaveErrorField names={["courseId","draft.courseId","course_id","draft.course_id"]}><EntitySelect aria-label="コース" size="full" value={draft.courseId} onChange={(value) => setDraft({ ...draft, courseId: value })} options={courseOptions} /></SaveErrorField>
             ) : <ReadOnlyChoice label="コース" value={draft.courseId} options={courseOptions} />}
           </Field>
-          <ReservationAllergySelect accountId={accountId} role={staffRole} values={allergies} onChange={setAllergies} disabled={!canWrite || busy} />
+          <ReservationAllergySelect accountId={allergyAccountId === undefined ? accountId : allergyAccountId} role={staffRole} values={allergies} onChange={setAllergies} disabled={!canWrite || busy} />
         </>
       )}
     </RsDialog></SaveErrorScope>

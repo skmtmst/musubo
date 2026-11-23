@@ -256,6 +256,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
     return (
       <PhoneReservation accountStyle={accountStyle.stale ? null : accountStyle.data?.style ?? null} staffRole={role} canUseAlternateBooking={canUseAlternateBooking}
         tableDefinition={ctx.tableDefinition}
+        allergyAccountId={store?.line_account_id ?? null}
         storeId={storeId}
         storeName={store?.name || ''}
         tables={tables}
@@ -344,7 +345,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
         onEdit={(id) => { setDetailId(''); setOpenId(id) }}
       />
       <EditReservationDialog
-        accountId={accountId} staffRole={role}
+        accountId={accountId} allergyAccountId={store?.line_account_id ?? null} staffRole={role}
         key={editTarget?.sequence ?? 0}
         reservation={opened}
         missing={missing}

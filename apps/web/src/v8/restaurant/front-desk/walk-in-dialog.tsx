@@ -47,9 +47,10 @@ export function nextFreeAt(tables: RestaurantTable[], guests: number, rows: Rest
   return best
 }
 
-export default function WalkInDialog({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
+export default function WalkInDialog({ tableDefinition, open, accountId, allergyAccountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  allergyAccountId?: string | null
   tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
@@ -159,7 +160,7 @@ export default function WalkInDialog({ tableDefinition, open, accountId, storeId
             <IconButton aria-label="人数を増やす" disabled={guests >= MAX_GUESTS || busy} onClick={() => setGuests((n) => Math.min(MAX_GUESTS, n + 1))}><Plus size={16} aria-hidden="true" /></IconButton>
           </div>
         </div>
-        <ReservationAllergySelect accountId={open ? accountId : null} role={role} values={allergies} onChange={setAllergies} disabled={busy} />
+        <ReservationAllergySelect accountId={open ? (allergyAccountId === undefined ? accountId : allergyAccountId) : null} role={role} values={allergies} onChange={setAllergies} disabled={busy} />
         {floorStatus === 'error' && <Notice tone="warn" message="階・エリアを読み込めませんでした。卓はすべて表示しています。" />}
         {currentRows === null ? <p className={styles.hint}>空いている卓を調べています。</p> : <>
           <AvailableTables tables={free} floors={floors} floorId={floorId} onFloorChange={setFloorId} selected={tableId} onSelect={setTableId} guests={guests} disabled={busy} />

@@ -56,9 +56,10 @@ function md(day: Date): string {
   return polishFormatDate(day, { style: 'list-day' })
 }
 
-export default function PhoneReservationDrawer({ staffRole, storeName, tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
+export default function PhoneReservationDrawer({ staffRole, storeName, tableDefinition, open, accountId, allergyAccountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  allergyAccountId?: string | null
   staffRole?: string | null
   storeName?: string
   tableDefinition?: RestaurantTableDefinition
@@ -348,7 +349,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
           }} selected={chosenTable?.id ?? ''} onSelect={setTableId} guests={guests} disabled={busy} radioName="phone-table" heading={`選べる卓（${guests}名が座れる卓だけ）`} errorNames={['id', 'chosenTable?.id', 'tableId', 'chosen_table?.id', 'table_id']} />
         </> : null}
         <div className={styles.contactRow}>
-        <ReservationAllergySelect accountId={open ? accountId : null} role={staffRole} values={allergies} onChange={setAllergies} disabled={busy || !canWrite} />
+        <ReservationAllergySelect accountId={open ? (allergyAccountId === undefined ? accountId : allergyAccountId) : null} role={staffRole} values={allergies} onChange={setAllergies} disabled={busy || !canWrite} />
         <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="記念日など" /></SaveErrorField></Field>
         </div>
         {friend?.lineUid ? (

@@ -85,11 +85,12 @@ function recommendTable(tables: RestaurantTable[], count: number, free: (table: 
     .sort((a, b) => (a.max_capacity - count) - (b.max_capacity - count) || a.code.localeCompare(b.code, 'ja', { numeric: true }))[0] ?? null
 }
 
-export default function PhoneReservation({ accountStyle, staffRole, canUseAlternateBooking = false, tableDefinition, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+export default function PhoneReservation({ accountStyle, staffRole, canUseAlternateBooking = false, tableDefinition, allergyAccountId, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
   accountStyle?: import('@line-crm/shared').AccountStyle | null
   staffRole?: string | null
   canUseAlternateBooking?: boolean
   tableDefinition?: RestaurantTableDefinition
+  allergyAccountId?: string | null
   storeId: string
   storeName: string
   tables: RestaurantTable[]
@@ -450,7 +451,7 @@ export default function PhoneReservation({ accountStyle, staffRole, canUseAltern
           </Card>
           <Card frame="raised" padding="spacious" layout="vertical" className={styles.phoneCard} aria-labelledby="rs-phone-allergy">
             <h2 id="rs-phone-allergy" className={styles.phoneCardTitle}>要望・アレルギー</h2>
-            <ReservationAllergySelect accountId={selectedAccountId} role={staffRole} values={selectedAllergies} onChange={setAllergies} disabled={busy || !canWrite} />
+            <ReservationAllergySelect accountId={allergyAccountId === undefined ? selectedAccountId : allergyAccountId} role={staffRole} values={selectedAllergies} onChange={setAllergies} disabled={busy || !canWrite} />
             <Field label="メモ"><TextField value={memo} onChange={event => setMemo(event.target.value)} placeholder="記念日など" /></Field>
           </Card>
           {canNotify ? (

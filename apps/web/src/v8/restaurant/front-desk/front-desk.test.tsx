@@ -19,6 +19,7 @@ vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import
 vi.mock('@/lib/api', async (original) => { const actual = await original<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, accountSettings: { ...actual.api.accountSettings, getAllergyOptions: vi.fn(async () => ({ success: true, data: { version: 1, options: ['卵', '乳'] } })) } } } })
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
+import { api as commonApi } from '@/lib/api'
 import { reservation, tables } from '../booking-kit/test-data'
 import PhoneReservationDrawer from './phone-drawer'
 import WalkInDialog, { nextFreeAt } from './walk-in-dialog'
@@ -26,6 +27,15 @@ import { freeTables, openTimes, toYmd } from './slots'
 import { WALK_IN_NOTE, isWalkIn, seatWalkIn } from './walk-in'
 
 const T = tables as unknown as RestaurantTable[]
+
+it.each(['phone', 'walk-in'])('%s は選択中ではなく店舗のアカウントの候補を読む', async kind => {
+  const read = vi.mocked(commonApi.accountSettings.getAllergyOptions)
+  read.mockClear()
+  if (kind === 'phone') render(<PhoneReservationDrawer staffRole="owner" open accountId="account-a" allergyAccountId="account-b" storeId="store-1" tables={T} onClose={vi.fn()} onSaved={vi.fn()} />)
+  else render(<WalkInDialog open accountId="account-a" allergyAccountId="account-b" storeId="store-1" tables={T} onClose={vi.fn()} onSaved={vi.fn()} />)
+  await waitFor(() => expect(read).toHaveBeenCalledWith('account-b'))
+  expect(read).not.toHaveBeenCalledWith('account-a')
+})
 const today = (hour: number, minute = 0) => new Date(`${toYmd(new Date())}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+09:00`)
 
 beforeEach(() => {
