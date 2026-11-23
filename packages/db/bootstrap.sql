@@ -4345,7 +4345,7 @@ CREATE TABLE hq_template_distribution_jobs (
   finished_at TEXT,
   PRIMARY KEY (id,tenant_id),
   UNIQUE (tenant_id,request_key),
-  FOREIGN KEY (template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id)
+  FOREIGN KEY (template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE hq_template_distribution_results (
@@ -4507,9 +4507,9 @@ CREATE TABLE hq_template_store_bindings (
   PRIMARY KEY (tenant_id,template_id,target_account_id),
   UNIQUE (tenant_id,target_account_id,kind,target_id),
   FOREIGN KEY (template_id,tenant_id) REFERENCES hq_templates(id,tenant_id),
-  FOREIGN KEY (applied_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id),
-  FOREIGN KEY (pending_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id),
-  FOREIGN KEY (dismissed_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id)
+  FOREIGN KEY (applied_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT,
+  FOREIGN KEY (pending_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT,
+  FOREIGN KEY (dismissed_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE hq_template_versions (
@@ -9929,9 +9929,13 @@ CREATE INDEX friend_delivery_consents_dispatch ON friend_delivery_consents(line_
 
 CREATE UNIQUE INDEX friends_account_member_number ON friends(line_account_id,member_number);
 
+CREATE INDEX hq_distribution_job_items_preflight ON hq_template_distribution_job_items(tenant_id,preflight_id);
+
 CREATE INDEX hq_distribution_job_items_queue ON hq_template_distribution_job_items(status,lease_expires_at,tenant_id,job_id);
 
 CREATE INDEX hq_distribution_jobs_status ON hq_template_distribution_jobs(status,updated_at);
+
+CREATE INDEX hq_distribution_jobs_version ON hq_template_distribution_jobs(tenant_id,template_id,template_version_id);
 
 CREATE INDEX hq_store_bindings_pending ON hq_template_store_bindings(tenant_id,target_account_id,pending_version_id);
 
