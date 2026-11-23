@@ -1,17 +1,17 @@
 /* イベント予約 › クラスの編集（★V8 修正案 f4bLF の XFRyO）。値は変数だけ。 */
 
-.title {
+.lifecycle {
   display: inline-flex;
-  align-items: baseline;
-  gap: var(--tpl-bm-8);
-  min-width: 0;
+  align-items: center;
+  gap: var(--space-8, 8px);
 }
 
-.titleParent {
-  flex: none;
-  color: var(--color-ink-secondary);
-  font-size: var(--tpl-bm-13);
-  font-weight: var(--font-weight-ui);
+:global([data-page-template='detail']):has(.side) > :global([data-template-region='body']) {
+  border-top: 0;
+}
+
+:global([data-page-template='detail']):has(.side) :global([data-template-region='preview']) {
+  border-left: 0;
 }
 
 .side {

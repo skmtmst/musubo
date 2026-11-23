@@ -52,6 +52,15 @@ describe('公開の状態（WEB318/319）', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'その他の操作' }))
     expect((await screen.findByText('申込の一覧を見る')).closest('a')?.getAttribute('href')).toBe('/events/bookings?id=ev-1')
   })
+  it('下書きの状態と公開する操作は見出しに並び、数の帯には重ねない', async () => {
+    net.getEvent.mockResolvedValue({ id: 'ev-1', name: '2026大忘年会', lifecycle_status: 'draft', is_published: 0 })
+    render(<EditEventPage />)
+    const publish = await screen.findByRole('button', { name: '公開する' })
+    const heading = publish.closest('[data-template-region="heading"]')!
+    expect(heading.textContent).toContain('2026大忘年会')
+    expect(heading.textContent).toContain('下書き')
+    expect(document.querySelector('[data-template-region="stats"]')?.textContent).not.toContain('下書き')
+  })
   it('状態が読めなかったら、読み直しを出す', async () => {
     net.getEvent.mockRejectedValue(new Error('down'))
     render(<EditEventPage />)
@@ -64,17 +73,16 @@ describe('公開の状態（WEB318/319）', () => {
     net.setEventLifecycle.mockResolvedValue({ lifecycle_status: 'paused' })
     render(<EditEventPage />)
     const pause = await screen.findByRole('button', { name: '一時停止する' })
-    expect(pause.closest('[data-template-region="content"]')?.closest('[data-page-template="detail"]')).toBeTruthy()
+    expect(pause.closest('[data-template-region="heading"]')).toBeTruthy()
     net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'paused', is_published: 1 })
     await act(async () => { pause.click() })
     const reason = document.body.querySelector('textarea') as HTMLTextAreaElement
     await act(async () => { fireEvent.change(reason, { target: { value: '台風' } }) })
     const confirm = screen.getAllByRole('button', { name: '一時停止する' }).at(-1)!
     await act(async () => { confirm.click() })
-    await waitFor(() => expect(screen.getByText('停止中')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('[data-template-region="heading"]')?.textContent).toContain('停止中'))
     expect(net.setEventLifecycle).toHaveBeenCalledWith('acc-1', 'ev-1', expect.objectContaining({ to: 'paused', reason: '台風' }))
-    // 題の名前（XFRyO「イベント予約 › 名前」）を読む1回を足して4回。状態を変えたあとに申込の状況を読み直すのは今と同じ。
-    expect(net.getEvent).toHaveBeenCalledTimes(4)
+    expect(net.getEvent).toHaveBeenCalledTimes(2)
   })
 
   it('理由なしの中止を止め、二度押しと失敗後の再送でも同じ操作の鍵を使う', async () => {
@@ -82,7 +90,8 @@ describe('公開の状態（WEB318/319）', () => {
     let fail!: (error: unknown) => void
     net.setEventLifecycle.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject })).mockResolvedValue({ lifecycle_status: 'cancelled' })
     render(<EditEventPage />)
-    const cancel = await screen.findByRole('button', { name: '中止する' })
+    fireEvent.click(await screen.findByRole('button', { name: '公開状態の操作' }))
+    const cancel = await screen.findByRole('menuitem', { name: '中止する' })
     await act(async () => { cancel.click() })
     const dialog = screen.getByRole('alertdialog')
     expect(dialog.textContent).toContain('LINEアカウント')

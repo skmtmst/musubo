@@ -330,12 +330,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     <FormSection id="ev-form-record" title={eventId ? draft.name || 'イベント編集' : '新規イベント作成'}
       description={eventId ? 'タブで各項目を編集できます' : 'まず「概要」を保存するとイベントが作成されます'}
       action={<>
-        <Button href="/events">イベント一覧</Button>
+        {!eventId ? <Button href="/events">イベント一覧</Button> : null}
         {eventId && canDuplicate ? <RowMenu label="イベントの操作" triggerProps={{ disabled: saving || duplicating }} items={[{ id: 'duplicate', label: '複製する', onSelect: () => guarded(() => void duplicateSaved()) }]} /> : null}
         {eventId ? <Button href={`/events/bookings?id=${eventId}`}>予約を確認</Button> : null}
       </>}>{null}</FormSection>
     {error ? <Notice tone="danger" message={error} /> : null}
-    {eventId && draft.is_published === 0 ? <Notice tone="warn" message="現在「下書き」状態です。公開設定タブで「公開する」を ON にすると友だち向けの予約 URL が表示されます。" /> : null}
     <Tabs label="イベントの編集" items={TABS.map((item) => ({
       label: item.label, current: tab === item.key, disabled: item.key !== 'overview' && !eventId,
       onClick: () => { if (item.key === 'overview' || eventId) setTab(item.key) },
