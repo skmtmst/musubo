@@ -19,6 +19,7 @@ import { registerCustomers } from './booking/register-customers.js';
 import { registerSettings } from './booking/register-settings.js';
 import { registerMenusRead } from './booking/register-menus-read.js';
 import { registerMenusWrite } from './booking/register-menus-write.js';
+import { registerMenusHq } from './booking/register-menus-hq.js';
 import { registerCustomerContext } from './booking/register-customer-context.js';
 import { registerWaitlistAdmin } from './booking/register-waitlist-admin.js';
 import { registerWaitlistLiff } from './booking/register-waitlist-liff.js';
@@ -88,6 +89,8 @@ registerSettings(booking);
 registerMenusRead(booking);
 
 registerMenusWrite(booking);
+
+registerMenusHq(booking);
 
 registerCustomerContext(booking);
 
