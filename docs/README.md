@@ -493,6 +493,7 @@
 - [統括メンバー画面の設定メニューを整える](release-log/unreleased/185-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
 - [受信箱のマイル表示](release-log/unreleased/191-kenta-friend-mileage-error.md) — マイルを使っていない店舗の表示に関する修正履歴。
 
+- [受信箱のテンプレートの差し込みを名前の札で読む](release-log/unreleased/194-kenta-template-unresolved-vars.md) — 反映履歴、確認 2026-11-23。
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
