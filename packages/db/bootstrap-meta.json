@@ -685,5 +685,5 @@
     "786_restaurant_course_gallery.sql",
     "789_limit_legacy_folder_update_triggers.sql"
   ],
-  "migrationCount": 683
+  "migrationCount": 684
 }

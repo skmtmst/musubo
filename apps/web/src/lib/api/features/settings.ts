@@ -10,6 +10,7 @@ export type InstagramConnectionList = {
   connections: Array<{
     id: string
     state: 'connected' | 'expired'
+    dmReconnectRequired?: boolean
     pageId: string
     instagramId: string
     pageName: string
@@ -19,6 +20,18 @@ export type InstagramConnectionList = {
     version: number
     syncedAt: string | null
   }>
+}
+
+type InstagramReplyState = 'ready' | 'disconnected' | 'permission_required'
+type InstagramConversationDetail = {
+  messages: Array<{ id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }>
+  pendingReply?: { key: string; content: string; canResolve: boolean } | null
+  replyState: InstagramReplyState
+}
+
+function conversationPath(accountId: string, senderId: string, instagramId?: string, action = '') {
+  const params = instagramParams(accountId, null, instagramId ? { instagramId } : undefined)
+  return `/api/instagram/conversations/${encodeURIComponent(senderId)}${action}?${params}`
 }
 
 /**
@@ -131,9 +144,18 @@ export const settingsMethods = {
     }>>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
   },
   instagram: {
-    conversation: (accountId: string, senderId: string) => fetchApi<ApiResponse<{ messages: Array<{ id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }>; replyState: 'ready' | 'disconnected' | 'permission_required' }>>(`/api/instagram/conversations/${encodeURIComponent(senderId)}?${new URLSearchParams({ lineAccountId: accountId })}`),
-    markConversationRead: (accountId: string, senderId: string) => fetchApi(`/api/instagram/conversations/${encodeURIComponent(senderId)}/read?${new URLSearchParams({ lineAccountId: accountId })}`, { method: 'POST' }),
-    sendReply: (accountId: string, messageId: string, text: string, key: string) => fetchApi(`/api/instagram/messages/${encodeURIComponent(messageId)}/reply?${new URLSearchParams({ lineAccountId: accountId })}`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ text }) }),
+    inboxStatus: (accountId: string) =>
+      fetchApi<ApiResponse<{ state: InstagramReplyState }>>(`/api/instagram/inbox-status?${instagramParams(accountId)}`),
+    conversation: (accountId: string, senderId: string, instagramId?: string) =>
+      fetchApi<ApiResponse<InstagramConversationDetail>>(conversationPath(accountId, senderId, instagramId)),
+    resolveReply: (accountId: string, senderId: string, instagramId: string | undefined, key: string, outcome: 'sent' | 'not_sent') =>
+      fetchApi(conversationPath(accountId, senderId, instagramId, '/resolve'), { method: 'POST', body: JSON.stringify({ key, outcome }) }),
+    markConversationRead: (accountId: string, senderId: string, instagramId?: string) =>
+      fetchApi(conversationPath(accountId, senderId, instagramId, '/read'), { method: 'POST' }),
+    sendReply: (accountId: string, messageId: string, text: string, key: string) =>
+      fetchApi(`/api/instagram/messages/${encodeURIComponent(messageId)}/reply?${instagramParams(accountId)}`, {
+        method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ text }),
+      }),
     // connectionId は操作する接続そのものの id。省略すると既定の1件が相手になるため、
     // 接続が2つ以上あるときは画面で選んだ行の id を必ず渡す。
     connection: (accountId:string,connectionId?:string|null)=>fetchApi<ApiResponse<import('@line-crm/shared').InstagramConnectionStatus>>(`/api/instagram/connection?${instagramParams(accountId,connectionId)}`),

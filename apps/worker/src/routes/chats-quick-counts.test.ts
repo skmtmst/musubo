@@ -67,7 +67,7 @@ async function counts(filters: Record<string, string> = {}, actor = 'reader-a') 
 }
 
 describe('GET /api/chats/quick-counts (INBOX-09)', () => {
-  test('Instagramの要返信は最後が受信の会話だけで、期限超過はLINEだけ', async () => {
+  test('Instagramの要返信は最後が受信の会話だけで、1時間以上待ちはLINEとメールだけ', async () => {
     seedLine('line-overdue', { age: 2 * 3600_000 });
     seedEmail('mail-overdue', { age: 2 * 3600_000 });
     const incoming = new Date(NOW - 2 * 3600_000).toISOString();
@@ -76,7 +76,7 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
       VALUES(?,'account-a','ig',?,'ig','hello',?,?)`);
     insert.run('m1', 'waiting', incoming, incoming);
     insert.run('m2', 'replied', incoming, incoming);
-    db.raw.prepare(`INSERT INTO instagram_inbox_reads(staff_id,line_account_id,sender_id,last_read_at) VALUES('reader-a','account-a','waiting',?)`).run(outgoing);
+    db.raw.prepare(`INSERT INTO instagram_inbox_reads(staff_id,line_account_id,sender_id,last_read_at) VALUES('reader-a','account-a',json_array('ig','waiting'),?)`).run(outgoing);
     db.raw.prepare(`INSERT INTO instagram_outbound_messages(idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at,sent_at)
       VALUES('sent','account-a','ig','replied','reader-a','reply','sent',?,?)`).run(outgoing, outgoing);
     const instagram = await counts({ channel: 'instagram' });
@@ -85,7 +85,7 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
     expect((await counts({ channel: 'instagram', unreadOnly: '1' })).body.data).toMatchObject({ all: 1, reply: 0, overdue: 0 });
     const combined = await counts({ channel: 'line', socialChannel: 'all' });
     expect(combined.body.data).toMatchObject({ all: 3, reply: 2, overdue: 1 });
-    expect((await counts({ channel: 'all', socialChannel: 'all' })).body.data).toMatchObject({ all: 4, reply: 3, overdue: 1 });
+    expect((await counts({ channel: 'all', socialChannel: 'all' })).body.data).toMatchObject({ all: 4, reply: 3, overdue: 2 });
     expect((await counts({ channel: 'email', socialChannel: 'all' })).body.data).toMatchObject({ all: 1, reply: 1, overdue: 1 });
     expect((await counts({ channel: 'all' })).body.data).toMatchObject({ all: 4, reply: 3 });
     expect((await counts({ channel: 'instagram', assignee: 'target' })).body.data).toMatchObject({ all: 0, reply: 0 });
@@ -94,6 +94,15 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
       expect(res.status).toBe(200);
       expect(((await res.json()) as { data: unknown[] }).data).toHaveLength(expected);
     }
+  });
+  test('外部連携が停止中の店舗のDMは混合一覧と件数にも含めない', async () => {
+    const now = new Date(NOW).toISOString();
+    db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+      VALUES('dm','account-a','ig','customer','ig','hello',?,?)`).run(now, now);
+    db.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('toggle','account-a','feature.external_integrations','false')");
+    expect((await counts()).body.data).toMatchObject({ all: 0, reply: 0 });
+    const res = await app().request('/api/chats?channel=all', {}, { DB: db.db });
+    expect(await res.json()).toMatchObject({ success: true, data: [] });
   });
   test('Instagramの件数は一覧の200件上限を超えて数える', async () => {
     const at = new Date(NOW).toISOString();

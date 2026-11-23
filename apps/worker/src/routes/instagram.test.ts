@@ -1313,3 +1313,109 @@ it('別のLINEアカウントの接続IDを渡しても見つからない扱い�
     db.raw.prepare("SELECT version FROM instagram_connections WHERE id='igc-other'").get(),
   ).toEqual({ version: 1 });
 });
+
+it('接続時に受け取ったDM権限と接続期限を受信箱の利用者に返す', async () => {
+  await connect();
+  const path = '/api/instagram/inbox-status?lineAccountId=a1';
+  const prod = { DEPLOY_ENV: 'production' };
+  const state = async (env: Record<string, string>) => (await read(await app(admin, true, env).request(path))).data.state;
+  expect(await state(prod)).toBe('permission_required');
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  expect(await state(prod)).toBe('ready');
+  db.raw.exec("UPDATE instagram_connections SET expires_at='2000-01-01'");
+  expect(await state(prod)).toBe('disconnected');
+});
+
+it('同じ送信者でも店舗のInstagramアカウントごとに履歴・既読・返信先を分ける', async () => {
+  await connect();
+  const now = new Date().toISOString();
+  const insert = db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+    VALUES(?,'a1',?,'customer',?,?,?,?)`);
+  insert.run('owned', '20', '20', '本店', now, now);
+  insert.run('former', '21', '21', '別店舗', now, now);
+  const path = '/api/instagram/conversations/customer';
+  expect((await req(path)).status).toBe(400);
+  const history = await read(await req(path + '?instagramId=20'));
+  expect(history.data.messages).toEqual([expect.objectContaining({ content: '本店' })]);
+  expect((await req(path + '/read?instagramId=20', {})).status).toBe(200);
+  expect(db.raw.prepare('SELECT sender_id FROM instagram_inbox_reads').get()).toEqual({ sender_id: JSON.stringify(['20','customer']) });
+  const send = vi.fn();
+  vi.stubGlobal('fetch', send);
+  const options = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ text: '返信' }) };
+  const response = await app().request('/api/instagram/messages/former/reply?lineAccountId=a1', options);
+  expect(response.status).toBe(409);
+  expect(await response.text()).toContain('接続が切れ');
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('不明な送信は確認まで新しいキーでも再送せず、送信済みの確認後は次の返信ができる', async () => {
+  await connect();
+  const now = new Date().toISOString();
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+    VALUES('m1','a1','20','customer','20','hello',?,?)`).run(now, now);
+  const send = vi.fn().mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce(Response.json({message_id:'second'}));
+  vi.stubGlobal('fetch', send);
+  const first = crypto.randomUUID();
+  const reply = (key: string) => app().request('/api/instagram/messages/m1/reply?lineAccountId=a1', {
+    method: 'POST', headers: { 'Content-Type':'application/json','Idempotency-Key':key }, body:JSON.stringify({text:'返信'}),
+  });
+  expect((await reply(first)).status).toBe(502);
+  expect((await reply(crypto.randomUUID())).status).toBe(409);
+  const history = await req('/api/instagram/conversations/customer?instagramId=20');
+  expect(await history.json()).toMatchObject({data:{pendingReply:{key:first,canResolve:true}}});
+  expect((await req('/api/instagram/conversations/customer/resolve?instagramId=21', {key:first,outcome:'sent'})).status).toBe(409);
+  expect((await req('/api/instagram/conversations/customer/resolve?instagramId=20', {key:first,outcome:'sent'})).status).toBe(200);
+  expect((await reply(first)).status).toBe(200);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect((await reply(crypto.randomUUID())).status).toBe(200);
+  expect(send).toHaveBeenCalledTimes(2);
+});
+
+it.each([10, 190])('Metaが返信を明示的に拒否したら予約を解放する（%i）', async code => {
+  await connect();
+  const now = new Date().toISOString();
+  db.raw.exec("UPDATE instagram_connections SET scopes=scopes || ',instagram_business_manage_messages'");
+  db.raw.prepare(`INSERT INTO instagram_messages(id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+    VALUES('m','a1','20','sender','20','DM',?,?)`).run(now, now);
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: { code } }, { status: 400 })));
+  const res = await app().request('/api/instagram/messages/m/reply?lineAccountId=a1', {
+    method: 'POST', headers: {'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()}, body: JSON.stringify({text:'reply'}),
+  });
+  expect(res.status).toBe(code === 190 ? 409 : 422);
+  expect(db.raw.prepare('SELECT count(*) AS n FROM instagram_outbound_messages').get()).toEqual({ n: 0 });
+  expect((await read(await req('/api/instagram/inbox-status'))).data.state).toBe(code === 190 ? 'disconnected' : 'ready');
+});
+
+it('進行中の予約は解除できず、古い予約は未送信の確認後にだけ解除できる', async () => {
+  const key = crypto.randomUUID();
+  db.raw.prepare(`INSERT INTO instagram_outbound_messages(idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+    VALUES(?,'a1','20','sender','staff','reply','pending',?)`).run(key, new Date().toISOString());
+  const resolve = () => req('/api/instagram/conversations/sender/resolve?instagramId=20', {key,outcome:'not_sent'});
+  expect((await resolve()).status).toBe(409);
+  db.raw.exec("UPDATE instagram_outbound_messages SET created_at='2000-01-01T00:00:00.000Z'");
+  expect((await resolve()).status).toBe(200);
+  expect(db.raw.prepare('SELECT count(*) AS n FROM instagram_outbound_messages').get()).toEqual({ n: 0 });
+});
+
+it.each(['ok','subscription_failed','personal'])('店舗のOAuthだけでDMの通知を登録する（%s）', async mode => {
+  const subscribed: string[] = [];
+  const upstream = vi.mocked(fetch).getMockImplementation()!;
+  vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) => {
+    const u = new URL(String(url));
+    if (u.hostname === 'api.instagram.com') return Response.json({data:[{access_token:'short_mock',user_id:'20',
+      permissions:'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages'}]});
+    if (u.pathname.endsWith('/me')) return Response.json({id:'20',username:'shop',account_type: mode === 'personal' ? 'PERSONAL' : 'BUSINESS'});
+    if (u.pathname.endsWith('/subscribed_apps')) {
+      if (init?.method !== 'POST') return Response.json({data:[{id:config.META_APP_ID,subscribed_fields:['comments']}]});
+      subscribed.push(u.searchParams.get('subscribed_fields') ?? '');
+      return Response.json({success: mode === 'ok'});
+    }
+    return upstream(url, init);
+  }));
+  const back = await callback({code:'mock_code'});
+  expect(back.searchParams.get('instagram')).toBe(mode === 'ok' ? 'connected' : 'failed');
+  expect(subscribed).toEqual(mode === 'personal' ? [] : ['comments,messages']);
+  expect((await read(await req('/api/instagram/connections'))).data.connections).toHaveLength(mode === 'ok' ? 1 : 0);
+  if (mode === 'ok') expect((await read(await req('/api/instagram/inbox-status'))).data.state).toBe('ready');
+});

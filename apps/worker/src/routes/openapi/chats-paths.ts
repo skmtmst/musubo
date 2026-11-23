@@ -1,9 +1,15 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const chatsPaths = {
+  '/api/instagram/inbox-status': {
+    get: { tags: ['Chats'], summary: 'Instagram受信箱の接続とDM権限を確認',
+      parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+      responses: { '200': { description: 'ready、permission_required、disconnected のいずれか' } } },
+  },
   '/api/instagram/conversations/{senderId}': {
     get: {
       tags: ['Chats'], summary: 'Instagram の会話を取得',
       parameters: [
+        { name: 'instagramId', in: 'query', schema: { type: 'string' }, description: '会話を受信したInstagramアカウント' },
         { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
         { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
       ],
@@ -14,10 +20,24 @@ export const chatsPaths = {
     post: {
       tags: ['Chats'], summary: 'Instagram の会話を既読にする',
       parameters: [
+        { name: 'instagramId', in: 'query', schema: { type: 'string' }, description: '会話を受信したInstagramアカウント' },
         { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
         { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
       ],
       responses: { '200': { description: '既読を記録' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' }, '404': { description: '会話が見つかりません' } },
+    },
+  },
+  '/api/instagram/conversations/{senderId}/resolve': {
+    post: {
+      tags: ['Chats'], summary: 'Instagramで確認した送信結果を記録する',
+      parameters: [
+        { name: 'instagramId', in: 'query', schema: { type: 'string' }, description: '会話を受信したInstagramアカウント' },
+        { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['key','outcome'],
+        properties: { key: { type: 'string' }, outcome: { type: 'string', enum: ['sent','not_sent'] } } } } } },
+      responses: { '200': { description: '送信結果を記録' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' }, '404': { description: '会話が見つかりません' } },
     },
   },
   /*

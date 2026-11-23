@@ -288,7 +288,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       data: {
         all: line.all + email.all + instagram.all,
         reply: line.reply + email.reply + instagram.reply,
-        overdue: line.overdue + (c.req.query('socialChannel') === 'all' && channel !== 'email' ? 0 : email.overdue),
+        overdue: line.overdue + email.overdue,
         line,
         email,
         instagram,

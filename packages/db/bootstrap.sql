@@ -11014,16 +11014,17 @@ CREATE INDEX idx_instagram_connections_instagram_id ON instagram_connections(ins
 
 CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_account_id,received_at,id);
 
-CREATE INDEX idx_instagram_messages_conversation_768
-  ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
-
-CREATE UNIQUE INDEX idx_instagram_outbound_pending_768
-  ON instagram_outbound_messages(instagram_id, sender_id) WHERE status IN ('pending','unknown');
 CREATE INDEX idx_instagram_messages_connection_772
   ON instagram_messages(connection_id, received_at, id);
 
+CREATE INDEX idx_instagram_messages_conversation_768
+  ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
+
 CREATE INDEX idx_instagram_oauth_states_connection_772
   ON instagram_oauth_states(connection_id);
+
+CREATE UNIQUE INDEX idx_instagram_outbound_pending_768
+  ON instagram_outbound_messages(instagram_id, sender_id) WHERE status IN ('pending','unknown');
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);

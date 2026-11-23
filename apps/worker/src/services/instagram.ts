@@ -508,6 +508,26 @@ export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_business_content_publish';
 export function instagramCanPublish(scopes: string): boolean {
   return scopes.split(',').includes(INSTAGRAM_PUBLISH_SCOPE);
 }
+export async function subscribeInstagramMessages(config: InstagramConfig, token: string, metaAppId?: string) {
+  const path = 'me/subscribed_apps';
+  try {
+    const current = await instagramGraph<{ data: { id: string; subscribed_fields: string[] }[]; paging?: { next?: string } }>(
+      config, path, token, { fields: 'id,subscribed_fields' });
+    if (!Array.isArray(current.data)) throw new Error('invalid_subscription_list');
+    const own = current.data.find(app => app.id === config.appId || app.id === metaAppId);
+    if (own && !Array.isArray(own.subscribed_fields)) throw new Error('invalid_fields');
+    if (!own && current.paging?.next) throw new Error('subscription_list_incomplete');
+    const fields = own?.subscribed_fields ?? [];
+    if (fields.includes('messages')) return;
+    const result = await instagramGraph<{ success: boolean }>(config, path, token, {
+      subscribed_fields: [...fields, 'messages'].join(','),
+    }, 'POST');
+    if (result.success !== true) throw new Error('subscription_rejected');
+  } catch (error) {
+    throw new InstagramError('instagram_webhook_subscription_failed', 502, error instanceof InstagramError ? error.detail : undefined);
+  }
+}
+
 export function instagramCanMessage(scopes: string): boolean {
   return scopes.split(',').includes('instagram_business_manage_messages');
 }
@@ -626,12 +646,15 @@ export async function purgeInstagramTransientData(
   db: D1Database,
   now = new Date(),
 ): Promise<void> {
+  const cutoff = new Date(now.getTime() - 90 * 86400000).toISOString();
   await db.batch([
     db
       .prepare('DELETE FROM instagram_oauth_states WHERE expires_at<=?')
       .bind(now.toISOString()),
     db
       .prepare('DELETE FROM instagram_messages WHERE created_at<?')
-      .bind(new Date(now.getTime() - 90 * 86400000).toISOString()),
+      .bind(cutoff),
+    db.prepare('DELETE FROM instagram_outbound_messages WHERE created_at<?').bind(cutoff),
+    db.prepare('DELETE FROM instagram_inbox_reads WHERE last_read_at<?').bind(cutoff),
   ]);
 }
