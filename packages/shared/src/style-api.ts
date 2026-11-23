@@ -105,6 +105,8 @@ export type StyleSnapshot = {
   previous: Record<string, StyleMetric>;
   items: StyleBooking[];
   newBookings: StyleBooking[];
+  /** 右欄に表示する未確認の新着予約の総数。 */
+  unconfirmedNewBookingsCount?: number;
   resultId: string;
   sidebar?: StyleDashboardSidebar;
   payments?: StyleDashboardPayments;
@@ -306,3 +308,6 @@ export type EcStyleSummary = {
   orders: StyleMetric; repeatCustomers: StyleMetric;
   changeAt: string; ordersAt: string; autoLineAt: string;
 };
+
+export type RestaurantBookingAcknowledgement = { operationId:string; acknowledgedCount:number; state:'active'|'undone'; replayed:boolean };
+export type RestaurantBookingAcknowledgementUndo = { operationId:string; undoneCount:number; state:'undone'; replayed:boolean };
