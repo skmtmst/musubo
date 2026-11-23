@@ -493,7 +493,7 @@
 
 - [LINE登録後の「使い方を選ぶ」への自動遷移](release-log/unreleased/154-masato-line-register-auto.md) — 反映履歴、確認 2026-11-22。
 - [LINE初回登録の初期設定保存](release-log/unreleased/162-masato-line-register-style-recovery.md) — 反映履歴、確認 2026-11-22。
-- [説明文の文字サイズの修正履歴](release-log/unreleased/PR-kenta-inherited-font-size.md) — 反映履歴、確認 2026-11-23。
+- [説明文の文字サイズの修正履歴](release-log/unreleased/192-kenta-inherited-font-size.md) — 反映履歴、確認 2026-11-23。
 - [LINE登録の完了画面と飲食店の初期設定](release-log/unreleased/167-masato-line-registration-finish.md) — 反映履歴、確認 2026-11-22。
 
 - [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
