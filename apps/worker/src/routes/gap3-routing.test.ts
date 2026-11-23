@@ -47,6 +47,7 @@ test('割当できない同じ未対応期間は店内の知らせを一度だ�
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:02:00Z'))).toBe(false);
  expect(d.raw.prepare("SELECT line_account_id,channel,event_type FROM notifications WHERE event_type='inbox_assignment_unavailable'").all()).toEqual([{line_account_id:'a',channel:'dashboard',event_type:'inbox_assignment_unavailable'}]);
+ expect(d.raw.prepare("SELECT json_extract(metadata,'$.reasons.away') AS away,body FROM notifications WHERE event_type='inbox_assignment_unavailable'").get()).toMatchObject({away:1,body:expect.stringContaining('不在 1件')});
  expect(d.raw.prepare("SELECT assignee_staff_id FROM chats WHERE id='c'").get()).toEqual({assignee_staff_id:null});
  expect(external).not.toHaveBeenCalled();
 });
@@ -55,6 +56,16 @@ test('営業時間外に担当できない時は責任者へ知らせを出さ�
  d.raw.exec("UPDATE staff_presence SET away=1");
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-15T23:00:00Z'))).toBe(false);
  expect(d.raw.prepare("SELECT count(*) n FROM notifications WHERE event_type='inbox_assignment_unavailable'").get()).toEqual({n:0});
+});
+test.each([
+ ['対象者なし',"UPDATE inbox_assignment_settings SET targets_json='[]' WHERE account_id='a'",'noTargets'],
+ ['操作なし',"UPDATE staff_presence SET last_seen_at='2026-10-15T00:00:00Z' WHERE staff_id='s'",'offline'],
+ ['上限',"INSERT INTO chats(id,friend_id,assignee_staff_id,status,last_customer_message_at,created_at,updated_at) VALUES('c2','f2','s','unread','2026-10-16T04:00:00Z','now','now')",'atCapacity'],
+])('割当不能の理由「%s」を記録する',async(_label,setup,reason)=>{
+ expect((await gapCall(app(),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
+ d.raw.exec(setup);expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);
+ const notice=d.raw.prepare("SELECT metadata FROM notifications WHERE event_type='inbox_assignment_unavailable'").get() as {metadata:string};
+ expect(JSON.parse(notice.metadata).reasons[reason]).toBe(1);
 });
 test('割当を使わない店や既に担当のある会話は割当不能の知らせを出さない',async()=>{
  expect(await assignInbox(d.db,'a','f',new Date('2026-10-16T04:01:00Z'))).toBe(false);

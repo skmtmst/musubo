@@ -19,35 +19,42 @@ export async function routingInput(db:D1Database,a:string,b:Record<string,unknow
  }
  return {strategy:strategy as RoutingSettings['strategy'],targets};
 }
-// 同じ未対応期間の再試行では一件だけ、店舗内の通知に残す。
-async function notifyUnassignable(db:D1Database,account:string,chatId:string,pendingSince:string|null,now:Date) {
+type AssignmentReasons={noTargets:number;inactive:number;away:number;offline:number;unauthorized:number;outsideShift:number;atCapacity:number};
+// 同じ時間帯の再試行では一件だけ、店舗内の通知に残す。
+async function notifyUnassignable(db:D1Database,account:string,chatId:string,pendingSince:string|null,now:Date,reasons:AssignmentReasons) {
  if (!pendingSince) return;
  const windows=await businessWindows(db,account,now.toISOString());
  if(!windows.some(([start,end])=>start<=now.getTime()&&now.getTime()<end))return;
+ const labels:Array<[keyof AssignmentReasons,string]>=[['noTargets','対象者なし'],['inactive','利用できない担当'],['away','不在'],['offline','操作なし'],['unauthorized','権限なし'],['outsideShift','勤務時間外'],['atCapacity','上限に到達']];
+ const detail=labels.filter(([key])=>reasons[key]>0).map(([key,label])=>key==='noTargets'?'割り当ての対象者が未設定':`${label} ${reasons[key]}件`).join('、');
  await db.prepare(`INSERT INTO notifications(id,event_type,title,body,channel,status,metadata,line_account_id,category)
   SELECT ?, 'inbox_assignment_unavailable', '担当を割り当てられませんでした',
-   '受信箱の未割り当てと担当者の勤務・不在・上限を確認してください。', 'dashboard', 'sent',
-   json_object('teamId',(SELECT escalate_team_id FROM inbox_routing_settings WHERE account_id=?)), ?, 'error'
+   ?, 'dashboard', 'sent',
+   json_object('teamId',(SELECT escalate_team_id FROM inbox_routing_settings WHERE account_id=?),'reasons',json(?)), ?, 'error'
   FROM chats c JOIN friends f ON f.id=c.friend_id
   WHERE c.id=? AND f.line_account_id=? AND c.pending_since=? AND c.first_response_at IS NULL
    AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'
-  ON CONFLICT(id) DO NOTHING`).bind(`inbox-assignment:${account}:${Math.floor(now.getTime()/3600000)}`,account,account,chatId,account,pendingSince).run();
+  ON CONFLICT(id) DO NOTHING`).bind(`inbox-assignment:${account}:${Math.floor(now.getTime()/3600000)}`,`割り当てられない理由：${detail}。受信箱と担当者の設定を確認してください。`,account,JSON.stringify(reasons),account,chatId,account,pendingSince).run();
 }
 export async function assignInbox(db:D1Database,a:string,friendId:string,now=new Date(),random=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296,job?:{token:string;id:string;leaseOwner:string},opening?:{leaseOwner:string}){
  const config=await routingSettings(db,a);if(config.strategy==='none')return false;
  const c=await db.prepare("SELECT c.id,c.pending_since FROM chats c JOIN friends f ON f.id=c.friend_id WHERE c.friend_id=? AND f.line_account_id=? AND c.operator_id IS NULL AND c.assignee_staff_id IS NULL AND c.status!='resolved'").bind(friendId,a).first<{id:string;pending_since:string|null}>();if(!c)return false;
  const tz=await getAccountTimeZone(db,a),day=tzDateStr(tz,now),time=tzHHMM(tz,now),eligible=[];
+ const reasons:AssignmentReasons={noTargets:config.targets.length?0:1,inactive:0,away:0,offline:0,unauthorized:0,outsideShift:0,atCapacity:0};
  for(const t of config.targets){
- const s=await db.prepare(`SELECT m.*,p.away,p.last_seen_at FROM staff_members m JOIN staff_presence p ON p.staff_id=m.id WHERE m.id=? AND m.is_active=1 AND m.access_level!='read_only' AND p.away=0 AND julianday(p.last_seen_at)>=julianday(?,'-30 minutes')`).bind(t.staffId,now.toISOString()).first<{id:string;role:'owner'|'admin'|'staff';tenant_id:string}>();
- if(!s||!await canAssignChatTo(db,s.id,a))continue;
+ const s=await db.prepare(`SELECT m.*,p.away,p.last_seen_at FROM staff_members m LEFT JOIN staff_presence p ON p.staff_id=m.id WHERE m.id=?`).bind(t.staffId).first<{id:string;is_active:number;access_level:string;away:number|null;last_seen_at:string|null}>();
+ if(!s||!s.is_active||s.access_level==='read_only'){reasons.inactive++;continue;}
+ if(s.away===1){reasons.away++;continue;}
+ if(!s.last_seen_at||!Number.isFinite(Date.parse(s.last_seen_at))||Date.parse(s.last_seen_at)<now.getTime()-1800000){reasons.offline++;continue;}
+ if(!await canAssignChatTo(db,s.id,a)){reasons.unauthorized++;continue;}
  const bs=await db.prepare('SELECT id FROM staff WHERE staff_member_id=? AND line_account_id=? AND is_active=1 AND deleted_at IS NULL').bind(t.staffId,a).first<{id:string}>();
- if(bs){const shifts=await db.prepare('SELECT count(*) n FROM staff_shifts WHERE staff_id=?').bind(bs.id).first<{n:number}>();if(shifts?.n&&!await db.prepare('SELECT id FROM staff_shifts WHERE staff_id=? AND work_date=? AND start_time<=? AND end_time>?').bind(bs.id,day,time,time).first())continue;}
+ if(bs){const shifts=await db.prepare('SELECT count(*) n FROM staff_shifts WHERE staff_id=?').bind(bs.id).first<{n:number}>();if(shifts?.n&&!await db.prepare('SELECT id FROM staff_shifts WHERE staff_id=? AND work_date=? AND start_time<=? AND end_time>?').bind(bs.id,day,time,time).first()){reasons.outsideShift++;continue;}}
  const load=await db.prepare(`SELECT count(*) n FROM chats c JOIN friends f ON f.id=c.friend_id WHERE f.line_account_id=? AND c.assignee_staff_id=? AND c.status!='resolved' AND c.last_customer_message_at IS NOT NULL AND (c.last_operator_message_at IS NULL OR julianday(c.last_customer_message_at)>julianday(c.last_operator_message_at))`).bind(a,t.staffId).first<{n:number}>();
- if((load?.n??0)>=t.cap)continue;
+ if((load?.n??0)>=t.cap){reasons.atCapacity++;continue;}
  const recent=await db.prepare("SELECT count(*) n,MAX(decided_at) last FROM inbox_assignment_logs WHERE account_id=? AND staff_id=? AND julianday(decided_at)>=julianday(?,'-7 days')").bind(a,t.staffId,now.toISOString()).first<{n:number;last:string|null}>();
  eligible.push({...t,count:recent?.n??0,last:recent?.last??''});
  }
- if(!eligible.length){if(!job)await notifyUnassignable(db,a,c.id,c.pending_since,now);return false;}
+ if(!eligible.length){if(!job)await notifyUnassignable(db,a,c.id,c.pending_since,now,reasons);return false;}
  eligible.sort((a,b)=>(config.strategy==='even'?a.count-b.count:0)||a.priority-b.priority||a.last.localeCompare(b.last));
  let pick=eligible[0];
  if(config.strategy==='random_weighted'){let cursor=random()*eligible.reduce((n,t)=>n+101-t.priority,0);for(const t of eligible){cursor-=101-t.priority;if(cursor<0){pick=t;break;}}}
