@@ -19,7 +19,7 @@ vi.mock('@line-crm/db', () => ({
 vi.mock('../../services/feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
 
 /*
- * R15: 走査も公開版の対象条件で絞る。判定の中身は別試験の守備範囲。
+ * 走査も公開版の対象条件で絞る。判定の中身は別試験の守備範囲。
  * 条件なしでは従来どおり登録し、判定を読まない。
  */
 const getReminderTargetCondition = vi.fn();

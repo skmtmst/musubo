@@ -38,7 +38,7 @@ export const post__api_liff_webinars_slug_funnel_event_1 = async (c: Context<Env
   const registration = await getWebinarRegistration(
     c.env.DB, auth.webinar.id, auth.friendId, sessionStartAt,
   );
-  // R96: オンデマンドは申込なしで入れるため、計測の申込必須を外す。
+  // オンデマンドは申込なしで入れるため、計測の申込必須を外す。
   if (!registration && (await resolveWebinarDeliveryKind(c.env.DB, auth.webinar)) !== 'on_demand') {
     return c.json({ error: 'not_registered' }, 409);
   }
@@ -177,7 +177,7 @@ export const post__api_webinars_5 = async (c: Context<Env, "/api/webinars">) => 
   if (!body.accountId) {
     return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
   }
-  // R95: 作った瞬間の公開は受けない。公開前検査と公開版の固定を通す
+  // 作った瞬間の公開は受けない。公開前検査と公開版の固定を通す
   // 公開専用口（POST /:id/publish）へ寄せるため、下書きで作る。
   if (body.status === 'active') {
     return inputError(c, { success: false, error: 'publish_via_publish_endpoint' }, 422, ["status"]);

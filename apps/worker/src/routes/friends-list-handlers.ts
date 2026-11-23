@@ -418,7 +418,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
             // ブロードキャスト)。/api/chats など他のチャット系ビューも同じく
             // test 配信を除外して "活動" を判定するので、そちらと整合させる。
             // 含めると、テスト送信先に登録されたまま実 incoming を放置している
-            // 友だちの handled が誤って true に flip する事故が起きる。
+            // 友だちの handled が誤って true に変わる。
             `SELECT friend_id, MAX(created_at) AS max_at FROM messages_log
              WHERE direction = 'outgoing'
                AND (delivery_type IS NULL OR delivery_type != 'test')

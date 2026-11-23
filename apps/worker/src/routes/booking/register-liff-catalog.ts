@@ -107,7 +107,7 @@ booking.get('/api/liff/booking/availability', async (c) => {
   let addonIds:unknown;try{addonIds=c.req.query('addon_ids')?JSON.parse(c.req.query('addon_ids')!):undefined;}catch{return liffBookingJson(c, {error:'invalid_addons'},400);}
   const user=addonIds?await verifyCallerLineUserId(c):null,friend=user?await resolveFriendId(c,user,accountId):null;
   const addons=await bookingAddons(c.env.DB,accountId,menuId,addonIds,friend);
-  // R92: お客さまの画面の空き確認では、店舗共通の受付締切・受付期間を
+  // お客さまの画面の空き確認では、店舗共通の受付締切・受付期間を
   // メニューの個別指定が無いときの既定値として使う。
   const result = await getAvailability(c.env.DB, {
     lineAccountId: accountId,

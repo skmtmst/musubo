@@ -575,7 +575,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
         });
         return fail(c, 422, 'FRIEND_NOT_FOUND_OR_OUT_OF_SCOPE', {}, []);
       }
-      // R40: 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
+      // 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
       if (message === 'conversion_excluded') {
         await log({
           result: 'rejected', reason: 'excluded_by_condition',

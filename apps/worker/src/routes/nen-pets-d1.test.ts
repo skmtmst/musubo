@@ -271,7 +271,7 @@ describe('GET /api/nen/health（★37-4 健康日記）', () => {
     expect((await get('/api/nen/health/pet-other/summary?accountId=account-other')).status).toBe(403);
   });
 
-  // DEEP-24: 「その他」の動物を犬へ変換しない。登録→一覧→健康まとめで種類を保持し、
+  // 「その他」の動物を犬へ変換しない。登録→一覧→健康まとめで種類を保持し、
   // 犬・猫専用の給与計算には進めない。
   it('種別が「その他」のペットは一覧・健康日記・まとめで other のまま返し、給与目安を計算しない', async () => {
     sql.exec(`
