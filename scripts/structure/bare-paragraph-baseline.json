@@ -183,13 +183,13 @@
     "file": "apps/web/src/components/shared/composer-stickers.tsx",
     "fingerprint": "277568c41bab938d2800faa5bca4adca883eb47d366ad850827cdbfb3383fe69",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "スタンプの説明は共通部品の CSS が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/composer-stickers.tsx",
     "fingerprint": "3dceebc23707838d10a4005a577f1ff983ac63f17ef139bf11bca1ab69cf1d28",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "スタンプの説明は共通部品の CSS が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/customer-look-preview.tsx",
@@ -285,7 +285,7 @@
     "file": "apps/web/src/components/shared/entity-select.tsx",
     "fingerprint": "220f6be6ed8087f43909eda4a1737fa6b812b4a76838f4bb2f3abfc545b73927",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/event-roster.tsx",
@@ -312,12 +312,6 @@
     "reason": "選択ダイアログの候補欄が本文サイズを指定"
   },
   {
-    "file": "apps/web/src/components/shared/friend-picker-field.tsx",
-    "fingerprint": "3a80ab612e3f1ecdab5007c51b5fad064d08817a9326ae660823845f2dd20829",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/components/shared/hq-message-inserts.tsx",
     "fingerprint": "09c9ebfb2ccbec94d633b8244e4791041a5cd6665b3d698286d5cc7b99f93558",
     "count": 1,
@@ -339,7 +333,7 @@
     "file": "apps/web/src/components/shared/media-slot-limit.tsx",
     "fingerprint": "8ddd6030001796b729a952b38c1e3d9d31d02310e91c39cb2d1fe11dd9973a9c",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "利用先の知らせの共通部品が補足サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/media-slot.tsx",
@@ -424,24 +418,6 @@
     "fingerprint": "903591c1a1a43614df36121b80245e72a5e70cd92cd4da4dd0365a7f99ffc57f",
     "count": 1,
     "reason": "apps/web/src/components/shared/reply-template-picker.module.css: .desktopHeader p { font-size: var(--text-micro) }"
-  },
-  {
-    "file": "apps/web/src/components/shared/reservation-board.tsx",
-    "fingerprint": "3043c8a12533aebcbcd87101392b6285294237f600a46465688434ccc58510b5",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/components/shared/reservation-board.tsx",
-    "fingerprint": "4b26945d28756d01673d05232af2dc0b9821348e369c129525e542c383aa64f5",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/components/shared/reservation-board.tsx",
-    "fingerprint": "f90193336680b12a5a2b9e1fab1215638e58ae7d435f64d81ae9d25dee9c885f",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/components/shared/restaurant-floor-editor.tsx",
@@ -531,13 +507,13 @@
     "file": "apps/web/src/components/shared/tag-picker-field.tsx",
     "fingerprint": "61b1109704bd9185d768d26d1992d423f7fa9ed3afc36e2bce729a061572e75c",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通の選択窓の候補枠が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/tag-picker-field.tsx",
     "fingerprint": "c04fc219b339283b52592f9995076c9c6733fd494e55ee9b8815041bc47757ae",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "共通の選択窓の候補枠が本文サイズを指定"
   },
   {
     "file": "apps/web/src/components/shared/totp-qr.tsx",
@@ -714,12 +690,6 @@
     "reason": "styles.emptyChart: var(--text-caption)"
   },
   {
-    "file": "apps/web/src/v8/analytics/search-console.tsx",
-    "fingerprint": "5112af9bf7904b8506e80aa7f1a99820797445fe487b4726de1a4899c73f9656",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/v8/auto-replies/edit/wizard-priority-step.tsx",
     "fingerprint": "9f6b61a6cd0c8353d102b498de7924aadf18b95d81b18c030da764df1f3014e3",
     "count": 1,
@@ -742,18 +712,6 @@
     "fingerprint": "e683f17931ef4bb8e0790c8e978f2423a15f407385a2f18a0b2598075dca919b",
     "count": 1,
     "reason": "styles.sideNote: var(--text-micro)"
-  },
-  {
-    "file": "apps/web/src/v8/automations/create/friend-multi-select.tsx",
-    "fingerprint": "92768fd8d2a4e1610c570e7e6361c3d4592892c13afb94f1345546b91eb7ad14",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/automations/create/friend-multi-select.tsx",
-    "fingerprint": "db53fc76cfc66a3af66f2ad1e791a2e6ebecf6a75c9801d31a1042248e379f1f",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/v8/booking-menus/tabs/holiday-bookings.tsx",
@@ -933,13 +891,13 @@
     "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
     "fingerprint": "27e3da620482faf0c7063cb46f3a69a00648f2aba07115196b05bee26ef7a393",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "配信の確認欄が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-broadcasts/create.tsx",
     "fingerprint": "3c8761bce1c067fa6c6a0525d399987fba12db95b02ef18c2bab7c3f96ea88af",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "配信の確認欄が補足の文字サイズを指定"
   },
   {
     "file": "apps/web/src/v8/hq-deliveries/action-resource-picker.tsx",
@@ -1446,12 +1404,6 @@
     "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
-    "file": "apps/web/src/v8/reminders/detail.tsx",
-    "fingerprint": "e8595c6f0a9f3fa4d87cd043b4413d4be7718871bfb91cf106ca3884f9e8aa3a",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/v8/restaurant/google/google.tsx",
     "fingerprint": "085d091f8419e281eec9a02b983e6bdc52bea338c29d60aac5e22be36599c081",
     "count": 1,
@@ -1572,52 +1524,10 @@
     "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
-    "file": "apps/web/src/v8/restaurant/line-followup/message-editor.tsx",
-    "fingerprint": "842c2e457361755c1fbdab6a45a80d45a4c7850acd4df4777bf58d2e677f79f4",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/restaurant/line-followup/reservation-form-editor.tsx",
-    "fingerprint": "7bec41198c71573a590033f2d5642938de6da638a74706937288cbba9e55192f",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/restaurant/line-followup/reservation-form-editor.tsx",
-    "fingerprint": "c5d891c480f362215933f899cd6406c72043de89a057cb1ac69ea5bc99f6ad07",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
-    "fingerprint": "0457985c2b26a735383dcc475e3c46d1a1c23e58e5d50e020e6d5d9fe58719a8",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
-    "fingerprint": "0688481b13314adbaa54c55f2eaabb07d4cac7a24234e3dda9703a4991d1c5d2",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
     "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
     "fingerprint": "1ad4afbff27328c93adda77c46dc10868f643eaf7259b72b9f183d0c9a4691a0",
     "count": 1,
     "reason": "notice.module.css: .notice font-size: var(--text-label)"
-  },
-  {
-    "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
-    "fingerprint": "2acd4f4f2cf7cd66231f004371c05c9c2ff926734beb00a8cfdf12d1e0955fb3",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
-  },
-  {
-    "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
-    "fingerprint": "54c861bf9231dab8e4fabce6c5f9e51448a7e8117d5376bb7e1cc0ec1f2a8f65",
-    "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
   },
   {
     "file": "apps/web/src/v8/rich-menu-edit/compatibility-form.tsx",
@@ -1803,7 +1713,7 @@
     "file": "apps/web/src/v8/tags/field-editor.tsx",
     "fingerprint": "270aa809e028de5c8f371679a314f4fa071a59a2123024eedcf49ec77434482b",
     "count": 1,
-    "reason": "既存の段落。文字サイズの継承先を確認中。"
+    "reason": "画面のヘルプ部品が補足サイズを指定"
   },
   {
     "file": "apps/web/src/v8/template-edit/rich-video.tsx",
