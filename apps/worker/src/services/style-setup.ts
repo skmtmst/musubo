@@ -10,6 +10,7 @@ export { featureReadiness, styleWarnings } from './style-readiness.js';
 import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { restaurantFollowupSeedStatement } from './restaurant-followup-rows.js';
+import { restaurantWorkspaceStatements } from './style-setup-restaurant.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
 import { logger } from '@line-crm/shared/server';
 import { HqTemplateError } from './hq-templates/tag.js';
@@ -26,7 +27,12 @@ export async function saveProfile(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
-  options: { initialSelectionPending?: boolean; images?: R2Bucket; catalogRuntime?: StarterCatalogRuntime } = {},
+  options: {
+    initialSelectionPending?: boolean;
+    images?: R2Bucket;
+    catalogRuntime?: StarterCatalogRuntime;
+    provisionRestaurantWorkspace?: boolean;
+  } = {},
 ) {
   const current = await profile(db, account);
   assertVersion(input.expectedVersion, current?.version ?? 0);
@@ -144,8 +150,11 @@ export async function saveProfile(
         version: 1,
         data: { features: restaurantDefaultFeatures(), sidebarOrder: null, sidebarItemOrder: null },
       }), now, now));
+    if (explicitSelection && options.provisionRestaurantWorkspace) {
+      statements.push(...restaurantWorkspaceStatements(db, account, tenant));
+    }
+    statements.push(restaurantFollowupSeedStatement(db, { accountId: account }));
   }
-  if (selected && style === 'restaurant') statements.push(restaurantFollowupSeedStatement(db,{accountId:account}));
   const previousAnswers = JSON.parse(current?.answers_json ?? '{}') as Record<
     string,
     SetupAnswer

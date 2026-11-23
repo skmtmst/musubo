@@ -25,10 +25,10 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
     <PageContent layout="stats">
       <Notice tone="info">LINEアカウントは登録済みです。使い方はあとから設定で変更できます。</Notice>
       {state.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={state.error} onRetry={state.reload} /> : null}
-      {done ? <Button href={done === 'saved' && state.choice === 'restaurant' ? '/restaurant-test/stores/new' : '/hq'}>次へ</Button> : <>
+      {done ? <Button href="/hq">次へ</Button> : <>
         <Step4Template templateKey={state.choice} onOpen={() => setDialogOpen(true)} />
         <RegistrationStyleDialog
-          accountId={state.accountId} accountName={accountName} menu={state.menu} onMenuChange={state.setMenu}
+          accountName={accountName}
           open={dialogOpen}
           choice={state.choice}
           busy={state.busy}

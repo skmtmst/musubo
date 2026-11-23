@@ -38,12 +38,13 @@ test('開き直したとき、前の確認コードを出したままにしな�
   expect(screen.queryByLabelText('確認コード 123456')).toBeNull()
 })
 
-test('PenどおりPCのQRと紐づけ理由を示し、友だち追加リンクは置かない', async () => {
+test('PenどおりPCのQRと手順を示し、友だち追加リンクは置かない', async () => {
   net.lineRegistration.mockResolvedValue({ success: true, data: { available: true, accountName: 'musubo契約者様 通知専用', basicId: '@540qlkhn', addFriendUrl: 'https://line.me/R/ti/p/@540qlkhn', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
   render(<NoticeLineDialogV8 open onClose={() => undefined} />)
   await waitFor(() => expect(screen.getByAltText('musubo契約者様 通知専用 の友だち追加QRコード')).toBeTruthy())
   expect(screen.getByText('PC画面のQRをスマートフォンのLINEで読み取ります。')).toBeTruthy()
-  expect(screen.getByText(/運営が契約先に必要なお知らせだけを/)).toBeTruthy()
+  expect(screen.getByText('6桁コードをLINEのトークに送信')).toBeTruthy()
+  expect(screen.queryByText(/運営が契約先に必要なお知らせだけを/)).toBeNull()
   expect(screen.queryByRole('link', { name: /友だち追加/ })).toBeNull()
   expect(screen.getByLabelText('確認コード 123456')).toBeTruthy()
 })
@@ -60,13 +61,29 @@ test('24時間の期限が切れたコードは表示せず、更新して新し
   await waitFor(() => expect(screen.getByLabelText('確認コード 222222')).toBeTruthy())
 })
 
-test('画面を開いたまま紐づけ完了を検知し、確認コードを消す', async () => {
+test.each([undefined, true])('連携の確認後に確認コードを消す（自動終了 %s）', async (closeWhenLinked) => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   net.lineRegistration.mockResolvedValue({ success: true, data: { available: true, accountName: '通知専用', basicId: '@540qlkhn', addFriendUrl: 'https://line.me/R/ti/p/@540qlkhn', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
-  net.lineRegistrationStatus.mockResolvedValue({ success: true, data: { linked: true } })
-  render(<NoticeLineDialogV8 open onClose={() => undefined} />)
-  await waitFor(() => expect(screen.getByLabelText('確認コード 123456')).toBeTruthy())
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5100)) })
-  await waitFor(() => expect(screen.getByText('LINEとの連携が完了しています')).toBeTruthy())
+  net.lineRegistrationStatus
+    .mockResolvedValueOnce({ success: true, data: { linked: false } })
+    .mockResolvedValueOnce({ success: true, data: { linked: true } })
+  const onClose = vi.fn()
+  await act(async () => { render(<NoticeLineDialogV8 open onClose={onClose} closeWhenLinked={closeWhenLinked} />) })
+  expect(screen.getByLabelText('確認コード 123456')).toBeTruthy()
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+  expect(screen.getByLabelText('確認コード 123456')).toBeTruthy()
+  expect(onClose).not.toHaveBeenCalled()
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
   expect(screen.queryByLabelText('確認コード 123456')).toBeNull()
-  expect(net.lineRegistrationStatus).toHaveBeenCalledTimes(1)
-}, 10000)
+  if (closeWhenLinked) {
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  } else {
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'LINEとの連携が完了しています' })).toBeTruthy()
+  }
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+  expect(net.lineRegistrationStatus).toHaveBeenCalledTimes(2)
+})

@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ACCOUNT_STYLES } from '@line-crm/shared'
 import { invalidateApiReads } from '@/lib/api/transport/read-cache'
+import { FEATURE_SETTINGS_UPDATED_EVENT, type FeatureSettingsUpdate } from '@/lib/feature-settings-event'
 import type { styleApi } from '@/lib/api/helpers/styles'
 
 export const ACCOUNT_STYLE_UPDATED = 'musubo:account-style-updated'
 export function accountStyleUpdated(accountId: string) {
   invalidateApiReads('/api/dashboard/style', accountId)
+  invalidateApiReads('/api/settings/features', accountId)
   window.dispatchEvent(new CustomEvent(ACCOUNT_STYLE_UPDATED, { detail: { accountId } }))
+  window.dispatchEvent(new CustomEvent<FeatureSettingsUpdate>(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId, source: 'account-style' } }))
 }
 
 type Data = Awaited<ReturnType<typeof styleApi.get>>['data']

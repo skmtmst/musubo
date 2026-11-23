@@ -1,5 +1,5 @@
 'use client'
-import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog, FirstRunPopup, FirstRunWelcome, useFirstRunPopup } from '@/v8/dashboard/public/first-steps/index'
+import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog, FirstRunPopup, useFirstRunPopup } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
 import { ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
@@ -112,8 +112,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
   const { qrRequested } = wizard
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
-  const lineConnected = start.summary?.steps.some(step => step.key === 'accounts' && step.done)
-  const restaurantWelcome = style === 'restaurant' && !qrRequested && lineConnected ? start.guide.welcome : undefined
   /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
     accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: start.guide.phase,
@@ -303,9 +301,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         }}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
       {/* 「開店準備を始めましょう」（承認済み Pen 枠 02 / 02b）。 */}
-      {firstRunPopup.open && restaurantWelcome === 'pending' && start.guide.acknowledgeWelcome
-        ? <FirstRunWelcome onDone={start.guide.acknowledgeWelcome} /> : null}
-      {firstRunPopup.open && start.summary && restaurantWelcome !== 'pending' && restaurantWelcome !== 'loading' ? (
+      {firstRunPopup.open && start.summary ? (
         <FirstRunPopup
           summary={start.summary}
           onStartGuide={() => { firstRunPopup.close(); start.guide.start() }}
