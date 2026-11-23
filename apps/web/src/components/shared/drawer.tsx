@@ -125,7 +125,7 @@ export default function Drawer({
       </div>
     </div>
   )
-  const closeButton = closeAppearance === 'box' ? <IconButton className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={20} /></IconButton> : <button type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={20} /></button>
+  const closeButton = closeAppearance === 'box' ? <IconButton data-close-control="" variant="plain" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={20} /></IconButton> : <button data-close-control="" type="button" className={styles.close} onClick={discard.requestClose} disabled={busy} aria-label="閉じる"><X aria-hidden="true" size={20} /></button>
 
   const panel = (
     <aside

@@ -347,7 +347,7 @@ export default function Dialog({
           {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
           {/* ガイドの窓はフッターの操作で閉じる。 */}
           {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker' ? (
-            <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
+            <IconButton data-close-control="" variant="plain" aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
               <X aria-hidden="true" size={20} />
             </IconButton>
           ) : null}

@@ -116,11 +116,15 @@
 }
 :root .button[data-variant='plain'] { box-shadow: none; background: transparent; }
 :root .button[data-variant='plain']:not(:focus-visible) { outline-color: transparent; }
-:root .button[data-variant='plain']:hover:not(:disabled) { background: var(--polish-hover); }
+:root .button[data-variant='plain']:is(:hover, :focus-visible):not(:disabled) { background: var(--polish-hover); }
 }
 
 /* ・仕上げ7 */
 :root .button[data-size='compact'] { width: var(--select-menu-field-h); height: var(--select-menu-field-h); min-height: var(--select-menu-field-h); flex-basis: var(--select-menu-field-h); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); }
+:root .button[data-size='compact'][data-variant='plain'] { background: transparent; box-shadow: none; }
+:root .button[data-size='compact'][data-variant='plain']:not(:focus-visible) { outline-color: transparent; }
+:root .button[data-size='compact'][data-variant='plain']:is(:hover, :focus-visible):not(:disabled) { background: var(--polish-hover); }
+:root .button[data-size='compact'][data-variant='plain']:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .button:disabled { opacity: var(--polish-disabled-opacity); }
 :root .button:is(:hover, :active):not(:disabled) { filter: none; }
 

@@ -6,12 +6,12 @@ import { usePermissionLockTip } from './permission-lock-tip'
 import { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type SingleProps, type EntityPickerWindowProps, type MultiBodyProps, type MultiProps, type FieldBase, type SingleField, type MultiField } from './entity-picker-types'
 export { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type EntityPickerWindowProps } from './entity-picker-types'
 
-import { ChevronDown, ArrowUpRight, Plus, X, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import Button from './button'
-import IconButton from './icon-button'
+import CloseButton from './close-button'
 import Checkbox from './checkbox'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import SearchField from './search-field'
@@ -67,7 +67,7 @@ export function EntityPickerWindow(props: EntityPickerWindowProps) {
     <section className={styles.preview} aria-label="テンプレートの中身">
       <header className={styles.previewHeader}>
         <h2 className={styles.previewTitle} title={props.preview.title}>{props.preview.title}</h2>
-        <IconButton aria-label="中身の表示を閉じる" onClick={props.preview.onClose}><X size={16} aria-hidden="true" /></IconButton>
+        <CloseButton size="standard" aria-label="中身の表示を閉じる" onClick={props.preview.onClose} />
       </header>
       <div className={styles.previewBody}>{props.preview.content}</div>
       {props.preview.actions ? <footer className={styles.previewActions}>{props.preview.actions}</footer> : null}
