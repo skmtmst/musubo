@@ -170,7 +170,7 @@ export default function ColumnIntros() {
           if (saveError?.id === column.id) setSaveError(null)
         }} /></SaveErrorField>
       </Field>
-      {latestIntro?.id === column.id ? <Field label="ほかの人が保存した最新の紹介文"><p>{latestIntro.text === '' ? '（空になっています）' : latestIntro.text}</p></Field> : null}
+      {latestIntro?.id === column.id ? <Field label="ほかの人が保存した最新の紹介文"><p className="text-body">{latestIntro.text === '' ? '（空になっています）' : latestIntro.text}</p></Field> : null}
       {savingId === column.id ? <Notice tone="info" message="保存しています…" />
         : saveError?.id === column.id ? <Notice tone="danger" message={saveError.message} />
         : savedId === column.id ? <Notice tone="success" message="この紹介文を保存しました" />

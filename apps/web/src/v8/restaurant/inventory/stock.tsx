@@ -603,7 +603,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                               /></SaveErrorField>
                             </span>
                           </> : (
-                            <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
+                            <span className="text-body" aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
                           )}
                           <IconButton lockedReason={lockedReason} disabled={!canEdit} variant="plain" size="row" aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
                               <X size={16} aria-hidden="true" />
