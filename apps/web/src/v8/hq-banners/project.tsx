@@ -10,7 +10,7 @@ import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { accountAiFeaturesApi } from '@/lib/api/helpers/gap3'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
@@ -662,7 +662,7 @@ function ProjectInner() {
           aside={canManage ? <div ref={panelRef}>
             <GenerationPanel v8Layout accountSelector={<div className="flex flex-col gap-1.5">
               <span className="text-caption font-semibold text-ink">AI を使うアカウント</span>
-              {aiAccountsStatus === 'ready' && aiAccounts.length === 1 ? <p className="truncate text-caption text-ink" title={aiAccounts[0].displayName ?? aiAccounts[0].name}>{aiAccounts[0].displayName ?? aiAccounts[0].name}</p> : aiAccountsStatus === 'ready' && aiAccounts.length > 1 ? <Select aria-label="AI を使うアカウント" value={aiAccountId} options={[{ value: '', label: '選んでください' }, ...aiAccounts.map(account => ({ value: account.id, label: account.displayName ?? account.name }))]} onChange={id => { setAiAccountId(id); try { localStorage.setItem('lh_hq_banner_ai_account', id) } catch { /* storage unavailable */ } }} disabled={busy} /> : <p className="text-caption text-ink-secondary">{accountReason}</p>}
+              {aiAccountsStatus === 'ready' && aiAccounts.length === 1 ? <p className="truncate text-caption text-ink" title={aiAccounts[0].displayName ?? aiAccounts[0].name}>{aiAccounts[0].displayName ?? aiAccounts[0].name}</p> : aiAccountsStatus === 'ready' && aiAccounts.length > 1 ? <EntitySelect aria-label="AI を使うアカウント" noun="アカウント" placeholder="選んでください" size="full" value={aiAccountId} options={aiAccounts.map(account => ({ ...entityOptionMetadata(account), value: account.id, label: account.displayName ?? account.name }))} onChange={id => { setAiAccountId(id); try { localStorage.setItem('lh_hq_banner_ai_account', id) } catch { /* storage unavailable */ } }} disabled={busy} /> : <p className="text-caption text-ink-secondary">{accountReason}</p>}
             </div>} presets={presets} maxCount={maxCount} value={input}
               onChange={(next) => { setInputTouched(true); setInput(next) }} disabled={Boolean(running) || archived || !engineReady}
               referenceImages={referenceImages} onPickReference={openPicker} onUploadReference={(file) => void uploadReference(file)}
