@@ -12,7 +12,7 @@ export type SecurityAlertRow = {
 
 export function publicSecurityAlert(row: SecurityAlertRow): SecurityAlert {
   return {
-    id: row.id, ruleKey: row.rule_key, summary: securityRule(row.rule_key)?.label ?? '安全監視',
+    id: row.id, ruleKey: row.rule_key, summary: row.rule_key === 'stripe_hash_key_review' ? '決済照合の鍵を確認してください' : row.rule_key === 'stripe_external_effect_review' ? '決済操作の結果確認が必要' : row.rule_key === 'stripe_purge_review' ? '削除済み統括のStripe通知の照合' : securityRule(row.rule_key)?.label ?? '安全監視',
     count: row.observed_count, threshold: row.threshold_count, status: row.status, version: row.version,
     firstDetectedAt: row.first_detected_at, lastDetectedAt: row.last_detected_at, reviewedAt: row.reviewed_at,
     notification: row.slack_sent_version >= row.version ? 'sent' : row.slack_last_error === 'unconfigured' ? 'unconfigured' : 'pending',

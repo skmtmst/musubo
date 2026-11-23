@@ -1,3 +1,4 @@
+import { hashPurgedPaymentIdentifier, purgedPaymentIdentifierKeyVersion, storePurgedPaymentIdentifierHash } from '../services/tenant-purge-payment-hashes.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -183,6 +184,16 @@ describe('申込（checkout）', () => {
     setTenant({ plan_status: 'trialing', trial_ends_at: '2020-01-01T00:00:00.000' });
     stripe.createCustomer.mockResolvedValue({ id: 'cus_1', email: 'masato@example.com', name: '既定の統括' });
     stripe.createCheckoutSession.mockResolvedValue({ id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1', customer: 'cus_1', subscription: null, client_reference_id: DEFAULT_TENANT_ID });
+  });
+
+  it('削除中は申込と支払い方法の管理を開始しない', async () => {
+    setTenant({purge_started_at:'2026-01-01',stripe_customer_id:'cus_1'});
+    const checkout = await call('POST', '/api/hq/billing/checkout', {planKey:'light'});
+    expect(checkout.status).toBe(409);
+    expect(await checkout.json()).toMatchObject({error:'削除の処理中です。終わった後に新しいアカウントとして始められます'});
+    expect((await call('POST', '/api/hq/billing/portal')).status).toBe(409);
+    expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
+    expect(stripe.createPortalSession).not.toHaveBeenCalled();
   });
 
   it.each(['light', 'standard', 'pro'])('%s を年払いで申し込むと年の Price を選ぶ', async (planKey) => {
@@ -405,6 +416,103 @@ describe('課金 Webhook', () => {
   beforeEach(() => {
     setTenant({ plan_status: 'trialing', trial_ends_at: '2020-01-01T00:00:00.000' });
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
+  });
+
+  it('期限切れ操作の再送を重複扱いせずもう一度処理する', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_1'});
+    testDb.raw.exec("INSERT INTO billing_events(id,type,tenant_id,summary,external_effect_pending) VALUES('evt_retry','fixture.ignored','00000000-0000-4000-8000-000000000001','external_review',0)");
+    const response=await webhook({id:'evt_retry',type:'fixture.ignored',data:{object:{customer:'cus_1'}}});
+    expect(response.status).toBe(200);
+    expect((testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_retry'").get() as {summary:string}).summary).toContain('completed');
+  });
+
+  it('削除中の入金通知は金額を照合待ちで残し、再送しても適用しない', async () => {
+    setTenant({plan_status:'trialing',stripe_customer_id:'cus_1',purge_started_at:'2026-01-01'});
+    const event = {id:'evt_deferred_by_purge',type:'invoice.paid',data:{object:{id:'in_1',customer:'cus_1',amount_paid:3000,currency:'jpy'}}};
+    testDb.raw.prepare("INSERT INTO billing_events(id,type,tenant_id,summary) VALUES('evt_deferred_by_purge','invoice.paid',?,'pending')").run(DEFAULT_TENANT_ID);
+    expect((await webhook(event)).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_deferred_by_purge'").get()).toEqual({summary:'purge_review'});
+    expect(testDb.raw.prepare("SELECT amount,currency,review_reason FROM stripe_events WHERE stripe_event_id='evt_deferred_by_purge'").get()).toEqual({amount:3000,currency:'jpy',review_reason:'purged_tenant'});
+    expect(tenantRow()).toMatchObject({plan_status:'trialing',stripe_subscription_id:null});
+    setTenant({purge_started_at:null});
+    expect((await webhook(event)).status).toBe(200);
+    expect(tenantRow()).toMatchObject({plan_status:'trialing',stripe_subscription_id:null});
+  });
+
+  it('別の生きている統括の通知は旧鍵なしでも受け取り、同じ顧客の旧記録より優先する', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_shared'});
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_shared'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event={id:'evt_live_without_old_key',type:'fixture.ignored',data:{object:{customer:'cus_shared'}}};
+    expect((await webhook(event)).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT tenant_id FROM billing_events WHERE id='evt_live_without_old_key'").get()).toEqual({tenant_id:DEFAULT_TENANT_ID});
+  });
+
+  it('旧鍵がなくても初回契約中の新しい統括のCheckout通知は通す', async () => {
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    expect((await webhook(completed('evt_first_checkout_without_old_key'))).status).toBe(200);
+    expect(tenantRow()).toMatchObject({stripe_customer_id:'cus_1'});
+  });
+
+  it('通知に顧客IDと契約IDが無ければ過去鍵の欠落で止めない', async () => {
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event={id:'evt_no_customer',type:'fixture.ignored',data:{object:{id:'obj_1'}}};
+    expect((await webhook(event,{env:{PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS:'{invalid'}})).status).toBe(200);
+  });
+
+  it('欠けた旧鍵で照合待ちにした通知は他の通知の処理を止めない', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_current'});
+    testDb.raw.exec("INSERT INTO tenants(id,name) VALUES ('retired-tenant','Retired')");
+    const secret='old-purge-key';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:'retired-tenant',kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event=(id:string,customer?:string)=>({id,type:'fixture.ignored',data:{object:customer ? {customer} : {id:'obj_no_customer'}}});
+    expect((await webhook(event('evt_hold','cus_old'))).status).toBe(503);
+    expect((await webhook(event('evt_active','cus_current'))).status).toBe(200);
+    expect((await webhook(event('evt_no_id'))).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT id FROM billing_events WHERE summary='pending' ORDER BY id").all()).toEqual([{id:'evt_hold'}]);
+    expect((await webhook(event('evt_hold','cus_old'),{env:{PURGED_PAYMENT_HMAC_SECRET:secret}})).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_hold'").get()).toEqual({summary:'purge_review'});
+  });
+
+  it('旧鍵がない場合は課金通知を適用せず安全監視へ出す', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_new'});
+    const secret='test-purge-hmac';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:DEFAULT_TENANT_ID,kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event={id:'evt_unknown_key',type:'invoice.paid',data:{object:{id:'in_old',customer:'cus_old',amount_paid:3000,currency:'jpy',metadata:{tenant_id:DEFAULT_TENANT_ID}}}};
+    expect((await webhook(event)).status).toBe(503);
+    expect(testDb.raw.prepare("SELECT rule_key FROM security_alerts WHERE rule_key='stripe_hash_key_review'").get()).toEqual({rule_key:'stripe_hash_key_review'});
+    expect(testDb.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_old'").get()).toBeUndefined();
+    expect(testDb.raw.prepare("SELECT tenant_id,summary FROM billing_events WHERE id='evt_unknown_key'").get()).toEqual({tenant_id:null,summary:'pending'});
+    expect((await webhook(event,{env:{PURGED_PAYMENT_HMAC_SECRET:secret}})).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT tenant_id,summary FROM billing_events WHERE id='evt_unknown_key'").get()).toEqual({tenant_id:DEFAULT_TENANT_ID,summary:'purge_review'});
+  });
+
+  it('再開後に古い決済IDの通知が届いたら新しい契約へ適用せず要確認にする', async () => {
+    setTenant({plan_status:'active',stripe_customer_id:'cus_new'});
+    const secret='test-purge-hmac';
+    const digest=(await hashPurgedPaymentIdentifier(secret,'customer','cus_old'))!;
+    const keyVersion=(await purgedPaymentIdentifierKeyVersion(secret))!;
+    await storePurgedPaymentIdentifierHash(testDb.db,{tenantId:DEFAULT_TENANT_ID,kind:'customer',digest,keyVersion,now:'2026-01-01T00:00:00Z',expiresAt:'2040-01-01T00:00:00Z'});
+    const event={id:'evt_retired',type:'invoice.paid',data:{object:{id:'in_old',customer:'cus_old',amount_paid:3000,currency:'jpy'}}};
+    expect((await webhook(event,{env:{PURGED_PAYMENT_HMAC_SECRET:secret}})).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_retired'").get()).toEqual({summary:'purge_review'});
+    expect(testDb.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_old'").get()).toBeUndefined();
+    expect(tenantRow()).toMatchObject({plan_status:'active',stripe_customer_id:'cus_new'});
   });
 
   it('新料金の契約通知を旧プランへ適用せず、再処理可能な受領状態で残す', async () => {

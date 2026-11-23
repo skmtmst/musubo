@@ -8,6 +8,7 @@ export interface ResumptionSubscriptionInput {
   interval: 'month' | 'year';
   unitAmountYen: number;
   generation: number;
+  billingEpoch?: number;
   chargeAtEpoch?: number;
 }
 
@@ -51,6 +52,7 @@ function matches(subscription: StripeSubscription, input: ResumptionSubscription
     && subscription.metadata?.tenant_id === input.tenantId
     && subscription.metadata?.purpose === `musubo_${input.purpose}`
     && subscription.metadata?.resumption_generation === String(input.generation)
+    && Number(subscription.metadata?.billing_epoch ?? 0) === (input.billingEpoch ?? 0)
     && subscription.items?.data?.length === 1
     && price?.product === input.productId && price.unit_amount === input.unitAmountYen
     && price.currency === 'jpy' && price.tax_behavior === 'inclusive'
@@ -80,7 +82,7 @@ export async function ensureMusuboResumptionSubscription(env: StripeEnv,
   }
   const subscription = found ?? await stripeApi.createMusuboResumptionSubscription(env, {
     ...input,
-    idempotencyKey: `musubo-resume-${input.tenantId}-${input.generation}-${input.purpose}`,
+    idempotencyKey: `musubo-resume-${input.tenantId}-${input.generation}-${input.purpose}${input.billingEpoch ? `-${input.billingEpoch}` : ''}`,
   });
   if (!matches(subscription, input) || !['active', 'trialing'].includes(subscription.status)) {
     throw new Error('Resumption subscription has not become payable');

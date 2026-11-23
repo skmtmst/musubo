@@ -23,7 +23,8 @@ export async function friendBreakdown(
   accountId: string | null,
   explicitScope?: { sql: string; binds: string[] },
 ): Promise<DashboardOverview['friends']> {
-  const where = explicitScope ? `WHERE ${explicitScope.sql}` : accountId ? 'WHERE line_account_id = ?' : '';
+  const live = `data_purged_at IS NULL AND (line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL))`;
+  const where = explicitScope ? `WHERE ${live} AND ${explicitScope.sql}` : accountId ? `WHERE ${live} AND line_account_id = ?` : `WHERE ${live}`;
   const binds = explicitScope?.binds ?? (accountId ? [accountId] : []);
   const row = await db
     .prepare(

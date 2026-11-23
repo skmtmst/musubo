@@ -190,3 +190,18 @@ it('同じ統括でも別のLINEや店舗、セッションに残った別店舗
   expect((await request('/api/restaurant-test/seat-waitlist?account_id=restaurant&storeId=sibling-store')).status).toBe(400);
   expect((await request(`${snapshot}?account_id=restaurant`, { environment: 'production' })).status).toBe(404);
 });
+
+it('削除済み統括と店舗を再利用せず、現在のアカウントに新しい店舗を用意する', async () => {
+  db.raw.exec(`UPDATE rt_organizations SET data_purged_at='2026-01-01', account_id='purged:org' WHERE id='org';
+    UPDATE rt_stores SET data_purged_at='2026-01-01' WHERE organization_id='org';
+    UPDATE line_accounts SET data_purged_at='2026-01-01' WHERE id IN ('restaurant','sibling');
+    INSERT INTO line_accounts(id,tenant_id,channel_id,name,channel_access_token,channel_secret)
+      VALUES ('new-restaurant','tenant','new-restaurant','New Restaurant','','');`);
+  expect((await selectRestaurant('new-restaurant')).status).toBe(200);
+  const live = db.raw.prepare(`SELECT s.id, o.id AS organization_id FROM rt_stores s
+    JOIN rt_organizations o ON o.id=s.organization_id
+    WHERE s.line_account_id='new-restaurant' AND s.data_purged_at IS NULL AND o.data_purged_at IS NULL`).all();
+  expect(live).toHaveLength(1);
+  expect(live[0]).not.toMatchObject({ id: 'own-store' });
+  expect(live[0]).not.toMatchObject({ organization_id: 'org' });
+});

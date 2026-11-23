@@ -122,6 +122,7 @@ describe('運用状態の外側', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = new URL(String(input))
       if (url.pathname === '/admin/version') return new Response(JSON.stringify({ version: '0.0.0-test' }), { status: 200 })
+      if (url.pathname === '/api/auth/session') return new Response(JSON.stringify({ success: true, data: { platformAdmin: false } }), { status: 200 })
       unexpected.push(url.pathname)
       throw new Error(`未定義の取得: ${url.pathname}`)
     })

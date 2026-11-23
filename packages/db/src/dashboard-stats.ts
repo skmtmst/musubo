@@ -125,7 +125,7 @@ export async function getFriendStats(
     FROM (
       SELECT COALESCE((SELECT c.status FROM chats c WHERE c.friend_id = f.id
         ORDER BY c.created_at DESC, c.id DESC LIMIT 1), 'resolved') AS status
-      FROM friends f WHERE ${statusScope.sql}
+      FROM friends f WHERE f.data_purged_at IS NULL AND ${statusScope.sql}
     )`).bind(...statusScope.binds).first<{ unanswered: number | null; resolved: number | null }>();
 
   // JST の月の頭。月をまたぐ集計は UTC のままだと9時間ずれる。
@@ -136,8 +136,8 @@ export async function getFriendStats(
 
   const bindsFor = (month: string) => [`${month}-01`, `${nextMonth(month)}-01`, ...friendScope.binds];
   const [addedThisMonth, addedLastMonth] = await Promise.all([
-    count(db, `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? AND ${friendScope.sql}`, ...bindsFor(thisMonth)),
-    count(db, `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? AND ${friendScope.sql}`, ...bindsFor(lastMonth)),
+    count(db, `SELECT COUNT(*) AS n FROM friends WHERE data_purged_at IS NULL AND created_at >= ? AND created_at < ? AND ${friendScope.sql}`, ...bindsFor(thisMonth)),
+    count(db, `SELECT COUNT(*) AS n FROM friends WHERE data_purged_at IS NULL AND created_at >= ? AND created_at < ? AND ${friendScope.sql}`, ...bindsFor(lastMonth)),
   ]);
 
   return {

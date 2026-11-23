@@ -6,6 +6,8 @@ import type Database from 'better-sqlite3';
 // 本番の列が増えたらここにも足す。足りない列があると試験が落ちて知らせる。
 export function applyConversionTestSchema(db: Database.Database): void {
   db.exec(`
+    CREATE TABLE tenants (id TEXT PRIMARY KEY, purge_started_at TEXT, data_purged_at TEXT);
+    CREATE TABLE tenant_purge_tombstone_progress (tenant_id TEXT, table_name TEXT, row_id TEXT);
     CREATE TABLE line_accounts (
       id TEXT PRIMARY KEY, channel_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
       channel_access_token TEXT NOT NULL, channel_secret TEXT NOT NULL,

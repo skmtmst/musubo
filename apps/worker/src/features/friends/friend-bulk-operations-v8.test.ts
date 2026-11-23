@@ -11,9 +11,10 @@ describe('一括操作の追加分の実行と結果件数', () => {
   let testDb: SqliteD1;
   beforeEach(async () => {
     testDb = createTestD1();
+    testDb.raw.exec("INSERT OR IGNORE INTO tenants(id,name) VALUES ('default','fixture')");
     testDb.raw.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
       VALUES ('a1', 'channel-1', '試験店舗', '', '', 'default');
-      INSERT INTO tenants(id,name) VALUES ('default','試験会社');
+      INSERT OR IGNORE INTO tenants(id,name) VALUES ('default','試験会社');
       INSERT INTO staff_members(id,name,role,api_key,tenant_id,permission_keys) VALUES ('operator-1','試験担当','staff','key','default','["/chats"]');
       INSERT INTO support_marks (id, name) VALUES ('mark-1', '対応中');
       INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)

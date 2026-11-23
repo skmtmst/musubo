@@ -13,6 +13,8 @@ const migration = readFileSync(
 function setup(): Database.Database {
   const sqlite = new Database(':memory:');
   sqlite.exec(`
+    CREATE TABLE tenants (id TEXT PRIMARY KEY, purge_started_at TEXT, data_purged_at TEXT);
+    CREATE TABLE tenant_purge_tombstone_progress (tenant_id TEXT, table_name TEXT, row_id TEXT);
     CREATE TABLE line_accounts (id TEXT PRIMARY KEY, tenant_id TEXT);
     CREATE TABLE conversion_points (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, event_type TEXT NOT NULL, value REAL,

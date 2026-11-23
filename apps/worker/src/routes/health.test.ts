@@ -125,3 +125,11 @@ describe('GET /api/accounts/health-summary', () => {
     expect(JSON.stringify(body)).not.toContain('"logs"');
   });
 });
+
+
+test('health reports invalid retired payment key configuration', async () => {
+  const a=new Hono<Env>(); a.route('/',health);
+  const response=await a.request('/api/health',{}, {...env(),PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS:'{bad'});
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({error:'purged_payment_key_configuration_invalid'});
+});

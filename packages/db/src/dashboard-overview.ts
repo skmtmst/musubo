@@ -87,14 +87,14 @@ async function dashboardOverview(
     db.prepare(
       `SELECT er.name name, COUNT(*) count
          FROM friends f LEFT JOIN entry_routes er ON er.ref_code=f.ref_code
-        WHERE f.created_at >= ? AND ${friendAccount.sql}
+        WHERE f.data_purged_at IS NULL AND f.created_at >= ? AND ${friendAccount.sql}
         GROUP BY name ORDER BY count DESC LIMIT 3`,
     ).bind(start, ...friendAccount.binds).all<{ name: string | null; count: number }>(),
     count(db,
       `SELECT COUNT(*) n FROM (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
            FROM friends f LEFT JOIN conversion_events ce ON ce.friend_id=f.id
-          WHERE f.created_at >= ? AND ${friendAccount.sql}
+          WHERE f.data_purged_at IS NULL AND f.created_at >= ? AND ${friendAccount.sql}
           GROUP BY f.ref_code
        ) funnel WHERE additions >= 3 AND conversions = 0`,
       start, ...friendAccount.binds),

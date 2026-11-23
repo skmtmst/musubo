@@ -766,6 +766,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/pricing-conditions',
     'POST /api/ops/security-alerts/:id/acknowledge',
     'POST /api/ops/security-alerts/:id/resolve',
+    'POST /api/ops/security-alerts/:id/retry-billing',
     'POST /api/ops/security-alerts/run-once',
     'POST /api/ops/support/template-folders',
     'POST /api/ops/support/templates',

@@ -1465,7 +1465,7 @@ CREATE TABLE billing_events (
   tenant_id    TEXT,
   summary      TEXT NOT NULL DEFAULT '',
   received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, lease_token TEXT, lease_until TEXT, review_amount INTEGER, review_currency TEXT, retained_until TEXT, external_effect_pending INTEGER NOT NULL DEFAULT 0 CHECK (external_effect_pending IN (0,1)));
 
 CREATE TABLE billing_invoices (
   id                  TEXT PRIMARY KEY,
@@ -1896,7 +1896,7 @@ CREATE TABLE "booking_pass_plans" (
  id TEXT PRIMARY KEY,line_account_id TEXT NOT NULL REFERENCES line_accounts(id),kind TEXT NOT NULL CHECK(kind IN('ticket','monthly')),name TEXT NOT NULL,
  price INTEGER NOT NULL CHECK(price>=0),count INTEGER,monthly_limit INTEGER,valid_days INTEGER NOT NULL CHECK(valid_days BETWEEN 1 AND 3650),
  target_scope_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(target_scope_json)),allow_without_pass INTEGER NOT NULL DEFAULT 1 CHECK(allow_without_pass IN(0,1)),
- status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','on_sale','stopped')),version INTEGER NOT NULL DEFAULT 1,created_by TEXT NOT NULL,created_at TEXT NOT NULL,idempotency_key TEXT NOT NULL,request_json TEXT NOT NULL, notify_remaining_one INTEGER NOT NULL DEFAULT 0 CHECK(notify_remaining_one IN(0,1)), notify_expiry_14_days INTEGER NOT NULL DEFAULT 0 CHECK(notify_expiry_14_days IN(0,1)), event_target_scope_json TEXT CHECK(event_target_scope_json IS NULL OR json_valid(event_target_scope_json) AND json_type(event_target_scope_json)='array'),
+ status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','on_sale','stopped')),version INTEGER NOT NULL DEFAULT 1,created_by TEXT NOT NULL,created_at TEXT NOT NULL,idempotency_key TEXT NOT NULL,request_json TEXT NOT NULL, notify_remaining_one INTEGER NOT NULL DEFAULT 0 CHECK(notify_remaining_one IN(0,1)), notify_expiry_14_days INTEGER NOT NULL DEFAULT 0 CHECK(notify_expiry_14_days IN(0,1)), event_target_scope_json TEXT CHECK(event_target_scope_json IS NULL OR json_valid(event_target_scope_json) AND json_type(event_target_scope_json)='array'), data_purged_at TEXT,
  UNIQUE(line_account_id,created_by,idempotency_key),CHECK(kind='ticket' AND count>0 AND monthly_limit IS NULL OR kind='monthly' AND count IS NULL AND (monthly_limit IS NULL OR monthly_limit>0))
 );
 
@@ -2464,7 +2464,7 @@ CREATE TABLE "broadcasts" (
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1, common_var_snapshot TEXT
-  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER, hq_run_id TEXT REFERENCES hq_broadcast_runs(id));
+  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER, hq_run_id TEXT REFERENCES hq_broadcast_runs(id), data_purged_at TEXT);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -4098,7 +4098,7 @@ CREATE TABLE friends (
   unfollow_count   INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT, photo_watch_required INTEGER NOT NULL DEFAULT 0, member_number TEXT);
+, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT, photo_watch_required INTEGER NOT NULL DEFAULT 0, member_number TEXT, data_purged_at TEXT);
 
 CREATE TABLE funnel_steps (
   id         TEXT PRIMARY KEY,
@@ -4866,7 +4866,7 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
   CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
-  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL, created_by_staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL);
+  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL, created_by_staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL, data_purged_at TEXT);
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -5230,7 +5230,7 @@ CREATE TABLE menus (
   auto_tag_id           TEXT,                  -- 予約申込時に friend に自動付与するタグ
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), concurrent_capacity INTEGER NOT NULL DEFAULT 1, booking_window_days INTEGER, cutoff_hours_before INTEGER, cancel_deadline_hours_before INTEGER, intake_question TEXT, price_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT, fixed_meeting_url TEXT, audience_mode TEXT NOT NULL DEFAULT 'all' CHECK(audience_mode IN('all','include_tags','exclude_tags')), audience_tag_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(audience_tag_ids_json)), customer_recurring_enabled INTEGER NOT NULL DEFAULT 0 CHECK(customer_recurring_enabled IN(0,1)), recurring_freqs_json TEXT NOT NULL DEFAULT '["weekly"]' CHECK(json_valid(recurring_freqs_json)), recurring_max_count INTEGER NOT NULL DEFAULT 12 CHECK(recurring_max_count BETWEEN 2 AND 12), max_party_size INTEGER NOT NULL DEFAULT 1 CHECK(max_party_size BETWEEN 1 AND 6), addon_menu_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(addon_menu_ids_json)), addon_only INTEGER NOT NULL DEFAULT 0 CHECK(addon_only IN(0,1)), hq_template_id TEXT, hq_template_version_id TEXT, hq_customized INTEGER NOT NULL DEFAULT 0 CHECK(hq_customized IN(0,1)), image_url TEXT, photo_media_id TEXT,
+  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT, fixed_meeting_url TEXT, audience_mode TEXT NOT NULL DEFAULT 'all' CHECK(audience_mode IN('all','include_tags','exclude_tags')), audience_tag_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(audience_tag_ids_json)), customer_recurring_enabled INTEGER NOT NULL DEFAULT 0 CHECK(customer_recurring_enabled IN(0,1)), recurring_freqs_json TEXT NOT NULL DEFAULT '["weekly"]' CHECK(json_valid(recurring_freqs_json)), recurring_max_count INTEGER NOT NULL DEFAULT 12 CHECK(recurring_max_count BETWEEN 2 AND 12), max_party_size INTEGER NOT NULL DEFAULT 1 CHECK(max_party_size BETWEEN 1 AND 6), addon_menu_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(addon_menu_ids_json)), addon_only INTEGER NOT NULL DEFAULT 0 CHECK(addon_only IN(0,1)), hq_template_id TEXT, hq_template_version_id TEXT, hq_customized INTEGER NOT NULL DEFAULT 0 CHECK(hq_customized IN(0,1)), image_url TEXT, photo_media_id TEXT, data_purged_at TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
 );
@@ -8070,7 +8070,7 @@ CREATE TABLE rt_organizations (
   status TEXT NOT NULL DEFAULT 'test' CHECK (status IN ('test', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, tenant_id TEXT REFERENCES tenants(id));
+, tenant_id TEXT REFERENCES tenants(id), data_purged_at TEXT);
 
 CREATE TABLE rt_reservation_close_outbox (
  id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES rt_reservation_close_tasks(id), generation INTEGER NOT NULL,
@@ -8343,7 +8343,7 @@ CREATE TABLE rt_stores (
   line_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (line_status IN ('connected', 'warning', 'error', 'unconfigured')),
   google_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (google_status IN ('connected', 'warning', 'error', 'unconfigured')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id), latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90), longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id), latitude REAL CHECK(latitude IS NULL OR latitude BETWEEN -90 AND 90), longitude REAL CHECK(longitude IS NULL OR longitude BETWEEN -180 AND 180), data_purged_at TEXT,
   UNIQUE(organization_id, code)
 );
 
@@ -8637,7 +8637,7 @@ CREATE TABLE security_alerts (
   notification_id TEXT NOT NULL,
   slack_lease_until TEXT,
   slack_lease_token TEXT,
-  slack_last_error TEXT,
+  slack_last_error TEXT, billing_retry_token TEXT, billing_retry_until TEXT,
   UNIQUE (scope_key, rule_key)
 );
 
@@ -8865,7 +8865,7 @@ CREATE TABLE stripe_events (
   currency         TEXT,
   metadata         TEXT,
   processed_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, tenant_id TEXT, review_reason TEXT, identifier_hash TEXT, identifier_kind TEXT, identifier_expires_at TEXT, identifier_key_version TEXT);
 
 CREATE TABLE style_analytics_results(id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), style TEXT NOT NULL, selection_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL);
 
@@ -9154,6 +9154,13 @@ CREATE TABLE tenant_purge_guard (
   PRIMARY KEY (tenant_id, table_name)
 );
 
+CREATE TABLE tenant_purge_tombstone_progress (
+  tenant_id TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, table_name, row_id)
+);
+
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -9162,7 +9169,7 @@ CREATE TABLE tenants (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
   CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT, retention_anchor_at TEXT, purge_requested_at TEXT, data_purged_at TEXT, login_display_name TEXT, logo_media_id TEXT REFERENCES media(id) ON DELETE SET NULL, logo_background_color TEXT NOT NULL DEFAULT '#ffffff', company_settings_version INTEGER NOT NULL DEFAULT 0
-  CHECK (company_settings_version >= 0), legal_company_name TEXT, company_postal_code TEXT, company_address TEXT, company_building TEXT, company_phone TEXT, contact_name TEXT, contact_email TEXT, invoice_addressee TEXT);
+  CHECK (company_settings_version >= 0), legal_company_name TEXT, company_postal_code TEXT, company_address TEXT, company_building TEXT, company_phone TEXT, contact_name TEXT, contact_email TEXT, invoice_addressee TEXT, purge_started_at TEXT, billing_epoch INTEGER NOT NULL DEFAULT 0, last_purged_at TEXT);
 
 CREATE TABLE tiktok_pnl_order_lines (
   -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
@@ -11790,8 +11797,7 @@ CREATE UNIQUE INDEX idx_rt_organizations_account ON rt_organizations(account_id)
 CREATE INDEX idx_rt_organizations_tenant
   ON rt_organizations(tenant_id);
 
-CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique
-  ON rt_organizations(tenant_id);
+CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique ON rt_organizations(tenant_id) WHERE data_purged_at IS NULL;
 
 CREATE INDEX idx_rt_reservation_hold_expiry ON rt_reservations(hold_expires_at) WHERE status = 'pending' AND hold_expires_at IS NOT NULL;
 
@@ -12475,13 +12481,24 @@ CREATE TRIGGER booking_menu_photo_usage_update AFTER UPDATE ON menus BEGIN DELET
 
 CREATE TRIGGER booking_monthly_attempt_delete BEFORE DELETE ON booking_monthly_attempts BEGIN SELECT RAISE(ABORT,'monthly_attempt_immutable'); END;
 
-CREATE TRIGGER booking_monthly_attempt_identity BEFORE UPDATE ON booking_monthly_attempts WHEN NEW.cycle_id IS NOT OLD.cycle_id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id  OR NEW.attempt_no IS NOT OLD.attempt_no OR NEW.scheduled_at IS NOT OLD.scheduled_at OR NEW.request_key IS NOT OLD.request_key  OR NEW.payment_method_id IS NOT OLD.payment_method_id OR NEW.payment_method_version IS NOT OLD.payment_method_version  OR NEW.version!=OLD.version+1 OR OLD.state IN('succeeded','failed','canceled') AND NEW.state!=OLD.state BEGIN SELECT RAISE(ABORT,'monthly_attempt_conflict'); END;
+CREATE TRIGGER booking_monthly_attempt_identity BEFORE UPDATE ON booking_monthly_attempts WHEN
+ NEW.cycle_id IS NOT OLD.cycle_id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id
+ OR NEW.attempt_no IS NOT OLD.attempt_no OR NEW.scheduled_at IS NOT OLD.scheduled_at OR NEW.request_key IS NOT OLD.request_key
+ OR (NEW.payment_method_id IS NOT OLD.payment_method_id AND NOT (
+   NEW.payment_method_id='purged:'||OLD.cycle_id||':'||OLD.attempt_no
+   AND NEW.state IS OLD.state AND NEW.started_at IS OLD.started_at AND NEW.finished_at IS OLD.finished_at AND NEW.error_code IS OLD.error_code
+   AND EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id JOIN booking_monthly_cycles y ON y.id=OLD.cycle_id JOIN booking_monthly_contracts c ON c.id=y.contract_id
+     WHERE a.id=OLD.account_id AND a.tenant_id=OLD.tenant_id AND a.data_purged_at IS NOT NULL
+       AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL AND c.state IN ('stopped','expired'))))
+ OR NEW.payment_method_version IS NOT OLD.payment_method_version OR NEW.version!=OLD.version+1
+ OR OLD.state IN('succeeded','failed','canceled') AND NEW.state!=OLD.state
+BEGIN SELECT RAISE(ABORT,'monthly_attempt_conflict'); END;
 
 CREATE TRIGGER booking_monthly_attempt_validate BEFORE INSERT ON booking_monthly_attempts BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM booking_monthly_cycles y JOIN booking_monthly_contracts c ON c.id=y.contract_id  WHERE y.id=NEW.cycle_id AND y.tenant_id=NEW.tenant_id AND y.account_id=NEW.account_id  AND y.invoice_id IS NOT NULL AND y.invoice_status='open' AND y.state IN('open','retry_wait','requires_action')  AND c.state IN('applying','active','stop_scheduled') AND c.service_state='enabled'  AND c.payment_method_id=NEW.payment_method_id AND c.payment_method_version=NEW.payment_method_version  AND (c.stop_effective_at IS NULL OR julianday(c.stop_effective_at)>julianday('now'))  AND ((NEW.attempt_no=0 AND NOT EXISTS(SELECT 1 FROM booking_monthly_attempts a WHERE a.cycle_id=y.id))   OR (NEW.attempt_no>0 AND EXISTS(SELECT 1 FROM booking_monthly_attempts a WHERE a.cycle_id=y.id AND a.attempt_no=NEW.attempt_no-1 AND a.state='failed')    AND y.first_failed_at IS NOT NULL AND julianday(NEW.scheduled_at)=julianday(y.first_failed_at)+CASE NEW.attempt_no WHEN 1 THEN 3 WHEN 2 THEN 5 ELSE 7 END)))  THEN RAISE(ABORT,'monthly_attempt_unavailable') END; END;
 
 CREATE TRIGGER booking_monthly_contract_delete BEFORE DELETE ON booking_monthly_contracts BEGIN SELECT RAISE(ABORT,'monthly_contract_immutable'); END;
 
-CREATE TRIGGER booking_monthly_contract_identity BEFORE UPDATE ON booking_monthly_contracts WHEN NEW.id IS NOT OLD.id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id  OR NEW.friend_id IS NOT OLD.friend_id OR NEW.class_kind IS NOT OLD.class_kind OR NEW.class_id IS NOT OLD.class_id  OR NEW.plan_id IS NOT OLD.plan_id OR NEW.plan_version IS NOT OLD.plan_version OR NEW.amount IS NOT OLD.amount  OR NEW.monthly_limit IS NOT OLD.monthly_limit OR NEW.timezone IS NOT OLD.timezone OR NEW.connected_account IS NOT OLD.connected_account  OR NEW.connection_identity IS NOT OLD.connection_identity OR NEW.consent_version IS NOT OLD.consent_version  OR NEW.consented_at IS NOT OLD.consented_at OR NEW.request_key IS NOT OLD.request_key OR NEW.request_json IS NOT OLD.request_json  OR (OLD.customer_id IS NOT NULL AND NEW.customer_id IS NOT OLD.customer_id)  OR NEW.version!=OLD.version+1  OR (OLD.state='expired' AND NEW.state!=OLD.state)  OR (OLD.state='stopped' AND NEW.state!=OLD.state AND NOT(NEW.state='active' AND OLD.stop_reason='unpaid'    AND NEW.stop_reason IS NULL AND NEW.stop_effective_at IS NULL AND EXISTS(SELECT 1 FROM booking_monthly_cycles y      WHERE y.contract_id=NEW.id AND y.state='paid' AND julianday(y.service_start)<=julianday('now') AND julianday(y.service_end)>julianday('now'))))  OR (OLD.state IN('active','stop_scheduled') AND NEW.state IN('applying','expired'))  OR (OLD.stop_reason IN('member_request','store_request','store_immediate') AND    (NEW.stop_reason IS NOT OLD.stop_reason AND NOT(NEW.stop_reason IS 'store_immediate' AND julianday(NEW.stop_effective_at)<=julianday(OLD.stop_effective_at))     OR NEW.stop_effective_at IS NULL OR julianday(NEW.stop_effective_at)>julianday(OLD.stop_effective_at)))  OR (NEW.state IN('active','stop_scheduled') AND NOT EXISTS(SELECT 1 FROM booking_monthly_active_slots s WHERE s.contract_id=NEW.id))  OR (OLD.state='applying' AND NEW.state IN('active','stop_scheduled') AND NOT EXISTS(SELECT 1 FROM booking_monthly_cycles y WHERE y.contract_id=NEW.id AND y.kind='initial' AND y.state='paid'))  OR (NEW.payment_method_id IS NOT OLD.payment_method_id AND NEW.payment_method_version!=OLD.payment_method_version+1)  OR (OLD.attention_started_at IS NOT NULL AND NEW.attention_started_at IS NOT NULL AND julianday(NEW.attention_started_at)>julianday(OLD.attention_started_at)) BEGIN SELECT RAISE(ABORT,'monthly_contract_conflict'); END;
+CREATE TRIGGER booking_monthly_contract_identity BEFORE UPDATE ON booking_monthly_contracts WHEN NEW.id IS NOT OLD.id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id  OR NEW.friend_id IS NOT OLD.friend_id OR NEW.class_kind IS NOT OLD.class_kind OR NEW.class_id IS NOT OLD.class_id  OR NEW.plan_id IS NOT OLD.plan_id OR NEW.plan_version IS NOT OLD.plan_version OR NEW.amount IS NOT OLD.amount  OR NEW.monthly_limit IS NOT OLD.monthly_limit OR NEW.timezone IS NOT OLD.timezone OR NEW.connected_account IS NOT OLD.connected_account  OR NEW.connection_identity IS NOT OLD.connection_identity OR NEW.consent_version IS NOT OLD.consent_version  OR NEW.consented_at IS NOT OLD.consented_at OR NEW.request_key IS NOT OLD.request_key OR (NEW.request_json IS NOT OLD.request_json AND NOT ((EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id WHERE a.id=OLD.account_id AND a.tenant_id=OLD.tenant_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL) AND NEW."id" IS OLD."id" AND NEW."tenant_id" IS OLD."tenant_id" AND NEW."account_id" IS OLD."account_id" AND NEW."friend_id" IS OLD."friend_id" AND NEW."class_kind" IS OLD."class_kind" AND NEW."class_id" IS OLD."class_id" AND NEW."plan_id" IS OLD."plan_id" AND NEW."plan_version" IS OLD."plan_version" AND NEW."name" IS OLD."name" AND NEW."amount" IS OLD."amount" AND NEW."currency" IS OLD."currency" AND NEW."monthly_limit" IS OLD."monthly_limit" AND NEW."timezone" IS OLD."timezone" AND NEW."consent_version" IS OLD."consent_version" AND NEW."consented_at" IS OLD."consented_at" AND NEW."connected_account" IS OLD."connected_account" AND NEW."connection_identity" IS OLD."connection_identity" AND NEW."payment_method_id" IS OLD."payment_method_id" AND NEW."payment_method_version" IS OLD."payment_method_version" AND NEW."setup_session_id" IS OLD."setup_session_id" AND NEW."setup_expires_at" IS OLD."setup_expires_at" AND NEW."state" IS OLD."state" AND NEW."stop_reason" IS OLD."stop_reason" AND NEW."stop_effective_at" IS OLD."stop_effective_at" AND NEW."service_state" IS OLD."service_state" AND NEW."service_reason" IS OLD."service_reason" AND NEW."attention_episode_id" IS OLD."attention_episode_id" AND NEW."attention_started_at" IS OLD."attention_started_at" AND NEW."request_key" IS OLD."request_key" AND NEW."test_mode" IS OLD."test_mode" AND NEW."created_at" IS OLD."created_at") AND NEW.request_json = json_remove(OLD.request_json, '$.friendId')))  OR (OLD.customer_id IS NOT NULL AND NEW.customer_id IS NOT OLD.customer_id AND NOT ((EXISTS(SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id WHERE a.id=OLD.account_id AND a.tenant_id=OLD.tenant_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL) AND NEW."id" IS OLD."id" AND NEW."tenant_id" IS OLD."tenant_id" AND NEW."account_id" IS OLD."account_id" AND NEW."friend_id" IS OLD."friend_id" AND NEW."class_kind" IS OLD."class_kind" AND NEW."class_id" IS OLD."class_id" AND NEW."plan_id" IS OLD."plan_id" AND NEW."plan_version" IS OLD."plan_version" AND NEW."name" IS OLD."name" AND NEW."amount" IS OLD."amount" AND NEW."currency" IS OLD."currency" AND NEW."monthly_limit" IS OLD."monthly_limit" AND NEW."timezone" IS OLD."timezone" AND NEW."consent_version" IS OLD."consent_version" AND NEW."consented_at" IS OLD."consented_at" AND NEW."connected_account" IS OLD."connected_account" AND NEW."connection_identity" IS OLD."connection_identity" AND NEW."payment_method_id" IS OLD."payment_method_id" AND NEW."payment_method_version" IS OLD."payment_method_version" AND NEW."setup_session_id" IS OLD."setup_session_id" AND NEW."setup_expires_at" IS OLD."setup_expires_at" AND NEW."state" IS OLD."state" AND NEW."stop_reason" IS OLD."stop_reason" AND NEW."stop_effective_at" IS OLD."stop_effective_at" AND NEW."service_state" IS OLD."service_state" AND NEW."service_reason" IS OLD."service_reason" AND NEW."attention_episode_id" IS OLD."attention_episode_id" AND NEW."attention_started_at" IS OLD."attention_started_at" AND NEW."request_key" IS OLD."request_key" AND NEW."test_mode" IS OLD."test_mode" AND NEW."created_at" IS OLD."created_at") AND NEW.customer_id IS NULL))  OR NEW.version!=OLD.version+1  OR (OLD.state='expired' AND NEW.state!=OLD.state)  OR (OLD.state='stopped' AND NEW.state!=OLD.state AND NOT(NEW.state='active' AND OLD.stop_reason='unpaid'    AND NEW.stop_reason IS NULL AND NEW.stop_effective_at IS NULL AND EXISTS(SELECT 1 FROM booking_monthly_cycles y      WHERE y.contract_id=NEW.id AND y.state='paid' AND julianday(y.service_start)<=julianday('now') AND julianday(y.service_end)>julianday('now'))))  OR (OLD.state IN('active','stop_scheduled') AND NEW.state IN('applying','expired'))  OR (OLD.stop_reason IN('member_request','store_request','store_immediate') AND    (NEW.stop_reason IS NOT OLD.stop_reason AND NOT(NEW.stop_reason IS 'store_immediate' AND julianday(NEW.stop_effective_at)<=julianday(OLD.stop_effective_at))     OR NEW.stop_effective_at IS NULL OR julianday(NEW.stop_effective_at)>julianday(OLD.stop_effective_at)))  OR (NEW.state IN('active','stop_scheduled') AND NOT EXISTS(SELECT 1 FROM booking_monthly_active_slots s WHERE s.contract_id=NEW.id))  OR (OLD.state='applying' AND NEW.state IN('active','stop_scheduled') AND NOT EXISTS(SELECT 1 FROM booking_monthly_cycles y WHERE y.contract_id=NEW.id AND y.kind='initial' AND y.state='paid'))  OR (NEW.payment_method_id IS NOT OLD.payment_method_id AND NEW.payment_method_version!=OLD.payment_method_version+1)  OR (OLD.attention_started_at IS NOT NULL AND NEW.attention_started_at IS NOT NULL AND julianday(NEW.attention_started_at)>julianday(OLD.attention_started_at)) BEGIN SELECT RAISE(ABORT,'monthly_contract_conflict'); END;
 
 CREATE TRIGGER booking_monthly_contract_slot AFTER INSERT ON booking_monthly_contracts BEGIN INSERT INTO booking_monthly_active_slots VALUES(NEW.tenant_id,NEW.account_id,NEW.friend_id,NEW.class_kind,NEW.class_id,NEW.id); END;
 
@@ -13743,7 +13760,11 @@ BEGIN SELECT RAISE(ABORT, 'common action binding migration history is immutable'
 
 CREATE TRIGGER trg_common_action_published_version_immutable
 BEFORE UPDATE ON common_action_versions
-WHEN OLD.status = 'published'
+WHEN OLD.status = 'published' AND NOT (NEW."id" IS OLD."id" AND NEW."common_action_id" IS OLD."common_action_id" AND NEW."version_number" IS OLD."version_number" AND NEW."status" IS OLD."status" AND NEW."created_by" IS OLD."created_by" AND NEW."created_at" IS OLD."created_at" AND NEW."published_at" IS OLD."published_at" AND NEW."draft_revision" IS OLD."draft_revision" AND json_valid(OLD.action_config) AND json_type(OLD.action_config)='array'
+  AND NEW.action_config=(SELECT json_group_array(json_object('id',CASE WHEN json_type(value,'$.id')='text' AND length(json_extract(value,'$.id')) BETWEEN 1 AND 80 AND json_extract(value,'$.id') NOT GLOB '*[^A-Za-z0-9_-]*' THEN json_extract(value,'$.id') ELSE NULL END,
+    'type',CASE WHEN json_type(value,'$.type')='text' AND json_extract(value,'$.type') IN ('send_message','set_friend_fields','run_common_action','add_tag','remove_tag','explicit','segment','tag','friend_field','support_mark','scenario','common_var','send_template','reminder','event_booking','notify_staff','start_scenario','same_kind','list','daily','weekly','monthly','manual','purchase') THEN json_extract(value,'$.type') ELSE NULL END)) FROM json_each(OLD.action_config) WHERE type='object')
+  AND EXISTS(SELECT 1 FROM common_actions ca JOIN line_accounts a ON a.id=ca.line_account_id JOIN tenants t ON t.id=a.tenant_id
+    WHERE ca.id=OLD.common_action_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL))
 BEGIN SELECT RAISE(ABORT, 'published common action version is immutable'); END;
 
 CREATE TRIGGER trg_common_action_published_version_no_delete
@@ -13753,6 +13774,11 @@ BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); 
 
 CREATE TRIGGER trg_form_versions_immutable
 BEFORE UPDATE ON form_versions
+WHEN NOT (NEW.on_submit_webhook_url IS NULL AND NEW.on_submit_webhook_headers IS NULL AND NEW."id" IS OLD."id" AND NEW."form_id" IS OLD."form_id" AND NEW."version_number" IS OLD."version_number" AND NEW."source_content_revision" IS OLD."source_content_revision" AND NEW."name" IS OLD."name" AND NEW."description" IS OLD."description" AND NEW."fields" IS OLD."fields" AND NEW."layout" IS OLD."layout" AND NEW."on_submit_tag_id" IS OLD."on_submit_tag_id" AND NEW."on_submit_scenario_id" IS OLD."on_submit_scenario_id" AND NEW."on_submit_message_type" IS OLD."on_submit_message_type" AND NEW."on_submit_message_content" IS OLD."on_submit_message_content" AND NEW."on_submit_webhook_fail_message" IS OLD."on_submit_webhook_fail_message" AND NEW."save_to_metadata" IS OLD."save_to_metadata" AND NEW."og_title" IS OLD."og_title" AND NEW."og_description" IS OLD."og_description" AND NEW."og_image_url" IS OLD."og_image_url" AND NEW."status" IS OLD."status" AND NEW."published_at" IS OLD."published_at" AND NEW."created_at" IS OLD."created_at"
+  AND EXISTS (SELECT 1 FROM form_accounts fa JOIN line_accounts a ON a.id=fa.line_account_id JOIN tenants t ON t.id=a.tenant_id
+    WHERE fa.form_id=OLD.form_id AND a.data_purged_at IS NOT NULL AND t.purge_started_at IS NOT NULL AND t.data_purged_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM form_accounts other JOIN line_accounts oa ON oa.id=other.line_account_id
+        WHERE other.form_id=OLD.form_id AND (oa.tenant_id IS NOT t.id OR oa.data_purged_at IS NULL))))
 BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;
 
 CREATE TRIGGER trg_forms_activation_requires_published_version

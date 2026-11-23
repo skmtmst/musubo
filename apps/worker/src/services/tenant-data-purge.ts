@@ -13,6 +13,14 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 
+import { preparePurgedTenantBilling, requirePurgeHashKeyBeforeClaim } from './tenant-purge-billing-prepare.js';
+import { observeBillingHashKeyUnavailable } from './billing-external-review.js';
+import { discoverRetainedPurgeAncestors, validateTombstonePolicies, type TombstonePolicy } from './tenant-retain-graph.js';
+import { tombstoneRetainedParents } from './tenant-purge-generic.js';
+import candidates from './tenant-retain-column-candidates.json';
+import policies from './tenant-retain-column-policies.json';
+import { claimTenantPurge, deferStaleBillingReceipts, tombstoneLineAccount, tombstoneFriend, tombstoneRestaurantStore, tombstoneRestaurantOrganization, tombstoneBroadcast, detachSharedBroadcast, tombstoneBookingMenu, tombstonePassPlan, anonymizeMonthlyContract } from './tenant-purge-tombstones.js';
+
 
 /**
  * 退会・無料体験切れから保存期限が過ぎた統括(テナント)の顧客データを消す（★36-2）。
@@ -71,6 +79,7 @@ const R2_KEY_COLUMNS_BY_TABLE = RETENTION_R2_KEY_COLUMNS.reduce<Record<string, s
 export interface TenantDataPurgeEnv {
   DB: D1Database;
   IMAGES?: R2Bucket;
+  PURGED_PAYMENT_HMAC_SECRET?: string;
 }
 
 export interface TenantDataPurgeResult {
@@ -155,9 +164,14 @@ export async function processTenantDataPurge(
     const progress: OneTenantResult = { deletedRows: 0, deletedObjects: 0, failedObjects: 0, finished: true };
     let purged: OneTenantResult;
     try { purged = await purgeOneTenant(env, tenant, now, budget, progress); }
-    catch {
+    catch (error) {
       progress.finished = false;
-      progress.failure = { table: 'unknown', failureCode: 'unexpected_failure', r2DeletedBeforeFailure: 0 };
+      const missingKey = error instanceof Error && error.message === 'purge_payment_hash_key_missing';
+      if (missingKey) {
+        try { await observeBillingHashKeyUnavailable(env.DB,tenant.id,new Date(now).toISOString()); }
+        catch { logger.error('tenant_purge.billing_key_alert_failed'); }
+      }
+      progress.failure = { table: missingKey ? 'billing_events' : 'unknown', failureCode: missingKey ? 'billing_key_unavailable' : 'unexpected_failure', r2DeletedBeforeFailure: 0 };
       try {
         await recordAuditEvent(env.DB, {
           category: 'business', action: 'tenant_data.purge_failed', tenantId: tenant.id,
@@ -215,16 +229,110 @@ async function purgeOneTenant(
   const byTable: Record<string, number> = {};
   let remaining = budget;
 
+  await requirePurgeHashKeyBeforeClaim(env.DB,tenant.id,env.PURGED_PAYMENT_HMAC_SECRET);
+  // Keep retained foreign-key parents in place. The claim also prevents account resumption.
+  if (!await claimTenantPurge(env.DB, tenant.id, now, Boolean(env.PURGED_PAYMENT_HMAC_SECRET))) {
+    out.finished = false;
+    return out;
+  }
+  if (await deferStaleBillingReceipts(env.DB, tenant.id, new Date(now).toISOString()) === 100) {
+    out.finished = false;
+    return out;
+  }
+  await preparePurgedTenantBilling(env.DB,tenant.id,now,env.PURGED_PAYMENT_HMAC_SECRET);
+  await env.DB.prepare(`UPDATE mcp_connections SET status='stopped',previous_key_hash=NULL,previous_key_expires_at=NULL,version=version+1
+    WHERE organization_id=? AND (status<>'stopped' OR previous_key_hash IS NOT NULL)
+      AND EXISTS (SELECT 1 FROM tenants WHERE id=? AND purge_started_at IS NOT NULL AND data_purged_at IS NULL)` ).bind(tenant.id,tenant.id).run();
+  const retainedParents = await discoverRetainedPurgeAncestors(env.DB);
+  validateTombstonePolicies(retainedParents, candidates, policies as Record<string, TombstonePolicy>);
+  const retainedParentSet = new Set(retainedParents);
+  const accounts = await env.DB.prepare('SELECT id FROM line_accounts WHERE tenant_id=? AND data_purged_at IS NULL LIMIT ?')
+    .bind(tenant.id, remaining).all<{id:string}>();
+  for (const account of accounts.results) {
+    if (!await tombstoneLineAccount(env.DB, tenant.id, account.id, now)) throw new Error('account_tombstone_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['line_accounts'] = (byTable['line_accounts'] ?? 0) + 1;
+  }
+  const contracts = await env.DB.prepare(`SELECT id FROM booking_monthly_contracts WHERE tenant_id=? AND
+    (customer_id IS NOT NULL OR payment_method_id IS NOT NULL OR setup_session_id IS NOT NULL OR
+     name<>'削除済み' OR state NOT IN ('expired','stopped') OR json_extract(request_json,'$.friendId') IS NOT NULL) LIMIT ?`)
+    .bind(tenant.id, remaining).all<{id:string}>();
+  for (const contract of contracts.results) {
+    if (!await anonymizeMonthlyContract(env.DB, tenant.id, contract.id, now)) throw new Error('monthly_anonymization_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['booking_monthly_contracts'] = (byTable['booking_monthly_contracts'] ?? 0) + 1;
+  }
+  const friends = await env.DB.prepare(`SELECT f.id,f.line_account_id FROM friends f JOIN line_accounts a ON a.id=f.line_account_id
+    WHERE a.tenant_id=? AND f.data_purged_at IS NULL LIMIT ?`).bind(tenant.id,remaining).all<{id:string;line_account_id:string}>();
+  for (const friend of friends.results) {
+    if (!await tombstoneFriend(env.DB,friend.line_account_id,friend.id,now)) throw new Error('friend_tombstone_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['friends'] = (byTable['friends'] ?? 0) + 1;
+  }
+  const plans = await env.DB.prepare(`SELECT p.id FROM booking_pass_plans p JOIN line_accounts a ON a.id=p.line_account_id
+    WHERE a.tenant_id=? AND p.data_purged_at IS NULL LIMIT ?`).bind(tenant.id,remaining).all<{id:string}>();
+  for (const plan of plans.results) {
+    if (!await tombstonePassPlan(env.DB,tenant.id,plan.id,now)) throw new Error('plan_tombstone_failed');
+    remaining--;
+    out.deletedRows++;
+    byTable['booking_pass_plans'] = (byTable['booking_pass_plans'] ?? 0) + 1;
+  }
+
+  // Shared broadcasts must be detached before child-first deletion; otherwise
+  // children belonging to the other tenant would follow this tenant's owner.
+  if (remaining > 0) {
+    const shared = await env.DB.prepare(`SELECT b.id FROM broadcasts b
+      WHERE b.data_purged_at IS NULL AND b.target_type='multi-account-dedup' AND json_type(b.account_ids)='array'
+        AND (b.line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=?) OR EXISTS (
+          SELECT 1 FROM json_each(b.account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id=?))
+        AND EXISTS(SELECT 1 FROM json_each(b.account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id IS NOT ?) LIMIT ?`)
+      .bind(tenant.id,tenant.id,tenant.id,remaining).all<{id:string}>();
+    for (const row of shared.results) {
+      if (!await detachSharedBroadcast(env.DB,tenant.id,row.id)) throw new Error('shared_broadcast_detach_failed');
+      remaining--; out.deletedRows++;
+      byTable.broadcasts=(byTable.broadcasts ?? 0)+1;
+    }
+  }
+
   // 子が先、親が後。親を先に消すと子が親をたどれなくなって消し残る。
   tables: for (const table of purgeTablesChildFirst()) {
     if (remaining <= 0) {
       out.finished = false;
       break;
     }
+    if (table === 'line_accounts' || table === 'friends') continue;
+    if (table === 'broadcasts' || table === 'menus' || table === 'rt_stores' || table === 'rt_organizations') {
+      const condition = table === 'rt_stores'
+        ? 'rt_stores.organization_id IN (SELECT id FROM rt_organizations WHERE tenant_id=?)'
+        : table === 'broadcasts' ? `(${tenantScopeCondition(table)} OR (broadcasts.target_type='multi-account-dedup' AND EXISTS (SELECT 1 FROM json_each(broadcasts.account_ids) j JOIN line_accounts a ON a.id=j.value WHERE a.tenant_id=?)))`
+        : tenantScopeCondition(table);
+      const rows = await env.DB.prepare(`SELECT id FROM ${table} WHERE ${condition} AND data_purged_at IS NULL LIMIT ?`)
+        .bind(...(table === 'broadcasts' ? [tenant.id,tenant.id,remaining] : [tenant.id,remaining])).all<{id:string}>();
+      for (const row of rows.results) {
+        const ok = table === 'broadcasts' ? await detachSharedBroadcast(env.DB,tenant.id,row.id) || await tombstoneBroadcast(env.DB,tenant.id,row.id,now)
+          : table === 'menus' ? await tombstoneBookingMenu(env.DB,tenant.id,row.id,now)
+          : table === 'rt_stores' ? await tombstoneRestaurantStore(env.DB,tenant.id,row.id,now)
+          : await tombstoneRestaurantOrganization(env.DB,tenant.id,row.id,now);
+        if (!ok) throw new Error('parent_tombstone_failed');
+        remaining--;
+        out.deletedRows++;
+        byTable[table] = (byTable[table] ?? 0) + 1;
+      }
+      if (remaining <= 0) { out.finished = false; break; }
+      continue;
+    }
     // 回答フォームだけ統括またぎの使い回しを守る条件にする（? が1つ増える）。
     const sharedForm = table === 'forms';
-    const condition = sharedForm ? formsPurgeCondition() : tenantScopeCondition(table);
-    const tenantParams = sharedForm ? [tenant.id, tenant.id] : [tenant.id];
+    const sharedFormVersion = table === 'form_versions';
+    const scope = sharedForm ? formsPurgeCondition() : sharedFormVersion ? `${tenantScopeCondition(table)} AND NOT EXISTS (
+      SELECT 1 FROM form_accounts fa_other JOIN line_accounts a_other ON a_other.id=fa_other.line_account_id
+      WHERE fa_other.form_id=form_versions.form_id AND (a_other.tenant_id IS NULL OR a_other.tenant_id<>?))` : tenantScopeCondition(table);
+    const tenantParams = sharedForm || sharedFormVersion ? [tenant.id, tenant.id] : [tenant.id];
+    const isRetainedParent = retainedParentSet.has(table);
+    const condition = scope;
     const keyColumns = R2_KEY_COLUMNS_BY_TABLE[table] ?? [];
 
     for (;;) {
@@ -238,15 +346,38 @@ async function purgeOneTenant(
       // 読む順と消す順を rowid で揃えるので、両者は必ず同じ行を指す。
       let r2DeletedBeforeFailure = 0;
       if (keyColumns.length > 0) {
-        const objects = await deleteR2Objects(env, table, condition, keyColumns, tenant.id, chunk);
+        const objectCondition = isRetainedParent
+          ? `(${condition}) AND NOT EXISTS (SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=? AND p.table_name=? AND p.row_id=CAST(${table}.id AS TEXT))`
+          : condition;
+        const objectParams = isRetainedParent ? [...tenantParams, tenant.id, table] : tenantParams;
+        const objects = await deleteR2Objects(env, table, objectCondition, keyColumns, objectParams, chunk);
         out.deletedObjects += objects.deleted;
         r2DeletedBeforeFailure = objects.deleted;
         out.failedObjects += objects.failed;
-        if (table === 'form_submission_files' && objects.failed > 0) {
+        if ((table === 'form_submission_files' || isRetainedParent) && objects.failed > 0) {
           // 次回も削除を再試行できるよう、R2 キーと親行への参照を保つ。
           out.finished = false;
           break tables;
         }
+      }
+
+      if (isRetainedParent) {
+        let count: number;
+        try {
+          count = await tombstoneRetainedParents(env.DB, {
+            tenantId: tenant.id, table, scope, scopeValues: tenantParams, limit: chunk,
+            policy: (policies as Record<string, TombstonePolicy>)[table],
+          });
+        } catch (error) {
+          out.finished = false;
+          out.failure = { table, failureCode: deleteFailureCode(error), r2DeletedBeforeFailure };
+          break tables;
+        }
+        byTable[table] = (byTable[table] ?? 0) + count;
+        out.deletedRows += count;
+        remaining -= count;
+        if (count < chunk) break;
+        continue;
       }
 
       let deleted: D1Result;
@@ -287,6 +418,16 @@ async function purgeOneTenant(
     }
   }
 
+  if (out.finished) {
+    const remainingContracts = await env.DB.prepare(`SELECT 1 AS present FROM booking_monthly_contracts WHERE tenant_id=? AND
+      (customer_id IS NOT NULL OR payment_method_id IS NOT NULL OR setup_session_id IS NOT NULL OR
+       name<>'削除済み' OR state NOT IN ('expired','stopped') OR json_extract(request_json,'$.friendId') IS NOT NULL) LIMIT 1`)
+      .bind(tenant.id).first<{present:number}>();
+    if (remainingContracts) {
+      out.finished = false;
+      out.failure = { table: 'booking_monthly_contracts', failureCode: 'monthly_anonymization_incomplete', r2DeletedBeforeFailure: 0 };
+    }
+  }
   const finishedAt = out.finished ? now : null;
   try {
     await recordTenantDataPurgeAudit(
@@ -328,7 +469,7 @@ async function deleteR2Objects(
   table: string,
   condition: string,
   columns: string[],
-  tenantId: string,
+  params: readonly string[],
   chunk: number,
 ): Promise<{ deleted: number; failed: number }> {
   const selected = await env.DB
@@ -336,7 +477,7 @@ async function deleteR2Objects(
       `SELECT ${columns.map((column) => `${table}.${column}`).join(', ')}
          FROM ${table} WHERE ${condition} ORDER BY ${table}.rowid LIMIT ?`,
     )
-    .bind(tenantId, chunk)
+    .bind(...params, chunk)
     .all<Record<string, string | null>>();
 
   const keys = (selected.results ?? [])

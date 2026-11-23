@@ -12,6 +12,7 @@ describe('一括メッセージの承認', () => {
   let testDb: SqliteD1;
   beforeEach(() => {
     testDb = createTestD1();
+    testDb.raw.exec("INSERT OR IGNORE INTO tenants(id,name) VALUES ('default','fixture')");
     testDb.raw.exec(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
       VALUES ('a1', 'channel-1', '試験店舗', '', '', 'default');
       INSERT INTO account_settings (id, line_account_id, key, value)
@@ -102,6 +103,16 @@ describe('一括メッセージの承認', () => {
     expect(await processFriendBulkRun(testDb.db, run.id, { executors: { send_message: send } })).toMatchObject({ processed: 0 });
     expect(send).not.toHaveBeenCalled();
     expect(await getBulkMessageApproval(testDb.db, run.id)).toMatchObject({ status: 'pending' });
+  });
+
+  it('統括の削除開始後は新規作成せず、待機中の一括操作も実行しない', async () => {
+    const {run}=await start();
+    testDb.raw.exec("UPDATE tenants SET purge_started_at='2027-01-01' WHERE id='default'");
+    await expect(start()).rejects.toThrow();
+    expect(await listDueFriendBulkRunIds(testDb.db,NOW)).toEqual([]);
+    const send=vi.fn();
+    await expect(processFriendBulkRun(testDb.db,run.id,{executors:{send_message:send}})).rejects.toThrow();
+    expect(send).not.toHaveBeenCalled();
   });
 
 });

@@ -30,7 +30,7 @@ export async function organizationByTenantId(
       o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
     FROM rt_organizations o
     LEFT JOIN tenants t ON t.id = o.tenant_id
-    WHERE o.tenant_id = ?
+    WHERE o.tenant_id = ? AND o.data_purged_at IS NULL
     LIMIT 1`).bind(id).first<OrganizationRow>();
   return organization ? { ...organization, scopedStoreId: null } : null;
 }
@@ -75,7 +75,7 @@ async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext
     `SELECT o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
      FROM rt_organizations o
      LEFT JOIN tenants t ON t.id = o.tenant_id
-     WHERE o.account_id = ? LIMIT 1`,
+     WHERE o.account_id = ? AND o.data_purged_at IS NULL LIMIT 1`,
   ).bind(id).first<OrganizationRow>();
   if (organization) return { ...organization, scopedStoreId: null };
 
@@ -85,7 +85,7 @@ async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext
     FROM rt_stores s
     JOIN rt_organizations o ON o.id = s.organization_id
     LEFT JOIN tenants t ON t.id = o.tenant_id
-    WHERE s.line_account_id = ?
+    WHERE s.line_account_id = ? AND s.data_purged_at IS NULL AND o.data_purged_at IS NULL
     LIMIT 1`).bind(id).first<OrganizationRow & { scoped_store_id: string }>();
   return storeOrganization
     ? { ...storeOrganization, scopedStoreId: storeOrganization.scoped_store_id }
@@ -129,6 +129,7 @@ export async function selectedRestaurantStore(
     WHERE session.token_hash = ?
       AND session.expires_at > ?
       AND s.organization_id = ?
+      AND s.data_purged_at IS NULL
       AND (? IS NULL OR s.line_account_id = ?)
     LIMIT 1`).bind(tokenHash, new Date().toISOString(), organizationId, scopedAccountId, scopedAccountId)
     .first<SelectedRestaurantStore>();
@@ -148,7 +149,7 @@ export async function storeBelongsTo(c: Context<Env>, organizationId: string, st
   const selected = await selectedRestaurantStore(c, organizationId);
   if (selected && selected.id !== storeId) return false;
   const row = await dbFor(c.env, storeId).prepare(
-    'SELECT line_account_id FROM rt_stores WHERE id = ? AND organization_id = ? LIMIT 1',
+    'SELECT line_account_id FROM rt_stores WHERE id = ? AND organization_id = ? AND data_purged_at IS NULL LIMIT 1',
   ).bind(storeId, organizationId).first<{ line_account_id: string | null }>();
   if (!row) return false;
   const scopedAccountId = c.get('restaurantScopedAccountId');

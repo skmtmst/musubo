@@ -1,3 +1,4 @@
+import { registerRestaurantTombstoneTests } from '../test-utils/restaurant-tombstone-tests.js';
 import { registerRestaurantMenuConfirmationTests } from '../test-utils/restaurant-menu-confirmation.js';
 import { seedRestaurantFixture as seedRestaurantData } from '../test-utils/restaurant-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
@@ -10,7 +11,6 @@ import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-
 type MockStaff = {
   id: string;
   name: string;
@@ -330,7 +330,7 @@ describe('飲食店向けテストAPI', () => {
     const json = await snapshot.json() as { data: { stores: unknown[] } };
     expect(json.data.stores).toHaveLength(2);
   });
-
+  registerRestaurantTombstoneTests({ db: () => testDb, seed: seedRestaurantFixture, session: createAdminSession, request, requestAs, requestWithMethod });
   it('利用規約への同意を組織・現行版ごとに冪等記録する', async () => {
     seedRestaurantFixture();
     const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };

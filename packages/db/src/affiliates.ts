@@ -6,6 +6,8 @@ import { jstNow } from './utils.js';
 import { FRIEND_ADD_WINNER_SUBQUERY } from './affiliate-report.js';
 import { generateRefSlug } from './affiliate-links.js';
 
+const visibleAffiliate = `NOT EXISTS (SELECT 1 FROM tenants t_hidden WHERE t_hidden.id=affiliates.tenant_id AND (t_hidden.purge_started_at IS NOT NULL OR t_hidden.data_purged_at IS NOT NULL)) AND NOT EXISTS (SELECT 1 FROM tenant_purge_tombstone_progress p WHERE p.tenant_id=affiliates.tenant_id AND p.table_name='affiliates' AND p.row_id=affiliates.id)`;
+
 /** 認証利用者が読める紹介者の所属範囲。tenant と account の両方を必須にする。 */
 export interface AffiliateScope {
   tenantId: string;
@@ -50,7 +52,7 @@ export async function getAffiliates(
   const scoped = scope ? affiliateScopeSql(scope) : null;
   const result = await db
     .prepare(
-      `SELECT * FROM affiliates${scoped ? ` WHERE ${scoped.sql}` : ''} ORDER BY created_at DESC`,
+      `SELECT * FROM affiliates WHERE ${visibleAffiliate}${scoped ? ` AND ${scoped.sql}` : ''} ORDER BY created_at DESC`,
     )
     .bind(...(scoped?.binds ?? []))
     .all<Affiliate>();
@@ -64,7 +66,7 @@ export async function getAffiliateById(
 ): Promise<Affiliate | null> {
   const scoped = scope ? affiliateScopeSql(scope) : null;
   return db
-    .prepare(`SELECT * FROM affiliates WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}`)
+    .prepare(`SELECT * FROM affiliates WHERE id = ? AND ${visibleAffiliate}${scoped ? ` AND ${scoped.sql}` : ''}`)
     .bind(id, ...(scoped?.binds ?? []))
     .first<Affiliate>();
 }
@@ -74,7 +76,7 @@ export async function getAffiliateByCode(
   code: string,
 ): Promise<Affiliate | null> {
   return db
-    .prepare(`SELECT * FROM affiliates WHERE code = ?`)
+    .prepare(`SELECT * FROM affiliates WHERE code = ? AND ${visibleAffiliate}`)
     .bind(code)
     .first<Affiliate>();
 }
@@ -113,7 +115,7 @@ async function findAffiliateByOperationId(
 ): Promise<Affiliate | null> {
   return db
     .prepare(
-      `SELECT * FROM affiliates WHERE tenant_id = ? AND line_account_id = ? AND operation_id = ?`,
+      `SELECT * FROM affiliates WHERE tenant_id = ? AND line_account_id = ? AND operation_id = ? AND ${visibleAffiliate}`,
     )
     .bind(tenantId, lineAccountId, operationId)
     .first<Affiliate>();

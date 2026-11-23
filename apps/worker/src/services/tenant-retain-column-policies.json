@@ -1,0 +1,1286 @@
+{
+  "affiliate_adjustments": {
+    "columns": {
+      "reason_type": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "reason": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "actor_id": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "affiliate_offers": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      }
+    }
+  },
+  "affiliate_reward_entries": {
+    "columns": {
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      }
+    }
+  },
+  "affiliates": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "email": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "code": {
+        "action": "unique",
+        "reason": "旧紹介コードを再利用できない値に置換"
+      },
+      "is_active": {
+        "action": "zero",
+        "reason": "紹介者の利用を停止"
+      },
+      "lifecycle_status": {
+        "action": "archive",
+        "reason": "紹介者を終了状態にする"
+      },
+      "operation_id": {
+        "action": "null",
+        "reason": "過去の操作識別子を消去"
+      }
+    }
+  },
+  "booking_customers": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "display_name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "phone_normalized_hash": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "phone_encrypted": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "phone_last4": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "email_encrypted": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "pet_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      }
+    }
+  },
+  "booking_groups": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "request_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      }
+    }
+  },
+  "booking_makeup_credits": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "rule_snapshot_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "use_idempotency_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "use_request_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "granted_by": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "booking_payment_methods": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "setup_id": {
+        "action": "unique",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "stripe_customer_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "stripe_payment_method_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "card_last4": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      }
+    }
+  },
+  "booking_series": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "rule_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "request_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "created_by": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "bookings": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "customer_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "internal_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "menu_snapshot_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "meeting_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "cancellation_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "policy_snapshot_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "meeting_url_source": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "deposit_snapshot_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      },
+      "decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "created_by_staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      },
+      "updated_by_staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      },
+      "meeting_location": {
+        "action": "null",
+        "reason": "顧客ごとの待合せ場所を消去"
+      },
+      "person_label": {
+        "action": "null",
+        "reason": "顧客を示す名前を消去"
+      },
+      "external_event_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "external_calendar_id": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "outcome_recorded_by": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "notification_policy_snapshot": {
+        "action": "json",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      }
+    }
+  },
+  "broadcasts": {
+    "columns": {
+      "message_type": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "message_content": {
+        "action": "placeholder",
+        "reason": "必須のメッセージ本文を定型値に置換"
+      },
+      "message_bubbles_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "internal_memo": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "draft_payload_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "message_options_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "approval_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "approval_reject_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "approval_requested_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "approval_approver_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "approval_decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "common_action_versions": {
+    "columns": {
+      "created_by": {
+        "action": "retain",
+        "reason": "公開済み共通アクションの版は不変の店の定義のため保持"
+      },
+      "action_config": {
+        "action": "json",
+        "reason": "アクション種類を残し顧客向け本文と値を消去"
+      }
+    }
+  },
+  "common_actions": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "client_request_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "conversion_events": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "user_id": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "metadata": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "point_name_snapshot": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "idempotency_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "affiliate_code": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "attributed_ref_code": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      }
+    }
+  },
+  "conversion_points": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "target_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "source_config_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "ingest_secret_encrypted": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "status": {
+        "action": "stop",
+        "reason": "旧成果地点を再利用・再集計しない"
+      }
+    }
+  },
+  "event_bookings": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "customer_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "internal_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "identity_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "answer_snapshot_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "event_snapshot_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "event_slots": {
+    "columns": {
+      "client_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      }
+    }
+  },
+  "event_versions": {
+    "columns": {
+      "snapshot_json": {
+        "action": "json",
+        "reason": "版の骨格と日時・定員のみ保持し住所等を消去"
+      }
+    }
+  },
+  "events": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "venue_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "venue_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "description_centered": {
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
+      },
+      "confirmation_message_extra": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "reminder_message_extra": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "og_description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "og_image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "version_write_token": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "questions_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "lifecycle_change_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "venue_address": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "makeup_rule_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      }
+    }
+  },
+  "folders": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      }
+    }
+  },
+  "form_versions": {
+    "columns": {
+      "source_content_revision": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "name": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "description": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_message_type": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_message_content": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_webhook_url": {
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
+      },
+      "on_submit_webhook_fail_message": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "save_to_metadata": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "og_description": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "og_image_url": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_webhook_headers": {
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
+      }
+    }
+  },
+  "forms": {
+    "columns": {
+      "name": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "description": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "save_to_metadata": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_message_type": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_message_content": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_webhook_url": {
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
+      },
+      "on_submit_webhook_fail_message": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "og_description": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "og_image_url": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "content_revision": {
+        "action": "retain",
+        "reason": "店が作成したフォームの定義のため保持"
+      },
+      "on_submit_webhook_headers": {
+        "action": "null",
+        "reason": "Webhookの秘密を消去"
+      }
+    }
+  },
+  "friend_bulk_runs": {
+    "columns": {
+      "selection_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "operation_json": {
+        "action": "json",
+        "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+      },
+      "execution_plan_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "error_message": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "friends": {
+    "columns": {
+      "line_user_id": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "display_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "picture_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "status_message": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "user_id": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "metadata": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "real_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "system_display_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "private_memo": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "photo_watch_required": {
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
+      }
+    }
+  },
+  "impersonation_sessions": {
+    "columns": {
+      "write_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      }
+    }
+  },
+  "line_account_tags": {
+    "columns": {
+      "name": {
+        "action": "unique",
+        "reason": "統括内で一意な分類名を再登録可能にする"
+      }
+    }
+  },
+  "line_accounts": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "channel_access_token": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "channel_secret": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "channel_access_token_encrypted": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "channel_secret_encrypted": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "channel_access_token_updated_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "channel_secret_updated_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "login_channel_secret_updated_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "archived_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "og_site_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "og_default_image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "og_default_description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "official_profile_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "login_channel_secret": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "token_expires_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "icon_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "line_display_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "line_picture_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "line_profile_synced_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "inactive_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "inactive_reason_detail": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "login_channel_secret_encrypted": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "created_by_staff_id": {
+        "action": "retain",
+        "reason": "参照を維持"
+      }
+    }
+  },
+  "media": {
+    "columns": {
+      "r2_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "public_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "archive_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "usage_consent_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "filename": {
+        "action": "placeholder",
+        "reason": "ファイル名を消去"
+      },
+      "uploaded_by": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      },
+      "archived_by": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      }
+    }
+  },
+  "menus": {
+    "columns": {
+      "name": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "description": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "fixed_meeting_url": {
+        "action": "null",
+        "reason": "会議URLを消去"
+      },
+      "audience_tag_ids_json": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "recurring_freqs_json": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "addon_menu_ids_json": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "image_url": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "photo_media_id": {
+        "action": "retain",
+        "reason": "店が作成したメニューの定義のため保持"
+      },
+      "meeting_location": {
+        "action": "null",
+        "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+      }
+    }
+  },
+  "mileage_adjustment_approval_requests": {
+    "columns": {
+      "friend_id": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "reason_category": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "reason": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "requested_by_staff_name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "decided_by_staff_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "decision_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "requested_by_staff_id": {
+        "action": "placeholder",
+        "reason": "担当者の識別情報を消去"
+      },
+      "decided_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "nen_pet_profiles": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "image_r2_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "external_id": {
+        "action": "null",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "customer_id": {
+        "action": "null",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "concerns": {
+        "action": "empty_array",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "birthday": {
+        "action": "null",
+        "reason": "ペットの生年月日を消去"
+      }
+    }
+  },
+  "nen_photo_submissions": {
+    "columns": {
+      "friend_id": {
+        "action": "retain",
+        "reason": "参照と主キーを維持"
+      },
+      "r2_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "image_url": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "content_type": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "public_pet_name": {
+        "action": "zero",
+        "reason": "必須のフラグを無効化"
+      },
+      "review_reason_code": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "review_reason_note": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "reviewed_by_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "review_image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "public_image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "image_width": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "image_height": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "image_byte_size": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "rotation_idempotency_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "notification_retry_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "content_hash": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "review_r2_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "public_r2_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "caption": {
+        "action": "placeholder",
+        "reason": "顧客の識別子または自由記述を消去"
+      },
+      "captured_device": {
+        "action": "null",
+        "reason": "顧客の識別子または自由記述を消去"
+      }
+    }
+  },
+  "recipe_clone_runs": {
+    "columns": {
+      "name_prefix": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "idempotency_key": {
+        "action": "unique",
+        "reason": "必須の識別子を行IDから作る一意値に置換"
+      },
+      "failure_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "recipes": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "items_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "created_by_staff_id": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "rt_organizations": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      }
+    }
+  },
+  "rt_stores": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      }
+    }
+  },
+  "scenarios": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "audience_condition_json": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "stopped_reason": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "content_revision": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      }
+    }
+  },
+  "staff": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "display_name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "profile_image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "fixed_meeting_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "meeting_url_version": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "photo_media_id": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "photo_version": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "bio": {
+        "action": "null",
+        "reason": "担当者の自由記述を消去"
+      }
+    }
+  },
+  "staff_members": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "email": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "api_key": {
+        "action": "random",
+        "reason": "認証鍵を推測できない乱数に置換"
+      },
+      "invite_token_hash": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "email_verified_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "line_user_id": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "totp_secret_enc": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "totp_pending_secret_enc": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "password_hash": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "password_updated_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "email_mask": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "email_change_new": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "email_change_token_hash": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "email_change_expires_at": {
+        "action": "retain",
+        "reason": "金額・日時・状態等を保持"
+      },
+      "is_active": {
+        "action": "zero",
+        "reason": "削除済み担当者の認証を停止"
+      },
+      "permission_keys": {
+        "action": "empty_array",
+        "reason": "削除済み担当者の権限を消去"
+      },
+      "notification_preferences": {
+        "action": "json",
+        "reason": "通知設定内の個人情報を消去"
+      }
+    }
+  },
+  "tags": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "normalized_name": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "created_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      },
+      "updated_by": {
+        "action": "null",
+        "reason": "担当者の識別情報を消去"
+      }
+    }
+  },
+  "tracked_links": {
+    "columns": {
+      "name": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "original_url": {
+        "action": "placeholder",
+        "reason": "必須文字列を定型値に置換"
+      },
+      "og_description": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "og_image_url": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      },
+      "dedup_key": {
+        "action": "null",
+        "reason": "NULL 可能な候補を消去"
+      }
+    }
+  }
+}

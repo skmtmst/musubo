@@ -137,9 +137,10 @@ async function findInvoice(env: WorkerBindings, customerId: string, tenantId: st
   throw new Error('Stripe invoice list is incomplete');
 }
 
-function verifiedInvoice(invoice: StripeInvoice, addition: MusuboPendingLineAddition, customerId: string): void {
+function verifiedInvoice(invoice: StripeInvoice, addition: MusuboPendingLineAddition, customerId: string, billingEpoch: number): void {
   if (invoice.customer !== customerId || invoice.metadata?.tenant_id !== addition.tenant_id
     || invoice.metadata?.purpose !== 'musubo_addition' || invoice.metadata.addition_id !== addition.id
+    || Number(invoice.metadata?.billing_epoch ?? 0) !== billingEpoch
     || invoice.currency !== 'jpy') throw new Error('Addition invoice does not match the approved request');
 }
 
@@ -149,13 +150,15 @@ export async function collectMusuboLineAddition(env: WorkerBindings, addition: M
   const now = new Date().toISOString();
   if (addition.status !== 'awaiting_payment' || addition.amount_due_yen === 0) return addition;
   if (addition.expires_at <= now) throw new Error('The addition hold has expired');
+  const tenantBilling = await getTenantBilling(env.DB, addition.tenant_id);
+  if (!tenantBilling) throw new Error('Tenant billing is unavailable');
   let invoice = addition.stripe_invoice_id
     ? await stripeApi.retrieveInvoice(env, addition.stripe_invoice_id)
     : await findInvoice(env, customerId, addition.tenant_id, addition.id);
   if (!invoice) invoice = await stripeApi.createMusuboAdditionInvoice(env, {
-    customerId, tenantId: addition.tenant_id, additionId: addition.id,
+    customerId, tenantId: addition.tenant_id, additionId: addition.id, billingEpoch:tenantBilling.billing_epoch,
   });
-  verifiedInvoice(invoice, addition, customerId);
+  verifiedInvoice(invoice, addition, customerId, tenantBilling.billing_epoch);
   if (!addition.stripe_invoice_id) {
     await env.DB.prepare(`UPDATE musubo_pending_additions SET stripe_invoice_id=?,updated_at=?
       WHERE id=? AND stripe_invoice_id IS NULL AND status='awaiting_payment'`)
@@ -234,7 +237,7 @@ export async function reserveMusuboLineAddition(env: WorkerBindings, tenantId: s
       ? await stripeApi.retrieveInvoice(env, existing.stripe_invoice_id)
       : await findInvoice(env, legacy.stripe_customer_id, tenantId, existing.id);
     if (invoice) {
-      verifiedInvoice(invoice, existing, legacy.stripe_customer_id);
+      verifiedInvoice(invoice, existing, legacy.stripe_customer_id, legacy.billing_epoch);
       if (invoice.status === 'paid' && invoice.amount_paid >= existing.amount_due_yen) {
         await env.DB.prepare(`UPDATE musubo_pending_additions SET status='paid',stripe_invoice_id=?,paid_at=?,updated_at=?
           WHERE id=? AND status='awaiting_payment'`).bind(invoice.id, now.toISOString(), now.toISOString(), existing.id).run();

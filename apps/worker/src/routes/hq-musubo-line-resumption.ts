@@ -12,8 +12,17 @@ import { getMusuboLineResumptionComplete, reconcileMusuboLineResumption, request
 import { deliverMusuboResumptionNotice } from '../services/musubo-resumption-notification.js';
 import { getMusuboResumptionPaymentState } from '../services/musubo-resumption-subscription.js';
 import type { WorkerBindings } from '../worker-bindings.js';
+import { tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 
 export const hqMusuboLineResumption = new Hono<Env>();
+
+hqMusuboLineResumption.use('/api/hq/billing/musubo/resumption*', async (c, next) => {
+  const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  if (await tenantPurgeInProgress(c.env.DB, tenantId)) {
+    return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
+  }
+  await next();
+});
 
 async function pendingPayment(env: WorkerBindings, tenantId: string, generation: number) {
   const legacy = await getTenantBilling(env.DB, tenantId);

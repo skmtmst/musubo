@@ -17,10 +17,12 @@ export interface TenantBilling {
   stripe_subscription_id: string | null;
   current_period_ends_at: string | null;
   plan_updated_at: string | null;
+  billing_epoch: number;
+  last_purged_at: string | null;
 }
 
 const COLUMNS =
-  'id, name, plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at, plan_updated_at';
+  'id, name, plan_key, plan_status, trial_ends_at, stripe_customer_id, stripe_subscription_id, current_period_ends_at, plan_updated_at, billing_epoch, last_purged_at';
 
 export async function getTenantBilling(db: D1Database, tenantId: string): Promise<TenantBilling | null> {
   return db.prepare(`SELECT ${COLUMNS} FROM tenants WHERE id = ?`).bind(tenantId).first<TenantBilling>();
@@ -41,7 +43,7 @@ export async function getTenantBillingByLineAccount(
     .prepare(
       `SELECT t.id, t.name, t.plan_key, t.plan_status, t.trial_ends_at,
               t.stripe_customer_id, t.stripe_subscription_id,
-              t.current_period_ends_at, t.plan_updated_at
+              t.current_period_ends_at, t.plan_updated_at, t.billing_epoch, t.last_purged_at
          FROM line_accounts la
          LEFT JOIN tenants t ON t.id = la.tenant_id
         WHERE la.id = ?`,
@@ -67,7 +69,13 @@ export async function updateTenantBilling(
   patch: Partial<Pick<TenantBilling, 'plan_key' | 'plan_status' | 'trial_ends_at' | 'stripe_customer_id' | 'stripe_subscription_id' | 'current_period_ends_at'>>,
 ): Promise<TenantBilling | null> {
   const statement = prepareTenantBillingUpdate(db, tenantId, patch);
-  if (statement) await statement.run();
+  if (statement) {
+    const result = await statement.run();
+    if (!result.meta.changes && patch.plan_status && patch.plan_status !== 'canceled') {
+      const row = await db.prepare('SELECT purge_started_at FROM tenants WHERE id = ?').bind(tenantId).first<{purge_started_at:string|null}>();
+      if (row?.purge_started_at) throw new Error('tenant_purge_in_progress');
+    }
+  }
   return getTenantBilling(db, tenantId);
 }
 
@@ -103,7 +111,8 @@ export function prepareTenantBillingUpdate(
   }
   sets.push('plan_updated_at = ?', 'updated_at = ?');
   values.push(now, now, tenantId);
-  return db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?${condition ? ` AND (${condition.sql})` : ''}`)
+  const purgeGuard = patch.plan_status && patch.plan_status !== 'canceled' ? ' AND purge_started_at IS NULL' : '';
+  return db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?${purgeGuard}${condition ? ` AND (${condition.sql})` : ''}`)
     .bind(...values, ...(condition?.values ?? []));
 }
 

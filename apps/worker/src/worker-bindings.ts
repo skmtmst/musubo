@@ -111,6 +111,8 @@ export type WorkerBindings = {
     /** 統括の課金（Stripe サブスクリプション）。値は secret／var で持ち、ここには書かない。 */
     STRIPE_SECRET_KEY?: string;
     STRIPE_BILLING_WEBHOOK_SECRET?: string;
+    PURGED_PAYMENT_HMAC_SECRET?: string;
+    PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS?: string;
     STRIPE_PRICE_LIGHT?: string;
     STRIPE_PRICE_STANDARD?: string;
     STRIPE_PRICE_PRO?: string;

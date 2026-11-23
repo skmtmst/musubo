@@ -37,10 +37,10 @@ export async function ensureMusuboCoreContract(env: WorkerBindings, tenantId: st
     firstChargeDate: billing.first_charge_date,
   });
   const subscription = await ensureMusuboSubscription(env, {
-    customerId: legacy.stripe_customer_id, tenantId, productId,
+    customerId: legacy.stripe_customer_id, tenantId, productId, billingEpoch:legacy.billing_epoch,
     purpose: 'core', interval: terms.interval, unitAmountYen: terms.amountYen,
     firstChargeDateJst: billing.first_charge_date,
-    idempotencyKey: `musubo-core-${tenantId}`,
+    idempotencyKey: `musubo-core-${tenantId}${legacy.billing_epoch ? `-${legacy.billing_epoch}` : ''}`,
   });
   const claimed = await env.DB.prepare(`UPDATE musubo_tenant_billing
     SET core_subscription_id=?,updated_at=?
@@ -90,10 +90,10 @@ export async function ensureMusuboOptionsContract(env: WorkerBindings, tenantId:
     + (active.results.length > 1 ? schedule.headquartersYen : 0);
   if (!Number.isSafeInteger(optionsAmountYen)) throw new RangeError('Musubo options amount exceeds the safe range');
   const subscription = await ensureMusuboSubscription(env, {
-    customerId: legacy.stripe_customer_id, tenantId, productId,
+    customerId: legacy.stripe_customer_id, tenantId, productId, billingEpoch:legacy.billing_epoch,
     purpose: 'options', interval: 'month', unitAmountYen: optionsAmountYen,
     firstChargeDateJst: billing.first_charge_date,
-    idempotencyKey: `musubo-options-${tenantId}`,
+    idempotencyKey: `musubo-options-${tenantId}${legacy.billing_epoch ? `-${legacy.billing_epoch}` : ''}`,
   });
   const claimed = await env.DB.prepare(`UPDATE musubo_tenant_billing
     SET options_subscription_id=?,updated_at=?

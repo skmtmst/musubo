@@ -11,7 +11,7 @@ vi.mock('../features/friends/friend-tag-attach.js',()=>({attachTagAndFireSideEff
 }}));
 import {recordTrackedClick,processTrackedClick,processDueTrackedClicks} from './tracked-click-steps.js';
 let item:SqliteD1;
-beforeEach(()=>{item=createTestD1();fault.tag=true;insertFriend(item.raw,'f',{line_account_id:'a'});
+beforeEach(()=>{item=createTestD1();fault.tag=true;item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','channel-a','A','test','test')");insertFriend(item.raw,'f',{line_account_id:'a'});
  item.raw.exec(`INSERT INTO tracked_links(id,name,original_url,line_account_id)VALUES('l','link','https://example.test','a');
  CREATE TABLE effects(id TEXT PRIMARY KEY,n INTEGER);INSERT INTO effects VALUES('mileage',0),('score',0),('automation',0),('tag',0)`)});
 afterEach(()=>item.raw.close());
@@ -42,6 +42,7 @@ it.each(['b', null])('rejects a foreign or null account before persisting an ide
   expect(item.raw.prepare('SELECT COUNT(*) AS n FROM workflow_steps').get()).toEqual({n:0});
 });
 it('refuses a queued friend moved to NULL before any effects run', async () => {
+  item.raw.exec("UPDATE line_accounts SET tenant_id='other-tenant' WHERE id='a'");
   const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
   item.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='f'");
   await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan)).rejects.toThrow('tracked_click_account_changed');
@@ -61,7 +62,7 @@ it('refuses old persisted identified plans without verified identity provenance'
 
 
 it('records and continues a verified default-tenant NULL friend', async () => {
-  item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','a','A','token','secret'); UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  item.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='f'");
   fault.tag = false;
   const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
   expect(item.raw.prepare('SELECT friend_id FROM link_clicks').get()).toEqual({friend_id:'f'});
@@ -69,10 +70,16 @@ it('records and continues a verified default-tenant NULL friend', async () => {
   expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:1},{n:1},{n:1},{n:1}]);
 });
 it('refuses a queued NULL friend reassigned to another account', async () => {
-  item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','a','A','token','secret'); UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  item.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='f'");
   const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
   item.raw.exec("UPDATE friends SET line_account_id='b' WHERE id='f'");
   await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan)).rejects.toThrow('tracked_click_account_changed');
   await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]})).rejects.toThrow('tracked_click_account_changed');
   expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
+});
+
+it('rejects tracking for a friend whose account has been purged', async () => {
+  item.raw.exec("UPDATE line_accounts SET data_purged_at='2027-01-01' WHERE id='a'");
+  await expect(recordTrackedClick(item.db,{linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]})).rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT COUNT(*) AS n FROM link_clicks').get()).toEqual({n:0});
 });

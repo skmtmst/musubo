@@ -18,7 +18,7 @@ export async function getStripeEvents(db: D1Database, opts: {
 } = {}): Promise<StripeEventRow[]> {
   const limit = boundedListLimit(opts.limit, 100);
   if (opts.lineAccountIds !== undefined) {
-    const conditions = ['(f.line_account_id IN (SELECT value FROM json_each(?))'
+    const conditions = ['e.review_reason IS NULL', '(f.line_account_id IN (SELECT value FROM json_each(?))'
       + (opts.includeUnassigned ? ' OR (e.friend_id IS NULL OR (f.id IS NOT NULL AND f.line_account_id IS NULL))' : '') + ')'];
     const binds: unknown[] = [JSON.stringify(opts.lineAccountIds)];
     if (opts.friendId) { conditions.push('e.friend_id = ?'); binds.push(opts.friendId); }
@@ -29,16 +29,16 @@ export async function getStripeEvents(db: D1Database, opts: {
     return result.results;
   }
   if (opts.friendId) {
-    const result = await db.prepare(`SELECT * FROM stripe_events WHERE friend_id = ? ORDER BY processed_at DESC LIMIT ?`)
+    const result = await db.prepare(`SELECT * FROM stripe_events WHERE review_reason IS NULL AND friend_id = ? ORDER BY processed_at DESC LIMIT ?`)
       .bind(opts.friendId, limit).all<StripeEventRow>();
     return result.results;
   }
   if (opts.eventType) {
-    const result = await db.prepare(`SELECT * FROM stripe_events WHERE event_type = ? ORDER BY processed_at DESC LIMIT ?`)
+    const result = await db.prepare(`SELECT * FROM stripe_events WHERE review_reason IS NULL AND event_type = ? ORDER BY processed_at DESC LIMIT ?`)
       .bind(opts.eventType, limit).all<StripeEventRow>();
     return result.results;
   }
-  const result = await db.prepare(`SELECT * FROM stripe_events ORDER BY processed_at DESC LIMIT ?`)
+  const result = await db.prepare(`SELECT * FROM stripe_events WHERE review_reason IS NULL ORDER BY processed_at DESC LIMIT ?`)
     .bind(limit).all<StripeEventRow>();
   return result.results;
 }

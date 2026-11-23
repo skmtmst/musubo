@@ -31,6 +31,10 @@ import { asD1 } from './d1-test-helper.js';
 function setup(): Database.Database {
   const sqlite = new Database(':memory:');
   applyConversionTestSchema(sqlite);
+  sqlite.exec(`
+    CREATE TABLE tenants (id TEXT PRIMARY KEY, purge_started_at TEXT, data_purged_at TEXT);
+    CREATE TABLE tenant_purge_tombstone_progress (tenant_id TEXT, table_name TEXT, row_id TEXT);
+  `);
   sqlite.prepare(
     `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
      VALUES ('acc-1', 'ch-1', 'A店', 'tok', 'sec', 'tenant-1'),

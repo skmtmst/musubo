@@ -4,6 +4,7 @@ import { collectSecurityCounts } from './security-monitor-counts.js';
 import { securityThresholds } from './security-monitor-rules.js';
 import { observeSecurityAlert } from './security-monitor-store.js';
 import { flushSecurityAlerts } from './security-monitor-slack.js';
+import { observeUncertainBillingEffects } from './billing-external-review.js';
 
 export async function runSecurityMonitor(env: WorkerBindings, now = new Date(), fetcher: typeof fetch = fetch): Promise<void> {
   const startedAt = now.toISOString();
@@ -19,6 +20,7 @@ export async function runSecurityMonitor(env: WorkerBindings, now = new Date(), 
     .bind(leaseUntil, token, startedAt, window).run();
   if (Number(claim.meta.changes) !== 1) return;
   try {
+    await observeUncertainBillingEffects(env.DB, startedAt);
     const config = securityThresholds(env.SECURITY_MONITOR_THRESHOLDS);
     const counts = await collectSecurityCounts(env.DB, now);
     for (const count of counts) {

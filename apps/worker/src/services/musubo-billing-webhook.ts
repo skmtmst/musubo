@@ -24,9 +24,13 @@ export async function processMusuboBillingEvent(input: {
   event: MusuboBillingEvent;
   tenantId: string;
   customerId: string;
+  leaseToken: string;
   billing: MusuboTenantBillingRecord;
 }): Promise<'completed' | 'retry'> {
-  const { db, event, tenantId, customerId, billing } = input;
+  const { db, event, tenantId, customerId, billing, leaseToken } = input;
+  const completionFence = `AND lease_token=? AND julianday(lease_until)>julianday('now')
+    AND EXISTS (SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)`;
+  const assertCompleted = () => db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BILLING_LEASE_EXPIRED' END)");
   const object = event.data.object;
   const metadata = (object.metadata ?? {}) as Record<string, unknown>;
   if (event.type.startsWith('invoice.') && metadata.purpose === 'musubo_addition') {
@@ -66,7 +70,8 @@ export async function processMusuboBillingEvent(input: {
     }
     statements.push(db.prepare(`UPDATE billing_events SET summary=json_object(
       'state','completed','subjectId',?,'additionId',?,'applied',1)
-      WHERE id=? AND summary='pending'`).bind(invoiceId, additionId, event.id));
+      WHERE id=? AND summary='pending' ${completionFence}`).bind(invoiceId, additionId, event.id, leaseToken));
+    statements.push(assertCompleted());
     await db.batch(statements);
     return 'completed';
   }
@@ -145,7 +150,8 @@ export async function processMusuboBillingEvent(input: {
   }
   statements.push(db.prepare(`UPDATE billing_events SET summary=json_object(
     'state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',1)
-    WHERE id=? AND summary='pending'`).bind(created, subscriptionId, subjectId, event.id));
+    WHERE id=? AND summary='pending' ${completionFence}`).bind(created, subscriptionId, subjectId, event.id, leaseToken));
+  statements.push(assertCompleted());
   await db.batch(statements);
   return 'completed';
 }

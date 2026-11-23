@@ -11,9 +11,8 @@ describe('getStaffMembers', () => {
 
     await getStaffMembers(db, 'tenant-b');
 
-    expect(prepare).toHaveBeenCalledWith(
-      'SELECT * FROM staff_members WHERE COALESCE(tenant_id, ?) = ? ORDER BY created_at ASC',
-    );
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('COALESCE(sm.tenant_id, ?) = ?'));
+    expect(prepare).toHaveBeenCalledWith(expect.stringContaining('tenant_purge_tombstone_progress'));
     expect(bind).toHaveBeenCalledWith(DEFAULT_TENANT_ID, 'tenant-b');
     expect(all).toHaveBeenCalledOnce();
   });

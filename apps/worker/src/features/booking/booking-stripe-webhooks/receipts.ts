@@ -1,5 +1,6 @@
-import { ensureWorkflowStep, getWorkflowStep, type WorkflowStepRef } from '@line-crm/db';
+import { prepareWorkflowStep, getWorkflowStep, type WorkflowStepRef } from '@line-crm/db';
 import { bindingScope } from './bindings.js';
+import { recordPurgedTenantStripeEvent } from '../../../services/tenant-purge-tombstones.js';
 import { stripeReceiptDigest } from './normalize.js';
 import { BINDING_PROCESS, BookingStripeError, RECEIPT_PROCESS, STRIPE_BOOKING_API_VERSION, type BookingStripeEvent, type StripeReceiptInput } from './types.js';
 export function receiptRef(account: string, eventId: string): WorkflowStepRef {
@@ -15,7 +16,27 @@ export async function storeBookingStripeReceipt(db: D1Database, event: BookingSt
   const saved = bound ? JSON.parse(bound.input_json!) as {accountId:string;tenantId:string} : null;
   const owner = saved ? {id:saved.accountId,tenant_id:saved.tenantId} : owners.length === 1 ? owners[0] : null;
   const ref = receiptRef(event.account,event.id);
-  const row = await ensureWorkflowStep(db,ref,{input: {digest,event,retentionAccountId: owner?.id ?? null,retentionTenantId: owner?.tenant_id ?? null} satisfies StripeReceiptInput});
+  const reviewPurged = async () => {
+    if (!owner?.tenant_id) return false;
+    const tenant=await db.prepare(`SELECT t.purge_started_at,t.data_purged_at,a.data_purged_at AS account_purged_at
+      FROM tenants t JOIN line_accounts a ON a.tenant_id=t.id WHERE t.id=? AND a.id=?`).bind(owner.tenant_id,owner.id)
+      .first<{purge_started_at:string|null;data_purged_at:string|null;account_purged_at:string|null}>();
+    if (!tenant || (!tenant.purge_started_at && !tenant.data_purged_at && !tenant.account_purged_at)) return false;
+    await recordPurgedTenantStripeEvent(db,{tenantId:owner.tenant_id,eventId:event.id,eventType:event.type,
+      amount:event.object.amountPaid ?? event.object.amount,currency:event.object.currency,now:new Date().toISOString(),accountId:owner.id});
+    return true;
+  };
+  const minimalReview=async()=>({receiptId:await bookingStripeReceiptId(event.account,event.id),status:'review_required' as const});
+  const inputValue={digest,event,retentionAccountId:owner?.id ?? null,retentionTenantId:owner?.tenant_id ?? null} satisfies StripeReceiptInput;
+  if (owner?.tenant_id) {
+    const fence=db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM tenants t JOIN line_accounts a ON a.tenant_id=t.id
+      WHERE t.id=? AND a.id=? AND a.data_purged_at IS NULL AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL)
+      THEN 'true' ELSE 'BOOKING_STRIPE_PURGE_FENCE' END)`).bind(owner.tenant_id,owner.id);
+    try { await db.batch([fence,prepareWorkflowStep(db,ref,{input:inputValue})]); }
+    catch (error) { if (await reviewPurged()) return minimalReview(); throw error; }
+  } else await prepareWorkflowStep(db,ref,{input:inputValue}).run();
+  const row = await getWorkflowStep(db,ref);
+  if (!row) { if (await reviewPurged()) return minimalReview(); throw new BookingStripeError('stripe_receipt_not_found',503); }
   const input = JSON.parse(row.input_json!) as StripeReceiptInput;
   if (input.digest !== digest) throw new BookingStripeError('stripe_event_conflict');
   if (event.apiVersion !== STRIPE_BOOKING_API_VERSION) {

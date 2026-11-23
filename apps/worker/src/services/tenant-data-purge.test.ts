@@ -157,10 +157,10 @@ describe('tenant data retention purge', () => {
     expect(result.failedTenants).toBe(1);
     const audit = sqlite.raw.prepare("SELECT tenant_id, after_json FROM audit_events WHERE action='tenant_data.purge_failed'").get() as { tenant_id: string; after_json: string };
     expect(audit.tenant_id).toBe('t1');
-    expect(JSON.parse(audit.after_json)).toMatchObject({ failureCode: 'unexpected_failure', deletedRows: 1 });
+    expect(JSON.parse(audit.after_json)).toMatchObject({ failureCode: 'unexpected_failure', deletedRows: 2 });
     expect(audit.after_json).not.toContain('private-object-key');
     expect(audit.after_json).not.toContain('secret-error');
-    expect(result.deletedRows).toBe(1);
+    expect(result.deletedRows).toBe(2);
   });
 
   test.each(['status', 'deadline'] as const)('削除中に対象の%sが変われば保護表の許可を発行しない', async (changed) => {
@@ -236,7 +236,7 @@ describe('tenant data retention purge', () => {
     try {
       const result = await processTenantDataPurge({ DB: db, IMAGES: createR2() }, { now: NOW });
       expect(result.completed).toBe(1);
-      expect(count('friends', 'line_account_id = ?', 'acc-retired')).toBe(0);
+      expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-retired')).toBe(0);
       expect(logged).toHaveBeenCalledWith('tenant_data_purge.passkey_challenge_cleanup_failed');
       expect(JSON.stringify(logged.mock.calls)).not.toContain('private challenge detail');
     } finally { logged.mockRestore(); }
@@ -261,8 +261,8 @@ describe('tenant data retention purge', () => {
 
     expect(result.tenants).toBe(1);
     expect(result.completed).toBe(1);
-    expect(count('friends', 'line_account_id = ?', 'acc-t1')).toBe(0);
-    expect(count('media', 'line_account_id = ?', 'acc-t1')).toBe(0);
+    expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t1')).toBe(0);
+    expect(sqlite.raw.prepare("SELECT r2_key,filename FROM media WHERE line_account_id='acc-t1'").get()).toEqual({r2_key:'purged:media:r2_key:media-t1',filename:'（削除済み）'});
     // 支払の記録は retain。統括に紐づいていても消さない。
     expect(count('billing_invoices', 'tenant_id = ?', 't1')).toBe(1);
     // R2の実体も消す。
@@ -312,7 +312,7 @@ describe('tenant data retention purge', () => {
     const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
     expect(result.completed).toBe(1);
-    expect(count('friends', 'line_account_id = ?', 'acc-t1')).toBe(0);
+    expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t1')).toBe(0);
     const audit = sqlite.raw
       .prepare('SELECT reason FROM tenant_data_purge_audit WHERE tenant_id = ?')
       .get('t1') as { reason: string };
@@ -327,7 +327,7 @@ describe('tenant data retention purge', () => {
     const first = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
     expect(first.deletedRows).toBe(5000);
     expect(first.completed).toBe(0);
-    expect(count('friends', 'line_account_id = ?', 'acc-t1')).toBe(1);
+    expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t1')).toBe(2);
     // 消し終えていないので印は付かず、次の回も同じ統括が対象になる。
     const midway = sqlite.raw.prepare('SELECT data_purged_at FROM tenants WHERE id = ?').get('t1') as {
       data_purged_at: string | null;
@@ -340,7 +340,7 @@ describe('tenant data retention purge', () => {
 
     const second = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
     expect(second.completed).toBe(1);
-    expect(count('friends', 'line_account_id = ?', 'acc-t1')).toBe(0);
+    expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t1')).toBe(0);
   });
 
   test('無料体験が終わったままの統括に、体験終了の時刻を起点として入れる', async () => {
@@ -367,19 +367,19 @@ describe('tenant data retention purge', () => {
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(count('friends', 'line_account_id = ?', 'acc-t1')).toBe(0);
+    expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t1')).toBe(0);
     expect(count('friends', 'line_account_id = ?', 'acc-t2')).toBe(2);
   });
 
   test('削除を拒まれた統括は記録して再試行し、別の統括は完了する', async () => {
     seedTenant('t1', { anchor: jst(-93) }); seedMedia('t1', 'private/t1.png');
     seedTenant('t2', { anchor: jst(-92) }); seedFriends('t2', 1);
-    sqlite.raw.exec(`CREATE TRIGGER fixture_retention_delete_guard BEFORE DELETE ON media
+    sqlite.raw.exec(`CREATE TRIGGER fixture_retention_delete_guard BEFORE UPDATE ON media
       WHEN OLD.id = 'media-t1' BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_USE_LOGICAL_ARCHIVE'); END`);
     const IMAGES = createR2();
     const result = await processTenantDataPurge({ DB: sqlite.db, IMAGES }, { now: NOW });
     expect(result.completed).toBe(1);
-    expect(count('friends', 'line_account_id = ?', 'acc-t2')).toBe(0);
+    expect(count('friends', 'line_account_id = ? AND data_purged_at IS NULL', 'acc-t2')).toBe(0);
     expect(count('media', 'id = ?', 'media-t1')).toBe(1);
     expect(IMAGES.delete).toHaveBeenCalledWith(['private/t1.png']);
     expect(sqlite.raw.prepare('SELECT data_purged_at FROM tenants WHERE id=?').get('t1')).toEqual({ data_purged_at: null });
@@ -414,25 +414,39 @@ describe('tenant data retention purge', () => {
     return count('forms', where, ...args);
   }
 
-  test('タグを付けていないフォームも消える（子の版も一緒に）', async () => {
+  test('タグを付けていないフォームの定義と公開版は保持し利用関係を消す', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     seedForm('f1', null, ['acc-t1']);
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(formCount('id = ?', 'f1')).toBe(0);
-    expect(count('form_versions', 'form_id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f1')).toBe(1);
+    expect(count('form_versions', 'form_id = ?', 'f1')).toBe(1);
     expect(count('form_accounts', 'form_id = ?', 'f1')).toBe(0);
   });
 
-  test('タグを付けているフォームも今までどおり消える', async () => {
+  test('公開フォームのWebhook秘密だけをpurge時に消し、版の骨格を保つ', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    sqlite.raw.exec(`INSERT INTO forms(id,name,on_submit_webhook_url,on_submit_webhook_headers) VALUES('secure-form','公開定義','https://secret.test','{"Authorization":"private"}');
+      INSERT INTO form_accounts(form_id,line_account_id) VALUES('secure-form','acc-t1');`);
+    expect(() => sqlite.raw.exec("UPDATE form_versions SET on_submit_webhook_url=NULL,on_submit_webhook_headers=NULL WHERE form_id='secure-form'")).toThrow(/immutable/);
+    sqlite.raw.exec("SAVEPOINT form_guard; UPDATE tenants SET purge_started_at='2026-06-01' WHERE id='t1'; UPDATE line_accounts SET data_purged_at='2026-06-01' WHERE id='acc-t1'");
+    expect(() => sqlite.raw.exec("UPDATE form_versions SET name='changed',on_submit_webhook_url=NULL,on_submit_webhook_headers=NULL WHERE form_id='secure-form'")).toThrow(/immutable/);
+    sqlite.raw.exec('ROLLBACK TO form_guard; RELEASE form_guard');
+    const outcome = await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+    expect(outcome.completed).toBe(1);
+    expect(sqlite.raw.prepare("SELECT name,on_submit_webhook_url,on_submit_webhook_headers FROM forms WHERE id='secure-form'").get()).toEqual({name:'公開定義',on_submit_webhook_url:null,on_submit_webhook_headers:null});
+    expect(sqlite.raw.prepare("SELECT name,on_submit_webhook_url,on_submit_webhook_headers FROM form_versions WHERE form_id='secure-form'").get()).toEqual({name:'公開定義',on_submit_webhook_url:null,on_submit_webhook_headers:null});
+  });
+
+  test('タグを付けているフォームの定義も保持する', async () => {
     seedTenant('t1', { anchor: jst(-91) });
     seedTag('tag-1', 'acc-t1');
     seedForm('f1', 'tag-1', ['acc-t1']);
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(formCount('id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f1')).toBe(1);
   });
 
   test('ほかの店のフォームは消えない', async () => {
@@ -443,7 +457,7 @@ describe('tenant data retention purge', () => {
 
     await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
 
-    expect(formCount('id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f1')).toBe(1);
     expect(formCount('id = ?', 'f2')).toBe(1);
   });
 

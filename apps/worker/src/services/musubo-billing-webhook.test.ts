@@ -19,9 +19,9 @@ it('keeps a failed addition pending and activates only its payment receipt', asy
       '2026-12-20T00:00:00Z','2026-12-13T00:00:00Z','2026-12-13T00:00:00Z')`).run(tenantId);
   const billing = (await getMusuboTenantBilling(fixture.db, tenantId))!;
   const send = async (id: string, type: string, paid: number) => {
-    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
-      VALUES (?,?,?,'pending')`).run(id, type, tenantId);
-    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', billing,
+    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary,lease_token,lease_until)
+      VALUES (?,?,?,'pending','test-lease','2999-01-01T00:00:00Z')`).run(id, type, tenantId);
+    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', leaseToken: 'test-lease', billing,
       event: { id, type, created: Date.parse('2026-12-14T00:00:00Z') / 1000,
         data: { object: { id: 'in_addition', customer: 'cus_1', subscription: null,
           metadata: { tenant_id: tenantId, purpose: 'musubo_addition', addition_id: 'addition-one' },
@@ -54,9 +54,9 @@ it('keeps the paid core invoice separate from options and restores access after 
       amount_due: 5900, amount_paid: paid, status: paid ? 'paid' : 'open', currency: 'jpy' } },
   });
   const process = async (value: ReturnType<typeof event>) => {
-    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
-      VALUES (?,?,?,'pending')`).run(value.id, value.type, tenantId);
-    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1',
+    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary,lease_token,lease_until)
+      VALUES (?,?,?,'pending','test-lease','2999-01-01T00:00:00Z')`).run(value.id, value.type, tenantId);
+    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', leaseToken: 'test-lease',
       billing, event: value });
   };
   expect(await process(event('evt_option', 'invoice.payment_failed', 'sub_options', 0))).toBe('completed');
@@ -83,7 +83,7 @@ it('does not start seven-day grace without a signed failure timestamp', async ()
     .run(tenantId);
   fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
     VALUES ('evt_bad','invoice.payment_failed',?,'pending')`).run(tenantId);
-  expect(await processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1',
+  expect(await processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', leaseToken: 'test-lease',
     billing: (await getMusuboTenantBilling(fixture.db, tenantId))!,
     event: { id: 'evt_bad', type: 'invoice.payment_failed',
       data: { object: { id: 'in_bad', customer: 'cus_1', subscription: 'sub_core',
@@ -102,9 +102,9 @@ it('records next renewal dates only from paid subscription cycles and never move
     .run(tenantId);
   const billing = (await getMusuboTenantBilling(fixture.db, tenantId))!;
   const paid = async (id: string, subscription: string, next: string, reason = 'subscription_cycle') => {
-    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary)
-      VALUES (?,'invoice.paid',?,'pending')`).run(id, tenantId);
-    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', billing,
+    fixture.raw.prepare(`INSERT INTO billing_events (id,type,tenant_id,summary,lease_token,lease_until)
+      VALUES (?,'invoice.paid',?,'pending','test-lease','2999-01-01T00:00:00Z')`).run(id, tenantId);
+    return processMusuboBillingEvent({ db: fixture.db, tenantId, customerId: 'cus_1', leaseToken: 'test-lease', billing,
       event: { id, type: 'invoice.paid', created: Date.parse('2026-12-09T01:00:00Z') / 1000,
         data: { object: { id: `in_${id}`, customer: 'cus_1', subscription,
           amount_due: 100, amount_paid: 100, currency: 'jpy', billing_reason: reason,
@@ -118,4 +118,20 @@ it('records next renewal dates only from paid subscription cycles and never move
   const updated = await getMusuboTenantBilling(fixture.db, tenantId);
   expect(updated?.next_annual_renewal_at).toBe('2027-12-09');
   expect(updated?.next_monthly_charge_at).toBe('2027-01-09');
+});
+
+it('rolls back invoice writes when a different lease owns the receipt', async () => {
+  const fixture=createTestD1();
+  const tenantId=DEFAULT_TENANT_ID;
+  fixture.raw.prepare(`INSERT INTO musubo_tenant_billing
+    (tenant_id,pricing_snapshot_json,billing_interval,status,first_line_activated_at,first_charge_date,core_subscription_id,created_at,updated_at)
+    VALUES (?,'{}','month','active','2026-11-09','2026-12-09','sub_core','2026-11-09','2026-11-09')`).run(tenantId);
+  fixture.raw.prepare(`INSERT INTO billing_events(id,type,tenant_id,summary,lease_token,lease_until)
+    VALUES ('evt_stale','invoice.paid',?,'pending','replacement','2999-01-01T00:00:00Z')`).run(tenantId);
+  await expect(processMusuboBillingEvent({db:fixture.db,tenantId,customerId:'cus_1',leaseToken:'expired',
+    billing:(await getMusuboTenantBilling(fixture.db,tenantId))!,
+    event:{id:'evt_stale',type:'invoice.paid',created:1800000000,data:{object:{id:'in_stale',customer:'cus_1',subscription:'sub_core',amount_due:100,amount_paid:100,currency:'jpy'}}},
+  })).rejects.toThrow(/malformed JSON/);
+  expect(fixture.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_stale'").get()).toBeUndefined();
+  expect(fixture.raw.prepare("SELECT summary FROM billing_events WHERE id='evt_stale'").get()).toEqual({summary:'pending'});
 });

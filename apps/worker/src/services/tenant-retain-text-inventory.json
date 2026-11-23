@@ -1,0 +1,2904 @@
+{
+  "affiliate_adjustments": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "organization_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "affiliate_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "source_entry_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "applied_settlement_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "currency": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reason_type": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "reason": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "actor_id": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "applied_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "affiliate_offers": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "mileage_program_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "scenario_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "operation_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "affiliate_reward_entries": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "organization_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "affiliate_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "conversion_event_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "offer_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "offer_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reward_calculation_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "entry_type": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "currency": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approved_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "payable_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "affiliates": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "code": {
+      "action": "erase",
+      "reason": "旧紹介コードを再利用できない値に置換"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "email": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "payout_cycle": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "lifecycle_status": {
+      "action": "erase",
+      "reason": "紹介者を終了状態にする"
+    },
+    "archived_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "operation_id": {
+      "action": "erase",
+      "reason": "過去の操作識別子を消去"
+    },
+    "reward_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "booking_customers": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "display_name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "phone_normalized_hash": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "phone_encrypted": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "phone_last4": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "email_encrypted": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "pet_name": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "booking_groups": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "start_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "request_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    }
+  },
+  "booking_makeup_credits": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "source_event_booking_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "source_event_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "entitlement_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "expires_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "used_event_booking_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "granted_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "rule_snapshot_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    },
+    "use_idempotency_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "use_request_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    }
+  },
+  "booking_payment_methods": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "setup_id": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "stripe_customer_id": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "stripe_payment_method_id": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "card_brand": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "card_last4": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "booking_series": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "menu_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "staff_policy": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "rule_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    },
+    "created_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "request_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    }
+  },
+  "bookings": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "booking_customer_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "staff_id": {
+      "action": "retain",
+      "reason": "参照を維持"
+    },
+    "menu_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "starts_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "ends_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "block_ends_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "customer_note": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "internal_note": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "requested_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "decided_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "decided_by_staff_id": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "external_event_id": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "external_calendar_id": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "source": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_by_staff_id": {
+      "action": "retain",
+      "reason": "参照を維持"
+    },
+    "updated_by_staff_id": {
+      "action": "retain",
+      "reason": "参照を維持"
+    },
+    "notification_policy_snapshot": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "cancelled_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "completed_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "menu_snapshot_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "cancel_claim_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "waitlist_entry_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "meeting_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "meeting_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "meeting_location": {
+      "action": "erase",
+      "reason": "顧客ごとの待合せ場所を消去"
+    },
+    "consultation_outcome": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "outcome_recorded_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "outcome_recorded_by": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "cancellation_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "designation": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "entry_point": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "policy_snapshot_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "meeting_url_source": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "series_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "routing_form_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "group_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "person_label": {
+      "action": "erase",
+      "reason": "顧客を示す名前を消去"
+    },
+    "deposit_snapshot_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "booking_payment_method_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "broadcasts": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "title": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "message_type": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "message_content": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "target_type": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "target_tag_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "status": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "scheduled_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "sent_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "alt_text": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_request_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "aggregation_unit": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "segment_conditions": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "account_ids": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "dedup_priority": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "failed_account_ids": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "dedup_progress": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "batch_lock_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "message_bubbles_json": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "folder_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "internal_memo": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "draft_step": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "draft_payload_json": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "message_options_json": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "after_action_version_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "stopped_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "stopped_by": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "common_var_snapshot": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "common_var_snapshot_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "approval_status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approval_requested_by_staff_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "approval_requested_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approval_approver_staff_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "approval_note": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "approval_decided_by_staff_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "approval_decided_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approval_reject_reason": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "hq_run_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "data_purged_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    }
+  },
+  "common_action_versions": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "common_action_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "action_config": {
+      "action": "erase",
+      "reason": "アクション種類を残し顧客向け本文と値を消去"
+    },
+    "created_by": {
+      "action": "retain",
+      "reason": "公開済み共通アクションの版は不変の店の定義のため保持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "published_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "common_actions": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "current_draft_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "current_published_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "archived_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "client_request_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "conversion_events": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "conversion_point_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "user_id": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "affiliate_code": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "metadata": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "affiliate_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "attributed_ref_code": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "approval_status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approved_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "point_name_snapshot": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "event_type_snapshot": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approval_formula": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "approval_notified_generation": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "conversion_points": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "event_type": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "erase",
+      "reason": "旧成果地点を再利用・再集計しない"
+    },
+    "stopped_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "measure_method": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "target_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "source_config_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    },
+    "deduplication_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "value_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reversal_policy": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "ingest_secret_encrypted": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "ingest_disabled_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "event_bookings": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "event_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "slot_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "customer_note": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "internal_note": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "requested_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "decided_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "decided_by_staff_id": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "cancelled_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "cancelled_by": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "identity_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "answer_snapshot_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "first_participation_checked_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "event_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "event_snapshot_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "approval_expires_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "participation_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "absence_reported_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "event_slots": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "event_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "starts_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "ends_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "deleted_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "client_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "instructor_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "event_versions": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "event_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "snapshot_json": {
+      "action": "erase",
+      "reason": "版の骨格と日時・定員のみ保持し住所等を消去"
+    },
+    "published_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "events": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "venue_name": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "venue_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "deleted_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "target_type": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "account_ids": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "dedup_priority": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "failed_account_ids": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "confirmation_message_extra": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "reminder_message_extra": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "og_title": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "og_description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "og_image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "visible_tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "current_published_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "version_write_token": {
+      "action": "retain",
+      "reason": "金額・日時・状態等を保持"
+    },
+    "questions_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "lifecycle_status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "lifecycle_changed_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "lifecycle_change_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "venue_address": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "makeup_rule_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    }
+  },
+  "folders": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "kind": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "parent_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "color": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "form_versions": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "form_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "description": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "fields": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "layout": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_submit_tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_submit_scenario_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_submit_message_type": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "on_submit_message_content": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "on_submit_webhook_url": {
+      "action": "erase",
+      "reason": "Webhookの秘密を消去"
+    },
+    "on_submit_webhook_headers": {
+      "action": "erase",
+      "reason": "Webhookの秘密を消去"
+    },
+    "on_submit_webhook_fail_message": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "og_title": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "og_description": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "og_image_url": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "published_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "forms": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "description": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "fields": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_submit_tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_submit_scenario_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_submit_message_type": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "on_submit_message_content": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "on_submit_webhook_url": {
+      "action": "erase",
+      "reason": "Webhookの秘密を消去"
+    },
+    "on_submit_webhook_headers": {
+      "action": "erase",
+      "reason": "Webhookの秘密を消去"
+    },
+    "on_submit_webhook_fail_message": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "og_title": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "og_description": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "og_image_url": {
+      "action": "retain",
+      "reason": "店が作成したフォームの定義のため保持"
+    },
+    "layout": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "archived_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "current_published_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "friend_bulk_runs": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "selection_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    },
+    "operation_json": {
+      "action": "erase",
+      "reason": "JSON 内の個人情報と秘密を再帰的に削除し、制約を確認"
+    },
+    "execution_plan_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "scheduled_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "undo_of_run_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "error_message": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "started_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "completed_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "friends": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_user_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "display_name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "picture_url": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "status_message": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "user_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "ig_igsid": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "last_ref_code": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "last_ref_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "first_followed_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "current_follow_started_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "last_followed_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "last_unfollowed_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "created_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "ref_code": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "metadata": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "first_tracked_link_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "support_mark_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "real_name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "system_display_name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "private_memo": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "member_number": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "data_purged_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    }
+  },
+  "impersonation_sessions": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "staff_id": {
+      "action": "retain",
+      "reason": "参照を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "write_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "started_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "write_started_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "ended_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "line_account_tags": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "統括内で一意な分類名を再登録可能にする"
+    },
+    "color": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "line_accounts": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "channel_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "channel_access_token": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "channel_secret": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "channel_access_token_encrypted": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "channel_secret_encrypted": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "channel_access_token_updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "channel_secret_updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "login_channel_secret_updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "archived_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "archived_by": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "archived_reason": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "country": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "role": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "og_site_name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "og_default_image_url": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "og_default_description": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "official_profile_url": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "login_channel_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "login_channel_secret": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "liff_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "token_expires_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "icon_url": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "parent_line_account_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "timezone": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "provider_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_display_name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_picture_url": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_basic_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_profile_synced_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "inactive_reason": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "inactive_reason_detail": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "inactivated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "login_channel_secret_encrypted": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "last_webhook_received_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "folder_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "created_by_staff_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "data_purged_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    }
+  },
+  "media": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "kind": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "filename": {
+      "action": "erase",
+      "reason": "ファイル名を消去"
+    },
+    "mime_type": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "r2_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "public_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "uploaded_by": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "archived_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "archived_by": {
+      "action": "erase",
+      "reason": "顧客または担当者に結び付く識別情報・秘密を消去"
+    },
+    "archive_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "usage_expires_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "usage_consent_note": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    }
+  },
+  "menus": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "category_label": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "description": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "deleted_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "auto_tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "intake_question": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "price_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "meeting_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "meeting_location": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "fixed_meeting_url": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "audience_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "audience_tag_ids_json": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "recurring_freqs_json": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "addon_menu_ids_json": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "hq_template_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "hq_template_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "image_url": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "photo_media_id": {
+      "action": "retain",
+      "reason": "店が作成したメニューの定義のため保持"
+    },
+    "data_purged_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    }
+  },
+  "mileage_adjustment_approval_requests": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "program_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "direction": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reason_category": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "reason": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "source_reference_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "expires_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "requested_by_staff_id": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "requested_by_staff_name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "decided_by_staff_id": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "decided_by_staff_name": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "decided_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "decision_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "ledger_entry_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "nen_pet_profiles": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "external_id": {
+      "action": "erase",
+      "reason": "顧客の識別子または自由記述を消去"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "customer_id": {
+      "action": "erase",
+      "reason": "顧客の識別子または自由記述を消去"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "animal_type": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "gender": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "birthday": {
+      "action": "erase",
+      "reason": "ペットの生年月日を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "breed": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "concerns": {
+      "action": "erase",
+      "reason": "顧客の識別子または自由記述を消去"
+    },
+    "image_r2_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "activity_level": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "feeding_product_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "weight_updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "archived_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "nen_photo_submissions": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "friend_id": {
+      "action": "retain",
+      "reason": "参照と主キーを維持"
+    },
+    "pet_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "r2_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "image_url": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "content_type": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "caption": {
+      "action": "erase",
+      "reason": "顧客の識別子または自由記述を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "point_transaction_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reviewed_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "publication_consent_version": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "publication_consent_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "publication_withdrawn_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "review_reason_code": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "review_reason_note": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "reviewed_by": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reviewed_by_name": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "review_notification_status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "review_image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "public_image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "captured_device": {
+      "action": "erase",
+      "reason": "顧客の識別子または自由記述を消去"
+    },
+    "rotation_idempotency_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "notification_retry_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "content_hash": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "review_r2_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "public_r2_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    }
+  },
+  "recipe_clone_runs": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "recipe_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name_prefix": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "idempotency_key": {
+      "action": "erase",
+      "reason": "必須の識別子を行IDから作る一意値に置換"
+    },
+    "request_fingerprint": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "failure_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "created_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "finished_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "recipes": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "purpose": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "creates_summary": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "origin": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "required_features": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "items_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_by_staff_id": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    }
+  },
+  "rt_organizations": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "account_id": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "status": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "data_purged_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    }
+  },
+  "rt_stores": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "organization_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "code": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "area": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "timezone": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_status": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "google_status": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "data_purged_at": {
+      "action": "erase",
+      "reason": "専用の墓石処理で消去または置換"
+    }
+  },
+  "scenarios": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "trigger_type": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "trigger_tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "delivery_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "audience_condition_json": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "on_complete_mode": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "on_complete_scenario_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_from_recipe_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "recipe_clone_run_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "current_published_version_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "stopped_reason": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "stopped_by": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "stopped_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "staff": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "display_name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "role": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "profile_image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "bio": {
+      "action": "erase",
+      "reason": "担当者の自由記述を消去"
+    },
+    "deleted_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "staff_member_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "fixed_meeting_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "photo_media_id": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    }
+  },
+  "staff_members": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "email": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "role": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "access_level": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "api_key": {
+      "action": "erase",
+      "reason": "認証鍵を推測できない乱数に置換"
+    },
+    "permission_keys": {
+      "action": "erase",
+      "reason": "削除済み担当者の権限を消去"
+    },
+    "notification_preferences": {
+      "action": "erase",
+      "reason": "通知設定内の個人情報を消去"
+    },
+    "invite_status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "invite_token_hash": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "invite_expires_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "email_verified_at": {
+      "action": "retain",
+      "reason": "金額・日時・状態等を保持"
+    },
+    "line_linked_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_user_id": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "totp_secret_enc": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "totp_pending_secret_enc": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "totp_enabled_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "assigned_line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "tenant_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "account_scope": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "password_hash": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "password_updated_at": {
+      "action": "retain",
+      "reason": "金額・日時・状態等を保持"
+    },
+    "role_bundle": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "view_permission_keys": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "email_mask": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "notice_friend_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "notice_linked_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "email_change_new": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "email_change_token_hash": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "email_change_expires_at": {
+      "action": "retain",
+      "reason": "金額・日時・状態等を保持"
+    },
+    "getting_started_dismissed_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "tags": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "color": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "group_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "folder_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "normalized_name": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "reapply_policy": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "status": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "updated_by": {
+      "action": "erase",
+      "reason": "担当者の識別情報を消去"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_from_recipe_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "recipe_clone_run_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  },
+  "tracked_links": {
+    "id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "name": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "original_url": {
+      "action": "erase",
+      "reason": "必須文字列を定型値に置換"
+    },
+    "tag_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "scenario_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "created_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "updated_at": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "intro_template_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "reward_template_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "og_title": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "og_description": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "og_image_url": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "line_account_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "short_code": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    },
+    "dedup_key": {
+      "action": "erase",
+      "reason": "NULL 可能な候補を消去"
+    },
+    "template_id": {
+      "action": "retain",
+      "reason": "保持行の参照、履歴の照合、業務状態または店の定義を維持"
+    }
+  }
+}

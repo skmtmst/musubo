@@ -100,7 +100,7 @@ export const get__api_restaurant_test_stores_7 = async (c: Context<Env, "/api/re
       ) END AS friend_count
     FROM rt_stores s
     LEFT JOIN line_accounts la ON la.id = s.line_account_id
-    WHERE s.organization_id = ? AND (? IS NULL OR s.line_account_id = ?)
+    WHERE s.organization_id = ? AND s.data_purged_at IS NULL AND (? IS NULL OR s.line_account_id = ?)
     ORDER BY s.name COLLATE NOCASE ASC, s.id ASC`).bind(organization.id, scopedAccountId, scopedAccountId)
     .all<RestaurantStoreRow>();
   const withStatuses = await deriveStoreLineStatuses(c, stores.results);
@@ -250,7 +250,7 @@ export const get__api_restaurant_test_snapshot_13 = async (c: Context<Env, "/api
     dbFor(c.env).prepare(`SELECT s.*, la.name AS line_account_name
       FROM rt_stores s
       LEFT JOIN line_accounts la ON la.id = s.line_account_id
-      WHERE s.organization_id = ? AND (? IS NULL OR s.id = ?)
+      WHERE s.organization_id = ? AND s.data_purged_at IS NULL AND (? IS NULL OR s.id = ?)
       ORDER BY s.code`).bind(orgId, scopedStoreId, scopedStoreId).all<RestaurantStoreRow>(),
     dbFor(c.env).prepare(`SELECT m.*, sm.name AS loginName, sm.role AS loginRole, sm.access_level AS loginAccessLevel,
       sm.is_active AS loginActive, sm.policy_version AS loginPolicyVersion, sm.account_scope AS loginAccountScope,
@@ -568,9 +568,10 @@ export const patch__api_restaurant_test_stores_id_16 = async (c: Context<Env, "/
 
   fields.push("updated_at = datetime('now')");
   try {
-    await dbFor(c.env, storeId).prepare(
-      `UPDATE rt_stores SET ${fields.join(', ')} WHERE id = ? AND organization_id = ?`,
+    const updated = await dbFor(c.env, storeId).prepare(
+      `UPDATE rt_stores SET ${fields.join(', ')} WHERE id = ? AND organization_id = ? AND data_purged_at IS NULL`,
     ).bind(...values, storeId, organization.id).run();
+    if (!updated.meta.changes) return c.json({ success: false, error: 'not_found' }, 404);
   } catch (error) {
     const conflict = uniqueStoreConflict(error);
     if (conflict === 'line_account') {

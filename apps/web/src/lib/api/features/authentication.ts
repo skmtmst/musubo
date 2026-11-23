@@ -11,6 +11,7 @@ export const authenticationMethods = {
   auth: {
     /** 切替後の本人確認方式・代理モードを、使い回さずに確かめ直す。 */
     session: () => fetchApi<ApiResponse<{
+      platformAdmin?: boolean
       impersonation: OpsImpersonation | null
       unfamiliarAt?: string | null
       stepUpMethod?: 'totp' | 'password' | 'none'

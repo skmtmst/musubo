@@ -65,6 +65,8 @@ NEXT_PUBLIC_* と VITE_* は配信JavaScriptに入る公開情報。認証token�
 | VITE_DEFAULT_LIFF_ID | LIFFログインの公開ID。URLのliffId指定が優先。未設定なら未構成 | 各環境の公開設定。空値例のみ | [apps/liff/src/lib/liff-auth.ts:14](../apps/liff/src/lib/liff-auth.ts) |
 | VITE_LIFF_ID | Worker同梱LIFFの公開ID。URL指定等で解決できなければ未設定時に例外 | 各環境の公開設定。空値例のみ | [apps/worker/src/client/main.ts:51](../apps/worker/src/client/main.ts) |
 
+削除済み決済IDの照合にはWorker secret `PURGED_PAYMENT_HMAC_SECRET` と過去鍵のJSON配列 `PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS` を使い、過去鍵はその鍵で作ったハッシュがすべて期限切れになるまで消さない。
+
 ## Workerの全設定名
 
 未設定時は機能ごとのガード/フォールバックが働く。型の任意・必須だけを稼働の必須条件とはみなさない。未指定を有効・認証済み・接続成功に読み替えない。「秘密」は通常varsへ置かない。読取箇所はコメントを除いたASTのproperty/文字列添字参照と分割代入（型宣言だけの参照は含めない）。

@@ -137,6 +137,17 @@ describe('N-032 friend stats account scope integration (#664)', () => {
     };
   }
 
+  it('墓石の友だちは一覧と集計に含めない', async () => {
+    testDb.raw.exec("UPDATE friends SET data_purged_at='2027-05-01',line_user_id='purged-fixture',is_following=0,is_hidden=1,ref_code=NULL WHERE id='friend-a-1'");
+    const counts = await visibleCounts('key-partial', 'account-a');
+    expect(counts.ids).toEqual(['friend-a-2']);
+    expect(counts.list).toBe(1);
+    expect(counts.count).toBe(1);
+    expect(counts.refStats).toBe(1);
+    expect(counts.stats).toBe(1);
+    expect(counts.addBreakdown).toBe(1);
+  });
+
   it('SCALE-02 仲間の友だち一覧と4集計も201店舗の範囲を保つ', async () => {
     for(let i=0;i<201;i++) testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES(?,?,?,'token','secret',?)").run(`synthetic-account-${i}`,`synthetic-channel-${i}`,'人工店',DEFAULT_TENANT_ID);
     expect((await visibleCounts('key-all')).ids).toEqual(['friend-a-1','friend-a-2','friend-b-1','friend-unassigned']);

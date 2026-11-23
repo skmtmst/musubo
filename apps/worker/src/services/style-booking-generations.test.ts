@@ -154,6 +154,8 @@ test('the Meet cron cannot send an obsolete generation and still uses the origin
 test('the approved nullable table rebuild preserves populated plans, balances, uses, audit rows and all foreign keys',async()=>{
   const e=await grant('ticket',2);await use('class-use',e.id);
   const tables=['booking_pass_plans','booking_entitlements','event_booking_entitlement_uses','booking_entitlement_events'];
+  // migration 734 precedes the tombstone column added in migration 790.
+  f.raw.exec('ALTER TABLE booking_pass_plans DROP COLUMN data_purged_at');
   const before=tables.map(table=>f.raw.prepare(`SELECT * FROM ${table}`).all());
   const sql=readFileSync(new URL('../../../../packages/db/migrations/734_unlimited_monthly_passes.sql',import.meta.url),'utf8');
   // 後から追加された月謝の依存物は過去の作り直しの対象外。

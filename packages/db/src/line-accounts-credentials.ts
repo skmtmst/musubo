@@ -37,6 +37,7 @@ export function activeTenantLineAccountSql(accountIdExpression: string): string 
       LEFT JOIN tenants tenant_gate_tenant
         ON tenant_gate_tenant.id = COALESCE(tenant_gate_account.tenant_id, '${DEFAULT_TENANT_ID}')
      WHERE tenant_gate_account.id = ${accountIdExpression}
+       AND tenant_gate_account.data_purged_at IS NULL
        AND (
          COALESCE(tenant_gate_account.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
          OR tenant_gate_tenant.status = 'active'

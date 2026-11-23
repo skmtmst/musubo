@@ -52,21 +52,33 @@ async function deliverNotice(env: Env['Bindings'], input: {
   graceDeadlineAt: string;
   nextChargeAt?: string | null;
 }): Promise<boolean> {
-  const billingUrl = adminBillingUrl(env);
-  const recipient = await billingRecipient(env.DB, input.tenantId);
-  if (!billingUrl || !recipient) return false;
-  const mail = musuboInvoiceMail({
-    event: input.event, amountYen: input.amountYen, invoiceAt: input.invoiceAt,
-    graceDeadlineAt: input.graceDeadlineAt, billingUrl,
-    nextChargeAt: input.nextChargeAt ?? undefined,
-  });
-  await sendRecordedNotification(env.DB, {
-    sourceId: `billing-invoice:${input.invoiceId}:${input.event}`,
-    channel: 'email', recipient,
-    payload: JSON.stringify(mail),
-    send: () => sendPlainMail(env, { to: recipient, subject: mail.subject, body: mail.text, html: mail.html }),
-  });
-  return true;
+  const effectId=`internal_notice_${crypto.randomUUID()}`;
+  const claim=await env.DB.prepare(`INSERT INTO billing_events(id,type,tenant_id,summary,external_effect_pending)
+    SELECT ?,'internal.notice',id,'external_effect',1 FROM tenants
+    WHERE id=? AND purge_started_at IS NULL AND data_purged_at IS NULL`).bind(effectId,input.tenantId).run();
+  if (Number(claim.meta.changes ?? 0)!==1) return false;
+  let uncertain=false;
+  try {
+    const billingUrl = adminBillingUrl(env);
+    const recipient = await billingRecipient(env.DB, input.tenantId);
+    if (!billingUrl || !recipient) return false;
+    const mail = musuboInvoiceMail({
+      event: input.event, amountYen: input.amountYen, invoiceAt: input.invoiceAt,
+      graceDeadlineAt: input.graceDeadlineAt, billingUrl,
+      nextChargeAt: input.nextChargeAt ?? undefined,
+    });
+    uncertain=true;
+    await sendRecordedNotification(env.DB, {
+      sourceId: `billing-invoice:${input.invoiceId}:${input.event}`,
+      channel: 'email', recipient,
+      payload: JSON.stringify(mail),
+      send: () => sendPlainMail(env, { to: recipient, subject: mail.subject, body: mail.text, html: mail.html }),
+    });
+    uncertain=false;
+    return true;
+  } finally {
+    if (!uncertain) await env.DB.prepare("DELETE FROM billing_events WHERE id=? AND type='internal.notice'").bind(effectId).run();
+  }
 }
 
 /** Sends only the notice appropriate now, so a late sweep never floods old warnings. */

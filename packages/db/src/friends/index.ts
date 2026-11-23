@@ -25,7 +25,7 @@ export async function getFriends(
         `SELECT f.*
          FROM friends f
          INNER JOIN friend_tags ft ON ft.friend_id = f.id
-         WHERE ft.tag_id = ?
+         WHERE ft.tag_id = ? AND f.data_purged_at IS NULL AND (f.line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=f.line_account_id AND a.data_purged_at IS NULL))
          ORDER BY f.created_at DESC
          LIMIT ? OFFSET ?`,
       )
@@ -36,7 +36,7 @@ export async function getFriends(
 
   const result = await db
     .prepare(
-      `SELECT * FROM friends
+      `SELECT * FROM friends WHERE data_purged_at IS NULL AND (line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL))
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
     )
@@ -66,7 +66,7 @@ export async function getFollowingLineUserIdsByTag(
            INNER JOIN friend_tags ft ON ft.friend_id = f.id
           WHERE ft.tag_id = ?
             AND f.line_account_id = ?
-            AND f.is_following = 1`,
+            AND f.is_following = 1 AND f.data_purged_at IS NULL AND EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=f.line_account_id AND a.data_purged_at IS NULL)`,
       )
       .bind(tagId, accountId)
       .all<{ line_user_id: string }>();
@@ -76,7 +76,7 @@ export async function getFollowingLineUserIdsByTag(
     .prepare(
       `SELECT line_user_id
          FROM friends
-        WHERE line_account_id = ? AND is_following = 1`,
+        WHERE line_account_id = ? AND is_following = 1 AND data_purged_at IS NULL AND EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL)`,
     )
     .bind(accountId)
     .all<{ line_user_id: string }>();
@@ -90,7 +90,7 @@ export async function getFriendByLineUserId(
   lineUserId: string,
 ): Promise<Friend | null> {
   return db
-    .prepare(`SELECT * FROM friends WHERE line_user_id = ?`)
+    .prepare(`SELECT * FROM friends WHERE line_user_id = ? AND data_purged_at IS NULL AND (line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL))`)
     .bind(lineUserId)
     .first<Friend>();
 }
@@ -100,7 +100,7 @@ export async function getFriendById(
   id: string,
 ): Promise<Friend | null> {
   return db
-    .prepare(`SELECT * FROM friends WHERE id = ?`)
+    .prepare(`SELECT * FROM friends WHERE id = ? AND data_purged_at IS NULL AND (line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL))`)
     .bind(id)
     .first<Friend>();
 }
@@ -123,7 +123,7 @@ export async function getFriendWithFirstTrackedLinkName(
       `SELECT f.*, tl.name AS first_tracked_link_name
          FROM friends f
          LEFT JOIN tracked_links tl ON tl.id = f.first_tracked_link_id
-        WHERE f.id = ?`,
+        WHERE f.id = ? AND f.data_purged_at IS NULL AND (f.line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=f.line_account_id AND a.data_purged_at IS NULL))`,
     )
     .bind(id)
     .first<FriendWithFirstTrackedLinkName>();
@@ -187,6 +187,10 @@ export async function upsertFriend(
 ): Promise<Friend> {
   const now = jstNow();
   const followAt = input.followOccurredAt ?? now;
+  if (input.lineAccountId) {
+    const account = await db.prepare('SELECT id FROM line_accounts WHERE id=? AND data_purged_at IS NULL').bind(input.lineAccountId).first();
+    if (!account) throw new Error('friend_account_unavailable');
+  }
   let existing = await getFriendByLineUserIdForAccount(
     db,
     input.lineUserId,
@@ -197,12 +201,13 @@ export async function upsertFriend(
     const id = crypto.randomUUID();
     try {
       try {
-        await db.prepare(
+        const inserted = await db.prepare(
           `INSERT INTO friends
              (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
               first_followed_at, current_follow_started_at, last_followed_at,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+           SELECT ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?
+           WHERE ? IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=? AND a.data_purged_at IS NULL)`,
         ).bind(
           id,
           input.lineUserId,
@@ -215,14 +220,18 @@ export async function upsertFriend(
           followAt,
           now,
           now,
+          input.lineAccountId ?? null,
+          input.lineAccountId ?? null,
         ).run();
+        if (Number(inserted.meta.changes ?? 0) !== 1) throw new Error('friend_account_unavailable');
       } catch (error) {
         if (input.followOccurredAt || !isMissingFollowLifecycleColumn(error)) throw error;
-        await db.prepare(
+        const inserted = await db.prepare(
           `INSERT INTO friends
              (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           SELECT ?, ?, ?, ?, ?, ?, 1, ?, ?
+           WHERE ? IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=? AND a.data_purged_at IS NULL)`,
         ).bind(
           id,
           input.lineUserId,
@@ -232,9 +241,14 @@ export async function upsertFriend(
           input.statusMessage ?? null,
           now,
           now,
+          input.lineAccountId ?? null,
+          input.lineAccountId ?? null,
         ).run();
+        if (Number(inserted.meta.changes ?? 0) !== 1) throw new Error('friend_account_unavailable');
       }
-      return (await getFriendById(db, id))!;
+      const created = await getFriendById(db, id);
+      if (!created) throw new Error('friend_account_unavailable');
+      return created;
     } catch (error) {
       if (!isFriendLineUserIdConflict(error)) throw error;
       // UNIQUE(line_user_id) に当たった = 別アカウント所有の行が占有しているか、
@@ -267,7 +281,10 @@ export async function upsertFriend(
            END,
            is_following = 1,
            updated_at = ?
-       WHERE id = ? AND (? IS NULL OR julianday(?) > MAX(
+       WHERE id = ? AND data_purged_at IS NULL
+       AND (line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL))
+       AND (? IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=? AND a.data_purged_at IS NULL))
+       AND (? IS NULL OR julianday(?) > MAX(
          COALESCE(${followTimeSql('last_followed_at')},0), COALESCE(${followTimeSql('last_unfollowed_at')},0)))`,
     ).bind(
       'displayName' in input ? (input.displayName ?? null) : existing.display_name,
@@ -279,6 +296,8 @@ export async function upsertFriend(
       followAt,
       now,
       existing.id,
+      input.lineAccountId ?? null,
+      input.lineAccountId ?? null,
       input.followOccurredAt ?? null,
       followAt,
     ).run();
@@ -292,7 +311,9 @@ export async function upsertFriend(
        SET display_name = ?, picture_url = ?, status_message = ?,
            line_account_id = COALESCE(line_account_id, ?),
            is_following = 1, updated_at = ?
-       WHERE id = ?`,
+       WHERE id = ? AND data_purged_at IS NULL
+         AND (line_account_id IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=friends.line_account_id AND a.data_purged_at IS NULL))
+         AND (? IS NULL OR EXISTS (SELECT 1 FROM line_accounts a WHERE a.id=? AND a.data_purged_at IS NULL))`,
     ).bind(
       'displayName' in input ? (input.displayName ?? null) : existing.display_name,
       'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
@@ -300,10 +321,14 @@ export async function upsertFriend(
       input.lineAccountId ?? null,
       now,
       existing.id,
+      input.lineAccountId ?? null,
+      input.lineAccountId ?? null,
     ).run();
   }
 
-  return (await getFriendById(db, existing.id))!;
+  const current = await getFriendById(db, existing.id);
+  if (!current) throw new Error('friend_account_unavailable');
+  return current;
 }
 
 export async function updateFriendFollowStatus(
@@ -424,7 +449,7 @@ export async function getFriendAddBreakdown(
          SUM(CASE WHEN COALESCE(unfollow_count, 0) = 0 THEN 1 ELSE 0 END) AS first_time,
          SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning_count
        FROM friends
-       WHERE julianday('now', '+9 hours') - julianday(created_at) <= ?
+       WHERE data_purged_at IS NULL AND julianday('now', '+9 hours') - julianday(created_at) <= ?
          ${accountClause}`,
     )
     .bind(...binds)
@@ -437,7 +462,7 @@ export async function getFriendAddBreakdown(
     .prepare(
       `SELECT COUNT(*) AS count
          FROM friends
-        WHERE is_following = 1
+        WHERE is_following = 1 AND data_purged_at IS NULL
           AND COALESCE(unfollow_count, 0) > 0
           AND last_followed_at IS NOT NULL
           AND julianday('now', '+9 hours') - julianday(last_followed_at) <= ?

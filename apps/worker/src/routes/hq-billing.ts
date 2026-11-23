@@ -39,6 +39,9 @@ import { getBillingPaymentFailure, getRecentBillingPaymentRecovery } from '../se
 import { musuboBillingOverview } from '../services/musubo-billing-overview.js';
 import { acceptedMusuboLineResumption } from '../services/musubo-line-resumption-review.js';
 import { processMusuboBillingEvent } from '../services/musubo-billing-webhook.js';
+import { matchPurgedPaymentIdentifiers } from '../services/tenant-purge-payment-hashes.js';
+import { observeBillingHashKeyUnavailable } from '../services/billing-external-review.js';
+import { claimBillingEventLease, releaseBillingEventLease, beginBillingExternalEffect, endBillingExternalEffect, deferPurgedBillingEvent, tenantPurgeInProgress } from '../services/tenant-purge-tombstones.js';
 import { deliverBillingRecoveryNotice, deliverCurrentBillingFailureNotice } from '../services/billing-invoice-notifications.js';
 import { StripeApiError, stripeApi, type StripeCheckoutSession, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
@@ -105,7 +108,7 @@ async function stripeCustomerForTenant(c: Context<Env>, billing: TenantBilling):
   const staff = c.get('staff');
   const member = staff?.id ? await getStaffById(c.env.DB, staff.id).catch(() => null) : null;
   const customer = await stripeApi.createCustomer(c.env, {
-    name: billing.name, email: member?.email ?? null, tenantId: billing.id,
+    name: billing.name, email: member?.email ?? null, tenantId: billing.id, billingEpoch: billing.billing_epoch,
   });
   const claim = prepareTenantBillingUpdate(c.env.DB, billing.id, { stripe_customer_id: customer.id },
     { sql: 'stripe_customer_id IS NULL', values: [] });
@@ -348,6 +351,7 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner', 'admin'), async (c
 
 hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
+    if (await tenantPurgeInProgress(c.env.DB, tenantOf(c))) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
     if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
     const origin = adminOrigin(c);
     if (!origin) return c.json({ success: false, error: '管理画面のURLが設定されていません' }, 503);
@@ -391,7 +395,7 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
     const cardReturn = body?.resumption === true ? `${origin}/hq/billing/resume/card`
       : `${origin}/hq/onboarding/card`;
     const session = await stripeApi.createCardSetupSession(c.env, {
-      customerId, tenantId,
+      customerId, tenantId, billingEpoch: billing.billing_epoch,
       successUrl: `${cardReturn}?setup=success&session_id={CHECKOUT_SESSION_ID}${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
       cancelUrl: `${cardReturn}?setup=cancel${quoteId ? `&quote=${encodeURIComponent(quoteId)}` : ''}`,
       logoUrl: `${origin}/brand/musubo-color.png`,
@@ -405,6 +409,7 @@ hqBilling.post('/api/hq/billing/card-setup', requireRole('owner', 'admin'), inpu
 });
 
 hqBilling.post('/api/hq/billing/card-confirm', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  if (await tenantPurgeInProgress(c.env.DB, tenantOf(c))) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
   const body = await c.req.json<{ sessionId?: unknown } | null>().catch(() => null);
   if (typeof body?.sessionId !== 'string' || !/^cs_(?:test_)?[A-Za-z0-9]{5,200}$/.test(body.sessionId)) {
     return c.json({ success: false, error: 'クレジットカード登録を確認できませんでした' }, 400);
@@ -453,6 +458,7 @@ hqBilling.get('/api/hq/billing/card-status', requireRole('owner', 'admin'), asyn
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJsonBoundary({ planKey: ['string'], interval: ['string'] }), async (c) => {
   try {
     const tenantId = tenantOf(c);
+    if (await tenantPurgeInProgress(c.env.DB, tenantId)) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
     if (await getMusuboTenantBilling(c.env.DB, tenantId)) {
       return c.json({ success: false, error: 'この統括には新しい料金条件が適用されています。利用料金の画面をご確認ください' }, 409);
     }
@@ -483,6 +489,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJ
       priceId,
       tenantId,
       planKey: plan.key,
+      billingEpoch: billing.billing_epoch,
       successUrl: `${origin}/hq/billing?checkout=success`,
       cancelUrl: `${origin}/hq/billing?checkout=cancel`,
     });
@@ -501,6 +508,7 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner', 'admin'), inputJ
 
 hqBilling.post('/api/hq/billing/portal', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   try {
+    if (await tenantPurgeInProgress(c.env.DB, tenantOf(c))) return c.json({success:false,error:'削除の処理中です。終わった後に新しいアカウントとして始められます'},409);
     const billing = await getTenantBilling(c.env.DB, tenantOf(c));
     if (!billing?.stripe_customer_id || !stripeReady(c)) {
       return c.json({ success: false, error: 'まだ契約がないため、支払い方法の管理画面はありません' }, 409);
@@ -627,15 +635,75 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
   try {
     const object = event.data.object;
+    const amountCandidate = event.type === 'charge.refunded' ? object.amount_refunded
+      : event.type === 'invoice.paid' ? object.amount_paid : object.amount_due ?? object.amount_total ?? object.amount;
+    const amount = typeof amountCandidate === 'number' && Number.isSafeInteger(amountCandidate) ? amountCandidate : null;
+    const currency = typeof object.currency === 'string' && /^[a-z]{3}$/.test(object.currency) ? object.currency : null;
+    const matchTime = new Date().toISOString();
+    const customerId = stripeExpandableId(object.customer);
+    let liveAccount = customerId ? await c.env.DB.prepare(`SELECT id FROM tenants WHERE stripe_customer_id=?
+      AND purge_started_at IS NULL AND data_purged_at IS NULL LIMIT 1`).bind(customerId).first<{id:string}>() : null;
+    // A first checkout can legitimately be the first place a new tenant binds its
+    // customer. A resumed tenant must still check retired identifiers first.
+    if (!liveAccount && event.type === 'checkout.session.completed' && object.mode !== 'setup') {
+      const candidate = await findTenantForEvent(c, object, event.type);
+      if (candidate && !candidate.stripe_customer_id && !candidate.last_purged_at) {
+        liveAccount = await c.env.DB.prepare(`SELECT id FROM tenants WHERE id=? AND stripe_customer_id IS NULL
+          AND last_purged_at IS NULL AND purge_started_at IS NULL AND data_purged_at IS NULL`).bind(candidate.id).first<{id:string}>();
+      }
+    }
+    let oldTenantId:string|null = null;
+    try {
+      if (!liveAccount) oldTenantId = await matchPurgedPaymentIdentifiers(c.env.DB,c.env.PURGED_PAYMENT_HMAC_SECRET,{
+        customer:stripeExpandableId(object.customer),
+        subscription:event.type.startsWith('customer.subscription.') ? stripeExpandableId(object.id) : stripeExpandableId(object.subscription),
+        now:matchTime,
+      },c.env.PURGED_PAYMENT_HMAC_PREVIOUS_SECRETS);
+    } catch (error) {
+      if (!(error instanceof Error) || !['purged_payment_key_unavailable','purged_payment_ambiguous_match'].includes(error.message)) throw error;
+      await c.env.DB.prepare(`INSERT OR IGNORE INTO billing_events(id,type,tenant_id,summary,review_amount,review_currency)
+        VALUES (?,?,NULL,'pending',?,?)`).bind(event.id,event.type,amount,currency).run();
+      const metadata = object.metadata as Record<string,unknown>|undefined;
+      const candidate = typeof metadata?.tenant_id === 'string' ? metadata.tenant_id : typeof object.client_reference_id === 'string' ? object.client_reference_id : null;
+      if (candidate) await observeBillingHashKeyUnavailable(c.env.DB,candidate,matchTime);
+      logger.error('billing.purged_payment_key_unavailable');
+      return c.json({success:false,error:'billing_review_required'},503);
+    }
+    const tenant = liveAccount ? await getTenantBilling(c.env.DB,liveAccount.id) : oldTenantId ? await getTenantBilling(c.env.DB,oldTenantId) : await findTenantForEvent(c, object, event.type);
+    // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
+    await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary,review_amount,review_currency) VALUES (?,?,?,?,?,?)')
+      .bind(event.id,event.type,tenant?.id ?? null,'pending',amount,currency).run();
+    if (tenant) await c.env.DB.prepare(`UPDATE billing_events SET tenant_id=? WHERE id=? AND type=? AND tenant_id IS NULL AND summary='pending' AND lease_token IS NULL`).bind(tenant.id,event.id,event.type).run();
+    await c.env.DB.prepare(`UPDATE billing_events SET review_amount=COALESCE(review_amount,?),review_currency=COALESCE(review_currency,?)
+      WHERE id=? AND type=? AND tenant_id IS ? AND summary='pending'`).bind(amount,currency,event.id,event.type,tenant?.id ?? null).run();
+    await c.env.DB.prepare(`UPDATE billing_events SET summary='pending' WHERE id=? AND summary='external_review'
+      AND external_effect_pending=0 AND lease_token IS NULL`).bind(event.id).run();
+    const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
+    if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
+    // Receipt is saved before this check. A purge claim cannot start while it is pending.
+    if (tenant && (oldTenantId || await tenantPurgeInProgress(c.env.DB, tenant.id))) {
+      if (!await deferPurgedBillingEvent(c.env.DB, {tenantId:tenant.id,eventId:event.id,eventType:event.type,amount,currency,now:new Date().toISOString(),retiredMatch:Boolean(oldTenantId)})) {
+        return c.json({success:false,error:'tenant_purge_review_unavailable'},503);
+      }
+      logger.warn('billing.webhook_review_for_tenant_purge');
+      return c.json({success:true,data:{received:true,review:true}});
+    }
+    const leaseToken = crypto.randomUUID();
+    const leaseNow = new Date();
+    if (!await claimBillingEventLease(c.env.DB,event.id,leaseToken,leaseNow.toISOString(),new Date(leaseNow.getTime()+15*60*1000).toISOString())) {
+      return c.json({ success:false,error:'billing_event_busy' },503);
+    }
+    const mayHaveExternalEffect = Boolean(tenant && (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed'
+      || (event.type === 'checkout.session.completed' && object.mode === 'setup')));
+    let externalEffectUncertain = false;
+    if (mayHaveExternalEffect && !await beginBillingExternalEffect(c.env.DB,event.id,leaseToken)) {
+      await releaseBillingEventLease(c.env.DB,event.id,leaseToken);
+      return c.json({success:false,error:'billing_external_effect_unavailable'},503);
+    }
+    try {
     const refundedInvoiceId = event.type === 'charge.refunded'
       ? await resolveRefundedInvoiceId(c, object)
       : undefined;
-    const tenant = await findTenantForEvent(c, object, event.type);
-    // 保存済みの受領記録は完了済みとして扱う。新しい記録は、業務更新と完了印を一緒に確定するまで pending に残す。
-    await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)')
-      .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
-    const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
-    if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
     // New-price contracts use separate core/options subscriptions. The legacy
     // handler has one plan slot and must not acknowledge or apply those events.
     // Keep the receipt pending until the new contract handler can reconcile it.
@@ -643,19 +711,20 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     if (tenant && musuboBilling
       && !(event.type === 'checkout.session.completed' && object.mode === 'setup')) {
       if (!tenant.stripe_customer_id || await processMusuboBillingEvent({
-        db: c.env.DB, event, tenantId: tenant.id,
+        db: c.env.DB, event, tenantId: tenant.id, leaseToken,
         customerId: tenant.stripe_customer_id, billing: musuboBilling,
       }) === 'retry') return c.json({ success: false, error: '新料金の契約状態を確認できませんでした' }, 503);
       if ((event.type === 'invoice.paid' || event.type === 'invoice.payment_failed')
         && stripeExpandableId(object.id)
         && (object.metadata as Record<string, unknown> | undefined)?.purpose !== 'musubo_addition') {
         const invoiceId = stripeExpandableId(object.id)!;
-        const notice = (event.type === 'invoice.paid'
-          ? deliverBillingRecoveryNotice(c.env, invoiceId)
-          : deliverCurrentBillingFailureNotice(c.env, tenant.id))
-          .catch(() => logger.error('billing_invoice_notification_failed'));
-        try { c.executionCtx.waitUntil(notice); }
-        catch { await notice; }
+        try {
+          externalEffectUncertain = true;
+          await (event.type === 'invoice.paid'
+            ? deliverBillingRecoveryNotice(c.env, invoiceId)
+            : deliverCurrentBillingFailureNotice(c.env, tenant.id));
+          externalEffectUncertain = false;
+        } catch { logger.error('billing_invoice_notification_failed'); }
       }
       return c.json({ success: true, data: { received: true } });
     }
@@ -722,8 +791,10 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       if(statement){statements.push(statement);hasTenantWrite=true;}
     };
     const finish = async () => {
-      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
-        .bind(created,subscriptionId,subjectId,event.id));
+      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending' AND lease_token=? AND julianday(lease_until)>julianday('now')
+          AND (tenant_id IS NULL OR EXISTS (SELECT 1 FROM tenants t WHERE t.id=billing_events.tenant_id AND t.purge_started_at IS NULL AND t.data_purged_at IS NULL))`)
+        .bind(created,subscriptionId,subjectId,event.id,leaseToken));
+      statements.push(c.env.DB.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'BILLING_LEASE_EXPIRED' END)"));
       const results = await c.env.DB.batch(statements);
       if (refundStatementIndex !== undefined && !results[refundStatementIndex]?.meta.changes) {
         logger.warn('routes_hq_billing_warn');
@@ -752,7 +823,9 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
             if (setupIntent.status !== 'succeeded' || setupIntent.customer !== customerId || !setupIntent.payment_method) {
               throw new StripeApiError(502, 'SetupIntent has not completed');
             }
+            externalEffectUncertain = true;
             await stripeApi.setCustomerDefaultPaymentMethod(c.env, customerId, setupIntent.payment_method);
+            externalEffectUncertain = false;
           } else {
             logger.warn('routes_hq_billing_warn');
           }
@@ -835,14 +908,19 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     if (subjectId && (event.type === 'invoice.payment_failed' || event.type === 'invoice.paid')) {
       // 通知の失敗で決済Webhookを再適用しない。送信台帳で二重送信を防ぎ、
       // 請求失敗の未送信分は定期ジョブでも拾う。
-      const notification = (event.type === 'invoice.paid'
-        ? deliverBillingRecoveryNotice(c.env, subjectId)
-        : deliverCurrentBillingFailureNotice(c.env, tenant.id))
-        .catch(() => logger.error('billing_invoice_notification_failed'));
-      try { c.executionCtx.waitUntil(notification); }
-      catch { await notification; }
+      try {
+        externalEffectUncertain = true;
+        await (event.type === 'invoice.paid'
+          ? deliverBillingRecoveryNotice(c.env, subjectId)
+          : deliverCurrentBillingFailureNotice(c.env, tenant.id));
+        externalEffectUncertain = false;
+      } catch { logger.error('billing_invoice_notification_failed'); }
     }
     return c.json({ success: true, data: { received: true } });
+    } finally {
+      if (mayHaveExternalEffect && !externalEffectUncertain) await endBillingExternalEffect(c.env.DB,event.id,leaseToken);
+      await releaseBillingEventLease(c.env.DB,event.id,leaseToken);
+    }
   } catch (err) {
     throw err;
   }
