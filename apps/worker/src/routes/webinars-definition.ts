@@ -485,7 +485,7 @@ export async function buildPublishValidation(c: Context<Env>, row: Webinar) {
       ) ? 'passed' : 'failed',
       detail: 'CTAは動画の長さ以内、外部URLはhttpsで検査します',
     },
-    // R96: 日時指定の配信は枠が無いと「次の回」が出ない。枠なしで
+    // 日時指定の配信は枠が無いと「次の回」が出ない。枠なしで
     // 公開できるのはオンデマンド（いつでも視聴）だけにする。
     {
       key: 'delivery_schedule',

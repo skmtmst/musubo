@@ -1,4 +1,4 @@
-/* R25 直接試験: 実route＋実SQLite。回答フォームの箱の作成・名前変更・削除・移動。 */
+/* 直接試験: 実route＋実SQLite。回答フォームの箱の作成・名前変更・削除・移動。 */
 import { Hono } from 'hono';
 import { expect, test } from 'vitest';
 

@@ -715,7 +715,7 @@ describe('契約先の利用停止', () => {
   })
 })
 
-describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
+describe('予定の変更や送信失敗に応じてリマインドの送信状態を管理する', () => {
   it('R337: 古い実行行が止まっても未送信の予定がある間は完了にしない', async () => {
     const { db, raw } = createTestD1()
     seedReminder(raw)

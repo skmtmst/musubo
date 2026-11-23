@@ -170,7 +170,7 @@ export const post__api_liff_nen_pets_4 = async (c: Context<Env, "/api/liff/nen/p
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
-  // DEEP-24: 「その他」も登録できる。犬・猫専用の目安計算は feedingGuide が
+  // 「その他」も登録できる。犬・猫専用の目安計算は feedingGuide が
   // 対象外として null を返し、犬の係数で作った数値を保存しない。
   const animalType = body?.animalType === 'cat' || body?.animalType === 'dog' || body?.animalType === 'other' ? body.animalType : '';
   const breed = typeof body?.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
@@ -208,7 +208,7 @@ export const post__api_liff_nen_pets_4 = async (c: Context<Env, "/api/liff/nen/p
     gender,
     birthday, breed, weightKg, JSON.stringify(concerns), guide?.daily ?? null, guide?.min ?? null, guide?.max ?? null,
     guide?.venison ?? null, guide?.cycleDays ?? null, photoKey, imageUrl, now, now,
-    // 登録時に体重を入れているので、測った日＝登録日として記録する（監査 R57）。
+    // 登録時に体重を入れているので、測った日＝登録日として記録する。
     now,
     feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
     feeding.activityLevel ?? 'normal',
@@ -261,7 +261,7 @@ export const put__api_liff_nen_pets_id_5 = async (c: Context<Env, "/api/liff/nen
     const weightKg = Number(body.weightKg);
     if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return inputError(c, { success: false, error: '体重は 0.2〜150kg で入力してください' }, 400, ["weightKg"]);
     sets.push('weight_kg = ?'); values.push(Math.round(weightKg * 10) / 10);
-    // 監査 R57: 体重が変わったときだけ「体重の更新」を動かす。同じ値の再送や
+    // 体重が変わったときだけ「体重の更新」を動かす。同じ値の再送や
     // 名前だけの編集では日付を維持する。
     const rounded = Math.round(weightKg * 10) / 10;
     if (rounded !== Number(current.weight_kg)) {
@@ -368,7 +368,7 @@ export const post__api_liff_nen_health_logs_7 = async (c: Context<Env, "/api/lif
        appetite=excluded.appetite, skin_status=excluded.skin_status, tear_stain_status=excluded.tear_stain_status, note=excluded.note`,
   ).bind(id, body!.petId, friend.id, loggedOn, weightKg, heartRateBpm, respiratoryRateBpm, stool, appetite, skin, tear, String(body?.note || '').slice(0, 500), jstNow()).run();
 
-  // 監査 R59: 日記につけた体重が「今日の目安」に反映されない穴を塞ぐ。
+  // 日記につけた体重を「今日の目安」に反映する。
   // この記録が体重を持つ記録の中でいちばん新しい日付なら、プロフィールの体重を
   // その値に揃えて給餌目安も計算し直す（過去日の記録で今の体重を戻さない）。
   if (weightKg != null) {
@@ -383,7 +383,7 @@ export const post__api_liff_nen_health_logs_7 = async (c: Context<Env, "/api/lif
         accountFeedingProducts(c, friend),
       ]);
       const now = jstNow();
-      // 監査 R57: 「体重の更新」には同期した瞬間ではなく日記の記録日（測った日）を入れる。
+      // 「体重の更新」には同期した瞬間ではなく日記の記録日（測った日）を入れる。
       await c.env.DB.prepare(`UPDATE nen_pet_profiles SET weight_kg = ?, weight_updated_at = ?, updated_at = ? WHERE id = ?`).bind(weightKg, loggedOn, now, body!.petId).run();
       if (current) {
         const plan = planForPetRow({

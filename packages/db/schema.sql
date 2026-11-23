@@ -1128,7 +1128,6 @@ CREATE TABLE IF NOT EXISTS pool_accounts (
   UNIQUE(pool_id, line_account_id)
 );
 -- Migration 036: Booking feature (Phase 1)
--- See: docs/superpowers/specs/2026-05-08-booking-design.md
 --
 -- Conventions follow schema.sql: TEXT (UUID/nanoid) primary keys,
 -- created_at default in JST. Time-of-event columns (starts_at / ends_at /

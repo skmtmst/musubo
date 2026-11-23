@@ -15,7 +15,7 @@ import { trackConversion } from './conversions/index.js';
  *
  * 実SQLite(bootstrap.sql)で、記録と試算の両方を見る。件数だけを見ると
  * 絞り込みを外しても緑のままになる箇所があるため、値・理由文・除外数
- * まで見て、外したら赤になる形にしている。
+ * まで確認し、対象の判断と説明が一致することを確かめる。
  */
 
 const packageRoot = join(import.meta.dirname, '..');

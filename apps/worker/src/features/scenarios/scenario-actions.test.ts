@@ -218,7 +218,7 @@ describe('友だち情報欄', () => {
   })
 })
 
-describe('N-042 型検証の接続(#702)', () => {
+describe('シナリオの動作で更新する友だち情報を型に合わせて検証する', () => {
   function addSelectField() {
     raw
       .prepare(

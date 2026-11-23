@@ -4,7 +4,7 @@ import type { Env } from '../worker-env.js';
 import { webhooks } from './webhooks.js';
 
 /*
- * R32 / D43: 担当者は全操作を拒否し、管理者は定義の通常操作のみ許可する。
+ * 担当者は全操作を拒否し、管理者は定義の通常操作のみ許可する。
  * 削除・API鍵と既存secret差替えは引き続きオーナー限定。
  * 管理者のPOST/通常PUT/PATCHの成功と範囲外副作用0は、
  * webhooks-management-permissions.test.ts の実D1行列で照合する。

@@ -131,7 +131,7 @@ function reportState(value: unknown): 'available' | 'partial' | 'unavailable' {
 }
 
 /**
- * 変化通知の1条件の判定結果（R77）。
+ * 変化通知の1条件の判定結果。
  *
  * 要件 -20 §4-5: 同じ長さの直前期間と比べ、最低母数を満たすときだけ
  * 判定する。取得待ち・部分データの期間は判定しない。
@@ -241,7 +241,7 @@ function evaluateFriendDecrease(
 }
 
 /**
- * 成果0件が続いた日数（R77）。日別の成果集計は期間別レポートに載らないため、
+ * 成果0件が続いた日数。日別の成果集計は期間別レポートに載らないため、
  * ここで直接数える。件数が多すぎるときは数えず `skipped` にする
  * （URLクリック集計の5万件打ち切りと同じ考え）。
  */
@@ -387,7 +387,7 @@ async function buildReport(db: D1Database, schedule: AnalyticsReportSchedule, no
 
 const jaNumber = new Intl.NumberFormat('ja-JP');
 
-/** 見出しの数値を1行にする。集計できていない節は行ごと出さない（R78）。 */
+/** 見出しの数値を1行にする。集計できていない節は行ごと出さない。 */
 function headlineLines(schedule: AnalyticsReportSchedule, report: Awaited<ReturnType<typeof buildReport>>): string[] {
   const lines: string[] = [];
   const current = report.result.current as Record<string, unknown>;

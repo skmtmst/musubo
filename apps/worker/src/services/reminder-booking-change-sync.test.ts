@@ -1334,7 +1334,7 @@ describe('送信権と取消の直列化', () => {
   });
 });
 
-describe('監査の直し (R334)', () => {
+describe('予約日時の変更を既存のリマインド登録へ反映する', () => {
   it('版ずれの登録も固定版の起点で追随する', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw, ACCOUNT_1);

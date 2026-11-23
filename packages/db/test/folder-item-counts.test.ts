@@ -55,7 +55,7 @@ beforeEach(() => {
   insertReminder.run('r-null1', 'N1', 'folder-1', null)
 })
 
-describe('getFolderItemCounts(#631)', () => {
+describe('閲覧できる項目をフォルダごとに数える', () => {
   it('自アカウントの行だけを、フォルダごとに数える', async () => {
     const counts = await getFolderItemCounts(db, 'reminder', {
       allowedAccountIds: ['account-a'],
@@ -209,7 +209,7 @@ describe('getFolderItemCounts(#631)', () => {
   })
 })
 
-describe('FOLDER_ITEM_COUNT_TABLES(#631)', () => {
+describe('フォルダ内の件数を数える対象種別を管理する', () => {
   it('対応表のキーはすべて FOLDER_KINDS に含まれる', () => {
     for (const kind of Object.keys(FOLDER_ITEM_COUNT_TABLES)) {
       expect(FOLDER_KINDS).toContain(kind)

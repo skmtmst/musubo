@@ -74,7 +74,7 @@ type ReceiveData = {
   failed?: number;
 };
 
-describe('#829 受信Webhookの受理境界', () => {
+describe('受信Webhookの入力・受理条件と処理を検証する', () => {
   let db: SqliteD1;
   let env: never;
 
@@ -103,7 +103,7 @@ describe('#829 受信Webhookの受理境界', () => {
     `SELECT COUNT(*) AS n FROM incoming_webhook_receipts WHERE webhook_id='iwh-1'`,
   ).get() as { n: number }).n;
 
-  describe('N-378: 受理と処理結果を区別して返す', () => {
+  describe('受信Webhookは照合の有無と実行・失敗件数を区別して返す', () => {
     it('相手が見つかり処理が走った受信は matched/executed/failed を返す', async () => {
       configureTagAction();
       const res = await receive(env, JSON.stringify({ friendId: 'friend-1' }));
@@ -136,7 +136,7 @@ describe('#829 受信Webhookの受理境界', () => {
     });
   });
 
-  describe('N-384: 本文サイズと短時間回数の上限', () => {
+  describe('受信Webhookは本文サイズと短時間の受理回数を制限する', () => {
     it('上限を超える本文は413で受け付けず、受領記録を消費しない', async () => {
       const big = JSON.stringify({ friendId: 'friend-1', pad: 'x'.repeat(300 * 1024) });
       const res = await receive(env, big);

@@ -196,7 +196,7 @@ function seedDeliveryRun(
  */
 const LIVE_CLAIM_COUNT_SQL = 'SELECT COUNT(*) AS c FROM reminder_delivery_runs';
 
-describe('取消と送信claimの原子化 (#654-1)', () => {
+describe('送信権の確保と取消が競合したときに送信権を守る', () => {
   it('実claim→最終verify後の取消割込みは409相当で拒否し、push権を守る', async () => {
     const dual = openDualDb();
     try {
@@ -442,7 +442,7 @@ function makeBookingApp(db: D1Database) {
   return { app, env: { DB: db } };
 }
 
-describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
+describe('カレンダー取消の記録が失敗しても再送で回復する', () => {
   it('fence成功後の登録の失敗は落とさず、取消再送で回復する', async () => {
     const dual = openDualDb();
     try {
@@ -706,7 +706,7 @@ function makeEventsApp(db: D1Database) {
   return { app, env: { DB: db } };
 }
 
-describe('event却下再送の待機者再登録 (#654-3)', () => {
+describe('イベント却下の再送は待機者登録を重複させず回復する', () => {
   it('初回の待機者登録失敗は再送で直り、二重登録しない', async () => {
     const dual = openDualDb();
     try {

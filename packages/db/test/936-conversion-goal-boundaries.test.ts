@@ -90,7 +90,7 @@ function addEvent(
   return id;
 }
 
-describe('N-258 利用先は実IDだけを保存する', () => {
+describe('成果地点の利用先は同じアカウントに存在するIDだけ保存する', () => {
   it('存在しない利用先は作成ごと弾く', async () => {
     const sqlite = setup();
     await expect(createConversionDefinition(asD1(sqlite), definitionInput({
@@ -133,7 +133,7 @@ describe('N-258 利用先は実IDだけを保存する', () => {
   });
 });
 
-describe('N-261 種類の違う地点へは差し替えられない', () => {
+describe('成果地点の差し替え先は起点・計測方法・対象URLを照合する', () => {
   it('起点・計測方法・対象URLが違う置換先は409で弾く', async () => {
     const sqlite = setup();
     const source = await createPoint(sqlite, '地点A');

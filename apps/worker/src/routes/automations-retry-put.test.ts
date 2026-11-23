@@ -57,7 +57,7 @@ function rowOf(raw: SqliteD1['raw'], id: string) {
   ).get(id) as { event_type: string; conditions: string; actions: string; is_active: number };
 }
 
-describe('旧PUTの厳格化（#736 M6、実DB）', () => {
+describe('自動化の稼働切替だけを受け付け不正な入力を拒否する', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -116,7 +116,7 @@ describe('旧PUTの厳格化（#736 M6、実DB）', () => {
   });
 });
 
-describe('再送受け付けの即202（#736 M3、実DB）', () => {
+describe('自動化の再試行を受け付けて待機に戻し重複を拒否する', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {

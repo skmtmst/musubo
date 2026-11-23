@@ -76,7 +76,7 @@ const listInput = {
   limit: 50,
 };
 
-describe('ログインユーザー検索の照合範囲 (#620)', () => {
+describe('ログインユーザー検索は閲覧権限に応じた名前とメールを照合する', () => {
   beforeEach(() => {
     addStaff({ id: 'staff-yamada', name: '見本 141', email: 'yamada@mail.test', accountId: 'account-a' });
     addStaff({ id: 'staff-sato', name: '見本 122', email: 'sato@mail.test', accountId: 'account-a' });
@@ -126,7 +126,7 @@ describe('ログインユーザー検索の照合範囲 (#620)', () => {
   });
 });
 
-describe('入った記録検索の照合 (#620)', () => {
+describe('操作記録検索は名前と内容を照合し検索記号を文字として扱う', () => {
   beforeEach(async () => {
     addStaff({ id: 'staff-owner', name: '管理者の人', email: 'owner@mail.test', role: 'owner', accountId: 'account-a' });
     await recordAuditEvent(db, {
