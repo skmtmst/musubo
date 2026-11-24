@@ -47,6 +47,23 @@ function assertContract(subscription: StripeSubscription, tenantId: string, cust
   }
 }
 
+/** Read the verified monthly options period without creating or charging anything. */
+export async function getMusuboOptionsBillingPeriod(
+  env: WorkerBindings,
+  tenantId: string,
+): Promise<{ start: string; end: string }> {
+  const billing = await getMusuboTenantBilling(env.DB, tenantId);
+  if (!billing || billing.status !== 'active' || billing.termination_requested_at
+    || !billing.options_subscription_id) {
+    throw new Error('The musubo options contract is not active');
+  }
+  const legacy = await getTenantBilling(env.DB, tenantId);
+  if (!legacy?.stripe_customer_id) throw new Error('Stripe customer is unavailable');
+  const options = await stripeApi.retrieveSubscription(env, billing.options_subscription_id);
+  assertContract(options, tenantId, legacy.stripe_customer_id, 'musubo_options');
+  return period(options);
+}
+
 /** The server and Stripe dates, never a client price, determine the incremental charge. */
 export async function quoteMusuboLineAddition(env: WorkerBindings, tenantId: string, now = new Date()) {
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
