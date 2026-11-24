@@ -14,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { isSaveConflict } from '@/components/shared/save-conflict'
 import StatusBadge from '@/components/shared/status-badge'
+import TruncatedText from '@/components/shared/truncated-text'
 import { TextField } from '@/components/shared/text-field'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
@@ -297,31 +298,44 @@ export function EmailConnectionCard({ accountId, canManage, lockedReason }: { ac
     </>
   )
 
-  const addressField = (
-    <Field label="転送用アドレス" htmlFor="sns-email-address">
-      <div className={styles.copyRow}>
-        <TextField id="sns-email-address" readOnly value={visible?.address ?? HIDDEN_REASON} title={visible?.address ?? undefined} />
+  /*
+   * 転送用アドレスは打ち込む欄ではないので、読み取り専用の文字と［コピーする］で出す（1行で省略し、全文は吹き出し）。
+   * 見られない人には値の代わりに理由を出し、［コピーする］は理由つきの押せない形にする。
+   */
+  const addressRow = {
+    label: '転送用アドレス',
+    value: (
+      <span className={styles.copyText}>
+        <TruncatedText value={visible?.address ?? HIDDEN_REASON} />
         {visible?.address
-          ? <CopyTextButton variant="secondary" icon={<Copy size={16} aria-hidden />} label="コピーする" value={visible.address} aria-label="転送用アドレスをコピーする" />
-          : <Button variant="secondary" lockedReason={HIDDEN_REASON}><Copy size={16} aria-hidden />コピーする</Button>}
-      </div>
-    </Field>
-  )
+          ? <CopyTextButton variant="text" size="inline" icon={<Copy size={16} aria-hidden />} label="コピーする" value={visible.address} aria-label="転送用アドレスをコピーする" />
+          : <Button variant="text" size="inline" lockedReason={HIDDEN_REASON}><Copy size={16} aria-hidden />コピーする</Button>}
+      </span>
+    ),
+  }
+  const addressField = <CustomerInfoRows rows={[addressRow]} />
 
   const confirmationField = confirmation ? (
     <>
-      <Field label={confirmation.kind === 'url' ? '届いた確認用の URL' : '届いた確認コード'} htmlFor="sns-email-confirmation">
-        <div className={styles.copyRow}>
-          <TextField id="sns-email-confirmation" readOnly value={confirmation.text} title={confirmation.text} />
-          <CopyTextButton
-            variant="secondary"
-            icon={<Copy size={16} aria-hidden />}
-            label="コピーする"
-            value={confirmation.text}
-            aria-label={confirmation.kind === 'url' ? '確認用の URL をコピーする' : '確認コードをコピーする'}
-          />
-        </div>
-      </Field>
+      {/* 確認コード・確認用の URL も読み取り専用の値なので、転送用アドレスと同じく文字と［コピーする］で出す。 */}
+      <CustomerInfoRows
+        rows={[{
+          label: confirmation.kind === 'url' ? '届いた確認用の URL' : '届いた確認コード',
+          value: (
+            <span className={styles.copyText}>
+              <TruncatedText value={confirmation.text} url={confirmation.kind === 'url'} />
+              <CopyTextButton
+                variant="text"
+                size="inline"
+                icon={<Copy size={16} aria-hidden />}
+                label="コピーする"
+                value={confirmation.text}
+                aria-label={confirmation.kind === 'url' ? '確認用の URL をコピーする' : '確認コードをコピーする'}
+              />
+            </span>
+          ),
+        }]}
+      />
       <p className={snsStyles.note}>
         {confirmation.kind === 'url'
           ? 'この URL をコピーし、ブラウザのアドレス欄に貼り付けて開くと、転送先の確認が終わります。'
@@ -387,9 +401,9 @@ export function EmailConnectionCard({ accountId, canManage, lockedReason }: { ac
         {issueCopy ? <Notice tone="warn" compact heading={issueCopy.title}>{issueCopy.fix}</Notice> : null}
         {stalledNotice}
         <p className={snsStyles.cardSub}>お店のメールアドレスに届いたメールが、受信箱に入ります。</p>
-        {addressField}
         <CustomerInfoRows
           rows={[
+            addressRow,
             { label: 'お店のメールアドレス', value: visible.mailbox ?? HIDDEN_REASON },
             { label: '最後に受信を確かめた日時', value: visible.checkedAt ? formatDate(visible.checkedAt, { style: 'detail' }) : '—' },
           ]}

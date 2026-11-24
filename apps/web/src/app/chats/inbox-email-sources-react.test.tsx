@@ -100,7 +100,7 @@ function handle(method: string, url: URL): Response {
     if (storeThread[2] === '/read' && method === 'POST') readByMe.add(`store:${storeThread[1]}`)
     return storeThread[2] ? response({ success: true, data: { marked: true } }) : thread(store.find(row => row.threadId === storeThread[1]))
   }
-  if (path === '/api/operators') return response({ success: true, data: [{ id: 'operator-a', name: '担当A' }] })
+  if (path === '/api/operators') return response({ success: true, data: [{ id: 'operator-a', name: '見本 担当A' }] })
   if (path === '/api/chats/quick-counts') return response({ success: true, data: { all: 3, reply: 2, overdue: 0, line: { all: 0, reply: 0, overdue: 0 }, email: { all: 3, reply: 2, overdue: 0 } } })
   if (path === '/api/chats/stats') return response({ success: true, data: { total: 0, unread: 0, assigneeUnread: [], waiting: 0, waitingOverAnHour: 0 } })
   if (method !== 'GET') return response({ success: true, data: {} })
@@ -134,12 +134,12 @@ beforeEach(() => {
   fixture.params = new URLSearchParams('channel=email')
   fixture.role = 'staff'
   shared = [
-    mail('c1', '共通の佐藤', true, '2026-11-24T03:00:00.000Z'),
-    mail('c2', '共通の鈴木', false, '2026-11-24T05:00:00.000Z'),
+    mail('c1', '見本 共通A', true, '2026-11-24T03:00:00.000Z'),
+    mail('c2', '見本 共通B', false, '2026-11-24T05:00:00.000Z'),
   ]
   store = [
-    mail('s1', '店舗の高橋', true, '2026-11-24T04:00:00.000Z'),
-    mail('s2', '店舗の田中', false, '2026-11-24T01:00:00.000Z', '予約の変更について。駐車場はありますか'),
+    mail('s1', '見本 店舗A', true, '2026-11-24T04:00:00.000Z'),
+    mail('s2', '見本 店舗B', false, '2026-11-24T01:00:00.000Z', '予約の変更について。駐車場はありますか'),
   ]
   pageSize = 200
   fail = { shared: null, store: null }
@@ -206,11 +206,11 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
   test('続きは経路ごとの位置から読み、見えている一覧は全体の並びの先頭どおりに保つ', async () => {
     pageSize = 2
     shared = [
-      mail('c1', '共通1', true, '2026-11-24T05:00:00.000Z'),
-      mail('c2', '共通2', false, '2026-11-24T04:00:00.000Z'),
-      mail('c3', '共通3', false, '2026-11-24T02:00:00.000Z'),
+      mail('c1', '見本 共通1', true, '2026-11-24T05:00:00.000Z'),
+      mail('c2', '見本 共通2', false, '2026-11-24T04:00:00.000Z'),
+      mail('c3', '見本 共通3', false, '2026-11-24T02:00:00.000Z'),
     ]
-    store = [mail('s1', '店舗1', false, '2026-11-24T03:00:00.000Z')]
+    store = [mail('s1', '見本 店舗1', false, '2026-11-24T03:00:00.000Z')]
     await renderPage()
     // 共通に続きがある間、共通の2件目より古い店舗の行は出さずに待つ。
     await eventually(() => expect(rowKeys()).toEqual(['shared:c1', 'shared:c2']))
@@ -227,8 +227,8 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
 
   test('既読にした直後も行の位置と見えている行を変えず、続きを読んでも並びが崩れない', async () => {
     pageSize = 1
-    shared = [mail('c1', '共通1', true, '2026-11-24T08:00:00.000Z')]
-    store = [mail('s1', '店舗1', false, '2026-11-24T10:00:00.000Z'), mail('s2', '店舗2', false, '2026-11-24T07:00:00.000Z')]
+    shared = [mail('c1', '見本 共通1', true, '2026-11-24T08:00:00.000Z')]
+    store = [mail('s1', '見本 店舗1', false, '2026-11-24T10:00:00.000Z'), mail('s2', '見本 店舗2', false, '2026-11-24T07:00:00.000Z')]
     await renderPage()
     await eventually(() => expect(rowKeys()).toEqual(['shared:c1', 'store:s1']))
     const unreadDot = () => row('shared:c1')!.querySelector('[aria-label="未読"]')
@@ -252,9 +252,9 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
   ] as const)('既読の知らせで口の並びが変わっても、続きの読み込みで未読の会話を飛ばさない（%s）', async (source, listPath, readPath) => {
     pageSize = 1
     const rows = [
-      mail('x1', '会話A', true, '2026-11-24T10:00:00.000Z'),
-      mail('x2', '会話B', true, '2026-11-24T09:00:00.000Z'),
-      mail('x3', '会話C', false, '2026-11-24T11:00:00.000Z'),
+      mail('x1', '見本 会話A', true, '2026-11-24T10:00:00.000Z'),
+      mail('x2', '見本 会話B', true, '2026-11-24T09:00:00.000Z'),
+      mail('x3', '見本 会話C', false, '2026-11-24T11:00:00.000Z'),
     ]
     if (source === 'store') { store = rows; shared = [] } else { shared = rows; store = [] }
     await renderPage()
@@ -281,10 +281,10 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
     pageSize = 1
     shared = []
     store = [
-      mail('x1', '会話A', true, '2026-11-24T10:00:00.000Z'),
-      mail('x2', '会話B', true, '2026-11-24T09:00:00.000Z'),
-      mail('x3', '会話C', true, '2026-11-24T08:00:00.000Z'),
-      mail('x4', '会話D', false, '2026-11-24T11:00:00.000Z'),
+      mail('x1', '見本 会話A', true, '2026-11-24T10:00:00.000Z'),
+      mail('x2', '見本 会話B', true, '2026-11-24T09:00:00.000Z'),
+      mail('x3', '見本 会話C', true, '2026-11-24T08:00:00.000Z'),
+      mail('x4', '見本 会話D', false, '2026-11-24T11:00:00.000Z'),
     ]
     await renderPage()
     await eventually(() => expect(rowKeys()).toEqual(['store:x1']))
@@ -310,7 +310,7 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
   test('通信中の既読のあと口が「続きなし」と返す最後のページでも、戻した位置を読み直して取りこぼさない', async () => {
     pageSize = 1
     shared = []
-    store = [mail('x1', '会話A', true, '2026-11-24T10:00:00.000Z'), mail('x2', '会話B', true, '2026-11-24T09:00:00.000Z')]
+    store = [mail('x1', '見本 会話A', true, '2026-11-24T10:00:00.000Z'), mail('x2', '見本 会話B', true, '2026-11-24T09:00:00.000Z')]
     await renderPage()
     await eventually(() => expect(rowKeys()).toEqual(['store:x1']))
     let release!: () => void
@@ -354,10 +354,12 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
     await open('store:s1')
     const reply = () => host.querySelector<HTMLTextAreaElement>('textarea[aria-label="メールの返信を入力"]')
     await eventually(() => expect(reply()).toBeTruthy())
+    const reason = 'このメールアドレスからの返信は準備中です。返信は共通メールか LINE から'
     expect(reply()!.readOnly).toBe(true)
     expect(reply()!.getAttribute('aria-disabled')).toBe('true')
+    // 欄の中に理由の文をそのまま出す（吹き出しにも同じ文を出す）。
+    expect(reply()!.placeholder).toBe(reason)
     await act(async () => { reply()!.focus() })
-    const reason = 'このメールアドレスからの返信は準備中です。返信は共通メールか LINE から'
     await eventually(() => expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(reason))
     const send = buttonNamed('メールで返信')!
     expect(send.getAttribute('aria-disabled')).toBe('true')
@@ -368,6 +370,7 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
     await open('shared:c1')
     await eventually(() => expect(callsTo('/api/support/email/threads/c1')).toHaveLength(1))
     await eventually(() => expect(reply()?.readOnly).toBe(false))
+    expect(reply()!.placeholder).toBe('メールの返信を入力')
     await act(async () => {
       const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
       setValue.call(reply()!, 'お問い合わせありがとうございます')
@@ -376,6 +379,30 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
     await act(async () => { buttonNamed('メールで返信')!.click() })
     await eventually(() => expect(callsTo('/api/support/email/threads/c1/reply', 'POST')).toHaveLength(1))
     expect(calls.some(call => call.url.pathname.startsWith('/api/account-email/') && call.url.pathname.endsWith('/reply'))).toBe(false)
+  })
+
+  test('共通メールの書きかけは、店舗の会話を見て戻っても残り、店舗の会話の欄には値を出さず理由を見せる', async () => {
+    await renderPage()
+    await eventually(() => expect(rowKeys()).toHaveLength(4))
+    const reply = () => host.querySelector<HTMLTextAreaElement>('textarea[aria-label="メールの返信を入力"]')
+    await open('shared:c1')
+    await eventually(() => expect(reply()?.readOnly).toBe(false))
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+      setValue.call(reply()!, '共通への書きかけ')
+      reply()!.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(reply()!.value).toBe('共通への書きかけ')
+    await open('store:s1')
+    await eventually(() => expect(reply()?.readOnly).toBe(true))
+    expect(reply()!.value).toBe('')
+    expect(reply()!.placeholder).toBe('このメールアドレスからの返信は準備中です。返信は共通メールか LINE から')
+    await open('shared:c1')
+    await eventually(() => expect(reply()?.readOnly).toBe(false))
+    expect(reply()!.value).toBe('共通への書きかけ')
+    // 書きかけは送らず、店舗の口にもどの口にも漏らさない。
+    expect(calls.some(call => call.url.pathname.endsWith('/reply'))).toBe(false)
+    expect(calls.some(call => call.body.includes('共通への書きかけ') || call.url.href.includes(encodeURIComponent('共通への書きかけ')))).toBe(false)
   })
 
   test('閲覧のみの人には対応状況・担当・返信を隠さず灰色にして理由を出し、既読も送らない', async () => {
@@ -457,7 +484,7 @@ describe('アカウントの境界', () => {
     await open('store:s1')
     await eventually(() => expect(callsTo('/api/account-email/account-a/threads/s1')).toHaveLength(1))
     fixture.accountId = 'account-b'
-    store = [mail('s9', '別の店の客', true, '2026-11-24T06:00:00.000Z')]
+    store = [mail('s9', '見本 別店舗の客', true, '2026-11-24T06:00:00.000Z')]
     await renderPage()
     await eventually(() => expect(rowKeys()).toEqual(['store:s9', 'shared:c1', 'shared:c2']))
     expect(callsTo('/api/account-email/account-b/inbox').length).toBeGreaterThan(0)

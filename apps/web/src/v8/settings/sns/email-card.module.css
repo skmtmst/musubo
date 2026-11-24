@@ -29,16 +29,16 @@
   line-height: var(--tpl-e1-sns-can-title-lh);
 }
 
-/* 読み取り専用の欄と［コピーする］の横並び。欄が残りの幅を取る。 */
-.copyRow {
+/* 読み取り専用の文字と［コピーする］。文字は1行で省略し、［コピーする］はその後ろに付ける。 */
+.copyText {
   display: flex;
   align-items: center;
   gap: var(--polish-space-row);
   min-width: 0;
 }
 
-.copyRow > :first-child {
-  flex: 1 1 0;
+.copyText > :first-child {
+  flex: 0 1 auto;
   min-width: 0;
 }
 

@@ -19,5 +19,8 @@
 
 }
 
+/* 送れない返信欄（店舗のメールの受信専用）は、欄の中の理由を本文の灰色で読ませる。押せない欄に伸縮のつまみを出さない。 */
+html:root [data-reply-unavailable] .input textarea::placeholder { color: var(--color-ink-secondary); }
+html:root .input textarea[data-permission-locked] { resize: none; }
 /* 箱の輪1本：中の入力の輪は消し、外枠を正本に（層の外＝全体の青輪より勝つ）。 */
 html:root .input textarea:focus-visible { outline: var(--polish-focus-width) solid transparent; }/* 中の欄に誤りがある時は外枠を赤1本。 */

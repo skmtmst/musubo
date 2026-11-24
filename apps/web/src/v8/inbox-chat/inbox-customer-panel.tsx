@@ -108,7 +108,7 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
                       <span className="text-ink-secondary text-micro font-bold">MAIL</span>
                     </div>
                     <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
-                    <p className="text-ink-faint mt-0.5 max-w-full break-all text-micro">
+                    <p className="text-ink-faint mt-0.5 max-w-full truncate text-micro" title={mail?.customerIdentifier ?? undefined}>
                       {mail?.customerIdentifier ?? 'メールアドレス未登録'}
                     </p>
                   </section>
@@ -122,7 +122,8 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
                       </div>
                       <div className="flex items-start justify-between gap-3">
                         <dt className="text-ink-faint shrink-0">メール</dt>
-                        <dd className="text-ink-secondary min-w-0 break-all text-right">{mail?.customerIdentifier ?? '未登録'}</dd>
+                        {/* メールアドレスは途中で折り返さず1行で省略し、全文は title で読む。 */}
+                        <dd className="text-ink-secondary min-w-0 truncate text-right" title={mail?.customerIdentifier ?? undefined}>{mail?.customerIdentifier ?? '未登録'}</dd>
                       </div>
                       <div className="flex items-start justify-between gap-3">
                         <dt className="text-ink-faint shrink-0">受信経路</dt>

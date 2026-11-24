@@ -116,6 +116,7 @@ export default function EmailThread({
   storeAccountId = null,
   sourceLabel,
   replyLockedReason,
+  draftStore,
   readOnly = false,
   onBack,
   onChanged,
@@ -133,6 +134,11 @@ export default function EmailThread({
    * 吹き出しで出す（店舗のメールは送信の手段と差出人を確かめるまで受信専用）。
    */
   replyLockedReason?: string
+  /**
+   * 会話ごとの下書きの預かり先。渡すと、この部品を作り直しても（店舗の会話や LINE を見てから戻っても）
+   * 下書きが残る。渡さなければ部品の中だけで預かる。
+   */
+  draftStore?: Map<string, string>
   /** 閲覧のみ。担当・対応状況・返信・メモは隠さず灰色＋理由にする。 */
   readOnly?: boolean
   /** スマホでメール一覧へ戻る。LINEのトークと同じ位置に出す。 */
@@ -152,7 +158,7 @@ export default function EmailThread({
     入力しても、Aの成功応答がBの文面を消さない。A→B→Aの往復でも
     それぞれの下書きが戻る。消すのは「送った会話の、送った版」だけ。
   */
-  const draftsRef = useRef(new Map<string, string>())
+  const draftsRef = useRef(draftStore ?? new Map<string, string>())
   const writeDraft = useCallback((thread: string, value: string) => {
     if (value) draftsRef.current.set(thread, value)
     else draftsRef.current.delete(thread)
@@ -693,7 +699,7 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      <div data-inbox-v4="composer" data-reply-locked={replyLock ? '' : undefined} className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
+      <div data-inbox-v4="composer" data-reply-locked={replyLock ? '' : undefined} data-reply-unavailable={replyLockedReason ? '' : undefined} className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
         {/*
           上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた。
           U010: 横に収まらなければ次の行へ折り返す。1行に固定したままだと
@@ -781,7 +787,8 @@ export default function EmailThread({
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
         <InboxInputBox>
           <SharedTextArea
-            value={reply}
+            // 送れない会話（店舗のメール）は値を出さず、欄の中の理由を常に見せる。預かった下書きは消さない。
+            value={replyLockedReason ? '' : reply}
             lockedReason={replyLock}
             onChange={(e) => setReplyDraft(e.target.value)}
             onCompositionStart={() => { isComposingRef.current = true }}
@@ -807,7 +814,8 @@ export default function EmailThread({
                 void sendReply()
               }
             }}
-            placeholder="メールの返信を入力"
+            // 店舗のメールは欄の中に送れない理由をそのまま出す（吹き出しにも同じ文）。
+            placeholder={replyLockedReason ?? 'メールの返信を入力'}
             aria-label="メールの返信を入力"
             rows={3}
             className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"

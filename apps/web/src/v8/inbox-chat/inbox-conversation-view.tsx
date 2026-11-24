@@ -16,7 +16,7 @@ import ConversationHead from '@/v8/inbox-chat/conversation-head';
 import { ChatSearchBar } from '@/v8/inbox-search/public/chat-search-bar/index'
 import { CORRECTION_TEMPLATE, Chat, formatByteSize, formatInboxDatetime } from './inbox-model';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { Props } from './inbox-conversation-view-types';
 import InboxEmptyGuide from './inbox-empty-guide';
 import InboxReplyComposer from './inbox-reply-composer';
@@ -29,6 +29,8 @@ export default function InboxConversation({ operators, selectedChatId, selectedE
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
   // 店舗の会話は店舗の口だけで開く。つながっていない間は共通の口で開き直さない。
   const openEmail = selectedEmail && (selectedEmail.source === 'shared' || storeEmailAccountId) ? selectedEmail : null
+  // 共通メールの下書きはここで預かる。店舗の会話や LINE を見てから戻っても書きかけが残る。
+  const sharedEmailDrafts = useRef(new Map<string, string>())
   return (<InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || openEmail)}>
     {openEmail ? (
       /* メールの往復。LINEのトークと同じ場所に出す。会話・対応状況・既読・返信は届いた経路の口を使う。 */
@@ -38,6 +40,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedE
         storeAccountId={openEmail.source === 'store' ? storeEmailAccountId : null}
         sourceLabel={EMAIL_SOURCE_LABEL[openEmail.source]}
         replyLockedReason={openEmail.source === 'store' ? STORE_EMAIL_REPLY_LOCK_REASON : undefined}
+        draftStore={openEmail.source === 'shared' ? sharedEmailDrafts.current : undefined}
         readOnly={staffRole === 'viewer'}
         onBack={() => setSelectedEmail(null)}
         customerInfoOpen={showFriendInfo}

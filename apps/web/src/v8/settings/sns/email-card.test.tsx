@@ -28,7 +28,10 @@ it('転送の確認コードとメールサービス別の手順を表示して�
   }))
   fixture.verify.mockResolvedValue(response('pending', { address: 'inbox-fixture@example.org' }))
   render(<EmailConnectionCard accountId="store-a" canManage lockedReason="" />)
-  expect(await screen.findByDisplayValue('12345678')).toBeTruthy()
+  expect(await screen.findByText('12345678')).toBeTruthy()
+  // 確認コードも入力欄ではなく読み取り専用の文字で出し、任意の札を付けない。
+  expect(screen.queryByDisplayValue('12345678')).toBeNull()
+  expect(screen.queryByText('任意')).toBeNull()
   expect(screen.getByRole('button', { name: '確認コードをコピーする' })).toBeTruthy()
   fireEvent.click(screen.getByRole('radio', { name: 'Yahoo!メール' }))
   expect(screen.getByText(/IMAP\/POP\/SMTP/)).toBeTruthy()
@@ -85,4 +88,39 @@ it.each([
   render(<EmailConnectionCard accountId="store-a" canManage lockedReason="" />)
   expect(await screen.findByText('このメールアドレスからの返信は準備中です。返信は共通メールか LINE から')).toBeTruthy()
   expect(screen.queryByText(/お店のメールソフト/)).toBeNull()
+})
+
+it('転送用アドレスは入力欄ではなく読み取り専用の文字と［コピーする］で出し、任意の札を付けない', async () => {
+  fixture.connection.mockResolvedValue(response('setup', { address: 'inbox-fixture@example.org', mailbox: 'shop@example.org', connectionId: 'connection-a' }))
+  render(<EmailConnectionCard accountId="store-a" canManage lockedReason="" />)
+  expect(await screen.findByText('inbox-fixture@example.org')).toBeTruthy()
+  expect(screen.queryByDisplayValue('inbox-fixture@example.org')).toBeNull()
+  expect(screen.getByRole('button', { name: '転送用アドレスをコピーする' })).toBeTruthy()
+  expect(screen.queryByText('任意')).toBeNull()
+})
+
+it('転送用アドレスを見られない人には値の代わりに理由を出し、［コピーする］は理由つきで押せない', async () => {
+  fixture.connection.mockResolvedValue(response('connected', { address: null, mailbox: null }))
+  render(<EmailConnectionCard accountId="store-a" canManage={false} lockedReason="管理者へ依頼してください" />)
+  expect((await screen.findAllByText('オーナーか管理者だけが見られます')).length).toBeGreaterThan(0)
+  const copy = screen.getByRole('button', { name: 'コピーする' })
+  expect(copy.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(copy)
+  expect(screen.queryByDisplayValue('オーナーか管理者だけが見られます')).toBeNull()
+})
+
+it.each([
+  ['Gmail の確認コード', '34567891', '確認コードをコピーする', '34567891'],
+  ['確認用の URL', 'https://mail-settings.example.com/verify?forward=inbox-fixture%40example.org&token=mihon-0001', '確認用の URL をコピーする', 'https://mail-settings.example.com/verify?forward=inbox-fixture%40example.org&token=mihon-0001'],
+] as const)('%sは画面に出し、［コピーする］でその値そのものをコピーする', async (_label, confirmation, copyLabel, copied) => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  fixture.connection.mockResolvedValue(response('setup', { address: 'inbox-fixture@example.org', mailbox: 'shop@example.org', connectionId: 'connection-a', forwardingConfirmation: confirmation }))
+  render(<EmailConnectionCard accountId="store-a" canManage lockedReason="" />)
+  const copy = await screen.findByRole('button', { name: copyLabel })
+  // コードはそのまま、URL は途中を省略して見せても、全文は吹き出しで読める。
+  if (confirmation.startsWith('https://')) expect(screen.getByText((text) => text.startsWith('https://mail-settings.example.com/'))).toBeTruthy()
+  else expect(screen.getByText(confirmation)).toBeTruthy()
+  await act(async () => { fireEvent.click(copy) })
+  expect(writeText).toHaveBeenCalledWith(copied)
 })
