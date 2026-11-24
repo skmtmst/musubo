@@ -19,6 +19,8 @@ import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { api, type AccountEmailConnection, type AccountEmailStatus } from '@/lib/api'
 import { formatDate } from '@/lib/format'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { ACCOUNT_EMAIL_CONNECTION_STATUS } from '@/lib/status-labels'
 import { startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import snsStyles from './sns.module.css'
@@ -71,6 +73,22 @@ export function EmailConnectionCard({ accountId, canManage, lockedReason }: { ac
   const disconnectTicket = useRef<{ accountId: string; connectionId: string | null } | null>(null)
   const pollRef = useRef<VisiblePollHandle | null>(null)
   const inboxReceiving = accounts.find((account) => account.id === accountId)?.accountEmailInboxEnabled === true
+  /*
+   * 入力は「メールをつなぐ」窓のお店のメールアドレスだけ。窓の閉じる操作は共通 Dialog の破棄確認が守り、
+   * 窓を開いたままの戻る・再読込・アカウントの切り替えなどは、ここで離れる前に確かめる。
+   */
+  const mailboxDirty = issueOpen && mailboxDraft.trim() !== (visible?.mailbox ?? '')
+  const leaveGuard = useUnsavedGuard({
+    dirty: mailboxDirty || busy === 'issue',
+    busy: busy === 'issue',
+    subject: '入力したお店のメールアドレス',
+    onDiscard: () => {
+      setIssueOpen(false)
+      setMailboxDraft('')
+      setMailboxError('')
+      setActionError('')
+    },
+  })
 
   /** 読み直し。静かな読み直し（定期）の失敗は、いま出ている状態を消さない。 */
   const load = useCallback(async (quiet = false): Promise<boolean> => {
@@ -457,7 +475,7 @@ export function EmailConnectionCard({ accountId, canManage, lockedReason }: { ac
         designWidth={560}
         busy={busy === 'issue'}
         busyLabel="発行中…"
-        dirty={mailboxDraft.trim() !== (visible?.mailbox ?? '')}
+        dirty={mailboxDirty}
         error={issueOpen && actionError ? actionError : undefined}
         confirmLabel="転送用アドレスを発行する"
         confirmLockedReason={locked}
@@ -488,6 +506,14 @@ export function EmailConnectionCard({ accountId, canManage, lockedReason }: { ac
           />
         </Field>
         <p className={snsStyles.note}>このアドレス専用の転送用アドレスを発行します。お店のメールで、そのアドレスへの転送を設定します。お店のドメインや DNS の設定は要りません。</p>
+        {/* 窓の中に置き、確かめは窓より上に重ねる。 */}
+        <UnsavedLeaveDialog
+          open={leaveGuard.leaveTarget !== null}
+          subject="入力したお店のメールアドレス"
+          busy={busy === 'issue'}
+          onConfirm={leaveGuard.confirmLeave}
+          onCancel={leaveGuard.cancelLeave}
+        />
       </Dialog>
 
       <ConfirmDialog
