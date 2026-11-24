@@ -18,7 +18,7 @@ import {
 } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { qaOutboundStopped } from '../services/staging-qa-safety.js';
-import { instagramInboxRoutes } from './instagram-inbox.js';
+import { registerInstagramInboxRoutes } from './instagram-inbox.js';
 import {
   InstagramError,
   instagramConfig,
@@ -766,7 +766,7 @@ instagram.get('/api/instagram/messages', async (c) => {
       total: total!.n, items: responseItems, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 });
-instagram.route('/', instagramInboxRoutes(account));
+registerInstagramInboxRoutes(instagram, account);
 instagram.get('/api/instagram/webhook', async (c) => {
   const token = c.env.META_WEBHOOK_VERIFY_TOKEN,
     challenge = c.req.query('hub.challenge');

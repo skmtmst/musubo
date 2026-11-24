@@ -1,6 +1,7 @@
-import { Hono, type Context } from 'hono';
+import type { Hono, Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
+import { requirePermission } from '../middleware/role-guard.js';
 import { instagramIncomingPreviewSql } from '../services/instagram-inbox-list.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { qaOutboundStopped } from '../services/staging-qa-safety.js';
@@ -39,16 +40,15 @@ async function businessConnection(c: Context<Env>, lineAccount: string, business
     .bind(lineAccount, business).first<DmConnection>();
 }
 
-export function instagramInboxRoutes(account: (c: Context<Env>) => Promise<string>) {
-  const instagram = new Hono<Env>();
-  instagram.get('/api/instagram/inbox-status', async c => {
+export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: Context<Env>) => Promise<string>): void {
+  instagram.get('/api/instagram/inbox-status', requirePermission('/chats'), async c => {
     const id = await account(c);
     const rows = await c.env.DB.prepare('SELECT instagram_id,expires_at,data_access_expires_at,scopes FROM instagram_connections WHERE line_account_id=?')
       .bind(id).all<Omit<DmConnection, 'user_token_encrypted'>>();
     const states = rows.results.map(row => replyState(c, row));
     return c.json({ success: true, data: { state: states.includes('ready') ? 'ready' : states.includes('permission_required') ? 'permission_required' : 'disconnected' } });
   });
-  instagram.get('/api/instagram/conversations/:senderId', async (c) => {
+  instagram.get('/api/instagram/conversations/:senderId', requirePermission('/chats'), async (c) => {
     const id = await account(c), sender = c.req.param('senderId');
     const business = await businessForConversation(c, id, sender);
     const state = replyState(c, await businessConnection(c, id, business));
@@ -65,7 +65,7 @@ export function instagramInboxRoutes(account: (c: Context<Env>) => Promise<strin
       canResolve: pending.status === 'unknown' || Date.parse(pending.created_at) <= Date.now() - staleReservationMs } : null;
     return c.json({ success: true, data: { messages: rows.results.reverse(), replyState: state, pendingReply } });
   });
-  instagram.post('/api/instagram/conversations/:senderId/resolve', inputJsonBoundary(), async c => {
+  instagram.post('/api/instagram/conversations/:senderId/resolve', requirePermission('/chats'), inputJsonBoundary(), async c => {
     const id = await account(c), sender = c.req.param('senderId');
     if (c.get('impersonation')) return c.json({ success: false, error: '代理ログイン中は変更できません' }, 403);
     const business = await businessForConversation(c, id, sender);
@@ -82,7 +82,7 @@ export function instagramInboxRoutes(account: (c: Context<Env>) => Promise<strin
     if (!changed.meta.changes) return c.json({ success: false, error: 'この返信は送信中、または確認済みです。会話を読み直してください。' }, 409);
     return c.json({ success: true });
   });
-  instagram.post('/api/instagram/conversations/:senderId/read', async (c) => {
+  instagram.post('/api/instagram/conversations/:senderId/read', requirePermission('/chats'), async (c) => {
     const id = await account(c), sender = c.req.param('senderId');
     const business = await businessForConversation(c, id, sender);
     const last = await c.env.DB.prepare('SELECT MAX(received_at) AS last FROM instagram_messages WHERE line_account_id=? AND sender_id=? AND instagram_id=?')
@@ -93,7 +93,7 @@ export function instagramInboxRoutes(account: (c: Context<Env>) => Promise<strin
       .bind(c.get('staff').id, id, JSON.stringify([business, sender]), last.last).run();
     return c.json({ success: true });
   });
-  instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {
+  instagram.post('/api/instagram/messages/:id/reply', requirePermission('/chats'), inputJsonBoundary(), async (c) => {
     if (c.get('impersonation')) return c.json({ success: false, error: '代理ログイン中は送れません' }, 403);
     const id = await account(c);
     const key = c.req.header('Idempotency-Key')?.trim();
@@ -168,5 +168,4 @@ export function instagramInboxRoutes(account: (c: Context<Env>) => Promise<strin
       return c.json({ success: false, error: '送信結果を確認できません。Instagramで確認してください' }, 502);
     }
   });
-  return instagram;
 }
