@@ -145,3 +145,58 @@ it('アカウントがない場合は共通の未取得状態を使わず設定�
   expect(state.runEnabled).toHaveBeenCalledWith(true)
   expect(screen.getByRole('table', { name: 'はじめの設定の順路' })).toBeTruthy()
 })
+
+it('最初の未完了だけに次の札と主ボタンを出す', () => {
+  state.stepState = 'todo'
+  render(<GettingStarted />)
+  const table = screen.getByRole('table', { name: 'はじめの設定の順路' })
+  const badge = within(table).getByText('次はここ')
+  const row = badge.closest('[role="row"]')!
+  expect(row.getAttribute('data-step-state')).toBe('todo')
+  expect(within(table).getAllByText('次はここ')).toHaveLength(1)
+  expect(row.querySelector('[data-variant="primary"]')).not.toBeNull()
+  expect(table.querySelectorAll('[data-variant="primary"]')).toHaveLength(1)
+})
+
+it('権限がない最初の段は緑の操作可能なボタンにしない', () => {
+  state.role = 'viewer'
+  state.allowed = false
+  state.stepState = 'forbidden'
+  render(<GettingStarted />)
+  const table = screen.getByRole('table', { name: 'はじめの設定の順路' })
+  expect(within(table).queryByText('次はここ')).toBeNull()
+  expect(table.querySelector('[data-variant="primary"]')).toBeNull()
+})
+
+it('状態を確認できない最初の段も開けるなら次に案内する', () => {
+  render(<GettingStarted />)
+  const row = screen.getByText('次はここ').closest('[role="row"]')!
+  expect(row.getAttribute('data-step-state')).toBe('unknown')
+  expect(row.textContent).toContain('営業時間を決める')
+  expect(row.querySelector('[data-variant="primary"]')).not.toBeNull()
+})
+
+it.each(['viewer', null])('権限が %s のときは次の操作を勧めない', role => {
+  state.role = role
+  state.stepState = 'todo'
+  render(<GettingStarted />)
+  expect(screen.queryByText('次はここ')).toBeNull()
+})
+
+it('進み具合を読み込み中は次の段を推測しない', () => {
+  state.style = 'restaurant'
+  state.progressStatus = 'loading'
+  render(<GettingStarted />)
+  expect(screen.queryByText('次はここ')).toBeNull()
+})
+
+it('停止中の段と手順を再開ボタンのそばに示す', async () => {
+  state.style = 'restaurant'
+  const { GuideSharedProvider } = await import('@/v8/onboarding/public/guide-shared/index')
+  const resume = vi.fn()
+  const guide = { phase:'paused' as const, stepKey:'attributes', procedureIndex:2, anchor:null, pausedAnchor:null, start:vi.fn(), pause:vi.fn(), resume, reset:vi.fn(), advanceProcedure:vi.fn() }
+  render(<GuideSharedProvider value={{ guide, summary:null }}><GettingStarted /></GuideSharedProvider>)
+  expect(screen.getByText('③ 卓と席を登録する・手順 2/3で停止中')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name:'ガイドを再開' }))
+  expect(resume).toHaveBeenCalledOnce()
+})

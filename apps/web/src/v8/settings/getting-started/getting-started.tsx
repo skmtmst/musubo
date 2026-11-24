@@ -13,6 +13,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
+import { guideProcedureTotal } from '@/v8/onboarding/public/guide-script/index'
 import { useAccountStyle, STALE_STYLE_TEXT } from '@/hooks/use-account-style'
 import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
 import Notice from '@/components/shared/notice'
@@ -62,6 +63,12 @@ export default function GettingStartedV8() {
 
   const reasons = stoppedReasons(steps)
   const done = doneCount(steps)
+  const firstPending = steps.find(step => step.state !== 'done' && step.action)
+  const nextKey = role && role !== 'viewer' ? firstPending?.key : null
+  const pausedStep = steps.find(step => step.key === shared?.guide.stepKey)
+  const pausedTotal = profile.data?.style === 'restaurant' ? guideProcedureTotal(shared?.guide.stepKey ?? null) : 0
+  const ordinal = pausedStep ? (['', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'][Number(pausedStep.ordinal)] ?? pausedStep.ordinal) : ''
+  const pausedLabel = pausedStep ? `${ordinal} ${pausedStep.title}${pausedTotal ? `・手順 ${Math.min(Math.max(shared?.guide.procedureIndex ?? 1, 1), pausedTotal)}/${pausedTotal}` : ''}で停止中` : '開店準備ガイドを一時停止しています。'
 
   return (
     <div className={frame.screen}>
@@ -80,7 +87,7 @@ export default function GettingStartedV8() {
           />
         ) : (
           <>
-            {shared?.guide.phase === 'paused' && canManageRole(role) ? <Notice tone="info" action={<Button onClick={shared.guide.resume}>ガイドを再開</Button>}>開店準備ガイドを一時停止しています。</Notice> : null}
+            {shared?.guide.phase === 'paused' && canManageRole(role) ? <Notice tone="info" action={<Button onClick={shared.guide.resume}>ガイドを再開</Button>}><TruncatedText value={pausedLabel} /></Notice> : null}
             <div className={styles.progress} role="note">
               <strong className={styles.progressText}>{progressHeadline(steps)}</strong>
               <ProgressBar className={styles.bar} value={100 * done / Math.max(steps.length, 1)} label="はじめの設定の進み具合" />
@@ -88,7 +95,7 @@ export default function GettingStartedV8() {
 
             <Card padding="rows" overflow="hidden">
               <GridTable label="はじめの設定の順路" framed={false} design={{ columns: "max-content minmax(0, 1fr) max-content", gap: "var(--polish-space-card)", rowPadding: "var(--polish-space-card)", fontSize: "var(--text-body)" }}>
-                {steps.map((step) => <StepRow key={step.key} step={step} role={role} />)}
+                {steps.map((step) => <StepRow key={step.key} step={step} role={role} next={step.key === nextKey} />)}
               </GridTable>
             </Card>
 
@@ -128,7 +135,7 @@ export default function GettingStartedV8() {
 }
 
 /** 1段。済みは緑の丸と札、まだは番号の丸と行き先のボタン。権限で押せない段は灰色のボタンと共通の理由。 */
-function StepRow({ step, role }: { step: StepResult; role: string | null }) {
+function StepRow({ step, role, next }: { step: StepResult; role: string | null; next: boolean }) {
   const allowed = Boolean(role && role !== 'viewer' && step.action && step.state !== 'forbidden')
   const reason = role ? lockUnless(allowed, role === 'viewer' ? 'viewer' : 'feature') : undefined
   const done = step.state === 'done'
@@ -136,12 +143,12 @@ function StepRow({ step, role }: { step: StepResult; role: string | null }) {
     <GridRow className={styles.stepRow} data-step-state={step.state}>
       <GridCell><span className={`${styles.mark} ${done ? styles.markDone : ''}`} aria-label={done ? '済み' : `手順${step.ordinal}`}>{done ? <Check size={16} aria-hidden="true" /> : step.ordinal}</span></GridCell>
       <GridCell><div className={styles.stepBody}>
-        <strong className={done ? styles.stepDoneTitle : undefined}><TruncatedText value={step.title} /></strong>
+        <strong className={styles.stepTitle}><span className={done ? styles.stepDoneTitle : undefined}><TruncatedText value={step.title} /></span>{next ? <StatusBadge tone="success" size="compact" dot={false}>次はここ</StatusBadge> : null}</strong>
         <span className={styles.stepSub}><TruncatedText value={step.sub} /></span>
       </div></GridCell>
       <GridCell align="right">
         {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action || step.state === 'forbidden' ? (
-          role && step.action ? <Button href={step.action.href} lockedReason={reason} presentation="row-action" textTone={step.state === 'stalled' ? 'accent' : 'ink'}>{step.action.label}</Button>
+          role && step.action ? <Button href={step.action.href} lockedReason={reason} variant={next && allowed ? 'primary' : 'secondary'} presentation="row-action" textTone={next && allowed ? undefined : step.state === 'stalled' ? 'accent' : 'ink'}>{step.action.label}</Button>
             : <Button disabled={!role} lockedReason={reason} presentation="row-action" textTone={step.state === 'stalled' ? 'accent' : 'ink'}>{step.action?.label ?? '設定を開く'}</Button>
         ) : <span className={styles.stepBlocked}>{step.blockedReason}</span>}
       </GridCell>
