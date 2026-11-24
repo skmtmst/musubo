@@ -9,6 +9,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { EmailInboxItem, OldestAttentionTarget, PendingAttachment } from './inbox-model';
 import { Chat } from './inbox-model';
 export type Props = {
+  storeEmailAccountId?: string | null
   operators: { id: string; name: string }[]
   selectedChatId: string | null
   selectedThreadId: string | null

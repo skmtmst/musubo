@@ -73,6 +73,7 @@ import { richMenusMethods } from './features/rich-menus'
 import { entryRoutesMethods } from './features/entry-routes'
 import { identityMethods } from './features/identity'
 import { adsMethods } from './features/ads'
+import { accountEmailMethods } from './features/account-email'
 export const api = {
   individualQuotes: individualQuoteMethods.individualQuotes,
   pricingConditions: pricingConditionMethods.pricingConditions,
@@ -146,6 +147,7 @@ export const api = {
   nenCampaigns: nenCampaignsMethods.nenCampaigns,
   nenMembers: nenMembersMethods.nenMembers,
   instagram: settingsMethods.instagram,
+  accountEmail: accountEmailMethods.accountEmail,
   autoReplyUnmatched: autoRepliesMethods.autoReplyUnmatched,
   scenarioDrafts: scenariosMethods.scenarioDrafts,
   chats: chatsMethods.chats,
@@ -260,6 +262,17 @@ export type {
   ChatDetail,
   InboxSavedViewApiItem,
 } from './types/chats'
+export type {
+  AccountEmailStatus,
+  AccountEmailIssue,
+  AccountEmailThreadStatus,
+  AccountEmailConnection,
+  AccountEmailInboxItem,
+  AccountEmailInboxList,
+  AccountEmailAttachment,
+  AccountEmailMessage,
+  AccountEmailThreadDetail,
+} from './types/account-email'
 export type {
   OperationCapability,
   OperationImpactMetric,

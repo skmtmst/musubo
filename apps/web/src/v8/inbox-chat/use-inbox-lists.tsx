@@ -16,6 +16,7 @@ type Options = {
   nameQuery: string
   selectedAccountId: string | null
   emailInboxEnabled: boolean
+  storeEmailAccountId?: string | null
   statusFilter: StatusFilter
   assigneeFilter: string
   unreadOnly: boolean
@@ -25,7 +26,7 @@ type Options = {
   setError: Dispatch<SetStateAction<string>>
 }
 
-export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, emailInboxEnabled, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
+export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, emailInboxEnabled, storeEmailAccountId, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
 
   /*
    * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
@@ -118,7 +119,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, storeEmailAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
 
   const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
   const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])
@@ -180,11 +181,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     }
     try {
       // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
-      const res = await withRequestTimeout(fetchApi<{
-        success: boolean
-        data: { items: EmailInboxItem[]; summary?: { total: number } }
-      }>(
-        `/api/support/inbox?${buildSupportEmailInboxQuery({
+      const query = buildSupportEmailInboxQuery({
           status: statusFilter,
           query: debouncedNameQuery,
           limit: EMAIL_PAGE_SIZE,
@@ -192,8 +189,10 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
           assignee: assigneeFilter,
           unreadOnly,
           quickFilter: quickFilter === 'all' ? undefined : quickFilter,
-        })}`,
-      ))
+        })
+      const res = await withRequestTimeout<{ success: boolean; data?: { items: EmailInboxItem[]; summary?: { total?: number } } }>(storeEmailAccountId
+        ? api.accountEmail.inbox(storeEmailAccountId, query)
+        : fetchApi<{ success: boolean; data: { items: EmailInboxItem[]; summary?: { total: number } } }>(`/api/support/inbox?${query}`))
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
       if (res.success && res.data && Array.isArray(res.data.items)) {
         setEmailError('')
@@ -227,7 +226,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setEmailLoading(false)
       }
     }
-  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE, emailInboxEnabled, setEmailItems])
+  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE, emailInboxEnabled, storeEmailAccountId, setEmailItems])
 
   useEffect(() => {
     void loadEmails()

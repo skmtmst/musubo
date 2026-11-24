@@ -77,7 +77,8 @@ vi.mock('@/hooks/use-account-style', () => ({
 vi.mock('@/lib/use-running-version', () => ({ useRunningVersion: () => ({ detail: { deploy_env: 'staging' }, statusText: '稼働版を確認' }) }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'acc-1', name: '移行前の店' }, { id: 'acc-2', name: '移行先の店' }] })) }))
 
-vi.mock('@/lib/staff-role', () => ({
+vi.mock('@/lib/staff-role', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/staff-role')>(),
   useStaffRole: () => fixture.role.value,
   canManageRole: (role: string | null) => role === 'owner' || role === 'admin',
 }))

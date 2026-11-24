@@ -4,7 +4,8 @@ import { scrollMotion } from '@/components/shared/overlay-utils'
 import EntitySelect from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { ApiError, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi, type AccountEmailAttachment } from '@/lib/api'
+import Notice from '@/components/shared/notice'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { InboxInputBox } from '@/components/shared/inbox-composer'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -36,6 +37,7 @@ type EmailMessage = {
   body_text: string
   sent_by_staff_name: string | null
   created_at: string
+  attachments?: AccountEmailAttachment[]
 }
 
 type EmailDetail = {
@@ -111,6 +113,8 @@ function EmailThreadHeader({ children }: { children: React.ReactNode }) {
 
 export default function EmailThread({
   threadId,
+  storeAccountId = null,
+  readOnly = false,
   onBack,
   onChanged,
   customerInfoOpen = false,
@@ -118,6 +122,8 @@ export default function EmailThread({
   onCloseCustomerInfo,
 }: {
   threadId: string
+  storeAccountId?: string | null
+  readOnly?: boolean
   /** スマホでメール一覧へ戻る。LINEのトークと同じ位置に出す。 */
   onBack: () => void
   /** 状態や返信で一覧の中身が変わったときに知らせる。 */
@@ -172,6 +178,7 @@ export default function EmailThread({
   }, [])
 
   useEffect(() => {
+    if (storeAccountId || readOnly) return
     let cancelled = false
     void fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
       '/api/operators?channel=email',
@@ -184,7 +191,7 @@ export default function EmailThread({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [storeAccountId, readOnly])
 
   // 世代で古い応答を捨てる。threadIdが変わった後の遅い応答が
   // 新しい会話を上書きしない(順序逆転防止、#630)。
@@ -243,9 +250,9 @@ export default function EmailThread({
       const after = current && current.thread.id === myThread ? (current.newestCursor ?? null) : null
       const query = after ? `?after=${encodeURIComponent(after)}` : ''
       try {
-        const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
-          `/api/support/email/threads/${encodeURIComponent(threadId)}${query}`,
-        )
+        const res = storeAccountId
+          ? await api.accountEmail.thread(storeAccountId, threadId, { after })
+          : await fetchApi<{ success: boolean; data: EmailDetail }>(`/api/support/email/threads/${encodeURIComponent(threadId)}${query}`)
         if (isStale()) return true
         if (res.success) {
           const data = res.data
@@ -276,7 +283,7 @@ export default function EmailThread({
         return false
       }
     },
-    [threadId],
+    [threadId, storeAccountId],
   )
 
   // 相手からの返信が届いたら出したい。未解決の間だけ5秒起点の1本で
@@ -358,9 +365,12 @@ export default function EmailThread({
   const updateStatus = async (status: ThreadStatus) => {
     // 操作を始めたスレッドを固定する。応答を待つ間に別スレッドへ
     // 切り替わっても、その画面へ結果・失敗を書き込まない(A02-01/04)。
+    if (readOnly || !detail) return
     const myThread = threadId
     try {
-      const res = await fetchApi<{ success: boolean; error?: string }>(
+      const res = storeAccountId
+        ? await api.accountEmail.updateStatus(storeAccountId, myThread, status, detail.thread.revision)
+        : await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(myThread)}/status`,
         { method: 'PATCH', body: JSON.stringify({ status, revision: detail?.thread.revision }) },
       )
@@ -399,7 +409,7 @@ export default function EmailThread({
   }
 
   const sendReply = async () => {
-    if (!reply.trim() || sending) return
+    if (storeAccountId || readOnly || !reply.trim() || sending) return
     /*
       F06+A02-01/04: 送信を始めたスレッドと送った版を固定する。
       応答を待つ間に別の会話へ切り替わっても、その画面の入力欄を
@@ -457,9 +467,9 @@ export default function EmailThread({
     const heightBefore = scroller?.scrollHeight ?? 0
     setOlderLoading(true)
     try {
-      const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
-        `/api/support/email/threads/${encodeURIComponent(myThread)}?before=${encodeURIComponent(cursor)}`,
-      )
+      const res = storeAccountId
+        ? await api.accountEmail.thread(storeAccountId, myThread, { before: cursor })
+        : await fetchApi<{ success: boolean; data: EmailDetail }>(`/api/support/email/threads/${encodeURIComponent(myThread)}?before=${encodeURIComponent(cursor)}`)
       if (latestThreadRef.current !== myThread || !res.success) return
       const data = res.data
       setDetail((prev) => {
@@ -597,12 +607,12 @@ export default function EmailThread({
           sub={`メール・${detail.thread.subject}`}
           subTitle={`${detail.thread.customer_email}・メール・${detail.thread.subject}`}
           onBack={onBack}
-          operator={{
+          operator={storeAccountId || readOnly ? undefined : {
             value: detail.thread.assigned_staff_id ? `staff:${detail.thread.assigned_staff_id}` : 'unassigned',
             operators,
             onChange: (next) => { void updateAssignee(next === 'unassigned' ? null : next) },
           }}
-          status={{ value: detail.thread.status, onChange: (next) => void updateStatus(next) }}
+          status={readOnly ? undefined : { value: detail.thread.status, onChange: (next) => void updateStatus(next) }}
           panel={onOpenCustomerInfo ? {
             open: customerInfoOpen,
             onToggle: () => (customerInfoOpen ? onCloseCustomerInfo?.() : onOpenCustomerInfo()),
@@ -633,6 +643,12 @@ export default function EmailThread({
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
+              {storeAccountId && message.attachments?.map(file => (
+                <Button key={file.id} title={file.filename} variant="text" size="inline" onClick={() => {
+                  void api.accountEmail.downloadAttachment(storeAccountId, file.id, file.filename)
+                    .catch(() => setError('添付をダウンロードできませんでした。'))
+                }}>{file.filename}</Button>
+              ))}
               <p className="mt-2 text-right text-nano text-ink-faint">
                 {dateTime(message.created_at)}
                 {message.direction === 'outgoing' ? '・送信済み' : ''}
@@ -656,7 +672,11 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
+      {storeAccountId && <Notice tone="info" message="返信はまだできません。お店のメールから返信してください。" />}
+      {(storeAccountId || readOnly) && error && <Notice tone="warn" message={error} />}
+      {(storeAccountId || readOnly) && threadStalled && <Notice tone="warn" message="会話の更新を一時停止しています。"
+        action={<Button variant="text" size="inline" onClick={() => setThreadRetryKey(key => key + 1)}>再試行する</Button>} />}
+      {!storeAccountId && !readOnly && <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
         {/*
           上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた。
           U010: 横に収まらなければ次の行へ折り返す。1行に固定したままだと
@@ -784,7 +804,7 @@ export default function EmailThread({
             </Button>
           </div>
         </InboxInputBox>
-      </div>
+      </div>}
 
       {/* 選ぶと本文が入力欄に入る。送る前に直せる（LINE 側と同じ部品）。 */}
       <TemplatePicker

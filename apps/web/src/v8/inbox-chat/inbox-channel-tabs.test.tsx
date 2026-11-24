@@ -25,3 +25,11 @@ it('未接続InstagramのURLを開くだけでは移動しない', async () => {
 it('未接続メールのURLを開くだけでは移動しない', async () => { state.query = 'channel=email'; render(<InboxChannelTabs />); expect(await screen.findByRole('button', { name: '設定へ' })).toBeTruthy(); expect(state.push).not.toHaveBeenCalled() })
 it('メールの権限確認後に設定へ進む', async () => { state.role = null; const view = render(<InboxChannelTabs />); fireEvent.click(screen.getByRole('tab', { name: 'メール' })); expect(state.push).not.toHaveBeenCalled(); state.role = 'owner'; view.rerender(<InboxChannelTabs />); await waitFor(() => expect(state.push).toHaveBeenCalledWith('/settings/sns')) })
 it('媒体を戻すと古い未接続の案内が消える', async () => { state.query = 'channel=email'; const view = render(<InboxChannelTabs />); expect(await screen.findByText('この受信経路はつながっていません。')).toBeTruthy(); state.query = 'channel=line'; view.rerender(<InboxChannelTabs />); await waitFor(() => expect(screen.queryByText('この受信経路はつながっていません。')).toBeNull()) })
+
+it('店舗の転送メールが接続済みなら既存窓口の設定に依存せずメール一覧を開く', () => {
+  Object.assign(state.account, { accountEmailInboxEnabled: true })
+  render(<InboxChannelTabs />)
+  fireEvent.click(screen.getByRole('tab', { name: 'メール' }))
+  expect(state.push).toHaveBeenCalledWith(expect.stringContaining('channel=email'))
+  Reflect.deleteProperty(state.account, 'accountEmailInboxEnabled')
+})

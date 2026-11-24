@@ -20,7 +20,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useInsertTokenNames } from '@/lib/use-insert-token-names';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
-import { Suspense,useEffect,useRef,useState } from 'react';
+import { Suspense,useCallback,useEffect,useRef,useState } from 'react';
 import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,inboxSortFromParam,resolveInboxChannel,statusFilters,type OldestAttentionTarget } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
@@ -46,7 +46,7 @@ const CHAT_PAGE_SIZE = 200
 const EMAIL_PAGE_SIZE = 200
 const CHAT_MESSAGE_PAGE_SIZE = 100
 
-function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line' | 'email'; emailInboxEnabled: boolean }) {
+function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { channel: 'all' | 'line' | 'email'; emailInboxEnabled: boolean; storeEmailAccountId: string | null }) {
 
   const saveErrors = useSaveFormErrors()
 
@@ -59,7 +59,16 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const { selectedAccountId, loading: accountsLoading } = useAccount()
 
   // 中央ペインで開いているメール。LINEのトークと排他。
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
+  const emailScope = selectedAccountId + (storeEmailAccountId ? ':store' : ':shared')
+  const [selectedEmail, setSelectedEmail] = useState<{ id: string; scope: string } | null>(null)
+  const selectedThreadId = selectedEmail?.scope === emailScope ? selectedEmail.id : null
+  const setSelectedThreadId = useCallback((update: React.SetStateAction<string | null>) => {
+    setSelectedEmail(previous => {
+      const current = previous?.scope === emailScope ? previous.id : null
+      const id = typeof update === 'function' ? update(current) : update
+      return id ? { id, scope: emailScope } : null
+    })
+  }, [emailScope])
   // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
   const visibleThreadId = emailInboxEnabled && channel !== 'line' ? selectedThreadId : null
 
@@ -255,6 +264,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     nameQuery,
     selectedAccountId,
     emailInboxEnabled: emailInboxEnabled && channel !== 'line',
+    storeEmailAccountId,
     statusFilter,
     assigneeFilter,
     unreadOnly,
@@ -552,12 +562,14 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     setSelectedChatId(null)
     setSelectedThreadId(threadId)
     clearConversationParams()
+    if (staffRole === 'viewer') return
     setEmailItems((prev) => prev.map((email) => (
       email.threadId === threadId ? { ...email, isUnread: false } : email
     )))
-    void fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/read`, {
-      method: 'POST',
-    }).catch(() => undefined)
+    const marked = storeEmailAccountId
+      ? api.accountEmail.markRead(storeEmailAccountId, threadId)
+      : fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' })
+    void marked.catch(() => undefined)
   }
 
   // 未選択の中央の「いちばん古い会話を開く」（ID27）。一覧の行を押した時と同じ開き方。
@@ -823,7 +835,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
         }} />
 
         <InboxConversation {...{
-          operators, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
+          operators, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, storeEmailAccountId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
           loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
           openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef,
@@ -862,8 +874,8 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 function ChatsPageHost() {
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading } = useAccount()
-  // 既存アカウントはこれまでどおり。新規アカウントはメール接続が未設計なのでLINEだけ。
-  const emailInboxEnabled = !loading && (!selectedAccountId || selectedAccount?.emailInboxEnabled === true)
+  const storeEmailAccountId = !loading && selectedAccount?.accountEmailInboxEnabled ? selectedAccountId : null
+  const emailInboxEnabled = !loading && (!selectedAccountId || Boolean(storeEmailAccountId) || selectedAccount?.emailInboxEnabled === true)
   const channel = resolveInboxChannel(params.get('channel'), emailInboxEnabled)
 
   return (
@@ -875,7 +887,7 @@ function ChatsPageHost() {
         2か所で探すことになっていた。設計 `V2 2-1 受信箱` の一覧も
         「✉ 定期便の解約について」のように1本に混ざっている。
       */}
-      <ChatsPageInner channel={channel} emailInboxEnabled={emailInboxEnabled} />
+      <ChatsPageInner channel={channel} emailInboxEnabled={emailInboxEnabled} storeEmailAccountId={storeEmailAccountId} />
 
     </div>
   )
