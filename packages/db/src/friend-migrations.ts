@@ -124,10 +124,10 @@ export async function createUidMigrationRun(
   }> = [];
   for (const mapping of input.mappings) {
     const [oldFriend, newFriend] = await Promise.all([
-      db.prepare('SELECT id, display_name, user_id FROM friends WHERE line_account_id = ? AND line_user_id = ? LIMIT 1')
+      db.prepare('SELECT id, display_name, user_id FROM friends WHERE line_account_id = ? AND line_platform_user_id = ? LIMIT 1')
         .bind(input.fromAccountId, mapping.oldUid).first<MigrationFriendMatch>(),
       mapping.newUid
-        ? db.prepare('SELECT id, display_name, user_id FROM friends WHERE line_account_id = ? AND line_user_id = ? LIMIT 1')
+        ? db.prepare('SELECT id, display_name, user_id FROM friends WHERE line_account_id = ? AND line_platform_user_id = ? LIMIT 1')
           .bind(input.toAccountId, mapping.newUid).first<MigrationFriendMatch>()
         : Promise.resolve(null),
     ]);

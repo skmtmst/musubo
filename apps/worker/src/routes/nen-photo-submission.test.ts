@@ -42,7 +42,7 @@ function harness() {
           const statement = {
             bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },
             async first() {
-              if (query.includes('SELECT f.id, f.line_user_id')) {
+              if (query.includes('FROM friends f') && query.includes('channel_access_token')) {
                 return {
                   id: 'friend-1', line_user_id: 'U1', display_name: '利用者', user_id: null,
                   line_account_id: 'account-a', channel_access_token: null,

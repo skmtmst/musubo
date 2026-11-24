@@ -11,7 +11,7 @@ export async function sendRestaurantLineConfirmation(c:Context<Env>,input:{reser
   if(!input.lineUid)return {sent:false,reason:'not_friend'};
   if(!['confirmed','visited','seated'].includes(input.status))return {sent:false,reason:'not_confirmed'};
   const db=dbFor(c.env,input.storeId);
-  const friend=await db.prepare('SELECT f.is_following FROM friends f JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=? AND f.line_user_id=?').bind(input.storeId,input.lineUid).first<{is_following:number}>();
+  const friend=await db.prepare('SELECT f.is_following FROM friends f JOIN rt_stores s ON s.line_account_id=f.line_account_id WHERE s.id=? AND f.line_platform_user_id=?').bind(input.storeId,input.lineUid).first<{is_following:number}>();
   if(!friend)return {sent:false,reason:'not_friend'};
   if(!friend.is_following)return {sent:false,reason:'blocked'};
   const account=await db.prepare('SELECT a.id FROM line_accounts a JOIN rt_stores s ON s.line_account_id=a.id WHERE s.id=? AND a.is_active=1 AND a.archived_at IS NULL').bind(input.storeId).first<{id:string}>();

@@ -23,7 +23,7 @@ export async function trackedLinkSigningAccount(db: D1Database, accountId: strin
 }
 
 export async function trackedLinkFriendMatches(db: D1Database, friendId: string, accountId: string | null): Promise<boolean> {
-  const friend = await db.prepare('SELECT line_user_id FROM friends WHERE id = ?')
+  const friend = await db.prepare('SELECT line_platform_user_id AS line_user_id FROM friends WHERE id = ?')
     .bind(friendId).first<{ line_user_id: string | null }>();
   if (!friend?.line_user_id) return false;
   const scoped = await getFriendByLineUserIdForAccount(db, friend.line_user_id, accountId);

@@ -22,7 +22,7 @@ export async function respondToRestaurantConfirmation(db: D1Database, input: {
   s.name store_name FROM rt_reservation_confirmations c JOIN rt_reservations r ON r.id=c.reservation_id
   JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.id=c.friend_id
   WHERE c.request_id=? AND c.friend_id=? AND s.line_account_id=? AND f.line_account_id=s.line_account_id
-  AND f.line_user_id=r.line_uid AND f.is_following=1 AND s.status='active'`)
+  AND f.line_platform_user_id=r.line_uid AND f.is_following=1 AND s.status='active'`)
         .bind(input.requestId, input.friendId, input.accountId).first<{
         reservation_id: string;
         reservation_version: number;

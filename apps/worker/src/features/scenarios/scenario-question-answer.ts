@@ -232,7 +232,7 @@ export async function resumeQuestionAnswer(db:D1Database,input:{
   const root=await getWorkflowStep(db,ref)
   if(!root?.input_json) throw new Error('answer_not_found')
   const snapshot=JSON.parse(root.input_json) as {friendId:string;target:ResolvedAnswerTarget;choiceIndex:number}
-  const friend=await db.prepare('SELECT id,line_user_id,line_account_id FROM friends WHERE id=?').bind(snapshot.friendId)
+  const friend=await db.prepare('SELECT id,line_platform_user_id AS line_user_id,line_account_id FROM friends WHERE id=?').bind(snapshot.friendId)
     .first<{id:string;line_user_id:string;line_account_id:string|null}>()
   if(!friend || `line:${friend.line_account_id ?? 'default'}`!==input.scopeId || (snapshot.target.scenarioAccountId!==null && snapshot.target.scenarioAccountId!==friend.line_account_id))
     throw new Error('answer_scope_changed')

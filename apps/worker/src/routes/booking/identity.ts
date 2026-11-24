@@ -177,7 +177,7 @@ export async function resolveFriendId(
   const f = await c.env.DB
     .prepare(
       `SELECT id FROM friends
-        WHERE line_user_id = ? AND line_account_id = ?`,
+        WHERE line_platform_user_id = ? AND line_account_id = ?`,
     )
     .bind(lineUserId, accountId)
     .first<{ id: string }>();

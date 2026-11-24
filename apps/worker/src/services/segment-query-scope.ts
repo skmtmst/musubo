@@ -8,8 +8,10 @@ type FriendInputScope = { allowedAccountIds: readonly string[]; canSeeUnassigned
 /** Trusted predicates restrict the input relation before any user-supplied OR/NOT conditions. */
 export function restrictSegmentInput(query: SegmentQuery, predicate: string, bindings: readonly unknown[] = []): SegmentQuery {
   if (/\b(?:UNION|WITH)\b/i.test(query.sql)) throw new Error('Segment account scope could not be applied');
-  if (!/^SELECT f\.id, f\.line_user_id, f\.display_name FROM (?:\(SELECT \* FROM )*friends f WHERE /.test(query.sql)) throw new Error('Segment account scope could not be applied');
-  const sql = query.sql.replace('FROM friends f', () => `FROM (SELECT * FROM friends f WHERE ${predicate}) f`);
+  if (!/^SELECT f\.id, f\.(?:line_user_id|line_platform_user_id AS line_user_id), f\.display_name FROM (?:\(SELECT \* FROM )*friends f WHERE /.test(query.sql)) throw new Error('Segment account scope could not be applied');
+  const sql = query.sql
+    .replace(/^SELECT f\.id, f\.line_user_id,/, 'SELECT f.id, f.line_platform_user_id AS line_user_id,')
+    .replace('FROM friends f', () => `FROM (SELECT * FROM friends f WHERE ${predicate}) f`);
   return { sql, bindings: [...bindings, ...query.bindings] };
 }
 
@@ -33,7 +35,7 @@ export async function storedBroadcastFriendScope(db: D1Database, accountId: stri
 
 export function scopedFriendIds(scope: FriendInputScope): SegmentQuery {
   const query = scopeSegmentQuery({
-    sql: 'SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE 1=1', bindings: [],
+    sql: 'SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name FROM friends f WHERE 1=1', bindings: [],
   }, scope);
   return { sql: `SELECT scoped_friends.id FROM (${query.sql}) scoped_friends`, bindings: query.bindings };
 }
