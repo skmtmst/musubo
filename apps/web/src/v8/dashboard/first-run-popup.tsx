@@ -5,7 +5,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type TouchEve
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import SheetDialog from '@/components/shared/sheet-dialog'
-import { publishSetupChip } from '@/v8/onboarding/public/setup-chip/index'
 import { nextFirstStepKey, type FirstStepsSummary } from './first-steps'
 import styles from './first-run-popup.module.css'
 
@@ -61,13 +60,6 @@ export function useFirstRunPopup(options: {
 
   const [dismissed, setDismissed] = useState(true)
   useEffect(() => { setDismissed(readDismissed(accountId)) }, [accountId])
-
-  /* 帯の札は、出す値がある間だけ置く。 */
-  useEffect(() => {
-    if (!eligible || !accountId || !summary) { publishSetupChip(null); return }
-    publishSetupChip({ accountId, done: summary.done, total: summary.total })
-  }, [eligible, accountId, summary])
-  useEffect(() => () => { publishSetupChip(null) }, [])
 
   const open = eligible && guidePhase !== 'active' && guidePhase !== 'paused' && !dismissed
 
