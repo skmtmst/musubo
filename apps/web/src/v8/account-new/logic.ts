@@ -24,7 +24,9 @@ export function isDuplicateChannelError(message: string): boolean {
 }
 
 export function isDuplicateChannelResponse(error: unknown): boolean {
-  return error instanceof ApiError && isDuplicateChannelError(error.message) && error.status === 409
+  if (!(error instanceof ApiError) || error.status !== 409) return false
+  const { message } = error
+  return isDuplicateChannelError(message)
 }
 
 /** 友だち数の統計は前日分。日本時間の昨日を yyyyMMdd で返す。 */

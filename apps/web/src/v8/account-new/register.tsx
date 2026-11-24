@@ -194,10 +194,15 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
 
+  const verifyingResume = Boolean(resumedId) && receiptStatus === 'loading'
+  const checkingPayment = receiptStatus === 'inactive' && checkedInactiveId !== createdId
+  const checkingStyle = Boolean(resumedId) && currentStep === 4 && !registrationStyle.error
+    && (registrationStyle.version === null || registrationStyle.selected)
+  const waitingForRegistration = verifyingResume || checkingPayment || !draftReady || checkingStyle
   const headingReady = currentStep !== 5 || Boolean(completionAccount)
   useEffect(() => {
-    if (headingReady) stepPanelRef.current?.querySelector<HTMLElement>('[data-step-heading]')?.focus()
-  }, [currentStep, sub, precheckAt, headingReady])
+    if (headingReady && !waitingForRegistration) stepPanelRef.current?.querySelector<HTMLElement>('[data-step-heading]')?.focus()
+  }, [currentStep, sub, precheckAt, headingReady, waitingForRegistration])
   useEffect(() => {
     if (!Object.keys(fieldErrors).length) return
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
@@ -638,9 +643,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : sub === 3 ? 'プロバイダーIDへ戻る' : 'Webhook の設定へ戻る'
   const nextLabel = currentStep === 3 && sub === 1 ? '登録する' : currentStep === 2 ? '次のステップへ' : '次へ'
 
-  const verifyingResume = Boolean(resumedId) && receiptStatus === 'loading'
-  const checkingPayment = receiptStatus === 'inactive' && checkedInactiveId !== createdId
-  if (verifyingResume || checkingPayment || !draftReady || (resumedId && currentStep === 4 && !registrationStyle.error && (registrationStyle.version === null || registrationStyle.selected))) {
+  if (waitingForRegistration) {
     return <PageFrame kind="wizard" boardId={shownStep.node}>
       <PageHeading title="LINEアカウントを登録" />
       <PageContent layout="stats"><ListState kind="loading" title="登録の状態を確認しています" /></PageContent>
