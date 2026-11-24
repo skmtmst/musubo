@@ -1223,6 +1223,48 @@ it('接続を増やすときは宛先を持たず、接続IDの同時指定は�
   ).toEqual([{ connection_id: null }]);
 });
 
+it.each([1, 2])('既存接続が%i件あっても、追加の認可完了では既存行を変えず別の接続を保存する', async (existingCount) => {
+  await connect();
+  db.raw.prepare('UPDATE instagram_connections SET sort_order=7').run();
+  if (existingCount === 2) addSecondConnection();
+  const existing = db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all();
+  const existingOrder = db.raw.prepare('SELECT instagram_id FROM instagram_connections ORDER BY sort_order,id').all();
+  const upstream = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) =>
+    new URL(String(url)).pathname.endsWith('/me')
+      ? Response.json({ id: '22', username: 'another_cafe' })
+      : upstream(url as RequestInfo, init),
+  ));
+
+  const start = await read(await req('/api/instagram/oauth/start?mode=add', {}));
+  const state = new URL(start.data.url).searchParams.get('state')!;
+  const response = await req('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
+  const back = new URL(response.headers.get('location')!);
+  expect(back.searchParams.get('instagram')).toBe('connected');
+  expect(db.raw.prepare("SELECT * FROM instagram_connections WHERE instagram_id<>'22' ORDER BY id").all()).toEqual(existing);
+  expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_connections').get()).toEqual({ count: existingCount + 1 });
+  expect(db.raw.prepare('SELECT instagram_id FROM instagram_connections ORDER BY sort_order,id').all()).toEqual([
+    ...existingOrder, { instagram_id: '22' },
+  ]);
+  expect(db.raw.prepare("SELECT instagram_id,username,version FROM instagram_connections WHERE instagram_id='22'").get()).toEqual({
+    instagram_id: '22', username: 'another_cafe', version: 1,
+  });
+  expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_oauth_states').get()).toEqual({ count: 0 });
+});
+
+it('追加で同じInstagramを認可しても、既存接続を上書きせず重複として返す', async () => {
+  await connect();
+  const existing = db.raw.prepare('SELECT * FROM instagram_connections').all();
+  const start = await read(await req('/api/instagram/oauth/start?mode=add', {}));
+  const state = new URL(start.data.url).searchParams.get('state')!;
+  const response = await req('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
+  const back = new URL(response.headers.get('location')!);
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe('instagram_account_already_connected');
+  expect(db.raw.prepare('SELECT * FROM instagram_connections').all()).toEqual(existing);
+  expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_oauth_states').get()).toEqual({ count: 0 });
+});
+
 it('別のLINEアカウントの接続IDを渡しても見つからない扱いにする', async () => {
   await connect();
   addSecondConnection();

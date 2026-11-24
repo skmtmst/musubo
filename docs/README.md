@@ -516,6 +516,8 @@
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
 - [SNS連携の画面を契約枠・主連携・請求の口へつなぐ](release-log/unreleased/122-kenta-sns-multilink-ports-api.md) — 反映履歴、確認 2026-11-19。
 
+- [Instagramの追加接続で既存アカウントを保持する修正](release-log/unreleased/227-masato-instagram-add-preserve.md) — 反映履歴、確認 2026-11-24。
+
 - [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
 
 - [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
