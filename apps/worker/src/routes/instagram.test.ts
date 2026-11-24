@@ -4,6 +4,7 @@ import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { instagram } from './instagram.js';
+import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';
 import {
   verifyInstagramSignature,
   purgeInstagramTransientData,
@@ -32,13 +33,14 @@ const config = {
   META_TOKEN_ENCRYPTION_KEY: btoa('x'.repeat(32)),
   META_WEBHOOK_VERIFY_TOKEN: 'verify_mock',
 };
-function app(staff = admin, configured = true) {
+function app(staff = admin, configured = true, enforceFeatures = false) {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
     c.env = { DB: db.db, ...(configured ? config : {}) } as Env['Bindings'];
     c.set('staff', staff);
     await next();
   });
+  if (enforceFeatures) a.use('/api/*', featureEnforcementMiddleware);
   a.route('/', instagram);
   return a;
 }
@@ -218,6 +220,24 @@ it('接続一覧は同じLINEアカウントの接続を全件、既定と同じ
   // 合鍵は行ごとにも出さない。
   expect(JSON.stringify(list)).not.toContain('token');
   expect(JSON.stringify(list)).not.toContain('encrypted');
+});
+it('機能停止中も実middlewareを通って接続2件を読め、別統括の接続は読めない', async () => {
+  await connect();
+  addSecondConnection();
+  db.raw.prepare('INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)')
+    .run('ig-disabled', 'a1', 'feature.external_integrations', JSON.stringify({ enabled: false }));
+  const original = db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all();
+  vi.mocked(fetch).mockClear();
+
+  const response = await app(admin, true, true).request('/api/instagram/connections?lineAccountId=a1');
+  expect(response.status).toBe(200);
+  const list = await read(response);
+  expect(list.data.connections.map((row) => row.instagramId)).toEqual(['20', '21']);
+  expect(JSON.stringify(list)).not.toMatch(/token|encrypted/);
+  expect((await app({ ...admin, tenantId: 't2' }, true, true)
+    .request('/api/instagram/connections?lineAccountId=a1')).status).toBe(404);
+  expect(db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all()).toEqual(original);
+  expect(fetch).not.toHaveBeenCalled();
 });
 it('接続一覧は行ごとに期限を見て、1件が切れても他の行は使えるままにする', async () => {
   await connect();
