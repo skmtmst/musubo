@@ -1,6 +1,7 @@
 import { tzDateStr } from './availability.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 import { addDays } from '@line-crm/shared';
 /** 受付時の通信・端末時計のわずかなずれを許す。大きな過去日時は記録しない。 */
 const REQUEST_CLOCK_TOLERANCE_MS = 60_000;
@@ -8,8 +9,9 @@ const REQUEST_CLOCK_TOLERANCE_MS = 60_000;
 export async function phoneIntakeFailure(db: D1Database, storeId: string, startsAt: string, endsAt: string): Promise<'opening_hours_unconfigured' | 'reservation_time_past' | 'outside_opening_hours' | null> {
   const hours = await db.prepare('SELECT hours_json FROM rt_opening_hours_settings WHERE store_id = ?').bind(storeId).first<{ hours_json: string }>();
   if (!hours) return 'opening_hours_unconfigured';
-  const connection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?').bind(storeId).first<{ status: string }>();
-  const profile = connection ? await connectedGoogleProfile(db, storeId) : null;
+  // 接続の有無の判定と写しの読み取りで**同じ1件**を見る（773で互換索引が外れ接続が2件入り得る）。
+  const connection = await primaryGoogleConnection(db, storeId);
+  const profile = connection ? await connectedGoogleProfile(db, storeId, connection.id) : null;
   if (connection && !profile) return 'opening_hours_unconfigured';
   if (Date.parse(startsAt) < Date.now() - REQUEST_CLOCK_TOLERANCE_MS) return 'reservation_time_past';
   if (profile) {

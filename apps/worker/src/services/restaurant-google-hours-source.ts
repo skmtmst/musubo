@@ -1,4 +1,5 @@
 import { v1LocationName, type GoogleProfile } from './google-business-profile.js';
+import { PROFILE_FOR_CONNECTION_SQL, primaryGoogleConnection } from './google-connection-primary.js';
 import { validateRestaurantOpeningHours, type OpeningDay } from './restaurant-inventory.js';
 
 const weekdayNumber = { SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3, THURSDAY: 4, FRIDAY: 5, SATURDAY: 6 } as const;
@@ -19,17 +20,31 @@ export function googleOpeningWeek(profile: GoogleProfile): OpeningDay[] | null {
   return validateRestaurantOpeningHours(week);
 }
 
-type GoogleHoursRow = { status: string; location_name: string | null; profile_json: string | null; profile_location: string | null };
+type GoogleProfileRow = { profile_json: string | null; profile_location: string | null };
 
-/** 接続した店舗と同じ Google の写しだけを採用する。 */
-export async function connectedGoogleProfile(db: D1Database, storeId: string): Promise<GoogleProfile | null> {
-  const row = await db.prepare(`SELECT c.status,c.location_name,p.profile_json,p.location_name AS profile_location
-    FROM rt_google_connections c LEFT JOIN rt_google_profiles p ON p.store_id=c.store_id
-    WHERE c.store_id=?`).bind(storeId).first<GoogleHoursRow>();
-  if (!row || row.status !== 'connected' || !row.location_name || row.location_name !== row.profile_location || !row.profile_json) return null;
+/**
+ * 接続した店舗と同じ Google の写しだけを採用する。
+ *
+ * 接続と写しは必ず**同じ1件**を見る。接続を1件に決めてから、その接続に紐づく写しを読む。
+ * 接続と写しを `store_id` だけで別々に引くと、同じ店舗に2件目の接続が入った時点で
+ * 「接続Aの看板名 × 写しBの看板名」が食い違い、営業時間が読めない扱いに倒れる。
+ * `connectionId` を渡すとその接続の写しを見る（省略時は主連携）。
+ */
+export async function connectedGoogleProfile(
+  db: D1Database,
+  storeId: string,
+  connectionId?: string | null,
+): Promise<GoogleProfile | null> {
+  const connection = await primaryGoogleConnection(db, storeId, connectionId);
+  if (!connection || connection.status !== 'connected' || !connection.location_name) return null;
+  const row = await db
+    .prepare(`SELECT profile_json, location_name AS profile_location ${PROFILE_FOR_CONNECTION_SQL}`)
+    .bind(storeId, connection.id)
+    .first<GoogleProfileRow>();
+  if (!row || connection.location_name !== row.profile_location || !row.profile_json) return null;
   try {
     const profile = (JSON.parse(row.profile_json) as { profile?: GoogleProfile }).profile;
-    return profile?.name === v1LocationName(row.location_name) && googleOpeningWeek(profile) ? profile : null;
+    return profile?.name === v1LocationName(connection.location_name) && googleOpeningWeek(profile) ? profile : null;
   } catch { return null; }
 }
 
@@ -43,13 +58,25 @@ export function googleOpeningDay(profile: GoogleProfile, date: string): OpeningD
     ? special.periods.map(period => ({ opensAt: period.open, closesAt: closingTime(period.open, period.close) })) : [] })))?.[weekday]?.periods ?? null;
 }
 
-/** Google の取得・送信成功時に予約用の週設定を同期し、既存の遅刻設定は保持する。 */
-export async function syncGoogleOpeningWeek(db: D1Database, storeId: string, locationName: string, profile: GoogleProfile): Promise<boolean> {
+/**
+ * Google の取得・送信成功時に予約用の週設定を同期し、既存の遅刻設定は保持する。
+ *
+ * `rt_opening_hours_settings` は**店舗に1行**しかない。だから同じ店舗に接続が2件あるとき、
+ * 主連携でない接続の営業時間でこの行を上書きしてはいけない（予約の受付時間が
+ * 意図しない方のGoogleへ入れ替わる）。接続が1件のときは主連携＝その接続なので動きは変わらない。
+ */
+export async function syncGoogleOpeningWeek(
+  db: D1Database,
+  storeId: string,
+  locationName: string,
+  profile: GoogleProfile,
+  connectionId?: string | null,
+): Promise<boolean> {
   const week = googleOpeningWeek(profile);
   if (!week || profile.name !== v1LocationName(locationName)) return false;
-  const current = await db.prepare('SELECT status,location_name FROM rt_google_connections WHERE store_id=?')
-    .bind(storeId).first<{ status: string; location_name: string | null }>();
+  const current = await primaryGoogleConnection(db, storeId);
   if (current?.status !== 'connected' || current.location_name !== locationName) return false;
+  if (connectionId && connectionId !== current.id) return false;
   const json = JSON.stringify(week);
   const saved = await db.prepare('SELECT hours_json,updated_by FROM rt_opening_hours_settings WHERE store_id=?')
     .bind(storeId).first<{ hours_json: string; updated_by: string }>();
