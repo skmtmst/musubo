@@ -481,6 +481,7 @@
 
 ## 反映履歴
 
+- [運用の決まりと受けた訂正の記録を今の進め方に合わせる](release-log/unreleased/229-kenta-train-docs-1125.md) — 反映履歴、確認 2026-11-25。
 - [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
