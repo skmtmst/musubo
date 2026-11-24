@@ -153,3 +153,18 @@ it('破損した予約フォームの修復案内を、選んだ店舗のダッ�
  net.restaurantProgress.mockResolvedValue({success:true,data:{storeId:'another',tables:true,hours:true,menus:true,reception:true,followup:true,reservationForm:{available:false,message,repairPath:'/other'}}});
  expect((await loadStyleSetupProgress('a','restaurant','store')).notices).toBeUndefined();
 });
+
+it('保存後の再確認中は古い済みを消し、先に始まった遅い応答も戻さない', async () => {
+  const view = renderHook(() => useStyleSetupProgress('a', 'salon'))
+  await waitFor(() => expect(view.result.current.progress?.steps.attributes?.complete).toBe(true))
+  let resolveOld!: (value: unknown) => void
+  net.menus.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  act(() => view.result.current.reload())
+  await waitFor(() => expect(net.menus).toHaveBeenCalledTimes(2))
+  act(() => view.result.current.invalidate())
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+  await act(async () => { resolveOld({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [{ id: 'staff' }] }] }) })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+})

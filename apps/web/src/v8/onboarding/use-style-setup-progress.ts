@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
 import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
@@ -10,13 +10,15 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
   const scope = JSON.stringify([accountId, style, storeId])
   const [snapshot, setSnapshot] = useState<{ scope: string; progress: StyleSetupProgress } | null>(null)
   const [tick, setTick] = useState(0)
+  const generation = useRef(0)
   useEffect(() => {
     let active = true
+    const at = ++generation.current
     if (!enabled || !accountId || !style) return
     void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
-      if (active) setSnapshot({ scope, progress })
+      if (active && generation.current === at) setSnapshot({ scope, progress })
     }).catch(() => {
-      if (active) setSnapshot({ scope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
+      if (active && generation.current === at) setSnapshot({ scope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
     })
     return () => { active = false }
   }, [accountId, style, enabled, scope, tick, storeId])
@@ -31,6 +33,7 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
   return {
     status: !enabled || !accountId || !style ? 'idle' as const : snapshot?.scope === scope ? 'ready' as const : 'loading' as const,
     progress: enabled && snapshot?.scope === scope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
-    reload: () => setTick(value => value + 1),
+    invalidate: () => { generation.current += 1; setSnapshot(null) },
+    reload: () => { generation.current += 1; setSnapshot(null); setTick(value => value + 1) },
   }
 }

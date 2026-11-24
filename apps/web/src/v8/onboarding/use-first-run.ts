@@ -54,7 +54,8 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   const [watchRound, setWatchRound] = useState(0)
   const [watchExpired, setWatchExpired] = useState(false)
   const generation = useRef(0)
-  const reload = useCallback(() => { generation.current += 1; setSnapshot(null); setTick((n) => n + 1) }, [])
+  const invalidate = useCallback(() => { generation.current += 1; setSnapshot(null) }, [])
+  const reload = useCallback(() => { invalidate(); setTick((n) => n + 1) }, [invalidate])
   const refresh = useCallback(() => {
     if (!enabled) return
     const at = ++generation.current
@@ -117,6 +118,7 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
     status: current?.status ?? 'loading' as const,
     error: current?.error ?? null,
     reload,
+    invalidate,
     refresh,
     watchExpired: watch && watchExpired,
     rewatch,

@@ -48,7 +48,7 @@ it('失敗、読み取り、別アカウントの変更、ガイド操作では�
   } finally { vi.useRealTimers() }
 })
 
-it('保存直後に別画面へ移ったら、前の画面の読み直し予約を取り消す', async () => {
+it('保存直後の画面移動で読み直しをすぐ実行し、予約を二重に実行しない', async () => {
   vi.useFakeTimers()
   try {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: true })))
@@ -56,7 +56,8 @@ it('保存直後に別画面へ移ったら、前の画面の読み直し予約�
     const hook = renderHook(({ path }) => useSetupMutationRefresh('a', refresh, path), { initialProps: { path: '/settings' } })
     await fetchApi('/api/tags?account_id=a', { method: 'POST' })
     hook.rerender({ path: '/getting-started' })
+    expect(refresh).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(600)
-    expect(refresh).not.toHaveBeenCalled()
+    expect(refresh).toHaveBeenCalledTimes(1)
   } finally { vi.useRealTimers() }
 })
