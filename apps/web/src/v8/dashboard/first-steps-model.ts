@@ -96,7 +96,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   const state = sharedSetup?.run ?? ownRun
   const progress = sharedSetup?.progress ?? ownProgress
   const displaySteps = stepsForStyle(state.steps, style, progress.progress)
-  const summary = state.status === 'ready' && style && progress.status !== 'loading' ? summarizeFirstSteps(state.steps, style, progress.progress) : null
+  const summary = state.status === 'ready' && style && progress.status !== 'loading' && progress.status !== 'idle' ? summarizeFirstSteps(state.steps, style, progress.progress) : null
   /* 待つ帯（はじめにやること）が開いて見えている間だけ、最初の1通を待って読み直す。 */
   const visibleWaiting = options.watchWaiting !== false && canManageRole(role) && state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
   useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
@@ -120,7 +120,8 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   return {
     status: !enabled ? 'idle' as const : state.status === 'loading' || progress.status === 'loading' ? 'loading' as const : state.status,
     summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
-    refresh: () => { state.refresh(); progress.reload() },
+    refresh: () => { state.refresh(); (progress.refresh ?? progress.reload)() },
+    markStale: () => { state.markStale?.(); progress.markStale?.() },
     invalidate: () => { state.invalidate(); progress.invalidate() },
     runState: state, styleProgress: progress, steps: displaySteps, progress: progress.progress, dismissed: state.dismissed, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
     arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss, guide,

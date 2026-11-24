@@ -41,26 +41,51 @@ it('役割が分からない時は初期質問APIを読まない', () => {
   expect(net.get).not.toHaveBeenCalled()
 })
 
-it('保存直後の移動は古い済みを隠し、新しい進捗を受け取る', async () => {
+it('保存直後は他画面の札を消さず、はじめの設定へ移動した時は古い済みを隠して新しい進捗を受け取る', async () => {
   let resolveNew!: (value: unknown) => void
   const resultFor = (state: string) => ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state, href: '/tags?tab=tags', reason: null }] })
   net.progress.mockReset().mockResolvedValueOnce(resultFor('done')).mockImplementationOnce(() => new Promise(resolve => { resolveNew = resolve }))
   function Screen({ path }: { path: string }) {
     const run = useFirstRun('a')
-    useSetupMutationRefresh('a', run.reload, path, run.invalidate)
+    useSetupMutationRefresh('a', run.refresh, path, run.markStale)
     const step = run.steps.find(item => item.key === 'attributes')
-    return <div><span>{path}</span><span>{run.status === 'loading' ? '確認中' : step?.state === 'done' ? '済み 1' : '未完了 0'}</span></div>
+    const chipCount = step?.state === 'done' ? '札 1' : '札 0'
+    const listText = path === '/getting-started' && (run.status === 'loading' || run.revalidating) ? '確認中' : step?.state === 'done' ? '済み 1' : '未完了 0'
+    return <div><span>{path}</span><span>{chipCount}</span><span>{listText}</span></div>
   }
   const view = render(<Screen path="/settings" />)
   await screen.findByText('済み 1')
+  expect(screen.getByText('札 1')).toBeTruthy()
   act(() => { window.dispatchEvent(new CustomEvent(API_MUTATION_SUCCEEDED, { detail: { accountId: 'a' } })) })
-  expect(screen.queryByText('済み 1')).toBeNull()
-  expect(screen.getByText('確認中')).toBeTruthy()
+  expect(screen.getByText('札 1')).toBeTruthy()
+  expect(screen.getByText('済み 1')).toBeTruthy()
   view.rerender(<Screen path="/getting-started" />)
   await waitFor(() => expect(net.progress).toHaveBeenCalledTimes(2))
   expect(screen.getByText('/getting-started')).toBeTruthy()
+  expect(screen.getByText('札 1')).toBeTruthy()
   expect(screen.queryByText('済み 1')).toBeNull()
   expect(screen.getByText('確認中')).toBeTruthy()
   await act(async () => { resolveNew(resultFor('todo')) })
   expect(await screen.findByText('未完了 0')).toBeTruthy()
+  expect(screen.getByText('札 0')).toBeTruthy()
+})
+
+it('再読込中に後ろの読み直しが割り込んで失敗しても、読み込み中で固まらず失敗として再試行できる', async () => {
+  let resolveReload!: (value: unknown) => void
+  const readyPayload = ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'done', href: '/tags?tab=tags', reason: null }] })
+  net.progress.mockReset()
+    .mockResolvedValueOnce(readyPayload)
+    .mockImplementationOnce(() => new Promise(resolve => { resolveReload = resolve }))
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce(readyPayload)
+  const { result } = renderHook(() => useFirstRun('a'))
+  await waitFor(() => expect(result.current.status).toBe('ready'))
+  act(() => { result.current.reload() })
+  expect(result.current.status).toBe('loading')
+  act(() => { result.current.refresh() })
+  await waitFor(() => expect(result.current.status).toBe('error'))
+  await act(async () => { resolveReload(readyPayload) })
+  expect(result.current.status).toBe('error')
+  act(() => { result.current.reload() })
+  await waitFor(() => expect(result.current.status).toBe('ready'))
 })

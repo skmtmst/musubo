@@ -70,15 +70,25 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
   const [sharedWatch, setSharedWatch] = useState(false)
   const setWatch = useCallback((id: symbol, enabled: boolean) => { if (enabled) watchers.current.add(id); else watchers.current.delete(id); setSharedWatch(watchers.current.size > 0) }, [])
   const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: true, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch })
-  const { guide, summary } = first
-  const shared = useMemo<SharedGuide>(() => ({ guide, summary, dismissed: first.dismissed, setup: { accountId, run: first.runState, progress: first.styleProgress, setWatch } }), [guide, summary, first.dismissed, first.runState, first.styleProgress, accountId, setWatch])
+  const retained = useRef<{ accountId: string | null; summary: typeof first.summary; dismissed: boolean | null; style: typeof style.data extends infer T ? T extends { style: infer S } ? S : null : null }>({ accountId: null, summary: null, dismissed: null, style: null })
+  if (retained.current.accountId !== accountId || role === null || first.status === 'error' || style.status === 'error') {
+    retained.current = { accountId, summary: first.summary, dismissed: first.dismissed ?? null, style: style.data?.style ?? null }
+  } else {
+    if (first.summary) retained.current.summary = first.summary
+    if (first.dismissed !== null && first.dismissed !== undefined) retained.current.dismissed = first.dismissed
+    if (style.data?.style) retained.current.style = style.data.style
+  }
+  const guide = first.guide
+  const summary = first.summary ?? retained.current.summary
+  const dismissed = first.dismissed ?? retained.current.dismissed
+  const shared = useMemo<SharedGuide>(() => ({ guide, summary, dismissed, setup: { accountId, run: first.runState, progress: first.styleProgress, setWatch } }), [guide, summary, dismissed, first.runState, first.styleProgress, accountId, setWatch])
 
   const index = summary?.steps.findIndex(step => step.key === guide.stepKey) ?? -1
   const step = index >= 0 ? summary?.steps[index] ?? null : null
   /** 9項目の済みは実データ計測の値のまま渡す（ガイドで済みにしない）。 */
   const segments = useMemo(() => summary?.steps.map(item => item.done) ?? [], [summary])
 
-  const scripted = style.data?.style === 'restaurant'
+  const scripted = (style.data?.style ?? retained.current.style) === 'restaurant'
   const procedure = scripted ? guideProcedure(guide.stepKey, guide.procedureIndex) : null
   const next = summary?.steps.slice(index + 1).find(item => !item.done && item.href)
   const advance = guide.advanceProcedure
@@ -134,10 +144,10 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     () => { if (procedureSignal !== 'reception.save' && procedureSignal !== 'menu.save' && procedureSignal !== 'followup.save') advance() },
     procedureSignal === 'followup.start' ? accountId ?? undefined : undefined,
   )
-  useSetupMutationRefresh(accountId, first.reload, pathname, first.invalidate)
+  const refreshNow = useSetupMutationRefresh(accountId, first.refresh, pathname, first.markStale)
   useGuideSignal('followup.confirm', Boolean(accountId && followupCanConfirm && guide.phase === 'active'),
     () => advance(false, 4), accountId ?? undefined)
-  useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
+  useGuideSignal('accounts.connection', armed && Boolean(accountId), refreshNow, accountId ?? undefined)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.richMenuPublished === true
   const skipPublishPrompt = needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -18,24 +18,48 @@ const state = vi.hoisted(() => ({
       /* 実際の行き先と同じ（first-steps-styles.test.tsx が見張る値）。 */
       { key: 'hours', label: '営業時間を決める', href: '/restaurant-test/google?tab=hours', done: false },
     ],
-    done: 0,
-    total: 9,
+    done: 1,
+    total: 8,
   },
+  dismissed: false as boolean | null,
+  refresh: vi.fn(),
+  reload: vi.fn(),
+  markStale: vi.fn(),
+  invalidate: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: vi.fn() }), usePathname: () => nav.path, useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => ({ selectedAccountId: 'account-1' }) }))
-vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' } }) }))
+vi.mock('@/hooks/use-account-style', () => ({ ACCOUNT_STYLE_UPDATED: 'musubo:account-style-updated', useAccountStyle: () => ({ status: 'ready', data: { style: 'restaurant' } }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
-vi.mock('@/v8/dashboard/public/first-steps-model/index', () => ({ useFirstSteps: () => ({ status: 'success', guide: state.guide, summary: state.summary }) }))
-/* 重ね表示そのものは guide-overlay-react.test.tsx が見張る。ここは行き先だけ。 */
-vi.mock('./guide-overlay', () => ({ GuideOverlay: () => null }))
+vi.mock('@/v8/dashboard/public/first-steps-model/index', () => ({
+  useFirstSteps: () => ({
+    status: 'ready',
+    guide: state.guide,
+    summary: state.summary,
+    dismissed: state.dismissed,
+    refresh: state.refresh,
+    reload: state.reload,
+    markStale: state.markStale,
+    invalidate: state.invalidate,
+  }),
+}))
+/* 重ね表示そのものは guide-overlay-react.test.tsx が見張る。ここは行き先と引き渡しだけ。 */
+vi.mock('./guide-overlay', () => ({ GuideOverlay: ({ active, stepLabel }: { active: boolean; stepLabel: string | null }) => active ? <div data-testid="guide-overlay">{stepLabel}</div> : null }))
 
+import { SetupChip } from '@/components/shell/setup-chip'
+import { API_MUTATION_SUCCEEDED } from '@/lib/api/transport/mutation-events'
 import { guideEngineStorageKey } from './guide-engine'
 import { GuideHost } from './guide-host'
+import { emitGuideSignal } from './guide-signal'
 
 beforeEach(() => {
   nav.push.mockClear()
+  state.refresh.mockClear()
+  state.reload.mockClear()
+  state.markStale.mockClear()
+  state.invalidate.mockClear()
+  state.dismissed = false
   nav.path = '/restaurant-test/tables'
   state.guide = { ...state.guide, phase: 'active', stepKey: 'attributes', procedureIndex: 1 }
   localStorage.setItem(guideEngineStorageKey('account-1'), JSON.stringify({ phase: 'active', stepKey: 'attributes', procedureIndex: 1 }))
@@ -107,5 +131,37 @@ describe('案内の入れ物が段の画面へ移る', () => {
     state.guide = { ...state.guide, phase: 'paused', stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).not.toHaveBeenCalled()
+  })
+
+  it('保存ごとに札とガイドを消さず裏で読み直し、接続確認の合図とも二重発火しない', () => {
+    vi.useFakeTimers()
+    try {
+      render(<GuideHost><SetupChip /></GuideHost>)
+      expect(screen.getByRole('link', { name: '開店準備 1/8。はじめの設定を開く' })).toBeTruthy()
+      expect(screen.getByTestId('guide-overlay').textContent).toBe('卓と席を登録する')
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(API_MUTATION_SUCCEEDED, { detail: { accountId: 'account-1' } }))
+      })
+      expect(state.invalidate).not.toHaveBeenCalled()
+      expect(state.reload).not.toHaveBeenCalled()
+      expect(state.markStale).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('link', { name: '開店準備 1/8。はじめの設定を開く' })).toBeTruthy()
+      expect(screen.getByTestId('guide-overlay').textContent).toBe('卓と席を登録する')
+
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(state.refresh).toHaveBeenCalledTimes(1)
+      expect(state.reload).not.toHaveBeenCalled()
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(API_MUTATION_SUCCEEDED, { detail: { accountId: 'account-1' } }))
+        emitGuideSignal('accounts.connection', 'account-1')
+      })
+      expect(state.refresh).toHaveBeenCalledTimes(2)
+      act(() => { vi.advanceTimersByTime(600) })
+      expect(state.refresh).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

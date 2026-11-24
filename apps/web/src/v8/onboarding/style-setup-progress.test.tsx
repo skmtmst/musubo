@@ -168,3 +168,61 @@ it('保存後の再確認中は古い済みを消し、先に始まった遅い�
   expect(view.result.current.status).toBe('loading')
   expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
 })
+
+it('別アカウントや未確定スタイルを挟んで元のアカウントへ戻した時、再取得完了前に古い済みを表示しない', async () => {
+  const view = renderHook(({ id, style }) => useStyleSetupProgress(id, style), {
+    initialProps: { id: 'a' as string | null, style: 'salon' as 'salon' | null },
+  })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  let resolveB!: (value: unknown) => void
+  let resolveA!: (value: unknown) => void
+  net.menus
+    .mockImplementationOnce(() => new Promise(resolve => { resolveB = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { resolveA = resolve }))
+
+  view.rerender({ id: 'b', style: 'salon' })
+  expect(view.result.current.status).toBe('loading')
+  view.rerender({ id: 'a', style: 'salon' })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+
+  await act(async () => {
+    resolveB({ menus: [] })
+    resolveA({ menus: [] })
+  })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
+
+  let resolveStyleReload!: (value: unknown) => void
+  net.menus.mockImplementationOnce(() => new Promise(resolve => { resolveStyleReload = resolve }))
+  view.rerender({ id: 'a', style: null })
+  expect(view.result.current.status).toBe('idle')
+  view.rerender({ id: 'a', style: 'salon' })
+  expect(view.result.current.status).toBe('loading')
+  await act(async () => { resolveStyleReload({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [{ id: 'staff' }] }] }) })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+})
+
+it('裏でのrefreshは直前の済みを保ったまま新しい値へ更新する', async () => {
+  const view = renderHook(() => useStyleSetupProgress('a', 'salon'))
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  let resolveRefresh!: (value: unknown) => void
+  net.menus.mockImplementationOnce(() => new Promise(resolve => { resolveRefresh = resolve }))
+  act(() => {
+    view.result.current.markStale()
+    view.result.current.refresh()
+  })
+  expect(view.result.current.status).toBe('ready')
+  expect(view.result.current.revalidating).toBe(true)
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  await act(async () => { resolveRefresh({ menus: [] }) })
+  await waitFor(() => expect(view.result.current.revalidating).toBe(false))
+  expect(view.result.current.status).toBe('ready')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
+})

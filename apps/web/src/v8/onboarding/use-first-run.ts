@@ -50,21 +50,33 @@ type Snapshot =
  */
 export function useFirstRun(accountId: string | null, enabled = true, watch = false) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const [revalidatingFor, setRevalidatingFor] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const [watchRound, setWatchRound] = useState(0)
   const [watchExpired, setWatchExpired] = useState(false)
   const generation = useRef(0)
-  const invalidate = useCallback(() => { generation.current += 1; setSnapshot(null) }, [])
+  const markStale = useCallback(() => { if (enabled) setRevalidatingFor(accountId) }, [accountId, enabled])
+  const invalidate = useCallback(() => { generation.current += 1; setRevalidatingFor(null); setSnapshot(null) }, [])
   const reload = useCallback(() => { invalidate(); setTick((n) => n + 1) }, [invalidate])
   const refresh = useCallback(() => {
     if (!enabled) return
     const at = ++generation.current
     void loadFirstRun(accountId).then((loaded) => {
-      if (generation.current === at) setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
-    }).catch(() => { /* 後ろの読み直しの失敗では、読めている表示を消さない。次の読み直しで戻る。 */ })
+      if (generation.current === at) {
+        setRevalidatingFor(null)
+        setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
+      }
+    }).catch((error: unknown) => {
+      /* 後ろの読み直しの失敗では、読めている表示は消さず、未取得の時だけ失敗として知らせる。 */
+      if (generation.current === at) {
+        setRevalidatingFor(null)
+        setSnapshot((prev) => (prev?.accountId === accountId && prev.status === 'ready' ? prev : { accountId, status: 'error', error }))
+      }
+    })
   }, [accountId, enabled])
   useEffect(() => {
     const at = ++generation.current
+    setRevalidatingFor(null)
     setSnapshot(null)
     if (!enabled) return
     void loadFirstRun(accountId).then((loaded) => {
@@ -76,12 +88,12 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   }, [accountId, enabled, tick])
   useEffect(() => {
     const featureSaved = (event: Event) => {
-      // スタイルの保存は、下のアカウント別の合図で表示を保ったまま読み直す。
-      if ((event as CustomEvent<FeatureSettingsUpdate>).detail?.source !== 'account-style') reload()
+      const detail = (event as CustomEvent<FeatureSettingsUpdate>).detail
+      if (detail?.source !== 'account-style' && (!detail?.accountId || detail.accountId === accountId)) refresh()
     }
     window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, featureSaved)
     return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, featureSaved)
-  }, [reload])
+  }, [accountId, refresh])
   useEffect(() => {
     const styleSaved = (event: Event) => { if ((event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) refresh() }
     const visible = () => { if (document.visibilityState === 'visible') refresh() }
@@ -116,9 +128,11 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
     dismissed: current?.status === 'ready' ? current.dismissed : null,
     starter: current?.status === 'ready' ? current.starter : null,
     status: current?.status ?? 'loading' as const,
+    revalidating: enabled && revalidatingFor === accountId,
     error: current?.error ?? null,
     reload,
     invalidate,
+    markStale,
     refresh,
     watchExpired: watch && watchExpired,
     rewatch,

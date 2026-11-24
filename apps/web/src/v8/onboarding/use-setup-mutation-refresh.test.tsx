@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { renderHook, waitFor, cleanup } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
+import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
 import { fetchApi } from '@/lib/api/transport/request'
+import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
 import { useSetupMutationRefresh } from './use-setup-mutation-refresh'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -56,6 +58,32 @@ it('保存直後の画面移動で読み直しをすぐ実行し、予約を二�
     const hook = renderHook(({ path }) => useSetupMutationRefresh('a', refresh, path), { initialProps: { path: '/settings' } })
     await fetchApi('/api/tags?account_id=a', { method: 'POST' })
     hook.rerender({ path: '/getting-started' })
+    expect(refresh).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  } finally { vi.useRealTimers() }
+})
+
+it('既存のイベントや即時読み直しが走った時は、予約を取り消して二重に読み直さない', async () => {
+  vi.useFakeTimers()
+  try {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: true })))
+    const refresh = vi.fn()
+    const hook = renderHook(({ path }) => useSetupMutationRefresh('a', refresh, path), { initialProps: { path: '/settings' } })
+
+    await fetchApi('/api/settings/features?account_id=a', { method: 'PUT' })
+    window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: 'a' } }))
+    await vi.advanceTimersByTimeAsync(600)
+    expect(refresh).not.toHaveBeenCalled()
+
+    await fetchApi('/api/dashboard/style?account_id=a', { method: 'PUT' })
+    window.dispatchEvent(new CustomEvent(ACCOUNT_STYLE_UPDATED, { detail: { accountId: 'a' } }))
+    hook.rerender({ path: '/getting-started' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(refresh).not.toHaveBeenCalled()
+
+    await fetchApi('/api/line-accounts/a/connection-checks', { method: 'POST' })
+    hook.result.current()
     expect(refresh).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(600)
     expect(refresh).toHaveBeenCalledTimes(1)

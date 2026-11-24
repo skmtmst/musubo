@@ -1,39 +1,85 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
 import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
+import { FEATURE_SETTINGS_UPDATED_EVENT, type FeatureSettingsUpdate } from '@/lib/feature-settings-event'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 import { loadStyleSetupProgress, unknownStyleSetupProgress } from './style-setup-progress'
 
 /** 店とスタイルを切り替えた直後に、前の設定を「済み」として見せない。 */
 export function useStyleSetupProgress(accountId: string | null, style: AccountStyle | null, enabled = true, storeId?: string | null) {
   const scope = JSON.stringify([accountId, style, storeId])
+  const activeScope = enabled && accountId && style ? scope : null
   const [snapshot, setSnapshot] = useState<{ scope: string; progress: StyleSetupProgress } | null>(null)
+  const [revalidatingScope, setRevalidatingScope] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const generation = useRef(0)
+  const prevScope = useRef<string | null>(activeScope)
+  const markStale = useCallback(() => { if (activeScope) setRevalidatingScope(activeScope) }, [activeScope])
+  const invalidate = useCallback(() => { generation.current += 1; setRevalidatingScope(null); setSnapshot(null) }, [])
+  const reload = useCallback(() => { invalidate(); setTick(value => value + 1) }, [invalidate])
+  const refresh = useCallback(() => {
+    if (!enabled || !accountId || !style) return
+    const currentScope = JSON.stringify([accountId, style, storeId])
+    const at = ++generation.current
+    void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
+      if (generation.current === at) {
+        setRevalidatingScope(null)
+        setSnapshot({ scope: currentScope, progress })
+      }
+    }).catch(() => {
+      if (generation.current === at) {
+        setRevalidatingScope(null)
+        setSnapshot(prev => (prev?.scope === currentScope ? prev : { scope: currentScope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') }))
+      }
+    })
+  }, [accountId, enabled, storeId, style])
   useEffect(() => {
     let active = true
     const at = ++generation.current
-    if (!enabled || !accountId || !style) return
-    void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
-      if (active && generation.current === at) setSnapshot({ scope, progress })
-    }).catch(() => {
-      if (active && generation.current === at) setSnapshot({ scope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
-    })
-    return () => { active = false }
-  }, [accountId, style, enabled, scope, tick, storeId])
-  useEffect(() => {
-    const reload = (event: Event) => {
-      if (event.type === 'visibilitychange' ? document.visibilityState === 'visible' : (event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) setTick(value => value + 1)
+    if (prevScope.current !== activeScope) {
+      prevScope.current = activeScope
+      setRevalidatingScope(null)
+      setSnapshot(null)
     }
-    window.addEventListener(ACCOUNT_STYLE_UPDATED, reload)
-    document.addEventListener('visibilitychange', reload)
-    return () => { window.removeEventListener(ACCOUNT_STYLE_UPDATED, reload); document.removeEventListener('visibilitychange', reload) }
-  }, [accountId])
+    if (!activeScope || !accountId || !style) return
+    void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
+      if (active && generation.current === at) {
+        setRevalidatingScope(null)
+        setSnapshot({ scope: activeScope, progress })
+      }
+    }).catch(() => {
+      if (active && generation.current === at) {
+        setRevalidatingScope(null)
+        setSnapshot({ scope: activeScope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
+      }
+    })
+    return () => { active = false; generation.current += 1 }
+  }, [accountId, style, enabled, activeScope, tick, storeId])
+  useEffect(() => {
+    const onStyleOrVisible = (event: Event) => {
+      if (event.type === 'visibilitychange' ? document.visibilityState === 'visible' : (event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) refresh()
+    }
+    const onFeatureSaved = (event: Event) => {
+      const detail = (event as CustomEvent<FeatureSettingsUpdate>).detail
+      if (detail?.source !== 'account-style' && (!detail?.accountId || detail.accountId === accountId)) refresh()
+    }
+    window.addEventListener(ACCOUNT_STYLE_UPDATED, onStyleOrVisible)
+    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onFeatureSaved)
+    document.addEventListener('visibilitychange', onStyleOrVisible)
+    return () => {
+      window.removeEventListener(ACCOUNT_STYLE_UPDATED, onStyleOrVisible)
+      window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onFeatureSaved)
+      document.removeEventListener('visibilitychange', onStyleOrVisible)
+    }
+  }, [accountId, refresh])
   return {
-    status: !enabled || !accountId || !style ? 'idle' as const : snapshot?.scope === scope ? 'ready' as const : 'loading' as const,
-    progress: enabled && snapshot?.scope === scope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
-    invalidate: () => { generation.current += 1; setSnapshot(null) },
-    reload: () => { generation.current += 1; setSnapshot(null); setTick(value => value + 1) },
+    status: !activeScope ? 'idle' as const : snapshot?.scope === activeScope ? 'ready' as const : 'loading' as const,
+    revalidating: Boolean(activeScope && revalidatingScope === activeScope),
+    progress: activeScope && snapshot?.scope === activeScope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
+    invalidate,
+    markStale,
+    refresh,
+    reload,
   }
 }
