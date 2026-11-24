@@ -16,7 +16,7 @@ const app = new Hono<Env>();
 app.use('*', async (c, next) => {
   c.set('staff', {
     id: c.req.header('store') || 'A',
-    name: 'fixture',
+    name: '見本 担当者',
     role: c.req.header('role') === 'staff' ? 'staff' : 'owner',
     readOnly: c.req.header('readonly') === '1',
     permissionKeys: ['/chats'],
@@ -27,10 +27,10 @@ app.route('/api/account-email/:accountId', accountEmail);
 beforeEach(() => {
   data = createTestD1({ foreignKeys: true });
   data.raw.exec(
-    "INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('A','A','A','a','a'),('B','B','B','b','b')",
+    "INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES ('A','A','見本 店舗A','a','a'),('B','B','見本 店舗B','b','b')",
   );
   data.raw.exec(`INSERT INTO staff_members(id,name,role,api_key,account_scope) VALUES
-    ('A','A','owner','fixture-a','accounts'),('B','B','owner','fixture-b','accounts');
+    ('A','見本 担当A','owner','fixture-a','accounts'),('B','見本 担当B','owner','fixture-b','accounts');
     INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES ('A','A','now'),('B','B','now');`);
   env = { DB: data.db, ACCOUNT_EMAIL_DOMAIN: 'inbox.example.org' } as Env['Bindings'];
   vi.mocked(sendPlainMail).mockReset();
@@ -79,7 +79,7 @@ async function incoming(
   extra: string[] = [],
   sender = 'reader@example.com',
 ) {
-  const lines = ['From: Reader <' + sender + '>', 'Subject: ' + subject, ...extra, '', body];
+  const lines = ['From: 見本 送信者 <' + sender + '>', 'Subject: ' + subject, ...extra, '', body];
   const raw = lines.join('\r\n');
   const reject = vi.fn();
   const headers = new Headers(
@@ -290,8 +290,8 @@ it('写真サイズの添付を分割保存して元のバイト列を返す', a
 it('保存ビューとダッシュボードの集計は選択した店舗に限る', async () => {
   const a = await connect('A');
   const b = await connect('B');
-  await incoming(a, '店舗A', '特注品');
-  await incoming(b, '店舗B', '別の相談');
+  await incoming(a, '見本 店舗A', '特注品');
+  await incoming(b, '見本 店舗B', '別の相談');
   const conditions = { ...EMPTY_INBOX_SAVED_VIEW_CONDITIONS, query: '特注品' };
   for (const [staffId, expected] of [['A', 1], ['B', 0]] as const) {
     const result = await countInboxSavedViewMatches(data.db, {
