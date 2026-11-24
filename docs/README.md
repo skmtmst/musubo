@@ -482,7 +482,7 @@
 ## 反映履歴
 
 - [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
-- [はじめのポップアップの撮影試験の直し](release-log/unreleased/PR-kenta-first-run-popup-capture.md) — 反映履歴、確認 2026-11-24。
+- [はじめのポップアップの撮影試験の直し](release-log/unreleased/226-kenta-first-run-popup-capture.md) — 反映履歴、確認 2026-11-24。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
