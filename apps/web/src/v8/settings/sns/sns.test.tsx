@@ -12,7 +12,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  *  - 戻り先 `?instagram=connected|failed` の帯。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InstagramConnectionStatus, SnsConnectionPorts } from '@line-crm/shared'
 import type { GoogleConnection, GoogleConnectionData } from '@/lib/restaurant-google-api'
@@ -761,6 +761,31 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
 })
 
 describe('契約枠・主連携・請求の口（★v9 F3・F4／GET /api/settings/sns/connections）', () => {
+  it('主連携の保存中にアカウントを変えたら、遅い応答で前のアカウントを読み直さない', async () => {
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { id: 'gc-1', status: 'connected' } })
+    fixture.googleConnections.mockResolvedValue({ connections: [
+      { id: 'gc-1', status: 'connected', locationTitle: '本店', confirmationRevision: 2 },
+      { id: 'gc-2', status: 'connected', locationTitle: '支店', confirmationRevision: 4 },
+    ] })
+    fixture.snsPorts.mockImplementation(async (lineAccountId: string) => portsData({
+      lineAccountId, contracted: 2, googleConnections: [
+        { id: 'gc-1', label: '本店', state: 'connected', version: 2, isPrimary: true },
+        { id: 'gc-2', label: '支店', state: 'connected', version: 4, isPrimary: false },
+      ],
+    }))
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    let finish!: (value: unknown) => void
+    fixture.snsSetPrimary.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<SnsSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '主連携にする' }))
+    await waitFor(() => expect(fixture.snsSetPrimary).toHaveBeenCalledTimes(1))
+    fixture.account.selected = 'acc-2'
+    view.rerender(<SnsSettingsPage />)
+    await waitFor(() => expect(fixture.snsPorts).toHaveBeenLastCalledWith('acc-2'))
+    await act(async () => { finish({ success: true, data: { connectionId: 'gc-2', version: 2 } }) })
+    expect(fixture.snsPorts.mock.calls.map(args => args[0])).toEqual(['acc-1', 'acc-2'])
+  })
+
   it('契約枠内の2件目は既存の接続IDを付けず、新しい接続として開始する', async () => {
     fixture.snsPorts.mockResolvedValue(portsData({ contracted: 2 }))
     setup('connected', CONNECTED)

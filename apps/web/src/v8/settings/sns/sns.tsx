@@ -373,6 +373,7 @@ export default function SnsSettingsPage() {
    */
   const setGooglePrimary = async (connection: SnsConnectionView) => {
     if (!accountId || !canManageGoogle || !visiblePorts) return
+    const scope = accountScope.current
     setPrimaryBusyId(connection.id)
     setBusy(true)
     setActionError('')
@@ -382,8 +383,10 @@ export default function SnsSettingsPage() {
         connectionId: connection.connectionId ?? connection.id,
         expectedVersion: visiblePorts.primaryVersion,
       })
+      if (scope !== accountScope.current) return
       await load()
     } catch (saveFailure) {
+      if (scope !== accountScope.current) return
       if (isSaveConflict(saveFailure)) {
         await load()
         setActionError('ほかの人が先に主連携を変えました。いまの状態を読み込み直したので、もう一度お試しください。')
