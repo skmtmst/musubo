@@ -1,5 +1,6 @@
 'use client'
 
+import { guideDraftKey, readGuideDraft, writeGuideDraft } from '@/lib/scoped-guide-draft'
 import { storedStringList } from '@/lib/stored-json'
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -26,7 +27,7 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import RegisteredImageSelect from '@/components/shared/registered-image-select'
-import { readRestaurantCoursePhotos, type RestaurantCoursePhoto } from '@line-crm/shared'
+import { parseRestaurantCoursePhotos, readRestaurantCoursePhotos, type RestaurantCoursePhoto } from '@line-crm/shared'
 import CoursePhotos from './course-photos'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
@@ -66,6 +67,23 @@ function draftOf(item: RestaurantMenuItem | null): Draft {
     duration: item.duration_minutes == null ? '' : String(item.duration_minutes), kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' || periods[0] === 'dinner' ? periods[0] : '',
     effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, photos: readRestaurantCoursePhotos(item.photo_gallery_json, item.image_media_id), status: item.status === 'draft' ? 'draft' : 'active',
+  }
+}
+
+function restoreCourseDraft(key: string | null, baseline: Draft): Draft {
+  const saved = readGuideDraft<{ baseline: string; input: Draft }>(key)
+  if (!saved?.input || saved.baseline !== JSON.stringify(baseline)) return baseline
+  const input = saved.input
+  const text = (field: keyof Draft, limit = 2000) => typeof input[field] === 'string' ? input[field].slice(0, limit) : baseline[field] as string
+  const photos = parseRestaurantCoursePhotos(input.photos) ?? []
+  return {
+    ...baseline,
+    name: text('name'), price: text('price', 15), duration: text('duration', 10), description: text('description'),
+    allergens: text('allergens'), effectiveAt: text('effectiveAt', 25),
+    kind: input.kind === 'a_la_carte' ? input.kind : 'course',
+    period: input.period === 'lunch' || input.period === 'dinner' || input.period === 'both' ? input.period : '',
+    status: input.status === 'active' ? 'active' : 'draft',
+    photos, imageMediaId: photos[0]?.mediaId ?? (typeof input.imageMediaId === 'string' ? input.imageMediaId : null),
   }
 }
 
@@ -142,6 +160,21 @@ function MenuEditBody() {
   const editing = item
   const course = draft.kind === 'course'
   const guide = useSharedGuide()?.guide
+  const guideCourseKey = canEdit && storeIdentity?.accountId === selectedAccountId
+    && guide?.stepKey === 'friendAdd' && (guide.phase === 'active' || guide.phase === 'paused')
+    ? guideDraftKey(`course:${id ?? 'new'}`, selectedAccountId, storeIdentity?.id)
+    : null
+  const [draftRestoredKey, setDraftRestoredKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (!guideCourseKey || state !== 'ready' || draftRestoredKey === guideCourseKey) return
+    const restored = restoreCourseDraft(guideCourseKey, saved)
+    if (restored !== saved) setDraft(restored)
+    setDraftRestoredKey(guideCourseKey)
+  }, [guideCourseKey, state, draftRestoredKey, saved])
+  useEffect(() => {
+    if (state !== 'ready' || !guideCourseKey || draftRestoredKey !== guideCourseKey) return
+    writeGuideDraft(guideCourseKey, JSON.stringify(draft) === JSON.stringify(saved) ? null : { baseline: JSON.stringify(saved), input: draft })
+  }, [state, guideCourseKey, draftRestoredKey, draft, saved])
   const awaitingGuide = course && guide?.phase === 'active' && guide.stepKey === 'friendAdd'
   const payment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
   const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
@@ -207,6 +240,7 @@ function MenuEditBody() {
         notifySaved(draft.status === 'draft' ? '下書きのメニューを追加しました。' : 'メニューを公開しました。')
       }
       if (!stillHere()) return
+      writeGuideDraft(guideCourseKey, null)
       setSaved(draft)
       if (awaitingGuide) setCourseSaved(true)
       if (course || (draft.status === 'active' && (!editing || editing.status === 'draft'))) emitGuideSignal('menu.save', selectedAccountId)
@@ -301,7 +335,7 @@ function MenuEditBody() {
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
         destructive={canEdit && editing ? <Button variant="text" textTone="danger" onClick={() => { setConfirmationScope(currentConfirmationScope); setConfirmedRevision(editing.confirmation_revision); setError(null); setDeleting(true) }} disabled={busy || menuConflict}>削除する</Button> : undefined}
         footerActions={<>
-          <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
+          <Button onClick={() => { writeGuideDraft(guideCourseKey, null); router.push(LIST_HREF) }} disabled={busy}>キャンセル</Button>
           {/* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）の光らせる先。 */}
           {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || Boolean(saveDisabledReason)} disabledReason={saveDisabledReason} onClick={() => {
             const version = editing?.confirmation_revision ?? null

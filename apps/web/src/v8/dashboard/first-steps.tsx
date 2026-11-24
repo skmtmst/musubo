@@ -96,7 +96,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
               <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}（${actionLabel}）`}>{actionLabel}</TextLink>
             ) : (
               /* まだの段はどれも、この行からその段のガイドを始める。 */
-              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={() => guide?.startAt?.(step.key)}>{actionLabel}</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={step.href?.startsWith('/?guide=') ? undefined : () => guide?.startAt?.(step.key)}>{actionLabel}</TextLink>
             )}
           </SetupStepRow>
           )

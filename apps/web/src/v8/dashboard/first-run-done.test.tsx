@@ -102,7 +102,7 @@ describe('最初の1通が届いた時の窓', () => {
     await waitFor(() => expect(screen.getByText('止めています')).toBeTruthy())
     expect(screen.queryByText(/読まれ/)).toBeNull()
     const next = screen.getAllByRole('link', { name: '開く' }).map((link) => link.getAttribute('href'))
-    expect(next).toEqual(['/getting-started/rich-menu', '/restaurant-test/tables', '/restaurant-test/google?tab=hours', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
+    expect(next).toEqual(['/?guide=richMenu', '/restaurant-test/tables', '/restaurant-test/google?tab=hours', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
     expect(screen.queryByText('コースとメニューを登録する')).toBeNull()
     expect(next).toHaveLength(5)
     for (const button of screen.getAllByRole('button', { name: '閉じる' })) fireEvent.click(button)

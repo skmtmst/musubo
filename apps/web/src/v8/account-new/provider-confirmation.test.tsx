@@ -14,7 +14,7 @@ import { REGISTRATION_STYLE_KEY } from './use-registration-style'
 import AccountRegisterV8 from './register'
 
 const calls = vi.hoisted(() => ({
-  me: vi.fn(), check: vi.fn(), connect: vi.fn(), receipt: vi.fn(), list: vi.fn(),
+  me: vi.fn(), check: vi.fn(), connect: vi.fn(), receipt: vi.fn(), list: vi.fn(), resume: vi.fn(), account: vi.fn(),
   oldCheck: undefined as (() => void) | undefined,
   update: undefined as ((key: Step2Field, value: string) => void) | undefined,
   retry: undefined as StepUpRequest['retry'] | undefined,
@@ -22,12 +22,11 @@ const calls = vi.hoisted(() => ({
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, staff: { ...actual.api.staff, me: calls.me }, lineAccounts: {
-    ...actual.api.lineAccounts, connectCheck: calls.check, connect: calls.connect, registrationReceipt: calls.receipt, list: calls.list,
+    ...actual.api.lineAccounts, connectCheck: calls.check, connect: calls.connect, registrationReceipt: calls.receipt, list: calls.list, registrationResume: calls.resume, get: calls.account,
   } } }
 })
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
-vi.mock('./resume-style', () => ({ default: () => null }))
 vi.mock('@/lib/api/helpers/styles', () => ({
   styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })) },
 }))
@@ -82,6 +81,8 @@ beforeEach(() => {
   calls.me.mockImplementation(() => new Promise(() => {}))
   calls.check.mockResolvedValue({ success: true, data: checked })
   calls.connect.mockResolvedValue({ success: true, data: { ...checked, id: 'mock-account' } })
+  calls.resume.mockResolvedValue({ success: false })
+  calls.account.mockResolvedValue({ success: false })
   calls.receipt.mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
   calls.list.mockResolvedValue({ success: true, data: [] })
 })
@@ -220,6 +221,16 @@ it.each(fields)('接続確認中の%s更新後に旧成功を表示せず、再�
   expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
   submit(); expect(calls.connect).not.toHaveBeenCalled()
 })
+it('同じ本人が先に登録を保存した場合は受信確認から続ける', async () => {
+  calls.connect.mockRejectedValueOnce(new ApiError(409, 'このLINEチャネルは登録済みです'))
+  calls.resume.mockResolvedValueOnce({ success: true, data: { accountId: 'already-created' } })
+  open(); await checkConnection(); submit()
+  await screen.findByText('友だち追加できるか確かめます')
+  expect(calls.resume).toHaveBeenCalledWith('1234567890')
+  expect(calls.receipt).toHaveBeenCalledWith('already-created')
+  expect(calls.connect).toHaveBeenCalledTimes(1)
+})
+
 it('登録中に再度送信しても重複せず、受理された登録IDで受信を確かめる', async () => {
   const request = deferred<{ success: true; data: typeof checked & { id: string } }>()
   calls.connect.mockReturnValueOnce(request.promise)
@@ -326,8 +337,7 @@ it('再訪時に自動照合せず、消えた画面の古い確認操作から�
   const view = open(); await checkConnection(); const oldCheck = calls.oldCheck!
   calls.me.mockResolvedValue({ success: true, data: readStaffIdentity()! })
   view.unmount(); render(<AccountRegisterV8 />)
-  await screen.findByRole('radio', { name: 'はい、あります' })
-  advanceToConfirmation()
+  await screen.findByRole('button', { name: '接続を確かめる' })
   act(() => oldCheck())
   expect(calls.check).toHaveBeenCalledTimes(1)
 })

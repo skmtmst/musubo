@@ -93,7 +93,7 @@ export default function GettingStartedV8() {
               />
               <p className={styles.cardLine}>QRから友だち追加するか、シナリオを選んで自分にテスト送信してください。受け取ったらLINEで本文を確かめてください。</p>
               {role ? <div className={styles.messageActions}>
-                <Button href="/?qr=base" lockedReason={sendReason}>友だち追加のQRを開く</Button>
+                <Button href={profile.data?.style === 'restaurant' ? '/?guide=firstMessage' : '/?qr=base'} lockedReason={sendReason}>友だち追加のQRを開く</Button>
                 <Button href="/scenarios" lockedReason={sendReason}>シナリオを選んでテスト送信する</Button>
               </div> : null}
             </Card>

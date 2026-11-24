@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
 import Notice from '@/components/shared/notice'
 import { isAccountIndependentRoute } from '@/lib/store-route-guard'
+import { resolveLineAccountEntry } from '@/lib/line-account-entry'
 import BellNotifications from './bell-notifications'
 import { loadNotificationCenter, type NotificationAccount, type NotificationScope } from './notification-center-data'
 import { useAccount } from '@/contexts/account-context'
@@ -203,24 +204,36 @@ export default function AppTopBar() {
   }, [hqShell])
   const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
   const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
-  /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
+  const accountEntryRequest = useRef(0)
+  useEffect(() => () => { accountEntryRequest.current += 1 }, [pathname])
   const changeAccount = (accountId: string, after?: () => void) => {
     requestUnsavedAction(async () => {
+      const request = ++accountEntryRequest.current
       if (hqShell && accountId) {
         try {
-          const { api } = await import('@/lib/api')
-          const response = await api.lineAccounts.followerImportState(accountId)
-          if (!response.success || response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles') {
-            router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+          const entry = await resolveLineAccountEntry(accountId)
+          if (request !== accountEntryRequest.current) return
+          if ('href' in entry || entry.destination === 'unavailable') {
+            router.push('href' in entry ? entry.href : `/accounts/new?resume=${encodeURIComponent(accountId)}`)
             return
           }
         } catch {
-          router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+          if (request === accountEntryRequest.current) {
+            router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+          }
           return
         }
       }
       setSelectedAccountId(accountId)
       if (hqShell && accountId && !after) router.push('/')
+      if (!hqShell && !after && pathname === '/' && selectedAccountId !== accountId) {
+        const params = new URLSearchParams(window.location.search)
+        const keys = ['setup', 'setupReturn', 'qr', 'guide']
+        if (keys.some(key => params.has(key))) {
+          keys.forEach(key => params.delete(key))
+          router.replace(params.size ? `/?${params}` : '/')
+        }
+      }
       after?.()
     })
   }

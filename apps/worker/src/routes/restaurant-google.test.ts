@@ -87,6 +87,11 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function seedStore(): void {
+  testDb.raw.prepare(
+    `INSERT OR IGNORE INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+     VALUES ('account-2', 'test-2', '渋谷店', 'token', 'secret', 1, ?)`,
+  ).run(TENANT);
   testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, tenant_id, name) VALUES (?, ?, ?, ?)').run('org-1', 'account-1', TENANT, '飲食店LAB');
   testDb.raw
     .prepare('INSERT INTO rt_stores (id, organization_id, name, code, area, capacity, line_account_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
@@ -420,6 +425,49 @@ describe('Googleビジネス：設定（接続）', () => {
     const cookieHeader = cookie === null ? undefined : cookie ? cookie(state) : `lh_gb_state=${state}`;
     return call(`/api/restaurant-test/google/oauth/callback?${callbackQuery(state)}`, { cookie: cookieHeader });
   }
+
+  it('停止済みの公式LINEでは既存店舗があっても認可を始めない', async () => {
+    seedStore();
+    testDb.raw.prepare("UPDATE line_accounts SET is_active = 0 WHERE id = 'account-2'").run();
+    const stopped = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+    expect(stopped.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_oauth_states').get()).toEqual({ n: 0 });
+  });
+
+  it.each(['stopped', 'archived', 'store-reassigned', 'different-manager'] as const)(
+    '認可開始後に %s になったらGoogleに接続せず、stateを使ったことにしない',
+    async (changed) => {
+      seedStore();
+      const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+      const state = new URL(((await start.json()) as { authorizeUrl: string }).authorizeUrl).searchParams.get('state')!;
+      if (changed === 'stopped') testDb.raw.prepare("UPDATE line_accounts SET is_active = 0 WHERE id = 'account-2'").run();
+      if (changed === 'archived') testDb.raw.prepare("UPDATE line_accounts SET is_active = 0, archived_at = '2026-11-23' WHERE id = 'account-2'").run();
+      if (changed === 'store-reassigned') testDb.raw.prepare("UPDATE rt_stores SET line_account_id = 'account-1' WHERE id = 'store-shibuya'").run();
+      if (changed === 'different-manager') useStaffRole('admin');
+      const response = await call(
+        `/api/restaurant-test/google/oauth/callback?state=${state}&code=auth-code`,
+        { token: changed === 'different-manager' ? 'admin-session' : undefined },
+      );
+      const returned = new URL(response.headers.get('location')!);
+      expect(returned.searchParams.get('google')).toBe(changed === 'different-manager' ? 'error:invalid_state' : 'error:store_missing');
+      if (changed === 'different-manager') expect(returned.searchParams.has('account_id')).toBe(false);
+      expect(googleCalls).toHaveLength(0);
+      expect(testDb.raw.prepare('SELECT used_at FROM rt_google_oauth_states').get()).toEqual({ used_at: null });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_connections').get()).toEqual({ n: 0 });
+    },
+  );
+
+  it('同じ認可の戻りを同時に受けても一度だけGoogleへ問い合わせる', async () => {
+    seedStore();
+    const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+    const state = new URL(((await start.json()) as { authorizeUrl: string }).authorizeUrl).searchParams.get('state')!;
+    googleHandler = () => jsonResponse({ error: 'invalid_grant' }, 400);
+    const callback = `/api/restaurant-test/google/oauth/callback?state=${state}&code=auth-code`;
+    const responses = await Promise.all([call(callback), call(callback)]);
+    const results = responses.map((response) => new URL(response.headers.get('location')!).searchParams.get('google'));
+    expect(results).toContain('error:invalid_state');
+    expect(googleCalls.map(({ url }) => url)).toEqual(['https://oauth2.googleapis.com/token']);
+  });
 
   it('コールバック：クロスサイト制限でCookieが無くても、DBのstate・担当者が一致すれば接続できる', async () => {
     seedStore();

@@ -114,7 +114,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
   /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
-    accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: start.guide.phase,
+    accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: wizard.dialog || start.guide.loading ? 'loading' : start.guide.phase,
   })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')

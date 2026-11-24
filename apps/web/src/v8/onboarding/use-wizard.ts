@@ -10,7 +10,7 @@ import { useEffect,useMemo,useState } from 'react'
 import { LOOK_CHOICES, SETTINGS_KEYS, answerOf, answersForApi, changedAnswers, isBookingConfirmSample, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, settingsChanges, stepNames } from './model'
 import { type Question } from './question-types'
 import type { Props, SummaryData, WizardStep } from './wizard-types'
-export function useWizard({ accountId, state, initialStep = 0, onClose }: Props) {
+export function useWizard({ accountId, state, initialStep = 0, styleOnly = false, onClose }: Props) {
   const [style, setStyle] = useState<AccountStyle>(state.style)
   const [styleChosen, setStyleChosen] = useState(state.styleSelected)
   const [answers, setAnswers] = useState<Record<string, SetupAnswer>>(state.answers ?? {})
@@ -158,6 +158,19 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
       /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
       if (choice === 'later' || choice === 'manual') { await saveStyleMode(choice); return }
       if (!choice) return
+      if (styleOnly) {
+        if (choice === state.style) { onClose(false); return }
+        setBusy(true)
+        setError('')
+        try {
+          const res = await styleApi.save(accountId, { expectedVersion: version, style: choice as AccountStyle })
+          if (!res.success) throw new Error('使い方を保存できませんでした')
+          accountStyleUpdated(accountId)
+          onClose(true)
+        } catch (caught) { setError(describeApiFailure(caught, '保存')) }
+        finally { setBusy(false) }
+        return
+      }
       setStyleChosen(true)
       setDirty(true)
       if (choice !== style) {setMenuConfirmed(false);setStyle(choice as AccountStyle)}

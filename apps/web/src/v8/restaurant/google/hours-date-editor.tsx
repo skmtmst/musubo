@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { hoursDateAdd, hoursDateRange, hoursWeekday, hoursPeriodsProblem, type OpeningDate, type OpeningWeek, type OpeningPeriod } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import CloseButton from '@/components/shared/close-button'
@@ -10,24 +10,34 @@ import Radio, { RadioGroup } from '@/components/shared/radio'
 import SegmentedControl from '@/components/shared/segmented'
 import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
+import { readGuideDraft, writeGuideDraft } from '@/lib/scoped-guide-draft'
 import Checkbox from '@/components/shared/checkbox'
 import { PeriodFields } from './hours-controls'
 import { dateLabel, hoursLongDateLabel } from './hours-model'
 import styles from './hours.module.css'
 
 export type DateEditorValue = { dates: string[]; periods: OpeningPeriod[]; closed: boolean; memo: string; remove?: boolean }
-export function DateEditor({ today, initialDates=[], original, initialMode='dates', onChange, groupDates, individualDates=[], disabled=false, removableDates=[], initialMemo='', initialPeriods, weekly }: { today:string;initialDates?:string[];original:(date:string)=>OpeningDate;initialMode?:'dates'|'range';onChange:(value:DateEditorValue|null)=>void;groupDates?:Array<{date:string;name?:string}>;individualDates?:string[];disabled?:boolean;removableDates?:string[];initialMemo?:string;initialPeriods?:OpeningPeriod[];weekly?:OpeningWeek }) {
- const [mode,setMode]=useState(initialMode)
- const [dates,setDates]=useState(initialDates)
- const [start,setStart]=useState(initialDates[0]??'')
- const [end,setEnd]=useState(initialDates.at(-1)??'')
- const [month,setMonth]=useState((initialDates[0]??today).slice(0,7))
+type DateDraft = DateEditorValue & { version?: number; mode: 'dates' | 'range'; start: string; end: string; month: string; memoOpen: boolean }
+export function DateEditor({ today, initialDates=[], original, initialMode='dates', onChange, groupDates, individualDates=[], disabled=false, removableDates=[], initialMemo='', initialPeriods, weekly, draftKey=null, draftVersion }: { today:string;initialDates?:string[];original:(date:string)=>OpeningDate;initialMode?:'dates'|'range';onChange:(value:DateEditorValue|null)=>void;groupDates?:Array<{date:string;name?:string}>;individualDates?:string[];disabled?:boolean;removableDates?:string[];initialMemo?:string;initialPeriods?:OpeningPeriod[];weekly?:OpeningWeek;draftKey?:string|null;draftVersion?:number }) {
+ const [restored]=useState(()=>{
+  const value=readGuideDraft<DateDraft>(draftKey)
+  return value?.version===draftVersion&&value?value:null
+ })
+ const [mode,setMode]=useState(restored?.mode??initialMode)
+ const [dates,setDates]=useState(restored?.dates??initialDates)
+ const [start,setStart]=useState(restored?.start??initialDates[0]??'')
+ const [end,setEnd]=useState(restored?.end??initialDates.at(-1)??'')
+ const [month,setMonth]=useState(restored?.month??(initialDates[0]??today).slice(0,7))
  const initial=initialDates.length?original(initialDates[0]):null
- const [closed,setClosed]=useState(initialPeriods?false:initial?.closed??true)
- const [periods,setPeriods]=useState<OpeningPeriod[]>(initialPeriods??(initial?.periods.length?initial.periods:[{open:'11:00',close:'22:00'}]))
- const [memo,setMemo]=useState(initialMemo)
- const [memoOpen,setMemoOpen]=useState(Boolean(initialMemo))
- const [remove,setRemove]=useState(false)
+ const [closed,setClosed]=useState(restored?.closed??(initialPeriods?false:initial?.closed??true))
+ const [periods,setPeriods]=useState<OpeningPeriod[]>(restored?.periods??initialPeriods??(initial?.periods.length?initial.periods:[{open:'11:00',close:'22:00'}]))
+ const [memo,setMemo]=useState(restored?.memo??initialMemo)
+ const [memoOpen,setMemoOpen]=useState(restored?.memoOpen??Boolean(initialMemo))
+ const [remove,setRemove]=useState(restored?.remove??false)
+ useEffect(()=>{
+  if(!draftKey)return
+  writeGuideDraft(draftKey,{version:draftVersion,mode,dates,start,end,month,closed,periods,memo,memoOpen,remove} satisfies DateDraft)
+ },[draftKey,draftVersion,mode,dates,start,end,month,closed,periods,memo,memoOpen,remove])
  const max=hoursDateAdd(today,366)
  const selected=mode==='range'?hoursDateRange(start,end).filter(d=>d>=today&&d<=max):dates
  const emit=(overrides:Partial<DateEditorValue>={})=>{const v={dates:selected,closed,periods,memo,remove,...overrides};onChange(v.dates.length&&(v.closed||v.remove||!hoursPeriodsProblem(v.periods))?v:null)}

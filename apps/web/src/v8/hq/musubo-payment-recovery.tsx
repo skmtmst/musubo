@@ -1,10 +1,11 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import styles from './musubo-payment-recovery.module.css'
 
 type InvoiceView = {
@@ -197,5 +198,75 @@ export default function MusuboPaymentRecovery({ view, onPrimary, onSecondary, se
       <p>{footnote}</p>
       {!processing && <Button type="button" variant="text" textTone="accent" onClick={onSecondary}>{secondaryLabel ?? secondary}</Button>}
     </div>
+  </div>
+}
+
+const registrationPaymentCopy = {
+  failed: {
+    title: 'LINE追加のお支払いが未完了です',
+    description: '接続情報は保存済みです。Stripeでお手続き後、決済状況を更新できます。',
+  },
+  processing: {
+    title: '追加分のお支払いを確認しています',
+    description: '保存済みのお支払いを照会し、入金済みのLINEを有効にします。',
+  },
+  activated: {
+    title: '追加したLINEを利用できます',
+    description: '有効になったLINEの登録に戻り、接続確認または使い方の選択から続けます。',
+  },
+  unavailable: {
+    title: '登録を再開できませんでした',
+    description: 'アカウントの状態が変わったため、LINEアカウントの一覧で確認してください。',
+  },
+}
+
+type RegistrationPaymentProps =
+  | { state: 'failed' | 'processing'; onRefresh: () => Promise<void>; paymentUrl?: string | null }
+  | { state: 'activated'; registrationHref: string }
+  | { state: 'unavailable' }
+
+export function RegistrationPaymentRecovery(props: RegistrationPaymentProps) {
+  const { state } = props
+  const { title, description } = registrationPaymentCopy[state]
+  const refreshing = useRef(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(false)
+  const refresh = async (onRefresh: () => Promise<void>) => {
+    if (refreshing.current) return
+    refreshing.current = true
+    setBusy(true)
+    setError(false)
+    try { await onRefresh() }
+    catch { setError(true) }
+    finally { refreshing.current = false; setBusy(false) }
+  }
+
+  return <div className={styles.page + ' ' + styles.registrationPage}>
+    <PageHeading title="同じLINEアカウントへ戻る" subtitle="決済・LINE接続・使い方の状態は対象アカウントごとに照合します。" inset="none" />
+    <Card as="section" className={styles.registrationCard} layout="vertical" contentPadding="var(--space-20)" gap="normal"
+      aria-labelledby="registration-payment-title" data-registration-payment-state={state}>
+      <div className={styles.registrationCopy} aria-live="polite">
+        <h2 id="registration-payment-title">{title}</h2>
+        <p>{description}</p>
+      </div>
+      {error && (state === 'failed' || state === 'processing') &&
+        <Notice tone="danger" role="alert">決済状況を確認できませんでした。もう一度お試しください。</Notice>}
+      <div className={styles.registrationActions}>
+        {'onRefresh' in props && <span className={styles.registrationAction}>
+          <Button type="button" size="large" variant="primary" fullWidth busy={busy} busyLabel="確認中…"
+            onClick={() => void refresh(props.onRefresh)}>決済状況を更新</Button>
+        </span>}
+        {state === 'failed' && props.paymentUrl &&
+          <span className={styles.registrationStripe}>
+            <Button size="large" variant="text" textTone="accent" external fullWidth href={props.paymentUrl}>Stripeでお支払いを確認</Button>
+          </span>}
+        {state === 'activated' && <span className={styles.registrationAction}>
+          <Button size="large" variant="primary" fullWidth href={props.registrationHref}>LINE登録を続ける</Button>
+        </span>}
+        {state === 'unavailable' && <span className={styles.registrationAction}>
+          <Button size="large" variant="primary" fullWidth href="/accounts">アカウント一覧へ</Button>
+        </span>}
+      </div>
+    </Card>
   </div>
 }

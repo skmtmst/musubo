@@ -11,8 +11,15 @@ export const musuboOnboardingPaths = {
       responses: { '200': { description: '終了手続きの状態' }, '400': { description: '終了方法が不正' }, '409': { description: '終了状態が変化' } } },
   },
   '/api/hq/billing/musubo/line-addition': {
-    get: { tags: ['Musubo billing'], summary: '次のLINE追加料金または保留中の決済を取得', responses: { '200': { description: '追加料金または決済状態' }, '409': { description: '追加不可' } } },
-    post: { tags: ['Musubo billing'], summary: '確認済み料金でLINE追加の支払いを開始または再試行', requestBody: jsonBody, responses: { '200': { description: '追加の決済状態' }, '400': { description: '料金への同意なし' }, '409': { description: '料金または決済状態が変化' } } },
+    get: { tags: ['Musubo billing'], summary: '次のLINE追加料金または指定した追加の決済状態を取得',
+      parameters: [
+        { name: 'additionId', in: 'query', schema: { type: 'string' }, description: '対象の追加ID。accountIdと同時には指定しない。' },
+        { name: 'accountId', in: 'query', schema: { type: 'string' }, description: '対象のLINEアカウントID。additionIdと同時には指定しない。' },
+      ],
+      responses: { '200': { description: '追加料金または決済状態' }, '400': { description: '追加の指定が不正' }, '404': { description: '対象の追加を確認できない' }, '409': { description: '追加不可' } } },
+    post: { tags: ['Musubo billing'], summary: '確認済み料金でLINE追加を申し込むか、支払い済みの追加を有効化',
+      description: 'actionがreconcileの場合はadditionIdまたはaccountIdで対象を指定し、請求せず、確認できた既存の支払いを有効化に反映する。それ以外は追加料金への同意と本人確認を必要とする。',
+      requestBody: jsonBody, responses: { '200': { description: '追加の決済状態' }, '400': { description: '追加の指定が不正、または料金への同意なし' }, '404': { description: '対象の追加を確認できない' }, '409': { description: '料金または決済状態が変化' } } },
   },
   '/api/hq/billing/musubo/line-removal/{lineId}': {
     get: { tags: ['Musubo billing'], summary: '対象LINEの終了日と料金を取得', parameters: [lineId], responses: { '200': { description: '終了条件と状態' }, '409': { description: '対象のLINEを確認できない' } } },

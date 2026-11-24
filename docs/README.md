@@ -481,6 +481,7 @@
 
 ## 反映履歴
 
+- [LINEアカウント登録と開店準備の再開](release-log/unreleased/224-masato-line-onboarding-resume.md) — 反映履歴、確認 2026-11-24。
 - [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
 
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
