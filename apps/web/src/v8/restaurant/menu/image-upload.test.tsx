@@ -52,3 +52,21 @@ it('形式違いと容量超過は登録せず理由を示す', async () => {
   expect(screen.getByText(/大きすぎます/)).toBeTruthy()
   expect(data.upload).not.toHaveBeenCalled()
 })
+
+it('画像取込中は理由を表示して保存できず、完了後に保存できる', async () => {
+  let finish!: (value: { item: { id: string } }) => void
+  data.upload.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const view = render(<MenuEditPage />)
+  await screen.findByLabelText('メニュー名')
+  fireEvent.change(view.container.querySelector('input[type=file]')!, { target: { files: [new File(['x'], 'dish.png', { type: 'image/png' })] } })
+  await waitFor(() => expect(data.upload).toHaveBeenCalled())
+  const save = screen.getByRole('button', { name: /保存する/ }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(save.getAttribute('aria-description')).toBe('画像を取り込んでいます。')
+  fireEvent.click(save)
+  expect(data.updateMenu).not.toHaveBeenCalled()
+  finish({ item: { id: 'uploaded' } })
+  await waitFor(() => expect(save.disabled).toBe(false))
+  fireEvent.click(save)
+  await waitFor(() => expect(data.updateMenu).toHaveBeenCalledWith('account-1', 'm2', expect.objectContaining({ imageMediaId: 'uploaded' })))
+})

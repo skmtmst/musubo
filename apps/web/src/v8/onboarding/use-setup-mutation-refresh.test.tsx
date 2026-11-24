@@ -17,7 +17,7 @@ it('削除に成功した後、共通の仕組みが進捗を読み直し札の�
     return Response.json({ success: false }, { status: 400 })
   }))
   const received = vi.fn()
-  renderHook(() => useSetupMutationRefresh('a', () => { void fetchApi<{ data: { done: number } }>('/api/getting-started?account_id=a').then(result => received(result.data.done)) }))
+  renderHook(() => useSetupMutationRefresh('a', () => { void fetchApi<{ data: { done: number } }>('/api/getting-started?account_id=a').then(result => received(result.data.done)) }, '/settings'))
   await fetchApi('/api/scenarios/s1?account_id=a', { method: 'DELETE' })
   await waitFor(() => expect(received).toHaveBeenCalledWith(4))
   expect(requests).toEqual(['DELETE /api/scenarios/s1', 'GET /api/getting-started'])
@@ -32,7 +32,7 @@ it('失敗、読み取り、別アカウントの変更、ガイド操作では�
       return Response.json(path === '/api/failure' ? { success: false } : { success: true })
     }))
     const refresh = vi.fn()
-    renderHook(() => useSetupMutationRefresh('a', refresh))
+    renderHook(() => useSetupMutationRefresh('a', refresh, '/settings'))
     await fetchApi('/api/scenarios?account_id=a')
     await fetchApi('/api/failure?account_id=a', { method: 'POST' })
     await expect(fetchApi('/api/error?account_id=a', { method: 'POST' })).rejects.toThrow()
@@ -45,5 +45,18 @@ it('失敗、読み取り、別アカウントの変更、ガイド操作では�
     await fetchApi('/api/friend-fields?account_id=a', { method: 'PATCH' })
     await vi.advanceTimersByTimeAsync(600)
     expect(refresh).toHaveBeenCalledTimes(1)
+  } finally { vi.useRealTimers() }
+})
+
+it('保存直後に別画面へ移ったら、前の画面の読み直し予約を取り消す', async () => {
+  vi.useFakeTimers()
+  try {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: true })))
+    const refresh = vi.fn()
+    const hook = renderHook(({ path }) => useSetupMutationRefresh('a', refresh, path), { initialProps: { path: '/settings' } })
+    await fetchApi('/api/tags?account_id=a', { method: 'POST' })
+    hook.rerender({ path: '/getting-started' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(refresh).not.toHaveBeenCalled()
   } finally { vi.useRealTimers() }
 })

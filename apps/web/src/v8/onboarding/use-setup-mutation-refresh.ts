@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { API_MUTATION_SUCCEEDED } from '@/lib/api/transport/mutation-events'
 
-export function useSetupMutationRefresh(accountId: string | null, refresh: () => void): void {
+export function useSetupMutationRefresh(accountId: string | null, refresh: () => void, pathname: string | null): void {
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
   useEffect(() => {
@@ -17,5 +17,5 @@ export function useSetupMutationRefresh(accountId: string | null, refresh: () =>
     }
     window.addEventListener(API_MUTATION_SUCCEEDED, onMutation)
     return () => { clearTimeout(timer); window.removeEventListener(API_MUTATION_SUCCEEDED, onMutation) }
-  }, [accountId])
+  }, [accountId, pathname])
 }

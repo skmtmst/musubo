@@ -134,7 +134,7 @@ function GuideSession({ accountId, armed, watchFirstMessage, children }: { accou
     () => { if (procedureSignal !== 'reception.save' && procedureSignal !== 'menu.save' && procedureSignal !== 'followup.save') advance() },
     procedureSignal === 'followup.start' ? accountId ?? undefined : undefined,
   )
-  useSetupMutationRefresh(accountId, first.refresh)
+  useSetupMutationRefresh(accountId, first.refresh, pathname)
   useGuideSignal('followup.confirm', Boolean(accountId && followupCanConfirm && guide.phase === 'active'),
     () => advance(false, 4), accountId ?? undefined)
   useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
