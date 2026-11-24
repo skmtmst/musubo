@@ -71,7 +71,7 @@ const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限が�
 
 async function getTestRecipient(c: Context<Env>, accountId: string, friendId: string) {
   return c.env.DB.prepare(
-    `SELECT f.id, f.line_user_id
+    `SELECT f.id, f.line_platform_user_id AS line_user_id
        FROM friends f
        JOIN account_settings s ON s.line_account_id = f.line_account_id
         AND s.key = 'test_recipients' AND json_valid(s.value) AND json_type(s.value) = 'array'
@@ -978,7 +978,7 @@ nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff
   const like = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
   const rows = await c.env.DB.prepare(
     `SELECT p.id, p.friend_id, p.customer_id, p.name, p.animal_type, p.gender, p.birthday, p.updated_at,
-            f.display_name, f.line_user_id
+            f.display_name, f.line_platform_user_id AS line_user_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
       WHERE p.archived_at IS NULL AND f.line_account_id = ?
         AND (? = '' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')

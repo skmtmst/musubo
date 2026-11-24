@@ -141,7 +141,7 @@ export async function webinarTestRecipientPreview(db:D1Database, accountId:strin
   if(!Array.isArray(ids)||ids.some(id=>typeof id!=='string')) throw new Error('invalid_test_recipients');
   if(!ids.length) throw new Error('no_test_recipients');
   const set=sqlIdSet(ids);
-  const targets=(await db.prepare(`SELECT id,line_user_id,is_following,display_name FROM friends WHERE line_account_id=? AND id IN (${set.sql})`).bind(accountId,...set.binds).all<WebinarNotificationTestTarget>()).results
+  const targets=(await db.prepare(`SELECT id,line_platform_user_id AS line_user_id,is_following,display_name FROM friends WHERE line_account_id=? AND id IN (${set.sql})`).bind(accountId,...set.binds).all<WebinarNotificationTestTarget>()).results
     .filter(target=>target.is_following).sort((a,b)=>a.id.localeCompare(b.id));
   const bytes=new TextEncoder().encode(JSON.stringify([accountId,targets.map(target=>[target.id,target.line_user_id])]));
   const digest=await crypto.subtle.digest('SHA-256',bytes);
@@ -587,7 +587,7 @@ export async function processWebinarNotificationJobs(
     `SELECT j.id, j.webinar_id, j.registration_id, j.friend_id,
             j.session_start_at, j.kind, j.status, j.attempt_count, j.line_retry_key,
             w.title, w.slug, w.duration_seconds, w.account_id,
-            f.line_user_id, f.is_following, f.line_account_id,
+            f.line_platform_user_id AS line_user_id, f.is_following, f.line_account_id,
             la.channel_access_token, la.channel_access_token_encrypted,
             la.is_active AS line_account_active, la.liff_id,
             EXISTS (

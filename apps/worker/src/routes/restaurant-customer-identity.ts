@@ -49,7 +49,7 @@ export async function identity(
     return liffBookingJson(c, { success: false, error: 'unauthorized' }, 401);
   const friend = await dbFor(c.env)
     .prepare(
-      'SELECT display_name,is_following FROM friends WHERE line_user_id=? AND line_account_id=?',
+      'SELECT display_name,is_following FROM friends WHERE line_platform_user_id=? AND line_account_id=?',
     )
     .bind(verified.sub, a.id)
     .first<{ display_name: string; is_following: number }>();

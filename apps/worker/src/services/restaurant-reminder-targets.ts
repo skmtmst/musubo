@@ -47,7 +47,7 @@ export async function syncRestaurantReminderTargets(db: D1Database, event: Resta
     return;
   }
   if (!event.line_account_id || !event.friend_id || event.line_account_id !== reservation.line_account_id) return;
-  const friend = await db.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=? AND line_user_id=? AND is_following=1 AND is_hidden=0')
+  const friend = await db.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=? AND line_platform_user_id=? AND is_following=1 AND is_hidden=0')
     .bind(event.friend_id,event.line_account_id,reservation.line_uid).first();
   if (!friend) return;
   const targets = await db.prepare(`SELECT ft.trigger,ft.reminder_id,ft.version,ft.approved_version_id,ft.approved_content_hash,s.timezone

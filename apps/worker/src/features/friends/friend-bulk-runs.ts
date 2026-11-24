@@ -580,7 +580,7 @@ function addMinutes(value: string, minutes: number): string {
 
 async function requireFriend(db: D1Database, item: ItemRow) {
   const row = await db.prepare(
-    `SELECT id, line_user_id, line_account_id, is_following, metadata, is_hidden, support_mark_id
+    `SELECT id, line_platform_user_id AS line_user_id, line_account_id, is_following, metadata, is_hidden, support_mark_id
        FROM friends WHERE id = ? AND line_account_id IS ?`,
   ).bind(item.friend_id, item.line_account_id).first<{
     id: string; line_user_id: string; line_account_id: string | null; is_following: number;

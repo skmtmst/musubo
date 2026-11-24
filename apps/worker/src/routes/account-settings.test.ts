@@ -85,22 +85,7 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith(
-      'line-account-1',
-      'line-account-1',
-      'line-account-1',
-      '00000000-0000-4000-8000-000000000001',
-      'tenant-a',
-      'tenant-a',
-      '00000000-0000-4000-8000-000000000001',
-      '00000000-0000-4000-8000-000000000001',
-      'tenant-a',
-    );
-    expect(prepare.mock.calls[0]?.[0]).toContain('JOIN friends f ON f.line_user_id = sm.line_user_id');
-    expect(prepare.mock.calls[0]?.[0]).toContain('scoped.line_account_id = ?');
-    expect(prepare.mock.calls[0]?.[0]).toContain('fallback_account.id = f.line_account_id');
-    expect(prepare.mock.calls[0]?.[0]).toContain('COALESCE(fallback_account.tenant_id, ?) = ?');
-    expect(prepare.mock.calls[0]?.[0]).toContain('COALESCE(sm.tenant_id, ?) = ?');
+    expect(bind).toHaveBeenCalledWith('line-account-1', 'tenant-a', DEFAULT_TENANT_ID);
     expect(await response.json()).toEqual({
       success: true,
       data: [
@@ -122,41 +107,38 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
     });
   });
 
-  test('SQLでリクエスト元職員の統括だけに絞る', async () => {
-    const all = vi.fn(async () => ({ results: [] }));
-    const bind = vi.fn(() => ({ all }));
-    const prepare = vi.fn((_sql: string) => ({ bind }));
-
-    await app.request(
-      '/api/account-settings/test-recipient-login-users?accountId=line-account-1',
-      {}, { DB: { prepare } },
-    );
-
-    expect(bind.mock.calls[0]?.slice(-6)).toEqual([
-      '00000000-0000-4000-8000-000000000001', 'tenant-a',
-      'tenant-a', '00000000-0000-4000-8000-000000000001',
-      '00000000-0000-4000-8000-000000000001', 'tenant-a',
-    ]);
-  });
-
-  test('フォールバック候補をリクエスト元職員と同じ統括のアカウントに限る', async () => {
-    const all = vi.fn(async () => ({ results: [] }));
-    const bind = vi.fn(() => ({ all }));
-    const prepare = vi.fn((_sql: string) => ({ bind }));
-
-    await app.request(
-      '/api/account-settings/test-recipient-login-users?accountId=line-account-1',
-      {}, { DB: { prepare } },
-    );
-
-    const sql = prepare.mock.calls[0]?.[0];
-    expect(sql).toMatch(/NOT EXISTS[\s\S]+AND \([\s\S]+EXISTS \([\s\S]+FROM line_accounts fallback_account/);
-    expect(bind).toHaveBeenCalledWith(
-      'line-account-1', 'line-account-1', 'line-account-1',
-      '00000000-0000-4000-8000-000000000001', 'tenant-a',
-      'tenant-a', '00000000-0000-4000-8000-000000000001',
-      '00000000-0000-4000-8000-000000000001', 'tenant-a',
-    );
+  test('対象店舗を優先し、候補が別店舗に複数ある場合は同じ統括から1人だけ選ぶ', async () => {
+    const testDb = createTestD1();
+    try {
+      testDb.raw.exec(`
+        INSERT INTO line_accounts (id, channel_id, name, channel_secret, channel_access_token, tenant_id) VALUES
+          ('account-0', '1000', '別の統括', 'secret', 'token', 'tenant-other'),
+          ('account-1', '1001', '店舗1', 'secret', 'token', 'tenant-a'),
+          ('account-2', '1002', '店舗2', 'secret', 'token', 'tenant-a'),
+          ('account-3', '1003', '店舗3', 'secret', 'token', 'tenant-a');
+        INSERT INTO staff_members (id, name, role, api_key, line_user_id, tenant_id) VALUES
+          ('staff-1', 'スタッフ1', 'staff', 'key-1', 'U-shared', 'tenant-a'),
+          ('staff-2', '別の統括のスタッフ', 'staff', 'key-2', 'U-other', 'tenant-other');
+        INSERT INTO friends (id, line_account_id, line_user_id, is_following) VALUES
+          ('friend-other', 'account-0', 'U-shared', 1),
+          ('friend-3', 'account-3', 'musubo-scope:friend-3:U-shared', 1),
+          ('friend-2', 'account-2', 'musubo-scope:friend-2:U-shared', 1),
+          ('friend-staff-2', 'account-0', 'U-other', 1);
+      `);
+      const requestCandidates = async (accountId: string) => {
+        const response = await app.request(
+          '/api/account-settings/test-recipient-login-users?accountId=' + accountId,
+          {}, { DB: testDb.db },
+        );
+        expect(response.status).toBe(200);
+        return (await response.json() as { data: Array<{ id: string; sameAccount: boolean }> }).data;
+      };
+      expect(await requestCandidates('account-1')).toMatchObject([{ id: 'friend-2', sameAccount: false }]);
+      expect(await requestCandidates('account-3')).toMatchObject([{ id: 'friend-3', sameAccount: true }]);
+      expect(await requestCandidates('account-0')).toEqual([]);
+    } finally {
+      testDb.raw.close();
+    }
   });
 
   test.each([

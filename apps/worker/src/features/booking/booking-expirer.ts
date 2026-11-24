@@ -55,7 +55,7 @@ export async function runExpirer(
               s.display_name AS staff_name,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id,
+              f.line_platform_user_id AS line_user_id,
               bs.timezone, ast.style AS notification_style
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id

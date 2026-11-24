@@ -49,7 +49,7 @@ export async function recordIncomingLineMessage(
            ON u.line_message_account_key = ? AND u.line_message_id = ?
          LEFT JOIN line_message_unsends legacy
            ON legacy.line_message_account_key = ? AND legacy.line_message_id = ?
-          AND legacy.source_user_id = (SELECT line_user_id FROM friends WHERE id = ? AND line_account_id IS ?)
+          AND legacy.source_user_id = (SELECT line_platform_user_id FROM friends WHERE id = ? AND line_account_id IS ?)
         ${scoped ? `WHERE NOT EXISTS (SELECT 1 FROM messages_log existing
           WHERE existing.line_account_id = ? AND existing.line_message_id = ? AND existing.direction = 'incoming')` : ''}`,
     )

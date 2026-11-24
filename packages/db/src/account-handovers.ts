@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { isFriendLineUserIdConflict } from './friends/index.js';
 
 /**
  * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。
@@ -276,7 +277,9 @@ export async function rollbackHandover(
     ]);
     return { ok: true, restoredCount: Number(result[2].meta.changes ?? 0) };
   } catch (error) {
-    if (/malformed JSON/i.test(String(error))) return { ok:false, conflict:true, error:'引き継ぎまたは記録が変わりました。読み直してください' };
+    if (/malformed JSON/i.test(String(error)) || isFriendLineUserIdConflict(error)) {
+      return { ok: false, conflict: true, error: '引き継ぎまたは記録が変わりました。読み直してください' };
+    }
     throw error;
   }
 }

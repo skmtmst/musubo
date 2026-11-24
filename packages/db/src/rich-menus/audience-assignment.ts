@@ -119,7 +119,7 @@ export async function recordRichMenuAssignmentsByLineUserIds(
               ? || ':' || f.id, current.id, 'link', 'succeeded', 1,
               NULL, NULL, ?, ?
          FROM friends f
-         JOIN json_each(?) requested ON requested.value = f.line_user_id
+         JOIN json_each(?) requested ON requested.value = f.line_platform_user_id
          LEFT JOIN rich_menu_assignments current
            ON current.line_account_id = ? AND current.friend_id = f.id
         WHERE f.line_account_id = ?
@@ -143,7 +143,7 @@ export async function recordRichMenuAssignmentsByLineUserIds(
           reason_kind, reason_event_id, assigned_at, updated_at)
        SELECT COALESCE(existing.id, lower(hex(randomblob(16)))), f.id, ?, ?, NULL, ?, ?, ?, ?, ?
          FROM friends f
-         JOIN json_each(?) requested ON requested.value = f.line_user_id
+         JOIN json_each(?) requested ON requested.value = f.line_platform_user_id
          LEFT JOIN rich_menu_assignments existing
            ON existing.line_account_id = ? AND existing.friend_id = f.id
         WHERE f.line_account_id = ?

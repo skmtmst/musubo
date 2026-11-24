@@ -19,7 +19,7 @@ export async function currentFriend(c: Context<Env>): Promise<FriendRow | null> 
   );
   if (!friend?.is_following) return null;
   return c.env.DB.prepare(
-    `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id,
+    `SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name, f.user_id, f.line_account_id,
             a.channel_access_token, a.channel_access_token_encrypted
        FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
       WHERE f.id = ? AND f.is_following = 1

@@ -27,7 +27,7 @@ export async function readRestaurantBookingContext(db: D1Database, input: {
     s.timezone,s.name store_name,
     (SELECT m.name FROM rt_menu_items m WHERE m.id=r.course_id AND m.store_id=r.store_id) course_name
     FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
-    JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+    JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
     WHERE r.id=? AND s.line_account_id=? AND f.id=? AND (?=0 OR s.status='active')
       AND f.is_following=1 AND f.is_hidden=0`)
     .bind(input.reservationId,input.lineAccountId,input.friendId,input.requireActiveStore===false?0:1).first<RestaurantBookingContext>();

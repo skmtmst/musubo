@@ -29,7 +29,7 @@ interface BookingNotificationRow {
 async function loadNotificationRow(db:D1Database,bookingId:string,accountId?:string) {
   return await db.prepare(`SELECT b.starts_at,b.line_account_id,b.status,b.lock_version,b.friend_id,
     b.meeting_mode,b.meeting_url,b.policy_snapshot_json,m.name AS menu_name,s.display_name AS staff_name,
-    la.channel_access_token,la.channel_access_token_encrypted,la.liff_id,ast.style AS notification_style,f.line_user_id,bs.timezone,
+    la.channel_access_token,la.channel_access_token_encrypted,la.liff_id,ast.style AS notification_style,f.line_platform_user_id AS line_user_id,bs.timezone,
     COALESCE(m.cancel_deadline_hours_before*60,bs.cancel_deadline_minutes_before,1440) cancel_deadline_minutes_before
     FROM bookings b INNER JOIN menus m ON m.id=b.menu_id INNER JOIN staff s ON s.id=b.staff_id
     INNER JOIN line_accounts la ON la.id=b.line_account_id
@@ -97,7 +97,7 @@ export async function notifyForBooking(db: D1Database, bookingId: string, kind: 
       ctx:await notificationContext(db,bookingId,row,now)};
     const eligibleSql = `SELECT 1 ok FROM bookings b JOIN friends f ON f.id=b.friend_id
       WHERE b.id=? AND b.line_account_id=? AND b.friend_id=? AND b.lock_version=?
-        AND f.line_account_id=b.line_account_id AND f.is_following=1 AND f.line_user_id=?
+        AND f.line_account_id=b.line_account_id AND f.is_following=1 AND f.line_platform_user_id=?
         AND ${activeTenantLineAccountSql('b.line_account_id')}
         AND (? NOT IN ('approved','changed') OR b.status='confirmed')
         AND (? NOT IN ('approved','changed') OR json_extract(b.notification_policy_snapshot,

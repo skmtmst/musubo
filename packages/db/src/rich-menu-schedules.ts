@@ -565,7 +565,7 @@ export async function listScheduleGroupIndividualLinks(
 ): Promise<ScheduleIndividualLink[]> {
   const result = await db
     .prepare(
-      `SELECT a.friend_id AS friend_id, f.line_user_id AS line_user_id
+      `SELECT a.friend_id AS friend_id, f.line_platform_user_id AS line_user_id
          FROM rich_menu_assignments a
          JOIN friends f ON f.id = a.friend_id AND f.line_account_id = a.line_account_id
         WHERE a.line_account_id = ? AND a.group_id = ?`,

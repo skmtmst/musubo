@@ -10,7 +10,7 @@ import { resolveHqBroadcastAudience } from './hq-broadcast-audience.js';
 export async function hqAudienceSnapshot(db:D1Database,tenantId:string,accountId:string,input:HqBroadcastInput) {
   const condition=await resolveHqBroadcastAudience(db,tenantId,accountId,input);
   const scoped=await scopeStoredBroadcastSegmentQuery(db,buildBroadcastAudienceQuery(condition),accountId);
-  const query=restrictSegmentInput(scoped,`${DELIVERY_CONSENT_ALLOWED_SQL} AND f.line_user_id IS NOT NULL AND trim(f.line_user_id)<>''`);
+  const query=restrictSegmentInput(scoped,`${DELIVERY_CONSENT_ALLOWED_SQL} AND f.line_platform_user_id IS NOT NULL AND trim(f.line_platform_user_id)<>''`);
   const rows=(await db.prepare(`SELECT q.id,q.line_user_id FROM (${query.sql}) q ORDER BY q.id`).bind(...query.bindings).all<{id:string;line_user_id:string}>()).results;
   const token=await broadcastAudienceToken(accountId,rows);
   return {accountId,recipientCount:rows.length,recipientToken:token,rows,query};
