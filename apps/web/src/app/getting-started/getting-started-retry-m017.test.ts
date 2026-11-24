@@ -6,7 +6,13 @@ const get = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), api: { gettingStarted: { get } } }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', loading: false }) }))
 vi.mock('@/hooks/use-account-style', async (original) => ({ ...await original<typeof import('@/hooks/use-account-style')>(), useAccountStyle: () => ({ status: 'ready', data: { style: 'standard' }, error: null, reload: vi.fn() }) }))
-vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: () => ({ progress: undefined, reload: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({
+  useStyleSetupProgress: (_accountId: string | null, style: import('@line-crm/shared').AccountStyle | null) => ({
+    status: style ? 'ready' : 'idle',
+    progress: style ? { style, steps: {} } : undefined,
+    reload: vi.fn(),
+  }),
+}))
 vi.mock('@/lib/staff-role', async (original) => ({
   ...await original<typeof import('@/lib/staff-role')>(),
   useStaffRole: () => 'owner',
