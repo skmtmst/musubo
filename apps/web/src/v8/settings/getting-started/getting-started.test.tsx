@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const state = vi.hoisted(() => ({ stepState: 'done' as 'done' | 'todo' | 'forbidden', style: 'standard' as import('@line-crm/shared').AccountStyle, progressStyle: null as import('@line-crm/shared').AccountStyle | null, role: 'owner' as string | null, allowed: true, progressStatus: 'ready' as 'ready' | 'loading' | 'idle', revalidating: false, reload: vi.fn(), account: 'a' as string | null, runEnabled: vi.fn() }))
+const state = vi.hoisted(() => ({ stepState: 'done' as 'done' | 'todo' | 'forbidden', style: 'standard' as import('@line-crm/shared').AccountStyle, progressStyle: null as import('@line-crm/shared').AccountStyle | null, role: 'owner' as string | null, allowed: true, progressStatus: 'ready' as 'ready' | 'loading' | 'idle', revalidating: false, revalidationError: null as unknown, progressRevalidationError: null as unknown, reload: vi.fn(), progressReload: vi.fn(), account: 'a' as string | null, runEnabled: vi.fn() }))
 vi.mock('@/hooks/use-account-style', async original => ({ ...await original<typeof import('@/hooks/use-account-style')>(), useAccountStyle: () => ({ status: 'ready', data: { style: state.style }, error: null, stale: false, reload: vi.fn() }) }))
-vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: () => ({ status: state.progressStatus, revalidating: state.revalidating, progress: state.progressStatus === 'idle' ? undefined : { style: state.progressStyle ?? state.style, steps: { attributes: { complete: false }, friendAdd: { complete: true }, scenario: { complete: null, reason: '受付の設定を確認できていません' } } }, reload: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: () => ({ status: state.progressStatus, revalidating: state.revalidating, revalidationError: state.progressRevalidationError, progress: state.progressStatus === 'idle' ? undefined : { style: state.progressStyle ?? state.style, steps: { attributes: { complete: false }, friendAdd: { complete: true }, scenario: { complete: null, reason: '受付の設定を確認できていません' } } }, reload: state.progressReload }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
 vi.mock('@/lib/staff-role', async (original) => ({
   ...await original<typeof import('@/lib/staff-role')>(),
@@ -15,10 +15,10 @@ vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-util
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/v8/onboarding/use-first-run', async () => {
   const { buildStepsFromApi } = await import('./steps')
-  return { useFirstRun: (_account: string | null, enabled: boolean) => (state.runEnabled(enabled), { status: 'ready', revalidating: state.revalidating, error: null, reload: state.reload, steps: buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map((key) => ({ key, state: state.stepState, href: state.allowed ? '/' : null, reason: null }))) }) }
+  return { useFirstRun: (_account: string | null, enabled: boolean) => (state.runEnabled(enabled), { status: 'ready', revalidating: state.revalidating, revalidationError: state.revalidationError, error: null, reload: state.reload, steps: buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map((key) => ({ key, state: state.stepState, href: state.allowed ? '/' : null, reason: null }))) }) }
 })
 import GettingStarted from './getting-started'
-beforeEach(() => { state.reload.mockClear(); state.role = 'owner'; state.allowed = true; state.style = 'standard'; state.progressStyle = null; state.stepState = 'done'; state.progressStatus = 'ready'; state.revalidating = false; state.account = 'a'; state.runEnabled.mockClear() })
+beforeEach(() => { state.reload.mockClear(); state.progressReload.mockClear(); state.role = 'owner'; state.allowed = true; state.style = 'standard'; state.progressStyle = null; state.stepState = 'done'; state.progressStatus = 'ready'; state.revalidating = false; state.revalidationError = null; state.progressRevalidationError = null; state.account = 'a'; state.runEnabled.mockClear() })
 afterEach(cleanup)
 
 it('送信せずに2つの確認経路へ案内し、受信後の読み直しを置く', () => {
@@ -241,6 +241,39 @@ it('保存後の再確認中は札の数を保ったまま、はじめの設定�
     </GuideSharedProvider>,
   )
   expect(screen.getByRole('link', { name: '開店準備 4/6。はじめの設定を開く' })).toBeTruthy()
+  expect(screen.getByRole('table', { name: 'はじめの設定の順路' })).toBeTruthy()
+})
+
+it('保存後の読み直しが失敗したとき、上の帯の札は直前の数を保ち、一覧は古い済みを戻さずエラーと再試行を出す', async () => {
+  const { GuideSharedProvider } = await import('@/v8/onboarding/public/guide-shared/index')
+  const { SetupChip } = await import('@/components/shell/setup-chip')
+  state.revalidationError = new Error('通信できませんでした')
+  const guide = { phase:'idle' as const, stepKey:null, procedureIndex:1, anchor:null, pausedAnchor:null, start:vi.fn(), pause:vi.fn(), resume:vi.fn(), reset:vi.fn(), advanceProcedure:vi.fn() }
+  const view = render(
+    <GuideSharedProvider value={{ guide, dismissed: false, summary: { steps: [], done: 3, total: 6 } }}>
+      <SetupChip />
+      <GettingStarted />
+    </GuideSharedProvider>,
+  )
+  /* 上の帯の札は直前の数を維持する */
+  expect(screen.getByRole('link', { name: '開店準備 3/6。はじめの設定を開く' })).toBeTruthy()
+  /* 一覧は古い「済み」の表を出さず、エラーと［もう一度読み込む］を出す */
+  expect(screen.queryByRole('table', { name: 'はじめの設定の順路' })).toBeNull()
+  expect(screen.queryByText(/\d+ \/ \d+ 済み/)).toBeNull()
+  const retry = screen.getByRole('button', { name: 'もう一度読み込む', exact: true })
+  fireEvent.click(retry)
+  expect(state.reload).toHaveBeenCalledTimes(1)
+  expect(state.progressReload).toHaveBeenCalledTimes(1)
+
+  /* 再試行が成功したら最新の一覧を表示する */
+  state.revalidationError = null
+  view.rerender(
+    <GuideSharedProvider value={{ guide, dismissed: false, summary: { steps: [], done: 2, total: 6 } }}>
+      <SetupChip />
+      <GettingStarted />
+    </GuideSharedProvider>,
+  )
+  expect(screen.getByRole('link', { name: '開店準備 2/6。はじめの設定を開く' })).toBeTruthy()
   expect(screen.getByRole('table', { name: 'はじめの設定の順路' })).toBeTruthy()
 })
 

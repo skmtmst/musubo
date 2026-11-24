@@ -56,9 +56,20 @@ export default function GettingStartedV8() {
   const progress = sharedSetup?.progress ?? ownProgress
   const steps = stepsForStyle(firstRun.steps, profile.data?.style ?? null, progress.progress)
   const revalidating = Boolean(firstRun.revalidating || progress.revalidating)
+  const revalidationError = firstRun.revalidationError ?? progress.revalidationError ?? null
   const progressReady = !profile.data?.style || (progress.status === 'ready' && progress.progress?.style === profile.data.style)
-  const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : revalidating ? 'loading' : profile.status === 'ready' && progressReady ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
-  const loadError = firstRun.error ?? profile.error
+  const status = firstRun.status !== 'ready' || !selectedAccountId
+    ? firstRun.status
+    : revalidating
+      ? 'loading'
+      : revalidationError !== null
+        ? 'error'
+        : profile.status === 'ready' && progressReady
+          ? 'ready'
+          : profile.status === 'error'
+            ? 'error'
+            : 'loading'
+  const loadError = firstRun.error ?? revalidationError ?? profile.error
   const reload = () => { firstRun.reload(); progress.reload(); profile.reload() }
   const firstMessage = steps.find(step => step.key === 'firstMessage')
   const sendReason = lockUnless(Boolean(role && role !== 'viewer' && firstMessage?.action), role === 'viewer' ? 'viewer' : 'feature')
