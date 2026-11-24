@@ -31,7 +31,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   const friend = await c.env.DB
     .prepare(
       `SELECT id, user_id, picture_url FROM friends
-        WHERE line_user_id = ? AND line_account_id = ? AND is_following = 1`,
+        WHERE line_platform_user_id = ? AND line_account_id = ? AND is_following = 1`,
     )
     .bind(callerLineUserId, account_id)
     .first<{ id: string; user_id: string | null; picture_url: string | null }>();

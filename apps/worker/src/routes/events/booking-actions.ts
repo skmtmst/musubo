@@ -51,7 +51,7 @@ export async function notifyBookingFriend(
                 b.line_account_id,b.status,b.slot_id,b.lock_version,
                 la.channel_access_token,
                 la.channel_access_token_encrypted,
-                f.line_user_id
+                f.line_platform_user_id AS line_user_id
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
            JOIN event_slots s ON s.id = b.slot_id

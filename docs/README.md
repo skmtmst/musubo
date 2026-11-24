@@ -507,6 +507,8 @@
 - [受信箱のマイル表示](release-log/unreleased/191-kenta-friend-mileage-error.md) — マイルを使っていない店舗の表示に関する修正履歴。
 
 - [受信箱のテンプレートの差し込みを名前の札で読む](release-log/unreleased/194-kenta-template-unresolved-vars.md) — 反映履歴、確認 2026-11-23。
+- [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
+
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
 
 - [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
@@ -539,6 +541,10 @@
 - [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
 
 - [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
+- [SNS連携の画面を契約枠・主連携・請求の口へつなぐ](release-log/unreleased/122-kenta-sns-multilink-ports-api.md) — 反映履歴、確認 2026-11-19。
+
+- [Instagramの追加接続で既存アカウントを保持する修正](release-log/unreleased/227-masato-instagram-add-preserve.md) — 反映履歴、確認 2026-11-24。
+- [機能停止中のSNS接続一覧表示](release-log/unreleased/228-masato-instagram-list-settings.md) — 反映履歴、確認 2026-11-24。
 
 - [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
 

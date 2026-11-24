@@ -43,7 +43,7 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
       }
       if (budget <= 0) continue;
       // 有効な顧客を更新日が古いだけで消さず、ブロック済みの人だけを対象にする。
-      const friends = await env.DB.prepare(`SELECT id,line_user_id FROM friends WHERE line_account_id=? AND is_following=0
+      const friends = await env.DB.prepare(`SELECT id,line_platform_user_id AS line_user_id FROM friends WHERE line_account_id=? AND is_following=0
         AND last_unfollowed_at IS NOT NULL AND julianday(last_unfollowed_at)<julianday(?) ORDER BY last_unfollowed_at,id LIMIT ?`)
         .bind(account.id, retentionCutoff(now, policy.blockedFriendDays), budget)
         .all<{ id: string; line_user_id: string }>();

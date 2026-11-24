@@ -7,7 +7,7 @@ let t: SqliteD1;
 beforeEach(() => {
   t = createTestD1();
   t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','店','t','s'),('b','b','別','t','s');
-    INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち'),('g','a','OTHER','別の人'),('h','b','FOREIGN','他社');
+    INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','musubo-scope:f:UID','友だち'),('g','a','OTHER','別の人'),('h','b','UID','他社');
     INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','組織');
     INSERT INTO rt_stores(id,organization_id,name,code,line_account_id,timezone) VALUES('store','org','食堂','S','a','Asia/Tokyo');
     INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status)

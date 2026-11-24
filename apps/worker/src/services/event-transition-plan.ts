@@ -5,7 +5,7 @@ export function replacementEventTransition(db:D1Database,oldId:string,newId:stri
    operation_key,action,input_snapshot,before_json,after_json,created_at,updated_at)
   SELECT ?,b.line_account_id,b.event_id,b.id,b.id,0,b.lock_version,e.current_published_version_id,
     'event-transition:'||b.id||':'||b.lock_version,'change_to',
-    json_object('friendId',b.friend_id,'recipient',f.line_user_id,'slotId',b.slot_id,'startsAt',s.starts_at,'status',b.status,
+    json_object('friendId',b.friend_id,'recipient',f.line_platform_user_id,'slotId',b.slot_id,'startsAt',s.starts_at,'status',b.status,
       'eventName',e.name,'venueName',e.venue_name,'venueUrl',e.venue_url),
     json_object('bookingId',?,'slotId',(SELECT slot_id FROM event_bookings WHERE id=?)),
     json_object('bookingId',b.id,'slotId',b.slot_id),strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')

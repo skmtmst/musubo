@@ -20,7 +20,7 @@ events.get('/api/liff/events/me', async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const friend = await c.env.DB
-    .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
+    .prepare(`SELECT id FROM friends WHERE line_platform_user_id = ? AND line_account_id = ?`)
     .bind(callerLineUserId, account_id)
     .first<{ id: string }>();
   if (!friend) return liffBookingJson(c, { items: [] });
@@ -113,7 +113,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const friend = await c.env.DB
-    .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
+    .prepare(`SELECT id FROM friends WHERE line_platform_user_id = ? AND line_account_id = ?`)
     .bind(callerLineUserId, account_id)
     .first<{ id: string }>();
   if (!friend) return liffBookingResponse(c, bad(c, 'not_found', 404));
@@ -151,7 +151,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env, account_id);
   if (!callerLineUserId) return liffBookingResponse(c, bad(c, 'unauthorized', 401));
   const friend = await c.env.DB
-    .prepare(`SELECT id FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
+    .prepare(`SELECT id FROM friends WHERE line_platform_user_id = ? AND line_account_id = ?`)
     .bind(callerLineUserId, account_id)
     .first<{ id: string }>();
   if (!friend) return liffBookingResponse(c, bad(c, 'friend_not_found', 404));

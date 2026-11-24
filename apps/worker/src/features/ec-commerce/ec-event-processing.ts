@@ -100,7 +100,7 @@ export async function processEcEvent(
   }
   // 顧客 ID を全体で一意と扱わず、接続元・店舗・アカウントで絞って結び付ける。
   if(event.customer_id!=null) {
-    const linked = await db.prepare(`SELECT f.line_user_id FROM ec_identity_links l JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.line_account_id
+    const linked = await db.prepare(`SELECT f.line_platform_user_id AS line_user_id FROM ec_identity_links l JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.line_account_id
       JOIN ec_connectors c ON c.line_account_id=l.line_account_id AND c.shop_domain=l.shop_key
       WHERE l.line_account_id=? AND l.external_customer_id=? AND l.source_key=(SELECT source FROM ec_events WHERE id=?) AND l.unlinked_at IS NULL`).bind(lineAccountId,String(event.customer_id),row.id).first<{line_user_id:string}>();
     if(linked) event.line_user_id=linked.line_user_id;

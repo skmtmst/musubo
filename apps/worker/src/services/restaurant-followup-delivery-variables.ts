@@ -17,7 +17,7 @@ export async function restaurantWaitlistVariables(db:D1Database,accountId:string
 export async function restaurantConfirmationVariables(db:D1Database,requestId:string,context:RestaurantBookingContext,now:string){
  await db.prepare(`INSERT OR IGNORE INTO rt_reservation_confirmations(request_id,reservation_id,reservation_version,friend_id,requested_at,expires_at)
   SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
-   JOIN friends f ON f.id=? AND f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+   JOIN friends f ON f.id=? AND f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
    WHERE r.id=? AND r.customer_version=? AND r.status='confirmed' AND s.line_account_id=?)`)
   .bind(requestId,context.reservation_id,context.customer_version,context.friend_id,now,context.starts_at,context.friend_id,context.reservation_id,context.customer_version,context.line_account_id).run();
  const row=await db.prepare('SELECT 1 FROM rt_reservation_confirmations WHERE request_id=? AND reservation_id=? AND reservation_version=? AND friend_id=? AND julianday(expires_at)>julianday(?)')

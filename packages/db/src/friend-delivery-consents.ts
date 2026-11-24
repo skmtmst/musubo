@@ -50,7 +50,7 @@ export async function suppressedFriendIds(db:D1Database, friendIds:string[]):Pro
 }
 export async function hasSuppressedDeliveryRecipients(db:D1Database,accountId:string|null,uids?:string[]):Promise<boolean> {
   return (await db.prepare(`SELECT 1 AS suppressed FROM friend_delivery_consents c JOIN friends f ON f.id=c.friend_id AND f.line_account_id=c.line_account_id
-    WHERE c.state<>'granted' AND (? IS NULL OR c.line_account_id=?) AND (? IS NULL OR f.line_user_id IN (SELECT value FROM json_each(?))) LIMIT 1`)
+    WHERE c.state<>'granted' AND (? IS NULL OR c.line_account_id=?) AND (? IS NULL OR f.line_platform_user_id IN (SELECT value FROM json_each(?))) LIMIT 1`)
     .bind(accountId,accountId,uids?JSON.stringify(uids):null,uids?JSON.stringify(uids):null).first<{suppressed:number}>())?.suppressed===1;
 }
 /** Record an intentional non-send without marking it as dispatched or accepted. */

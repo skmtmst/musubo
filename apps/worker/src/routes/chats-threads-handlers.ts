@@ -307,7 +307,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         f.display_name,
         f.picture_url,
         CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
-        f.line_user_id,
+        f.line_platform_user_id AS line_user_id,
         f.line_account_id,
         COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) AS operator_id, CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE((SELECT name FROM staff_members WHERE id=c.assignee_staff_id), '担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE((SELECT name FROM operators WHERE id=c.operator_id), '担当者不明') END AS operator_name,
         COALESCE(c.status, 'resolved') AS status,
@@ -416,7 +416,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
     const createdAt = chatRow?.created_at ?? null;
 
     const friend = await c.env.DB
-      .prepare(`SELECT display_name, real_name, picture_url, line_user_id, metadata FROM friends WHERE id = ?`)
+      .prepare(`SELECT display_name, real_name, picture_url, line_platform_user_id AS line_user_id, metadata FROM friends WHERE id = ?`)
       .bind(resolvedFriendId)
       .first<{
         display_name: string | null;

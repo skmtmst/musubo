@@ -5,7 +5,7 @@ import { activeTenantLineAccountSql, parseScenarioVersionSteps, type ScenarioVer
 import type { ScenarioSourceJob } from '../features/scenarios/source-job-types/index.js';
 
 type Candidate=ScenarioVersion & {store_id:string;line_account_id:string;friend_id:string;line_uid:string;timezone:string;store_name:string;value:string;template_version:number;approved_version_id:string;live_step_id:string;offset_minutes:number;anniversary_time:string};
-const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name store_name,s.timezone,f.id friend_id,f.line_user_id line_uid,
+const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name store_name,s.timezone,f.id friend_id,f.line_platform_user_id line_uid,
  ff.value,t.template_version,t.approved_version_id,b.step_id live_step_id,b.offset_minutes,b.anniversary_time
  FROM rt_store_followup_templates t JOIN rt_stores s ON s.id=t.store_id AND s.status='active'
  JOIN scenarios sc ON sc.id=t.scenario_id AND sc.line_account_id=s.line_account_id AND sc.current_published_version_id=t.approved_version_id

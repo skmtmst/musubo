@@ -6,7 +6,8 @@ const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async (importOriginal) => ({
+  normalizeFriendLineUserId: (await importOriginal<typeof import('@line-crm/db')>()).normalizeFriendLineUserId,
   getLineAccounts: vi.fn(),
   listLineAccountsWithTenantStatus: vi.fn(),
   getLineAccountScopeEntries: vi.fn(),
@@ -97,10 +98,12 @@ function fakeDb(opts: {
         },
         async all() {
           executed.push({ sql, params: stmt.params });
-          if (sql.includes('line_user_id IN')) {
+          if (sql.includes('line_platform_user_id IN')) {
             const rows = stmt.params
-              .map((p) => opts.friendsByUserId?.[p as string])
-              .filter(Boolean);
+              .flatMap((p) => {
+                const friend = opts.friendsByUserId?.[p as string];
+                return friend ? [{ ...friend, line_platform_user_id: friend.line_user_id }] : [];
+              });
             return { results: rows };
           }
           return { results: (opts.broadcastFriendIds ?? []).map((id) => ({ id })) };

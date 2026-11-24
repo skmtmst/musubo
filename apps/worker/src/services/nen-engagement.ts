@@ -1243,7 +1243,7 @@ export async function processNenDeliveries(
       const payload = JSON.parse(job.payload) as Record<string, unknown>;
       let recipientLineUserId = friend.line_user_id;
       if (typeof payload.expectedLineUserId === 'string') {
-        const current = await db.prepare(`SELECT f.line_user_id,f.line_account_id,f.is_following,COALESCE(f.is_hidden,0) AS is_hidden,
+        const current = await db.prepare(`SELECT f.line_platform_user_id AS line_user_id,f.line_account_id,f.is_following,COALESCE(f.is_hidden,0) AS is_hidden,
           CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL}) THEN 1 ELSE 0 END AS consent_allowed
           FROM friends f JOIN nen_delivery_jobs j ON j.friend_id=f.id
           WHERE j.id=? AND j.status='processing' AND j.claim_token=?`)

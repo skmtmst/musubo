@@ -1,7 +1,14 @@
-import type { Friend } from '@line-crm/db';
+import { normalizeFriendLineUserId, type Friend } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 // D1 のバインド数上限に当てないよう、友だち照会を100件単位に分ける。
 export const LOOKUP_CHUNK = 90;
+type StoredFriend = Friend & { line_platform_user_id: string };
+
+const LEGACY_ACCOUNT_SCOPE = `EXISTS (
+  SELECT 1 FROM line_accounts legacy_owner
+  WHERE legacy_owner.id = ? AND COALESCE(legacy_owner.tenant_id, ?) = ?
+)`;
 
 /** userId の集合を、各100バインド以内の IN 句で取得する。 */
 export async function getFriendsByLineUserIds(
@@ -18,11 +25,11 @@ export async function getFriendsByLineUserIds(
         .prepare(
           `SELECT * FROM friends
             WHERE line_account_id = ?
-              AND line_user_id IN (${placeholders})`,
+              AND line_platform_user_id IN (${placeholders})`,
         )
         .bind(lineAccountId, ...chunk)
-        .all<Friend>();
-      for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
+        .all<StoredFriend>();
+      for (const row of scoped.results ?? []) found.set(row.line_platform_user_id, normalizeFriendLineUserId(row));
     }
 
     // 別アカウント所有の行には触れない。拾うのは未割当
@@ -35,11 +42,12 @@ export async function getFriendsByLineUserIds(
         .prepare(
           `SELECT * FROM friends
             WHERE line_account_id IS NULL
-              AND line_user_id IN (${unresolvedPlaceholders})`,
+              AND line_platform_user_id IN (${unresolvedPlaceholders})
+              AND (? IS NULL OR ${LEGACY_ACCOUNT_SCOPE})`,
         )
-        .bind(...unresolved)
-        .all<Friend>();
-      for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
+        .bind(...unresolved, lineAccountId, lineAccountId, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID)
+        .all<StoredFriend>();
+      for (const row of fallback.results ?? []) found.set(row.line_platform_user_id, normalizeFriendLineUserId(row));
     }
   }
   return found;
@@ -50,12 +58,13 @@ export async function readProxyPushRecipient(db: D1Database, accountId: string, 
   const row = await db.prepare(`SELECT f.*, EXISTS (
       SELECT 1 FROM friend_delivery_consents c JOIN friends recipient
         ON recipient.id=c.friend_id AND recipient.line_account_id=c.line_account_id
-      WHERE c.state<>'granted' AND c.line_account_id=? AND recipient.line_user_id=?
+      WHERE c.state<>'granted' AND c.line_account_id=? AND recipient.line_platform_user_id=?
     ) AS delivery_suppressed FROM friends f
-    WHERE f.line_user_id=? AND (f.line_account_id=? OR f.line_account_id IS NULL)
+    WHERE f.line_platform_user_id=? AND (f.line_account_id=? OR (f.line_account_id IS NULL AND ${LEGACY_ACCOUNT_SCOPE}))
     ORDER BY (f.line_account_id=?) DESC LIMIT 1`)
-    .bind(accountId, uid, uid, accountId, accountId).first<Friend & { delivery_suppressed: number }>();
+    .bind(accountId, uid, uid, accountId, accountId, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, accountId)
+    .first<StoredFriend & { delivery_suppressed: number }>();
   if (!row) return { friend: null, suppressed: false };
   const { delivery_suppressed, ...friend } = row;
-  return { friend: friend as Friend, suppressed: delivery_suppressed === 1 };
+  return { friend: normalizeFriendLineUserId(friend), suppressed: delivery_suppressed === 1 };
 }

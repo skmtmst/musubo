@@ -322,7 +322,7 @@ export async function getStampVisit(db:D1Database,kind:StampVisitKind,id:string)
     COALESCE((SELECT generation FROM visit_stamp_visit_queue WHERE kind='restaurant' AND visit_id=r.id),0) AS queue_generation,
     s.line_account_id AS account_id,f.id AS friend_id,COALESCE((SELECT marked_at FROM rt_seat_visit_marks WHERE reservation_id=r.id AND kind='visited' AND undone_at IS NULL ORDER BY marked_at DESC LIMIT 1),r.starts_at) AS occurred_at,
     CASE WHEN r.status IN ('visited','seated') THEN 1 ELSE 0 END AS visited
-    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid WHERE r.id=?`).bind(stampId(id)).first<StampVisit>();
+    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid WHERE r.id=?`).bind(stampId(id)).first<StampVisit>();
   return db.prepare(`SELECT id,lock_version AS source_version,updated_at AS source_updated_at,
     COALESCE((SELECT generation FROM visit_stamp_visit_queue WHERE kind='booking' AND visit_id=bookings.id),0) AS queue_generation,
     line_account_id AS account_id,friend_id,COALESCE((SELECT marked_at FROM booking_visit_marks WHERE booking_id=bookings.id AND kind='visited' ORDER BY marked_at DESC LIMIT 1),starts_at) AS occurred_at,CASE WHEN status='completed' THEN 1 ELSE 0 END AS visited FROM bookings WHERE id=?`).bind(stampId(id)).first<StampVisit>();
