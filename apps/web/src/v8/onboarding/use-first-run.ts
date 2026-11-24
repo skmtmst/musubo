@@ -42,6 +42,10 @@ type Snapshot =
   | ({ accountId: string | null; status: 'ready'; error: null } & FirstRunLoad)
   | { accountId: string | null; status: 'error'; error: unknown }
 
+type Revalidation =
+  | { accountId: string | null; status: 'loading'; error: null }
+  | { accountId: string | null; status: 'error'; error: unknown }
+
 /**
  * はじめにやることの状態。開いた時のほか、タブが前に戻った時・スタイルや機能の設定を保存した時に読み直す。
  * `watch` の間（QR の窓・最初の1通を待つ帯）は 10 秒ごとに読み直し、タブが裏の間は止める。
@@ -50,33 +54,38 @@ type Snapshot =
  */
 export function useFirstRun(accountId: string | null, enabled = true, watch = false) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
-  const [revalidatingFor, setRevalidatingFor] = useState<string | null>(null)
+  const [revalidation, setRevalidation] = useState<Revalidation | null>(null)
   const [tick, setTick] = useState(0)
   const [watchRound, setWatchRound] = useState(0)
   const [watchExpired, setWatchExpired] = useState(false)
   const generation = useRef(0)
-  const markStale = useCallback(() => { if (enabled) setRevalidatingFor(accountId) }, [accountId, enabled])
-  const invalidate = useCallback(() => { generation.current += 1; setRevalidatingFor(null); setSnapshot(null) }, [])
-  const reload = useCallback(() => { invalidate(); setTick((n) => n + 1) }, [invalidate])
-  const refresh = useCallback(() => {
+  const pendingReload = useRef(false)
+  const markStale = useCallback(() => {
     if (!enabled) return
+    generation.current += 1
+    setRevalidation({ accountId, status: 'loading', error: null })
+  }, [accountId, enabled])
+  const invalidate = useCallback(() => { generation.current += 1; setRevalidation(null); setSnapshot(null) }, [])
+  const reload = useCallback(() => { pendingReload.current = true; invalidate(); setTick((n) => n + 1) }, [invalidate])
+  const refresh = useCallback(() => {
+    if (!enabled || pendingReload.current) return
     const at = ++generation.current
     void loadFirstRun(accountId).then((loaded) => {
       if (generation.current === at) {
-        setRevalidatingFor(null)
+        setRevalidation(null)
         setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
       }
     }).catch((error: unknown) => {
-      /* 後ろの読み直しの失敗では、読めている表示は消さず、未取得の時だけ失敗として知らせる。 */
-      if (generation.current === at) {
-        setRevalidatingFor(null)
-        setSnapshot((prev) => (prev?.accountId === accountId && prev.status === 'ready' ? prev : { accountId, status: 'error', error }))
-      }
+      /* 後ろの読み直しの失敗では、札用の直前の表示は消さず、保存後の再確認と未取得は失敗として記録する。 */
+      if (generation.current !== at) return
+      setRevalidation((prev) => (prev?.accountId === accountId ? { accountId, status: 'error', error } : null))
+      setSnapshot((prev) => (prev?.accountId === accountId && prev.status === 'ready' ? prev : { accountId, status: 'error', error }))
     })
   }, [accountId, enabled])
   useEffect(() => {
+    pendingReload.current = false
     const at = ++generation.current
-    setRevalidatingFor(null)
+    setRevalidation(null)
     setSnapshot(null)
     if (!enabled) return
     void loadFirstRun(accountId).then((loaded) => {
@@ -122,13 +131,16 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   }, [enabled, watch, watchExpired, watchRound, refresh])
   const rewatch = useCallback(() => { setWatchExpired(false); setWatchRound((n) => n + 1); refresh() }, [refresh])
   const current = enabled && snapshot?.accountId === accountId ? snapshot : null
+  const currentRevalidation = enabled && revalidation?.accountId === accountId ? revalidation : null
   return {
     steps: current?.status === 'ready' ? current.steps : [],
     firstRun: current?.status === 'ready' ? current.firstRun : null,
     dismissed: current?.status === 'ready' ? current.dismissed : null,
     starter: current?.status === 'ready' ? current.starter : null,
     status: current?.status ?? 'loading' as const,
-    revalidating: enabled && revalidatingFor === accountId,
+    revalidating: currentRevalidation?.status === 'loading',
+    revalidationStatus: currentRevalidation?.status ?? 'idle' as const,
+    revalidationError: currentRevalidation?.status === 'error' ? currentRevalidation.error : null,
     error: current?.error ?? null,
     reload,
     invalidate,

@@ -6,51 +6,60 @@ import { FEATURE_SETTINGS_UPDATED_EVENT, type FeatureSettingsUpdate } from '@/li
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 import { loadStyleSetupProgress, unknownStyleSetupProgress } from './style-setup-progress'
 
+type Revalidation =
+  | { scope: string; status: 'loading'; error: null }
+  | { scope: string; status: 'error'; error: unknown }
+
 /** 店とスタイルを切り替えた直後に、前の設定を「済み」として見せない。 */
 export function useStyleSetupProgress(accountId: string | null, style: AccountStyle | null, enabled = true, storeId?: string | null) {
   const scope = JSON.stringify([accountId, style, storeId])
   const activeScope = enabled && accountId && style ? scope : null
   const [snapshot, setSnapshot] = useState<{ scope: string; progress: StyleSetupProgress } | null>(null)
-  const [revalidatingScope, setRevalidatingScope] = useState<string | null>(null)
+  const [revalidation, setRevalidation] = useState<Revalidation | null>(null)
   const [tick, setTick] = useState(0)
   const generation = useRef(0)
+  const pendingReload = useRef(false)
   const prevScope = useRef<string | null>(activeScope)
-  const markStale = useCallback(() => { if (activeScope) setRevalidatingScope(activeScope) }, [activeScope])
-  const invalidate = useCallback(() => { generation.current += 1; setRevalidatingScope(null); setSnapshot(null) }, [])
-  const reload = useCallback(() => { invalidate(); setTick(value => value + 1) }, [invalidate])
+  const markStale = useCallback(() => {
+    if (!activeScope) return
+    generation.current += 1
+    setRevalidation({ scope: activeScope, status: 'loading', error: null })
+  }, [activeScope])
+  const invalidate = useCallback(() => { generation.current += 1; setRevalidation(null); setSnapshot(null) }, [])
+  const reload = useCallback(() => { pendingReload.current = true; invalidate(); setTick(value => value + 1) }, [invalidate])
   const refresh = useCallback(() => {
-    if (!enabled || !accountId || !style) return
+    if (!enabled || !accountId || !style || pendingReload.current) return
     const currentScope = JSON.stringify([accountId, style, storeId])
     const at = ++generation.current
     void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
       if (generation.current === at) {
-        setRevalidatingScope(null)
+        setRevalidation(null)
         setSnapshot({ scope: currentScope, progress })
       }
-    }).catch(() => {
-      if (generation.current === at) {
-        setRevalidatingScope(null)
-        setSnapshot(prev => (prev?.scope === currentScope ? prev : { scope: currentScope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') }))
-      }
+    }).catch((error: unknown) => {
+      if (generation.current !== at) return
+      setRevalidation(prev => (prev?.scope === currentScope ? { scope: currentScope, status: 'error', error } : null))
+      setSnapshot(prev => (prev?.scope === currentScope ? prev : { scope: currentScope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') }))
     })
   }, [accountId, enabled, storeId, style])
   useEffect(() => {
+    pendingReload.current = false
     let active = true
     const at = ++generation.current
     if (prevScope.current !== activeScope) {
       prevScope.current = activeScope
-      setRevalidatingScope(null)
+      setRevalidation(null)
       setSnapshot(null)
     }
     if (!activeScope || !accountId || !style) return
     void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
       if (active && generation.current === at) {
-        setRevalidatingScope(null)
+        setRevalidation(null)
         setSnapshot({ scope: activeScope, progress })
       }
     }).catch(() => {
       if (active && generation.current === at) {
-        setRevalidatingScope(null)
+        setRevalidation(null)
         setSnapshot({ scope: activeScope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
       }
     })
@@ -73,9 +82,12 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
       document.removeEventListener('visibilitychange', onStyleOrVisible)
     }
   }, [accountId, refresh])
+  const currentRevalidation = activeScope && revalidation?.scope === activeScope ? revalidation : null
   return {
     status: !activeScope ? 'idle' as const : snapshot?.scope === activeScope ? 'ready' as const : 'loading' as const,
-    revalidating: Boolean(activeScope && revalidatingScope === activeScope),
+    revalidating: currentRevalidation?.status === 'loading',
+    revalidationStatus: currentRevalidation?.status ?? 'idle' as const,
+    revalidationError: currentRevalidation?.status === 'error' ? currentRevalidation.error : null,
     progress: activeScope && snapshot?.scope === activeScope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
     invalidate,
     markStale,

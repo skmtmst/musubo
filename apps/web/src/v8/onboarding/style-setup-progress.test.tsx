@@ -226,3 +226,29 @@ it('裏でのrefreshは直前の済みを保ったまま新しい値へ更新す
   expect(view.result.current.status).toBe('ready')
   expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
 })
+
+it('業種進捗でも保存より前に始まったrefreshの応答では結果も確認中の印も変えず、再確認失敗を記録する', async () => {
+  const view = renderHook(() => useStyleSetupProgress('a', 'salon'))
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  let resolveEarlier!: (value: unknown) => void
+  let resolveNext!: (value: unknown) => void
+  net.menus
+    .mockImplementationOnce(() => new Promise(resolve => { resolveEarlier = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { resolveNext = resolve }))
+
+  act(() => view.result.current.refresh())
+  act(() => view.result.current.markStale())
+  expect(view.result.current.revalidating).toBe(true)
+
+  await act(async () => { resolveEarlier({ menus: [] }) })
+  expect(view.result.current.revalidating).toBe(true)
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  act(() => view.result.current.refresh())
+  await act(async () => { resolveNext({ menus: [] }) })
+  await waitFor(() => expect(view.result.current.revalidating).toBe(false))
+  expect(view.result.current.revalidationStatus).toBe('idle')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
+})
