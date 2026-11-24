@@ -64,11 +64,13 @@ export function GuideReceiveFirstMessage({ basicId, step, total, watchExpired, o
       <span className={styles.step}>{step}/{total}</span>
       <span><strong>{title}</strong><span className={styles.description}>ご自分のスマホでQRコードを読み取り、お店のLINEを友だち追加してください。最初のメッセージが届いたら完了です。</span></span>
     </span>} designNode="waX3A" designLayout="stacked-guided" designWidth={640} exactDesignWidth designMinHeight={368}
-      headerIcon={false} onCancel={onLater} footerDivider={false}
-      footer={onTest ? <div className={styles.receiveActions}>
-        <Button className={styles.confirmAction} presentation="first-run-start" onClick={onTest}>テスト送信を開く</Button>
-        <Button variant="text" size="inline" onClick={onLater}>あとで</Button>
-      </div> : <DialogActions><Button variant="text" size="inline" onClick={onLater}>あとで</Button></DialogActions>}
+      headerIcon={false} onCancel={onLater} footerDivider={false} designFooterGap={onTest ? 14 : undefined}
+      footer={<div className={onTest ? styles.receiveFooter : undefined}>
+        <DialogActions>
+          {onTest ? <Button className={styles.confirmAction} presentation="first-run-start" onClick={onTest}>テスト送信を開く</Button> : null}
+          <Button variant="text" size="inline" onClick={onLater}>あとで</Button>
+        </DialogActions>
+      </div>}
     >
       <div className={styles.receive}>
         {qrError ? <InlineLoadFailure
