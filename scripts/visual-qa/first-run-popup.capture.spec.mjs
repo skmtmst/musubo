@@ -131,7 +131,7 @@ for (const width of PC_WIDTHS) {
     /* 「あとで」で閉じたら、帯の「開店準備 N/9」の札から開き直せる（枠02の足の注記）。 */
     await popup.getByRole('button', { name: 'あとで', exact: true }).click()
     await expect(popup).toHaveCount(0)
-    const chip = page.locator('[data-setup-chip="open"]')
+    const chip = page.getByRole('banner').locator('[data-setup-chip="open"]')
     await expect(chip, '帯の開店準備の札が無い').toBeVisible()
     await page.screenshot({ path: `${OUT}/${width}-02-closed-chip.png`, fullPage: false })
 
