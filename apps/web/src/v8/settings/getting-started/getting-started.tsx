@@ -55,7 +55,9 @@ export default function GettingStartedV8() {
   const firstRun = sharedSetup?.run ?? ownFirstRun
   const progress = sharedSetup?.progress ?? ownProgress
   const steps = stepsForStyle(firstRun.steps, profile.data?.style ?? null, progress.progress)
-  const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : profile.status === 'ready' && progress.status !== 'loading' ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
+  const revalidating = Boolean(firstRun.revalidating || progress.revalidating)
+  const progressReady = !profile.data?.style || (progress.status === 'ready' && progress.progress?.style === profile.data.style)
+  const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : revalidating ? 'loading' : profile.status === 'ready' && progressReady ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
   const loadError = firstRun.error ?? profile.error
   const reload = () => { firstRun.reload(); progress.reload(); profile.reload() }
   const firstMessage = steps.find(step => step.key === 'firstMessage')
@@ -63,12 +65,30 @@ export default function GettingStartedV8() {
 
   const reasons = stoppedReasons(steps)
   const done = doneCount(steps)
-  const firstPending = steps.find(step => step.state !== 'done' && step.action)
+  const firstPending = steps.find(step => step.state !== 'done' && step.state !== 'forbidden' && step.action)
   const nextKey = role && role !== 'viewer' ? firstPending?.key : null
-  const pausedStep = steps.find(step => step.key === shared?.guide.stepKey)
-  const pausedTotal = profile.data?.style === 'restaurant' ? guideProcedureTotal(shared?.guide.stepKey ?? null) : 0
+  const guideMatchesAccount = !shared?.setup || shared.setup.accountId === selectedAccountId
+  const needsReview = shared?.guide.stepKey === 'richMenu' ||
+    (shared?.guide.stepKey === 'attributes' && shared.guide.procedureIndex === 3) ||
+    shared?.guide.stepKey === 'hours' ||
+    (shared?.guide.stepKey === 'scenario' && shared.guide.procedureIndex === 2)
+  const savedPausedStep = steps.find(step => step.key === shared?.guide.stepKey)
+  const fallbackResumeKey = savedPausedStep?.action && savedPausedStep.state !== 'forbidden' &&
+    (savedPausedStep.state !== 'done' || (profile.data?.style === 'restaurant' && needsReview))
+    ? savedPausedStep.key
+    : firstPending?.key ?? null
+  const resumeKey = shared?.summary ? shared.guide.pausedAnchor?.key ?? null : fallbackResumeKey
+  const pausedStep = resumeKey ? steps.find(step => step.key === resumeKey) : undefined
+  const samePausedStep = Boolean(pausedStep && pausedStep.key === shared?.guide.stepKey)
+  const pausedTotal = samePausedStep && profile.data?.style === 'restaurant' ? guideProcedureTotal(pausedStep?.key ?? null) : 0
   const ordinal = pausedStep ? (['', '①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'][Number(pausedStep.ordinal)] ?? pausedStep.ordinal) : ''
-  const pausedLabel = pausedStep ? `${ordinal} ${pausedStep.title}${pausedTotal ? `・手順 ${Math.min(Math.max(shared?.guide.procedureIndex ?? 1, 1), pausedTotal)}/${pausedTotal}` : ''}で停止中` : '開店準備ガイドを一時停止しています。'
+  const pausedLabel = !pausedStep
+    ? '開店準備ガイドを一時停止しています。'
+    : samePausedStep
+      ? `${ordinal} ${pausedStep.title}${pausedTotal ? `・手順 ${Math.min(Math.max(shared?.guide.procedureIndex ?? 1, 1), pausedTotal)}/${pausedTotal}` : ''}で停止中`
+      : shared?.guide.stepKey
+        ? `${ordinal} ${pausedStep.title}から再開できます`
+        : '開店準備ガイドを一時停止しています。'
 
   return (
     <div className={frame.screen}>
@@ -87,7 +107,7 @@ export default function GettingStartedV8() {
           />
         ) : (
           <>
-            {shared?.guide.phase === 'paused' && canManageRole(role) ? <Notice tone="info" action={<Button onClick={shared.guide.resume}>ガイドを再開</Button>}><TruncatedText value={pausedLabel} /></Notice> : null}
+            {shared?.guide.phase === 'paused' && guideMatchesAccount && canManageRole(role) && Boolean(resumeKey) ? <Notice tone="info" actionLayout="stack-on-narrow" action={<Button onClick={shared.guide.resume}>ガイドを再開</Button>}><TruncatedText value={pausedLabel} /></Notice> : null}
             <div className={styles.progress} role="note">
               <strong className={styles.progressText}>{progressHeadline(steps)}</strong>
               <ProgressBar className={styles.bar} value={100 * done / Math.max(steps.length, 1)} label="はじめの設定の進み具合" />
