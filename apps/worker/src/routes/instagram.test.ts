@@ -1225,8 +1225,10 @@ it('接続を増やすときは宛先を持たず、接続IDの同時指定は�
 
 it.each([1, 2])('既存接続が%i件あっても、追加の認可完了では既存行を変えず別の接続を保存する', async (existingCount) => {
   await connect();
+  db.raw.prepare('UPDATE instagram_connections SET sort_order=7').run();
   if (existingCount === 2) addSecondConnection();
   const existing = db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all();
+  const existingOrder = db.raw.prepare('SELECT instagram_id FROM instagram_connections ORDER BY sort_order,id').all();
   const upstream = globalThis.fetch;
   vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) =>
     new URL(String(url)).pathname.endsWith('/me')
@@ -1241,6 +1243,9 @@ it.each([1, 2])('既存接続が%i件あっても、追加の認可完了では�
   expect(back.searchParams.get('instagram')).toBe('connected');
   expect(db.raw.prepare("SELECT * FROM instagram_connections WHERE instagram_id<>'22' ORDER BY id").all()).toEqual(existing);
   expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_connections').get()).toEqual({ count: existingCount + 1 });
+  expect(db.raw.prepare('SELECT instagram_id FROM instagram_connections ORDER BY sort_order,id').all()).toEqual([
+    ...existingOrder, { instagram_id: '22' },
+  ]);
   expect(db.raw.prepare("SELECT instagram_id,username,version FROM instagram_connections WHERE instagram_id='22'").get()).toEqual({
     instagram_id: '22', username: 'another_cafe', version: 1,
   });

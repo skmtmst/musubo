@@ -475,8 +475,9 @@ instagram.get(
       if (duplicate)
         throw new InstagramError('instagram_account_already_connected', 409);
       const now = new Date().toISOString();
+      // 新規接続は末尾に追加し、先頭を使う既存の処理の宛先を変えない。並び順は保存と同じSQLで決める。
       const result = await c.env.DB.prepare(
-        `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,scopes,profile_json,refreshed_at,connected_by) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE id=?) ON CONFLICT(id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,scopes=excluded.scopes,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
+        `INSERT INTO instagram_connections(id,line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,expires_at,data_access_expires_at,scopes,profile_json,refreshed_at,connected_by,sort_order) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,(SELECT COALESCE(MAX(sort_order),-1)+1 FROM instagram_connections WHERE line_account_id=?) WHERE ?=0 OR EXISTS(SELECT 1 FROM instagram_connections WHERE id=?) ON CONFLICT(id) DO UPDATE SET page_id=excluded.page_id,instagram_id=excluded.instagram_id,page_name=excluded.page_name,username=excluded.username,page_token_encrypted=excluded.page_token_encrypted,user_token_encrypted=excluded.user_token_encrypted,expires_at=excluded.expires_at,data_access_expires_at=excluded.data_access_expires_at,scopes=excluded.scopes,profile_json=excluded.profile_json,posts_json=NULL,synced_at=NULL,refreshed_at=excluded.refreshed_at,connected_by=excluded.connected_by,version=version+1 WHERE version=?`,
       )
         .bind(
           targetId,
@@ -493,6 +494,7 @@ instagram.get(
           JSON.stringify(profile),
           now,
           c.get('staff').id,
+          id,
           expectedVersion,
           targetId,
           expectedVersion,
