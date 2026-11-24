@@ -109,6 +109,25 @@ describe('最後の手順のスキップ', () => {
 })
 
 describe('ガイドの状態保存', () => {
+  it('最初から始めると選択済みリッチメニューも確認し、次に進んでから再読み込みすると戻らない', async () => {
+    const steps = summary().steps.map(step => step.key === 'richMenu' ? { ...step, done: true } : step)
+    const progress = summary({ steps, done: 2 })
+    let saved = { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 }
+    server.get.mockImplementation(async () => ({ success: true, data: saved }))
+    server.save.mockImplementation(async (_accountId, next) => { saved = next; return { success: true } })
+    const initial = renderHook(() => useGuideEngine('account-1', progress, true, 'staff-1'))
+    await waitFor(() => expect(initial.result.current.loading).toBe(false))
+    act(() => initial.result.current.restart?.())
+    await waitFor(() => expect(saved.stepKey).toBe('richMenu'))
+    expect(initial.result.current.stepKey).toBe('richMenu')
+    act(() => initial.result.current.advanceProcedure())
+    await waitFor(() => expect(saved.stepKey).toBe('attributes'))
+    initial.unmount()
+    const reloaded = renderHook(() => useGuideEngine('account-1', progress, true, 'staff-1'))
+    await waitFor(() => expect(reloaded.result.current.loading).toBe(false))
+    expect(reloaded.result.current.stepKey).toBe('attributes')
+  })
+
   it('アカウントごとに覚え、別のアカウントの続きを混ぜない', () => {
     writeGuideEngineState('account-1', { phase: 'paused', stepKey: 'richMenu', procedureIndex: 2 })
     expect(readGuideEngineState('account-1')).toEqual({ phase: 'paused', stepKey: 'richMenu', procedureIndex: 2 })

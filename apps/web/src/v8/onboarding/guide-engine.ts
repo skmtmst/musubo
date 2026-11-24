@@ -130,7 +130,7 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 export type GuideAnchor = { key: string; label: string; href: string }
 
 function needsGuideReview(state: GuideEngineState): boolean {
-  return (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
+  return state.stepKey === 'richMenu' || (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
     state.stepKey === 'hours' ||
     (state.stepKey === 'scenario' && state.procedureIndex === 2)
 }
@@ -325,7 +325,7 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit(state.phase === 'active' ? 'advance' : 'start', guideAnchor(summary)?.key ?? null) }, [commit, summary, state.phase]),
     restart: useCallback(() => {
       const connected = summary?.steps.some(step => step.key === 'accounts' && step.done)
-      const firstMenu = scripted && connected && summary?.steps.some(step => step.key === 'richMenu' && !step.done && step.href)
+      const firstMenu = scripted && connected && summary?.steps.some(step => step.key === 'richMenu' && step.href)
       setSkipped(EMPTY_SKIPPED)
       commit(state.phase === 'active' ? 'advance' : 'start', firstMenu ? 'richMenu' : guideAnchor(summary)?.key ?? null)
     }, [commit, scripted, summary, state.phase]),

@@ -1,5 +1,6 @@
 
 import { jstDateOffset } from '@/lib/jst-datetime'
+import { ApiError } from '@/lib/api/transport/errors'
 /*
  * ★V8 LINEアカウントを登録の、画面に依らない小さな計算。
  * src/v8 からは @/app を読めないので、今の登録（app/accounts/connection-check-view.ts・
@@ -20,6 +21,10 @@ export function matchRegisteredAccountId(accounts: Array<{ id: string; channelId
 /** サーバの重複エラーの目印（英語のまま返ることがある）。 */
 export function isDuplicateChannelError(message: string): boolean {
   return /already registered|UNIQUE constraint|このLINEチャネルは登録済みです/i.test(message)
+}
+
+export function isDuplicateChannelResponse(error: unknown): boolean {
+  return error instanceof ApiError && isDuplicateChannelError(error.message) && error.status === 409
 }
 
 /** 友だち数の統計は前日分。日本時間の昨日を yyyyMMdd で返す。 */

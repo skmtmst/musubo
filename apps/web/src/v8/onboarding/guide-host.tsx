@@ -4,9 +4,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
-import { useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
-import { isLineAccountEntryReady, subscribeLineAccountEntry } from '@/lib/line-account-entry'
+import { isLineAccountEntryReady, resolveLineAccountEntry, subscribeLineAccountEntry } from '@/lib/line-account-entry'
 import { isAccountIndependentRoute } from '@/lib/store-route-guard'
 import { useFirstSteps } from '@/v8/dashboard/public/first-steps-model/index'
 import { GUIDE_ENGINE_EVENT, readGuideEngineState } from './guide-engine'
@@ -38,12 +38,15 @@ export function GuideHost({ children }: { children: ReactNode }) {
    * 案内が動いているか。控え（localStorage）を見て決め、
    * 控えが変わった合図でも見直す（ダッシュボードで「開始」を押した直後もここで気づく）。
    */
-  const [remembered, setRemembered] = useState<{ accountId: string | null; staffId?: string; armed: boolean; watch: boolean } | null>(null)
+  const [remembered, setRemembered] = useState<{
+    accountId: string | null; staffId?: string; armed: boolean; watch: boolean; checkingAccount: boolean
+  } | null>(null)
 
   useEffect(() => {
     const read = () => {
       const { phase, stepKey } = readGuideEngineState(accountId, staffId)
-      setRemembered({ accountId, staffId, armed: phase === 'active' || phase === 'paused', watch: phase === 'active' && stepKey === 'firstMessage' })
+      setRemembered({ accountId, staffId, armed: phase === 'active' || phase === 'paused',
+        watch: phase === 'active' && stepKey === 'firstMessage', checkingAccount: phase === 'active' && stepKey === 'accounts' })
     }
     read()
     if (typeof window === 'undefined') return
@@ -56,7 +59,24 @@ export function GuideHost({ children }: { children: ReactNode }) {
   }, [accountId, staffId])
 
   const current = remembered?.accountId === accountId && remembered.staffId === staffId ? remembered : null
-  return <GuideSession accountId={accountId} role={role} armed={current?.armed ?? false} watchFirstMessage={current?.watch ?? false}>{children}</GuideSession>
+  return <GuideSession accountId={accountId} staffId={staffId} role={role} armed={current?.armed ?? false}
+    watchFirstMessage={current?.watch ?? false} checkingAccount={current?.checkingAccount ?? false}>{children}</GuideSession>
+}
+
+function useAccountsGuideEntry(accountId: string | null, scope: string | null, checkingAccount: boolean): boolean {
+  const [verifiedScope, setVerifiedScope] = useState<string | null>(null)
+  const verified = scope !== null && verifiedScope === scope
+  // 一覧を離れるか対象が変わるまで、次の手順へ進むための確認を保つ。
+  useEffect(() => { setVerifiedScope(null) }, [scope])
+  useEffect(() => {
+    if (!scope || !accountId || !checkingAccount || verified) return
+    let current = true
+    void resolveLineAccountEntry(accountId).then(result => {
+      if (current && result.destination === 'dashboard') setVerifiedScope(scope)
+    }).catch(() => {})
+    return () => { current = false }
+  }, [scope, accountId, checkingAccount, verified])
+  return verified
 }
 
 function matchesGuideLocation(pathname: string, query: Pick<URLSearchParams, 'get'>, href: string): boolean {
@@ -64,13 +84,18 @@ function matchesGuideLocation(pathname: string, query: Pick<URLSearchParams, 'ge
   return pathname === path && Array.from(new URLSearchParams(search)).every(([key, value]) => query.get(key) === value)
 }
 
-function GuideSession({ accountId, role, armed, watchFirstMessage, children }: { accountId: string | null; role: string | null; armed: boolean; watchFirstMessage: boolean; children: ReactNode }) {
+function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, checkingAccount, children }: {
+  accountId: string | null; staffId?: string; role: string | null; armed: boolean; watchFirstMessage: boolean; checkingAccount: boolean; children: ReactNode
+}) {
   const account = useOptionalAccount()
   const basicId = account?.selectedAccount?.basicId
   const style = useAccountStyle(accountId)
   const pathname = usePathname()
   const entryReady = useSyncExternalStore(subscribeLineAccountEntry, () => isLineAccountEntryReady(accountId), () => false)
-  const canOpenGuide = entryReady && !isAccountIndependentRoute(pathname)
+  const accountsScope = pathname === '/accounts' && accountId && staffId && canManageRole(role)
+    ? JSON.stringify([accountId, staffId]) : null
+  const accountsGuideReady = useAccountsGuideEntry(accountId, accountsScope, checkingAccount)
+  const canOpenGuide = accountsGuideReady || (entryReady && !isAccountIndependentRoute(pathname))
   const search = useSearchParams()
   const query = search.toString()
   const qrOpen = search.has('qr')
@@ -159,7 +184,7 @@ function GuideSession({ accountId, role, armed, watchFirstMessage, children }: {
   useGuideSignal('followup.confirm', Boolean(canOpenGuide && accountId && followupCanConfirm && guide.phase === 'active'),
     () => advance(false, 4), accountId ?? undefined)
   useSetupSaveSignal(scripted && armed, first.refresh)
-  useGuideSignal('accounts.connection', armed && Boolean(accountId), first.refresh, accountId ?? undefined)
+  useGuideSignal('accounts.connection', accountsGuideReady && Boolean(accountId), first.refresh, accountId ?? undefined)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.bookingExposure?.publicReservationMenu === true
   const skipPublishPrompt = canOpenGuide && needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished
@@ -168,9 +193,9 @@ function GuideSession({ accountId, role, armed, watchFirstMessage, children }: {
   const reviewingTables = guide.stepKey === 'attributes' && guide.procedureIndex === 3
   const reviewingHours = guide.stepKey === 'hours'
   const showComplete = canOpenGuide && scripted && !guide.loading && guide.phase !== 'done' && Boolean(summary?.total && summary.done === summary.total) &&
-    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours
+    (first.arrived || guide.phase === 'active' || guide.phase === 'paused') && !offerPublishing && !skipPublishPrompt && !reviewingTables && !reviewingHours && !menuPickerStep
   const showReceive = canOpenGuide && firstMessageStep && accountId && !step.done && guide.phase === 'active' && pathname === '/' && !qrOpen
-  const showMenuPicker = canOpenGuide && menuPickerStep && !step.done && guide.phase === 'active' && pathname === '/' &&
+  const showMenuPicker = canOpenGuide && menuPickerStep && guide.phase === 'active' && pathname === '/' &&
     accountId && style.data?.styleSelected && !style.stale
   useEffect(() => {
     if (canOpenGuide && firstMessageStep && guide.phase === 'active' && pathname === '/' && qrOpen && !entryStep) {

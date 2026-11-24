@@ -252,14 +252,20 @@ export function RegistrationPaymentRecovery(props: RegistrationPaymentProps) {
       {error && (state === 'failed' || state === 'processing') &&
         <Notice tone="danger" role="alert">決済状況を確認できませんでした。もう一度お試しください。</Notice>}
       <div className={styles.registrationActions}>
-        {'onRefresh' in props && <Button type="button" size="large" variant="primary" busy={busy} busyLabel="確認中…"
-          onClick={() => void refresh(props.onRefresh)}>決済状況を更新</Button>}
+        {'onRefresh' in props && <span className={styles.registrationAction}>
+          <Button type="button" size="large" variant="primary" fullWidth busy={busy} busyLabel="確認中…"
+            onClick={() => void refresh(props.onRefresh)}>決済状況を更新</Button>
+        </span>}
         {state === 'failed' && props.paymentUrl &&
           <span className={styles.registrationStripe}>
             <Button size="large" variant="text" textTone="accent" external fullWidth href={props.paymentUrl}>Stripeでお支払いを確認</Button>
           </span>}
-        {state === 'activated' && <Button size="large" variant="primary" href={props.registrationHref}>LINE登録を続ける</Button>}
-        {state === 'unavailable' && <Button size="large" variant="primary" href="/accounts">アカウント一覧へ</Button>}
+        {state === 'activated' && <span className={styles.registrationAction}>
+          <Button size="large" variant="primary" fullWidth href={props.registrationHref}>LINE登録を続ける</Button>
+        </span>}
+        {state === 'unavailable' && <span className={styles.registrationAction}>
+          <Button size="large" variant="primary" fullWidth href="/accounts">アカウント一覧へ</Button>
+        </span>}
       </div>
     </Card>
   </div>

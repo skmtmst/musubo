@@ -28,7 +28,7 @@ import TextLink from '@/components/shared/text-link'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, channelLengthWarning, checkActionLabel, checkErrorText,
-  checkStage, isDuplicateChannelError,
+  checkStage, isDuplicateChannelError, isDuplicateChannelResponse,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
@@ -44,7 +44,6 @@ import RegistrationSession from './registration-session'
 import { PENDING_REGISTRATION_RECEIPT, REGISTRATION_STYLE_KEY, registrationImportChoiceKey, registrationPresentationKey, registrationStorageKey, readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
 import { useRegistrationImport } from './use-registration-import'
 import { useRegistrationReceipt } from './use-registration-receipt'
-import { ApiError } from '@/lib/api/transport/errors'
 import { useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -483,7 +482,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     } catch (saveFailure) {
       if (!connectionRequestIsCurrent(revision)) return
       setCheckRunning(false)
-      if (saveFailure instanceof ApiError && saveFailure.status === 409 && isDuplicateChannelError(saveFailure.message)) {
+      if (isDuplicateChannelResponse(saveFailure)) {
         await recoverDuplicate(revision)
         return
       }
@@ -538,7 +537,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
         if (connectionRequestIsCurrent(revision)) setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
         return
       }
-      if (caught instanceof ApiError && caught.status === 409 && isDuplicateChannelError(caught.message)) {
+      if (isDuplicateChannelResponse(caught)) {
         await recoverDuplicate(revision)
         return
       }
