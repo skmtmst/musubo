@@ -10,7 +10,7 @@ vi.hoisted(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
 })
 
-const fixture = vi.hoisted(() => ({ account: 'account-1', snapshot: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
+const fixture = vi.hoisted(() => ({ account: 'account-1', snapshot: vi.fn(), storeContext: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 
@@ -36,6 +36,7 @@ beforeEach(() => {
   role.value = verifiedStaffRole('owner')
   fixture.account = 'account-1'; nav.params = new URLSearchParams()
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
+  fixture.storeContext.mockResolvedValue({ data: { selectedStore: null } })
   fixture.createMenu.mockResolvedValue({ success: true })
   fixture.updateMenu.mockResolvedValue({ success: true })
   fetchApi.mockResolvedValue({ success: true })

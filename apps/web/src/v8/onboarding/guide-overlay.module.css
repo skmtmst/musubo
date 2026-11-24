@@ -284,6 +284,12 @@ html:root .barHeader button[class][class][class] { height: auto; }
   border-radius: var(--polish-radius-card);
 }
 
+@media (max-width: 480px) {
+  [data-guide-followup-editor] .stack {
+    margin-inline: var(--space-8);
+  }
+}
+
 .root[data-guide-table-editor] .balloon {
   width: var(--tpl-guideov-complete-balloon-w);
 }

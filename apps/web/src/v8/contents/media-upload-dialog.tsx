@@ -17,7 +17,7 @@ import Disclosure from '@/components/shared/disclosure'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { MEDIA_ACCEPT, extractMediaMetadata, mediaFileLimitBytes, putMediaFile, validateMediaFile } from './media-direct-upload'
+import { MEDIA_ACCEPT, extractMediaMetadata, fileMatchesMediaKind, mediaAcceptForKind, mediaFileLimitBytes, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
@@ -55,6 +55,11 @@ const LIMITS = [
 ]
 const MAX_FILES = 10
 
+export type RegisteredPhoto = {
+  id: string
+  scanStatus: NonNullable<UploadEntry['scanStatus']>
+}
+
 export default function MediaUploadDialog({
   open,
   accountId,
@@ -63,6 +68,7 @@ export default function MediaUploadDialog({
   onCreateFolder,
   onClose,
   onComplete,
+  photoUpload,
 }: {
   open: boolean
   accountId: string | null
@@ -72,6 +78,10 @@ export default function MediaUploadDialog({
   onCreateFolder?: FolderSelectCreate
   onClose: () => void
   onComplete: () => void
+  photoUpload?: {
+    maxFiles: number
+    onRegistered: (photos: RegisteredPhoto[]) => void
+  }
 }) {
   const inputId = useId()
   const [entries, setEntries] = useState<UploadEntry[]>([])
@@ -137,7 +147,8 @@ export default function MediaUploadDialog({
   */
   const attempted = entries.some((entry) => entry.state === 'done' || (entry.state === 'error' && entry.retryable))
   const uploadErrorCount = entries.filter((entry) => entry.state === 'error' && entry.retryable).length
-  const selectedCountLabel = `選択したファイル（${formatNumber(entries.length)} / ${MAX_FILES}件）`
+  const maxFiles = photoUpload?.maxFiles ?? MAX_FILES
+  const selectedCountLabel = `選択したファイル（${formatNumber(entries.length)} / ${maxFiles}件）`
   const firstPhoto = entries.find((entry) => entry.previewUrl)
 
   function removeEntry(index: number) {
@@ -145,17 +156,22 @@ export default function MediaUploadDialog({
   }
 
   function stage(files: File[]) {
-    const next = files.slice(0, MAX_FILES).map((file) => {
-      const message = validateMediaFile(file)
+    if (busy) return
+    const registered = photoUpload ? entries.filter(entry => entry.state === 'done') : []
+    const remaining = maxFiles - registered.length
+    const next = files.slice(0, remaining).map((file) => {
+      const message = photoUpload && !fileMatchesMediaKind(file, 'image')
+        ? '写真の形式を確認してください'
+        : validateMediaFile(file)
       const previewUrl = !message && file.type.startsWith('image/') && typeof URL.createObjectURL === 'function'
         ? URL.createObjectURL(file)
         : undefined
       if (previewUrl) previewUrls.current.add(previewUrl)
       return { file, state: message ? 'error' : 'ready', message, retryable: false, progress: 0, previewUrl } satisfies UploadEntry
     })
-    setEntries(next)
+    setEntries([...registered, ...next])
     setPreview(null)
-    setError(files.length > MAX_FILES ? '一度に登録できるのは10件までです。先頭の10件を表示しています。' : '')
+    setError(files.length > remaining ? `一度に登録できるのは${remaining}件までです。先頭の${remaining}件を表示しています。` : '')
   }
 
   async function uploadReady() {
@@ -163,6 +179,7 @@ export default function MediaUploadDialog({
     setBusy(true)
     setError('')
     let completed = 0
+    const registeredPhotos: RegisteredPhoto[] = []
     const pending = entries
       .map((entry, index) => ({ entry, index }))
       .filter(({ entry }) => entry.state === 'ready')
@@ -208,15 +225,17 @@ export default function MediaUploadDialog({
           )))
           // 検査の状態を読む。確かめ終わるまで配信・公開には出さない。
           if (mediaId) {
+            let scanStatus: RegisteredPhoto['scanStatus'] = 'pending'
             try {
               const scan = await api.fileScan.forMedia(mediaId, accountId)
-              const status = scan.success ? scan.data.scan?.status ?? null : null
+              if (scan.success && scan.data.scan) scanStatus = scan.data.scan.status
               setEntries((current) => current.map((item, entryIndex) => (
-                entryIndex === index ? { ...item, scanStatus: status ?? 'pending' } : item
+                entryIndex === index ? { ...item, scanStatus } : item
               )))
             } catch {
               // 読めなくても登録自体は済んでいる。確かめ中として置く。
             }
+            registeredPhotos.push({ id: mediaId, scanStatus })
           }
       } catch (caught) {
         const message = describeApiFailure(caught, '登録')
@@ -226,6 +245,9 @@ export default function MediaUploadDialog({
       }
     }
     setBusy(false)
+    if (alive.current && current.current.open && current.current.accountId === accountId && registeredPhotos.length > 0) {
+      photoUpload?.onRegistered(registeredPhotos)
+    }
     if (completed > 0) onComplete()
   }
 
@@ -245,14 +267,16 @@ export default function MediaUploadDialog({
         <MediaSlot kind="file"
           title="ファイルを選ぶ・ここにドラッグ"
           size="compact"
-          accept={MEDIA_ACCEPT}
+          accept={photoUpload ? mediaAcceptForKind('image') : MEDIA_ACCEPT}
           busy={busy}
+          disabled={Boolean(photoUpload && doneCount >= maxFiles)}
           onFiles={stage}
         />
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-secondary" aria-label="ファイルのサイズ上限">
-          {LIMITS.map((limit) => <span key={limit.label}>
+          {(photoUpload ? LIMITS.slice(0, 1) : LIMITS).map((limit) => <span key={limit.label}>
             {limit.label}{limit.label === 'PDF' ? '' : ` ${formatNamesOf(limit.types)}`}：{formatBytes(mediaFileLimitBytes({ type: limit.example })!)}まで
           </span>)}
+          {photoUpload ? <span>{maxFiles}枚まで追加できます</span> : null}
         </div>
 
         {entries.length > 0 ? (
@@ -344,7 +368,7 @@ export default function MediaUploadDialog({
                       meta={entry.state === 'done' ? `${sizeText}・入りました` : `${sizeText}・${entry.message || '登録できます'}`}
                       tone={tone}
                       thumbnail={thumbnail}
-                      onRemove={busy ? undefined : () => removeEntry(index)}
+                      onRemove={busy || (photoUpload && entry.state === 'done') ? undefined : () => removeEntry(index)}
                     />
                     {entry.previewUrl ? <Button type="button" variant="text" size="inline" textTone="accent" className="ml-12 mt-1" onClick={() => setPreview(entry)}>写真を大きく見る</Button> : null}
                     {scan ? (
@@ -371,7 +395,7 @@ export default function MediaUploadDialog({
           /></SaveErrorField></Field></div>
         <Disclosure appearance="inset" size="compact" title="登録時の注意事項">
           <Notice tone="info">
-            <p>PDFはLINEで直接送れません。リンクとして使います。</p>
+            {photoUpload ? null : <p>PDFはLINEで直接送れません。リンクとして使います。</p>}
             <p>大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
             <p>中身の形式と拡張子が違うファイルは登録できません。</p>
             <p>公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>

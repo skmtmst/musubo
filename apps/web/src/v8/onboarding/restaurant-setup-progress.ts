@@ -52,7 +52,7 @@ async function loadRestaurantStoreProgress(accountId: string, selectedStoreId?: 
   return { style: 'restaurant', ...(data.reservationForm?.available===false?{notices:[{message:data.reservationForm.message,href:data.reservationForm.repairPath}]}:{}), steps: {
     attributes: { complete: data.tables, reason: '卓を作るか、停止中の卓の受付を再開してください' },
     hours: { complete: data.hours, reason: '予約を受け付ける曜日と時間を設定してください' },
-    friendAdd: { complete: data.menus, reason: 'コースとメニューを登録してください' },
+    friendAdd: { complete: data.menus || data.courseRegistered === true, reason: 'コースとメニューを登録してください' },
     scenario: { complete: data.reception, reason: 'LINEの予約ページと、これからの受付枠を用意してください' },
     followup: followupEvidence(data.followupSetup, data.followup),
   } }

@@ -14,7 +14,6 @@ export interface V06CheckRow { key: V8CheckRow['key']; title: string; detail: st
 
 type RowKey = V8CheckRow['key']
 
-export const PROVIDER_MEMBERSHIP_GUIDANCE = 'プロバイダーの所属は自動では照合していません。LINE Developersで、Messaging APIとLINEログインのチャネルが同じプロバイダー内にあることを確認してください。'
 
 /** 接続確認の見出し。認証の合否と、未照合のプロバイダー所属を区別する。 */
 const V06_ROW_TITLES: Record<RowKey, string> = {
