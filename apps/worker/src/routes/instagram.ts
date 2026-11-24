@@ -456,9 +456,9 @@ instagram.get(
         ),
         userToken = pageToken;
       // どの接続を書くかは state に預けた宛先で決める。
-      // 宛先があれば その接続のつなぎ直し、無ければ既定の接続の置き換え
-      // （772より前と同じ「1件を入れ替える」動き）。接続が1件も無ければ新規に作る。
-      const target = await connectionRow(c, id, row.connection_id);
+      // 宛先があればその接続のつなぎ直し、無ければ新規追加。ここで既定の接続へ
+      // 落とすと、追加の認可が完了したときに既存の接続を置き換えてしまう。
+      const target = row.connection_id ? await connectionRow(c, id, row.connection_id) : null;
       // つなぎ直す相手が途中で解除された場合は、新しい接続を勝手に生やさず衝突として返す。
       if (row.connection_id && !target)
         throw new InstagramError('version_conflict', 409);
