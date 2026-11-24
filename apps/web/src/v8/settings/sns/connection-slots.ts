@@ -22,6 +22,9 @@ import {
   linkedAccountSlots,
   prorateMonthlyIncrement,
   type InstagramConnectionStatus,
+  type SnsConnectionPorts,
+  type SnsGoogleConnectionPort,
+  type SnsSlotBilling as SharedSnsSlotBilling,
 } from '@line-crm/shared'
 import type { GoogleConnection, GoogleConnectionData } from '@/lib/restaurant-google-api'
 import type { InstagramConnectionList } from '@/lib/api/features/settings'
@@ -80,19 +83,52 @@ export type SnsSlotsView = {
   instagram: SnsServiceSlots
 }
 
-/** 請求の段。日付と残り日数はサーバーの値だけを使い、利用者の時計から作らない。 */
-export type SnsSlotBilling =
-  | { kind: 'trialing' }
-  | { kind: 'paid'; monthlyDaysRemaining: number; monthlyDaysInPeriod: number }
+/**
+ * 請求の段。日付と残り日数はサーバーの値だけを使い、利用者の時計から作らない。
+ * 形の正本は `@line-crm/shared` の `SnsSlotBilling`（`GET /api/settings/sns/connections` が返す段）。
+ * ここでは別に定義せず、同じ型を指すだけにして形がずれないようにする。
+ */
+export type SnsSlotBilling = SharedSnsSlotBilling
 
 /**
- * 契約枠の既定。
- * 契約枠は HQ が持ち、LINEアカウントごとに1つの数（両サービス共通）で返る形になる（要件 §4-1）。
- * その欄を返す API はまだ無い（要件 §6 の「API型」は別の担当）ので、
- * 返るまでは基本料金に入っている各1個ぶんだけを契約枠として数える。
+ * 契約枠が取れないときの既定。
+ * 契約枠は HQ が持ち、LINEアカウントごとに1つの数（両サービス共通）で返る（要件 §4-1）。
+ * ふだんは `GET /api/settings/sns/connections` の `contracted` を使う。
+ * その口が返らない LINEアカウント（契約枠の記録が無い＝404）では、
+ * 基本料金に入っている各1個ぶんだけを契約枠として数える。
  * 少なく見せて料金の確認を飛ばすことがない側へ寄せた既定。
  */
 export const SNS_DEFAULT_CONTRACTED = 1
+
+/**
+ * `GET /api/settings/sns/connections` の返事が、この画面が読める形かどうかを確かめる。
+ *
+ * サーバーや疑似APIは、知らない道でも `success: true` のまま別の形の中身を返すことがある。
+ * 形を見ずに受け取ると主連携を探すところで画面全体が止まるので、
+ * 必要な項目がそろっていないときは「取れなかった」のと同じ扱いにして、
+ * 既定（契約枠1・請求の段なし）へ戻す。
+ */
+export function asConnectionPorts(data: unknown, accountId?: string): SnsConnectionPorts | null {
+  if (!data || typeof data !== 'object') return null
+  const ports = data as Partial<SnsConnectionPorts>
+  if (typeof ports.lineAccountId !== 'string' || (accountId && ports.lineAccountId !== accountId)) return null
+  if (!Number.isSafeInteger(ports.contracted) || ports.contracted! < 1
+    || !Number.isSafeInteger(ports.primaryVersion) || ports.primaryVersion! < 0) return null
+  if (ports.billing !== null && ports.billing?.kind !== 'trialing') {
+    const billing = ports.billing
+    if (billing?.kind !== 'paid' || !Number.isSafeInteger(billing.monthlyDaysRemaining)
+      || !Number.isSafeInteger(billing.monthlyDaysInPeriod) || billing.monthlyDaysInPeriod < 1
+      || billing.monthlyDaysRemaining < 0 || billing.monthlyDaysRemaining > billing.monthlyDaysInPeriod) return null
+  }
+  if (!Array.isArray(ports.googleConnections)) return null
+  const connectionsReadable = ports.googleConnections.every((connection) => {
+    if (!connection || typeof connection !== 'object') return false
+    const port = connection as Partial<SnsGoogleConnectionPort>
+    return typeof port.id === 'string' && typeof port.isPrimary === 'boolean'
+  })
+  if (!connectionsReadable) return null
+  return data as SnsConnectionPorts
+}
 
 /* ------------------------------------------------------------------ 枠の数え方 */
 
@@ -287,13 +323,14 @@ function googleRow(
  * Google の返事を接続の配列へ直す。
  * `list` は接続一覧の口の返事で、接続が何件あってもそのぶんの行を作る。
  * 一覧を読めていないときは、1件ぶんの `data` から繋がっている1件だけを作る。
- * 主連携は API が持つようになるまで、先頭の接続を正本として扱う（要件 §4-3 の既定）。
+ * 主連携の指定を取得できた場合はその接続だけに札を付け、取得できない場合はサーバーの一覧の先頭を正本とする。
  * 一覧の並びはサーバーが主連携→並び順で返すので、ここでは並べ替えない。
  */
 export function googleSlots(
   data: GoogleConnectionData | null,
   formatLastSynced: (iso: string) => string,
   list?: GoogleConnection[] | null,
+  primaryConnectionId?: string | null,
 ): SnsServiceSlots {
   const storeName = data?.store.name
   if (list && list.length > 0) {
@@ -301,14 +338,14 @@ export function googleSlots(
       service: 'googleBusiness',
       connections: list
         .filter((connection) => connection.status !== 'disconnected')
-        .map((connection, index) => googleRow(connection, storeName, index === 0, formatLastSynced)),
+        .map((connection, index) => googleRow(connection, storeName, primaryConnectionId == null ? index === 0 : connection.id === primaryConnectionId, formatLastSynced)),
     }
   }
 
   const connection = data?.connection ?? null
   const connections: SnsConnectionView[] = []
   if (connection && connection.status !== 'disconnected') {
-    connections.push(googleRow(connection, storeName, true, formatLastSynced))
+    connections.push(googleRow(connection, storeName, primaryConnectionId == null || connection.id === primaryConnectionId, formatLastSynced))
   }
 
   return { service: 'googleBusiness', connections }
