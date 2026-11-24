@@ -176,6 +176,7 @@
 - **空の表示・読めない表示**：`ListState`（`components/shared/list-state.tsx`）。画面で手書きしない。
 - **閲覧のみの帯**：型に readOnly を渡すと帯が出る形の共通部品にする。持ち主は `ReadOnlyNotice`（`components/shared/read-only-notice.tsx`）。型の readOnly から使う。
 - **確かめの窓**：`ConfirmDialog`（`components/shared/confirm-dialog.tsx`）。頭・本文・下の帯を細い線で分ける。題の終わりは全角「？」。
+- **削除のボタン**：画面の中の削除は赤い文字にし、確かめる窓の最後の［削除する］は［キャンセル］と同じ大きさの赤い塗りにする。
 - **失敗の知らせ**：欄の誤りは `useFormErrors`（§6.9）、欄に結び付かない失敗は `Notice` の danger。手書きの `role="alert"` にしない。
 - 作る画面の細かい違い（閉じるボタンの枠・欄の高さ 36・右の欄の幅）は共通部品の値にそろえる。引き出し（`Drawer`）の閉じるは枠付き 36、日時の欄は 36。
 
