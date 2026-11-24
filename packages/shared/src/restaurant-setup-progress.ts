@@ -5,6 +5,8 @@ export interface RestaurantSetupProgress {
   tables: boolean;
   hours: boolean;
   menus: boolean;
+  /** 開店準備のコース登録。公開メニューまたは必須項目を保存したコースの下書きがある。 */
+  courseRegistered?: boolean;
   reception: boolean;
   followup: boolean;
   reservationForm?: RestaurantReservationFormHealth;

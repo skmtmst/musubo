@@ -58,9 +58,12 @@ async function openEditor(mode: 'create' | 'edit', kind: 'course' | 'a_la_carte'
   const price = await screen.findByLabelText('価格（税込）') as HTMLInputElement
   if (mode === 'create') {
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '架空のメニュー' } })
-    if (kind === 'a_la_carte') {
+    if (kind === 'course') {
+      fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+    } else {
       fireEvent.click(screen.getByRole('button', { name: '種類' }))
-      fireEvent.click(screen.getByRole('option', { name: '単品' }))
+      fireEvent.click(within(screen.getByRole('option', { name: '単品' })).getByRole('button', { name: '単品' }))
+      expect(screen.queryByLabelText('所要時間')).toBeNull()
     }
   }
   return price
@@ -108,7 +111,6 @@ it('0円の新規コースは送る値を保って一度だけ作れる', async 
   changePrice(price, '-500')
   expect(await screen.findByText(reason)).toBeTruthy()
   changePrice(price, '0')
-  fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
   fireEvent.click(saveButton())
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledExactlyOnceWith('account-1', {
     storeId: 'store-1', kind: 'course', name: '架空のメニュー', price: 0, durationMinutes: 120,

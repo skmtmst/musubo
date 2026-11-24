@@ -11,7 +11,7 @@ import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoic
 import styles from '@/v8/onboarding/wizard.module.css'
 
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
-export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onSkip, onClose }: {
+export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onClose }: {
   accountName?: string
   open: boolean
   choice: AccountStyle | ''
@@ -20,7 +20,6 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
   error: string
   onChoose: (style: AccountStyle) => void
   onSave: () => void
-  onSkip: () => void
   onClose: () => void
 }) {
   const [demoOpen, setDemoOpen] = useState(false)
@@ -49,7 +48,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
     footer={demoOpen ? <DialogActions leadingAction={<Button onClick={() => { if (demoPage > 0) setDemoPage(demoPage - 1) }} aria-disabled={demoPage === 0} disabled={busy}>前のページ</Button>}>
       <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
-    </DialogActions> : <DialogActions leadingAction={<Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}>
+    </DialogActions> : <DialogActions>
       <Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? '「このスタイルにする」を押して選んでください' : null}>次へ<ArrowRight size={16} aria-hidden="true" /></Button>
     </DialogActions>}
   >

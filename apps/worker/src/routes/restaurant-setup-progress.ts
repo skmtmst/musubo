@@ -20,13 +20,19 @@ export function registerRestaurantSetupProgressRoutes(routes: Hono<Env>) {
       EXISTS(SELECT 1 FROM rt_tables t WHERE t.store_id=s.id AND t.is_active=1 AND t.max_capacity>0) AS tables_ready,
       (SELECT h.hours_json FROM rt_opening_hours_settings h WHERE h.store_id=s.id) AS hours_json,
       EXISTS(SELECT 1 FROM rt_menu_items m WHERE m.store_id=s.id AND m.status='active') AS menus_ready,
+      EXISTS(SELECT 1 FROM rt_menu_items m WHERE m.store_id=s.id AND m.kind='course' AND m.status='draft'
+        AND length(trim(m.name))>0 AND typeof(m.price)='integer' AND m.price>=0
+        AND typeof(m.duration_minutes)='integer' AND m.duration_minutes BETWEEN 15 AND 600) AS course_draft_registered,
       (EXISTS(SELECT 1 FROM line_accounts a WHERE a.id=s.line_account_id AND a.is_active=1 AND a.archived_at IS NULL AND length(trim(COALESCE(a.liff_id,'')))>0) AND EXISTS(SELECT 1 FROM rt_inventory_slots i WHERE i.store_id=s.id
         AND julianday(i.starts_at)>julianday('now') AND i.total_capacity>0
         AND COALESCE(i.auto_line_original,i.line_capacity)>0)) AS reception_ready,
       EXISTS(SELECT 1 FROM rt_store_followup_templates f WHERE f.store_id=s.id AND f.sending_status='active'
         AND EXISTS(SELECT 1 FROM rt_store_followup_step_bindings b WHERE b.store_id=s.id AND b.enabled=1)) AS followup_ready
       FROM rt_stores s WHERE s.id=? AND s.organization_id=? AND s.status='active'`)
-      .bind(storeId, organization.id).first<{ id: string; line_account_id:string|null; tables_ready: number; hours_json: string | null; menus_ready: number; reception_ready: number; followup_ready: number }>();
+      .bind(storeId, organization.id).first<{
+        id: string; line_account_id: string | null; tables_ready: number; hours_json: string | null;
+        menus_ready: number; course_draft_registered: number; reception_ready: number; followup_ready: number;
+      }>();
     if (!row) return c.json({ success: false, error: '店舗が見つかりません' }, 404);
     // JSON不正は想定外のエラーとして共通の報告経路へ渡す。空配列だけが未設定。
     const hours: unknown = row.hours_json === null ? [] : JSON.parse(row.hours_json);
@@ -39,6 +45,7 @@ export function registerRestaurantSetupProgressRoutes(routes: Hono<Env>) {
     const followupSetup = await readRestaurantFollowupSetupProgress(dbFor(c.env, storeId), storeId);
     const data: RestaurantSetupProgress = {
       storeId: row.id, tables: Boolean(row.tables_ready), hours: hoursReady, menus: Boolean(row.menus_ready),
+      courseRegistered: Boolean(row.menus_ready || row.course_draft_registered),
       reception: Boolean(row.tables_ready && hoursReady && bookingHoursReady && row.reception_ready),
       followup: Boolean(row.followup_ready),
       ...(row.line_account_id?{reservationForm:await readRestaurantReservationFormHealth(dbFor(c.env,storeId),storeId,row.line_account_id)}:{}),

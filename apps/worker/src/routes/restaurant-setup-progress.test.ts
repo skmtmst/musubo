@@ -52,6 +52,24 @@ it('卓が無くても営業時間を独立に判定し、他店のメニュー�
   expect(await progress()).toMatchObject({ tables: false, hours: true, menus: false, reception: false, followup: false });
   expect(await progress('store-yokohama')).toMatchObject({ tables: false, hours: false, menus: false });
 });
+it('同じ店舗の必須項目がそろった下書きもコース登録済みとして読む', async () => {
+  expect(await progress()).toMatchObject({ menus: true, courseRegistered: true });
+  database.raw.exec(`
+    UPDATE rt_menu_items SET status='archived', duration_minutes=90 WHERE id='menu-ginza';
+    INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,status) VALUES
+      ('legacy-draft','store-ginza','course','以前の下書き',8800,NULL,'draft'),
+      ('invalid-draft','store-ginza','course','範囲外の所要時間',8800,10,'draft'),
+      ('single-draft','store-ginza','a_la_carte','単品の下書き',1000,90,'draft'),
+      ('other-store-draft','store-yokohama','course','横浜のコース',8800,90,'draft');
+  `);
+  expect(await progress()).toMatchObject({ menus: false, courseRegistered: false });
+  expect(await progress('store-yokohama')).toMatchObject({ menus: false, courseRegistered: true });
+
+  database.raw.exec(`INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,status)
+    VALUES('saved-course','store-ginza','course','登録したコース',0,150,'draft')`);
+  expect(await progress()).toMatchObject({ menus: false, courseRegistered: true });
+  expect(database.raw.prepare('SELECT status FROM rt_menu_items WHERE id=?').get('saved-course')).toEqual({ status: 'draft' });
+});
 it('過去300件の後ろにある未来の設定も数え、満席の自動停止を未設定にしない', async () => {
   hours();
   googleHours();

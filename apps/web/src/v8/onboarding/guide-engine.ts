@@ -44,7 +44,7 @@ export type GuideControl = {
   reset: () => void
   complete?: () => void
   /** 同じ段の次の手順へ（1/3→2/3→3/3）。 */
-  advanceProcedure: () => void
+  advanceProcedure: (skipRemainingProcedures?: boolean, targetIndex?: number) => void
   /** 選んだ段の手順1から始める。持たない呼び出し元もあるので任意。 */
   startAt?: (stepKey: string) => void
 }
@@ -100,7 +100,7 @@ export function writeGuideEngineState(accountId: string, state: GuideEngineState
  * 状態遷移表。許されない遷移は今の状態をそのまま返し、再開先を失わない。
  * 段が変わる時は現在手順を1に戻す（新しい段の手順1から案内する）。
  */
-export function nextGuideEngineState(current: GuideEngineState, action: GuideEngineAction, stepKey: string | null = null): GuideEngineState {
+export function nextGuideEngineState(current: GuideEngineState, action: GuideEngineAction, stepKey: string | null = null, targetIndex?: number): GuideEngineState {
   switch (action) {
     case 'start': return current.phase === 'active' ? current : { phase: 'active', stepKey, procedureIndex: 1 }
     case 'pause': return current.phase === 'active' ? { ...current, phase: 'paused' } : current
@@ -118,7 +118,7 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
         吹き出しもガイド帯も出ない「案内が消えた」状態になる（枠14 の差し戻し）。
         最後の手順から先へは、段をまたぐ advance で進める。
       */
-      const next = clampProcedureIndex(current.stepKey, current.procedureIndex + 1)
+      const next = clampProcedureIndex(current.stepKey, Math.max(current.procedureIndex + 1, targetIndex ?? 1))
       return next === current.procedureIndex ? current : { ...current, procedureIndex: next }
     }
     case 'complete': return current.phase === 'done' ? current : { phase: 'done', stepKey: null, procedureIndex: 1 }
@@ -234,13 +234,13 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     return request
   }, [accountId])
 
-  const commit = useCallback((action: GuideEngineAction, stepKey: string | null = null) => {
+  const commit = useCallback((action: GuideEngineAction, stepKey: string | null = null, targetIndex?: number) => {
     /*
       遷移はこの場で決める。setState の関数は描画の時まで走らないことがあり、
       中で決めた値を使うと「変わっていない」と誤判定して案内が始まらない。
     */
     const previous = state
-    const next = nextGuideEngineState(previous, action, stepKey)
+    const next = nextGuideEngineState(previous, action, stepKey, targetIndex)
     if (next === previous) return
     setState(next)
     const currentGeneration = generation.current
@@ -273,11 +273,11 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   }, [state.phase, state.stepKey, reviewingCompletion, anchor, summary, skipped, commit])
 
   /** 手順を見送って次の段へ移る。済みにはせず、存在する次の案内へ渡す（枠14 共通ルール）。 */
-  const advanceProcedure = useCallback(() => {
+  const advanceProcedure = useCallback((skipRemainingProcedures = false, targetIndex?: number) => {
     if (state.phase !== 'active') return
     const total = scripted ? guideProcedureTotal(state.stepKey) : 0
-    if (state.procedureIndex < total) {
-      commit('advanceProcedure')
+    if (state.procedureIndex < total && !skipRemainingProcedures) {
+      commit('advanceProcedure', null, targetIndex)
       return
     }
     const current = state.stepKey

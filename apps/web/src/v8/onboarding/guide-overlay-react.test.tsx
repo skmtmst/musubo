@@ -75,6 +75,7 @@ describe('手順別ガイドの重ね表示', () => {
   })
 
   it('保存で進む手順では、対象を押しただけでは進めない', () => {
+    mountTarget('menu.form').setAttribute('data-guide-ready', '')
     const element = mountTarget('menu.save')
     const props = renderOverlay({ stepKey: 'friendAdd', stepOrder: 6, procedureIndex: 3 })
     fireEvent.click(element)
@@ -82,10 +83,11 @@ describe('手順別ガイドの重ね表示', () => {
   })
 
   it('コース下書きのガイドには編集画面の保存名を使う', () => {
+    mountTarget('menu.form').setAttribute('data-guide-ready', '')
     const element = mountTarget('menu.save')
     element.textContent = '保存する'
     renderOverlay({ stepKey: 'friendAdd', stepOrder: 5, procedureIndex: 3 })
-    expect(screen.getByText(/「公開」を選び、「保存する」を押します/)).toBeTruthy()
+    expect(screen.getByText('「保存する」を押すと、次の設定へ進みます。')).toBeTruthy()
   })
 
   it('ESCと帯の「一時停止」でその場で止める', () => {

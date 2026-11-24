@@ -19,7 +19,7 @@ type CommonProps = {
    * そろえるときだけ使う（★管理画面：行内の操作は32）。本文の操作は
    * `standard` のままにする。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking'
+  size?: 'standard' | 'field' | 'large' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking'
   fullWidth?: boolean
   align?: 'start'
   /**
