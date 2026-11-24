@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React, { useState } from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from './save-form-errors'
@@ -108,9 +108,10 @@ function HiddenForm() {
 it('畳んだ欄を開いて最初の欄へ移り、選択群も赤い印と理由をつなぐ', async () => {
   render(<HiddenForm />)
   fireEvent.click(screen.getByText('試す'))
-  await act(async () => { await new Promise((r) => setTimeout(r, 80)) })
-  expect(screen.getByText('整数を入力してください')).toBeTruthy()
-  expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '本人マイル' }))
+  await waitFor(() => {
+    expect(screen.getByText('整数を入力してください')).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '本人マイル' }))
+  })
   const radio = screen.getByRole('radio')
   expect(radio.getAttribute('aria-invalid')).toBe('true')
   expect(radio.getAttribute('aria-describedby')).toContain(screen.getByText('選択してください').id)

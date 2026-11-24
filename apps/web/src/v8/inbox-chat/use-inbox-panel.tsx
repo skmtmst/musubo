@@ -3,20 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout';
 export function useInboxPanel() {
 
-  /*
-   * 顧客情報の開閉(#982 LAY-01/LAY-02)。
-   *
-   * 3列に収まる幅（`INBOX_INFO_PANEL_MIN_VIEWPORT`＝1536px〜）では右列と
-   * して常設し、既定は開く。それより狭い幅ではトークの上に重ねる
-   * ドロワーにし、既定は閉じる——開きっぱなしだと返信の本文が隠れる。
-   * 以前は `hidden xl:block` で1280px未満は常に非表示で、開閉ボタンを
-   * 押しても何も出なかった。
-   *
-   * `friendInfoChoice` は運用者が明示的に開閉したときだけ値を持つ。
-   * 未操作のあいだは `wideInfoPanel`（現在の画面幅）に従うので、
-   * 幅を変えても入力中の文章や選択中の相手を失わない。
-   */
   const [wideInfoPanel, setWideInfoPanel] = useState(false)
+  const [desktopViewport, setDesktopViewport] = useState(false)
 
   const [friendInfoChoice, setFriendInfoChoice] = useState<boolean | null>(null)
 
@@ -36,10 +24,19 @@ export function useInboxPanel() {
     return () => media.removeEventListener('change', sync)
   }, [])
 
-  const showFriendInfo = friendInfoChoice ?? wideInfoPanel
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)')
+    const sync = () => setDesktopViewport(media.matches)
+    sync(); media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
+
+  const inlineInfoPanel = wideInfoPanel || desktopViewport
+  const narrowDesktop = desktopViewport && !wideInfoPanel
+  const showFriendInfo = friendInfoChoice ?? inlineInfoPanel
 
   const setShowFriendInfo = (next: boolean | ((current: boolean) => boolean)) => {
-    setFriendInfoChoice((current) => (typeof next === 'function' ? next(current ?? wideInfoPanel) : next))
+    setFriendInfoChoice((current) => (typeof next === 'function' ? next(current ?? inlineInfoPanel) : next))
   }
 
   /*
@@ -50,13 +47,13 @@ export function useInboxPanel() {
   const customerPanelRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    if (!showFriendInfo || wideInfoPanel) return
+    if (!showFriendInfo || inlineInfoPanel) return
     customerPanelRef.current?.focus()
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setFriendInfoChoice(false)
+      if (event.key === 'Escape' && !event.defaultPrevented) setFriendInfoChoice(false)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [showFriendInfo, wideInfoPanel])
-  return { wideInfoPanel, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef }
+  }, [showFriendInfo, inlineInfoPanel])
+  return { wideInfoPanel, inlineInfoPanel, narrowDesktop, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef }
 }

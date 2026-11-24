@@ -16,6 +16,7 @@ import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatsPage from '@/app/chats/page'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { setTextControlValue } from '@/test-utils/text-control'
 
 const fixture = vi.hoisted(() => ({ params: new URLSearchParams() }))
 vi.mock('next/link', () => ({ default: () => null }))
@@ -218,12 +219,9 @@ describe('受信箱V4で既存機能を失わない', () => {
 
   it('テンプレートは選んでも送らず、書きかけの文を残して入力欄へ足す', async () => {
     await openLineChat()
-    const box = () => host.querySelector<HTMLTextAreaElement>('textarea[aria-label="メッセージを入力"], textarea')!
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
-      setter.call(box(), 'お待たせしました。')
-      box().dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    // 返信欄は差し込みを札で見せる欄。textarea と同じく value と input で書ける。
+    const box = () => host.querySelector<HTMLElement & { value: string }>('[aria-label="メッセージを入力"]')!
+    await act(async () => { setTextControlValue(box(), 'お待たせしました。') })
     await act(async () => { [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('テンプレートを選択'))!.click() })
     await eventually(() => expect(screen.getByText('発送のご案内').closest('button')).toBeTruthy())
     fireEvent.click(screen.getByText('発送のご案内').closest('button')!)

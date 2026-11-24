@@ -22,7 +22,7 @@ import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 import { GoogleConnectionSettings } from '@/v8/restaurant/google'
 import { api } from '@/lib/api'
 import type { InstagramConnectionList } from '@/lib/api/features/settings'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canAdministerRole, canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './sns.module.css'
 import { formatDate, formatNumber } from '@/lib/format'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -48,10 +48,12 @@ import {
   type SnsSlotsView,
 } from './connection-slots'
 import { SnsSlotAdditionDialog, SnsSlotQuoteDialog, SnsSlotRemovalDialog } from './slot-dialogs'
+import { EmailConnectionCard } from './email-card'
 
 /**
- * 設定 › SNS 連携の画面。承認デザイン（設定SNS連携 複数接続 第1段 v7）の F1〜F8。
+ * 設定 › メール・SNS連携の画面。承認デザイン（設定SNS連携 複数接続 第1段 v7）の F1〜F8。
  * Googleビジネスと Instagram を1列のカードで縦に並べ、カードごとに接続を複数積む。
+ * その下に、お店のメールを転送用アドレスで受信箱へ取り込む「メール」の枠を置く（email-card）。
  *
  * 決まり：
  * - 契約枠の中の追加は料金の確認を挟まず認可画面へ進む。枠を超える追加は画面内で料金を
@@ -111,7 +113,7 @@ type DisconnectTicket = {
 
 export default function SnsSettingsPage() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('SNS 連携')
+  usePageTitle('メール・SNS連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -469,8 +471,8 @@ export default function SnsSettingsPage() {
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="y3GGTs">
       <PageHeading
         headingSize="compact"
-        title="SNS 連携"
-        help="Googleビジネスや Instagram とつないで、お店の情報をまとめて発信します。"
+        title="メール・SNS連携"
+        help="お店のメール・Googleビジネス・Instagram とつなぎます。メールは受信箱で読めて、Googleビジネスと Instagram ではお店の情報をまとめて発信できます。"
       />
       <div className={styles.body}>
         {role !== null && !canManage ? (
@@ -622,6 +624,7 @@ export default function SnsSettingsPage() {
           )}
         </Card>
 
+        <EmailConnectionCard accountId={accountId} canManage={canAdministerRole(role)} lockedReason={LOCKED_REASON} />
       </div>
 
       {addPlan?.kind === 'over-quota' ? (

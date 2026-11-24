@@ -155,7 +155,7 @@ it('予約の日時の差し込みは日本語で見せ、保存するキーを�
  snapshot.board.engines[0]!.editorContent.messageParts[0]!.messageContent='日時：{{var.reservation_datetime}}';
  await ready();await edit();
  const field=screen.getByRole('textbox',{name:'本文'});
- expect(field.textContent).toContain('予約の時間');expect(field.textContent).not.toContain('reservation_datetime');
+ expect(field.textContent).toContain('予約の日時');expect(field.textContent).not.toContain('reservation_datetime');
  fireEvent.click(screen.getByRole('button',{name:'人数',exact:true}));await accept();await save();
  expect(f.saveRow.mock.calls[0][3].messageBubbles[0].content.text).toContain('{{var.reservation_datetime}}');
 });

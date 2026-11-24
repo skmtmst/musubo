@@ -50,17 +50,17 @@ describe('LAY-01/LAY-02 顧客情報のドロワー', () => {
       lineContent={<p>選んだ相手の情報</p>}
       showFriendInfo
       selectedChatId="chat-a"
-      selectedThreadId={null}
+      selectedEmail={null}
       wideInfoPanel={wide}
       setShowFriendInfo={setShowFriendInfo}
       customerPanelRef={createRef<HTMLElement>()}
-      emailItems={[]}
     />)
     return setShowFriendInfo
   }
   const backdrop = () => document.querySelector('[data-inbox-v4="customer-panel"]')?.previousElementSibling as HTMLElement | null
 
   it('狭い幅では背景の暗幕を押しても閉じる', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
     const setShowFriendInfo = mount(false)
     expect(backdrop()?.getAttribute('aria-hidden')).toBe('true')
     fireEvent.mouseDown(backdrop()!)

@@ -39,7 +39,7 @@
 
 /*
  * 管理画面・運営とも、統括のアカウントのカードと同じ作りの 1 枚。
- * 左寄せ・頭にmusubo公式ロゴ・右に「2 / 2」・下に薄い線・枠の線なしで影だけ・角 14・題 20/600。
+ * 左寄せ・頭にmusubo公式ロゴ・下に薄い線・枠の線なしで影だけ・角 14・題 20/600。
  * ログインの 1 段目も同じ地・同じ幅・同じカード。
  */
 .page[data-auth-layout] { background: var(--tpl-auth-page-bg); }
@@ -51,4 +51,3 @@
 .card[data-auth-layout] h1 { width: 100%; text-align: left; font-size: var(--tpl-auth-title-size); font-weight: var(--font-weight-bold); line-height: var(--tpl-auth-title-lh); }
 
 .head { display: flex; width: 100%; align-items: center; gap: var(--tpl-auth-head-gap); padding-bottom: var(--tpl-auth-head-pad); border-bottom: 1px solid var(--color-hairline); text-align: left; }
-.headStep { margin-left: auto; flex: none; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--font-weight-ui); font-variant-numeric: tabular-nums; white-space: nowrap; }

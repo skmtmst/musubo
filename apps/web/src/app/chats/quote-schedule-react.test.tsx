@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import ChatsPage from './page'
+import { setTextControlValue } from '@/test-utils/text-control'
 
 /*
  * N-025: 引用返信と送信予約の画面対照。
@@ -173,12 +174,9 @@ async function eventually(check: () => void, timeout = 1_500): Promise<void> {
 }
 
 async function typeText(host: HTMLElement, text: string) {
-  const textarea = document.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
-  await act(async () => {
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
-    setter.call(textarea, text)
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+  // 返信欄は差し込みを札で見せる欄。textarea と同じく value と input で書ける。
+  const textarea = document.querySelector<HTMLElement>('[aria-label="メッセージを入力"]')!
+  await act(async () => { setTextControlValue(textarea, text) })
 }
 
 describe('N-025 引用返信と送信予約', () => {
@@ -396,7 +394,7 @@ describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付'
     await eventually(() => { expect(values.get('chat.sendMode')).toBe('enter') })
     expect(host.textContent).toContain('Enter で送る／Shift+Enter で改行（この端末に覚える）')
     await typeText(host, 'Enterで送る')
-    const textarea = document.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    const textarea = document.querySelector('[aria-label="メッセージを入力"]') as HTMLElement
     await act(async () => {
       textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     })

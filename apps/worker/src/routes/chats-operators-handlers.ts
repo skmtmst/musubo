@@ -1,3 +1,4 @@
+import { storeEmailFilter, emailStatuses, accountEmailMode } from '../services/account-email-filter.js';
 import { assigneeFilter } from '../services/chat-assignees.js';
 import { listChatAssignees } from '../services/chat-assignees.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -216,13 +217,16 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       };
     }
 
-    /*
-     * ── メール側。一覧（/api/support/inbox?channel=email）と同じ
-     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。
-     * メールは LINE アカウントに所属しないため、選択中のアカウントが
-     * あっても数える（一覧と同じ）。 ──
-     */
-    if (channel !== 'line' && scope.canSeeUnassigned) {
+    const mode = channel === 'line' ? 'none' : await accountEmailMode(c.env.DB,lineAccountId,scope.canSeeUnassigned);
+    if ((mode === 'store' || mode === 'both') && lineAccountId) {
+      const filter = storeEmailFilter({statuses:emailStatuses(status || 'all'),
+        matchUnassigned:!assignee || assignee==='unassigned',query,unreadOnly});
+      const counts = await c.env.DB.prepare(`SELECT count(*) AS total,count(CASE WHEN t.status='unread' THEN 1 END) AS reply,
+        count(CASE WHEN t.status='unread' AND julianday(t.last_message_at)<=julianday(?) THEN 1 END) AS overdue ${filter.sql}`)
+        .bind(overdueThreshold,staff.id,lineAccountId,...filter.binds).first<{total:number; reply:number; overdue:number}>();
+      email = {all:counts?.total ?? 0,reply:counts?.reply ?? 0,overdue:counts?.overdue ?? 0};
+    }
+    if (mode === 'legacy' || mode === 'both') {
       const statusSql = !status || status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -272,9 +276,9 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       ).bind(overdueThreshold, staff.id, ...bindings)
         .first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
       email = {
-        all: emailCounts?.all_count ?? 0,
-        reply: emailCounts?.reply_count ?? 0,
-        overdue: emailCounts?.overdue_count ?? 0,
+        all: email.all + (emailCounts?.all_count ?? 0),
+        reply: email.reply + (emailCounts?.reply_count ?? 0),
+        overdue: email.overdue + (emailCounts?.overdue_count ?? 0),
       };
     }
 

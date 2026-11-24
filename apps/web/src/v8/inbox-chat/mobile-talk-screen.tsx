@@ -1,6 +1,7 @@
 'use client'
 import { useInboxPreview } from './use-reservation-warning'
-import TruncatedText from '@/components/shared/truncated-text'
+import { InboxResolvedText, InboxUnresolvedNotice } from './send-preview'
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -80,10 +81,8 @@ function MobileTalkInbox() {
     listFilterKey, chatListCompletedKey, loadChats, loadMoreChats, loadChatsQuietly,
   } = useInboxLists({
     CHAT_PAGE_SIZE: LIST_BATCH,
-    EMAIL_PAGE_SIZE: 1,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: false,
     statusFilter: 'all',
     assigneeFilter: 'all',
     unreadOnly: filter === 'unread',
@@ -136,6 +135,8 @@ function MobileTalkInbox() {
 
 /** 読み直さない側（一覧の画面の会話・会話の画面の一覧）に渡す。 */
 const nothingToRefresh = async () => true
+/** 電話のトークは LINE だけ。URL のメールの指定は開かない。 */
+const ignoreEmailSelection = () => {}
 
 function MobileTalkThread() {
   const router = useRouter()
@@ -146,7 +147,6 @@ function MobileTalkThread() {
   const canReply = !shell.readOnly && role !== null && canEditFeature(TALK_PERMISSION, role)
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const [, setSelectedThreadId] = useState<string | null>(null)
   const [chats, setChats] = useState<ChatListItem[]>([])
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
@@ -174,7 +174,7 @@ function MobileTalkThread() {
 
   /* 会話の指定は PC と同じ照合を通す（いま選んでいるアカウントの相手でなければ開かない）。 */
   const { deepLinkNotice, setDeepLinkNotice, deepLinkIdRef } = useInboxDeepLink({
-    params, setSelectedChatId, setSelectedThreadId, accountsLoading, emailInboxEnabled: false, selectedAccountId, router, channel: 'line', savedViewParam: '',
+    params, setSelectedChatId, setSelectedEmail: ignoreEmailSelection, accountsLoading, sharedEmailEnabled: false, storeEmailEnabled: false, selectedAccountId, router, channel: 'line', savedViewParam: '',
   })
 
   const draft = useInboxDraft({ selectedAccountId, selectedChatId })
@@ -186,7 +186,10 @@ function MobileTalkThread() {
   })
   const { chatPollStalled, setChatPollRetryKey } = useInboxSubscription({ refreshChatDetailQuietly, channel: 'line', loadChatsQuietly: nothingToRefresh })
 
+  // 差し込みの札の名前（送るとこうなります・送れなかった時の文で同じ名前を使う）。
+  const tokenNames = useInsertTokenNames(selectedAccountId)
   const { sendError, pendingMessages, handleSendMessage } = useInboxSend({
+    tokenNames,
     selectedChatId, sending, sendLockRef,
     pendingAttachment: draft.pendingAttachment, messageContent: draft.messageContent, pendingImage: draft.pendingImage,
     selectedAccountId, setSending, chatDetail, quotedMessage, senderId: '', sendKeysRef,
@@ -218,10 +221,10 @@ function MobileTalkThread() {
   const hasContent = Boolean(draft.messageContent.trim() || draft.pendingImage || draft.pendingAttachment?.status === 'ready')
   const ready = Boolean(chatDetail) && !deepLinkNotice
 
-  const { preview, warning: reservationWarning } = useInboxPreview(selectedChatId, draft.messageContent)
+  const preview = useInboxPreview(selectedChatId, draft.messageContent)
   const composer = canReply && ready ? (
     <div className={styles.composer}>
-      {reservationWarning ? <Notice tone="warn" message={reservationWarning} /> : null}
+      <InboxUnresolvedNotice preview={preview} tokenNames={tokenNames} />
       {sendError ? (
         <Notice tone="danger" message={sendError} action={<Button size="compact" onClick={() => void handleSendMessage()} busy={sending} busyLabel="送っています…">もう一度送る</Button>} />
       ) : null}
@@ -249,7 +252,7 @@ function MobileTalkThread() {
         aria-label="メッセージを入力"
         aria-invalid={overLimit}
       />
-      {preview !== null ? <Notice tone="info" heading="送るとこうなります："><TruncatedText value={preview} /></Notice> : null}
+      <InboxResolvedText preview={preview} content={draft.messageContent} tokenNames={tokenNames} scope={selectedChatId} />
       <div className={styles.composerRow}>
         <AttachMenu disabled={sending} onPick={(file, slot) => void draft.handlePickAttachment(file, slot)} />
         <span className={styles.count} data-over={overLimit || undefined} title={ATTACH_NOTE}>

@@ -12,6 +12,7 @@ const IDLE_GUIDE = vi.hoisted(() => ({
   phase: 'idle' as const, stepKey: null, procedureIndex: 1, anchor: null, pausedAnchor: null,
   start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
 }))
+vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: { floors: vi.fn(async () => ({ data: [] })) } }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/dashboard', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))

@@ -103,7 +103,8 @@ async function type(element: HTMLInputElement | HTMLTextAreaElement, text: strin
 async function colorCodeInput(label: string) {
   const well = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label')?.startsWith(label))!
   await act(async () => well.click())
-  return host.querySelector<HTMLInputElement>('input[aria-label="色を十六進で入力"]')
+  await eventually(() => expect(document.body.querySelector('input[aria-label="色を十六進で入力"]')).toBeTruthy())
+  return document.body.querySelector<HTMLInputElement>('input[aria-label="色を十六進で入力"]')
 }
 async function openLinkAppearance() {
   const button = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：'))!
@@ -152,7 +153,7 @@ describe('DEEP-12 カラーコードは1文字ずつ編集できる', () => {
     await type(input, '#12')
     await blur(input)
     expect(input.value).toBe('12')
-    expect(host.textContent).toContain('16進数')
+    expect(document.body.textContent).toContain('16進数')
     expect(handlers.onChange).toHaveBeenCalledTimes(1)
   })
 

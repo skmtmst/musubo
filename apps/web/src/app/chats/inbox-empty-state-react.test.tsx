@@ -69,6 +69,18 @@ async function eventually(check: () => void, timeout = 1000) {
   }
 }
 async function click(label: string) {
+  if (label === '要返信' || label === '1時間以上待ち') {
+    let control = document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')
+    if (!control) {
+      const open = document.querySelector<HTMLButtonElement>('button[aria-label="絞り込み"]')!
+      await act(async () => { open.click() })
+      control = document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')
+    }
+    await act(async () => { control!.click() })
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(el => el.textContent?.trim().startsWith(label))!
+    await act(async () => { option.querySelector('button')!.click() })
+    return
+  }
   const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === label || item.textContent?.trim().startsWith(label))
   expect(button, label).toBeTruthy()
   await act(async () => { button!.click() })
@@ -377,4 +389,17 @@ test('中央の行き先からメールも開ける（共用の開き方・ID27�
   await click('いちばん古い会話を開く')
   await eventually(() => expect(document.body.textContent).toContain('メール本文です'))
   expect(document.body.textContent).not.toContain('対応が必要な会話があります')
+})
+
+test('Instagram のURLでも表示できない一覧には切り替えない', async () => {
+  fixture.params = new URLSearchParams('channel=instagram')
+  handler = (url) => url.pathname === '/api/chats' ? response(linePayload(['通常の会話'])) : base(url)
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(list().textContent).toContain('通常の会話'))
+})
+
+test('メールの一覧が空のときメール向けの案内を表示する', async () => {
+  fixture.params = new URLSearchParams('channel=email')
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(state('empty')?.textContent).toContain('メールが届くとここに出ます。'))
 })

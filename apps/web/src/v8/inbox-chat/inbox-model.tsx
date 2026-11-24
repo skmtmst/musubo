@@ -4,6 +4,7 @@ import { formatDateTime } from '@/lib/format';
 import { jstCalendar,jstDate } from '@/lib/jst-datetime';
 import { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip';
 import type { ChatAttachment } from '@line-crm/shared';
+import { EMAIL_SOURCE_LABEL, type EmailSource } from './email-sources';
 import styles from './list-parts.module.css';
 import { type InboxSavedViewConditions } from './saved-view-types';
 
@@ -18,10 +19,12 @@ export type ChatDetail = ApiChatDetail
 
 export type StatusFilter = 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
-/** 受信箱に混ぜるメールの1件（/api/support/inbox の email ぶん）。 */
+/** 受信箱に混ぜるメールの1件（共通は /api/support/inbox、店舗は /api/account-email/:accountId/inbox）。 */
 export interface EmailInboxItem {
   id: string
   threadId: string
+  /** 届いた経路。口の応答には無く、読み込んだ経路を画面が付ける。開く口・既読・札はこれで決める。 */
+  source: EmailSource
   customerName: string
   /** 相手のメールアドレス。友だちを手で探すときの手がかりになる。 */
   customerIdentifier?: string
@@ -34,7 +37,18 @@ export interface EmailInboxItem {
   /** 受信・送信のうち新しい方の時刻。口はこの順で返す。無い口は受信時刻に倒す。 */
   lastMessageAt?: string | null
   lastIncomingAt: string
+  /** 口が返した未読。一覧の並び（未読が先）と続きの位置はこの値で決め、開いても書き換えない。 */
   isUnread: boolean
+  /**
+   * 開いて既読にした印。赤い点と太字だけを消し、行の位置は読み直すまで動かさない
+   * （並びの値を書き換えると、開いた行が下へ跳ねたり、続きを待つ側へ回って見えなくなる）。
+   */
+  readNow?: boolean
+}
+
+/** 画面に出す未読（赤い点・太字）。開いて既読にした行は消す。 */
+export function emailShownUnread(item: Pick<EmailInboxItem, 'isUnread' | 'readNow'>): boolean {
+  return item.isUnread && !item.readNow
 }
 
 /** 受信箱一覧の続きを読む位置。口の並び（未読が先・新しい順）と同じ3点。 */
@@ -78,16 +92,18 @@ export type InboxSavedView = {
   matchCount?: number | null
 }
 
-export function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
+/** 行の受信経路の札。メールは届いた経路（共通／店舗）まで出す。 */
+export function ChannelBadge({ channel, emailSource }: { channel: 'line' | 'email'; emailSource?: EmailSource }) {
   return channel === 'line' ? (
     <span className={`bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium ${styles.channelBadge}`}>
       LINE
     </span>
   ) : (
     <span
+      data-email-source={emailSource}
       className={`bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium ${styles.channelBadge}`}
     >
-      メール
+      {emailSource ? `${EMAIL_SOURCE_LABEL[emailSource]}メール` : 'メール'}
     </span>
   )
 }
@@ -109,8 +125,8 @@ export function toListCursor(
   return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
 }
 
-/** 対応が必要な会話の行き先（ID27「いちばん古い会話を開く」）。 */
-export type OldestAttentionTarget = { kind: 'chat'; id: string } | { kind: 'email'; threadId: string }
+/** 対応が必要な会話の行き先（ID27「いちばん古い会話を開く」）。メールは届いた経路で開き分ける。 */
+export type OldestAttentionTarget = { kind: 'chat'; id: string } | { kind: 'email'; threadId: string; source: EmailSource }
 
 /*
  * LINE とメールを混ぜて、まだ対応していない物のうち最も古い物を選ぶ。
@@ -119,7 +135,7 @@ export type OldestAttentionTarget = { kind: 'chat'; id: string } | { kind: 'emai
  */
 export function oldestAttentionTarget(
   chats: Pick<ChatListItem, 'id' | 'status' | 'lastMessageAt'>[],
-  emails: Pick<EmailInboxItem, 'threadId' | 'isUnread' | 'lastMessageAt' | 'lastIncomingAt'>[],
+  emails: Pick<EmailInboxItem, 'threadId' | 'source' | 'isUnread' | 'readNow' | 'lastMessageAt' | 'lastIncomingAt'>[],
 ): OldestAttentionTarget | null {
   let bestAt = Number.POSITIVE_INFINITY
   let bestTarget: OldestAttentionTarget | null = null
@@ -136,8 +152,8 @@ export function oldestAttentionTarget(
     consider(chat.lastMessageAt, { kind: 'chat', id: chat.id })
   }
   for (const mail of emails) {
-    if (!mail.isUnread) continue
-    consider(mail.lastMessageAt ?? mail.lastIncomingAt, { kind: 'email', threadId: mail.threadId })
+    if (!emailShownUnread(mail)) continue
+    consider(mail.lastMessageAt ?? mail.lastIncomingAt, { kind: 'email', threadId: mail.threadId, source: mail.source })
   }
   return bestTarget
 }
@@ -199,9 +215,6 @@ export function formatByteSize(bytes: number): string {
 
 /** サーバーと同じ数え方(JSの .length)。差し込みは解決後の長さでサーバーが最終判定する。 */
 export const MESSAGE_MAX_LENGTH = 5000
-
-/** 入力欄の自動拡張の上限。text-sm(行の高さ約20px)の8行＋上下余白。 */
-export const TEXTAREA_MAX_HEIGHT_PX = 168
 
 /**
  * 設計 `xGLVe` は、返信を待たせている行だけ日付ではなく待ち時間を出す
@@ -298,8 +311,7 @@ export function draftKeyOf(accountId: string | null | undefined, chatId: string 
 }
 export const CHANNELS = [{ key: 'all', label: 'すべて' }, { key: 'line', label: 'LINE' }, { key: 'email', label: 'メール' }] as const
 
-export function resolveInboxChannel(requested: string | null, emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
-  if (!emailInboxEnabled) return 'line'
+export function resolveInboxChannel(requested: string | null, _emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
   return requested === 'line' || requested === 'email' ? requested : 'all'
 }
 export const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'

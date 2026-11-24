@@ -40,7 +40,6 @@ type BroadcastPreviewRailContext = {
   previewCloseRef: RefObject<HTMLButtonElement | null>
   reviewKey: string
   previewConfirmed: boolean
-  previewDevice: "phone" | "pc"
   previewOpen: boolean
   previewToggleRef: RefObject<HTMLButtonElement | null>
   publishedActions: { versionId: string; name: string; version: number; }[]
@@ -49,13 +48,12 @@ type BroadcastPreviewRailContext = {
   selectedAccount: AccountWithStats | null
   sendWhenLabel: string | null
   setPreviewConfirmed: Dispatch<SetStateAction<boolean>>
-  setPreviewDevice: Dispatch<SetStateAction<"phone" | "pc">>
   setPreviewOpen: Dispatch<SetStateAction<boolean>>
   tags: Tag[]
   testBlockReason: string
 }
 
-export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, reviewKey, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }: BroadcastPreviewRailContext) {
+export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, reviewKey, previewConfirmed, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewOpen, tags, testBlockReason }: BroadcastPreviewRailContext) {
   const review = usePreviewReview(reviewKey, ab.hasB, previewConfirmed, setPreviewConfirmed)
   const previewOpened = useCallback(() => review.markVariant(ab.hasB ? ab.tab : 'A'), [review.markVariant, ab.hasB, ab.tab])
   const previousKey = useRef(reviewKey)
@@ -76,10 +74,11 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const blocked = preflight?.exclusions?.blocked
   const matched = preflight?.audience?.matched
   const people = (value: number | null | undefined) => (value === null || value === undefined ? null : `${formatNumber(value)} 人`)
-  const messagePreview = <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
+  const messagePreview = <div className={styles.phonePreview}>
           <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
             <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} time={scheduledLabel?.match(/\b\d{2}:\d{2}\b/)?.[0]} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
+          <p className={styles.previewCaption}>PC の LINE では見え方が少し変わります</p>
         </div>
   return (<aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label={reach ? '届く人' : 'LINEの見え方'}>
         {reach ? <>
@@ -94,7 +93,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
             <TextLink href="/friends">届く人の一覧へ</TextLink>
           </Card>
         </> : <>
-        <div className={styles.previewHead}><h3>LINE の見え方</h3><SegmentedControl aria-label="プレビューの端末" size="small" fit="content" value={previewDevice} options={[{ value: 'phone', label: 'スマホ' }, { value: 'pc', label: 'PC' }]} onChange={setPreviewDevice} />{closeButton}</div>
+        <div className={styles.previewHead}><h3>LINE の見え方</h3>{closeButton}</div>
         {ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}
         {messagePreview}
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>

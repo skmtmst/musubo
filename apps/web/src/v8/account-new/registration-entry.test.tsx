@@ -154,3 +154,20 @@ it('保存領域が使えなくても途中へ飛ばず、入口から操作で�
   expect(calls.connect).not.toHaveBeenCalled()
   expect(calls.getStyle).not.toHaveBeenCalled()
 })
+
+it('途中保存して閉じるを下の帯に置き、入力を下書きに残す', async () => {
+  render(<AccountRegisterV8 />)
+  fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
+  fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
+  fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
+  expect(screen.queryByRole('button', { name: '事前確認を変える' })).toBeNull()
+  const input = document.getElementById('v8-channel-id') as HTMLInputElement
+  fireEvent.change(input, { target: { value: '1234567890' } })
+  const close = screen.getByRole('link', { name: '途中保存して閉じる' })
+  expect(close.getAttribute('href')).toBe('/hq')
+  expect(close.closest('[data-shared-part="sticky-bar"]')).toBeTruthy()
+  const key = registrationStorageKey(DRAFT_KEY, readStaffIdentity())!
+  await waitFor(() => expect(JSON.parse(localStorage.getItem(key)!).channelId).toBe('1234567890'))
+  expect(calls.connect).not.toHaveBeenCalled()
+})

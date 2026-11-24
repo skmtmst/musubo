@@ -1,34 +1,24 @@
 'use client'
 
+import Link from 'next/link'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { requestSetupChipReopen, useSetupChipState } from '@/v8/onboarding/public/setup-chip/index'
 import styles from './setup-chip.module.css'
 
 /*
-  上の帯の「開店準備 N/9」の札。
-  承認済み Pen /Users/masatosakamoto/Documents/musubo-course-media-upload-20261110.pen
-  枠 02 (C5i3rw) の札 IJocF は薄い主色の丸い地、文字 XzDt5 は主色の太字。
-  押すと初回ポップアップを開き直す（枠 02 の足の注記どおり）。
+  上の帯と左メニューの「開店準備 N/M」の札。残りがある間はどの画面にも出し、はじめの設定へ移る。
+  初回ポップアップを出せる画面（ダッシュボード）では、閉じたポップアップをこの札から開き直す。
+  案内中・一時停止中はポップアップを重ねないので、そのときも、はじめの設定へ移る。
 */
-
 export function SetupChip() {
-  const popup = useSetupChipState()
   const shared = useSharedGuide()
-  const guide = shared?.guide
-  const state = guide?.phase === 'active' || guide?.phase === 'paused' ? shared?.summary ?? popup : popup
-  if (!state) return null
-  const count = `開店準備 ${state.done}/${state.total}`
-  if (guide?.phase === 'active') return <span className={styles.chip}>{count}</span>
-  const paused = guide?.phase === 'paused'
-  return (
-    <button
-      type="button"
-      className={styles.chip}
-      onClick={paused ? guide.resume : requestSetupChipReopen}
-      data-setup-chip="open"
-      aria-label={`${count}。${paused ? 'ガイドを再開する' : 'はじめにやることを開く'}`}
-    >
-      {count}
-    </button>
-  )
+  const popup = useSetupChipState()
+  const summary = shared?.summary
+  if (!summary || shared?.dismissed !== false || summary.total === 0 || summary.done >= summary.total) return null
+  const count = `開店準備 ${summary.done}/${summary.total}`
+  const phase = shared?.guide.phase
+  if (popup && phase !== 'active' && phase !== 'paused') {
+    return <button type="button" className={styles.chip} onClick={requestSetupChipReopen} data-setup-chip="open" aria-label={`${count}。はじめにやることを開く`}>{count}</button>
+  }
+  return <Link href="/getting-started" className={styles.chip} data-setup-chip="open" aria-label={`${count}。はじめの設定を開く`}>{count}</Link>
 }

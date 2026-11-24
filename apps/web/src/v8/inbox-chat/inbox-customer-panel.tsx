@@ -5,21 +5,32 @@ import { InboxEmailHeading, InboxInfoBackdrop } from '@/components/shared/inbox-
 import { InboxSummaryPane } from '@/components/templates/inbox-page';
 import { X } from 'lucide-react';
 import Link from 'next/link';
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { EMAIL_SOURCE_LABEL, type EmailRef } from './email-sources';
 import { EmailInboxItem } from './inbox-model';
 
 type Props = {
   lineContent: React.ReactNode
   showFriendInfo: boolean
   selectedChatId: string | null
-  selectedThreadId: string | null
+  /** 開いているメール（経路と会話IDの組）。 */
+  selectedEmail: EmailRef | null
+  /** 開いているメールの一覧の行。URL から開いて一覧に無いときは undefined。 */
+  selectedEmailItem?: EmailInboxItem
   wideInfoPanel: boolean
   setShowFriendInfo: (next: boolean | ((current: boolean) => boolean)) => void
   customerPanelRef: RefObject<HTMLElement | null>
-  emailItems: EmailInboxItem[]
 }
 
-export default function InboxCustomerPanel({ lineContent, showFriendInfo, selectedChatId, selectedThreadId, wideInfoPanel, setShowFriendInfo, customerPanelRef, emailItems }: Props) {
+export default function InboxCustomerPanel({ lineContent, showFriendInfo, selectedChatId, selectedEmail, selectedEmailItem, wideInfoPanel, setShowFriendInfo, customerPanelRef }: Props) {
+  const [desktopOverlay, setDesktopOverlay] = useState(false)
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)')
+    const sync = () => setDesktopOverlay(media.matches)
+    sync()
+    media.addEventListener('change', sync)
+    return () => media.removeEventListener('change', sync)
+  }, [])
   const slotRef = useRef<HTMLDivElement>(null)
   const [host] = useState(() => {
     if (typeof document === 'undefined') return null
@@ -39,19 +50,19 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
   }, [wideInfoPanel, host])
   useLayoutEffect(() => () => host?.remove(), [host])
 
-  const content = (showFriendInfo && (selectedChatId || selectedThreadId) && (
+  const content = (showFriendInfo && (selectedChatId || selectedEmail) && (
     <>
       {/*
               1536px 未満ではトークの上に重ねるドロワー。背景（暗幕）を
               押しても閉じる。モバイルヘッダー(z-50)より上に置く。
               1536px 以上では右列として常設するので暗幕は CSS で消す。
             */}
-      <InboxInfoBackdrop wide={wideInfoPanel} onMouseDown={() => setShowFriendInfo(false)} />
+      <InboxInfoBackdrop wide={wideInfoPanel || desktopOverlay} onMouseDown={() => setShowFriendInfo(false)} />
       <InboxSummaryPane wide={wideInfoPanel}
         ref={customerPanelRef}
         data-inbox-v4="customer-panel"
-        role={wideInfoPanel ? undefined : 'dialog'}
-        aria-modal={wideInfoPanel ? undefined : true}
+        role={wideInfoPanel ? undefined : desktopOverlay ? 'region' : 'dialog'}
+        aria-modal={wideInfoPanel || desktopOverlay ? undefined : true}
         aria-label="顧客情報"
         tabIndex={-1}>
         {/*
@@ -75,7 +86,7 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
             <X aria-hidden="true" className="h-4 w-4" />
           </Button>
         )}
-        {selectedThreadId ? (
+        {selectedEmail ? (
           /*
             メールの相手は友だちに結びついていない。
             以前は「紐づいていません」の1行だけで、なぜなのか・
@@ -83,7 +94,7 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
             いま何ができるかを出す。
           */
           (() => {
-            const mail = emailItems.find((e) => e.threadId === selectedThreadId)
+            const mail = selectedEmailItem
             return (
               <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
                 <InboxEmailHeading>
@@ -97,7 +108,7 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
                       <span className="text-ink-secondary text-micro font-bold">MAIL</span>
                     </div>
                     <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
-                    <p className="text-ink-faint mt-0.5 max-w-full break-all text-micro">
+                    <p className="text-ink-faint mt-0.5 max-w-full truncate text-micro" title={mail?.customerIdentifier ?? undefined}>
                       {mail?.customerIdentifier ?? 'メールアドレス未登録'}
                     </p>
                   </section>
@@ -111,7 +122,12 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
                       </div>
                       <div className="flex items-start justify-between gap-3">
                         <dt className="text-ink-faint shrink-0">メール</dt>
-                        <dd className="text-ink-secondary min-w-0 break-all text-right">{mail?.customerIdentifier ?? '未登録'}</dd>
+                        {/* メールアドレスは途中で折り返さず1行で省略し、全文は title で読む。 */}
+                        <dd className="text-ink-secondary min-w-0 truncate text-right" title={mail?.customerIdentifier ?? undefined}>{mail?.customerIdentifier ?? '未登録'}</dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="text-ink-faint shrink-0">受信経路</dt>
+                        <dd className="text-ink-secondary min-w-0 truncate text-right">{`${EMAIL_SOURCE_LABEL[selectedEmail.source]}メール`}</dd>
                       </div>
                     </dl>
                   </section>

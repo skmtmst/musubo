@@ -18,7 +18,7 @@ export default function InboxEmptyGuide({ unread, overdue, slaEnabled, chats, em
   overdue: number | null
   slaEnabled: boolean
   chats: Pick<ChatListItem, 'id' | 'status' | 'lastMessageAt'>[]
-  emails: Pick<EmailInboxItem, 'threadId' | 'isUnread' | 'lastMessageAt' | 'lastIncomingAt'>[]
+  emails: Pick<EmailInboxItem, 'threadId' | 'source' | 'isUnread' | 'lastMessageAt' | 'lastIncomingAt'>[]
   onOpenTarget: (target: OldestAttentionTarget) => void
 }) {
   const parts: string[] = []

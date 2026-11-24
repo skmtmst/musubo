@@ -243,7 +243,9 @@ export default function Sidebar({
   // 同じ画面の別タブをメニューへ出す項目（コンバージョン、データ移行）が
   // あるため、pathnameだけでなくクエリも選択状態へ反映する。
   useEffect(() => {
+    let active = true
     const sync = () => setCurrentSearch(window.location.search)
+    const scheduleSync = () => queueMicrotask(() => { if (active) sync() })
     sync()
     window.addEventListener('popstate', sync)
     /*
@@ -256,15 +258,16 @@ export default function Sidebar({
     const originalReplaceState = history.replaceState
     history.pushState = function (...args) {
       const result = originalPushState.apply(this, args)
-      sync()
+      scheduleSync()
       return result
     }
     history.replaceState = function (...args) {
       const result = originalReplaceState.apply(this, args)
-      sync()
+      scheduleSync()
       return result
     }
     return () => {
+      active = false
       window.removeEventListener('popstate', sync)
       history.pushState = originalPushState
       history.replaceState = originalReplaceState
