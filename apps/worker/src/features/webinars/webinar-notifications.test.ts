@@ -907,6 +907,7 @@ describe('webinar notification jobs', () => {
   test('テスト送信先だけへ自動送信として通知イメージを送る', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);
+    raw.prepare("UPDATE friends SET line_user_id='musubo-scope:friend-1:U001' WHERE id='friend-1'").run();
     raw.prepare(
       `INSERT INTO account_settings (id, line_account_id, key, value)
        VALUES ('test-recipients', 'account-1', 'test_recipients', '["friend-1"]')`,
@@ -928,6 +929,7 @@ describe('webinar notification jobs', () => {
     const request = dispatch.mock.calls[0]?.[0];
     expect(request.headers.get('X-Line-Harness-Source')).toBeNull();
     expect(await request.clone().json()).toEqual(expect.objectContaining({
+      to: 'U001',
       messages: [expect.objectContaining({ text: expect.stringContaining('【テスト送信】') })],
     }));
   });

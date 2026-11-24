@@ -40,7 +40,7 @@ export async function getSavedSearchMatchPreview(
     const row = await db.prepare(
       `SELECT COUNT(DISTINCT f.id) AS total,
               COUNT(DISTINCT CASE
-                WHEN NULLIF(f.line_user_id, '') IS NOT NULL THEN f.id END) AS line_total,
+                WHEN NULLIF(f.line_platform_user_id, '') IS NOT NULL THEN f.id END) AS line_total,
               COUNT(DISTINCT CASE
                 WHEN json_valid(f.metadata) = 1
                  AND NULLIF(CAST(json_extract(f.metadata, '$.email') AS TEXT), '') IS NOT NULL

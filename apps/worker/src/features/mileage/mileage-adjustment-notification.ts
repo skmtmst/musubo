@@ -87,7 +87,7 @@ export async function sendMileageNotification(
   if (reserved.status === 'sent') return reserved;
   try {
     const friend = await ports.db.prepare(
-      `SELECT f.id, f.line_user_id, f.is_following,
+      `SELECT f.id, f.line_platform_user_id AS line_user_id, f.is_following,
               a.channel_access_token, a.channel_access_token_encrypted
          FROM friends f JOIN line_accounts a ON a.id = f.line_account_id
         WHERE f.id = ? AND f.line_account_id = ?`,

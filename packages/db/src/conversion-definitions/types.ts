@@ -263,6 +263,8 @@ export type ReviseConversionDefinitionInput = {
 export type IngestPointRow = {
   id: string;
   status: ConversionDefinitionStatus;
+  line_account_id: string | null;
+  tenant_id: string | null;
   ingest_secret_encrypted: string | null;
   ingest_disabled_at: string | null;
 };

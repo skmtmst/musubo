@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHmacSha256Hex } from '../lib/hmac.js';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 
 // 公開受信口 /api/conversions/ingest/:id の回帰テスト。
@@ -39,16 +40,13 @@ vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval: v
 const { conversions } = await import('./conversions.js');
 
 const SECRET = 'cvwhk_testsecret';
+let fixture: SqliteD1;
 
-function app(friendByLineUserId: { id: string } | null = null) {
+function app() {
   const hono = new Hono<Env>();
   hono.use('*', async (c, next) => {
     c.env = {
-      DB: {
-        prepare: vi.fn(() => ({
-          bind: vi.fn(() => ({ first: vi.fn(async () => friendByLineUserId) })),
-        })),
-      } as unknown as D1Database,
+      DB: fixture.db,
       LINE_CREDENTIAL_ENCRYPTION_KEY: 'unused-in-mocks',
     } as Env['Bindings'];
     await next();
@@ -61,6 +59,8 @@ function activePoint(overrides: Record<string, unknown> = {}) {
   return {
     id: 'point-a',
     status: 'active',
+    line_account_id: 'account-a',
+    tenant_id: 'tenant-a',
     ingest_disabled_at: null,
     ingest_secret_encrypted: 'k1.v1.iv.ct',
     ...overrides,
@@ -89,6 +89,18 @@ function lastLog() {
 }
 
 beforeEach(() => {
+    fixture = createTestD1();
+    fixture.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_secret, channel_access_token, tenant_id) VALUES
+        ('account-a', '1001', 'A', 'secret', 'token', 'tenant-a'),
+        ('account-b', '1002', 'B', 'secret', 'token', 'tenant-a'),
+        ('account-c', '1003', 'C', 'secret', 'token', 'tenant-c');
+      INSERT INTO friends (id, line_account_id, line_user_id) VALUES
+        ('f1', 'account-a', 'U1'), ('friend-1', 'account-a', 'U2'),
+        ('friend-b', 'account-b', 'U123'),
+        ('friend-from-line', 'account-a', 'musubo-scope:friend-from-line:U123'),
+        ('friend-c', 'account-c', 'musubo-scope:friend-c:U123');
+    `);
     vi.clearAllMocks();
     dbMocks.getConversionPointForIngest.mockResolvedValue(activePoint());
     dbMocks.resolveConversionIngestSecret.mockResolvedValue(SECRET);
@@ -100,6 +112,7 @@ beforeEach(() => {
       },
     );
   });
+afterEach(() => fixture.raw.close());
 
 describe('POST /api/conversions/ingest/:id (N-270)', () => {
   it('存在しない地点は404で、point_not_found を台帳へ残す', async () => {
@@ -217,26 +230,8 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
     expect(lastLog()).toMatchObject({ result: 'duplicate', sourceEventId: 'e-dup' });
   });
 
-  it('lineUserId でも友だちを引き当てて記録できる', async () => {
-    const hono = new Hono<Env>();
-    hono.use('*', async (c, next) => {
-      c.env = {
-        DB: {
-          prepare: vi.fn(() => ({
-            bind: vi.fn(() => ({ first: vi.fn(async () => ({ id: 'friend-from-line' })) })),
-          })),
-        } as unknown as D1Database,
-      } as Env['Bindings'];
-      await next();
-    });
-    hono.route('/', conversions);
-    const raw = JSON.stringify({ lineUserId: 'U123', sourceEventId: 'e-line', timestamp: Math.floor(Date.now() / 1000), nonce: crypto.randomUUID() });
-    const signature = await computeHmacSha256Hex(SECRET, raw);
-    const response = await hono.request('/api/conversions/ingest/point-a', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Conversion-Signature': signature },
-      body: raw,
-    });
+  it('同じLINEユーザーが別店舗にもいる場合は地点の店舗に紐づく友だちを記録する', async () => {
+    const response = await signedRequest({ lineUserId: 'U123', sourceEventId: 'e-line' });
     expect(response.status).toBe(200);
     expect(dbMocks.trackConversion).toHaveBeenCalledWith(
       expect.anything(),
@@ -244,6 +239,33 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
       undefined,
       expect.anything(),
     );
+  });
+
+  it('統括全体の地点では同じLINEユーザーが統括内に1人だけなら記録する', async () => {
+    dbMocks.getConversionPointForIngest.mockResolvedValue(activePoint({ line_account_id: null, tenant_id: 'tenant-c' }));
+    const response = await signedRequest({ lineUserId: 'U123', sourceEventId: 'e-tenant' });
+    expect(response.status).toBe(200);
+    expect(lastLog()).toMatchObject({ result: 'recorded', friendId: 'friend-c' });
+  });
+
+  it('統括全体の地点でLINEユーザーが複数店舗にいるときは友だちIDで特定する', async () => {
+    dbMocks.getConversionPointForIngest.mockResolvedValue(activePoint({ line_account_id: null }));
+    const ambiguous = await signedRequest({ lineUserId: 'U123', sourceEventId: 'e-ambiguous' });
+    expect(ambiguous.status).toBe(422);
+    expect(lastLog()).toMatchObject({ result: 'rejected', reason: 'friend_ambiguous' });
+    expect(dbMocks.trackConversion).not.toHaveBeenCalled();
+
+    const matched = await signedRequest({ friendId: 'friend-b', sourceEventId: 'e-explicit' });
+    expect(matched.status).toBe(200);
+    expect(lastLog()).toMatchObject({ result: 'recorded', friendId: 'friend-b' });
+  });
+
+  it('検証受信でも地点が対象外とする店舗の友だちを記録しない', async () => {
+    const response = await signedRequest({ friendId: 'friend-b', sourceEventId: 'e-test', test: true });
+    expect(response.status).toBe(422);
+    expect(lastLog()).toMatchObject({ result: 'rejected', reason: 'friend_not_found', isTest: true });
+    expect(lastLog()?.friendId).toBeUndefined();
+    expect(dbMocks.trackConversion).not.toHaveBeenCalled();
   });
 
   it('冪等キー衝突(別内容の同ID)は409で、idempotency_conflict を台帳へ残す', async () => {

@@ -428,7 +428,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/confirmations/:requestId/re
  const self=await identity(c);if(self instanceof Response)return self;
  const b=await c.req.json<{expectedVersion?:number;response?:RestaurantConfirmationResponse}>().catch(()=>null);
  if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['going','change_requested','cancel'].includes(b.response??''))return liffBookingInputError(c,{success:false,error:'invalid_confirmation_response'},400,['expectedVersion','response']);
- const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
+ const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_platform_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
  if(!f)return liffBookingJson(c, {success:false,error:'not_found'},404);
  const result=await respondToRestaurantConfirmation(db,{requestId:c.req.param('requestId'),friendId:f.id,accountId:self.accountId,expectedVersion:b.expectedVersion!,response:b.response!});
  if(!result.ok)return liffBookingJson(c, {success:false,error:result.error},result.status);
@@ -477,7 +477,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoun
  const saved=await db.prepare(`SELECT s.id,s.data,v.layout,v.fields FROM form_submit_claims q
  JOIN form_submissions s ON s.id=q.submission_id JOIN friends f ON f.id=s.friend_id
  JOIN form_versions v ON v.id=s.form_version_id AND v.form_id=s.form_id
- WHERE q.form_id=s.form_id AND q.status='completed' AND q.form_id=? AND q.idempotency_key=? AND q.line_account_id=? AND q.friend_id=f.id AND f.line_user_id=? AND f.line_account_id=? AND s.is_test=0`)
+ WHERE q.form_id=s.form_id AND q.status='completed' AND q.form_id=? AND q.idempotency_key=? AND q.line_account_id=? AND q.friend_id=f.id AND f.line_platform_user_id=? AND f.line_account_id=? AND s.is_test=0`)
  .bind(b.formId,b.submissionKey,self.accountId,self.uid,self.accountId).first<{id:string;data:string;layout:string;fields:string}>();
  if(!saved)return liffBookingJson(c, {success:false,error:'saved_answer_required'},404);
  const block=collectInputs(parseLayout(saved.layout,saved.fields)).find(x=>x.id===b.blockId&&x.type==='booking');

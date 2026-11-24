@@ -10,7 +10,7 @@ export async function chatReservationVariables(db: D1Database, friendId: string,
   const restaurant = await db.prepare(`SELECT r.starts_at, r.guest_count, s.timezone,
       (SELECT m.name FROM rt_menu_items m WHERE m.id=r.course_id AND m.store_id=r.store_id) course_name
     FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
-    JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+    JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
     WHERE f.id=? AND s.line_account_id=? AND julianday(r.starts_at)>julianday('now')
       AND r.status IN ('pending','confirmed','seated')
     ORDER BY julianday(r.starts_at), r.id LIMIT 1`).bind(friendId, accountId)

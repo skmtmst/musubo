@@ -104,6 +104,7 @@ export * from './musubo-condition.js';
 export * from './musubo-individual-quote.js';
 export * from './musubo-linked-addition.js';
 export * from './musubo-linked-removal.js';
+export * from './sns-connection-ports.js';
 export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings, RestaurantTableAssignmentSettings, RestaurantTableAssignmentWrite } from './booking-assignment.js';
 
 export * from './booking-entitlements.js';

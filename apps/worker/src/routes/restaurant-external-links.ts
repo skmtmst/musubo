@@ -91,7 +91,7 @@ const readSql = `SELECT l.*, r.customer_name, r.starts_at, r.ends_at, r.status A
   FROM rt_reservation_external_links l
   LEFT JOIN rt_reservations r ON r.id = l.reservation_id AND r.store_id = l.store_id AND l.unlinked_at IS NULL
   JOIN rt_stores s ON s.id = l.store_id
-  LEFT JOIN friends f ON f.line_account_id = s.line_account_id AND f.line_user_id = r.line_uid`;
+  LEFT JOIN friends f ON f.line_account_id = s.line_account_id AND f.line_platform_user_id = r.line_uid`;
 
 function publicLink(row: LinkRow): RestaurantExternalLink {
   return {

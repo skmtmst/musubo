@@ -1003,9 +1003,9 @@ lineNotifications.post(
     }
     const placeholders = sqlIdSet(friendIds).sql;
     const recipients = await c.env.DB.prepare(`
-      SELECT id, line_user_id FROM friends
+      SELECT id, line_platform_user_id AS line_user_id FROM friends
        WHERE line_account_id = ? AND id IN (${placeholders})
-         AND is_following = 1 AND line_user_id IS NOT NULL AND line_user_id != ''
+         AND is_following = 1 AND line_platform_user_id IS NOT NULL AND line_platform_user_id != ''
     `).bind(lineAccountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
     const recipientById = new Map(recipients.results.map((row) => [row.id, row.line_user_id]));
     const missing = friendIds.filter((id) => !recipientById.has(id));

@@ -130,7 +130,7 @@ async function customer(c:Context<Env>,qr=false) {
     body:new URLSearchParams({id_token:token,client_id:shop.login_channel_id}),signal:AbortSignal.timeout(10000)});
   const identity=response.ok?await response.json() as {sub?:string}:null;
   if(!identity?.sub)throw new StampError('LINEの本人確認が必要です',401);
-  const friend=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(a,identity.sub).first<{id:string}>();
+  const friend=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_platform_user_id=? AND is_following=1').bind(a,identity.sub).first<{id:string}>();
   if(!friend)throw new StampError(qr?'友だち追加が必要です':'友だちの確認が必要です',403);
   if(!await featureJobCanRun(db,{accountId:a,featureId:'visit_stamps',job:'visit stamps'}))throw new StampError('来店スタンプは停止中です',403);return {db,a,friendId:friend.id,tenantId:shop.tenant_id};
 }

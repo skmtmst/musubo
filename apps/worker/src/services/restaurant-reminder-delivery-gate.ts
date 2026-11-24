@@ -44,7 +44,7 @@ export async function readRestaurantReminderDeliveryGate(db:D1Database,enrollmen
       ||Date.parse(reservationInstant(context.starts_at))!==Date.parse(row.target_date)||context.timezone!==row.timezone)
       return {allowed:false,reason:'restaurant_source_changed'};
     clauses.push(`EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
-      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
       WHERE r.id=? AND r.store_id=? AND r.customer_version=? AND r.starts_at=? AND r.ends_at=? AND r.guest_count=?
         AND r.status='confirmed' AND r.departed_at IS NULL AND s.status='active' AND s.line_account_id=?
         AND f.id=? AND f.is_following=1 AND f.is_hidden=0)`);
