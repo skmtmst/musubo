@@ -1165,7 +1165,7 @@ function addSecondConnection() {
       `INSERT INTO instagram_connections
          (id,line_account_id,page_id,instagram_id,page_name,username,page_token_encrypted,user_token_encrypted,
           expires_at,data_access_expires_at,profile_json,posts_json,refreshed_at,synced_at,connected_by,version,scopes,sort_order)
-       SELECT 'igc-2',line_account_id,'21','21',page_name,'nen_cafe_2',page_token_encrypted,user_token_encrypted,
+       SELECT 'igc-2',line_account_id,'21','21',page_name,'sample_shop_2',page_token_encrypted,user_token_encrypted,
               expires_at,data_access_expires_at,profile_json,posts_json,refreshed_at,synced_at,connected_by,7,scopes,1
          FROM instagram_connections WHERE line_account_id='a1' ORDER BY sort_order, id LIMIT 1`,
     )
@@ -1237,7 +1237,7 @@ it('接続が2件あるとき、接続確認は指定した接続だけを更新
     'fetch',
     vi.fn(async (url: URL | string, init?: RequestInit) =>
       new URL(String(url)).pathname.endsWith('/me')
-        ? Response.json({ id: '21', username: 'nen_cafe_2' })
+        ? Response.json({ id: '21', username: 'sample_shop_2' })
         : upstream(url as RequestInfo, init),
     ),
   );

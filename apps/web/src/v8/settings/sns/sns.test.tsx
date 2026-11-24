@@ -92,7 +92,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 function googleData(): GoogleConnectionData {
   return {
     success: true,
-    store: { id: 'store-1', name: '然カフェ 本店', lineAccountId: 'acc-1' },
+    store: { id: 'store-1', name: '見本 本店', lineAccountId: 'acc-1' },
     connection: { status: 'disconnected', locationTitle: null },
     candidates: [],
     summary: {
@@ -115,8 +115,8 @@ const CONNECTED = {
   id: 'igc-1',
   pageId: 'page-1',
   instagramId: 'ig-1',
-  pageName: '然カフェ',
-  username: 'nen_cafe',
+  pageName: '見本 カフェ',
+  username: 'sample_shop',
   expiresAt: '2026-12-31T00:00:00.000Z',
   dataAccessExpiresAt: null,
   version: 3,
@@ -140,7 +140,7 @@ function googleCard() {
 
 /* つなぎ直す・解除するは行の操作（「<接続の名前>の操作」）の中。 */
 async function openIgMenu() {
-  fireEvent.click(await igCard().findByRole('button', { name: '@nen_cafeの操作' }))
+  fireEvent.click(await igCard().findByRole('button', { name: '@sample_shopの操作' }))
 }
 
 /* 既定は「一覧の口がまだ無い配備先」。その場合も1件ぶんの返事から1行を出して画面を止めない。
@@ -180,7 +180,7 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
 
     const card = () => igCard()
     expect(await card().findByText('接続済み')).toBeTruthy()
-    expect(card().getByText('@nen_cafe')).toBeTruthy()
+    expect(card().getByText('@sample_shop')).toBeTruthy()
     expect(card().getByText(/^ビジネスアカウント・接続した日/)).toBeTruthy()
     expect(card().getByText('連携 1個（契約枠 1個）')).toBeTruthy()
     expect(card().getAllByRole('button', { name: '接続を追加する' }).length).toBeGreaterThan(0)
@@ -261,7 +261,7 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     expect(fixture.igRefresh).not.toHaveBeenCalled()
 
     // 行の操作も残すが、押しても開かない。
-    const menu = igCard().getByRole('button', { name: '@nen_cafeの操作' })
+    const menu = igCard().getByRole('button', { name: '@sample_shopの操作' })
     expect(menu.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(menu)
     expect(screen.queryByRole('menuitem')).toBeNull()
@@ -273,7 +273,7 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
 
     await screen.findByText(READ_ONLY_NOTICE)
     if (state === 'expired') {
-      const menu = await igCard().findByRole('button', { name: '@nen_cafeの操作' })
+      const menu = await igCard().findByRole('button', { name: '@sample_shopの操作' })
       expect(menu.getAttribute('aria-disabled')).toBe('true')
     } else {
       const connect = await igCard().findByRole('button', { name: 'Instagram をつなぐ' })
@@ -371,7 +371,7 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     const dialog = within(await screen.findByRole('dialog'))
     expect(dialog.getByText('LINEアカウント')).toBeTruthy()
     expect(dialog.getByText('移行前の店')).toBeTruthy()
-    expect(dialog.getByText('@nen_cafe（Instagram）')).toBeTruthy()
+    expect(dialog.getByText('@sample_shop（Instagram）')).toBeTruthy()
     expect(dialog.getByText('Instagramの連携数')).toBeTruthy()
     expect(dialog.getByText('1個 → 0個')).toBeTruthy()
     expect(dialog.getByText('契約枠')).toBeTruthy()
@@ -492,7 +492,7 @@ describe('Google のカード（★v7 F1・F7）', () => {
 
   it('接続済みなら一覧の行と営業時間への移動を出し、行の操作から解除できる', async () => {
     fixture.googleDisconnect.mockResolvedValue({ success: true })
-    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' } })
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationName: 'locations/1', locationTitle: '見本 本店' } })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
     render(<SnsSettingsPage />)
 
@@ -500,7 +500,7 @@ describe('Google のカード（★v7 F1・F7）', () => {
     expect(googleCard().getByText('連携 1個（契約枠 1個）')).toBeTruthy()
     expect(screen.getByRole('link', { name: '営業時間へ' }).getAttribute('href')).toBe('/settings/google-hours')
 
-    fireEvent.click(googleCard().getByRole('button', { name: '然カフェ 本店の操作' }))
+    fireEvent.click(googleCard().getByRole('button', { name: '見本 本店の操作' }))
     expect(screen.getAllByRole('menuitem', { name: 'つなぎ直す' }).length).toBeGreaterThan(0)
     fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
     const dialog = within(await screen.findByRole('dialog'))
@@ -513,7 +513,7 @@ describe('Google のカード（★v7 F1・F7）', () => {
   it('接続済みなら前からある口コミ・投稿の件数と、口コミ・投稿・プロフィールへの移動を残す', async () => {
     fixture.googleConnection.mockResolvedValue({
       ...googleData(),
-      connection: { status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+      connection: { status: 'connected', locationName: 'locations/1', locationTitle: '見本 本店' },
       summary: { unrepliedCount: 2, draftCount: 0, attentionCount: 0, newCount: 0, storedCount: 12, postsAttentionCount: 1, syncStale: false },
     })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
@@ -531,7 +531,7 @@ describe('Google のカード（★v7 F1・F7）', () => {
     fixture.style.value = 'general'
     fixture.googleConnection.mockResolvedValue({
       ...googleData(),
-      connection: { status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+      connection: { status: 'connected', locationName: 'locations/1', locationTitle: '見本 本店' },
       summary: { unrepliedCount: 2, draftCount: 0, attentionCount: 0, newCount: 0, storedCount: 12, postsAttentionCount: 1, syncStale: false },
     })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
@@ -546,11 +546,11 @@ describe('Google のカード（★v7 F1・F7）', () => {
 
   it('店舗の選択待ちなら候補を選んで接続できる', async () => {
     fixture.googleSelectLocation.mockResolvedValueOnce({ success: true })
-    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'pending_location', locationTitle: null }, candidates: [{ locationName: 'accounts/1/locations/2', locationTitle: '渋谷店', addressText: '東京都' }] })
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'pending_location', locationTitle: null }, candidates: [{ locationName: 'accounts/1/locations/2', locationTitle: '見本 C店', addressText: '見本県' }] })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
     render(<SnsSettingsPage />)
     const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
-    fireEvent.click(await card.findByText('渋谷店'))
+    fireEvent.click(await card.findByText('見本 C店'))
     fireEvent.click(card.getByRole('button', { name: 'この店舗を接続する' }))
     await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false, undefined))
   })
@@ -567,8 +567,8 @@ describe('行の操作は押した行の接続をAPIへ渡す（複数接続・v
     id: 'igc-2',
     pageId: 'page-2',
     instagramId: 'ig-2',
-    pageName: '然カフェ 2号店',
-    username: 'nen_cafe_2',
+    pageName: '見本 2号店',
+    username: 'sample_shop_2',
     expiresAt: '2026-12-31T00:00:00.000Z',
     dataAccessExpiresAt: null,
     version: 7,
@@ -589,7 +589,7 @@ describe('行の操作は押した行の接続をAPIへ渡す（複数接続・v
     fixture.igDisconnect.mockResolvedValue({ success: true })
     setup('connected', IG_SECOND)
 
-    fireEvent.click(await igCard().findByRole('button', { name: '@nen_cafe_2の操作' }))
+    fireEvent.click(await igCard().findByRole('button', { name: '@sample_shop_2の操作' }))
     fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
     const dialog = within(await screen.findByRole('dialog'))
     fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
@@ -611,7 +611,7 @@ describe('行の操作は押した行の接続をAPIへ渡す（複数接続・v
     fixture.googleConnectStart.mockResolvedValue({ success: true, mode: 'reconnect', authorizeUrl: 'https://example.test/g' })
     fixture.googleConnection.mockResolvedValue({
       ...googleData(),
-      connection: { id: 'gc-2', confirmationRevision: 5, status: 'expired', locationName: 'locations/2', locationTitle: '然カフェ 2号店' },
+      connection: { id: 'gc-2', confirmationRevision: 5, status: 'expired', locationName: 'locations/2', locationTitle: '見本 2号店' },
     })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
     render(<SnsSettingsPage />)
@@ -625,12 +625,12 @@ describe('行の操作は押した行の接続をAPIへ渡す（複数接続・v
     fixture.googleDisconnect.mockResolvedValue({ success: true })
     fixture.googleConnection.mockResolvedValue({
       ...googleData(),
-      connection: { id: 'gc-2', confirmationRevision: 5, status: 'connected', locationName: 'locations/2', locationTitle: '然カフェ 2号店' },
+      connection: { id: 'gc-2', confirmationRevision: 5, status: 'connected', locationName: 'locations/2', locationTitle: '見本 2号店' },
     })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
     render(<SnsSettingsPage />)
 
-    fireEvent.click(await googleCard().findByRole('button', { name: '然カフェ 2号店の操作' }))
+    fireEvent.click(await googleCard().findByRole('button', { name: '見本 2号店の操作' }))
     fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
     const dialog = within(await screen.findByRole('dialog'))
     fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
@@ -655,7 +655,7 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
       status: 'connected',
       googleAccountEmail: 'shop@example.com',
       locationName: 'locations/1',
-      locationTitle: '然カフェ 本店',
+      locationTitle: '見本 本店',
       lastSyncedAt: '2026-10-07T01:00:00.000Z',
     },
     {
@@ -664,7 +664,7 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
       status: 'connected',
       googleAccountEmail: 'shop@example.com',
       locationName: 'locations/2',
-      locationTitle: '然カフェ 2号店',
+      locationTitle: '見本 2号店',
       lastSyncedAt: '2026-10-08T01:00:00.000Z',
     },
   ]
@@ -678,8 +678,8 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
         state: 'expired' as const,
         pageId: 'page-2',
         instagramId: 'ig-2',
-        pageName: '然カフェ 2号店',
-        username: 'nen_cafe_2',
+        pageName: '見本 2号店',
+        username: 'sample_shop_2',
         expiresAt: '2026-12-31T00:00:00.000Z',
         dataAccessExpiresAt: null,
         version: 7,
@@ -692,7 +692,7 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
   function setupTwo() {
     fixture.googleConnection.mockResolvedValue({
       ...googleData(),
-      connection: { id: 'gc-1', confirmationRevision: 4, status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+      connection: { id: 'gc-1', confirmationRevision: 4, status: 'connected', locationName: 'locations/1', locationTitle: '見本 本店' },
     })
     fixture.googleConnections.mockResolvedValue({ success: true, store: googleData().store, connections: GOOGLE_TWO })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', CONNECTED) })
@@ -720,7 +720,7 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
   it('Google は行ごとに営業時間への行き先を出す（店舗を選び終えた行だけ）', async () => {
     fixture.googleConnection.mockResolvedValue({
       ...googleData(),
-      connection: { id: 'gc-1', confirmationRevision: 4, status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+      connection: { id: 'gc-1', confirmationRevision: 4, status: 'connected', locationName: 'locations/1', locationTitle: '見本 本店' },
     })
     fixture.googleConnections.mockResolvedValue({
       success: true,
@@ -752,7 +752,7 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
     fixture.igDisconnect.mockResolvedValue({ success: true })
     setupTwo()
 
-    fireEvent.click(await igCard().findByRole('button', { name: '@nen_cafe_2の操作' }))
+    fireEvent.click(await igCard().findByRole('button', { name: '@sample_shop_2の操作' }))
     fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
     const dialog = within(await screen.findByRole('dialog'))
     fireEvent.click(dialog.getByRole('button', { name: '解除する' }))
@@ -764,7 +764,7 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
     fixture.googleDisconnect.mockResolvedValue({ success: true })
     setupTwo()
 
-    fireEvent.click(await googleCard().findByRole('button', { name: '然カフェ 2号店の操作' }))
+    fireEvent.click(await googleCard().findByRole('button', { name: '見本 2号店の操作' }))
     fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0])
     const dialog = within(await screen.findByRole('dialog'))
     fireEvent.click(dialog.getByRole('button', { name: '解除する' }))

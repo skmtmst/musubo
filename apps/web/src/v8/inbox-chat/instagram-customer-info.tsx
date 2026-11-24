@@ -50,7 +50,7 @@ export default function InstagramCustomerInfo({ chat, thread }: { chat: ChatList
           </div>
           {canEdit && detail && detail.replyState !== 'ready' ? (
             <p className="mt-2">
-              <TextLink href="/settings/sns">{detail.replyState === 'permission_required' ? 'SNS連携でつなぎ直す' : 'SNS連携で接続を確認する'}</TextLink>
+              <TextLink href="/settings/sns">{detail.replyState === 'permission_required' ? 'メール・SNS連携でつなぎ直す' : 'メール・SNS連携で接続を確認する'}</TextLink>
             </p>
           ) : null}
           <p className="text-ink-faint mt-2 text-xs leading-relaxed">返信できるのは、お客さまの最後のメッセージから24時間です。</p>

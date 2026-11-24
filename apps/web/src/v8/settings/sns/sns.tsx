@@ -112,7 +112,7 @@ type DisconnectTicket = {
 
 export default function SnsSettingsPage() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('SNS 連携')
+  usePageTitle('メール・SNS連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -449,7 +449,7 @@ export default function SnsSettingsPage() {
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="y3GGTs">
       <PageHeading
         headingSize="compact"
-        title="SNS 連携"
+        title="メール・SNS連携"
         help="Googleビジネスや Instagram とつないで、お店の情報をまとめて発信します。"
       />
       <div className={styles.body}>
