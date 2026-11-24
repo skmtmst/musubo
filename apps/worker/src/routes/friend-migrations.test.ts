@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const db = {
   UID_EVIDENCE_TYPES: ['same_provider', 'line_login', 'signed_customer_id', 'verified_contact', 'operator_csv', 'manual'],
@@ -13,7 +14,7 @@ const db = {
   listUidMigrationRuns: vi.fn(),
   protectCsvCell: vi.fn((value: string | null) => value ?? ''),
 };
-vi.mock('@line-crm/db', () => db);
+vi.mock('@line-crm/db', async (importOriginal) => ({ ...await importOriginal<typeof import('@line-crm/db')>(), ...db }));
 
 const accountAccess = { canAccessAllLineAccounts: vi.fn(), getVisibleLineAccountScope: vi.fn() };
 vi.mock('../services/account-access.js', () => accountAccess);
@@ -164,27 +165,81 @@ describe('対応表のページ送り', () => {
 describe('取り込みの競合検出と実行', () => {
   const VALUES = { displayName: '表示', realName: null, systemDisplayName: null };
 
-  it('対象と他アカウントを別々に見る', async () => {
+  it('対象アカウントのUIDだけを見る', async () => {
     first.mockReset();
     await appFor().fetch(post('/api/friends/imports', {
       accountId: 'acc-1', sourceFilename: 'in.csv', sourceChecksum: 'sum-1',
       rows: [{ lineUid: 'U1', ...VALUES }],
     }), env);
     const statements = prepare.mock.calls.map(([sql]) => String(sql));
-    expect(statements.some((sql) => /line_account_id = \? AND line_user_id = \?/.test(sql))).toBe(true);
-    expect(statements.some((sql) => /line_user_id = \? AND line_account_id != \?/.test(sql))).toBe(true);
+    expect(statements.filter((sql) => /FROM friends/.test(sql))).toEqual([
+      expect.stringMatching(/line_account_id = \? AND line_platform_user_id = \?/),
+    ]);
   });
 
-  it('同アカウントに無く他アカウントにあれば競合にする', async () => {
+  it('別アカウントにもいる利用者を取り込み、対象の実UIDを書き出す', async () => {
+    const { db: realDb, raw } = createTestD1({ foreignKeys: true });
+    try {
+      raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES
+        ('acc-1','1001','対象','fixture','fixture'),('acc-2','1002','別店','fixture','fixture');
+        INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES ('elsewhere','U9','acc-2','別店の履歴');`);
+      const app = appFor();
+      const vars = { DB: realDb };
+      const response = await app.fetch(post('/api/friends/imports', {
+        accountId: 'acc-1', sourceFilename: 'in.csv', sourceChecksum: 'sum-2',
+        rows: [{ lineUid: 'U9', ...VALUES }],
+      }), vars);
+      expect(response.status).toBe(201);
+      const preview = await response.json() as { data: { id: string; result: { rows: Array<{ kind: string }> } } };
+      expect(preview.data.result.rows[0].kind).toBe('add');
+      const execution = await app.fetch(post(`/api/friends/imports/${preview.data.id}/execute`, {}), vars);
+      expect(execution.status).toBe(200);
+      expect(raw.prepare(`SELECT line_account_id,display_name FROM friends WHERE line_platform_user_id=? ORDER BY line_account_id`).all('U9'))
+        .toEqual([{ line_account_id: 'acc-1', display_name: '表示' }, { line_account_id: 'acc-2', display_name: '別店の履歴' }]);
+      const exportResponse = await app.fetch(post('/api/friends/exports', { accountId: 'acc-1' }), vars);
+      expect(exportResponse.status).toBe(201);
+      const requestedExport = await exportResponse.json() as { data: { downloadUrl: string } };
+      const csv = await (await app.request(requestedExport.data.downloadUrl, {}, vars)).text();
+      expect(csv).toContain('U9,表示');
+      expect(csv).not.toContain('musubo-scope:');
+      expect(csv).not.toContain('別店の履歴');
+    } finally { raw.close(); }
+  });
+
+  it('旧ルールで止まったファイルは同じデータを再確認できる', async () => {
     first.mockReset();
-    first.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue({ id: 'f-other' });
+    first.mockResolvedValueOnce({ id: 'legacy', status: 'previewed', rows_json: JSON.stringify([{ lineUid: 'U9', ...VALUES }]),
+      result_json: JSON.stringify({ rows: [{ kind: 'conflict', reason: '別のLINEアカウントに同じUIDがあります' }] }) })
+      .mockResolvedValueOnce(null);
     const response = await appFor().fetch(post('/api/friends/imports', {
-      accountId: 'acc-1', sourceFilename: 'in.csv', sourceChecksum: 'sum-2',
-      rows: [{ lineUid: 'U9', ...VALUES }],
+      accountId: 'acc-1', sourceFilename: 'in.csv', sourceChecksum: 'legacy-sum',
+      rows: [{ lineUid: 'changed', ...VALUES }],
     }), env);
-    expect(response.status).toBe(201);
-    const body = await response.json() as { data: { result: { rows: Array<{ kind: string }> } } };
-    expect(body.data.result.rows[0].kind).toBe('conflict');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { id: 'legacy',
+      result: { rows: [{ lineUid: 'U9', kind: 'add' }] }, duplicate: false } });
+    expect(prepare.mock.calls.some(([sql]) => /UPDATE friend_import_jobs/.test(sql))).toBe(true);
+  });
+
+  it('確認後に同じアカウントで友だちが増えたときは取り込みを部分適用しない', async () => {
+    const { db: realDb, raw } = createTestD1({ foreignKeys: true });
+    try {
+      raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)
+        VALUES ('acc-1','1001','対象','fixture','fixture')`);
+      const app = appFor();
+      const vars = { DB: realDb };
+      const response = await app.fetch(post('/api/friends/imports', {
+        accountId: 'acc-1', sourceFilename: 'in.csv', sourceChecksum: 'scope-race',
+        rows: [{ lineUid: 'U1', ...VALUES }, { lineUid: 'U2', ...VALUES }],
+      }), vars);
+      const preview = await response.json() as { data: { id: string } };
+      raw.exec(`INSERT INTO friends(id,line_user_id,line_account_id,display_name) VALUES ('received','U2','acc-1','受信した名前')`);
+      const execute = await app.fetch(post(`/api/friends/imports/${preview.data.id}/execute`, {}), vars);
+      expect(execute.status).toBe(409);
+      expect(raw.prepare(`SELECT line_platform_user_id,display_name FROM friends WHERE line_account_id='acc-1'`).all())
+        .toEqual([{ line_platform_user_id: 'U2', display_name: '受信した名前' }]);
+      expect(raw.prepare(`SELECT status FROM friend_import_jobs WHERE id=?`).get(preview.data.id)).toEqual({ status: 'previewed' });
+    } finally { raw.close(); }
   });
 
   it('競合が残る実行は409で止める', async () => {
@@ -222,6 +277,24 @@ describe('取り込みの競合検出と実行', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { status: 'completed' } });
   });
+});
+
+it('同じプロバイダーのUID移行確認で移行元と移行先を別の行として解決する', async () => {
+  const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+  const { db: realDb, raw } = createTestD1({ foreignKeys: true });
+  try {
+    raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES
+      ('from','1001','移行元','fixture','fixture'),('to','1002','移行先','fixture','fixture');
+      INSERT INTO friends(id,line_user_id,line_account_id) VALUES
+      ('old-friend','U-shared','from'),('new-friend','musubo-scope:new-friend:U-shared','to');`);
+    const migration = await actual.createUidMigrationRun(realDb, {
+      fromAccountId: 'from', toAccountId: 'to', purpose: '確認', sourceKind: 'verified_api',
+      mappings: [{ oldUid: 'U-shared', newUid: 'U-shared', evidenceType: 'same_provider' }], createdBy: 'owner-1',
+    });
+    const items = await actual.listUidMigrationItems(realDb, migration.id);
+    expect(items).toMatchObject([{ old_friend_id: 'old-friend', new_friend_id: 'new-friend', classification: 'auto' }]);
+    expect(raw.prepare(`SELECT COUNT(*) AS count FROM friends WHERE user_id IS NOT NULL`).get()).toEqual({ count: 0 });
+  } finally { raw.close(); }
 });
 
 /**

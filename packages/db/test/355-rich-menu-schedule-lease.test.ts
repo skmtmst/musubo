@@ -29,7 +29,8 @@ function setup() {
     CREATE TABLE friends (
       id TEXT PRIMARY KEY,
       line_account_id TEXT NOT NULL,
-      line_user_id TEXT
+      line_user_id TEXT,
+      line_platform_user_id TEXT GENERATED ALWAYS AS (line_user_id) VIRTUAL
     );
     CREATE TABLE rich_menu_assignments (
       id TEXT PRIMARY KEY,

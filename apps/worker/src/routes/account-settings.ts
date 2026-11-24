@@ -96,46 +96,28 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
   const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 
   const result = await c.env.DB.prepare(
-    `SELECT
-       f.id,
-       COALESCE(NULLIF(f.display_name, ''), sm.name) AS display_name,
-       f.picture_url,
-       sm.name AS staff_name,
-       CASE WHEN f.line_account_id = ? THEN 1 ELSE 0 END AS same_account
-     FROM staff_members sm
-     JOIN friends f ON f.line_user_id = sm.line_user_id
-       AND (
-         f.line_account_id = ?
-         OR NOT EXISTS (
-           SELECT 1 FROM friends scoped
-            WHERE scoped.line_user_id = sm.line_user_id
-              AND scoped.line_account_id = ?
-         ) AND (
-           EXISTS (
-             SELECT 1 FROM line_accounts fallback_account
-              WHERE fallback_account.id = f.line_account_id
-                AND COALESCE(fallback_account.tenant_id, ?) = ?
-           ) OR (f.line_account_id IS NULL AND ? = ?)
-         )
-       )
-     WHERE sm.is_active = 1
-       AND COALESCE(sm.tenant_id, ?) = ?
-       AND sm.line_user_id IS NOT NULL
-       AND f.is_following = 1
-     ORDER BY same_account DESC, sm.created_at ASC`
-  // C-2bで複合一意制約へ移行したら、上のNOT EXISTSフォールバックを外す。
-  // 現在は既存の別アカウント・未割当行を候補から消さず、同じ応答を保つ。
-  ).bind(
-    accountId,
-    accountId,
-    accountId,
-    DEFAULT_TENANT_ID,
-    tenantId,
-    tenantId,
-    DEFAULT_TENANT_ID,
-    DEFAULT_TENANT_ID,
-    tenantId,
-  ).all<{
+    `WITH scope(account_id, tenant_id, default_tenant_id) AS (VALUES (?, ?, ?)),
+     candidates AS (
+       SELECT f.id, COALESCE(NULLIF(f.display_name, ''), sm.name) AS display_name,
+              f.picture_url, sm.name AS staff_name, sm.created_at AS staff_created_at,
+              CASE WHEN f.line_account_id = scope.account_id THEN 1 ELSE 0 END AS same_account,
+              ROW_NUMBER() OVER (PARTITION BY sm.id ORDER BY f.line_account_id IS NULL, f.line_account_id, f.id) AS candidate_rank
+         FROM scope
+         JOIN staff_members sm ON COALESCE(sm.tenant_id, scope.default_tenant_id) = scope.tenant_id
+         JOIN friends f ON f.line_platform_user_id = sm.line_user_id
+         LEFT JOIN line_accounts friend_owner ON friend_owner.id = f.line_account_id
+        WHERE sm.is_active = 1 AND f.is_following = 1
+          AND (f.line_account_id IS NULL OR friend_owner.id IS NOT NULL)
+          AND COALESCE(friend_owner.tenant_id, scope.default_tenant_id) = scope.tenant_id
+          AND (f.line_account_id = scope.account_id OR NOT EXISTS (
+            SELECT 1 FROM friends scoped
+             WHERE scoped.line_platform_user_id = sm.line_user_id
+               AND scoped.line_account_id = scope.account_id
+          ))
+     )
+     SELECT id, display_name, picture_url, staff_name, same_account
+       FROM candidates WHERE candidate_rank = 1 ORDER BY same_account DESC, staff_created_at ASC, id ASC`
+  ).bind(accountId, tenantId, DEFAULT_TENANT_ID).all<{
     id: string;
     display_name: string | null;
     picture_url: string | null;

@@ -20,7 +20,7 @@ async function caller(c:import('hono').Context<Env>) {
  const identity=await verifyCallerLineIdentity(c.req.header('Authorization'),c.env,accountId);
  if(!identity||identity.lineAccountId!==accountId)return {response:c.json({success:false,error:'LINEでログインし直してください'},401)} as const;
  if(!await isLineAccountTenantActive(c.env.DB,accountId))return {response:c.json({success:false,error:'このアカウントは現在ご利用いただけません'},503)} as const;
- const friend=await c.env.DB.prepare(`SELECT f.id,f.line_account_id accountId FROM friends f JOIN line_accounts a ON a.id=f.line_account_id WHERE f.line_account_id=? AND f.line_user_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(accountId,identity.lineUserId).first<{id:string;accountId:string}>();
+ const friend=await c.env.DB.prepare(`SELECT f.id,f.line_account_id accountId FROM friends f JOIN line_accounts a ON a.id=f.line_account_id WHERE f.line_account_id=? AND f.line_platform_user_id=? AND a.is_active=1 AND a.archived_at IS NULL`).bind(accountId,identity.lineUserId).first<{id:string;accountId:string}>();
  if(!friend)return {response:c.json({success:false,error:'お客さまの登録が見つかりません'},404)} as const;
  return {friend} as const;
 }

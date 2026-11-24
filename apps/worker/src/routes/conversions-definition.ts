@@ -1,7 +1,6 @@
-import { jstDate as japanDate } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, hasStaffAccess, jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-import { hasStaffAccess } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 import { createBroadcastRetryKey } from '../features/broadcasts/broadcast-retry-key/index.js';
 import { type Context, type MiddlewareHandler } from 'hono';
@@ -14,6 +13,21 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { fail } from '../lib/fail.js';
 
+/** 受信鍵で認証した地点の範囲から友だちを検索し、複数一致も検出する。 */
+export async function findConversionIngestFriends(
+  db: D1Database,
+  point: { line_account_id: string | null; tenant_id: string | null },
+  identity: { friendId: string } | { lineUserId: string },
+): Promise<{ id: string }[]> {
+  const [column, value] = 'friendId' in identity ? ['f.id', identity.friendId] : ['f.line_platform_user_id', identity.lineUserId];
+  const accountFilter = point.line_account_id === null ? '' : 'AND f.line_account_id = ?';
+  const accountArgs = point.line_account_id === null ? [] : [point.line_account_id];
+  const friends = await db.prepare(`SELECT f.id FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
+    WHERE ${column} = ? ${accountFilter} AND COALESCE(a.tenant_id, ?) = ? LIMIT 2`)
+    .bind(value, ...accountArgs, DEFAULT_TENANT_ID, point.tenant_id ?? DEFAULT_TENANT_ID)
+    .all<{ id: string }>();
+  return friends.results;
+}
 
 
 export async function adminAccountScope(c: Context<Env>, alias = '') {

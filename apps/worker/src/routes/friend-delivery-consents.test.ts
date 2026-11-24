@@ -71,7 +71,7 @@ describe('配信停止・同意のAPIとUID移行（実SQLite）',()=>{
  it('createでも配信停止を引き継ぎ、切り戻す',async()=>{
   set('old','revoked');const id=await migration(true);
   expect((await req(`/api/friends/migrations/${id}/execute`,{})).status).toBe(200);
-  const target=fixture.raw.prepare("SELECT id FROM friends WHERE line_user_id='U-new'").get() as {id:string};
+  const target=fixture.raw.prepare("SELECT id FROM friends WHERE line_account_id='to' AND line_platform_user_id='U-new'").get() as {id:string};
   expect(await isFriendDeliverySuppressed(fixture.db,target.id)).toBe(true);
   expect((await req(`/api/friends/migrations/${id}/rollback`,{})).status).toBe(200);
   expect(await listFriendDeliveryConsents(fixture.db,target.id)).toEqual([]);
