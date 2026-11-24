@@ -122,7 +122,7 @@ export default function GenerationPanel({
       variant="form"
       gap="normal"
       data-design-node="GcJHv"
-      className="w-full shrink-0 self-start xl:sticky xl:top-4"
+      className={v8Layout ? 'w-full shrink-0 self-start' : 'w-full shrink-0 self-start xl:sticky xl:top-4'}
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >
