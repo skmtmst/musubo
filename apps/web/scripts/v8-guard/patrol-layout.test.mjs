@@ -141,10 +141,15 @@ async function withPage(width, name, run) {
 for (const width of [390, 430, 1152, 1440]) test(`getting started rows do not overlap ${width}`, async () => {
   await withPage(width, `getting-started-rows-${width}`, async (page, pending, dir, rows) => {
     styleDashboardMock('PUT', '/api/dashboard/style', new URLSearchParams(), { style: 'restaurant' })
+    await page.route('**/api/restaurant-test/setup-progress?**', route => {
+      const storeId = new URL(route.request().url()).searchParams.get('storeId')
+      return route.fulfill({ json: { success: true, data: { storeId, tables: false, hours: false, menus: false, reception: false, followup: false } } })
+    })
     await page.goto(base + '/getting-started', { waitUntil: 'domcontentloaded' })
     await waitForNavigationContent(page, pending, 15000)
     const table = page.getByRole('table', { name: 'はじめの設定の順路' })
     await table.waitFor()
+    await page.waitForFunction(() => document.querySelectorAll('[aria-label="はじめの設定の順路"] [role="row"]')[2]?.getAttribute('data-step-state') === 'todo')
     await page.evaluate(async () => { await document.fonts.ready })
     await page.screenshot({ path: join(dir, 'settings.png'), fullPage: true, animations: 'disabled' })
     const bounds = await table.evaluate(node => [...node.querySelectorAll('[role="row"]')].map(row => {
