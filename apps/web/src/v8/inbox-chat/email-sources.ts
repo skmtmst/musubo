@@ -1,3 +1,5 @@
+import { ACCOUNT_EMAIL_REPLY_PREPARING } from '@/lib/status-labels'
+
 /**
  * 受信箱のメールが届いた経路。
  * - shared（共通）：これまでの共通の窓口に届くメール（/api/support/*）。どの店舗にも属さない。
@@ -27,8 +29,8 @@ export function emailSourceFromParam(value: string | null | undefined): EmailSou
   return value === 'store' ? 'store' : 'shared'
 }
 
-/** 店舗の会話の返信欄を押せない形にするときの吹き出し。送信の手段と差出人を確かめるまで受信専用。 */
-export const STORE_EMAIL_REPLY_LOCK_REASON = 'このメールアドレスからの返信は準備中です。返信は共通メールか LINE から'
+/** 店舗の会話の返信欄を押せない形にするときの吹き出し。設定のメールの枠と同じ言葉。 */
+export const STORE_EMAIL_REPLY_LOCK_REASON = ACCOUNT_EMAIL_REPLY_PREPARING
 
 type MergeRow = { isUnread: boolean; lastMessageAt?: string | null; lastIncomingAt: string }
 

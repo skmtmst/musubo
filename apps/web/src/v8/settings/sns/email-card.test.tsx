@@ -75,3 +75,14 @@ it('メールをつなぐ窓を開いても、何も打っていなければ画�
   expect(leave).toHaveBeenCalledTimes(1)
   expect(screen.queryByText('保存していない変更があります')).toBeNull()
 })
+
+it.each([
+  ['未接続', 'disconnected', {}],
+  ['接続済み', 'connected', { address: 'inbox-fixture@example.org', mailbox: 'shop@example.org', connectionId: 'connection-a' }],
+  ['接続切れ', 'revoked', {}],
+] as const)('%sのメールの枠は、受信箱と同じ言葉で返信が準備中であることと返信の経路を伝える', async (_label, status, extra) => {
+  fixture.connection.mockResolvedValue(response(status, extra))
+  render(<EmailConnectionCard accountId="store-a" canManage lockedReason="" />)
+  expect(await screen.findByText('このメールアドレスからの返信は準備中です。返信は共通メールか LINE から')).toBeTruthy()
+  expect(screen.queryByText(/お店のメールソフト/)).toBeNull()
+})

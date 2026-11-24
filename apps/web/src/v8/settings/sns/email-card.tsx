@@ -21,7 +21,7 @@ import { api, type AccountEmailConnection, type AccountEmailStatus } from '@/lib
 import { formatDate } from '@/lib/format'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { ACCOUNT_EMAIL_CONNECTION_STATUS } from '@/lib/status-labels'
+import { ACCOUNT_EMAIL_CONNECTION_STATUS, ACCOUNT_EMAIL_REPLY_PREPARING } from '@/lib/status-labels'
 import { startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import snsStyles from './sns.module.css'
 import styles from './email-card.module.css'
@@ -36,7 +36,8 @@ import {
 } from './email-connection-model'
 
 const CAPABILITIES = ['お店のメールアドレスに届いたメールを受信箱で読めます', '添付ファイルを受信箱から保存できます']
-const REPLY_NOTE = '受信箱からの返信はまだできません。返信はお店のメールソフトから行い、受信箱では対応状況だけを変えます。'
+/** 返信の案内。受信箱の店舗の会話の返信欄の吹き出しと同じ言葉。 */
+const REPLY_NOTE = ACCOUNT_EMAIL_REPLY_PREPARING
 const LIMIT_NOTE = 'お店のドメインや DNS の設定は要りません。添付は最大16件で、メール全体の上限は10 MiBです。'
 /** 転送用アドレスなどを見られない人へ出す理由。値が無いのではなく見せないことを伝える。 */
 const HIDDEN_REASON = 'オーナーか管理者だけが見られます'
