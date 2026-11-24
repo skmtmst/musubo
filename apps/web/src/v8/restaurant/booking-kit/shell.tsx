@@ -8,6 +8,7 @@ import { useStaffRole } from '@/lib/staff-role'
 import { notifySaved } from '@/components/shared/toast'
 import { type ComponentProps, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import { clearApiReadCache } from '@/lib/api/transport/read-cache'
 
 import {
   restaurantTestApi,
@@ -248,7 +249,7 @@ export default function RestaurantShell({ initialStoreId = '', boardId, title, d
   const storePicker = snapshot && snapshot.stores.length > 1 ? (
     <span className={templateHeading ? styles.fusionStore : styles.storePicker}>
       <SaveErrorField names={["selectedStoreId", "selected_store_id"]}>
-        <EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item => ({ value: item.id, label: item.name }))} />
+        <EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={next => { if (next !== selectedStoreId) clearApiReadCache(); setSelectedStoreId(next) }} options={snapshot.stores.map(item => ({ value: item.id, label: item.name }))} />
       </SaveErrorField>
     </span>
   ) : null

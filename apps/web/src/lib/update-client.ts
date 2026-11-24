@@ -9,6 +9,8 @@ import {
   findLatestUpgrade as engineFindLatestUpgrade,
   compareSemver as engineCompareSemver,
 } from '@line-harness/update-engine/pure'
+import { apiReadCacheGeneration } from './api/transport/read-cache'
+import { apiReadScope } from './api/transport/session'
 
 // Re-export so consumers can import all upgrade-related types from one place
 export type { Manifest, CurrentVersion, ForkStatus, ReleaseEntry }
@@ -58,10 +60,22 @@ export async function getCurrentVersion(): Promise<CurrentVersion> {
   }
 }
 
-export async function getManifest(): Promise<Manifest> {
-  const r = await fetch(getManifestUrl(), { cache: 'no-store' })
-  if (!r.ok) throw new Error(`manifest fetch failed ${r.status}`)
-  return r.json() as Promise<Manifest>
+let manifestRead: { key: string; promise: Promise<Manifest> } | undefined
+
+export function getManifest(): Promise<Manifest> {
+  const scope = apiReadScope()
+  const key = JSON.stringify([scope.key, apiReadCacheGeneration()])
+  if (!manifestRead || manifestRead.key !== key) {
+    const promise = (async () => {
+      const r = await fetch(getManifestUrl(), { cache: 'no-store' })
+      if (!r.ok) throw new Error(`manifest fetch failed ${r.status}`)
+      return r.json() as Promise<Manifest>
+    })()
+    const entry = { key, promise }
+    manifestRead = entry
+    void promise.then(() => { if (manifestRead === entry) manifestRead = undefined }, () => { if (manifestRead === entry) manifestRead = undefined })
+  }
+  return manifestRead.promise.then(value => structuredClone(value))
 }
 
 export async function startUpdate(): Promise<{ updateId: string }> {

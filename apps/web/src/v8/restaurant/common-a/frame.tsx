@@ -7,6 +7,7 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { notifySaved } from '@/components/shared/toast'
 import { type ComponentProps, type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import { clearApiReadCache } from '@/lib/api/transport/read-cache'
 import {
   restaurantTestApi,
   type ReservationQuery,
@@ -215,7 +216,7 @@ export default function RestaurantFrame({
       valuePrefix="店舗"
       width={STORE_PICKER_WIDTH}
       value={selectedStoreId}
-      onChange={next=>requestUnsavedAction(()=>setSelectedStoreId(next))}
+      onChange={next=>requestUnsavedAction(()=>{ if (next !== selectedStoreId) clearApiReadCache(); setSelectedStoreId(next) })}
       options={[
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
         ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),
@@ -225,7 +226,7 @@ export default function RestaurantFrame({
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
 
       value={selectedStoreId}
-      onChange={next=>requestUnsavedAction(()=>setSelectedStoreId(next))}
+      onChange={next=>requestUnsavedAction(()=>{ if (next !== selectedStoreId) clearApiReadCache(); setSelectedStoreId(next) })}
       options={[
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
         ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),

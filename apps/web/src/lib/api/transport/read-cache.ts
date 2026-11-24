@@ -2,7 +2,6 @@ import { LIST_REQUEST_TIMEOUT_MS } from '../../request-timeout'
 
 const REUSE_MS = 30_000
 const reusablePaths = new Set([
-  '/api/line-accounts',
   '/api/operators',
   '/api/staff/me',
   '/api/tenants/me',
@@ -10,6 +9,16 @@ const reusablePaths = new Set([
   '/api/settings/features/visibility',
   '/api/dashboard/style',
   '/api/hq/billing/summary',
+])
+
+const STARTUP_REUSE_MS = 1_000
+const SNAPSHOT_REUSE_MS = 2_000
+const startupPaths = new Set([
+  '/api/getting-started',
+  '/api/restaurant-test/stores',
+  '/api/restaurant-test/store-context',
+  '/api/rich-menu-groups',
+  '/api/restaurant-test/setup-progress',
 ])
 
 type ReadEntry = { promise: Promise<unknown>; expiresAt: number; path: string }
@@ -72,8 +81,9 @@ export function shareApiRead<T>(path: string, key: string, load: () => Promise<T
         && response.success === true && 'data' in response
       const url = new URL(path, 'https://request.invalid')
       // 接続の実確認は、同じ一覧でも保存済み表示とは分ける。
-      if (!successful || noStore || !reusablePaths.has(url.pathname) || url.searchParams.get('live') === '1') forget()
-      else current.expiresAt = Date.now() + REUSE_MS
+      const reuseMs = reusablePaths.has(url.pathname) ? REUSE_MS : startupPaths.has(url.pathname) ? STARTUP_REUSE_MS : url.pathname === '/api/restaurant-test/snapshot' ? SNAPSHOT_REUSE_MS : 0
+      if (!successful || noStore || !reuseMs || url.searchParams.get('live') === '1') forget()
+      else current.expiresAt = Date.now() + reuseMs
     }, forget)
   }
   // 表示用の並べ替え・加工が、別の利用者や保存済みの答えへ伝わらない。

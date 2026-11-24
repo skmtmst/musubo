@@ -42,14 +42,8 @@ describe('アカウント一覧の共有', () => {
     expect(res).toEqual(ok)
   })
 
-  it('30秒のあいだは取り直さない（2回目の画面移動で呼ばない）', async () => {
-    let now = 1_000_000
-    vi.spyOn(Date, 'now').mockImplementation(() => now)
+  it('完了した要求は保存せず、次の要求は読み直す', async () => {
     await loadLineAccounts()
-    now += 29_000
-    await loadLineAccounts()
-    expect(list).toHaveBeenCalledTimes(1)
-    now += 2_000
     await loadLineAccounts()
     expect(list).toHaveBeenCalledTimes(2)
   })

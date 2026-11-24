@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useLayoutEffect, useState } from 'react'
 import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
@@ -10,7 +10,7 @@ import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot, type SessionSnapshot } from '@/lib/session-snapshot'
 import { forgetAuthCheck, readAuthCheck, rememberAuthCheck } from '@/lib/auth-check-marker'
 import { clearCommonCaches } from '@/lib/common-caches'
-import { prefetchLineAccounts } from '@/lib/line-accounts-cache'
+import { prefetchApiRead } from '@/lib/api/transport/prefetch'
 import TenantSuspended from './tenant-suspended'
 import AuthPendingShell from './auth-pending-shell'
 import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
@@ -29,7 +29,7 @@ import { TenantAccessProvider, type TenantStatus } from './tenant-access-context
  *   書き換え（storageイベント）で即座に捨てる
  */
 const SESSION_REUSE_MS = 30_000
-let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus; onboardingPath: string | null } | null = null
+let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus; onboardingPath: string | null; accessKey: string } | null = null
 const OnboardingAccessContext = createContext<string | null>(null)
 
 /** 初回LINE有効化前は、接続ウィザードも含めて通常のサイドバーを描画しない。 */
@@ -67,8 +67,11 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
   const [checked, setChecked] = useState(false)
   const [tenantStatus, setTenantStatus] = useState<TenantStatus>('active')
   const [onboardingPath, setOnboardingPath] = useState<string | null>(null)
+  const [keepContent, setKeepContent] = useState(false)
+  const [contentEpoch, setContentEpoch] = useState(0)
+  const [recheck, setRecheck] = useState(0)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false
 
     if (isPublicAuthPath(pathname)) {
@@ -78,11 +81,12 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
 
     // セッション切れ・別タブでのログアウトは、次の遷移で必ず確認し直す。
     // 使い回していた共通の答えも捨てる（古い権限や別アカウントを見せない）。
-    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot(); forgetAuthCheck(); clearCommonCaches() }
+    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot(); forgetAuthCheck(); clearCommonCaches(); setKeepContent(false); setChecked(false) }
+    const onSessionLost = () => { invalidate(); router.replace(isMobileShellPath(pathname) ? `/login?next=${MOBILE_LOGIN_NEXT}` : '/login') }
     const onStorage = (event: StorageEvent) => {
-      if (event.key === 'lh_csrf' || event.key === 'lh_staff_role') invalidate()
+      if (event.key === 'lh_csrf' || event.key === 'lh_staff_role') { invalidate(); setRecheck(value => value + 1) }
     }
-    window.addEventListener(SESSION_LOST_EVENT, invalidate)
+    window.addEventListener(SESSION_LOST_EVENT, onSessionLost)
     window.addEventListener('storage', onStorage)
 
     // URLハンドオフは遷移ごとに拾う（新しいトークンなら指紋が変わって再確認になる）。
@@ -92,6 +96,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     // 別のログイン・権限更新で指紋が変わったら、使い回しの答えは捨てる。
     // 古い権限や別アカウントの一覧・名簿・設定を見せない。
     if (lastSessionCheck && lastSessionCheck.fingerprint !== fingerprint) {
+      forgetStaffIdentity()
       clearCommonCaches()
     }
 
@@ -107,21 +112,24 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
       setChecked(true)
       return () => {
         cancelled = true
-        window.removeEventListener(SESSION_LOST_EVENT, invalidate)
+        window.removeEventListener(SESSION_LOST_EVENT, onSessionLost)
         window.removeEventListener('storage', onStorage)
       }
     }
 
     // 再読込時の印は画面を先出しする根拠にしない。契約状態が別タブや運営側で
     // 変わっていても、最新の利用開始状態を取得するまで通常メニューを描画しない。
+    const previousCheck = lastSessionCheck
+    const canKeep = Boolean(previousCheck && previousCheck.fingerprint === fingerprint && previousCheck.tenantStatus === 'active' && !previousCheck.onboardingPath)
     const verified = readAuthCheck(fingerprint)
     if (verified?.snapshot) rememberSessionSnapshot(verified.snapshot)
+    setKeepContent(canKeep)
     setChecked(false)
 
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
-    // 一覧の取得は確認の結果を要らないので、確認と並べて先に始める（直列にしない）。
-    prefetchLineAccounts()
+    // アカウント一覧は認証確定後に画面から取得する。
+    prefetchApiRead('/api/staff/me')
     /*
      * R505: この確認の世代と開始時の指紋。応答を当てはめる前に今と照合し、
      * 古ければ捨てる。成功応答の書き戻しも、失敗時のログインへの送りもしない。
@@ -182,7 +190,13 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         clearSelectionAfterAuthentication(localStorage, sessionStorage)
         // 確認した時点の指紋で記憶する（CSRF更新を受けたなら新しい値で）。
         const confirmedFingerprint = sessionFingerprint(handoffToken)
-        lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus, onboardingPath: nextOnboardingPath }
+        const accessKey = JSON.stringify(data.data)
+        if (canKeep && (previousCheck?.accessKey !== accessKey || previousCheck.fingerprint !== confirmedFingerprint)) {
+          forgetStaffIdentity()
+          clearCommonCaches()
+          setContentEpoch(value => value + 1)
+        }
+        lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus, onboardingPath: nextOnboardingPath, accessKey }
         // 読み直しても中身を先に出せるよう、このタブに印を残す（停止中は残さない）。
         rememberAuthCheck(confirmedFingerprint, nextTenantStatus, snapshot, nextOnboardingPath)
         if (nextOnboardingPath && !isOnboardingContinuationPath(pathname, nextOnboardingPath)) {
@@ -207,13 +221,13 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     runSessionCheck(checkSeq, startFingerprint)
     return () => {
       cancelled = true
-      window.removeEventListener(SESSION_LOST_EVENT, invalidate)
+      window.removeEventListener(SESSION_LOST_EVENT, onSessionLost)
       window.removeEventListener('storage', onStorage)
     }
-  }, [pathname, router])
+  }, [pathname, router, recheck])
 
   // 認証と利用開始状態の確認中は、通常画面の外枠を描画しない。
-  if (!checked || (onboardingPath && !isOnboardingContinuationPath(pathname, onboardingPath))) {
+  if ((!checked && !keepContent) || (onboardingPath && !isOnboardingContinuationPath(pathname, onboardingPath))) {
     return isMobileShellPath(pathname) ? <div role="status" aria-busy="true" aria-label="読み込み中" /> : <AuthPendingShell />
   }
 
@@ -225,5 +239,10 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     return <TenantAccessProvider status={tenantStatus}>{suspendedSupport}</TenantAccessProvider>
   }
 
-  return <TenantAccessProvider status={tenantStatus}><OnboardingAccessContext.Provider value={onboardingPath}>{children}</OnboardingAccessContext.Provider></TenantAccessProvider>
+  return <>
+    <div key={contentEpoch} hidden={!checked} inert={!checked} aria-hidden={!checked || undefined} style={{ display: checked ? 'contents' : 'none' }}>
+      <TenantAccessProvider status={tenantStatus}><OnboardingAccessContext.Provider value={onboardingPath}>{children}</OnboardingAccessContext.Provider></TenantAccessProvider>
+    </div>
+    {!checked && (isMobileShellPath(pathname) ? <div role="status" aria-busy="true" aria-label="読み込み中" /> : <AuthPendingShell />)}
+  </>
 }

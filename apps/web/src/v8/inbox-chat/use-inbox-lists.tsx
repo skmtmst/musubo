@@ -76,17 +76,18 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   }, [nameQuery])
 
   /* 返事の期限（G3）。店が期限を使っているときだけ、札・期限超過の数・期限が近い順の並びを出す。読めなければ今までの形のまま。 */
-  const [slaEnabled, setSlaEnabled] = useState(false)
-
+  const [slaState, setSlaState] = useState<{ accountId: string; reload: number; enabled: boolean } | null>(null)
   const [overdueTotal, setOverdueTotal] = useState<number | null>(null)
-
   const [slaReload, setSlaReload] = useState(0)
+  const slaReady = !selectedAccountId || (slaState?.accountId === selectedAccountId && slaState.reload === slaReload)
+  const slaEnabled = Boolean(selectedAccountId && slaReady && slaState?.enabled)
 
   useEffect(() => {
-    setSlaEnabled(false); setOverdueTotal(null)
+    setOverdueTotal(null)
     if (!selectedAccountId) return
     let live = true
-    void inboxRoutingApi.get(selectedAccountId).then((res) => { if (live) setSlaEnabled(Boolean(res.data.enabled)) }, () => { })
+    const complete = (enabled: boolean) => { if (live) setSlaState({ accountId: selectedAccountId, reload: slaReload, enabled }) }
+    void inboxRoutingApi.get(selectedAccountId).then((res) => complete(Boolean(res.data.enabled)), () => complete(false))
     return () => { live = false }
   }, [selectedAccountId, slaReload])
 
@@ -139,11 +140,11 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   /* 上の「期限超過 N」。一覧と同じ口（期限超過の絞り込み）の総数を使う。行数とは別に数えさせる。 */
   useEffect(() => {
-    if (!slaEnabled || !selectedAccountId) { setOverdueTotal(null); return }
+    if (!slaEnabled || !selectedAccountId || chatListCompletedKey !== listFilterKey) { setOverdueTotal(null); return }
     let live = true
     void inboxRoutingApi.listByDeadline(selectedAccountId, { overdue: true, limit: 1 }).then((res) => { if (live) setOverdueTotal(res.total) }, () => { if (live) setOverdueTotal(null) })
     return () => { live = false }
-  }, [slaEnabled, selectedAccountId, chatListCompletedKey])
+  }, [slaEnabled, selectedAccountId, chatListCompletedKey, listFilterKey])
 
   const [emailListCompletedKey, setEmailListCompletedKey] = useState<string | null>(null)
 
@@ -234,6 +235,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   }, [loadEmails])
 
   const loadChats = useCallback(async () => {
+    if (!slaReady) return
     const requestId = ++chatListRequestRef.current
     nextCursorRef.current = null
     extraPagesLoadedRef.current = false
@@ -268,7 +270,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setLoading(false)
       }
     }
-  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
+  }, [slaReady, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
 
   // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
   // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
@@ -312,6 +314,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   const listPollRequestRef = useRef(0)
 
   const loadChatsQuietly = useCallback(async (): Promise<boolean> => {
+    if (!slaReady) return true
     const requestId = ++listPollRequestRef.current
     try {
       const res = await api.chats.list(buildListParams(null))
@@ -337,7 +340,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } catch {
       return false
     }
-  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats])
+  }, [slaReady, buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats])
 
   useEffect(() => {
     loadChats()

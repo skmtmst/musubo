@@ -33,7 +33,7 @@ it('検索条件のキー順序をそろえ、同じ GET の通信は1回・返�
 })
 
 it.each([
-  '/api/line-accounts', '/api/staff/me', '/api/tenants/me', '/api/settings/features?account_id=a',
+  '/api/staff/me', '/api/tenants/me', '/api/settings/features?account_id=a',
   '/api/settings/features/visibility?account_id=a', '/api/dashboard/style?account_id=a', '/api/hq/billing/summary',
 ])('%s は30秒だけ再利用し、期限が切れたら通信する', async path => {
   let now = 1_000
@@ -89,6 +89,20 @@ it('認証の世代を識別できない間は、結果も取得中の要求も�
   expect(net).toHaveBeenCalledTimes(2)
 })
 
+it.each(['account', 'login', 'permissions'] as const)('一覧の取得中に %s が変われば共有しない', async kind => {
+  let finish!: (response: Response) => void
+  net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
+  const old = fetchApi('/api/line-accounts')
+  if (kind === 'account') localStorage.setItem('lh_selected_account', 'different')
+  if (kind === 'login') localStorage.setItem('lh_csrf', 'different')
+  if (kind === 'permissions') clearCommonCaches()
+  const fresh = fetchApi('/api/line-accounts')
+  expect(net).toHaveBeenCalledTimes(2)
+  finish(ok({ value: 'old' }))
+  expect(await old).toEqual({ success: true, data: { value: 'old' } })
+  expect(await fresh).toEqual({ success: true, data: { value: 1 } })
+})
+
 it.each(['account', 'csrf', 'bearer', 'logout', 'login', 'invalidate'] as const)('%s の切替では全結果を破棄する', async kind => {
   localStorage.setItem('lh_selected_account', 'a')
   await fetchApi('/api/line-accounts')
@@ -116,14 +130,14 @@ it.each(['POST', 'PUT', 'PATCH', 'DELETE'])('%s は毎回送信し、成功後�
 })
 
 it('成功しなかった更新では成功済みの読みを破棄せず、204の成功では破棄する', async () => {
-  await fetchApi('/api/line-accounts')
+  await fetchApi('/api/staff/me')
   net.mockResolvedValueOnce(new Response('{"success":false}'))
-  await fetchApi('/api/line-accounts/a', { method: 'PATCH' })
-  await fetchApi('/api/line-accounts')
+  await fetchApi('/api/staff/me/a', { method: 'PATCH' })
+  await fetchApi('/api/staff/me')
   expect(net).toHaveBeenCalledTimes(2)
   net.mockResolvedValueOnce(new Response(null, { status: 204 }))
-  await fetchApi('/api/line-accounts/a', { method: 'DELETE' })
-  await fetchApi('/api/line-accounts')
+  await fetchApi('/api/staff/me/a', { method: 'DELETE' })
+  await fetchApi('/api/staff/me')
   expect(net).toHaveBeenCalledTimes(4)
 })
 
@@ -142,15 +156,15 @@ it.each(['cache', 'network', 'http', 'application', 'shape', 'empty'] as const)(
 it.each(['mutation', 'switch', 'reload'] as const)('%s 前に始めた遅い応答は、新しい答えを再登録しない', async kind => {
   let finish!: (response: Response) => void
   net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
-  const old = fetchApi('/api/line-accounts')
-  if (kind === 'mutation') await fetchApi('/api/line-accounts/a', { method: 'PATCH' })
+  const old = fetchApi('/api/staff/me')
+  if (kind === 'mutation') await fetchApi('/api/staff/me/a', { method: 'PATCH' })
   if (kind === 'switch') localStorage.setItem('lh_selected_account', 'b')
   net.mockResolvedValueOnce(ok({ value: 2 }))
-  const fresh = await fetchApi('/api/line-accounts', kind === 'reload' ? { cache: 'reload' } : undefined)
+  const fresh = await fetchApi('/api/staff/me', kind === 'reload' ? { cache: 'reload' } : undefined)
   expect(fresh).toEqual({ success: true, data: { value: 2 } })
   finish(ok({ value: 99 }))
   await old
-  expect(await fetchApi('/api/line-accounts')).toEqual(fresh)
+  expect(await fetchApi('/api/staff/me')).toEqual(fresh)
   expect(net).toHaveBeenCalledTimes(kind === 'mutation' ? 3 : 2)
 })
 
@@ -184,12 +198,71 @@ it.each(['retry-first', 'late-first'])('時間切れの便を再試行へ回さ�
   let finish!: (response: Response) => void
   net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
     .mockResolvedValueOnce(ok({ value: 2 }))
-  const old = fetchApi('/api/line-accounts')
+  const old = fetchApi('/api/staff/me')
   now += LIST_REQUEST_TIMEOUT_MS
   if (order === 'late-first') { finish(ok({ value: 99 })); await old }
-  const fresh = await fetchApi('/api/line-accounts')
+  const fresh = await fetchApi('/api/staff/me')
   expect(fresh).toEqual({ success: true, data: { value: 2 } })
   if (order === 'retry-first') { finish(ok({ value: 99 })); await old }
-  expect(await fetchApi('/api/line-accounts')).toEqual(fresh)
+  expect(await fetchApi('/api/staff/me')).toEqual(fresh)
   expect(net).toHaveBeenCalledTimes(2)
+})
+
+it.each([
+  '/api/getting-started?account_id=a&version=v8',
+  '/api/restaurant-test/stores?account_id=a',
+  '/api/restaurant-test/store-context?account_id=a',
+  '/api/rich-menu-groups?accountId=a&limit=1&page=1',
+  '/api/restaurant-test/setup-progress?account_id=a&storeId=one',
+])('初期画面の %s は同条件の連続取得をまとめ、1秒後は読み直す', async path => {
+  let now = 1_000
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  await Promise.all([fetchApi(path), fetchApi(path)])
+  await fetchApi(path)
+  expect(net).toHaveBeenCalledTimes(1)
+  now += 1000
+  await fetchApi(path)
+  expect(net).toHaveBeenCalledTimes(2)
+})
+
+it('初期画面の対象や店舗を変えたときと保存後は共有しない', async () => {
+  const url = (account: string, store: string) => `/api/restaurant-test/setup-progress?account_id=${account}&storeId=${store}`
+  await fetchApi(url('a', 'one'))
+  await fetchApi(url('a', 'two'))
+  await fetchApi(url('b', 'one'))
+  expect(net).toHaveBeenCalledTimes(3)
+  await fetchApi('/api/restaurant-test/stores/selection', { method: 'POST', body: '{}' })
+  await fetchApi(url('a', 'one'))
+  expect(net).toHaveBeenCalledTimes(5)
+})
+
+it('店舗情報は同じ条件で取得中と2秒未満だけ共有し、別条件と期限後は取り直す', async () => {
+  let now = 1_000
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  const url = '/api/restaurant-test/snapshot?account_id=a&storeId=one'
+  await Promise.all([fetchApi(url), fetchApi(url)])
+  now += 1999
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(1)
+  await fetchApi('/api/restaurant-test/snapshot?account_id=a&storeId=two')
+  await fetchApi('/api/restaurant-test/snapshot?account_id=b&storeId=one')
+  expect(net).toHaveBeenCalledTimes(3)
+  now += 1
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(4)
+})
+
+it('予約の受付・保存や店舗の切替後は店舗情報を取り直し、遅い古い応答を再利用しない', async () => {
+  const url = '/api/restaurant-test/snapshot?account_id=a&storeId=one'
+  let finish!: (response: Response) => void
+  net.mockImplementationOnce(() => new Promise<Response>(resolve => { finish = resolve }))
+  const old = fetchApi(url)
+  await fetchApi('/api/restaurant-test/reservations/manual', { method: 'POST', body: '{}' })
+  finish(ok({ version: 'old' }))
+  await old
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(3)
+  await fetchApi('/api/restaurant-test/stores/selection', { method: 'POST', body: '{}' })
+  await fetchApi(url)
+  expect(net).toHaveBeenCalledTimes(5)
 })

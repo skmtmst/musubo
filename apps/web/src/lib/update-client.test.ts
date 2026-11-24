@@ -39,4 +39,40 @@ describe('update-client manifest URL', () => {
       { cache: 'no-store' },
     )
   })
+
+  it('shares only an in-flight manifest and retries after completion', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://example-worker.workers.dev')
+    let finish!: (response: Response) => void
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+      .mockResolvedValue(new Response('{"releases":[]}'))
+    const { getManifest } = await loadUpdateClient()
+    const a = getManifest(), b = getManifest()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    finish(new Response('{"releases":[]}'))
+    const [first, second] = await Promise.all([a, b])
+    expect(first).toEqual(second)
+    expect(first).not.toBe(second)
+    await getManifest()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['account', 'login', 'permissions'] as const)('does not share an in-flight manifest after %s changes', async kind => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://example-worker.workers.dev')
+    const values = new Map([['lh_csrf', 'session-a'], ['lh_selected_account', 'account-a']])
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null })
+    let finish!: (response: Response) => void
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+      .mockResolvedValue(new Response('{"releases":[]}'))
+    const { getManifest } = await loadUpdateClient()
+    const old = getManifest()
+    if (kind === 'account') values.set('lh_selected_account', 'account-b')
+    if (kind === 'login') values.set('lh_csrf', 'session-b')
+    if (kind === 'permissions') (await import('./api/transport/read-cache')).clearApiReadCache()
+    const fresh = getManifest()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    finish(new Response('{"releases":[]}'))
+    await Promise.all([old, fresh])
+    vi.unstubAllGlobals()
+  })
 })
