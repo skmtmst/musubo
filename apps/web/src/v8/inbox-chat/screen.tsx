@@ -287,8 +287,16 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     setError,
   })
 
+  /*
+   * 開いている Instagram の会話は、一覧の今の行で見る。選んだ時の写しのままだと、
+   * 一覧の定期更新で届いた新着（最終受信の時刻）が会話へ伝わらず、期限切れのまま読み直さない。
+   */
+  const liveInstagram = visibleInstagram
+    ? chats.find((chat) => chat.id === visibleInstagram.id && chat.channel === 'instagram') ?? visibleInstagram
+    : null
+
   // 開いている Instagram の会話の読み書き。中央の会話と右の欄が同じ値を見る。
-  const instagramThread = useInstagramThread(visibleInstagram, staffRole, () => { void loadChatsQuietly() })
+  const instagramThread = useInstagramThread(liveInstagram, staffRole, () => { void loadChatsQuietly() })
 
   // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
   const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
@@ -861,9 +869,9 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
-        {visibleInstagram ? <InstagramConversation
-          key={visibleInstagram.id}
-          chat={visibleInstagram}
+        {liveInstagram ? <InstagramConversation
+          key={liveInstagram.id}
+          chat={liveInstagram}
           thread={instagramThread}
           panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
           onBack={() => setSelectedInstagram(null)}
@@ -892,7 +900,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
         }} />}
 
         <InboxCustomerPanel
-          instagramContent={visibleInstagram ? <InstagramCustomerInfo chat={visibleInstagram} thread={instagramThread} /> : null}
+          instagramContent={liveInstagram ? <InstagramCustomerInfo chat={liveInstagram} thread={instagramThread} /> : null}
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
           selectedChatId={visibleChatId}

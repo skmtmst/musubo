@@ -1,71 +1,160 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { InboxEmailHeading } from '@/components/shared/inbox-content'
-import { InboxDraftArea, InboxInputBox, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer'
-import { InboxMessage } from '@/components/shared/inbox-thread'
+import { InboxComposerActions, InboxComposerBottom, InboxDraftArea, InboxDraftCount, InboxInputBox } from '@/components/shared/inbox-composer'
+import { InboxMessage, InboxMessageDay, InboxThreadLoading } from '@/components/shared/inbox-thread'
 import { InboxComposer, InboxConversationPane, InboxMessages } from '@/components/templates/inbox-page'
-import { api, type ChatListItem } from '@/lib/api'
-import { canEditFeature } from '@/lib/staff-capability'
-import { readStaffIdentity } from '@/lib/staff-identity-state'
-import { formatTime } from '@/lib/format'
-import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
-import { ChannelBadge } from './inbox-model'
+import type { ChatListItem } from '@/lib/api'
+import { formatListRecent, formatTime } from '@/lib/format'
+import ConversationHead from './conversation-head'
+import { formatDayJa, formatInboxDatetime, sameYmd } from './inbox-model'
+import type { InstagramResolveOutcome, InstagramThread } from './use-instagram-thread'
 
-type Message = { id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }
-type Detail = { messages: Message[]; replyState: 'ready' | 'disconnected' | 'permission_required' }
+/** Instagram が受け付ける返信の長さ（Worker と同じ上限）。 */
+const INSTAGRAM_REPLY_MAX_LENGTH = 1000
 
-export default function InstagramConversation({ chat, role, onChanged }: { chat: ChatListItem; role: string | null; onChanged: () => void }) {
-  const [detail, setDetail] = useState<Detail | null>(null)
-  const [text, setText] = useState('')
-  const [error, setError] = useState('')
-  const [sending, setSending] = useState(false)
-  const lock = useRef(false)
-  const key = useRef<string | null>(null)
-  const account = chat.lineAccountId ?? ''
-  const load = useCallback(async () => {
-    const result = await api.instagram.conversation(account, chat.friendId)
-    if (!result.success) throw new Error('会話を読み込めませんでした')
-    setDetail(result.data)
-  }, [account, chat.friendId])
+const RESOLVE_TEXT: Record<InstagramResolveOutcome, { title: string; description: string; confirm: string }> = {
+  sent: {
+    title: '送信済みにしますか？',
+    description: 'Instagram のアプリで、この返信がお客さまに届いていることを確かめてから記録してください。記録すると次の返信を送れます。',
+    confirm: '送信済みにする',
+  },
+  not_sent: {
+    title: '未送信にしますか？',
+    description: 'Instagram のアプリで、この返信が届いていないことを確かめてから記録してください。入力欄が空なら同じ文を戻すので、送り直すかを選べます。',
+    confirm: '未送信にする',
+  },
+}
+
+/** 返信の期限までの残り（「あと5時間」「あと12分」）。 */
+export function formatReplyWindowLeft(deadline: number, now: number): string {
+  const minutes = Math.max(0, Math.ceil((deadline - now) / (60 * 1000)))
+  return minutes < 60 ? `あと${minutes}分` : `あと${Math.floor(minutes / 60)}時間`
+}
+
+/** 吹き出しに出す返信の文の頭（長い文は省く）。 */
+function quoteHead(content: string): string {
+  const flat = content.replace(/\s+/g, ' ').trim()
+  return flat.length > 30 ? `${flat.slice(0, 30)}…` : flat
+}
+
+/**
+ * 受信箱の中央に出す Instagram の会話。頭・吹き出し・返信欄は LINE の会話と同じ部品を使う。
+ * Instagram には担当・対応状況が無いので、頭はそれを出さず、右の欄の出し入れだけ置く。
+ */
+export default function InstagramConversation({ chat, thread, panel, onBack }: {
+  chat: ChatListItem
+  thread: InstagramThread
+  panel: { open: boolean; onToggle: () => void }
+  onBack: () => void
+}) {
+  const router = useRouter()
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [confirming, setConfirming] = useState<InstagramResolveOutcome | null>(null)
+  const { detail, loadFailed, reload, text, setText, sending, sendError, send, canEdit, canSend, lockedReason, blockedReason, deadline, now, pending, resolve, resolving, resolveError, clearResolveError } = thread
+  const messages = detail?.messages ?? []
+  const lastMessageAt = messages.at(-1)?.createdAt ?? chat.lastMessageAt
+
+  // 開いた時・送った後は、いちばん新しい吹き出しを見せる。
   useEffect(() => {
-    let active = true
-    setDetail(null); setText(''); setError(''); key.current = null
-    void api.instagram.conversation(account, chat.friendId).then(result => {
-      if (active && result.success) setDetail(result.data)
-    }).catch(() => { if (active) setError('会話を読み込めませんでした') })
-    if (canEditFeature('/chats', role) && !readStaffIdentity()?.readOnly) void api.instagram.markConversationRead(account, chat.friendId).then(() => { if (active) { onChanged(); window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)) } }).catch(() => undefined)
-    return () => { active = false }
-  }, [account, chat.friendId, role])
-  const incoming = detail?.messages.filter(m => m.direction === 'incoming').at(-1)
-  const canEdit = canEditFeature('/chats', role) && !readStaffIdentity()?.readOnly
-  const canSend = canEdit && detail?.replyState === 'ready' && Boolean(incoming)
-  const reason = !canEdit ? '閲覧のみの権限では返信できません。'
-    : detail?.replyState === 'disconnected' ? '接続が切れているため返信できません。Instagramの接続を確認してください。'
-      : detail?.replyState === 'permission_required' ? 'DMの権限がありません。Instagramをつなぎ直してください。' : ''
-  const send = async () => {
-    if (!incoming || !canSend || !text.trim() || lock.current) return
-    lock.current = true; setSending(true); setError('')
-    key.current ??= crypto.randomUUID()
-    try {
-      await api.instagram.sendReply(account, incoming.id, text, key.current)
-      setText(''); key.current = null
-      await load(); onChanged(); window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-    } catch (err) { setError(japaneseDetailOf(err) || '返信できませんでした') }
-    finally { lock.current = false; setSending(false) }
-  }
-  return <InboxConversationPane selected>
-    <InboxEmailHeading>{chat.friendName} <ChannelBadge channel="instagram" /></InboxEmailHeading>
-    <InboxMessages>{detail?.messages.map((message, index) => <InboxMessage key={`${message.direction}:${message.id}`} outgoing={message.direction === 'outgoing'} last={index === detail.messages.length - 1} time={formatTime(message.createdAt)} senderName={message.direction === 'outgoing' ? '担当者' : undefined}>{message.content}</InboxMessage>)}</InboxMessages>
-    <InboxComposer>
-      {reason ? <Notice tone="warn" message={reason} /> : null}
-      {error ? <Notice tone="danger" message={error} /> : null}
-      <InboxInputBox><InboxDraftArea aria-label="メッセージを入力" placeholder="メッセージを入力" value={text} disabled={!canSend || sending} maxLength={1000} onChange={event => { setText(event.target.value); key.current = null }} />
-        <InboxComposerBottom><InboxComposerActions><Button disabled={!canSend || !text.trim() || sending} title={reason || undefined} onClick={() => void send()}>送る</Button></InboxComposerActions></InboxComposerBottom>
-      </InboxInputBox>
-    </InboxComposer>
-  </InboxConversationPane>
+    const scroller = scrollerRef.current
+    if (scroller) scroller.scrollTop = scroller.scrollHeight
+  }, [messages.length])
+
+  const openSettings = canEdit && detail && detail.replyState !== 'ready'
+    ? <Button variant="text" size="inline" onClick={() => router.push('/settings/sns')}>設定へ</Button>
+    : undefined
+  const resolveActions = pending?.canResolve && canEdit
+    ? <>
+        <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setConfirming('sent') }}>送信済みにする</Button>
+        <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setConfirming('not_sent') }}>未送信にする</Button>
+      </>
+    : <Button variant="text" size="inline" onClick={() => void reload()}>読み直す</Button>
+
+  return (
+    <InboxConversationPane selected data-inbox-channel="instagram">
+      <ConversationHead
+        name={chat.friendName}
+        pictureUrl={chat.friendPictureUrl}
+        sub={`Instagram・${formatListRecent(lastMessageAt)}`}
+        subTitle={`Instagram・最終受信 ${formatInboxDatetime(lastMessageAt)}`}
+        onBack={onBack}
+        panel={panel}
+      />
+      {loadFailed ? (
+        <Notice tone="danger" role="alert" message="会話を読み込めませんでした。" action={<Button variant="text" size="inline" onClick={() => void reload()}>もう一度読み込む</Button>} />
+      ) : null}
+      <InboxMessages ref={scrollerRef}>
+        <InboxThreadLoading loading={!detail && !loadFailed}>
+          {messages.map((message, index) => (
+            <Fragment key={`${message.direction}:${message.id}`}>
+              {index === 0 || !sameYmd(messages[index - 1].createdAt, message.createdAt)
+                ? <InboxMessageDay first={index === 0}>{formatDayJa(message.createdAt)}</InboxMessageDay>
+                : null}
+              <InboxMessage
+                outgoing={message.direction === 'outgoing'}
+                last={index === messages.length - 1}
+                time={formatTime(message.createdAt)}
+                senderName={message.direction === 'outgoing' ? '担当者' : undefined}
+                sendStatus={message.direction === 'outgoing' ? 'sent' : undefined}
+              >
+                {message.content}
+              </InboxMessage>
+            </Fragment>
+          ))}
+        </InboxThreadLoading>
+      </InboxMessages>
+      <InboxComposer>
+        {pending ? (
+          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={`「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。`} action={resolveActions} />
+        ) : blockedReason ? (
+          <Notice tone="warn" role="status" message={blockedReason} action={openSettings} />
+        ) : null}
+        {sendError ? <Notice tone="danger" role="alert" message={sendError} /> : null}
+        <InboxInputBox>
+          <InboxDraftArea
+            aria-label="メッセージを入力"
+            placeholder="メッセージを入力"
+            value={text}
+            disabled={!canSend || sending}
+            maxLength={INSTAGRAM_REPLY_MAX_LENGTH}
+            onChange={(event) => setText(event.target.value)}
+          />
+          <InboxComposerBottom>
+            {canSend && deadline !== null ? (
+              <InboxDraftCount data-instagram-reply-window="">
+                {`返信の期限 ${formatInboxDatetime(new Date(deadline).toISOString())}（${formatReplyWindowLeft(deadline, now)}）`}
+              </InboxDraftCount>
+            ) : null}
+            <InboxComposerActions>
+              <Button disabled={!canSend || !text.trim()} lockedReason={lockedReason} busy={sending} busyLabel="送信中…" onClick={() => void send()}>
+                送る
+              </Button>
+            </InboxComposerActions>
+          </InboxComposerBottom>
+        </InboxInputBox>
+      </InboxComposer>
+      <ConfirmDialog
+        open={confirming !== null && pending !== null}
+        title={confirming ? RESOLVE_TEXT[confirming].title : ''}
+        description={confirming ? RESOLVE_TEXT[confirming].description : ''}
+        confirmLabel={confirming ? RESOLVE_TEXT[confirming].confirm : ''}
+        busy={resolving}
+        busyLabel="記録しています…"
+        error={resolveError || undefined}
+        onConfirm={() => {
+          if (!confirming) return
+          // 共通の窓は返した約束を待つ間、押し直しを受けない（記録を2回送らない）。
+          return resolve(confirming).then((done) => { if (done) setConfirming(null) })
+        }}
+        onCancel={() => { if (!resolving) setConfirming(null) }}
+      >
+        {pending ? <p className="text-ink-secondary text-sm">{`返信：「${quoteHead(pending.content)}」`}</p> : null}
+      </ConfirmDialog>
+    </InboxConversationPane>
+  )
 }

@@ -391,11 +391,15 @@ test('中央の行き先からメールも開ける（共用の開き方・ID27�
   expect(document.body.textContent).not.toContain('対応が必要な会話があります')
 })
 
-test('Instagram のURLでも表示できない一覧には切り替えない', async () => {
+test('Instagram のタブでは Instagram の会話だけを出し、LINE の会話を混ぜない', async () => {
   fixture.params = new URLSearchParams('channel=instagram')
-  handler = (url) => url.pathname === '/api/chats' ? response(linePayload(['通常の会話'])) : base(url)
+  const instagramRow = { ...linePayload(['インスタの会話']).data[0], channel: 'instagram', lineAccountId: 'account-a' }
+  handler = (url) => url.pathname === '/api/chats'
+    ? response({ success: true, data: [...linePayload(['通常の会話']).data, instagramRow] })
+    : base(url)
   await act(async () => root.render(<ChatsPage />))
-  await eventually(() => expect(list().textContent).toContain('通常の会話'))
+  await eventually(() => expect(list().textContent).toContain('インスタの会話'))
+  expect(list().textContent).not.toContain('通常の会話')
 })
 
 test('メールの一覧が空のときメール向けの案内を表示する', async () => {

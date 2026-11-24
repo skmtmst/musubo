@@ -10,6 +10,8 @@ import { EmailInboxItem } from './inbox-model';
 
 type Props = {
   lineContent: React.ReactNode
+  /** Instagram の会話を開いている時の中身。LINE の友だちの欄の代わりに出す。 */
+  instagramContent?: React.ReactNode
   showFriendInfo: boolean
   selectedChatId: string | null
   selectedThreadId: string | null
@@ -19,7 +21,7 @@ type Props = {
   emailItems: EmailInboxItem[]
 }
 
-export default function InboxCustomerPanel({ lineContent, showFriendInfo, selectedChatId, selectedThreadId, wideInfoPanel, setShowFriendInfo, customerPanelRef, emailItems }: Props) {
+export default function InboxCustomerPanel({ lineContent, instagramContent, showFriendInfo, selectedChatId, selectedThreadId, wideInfoPanel, setShowFriendInfo, customerPanelRef, emailItems }: Props) {
   const [desktopOverlay, setDesktopOverlay] = useState(false)
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)')
@@ -47,7 +49,7 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
   }, [wideInfoPanel, host])
   useLayoutEffect(() => () => host?.remove(), [host])
 
-  const content = (showFriendInfo && (selectedChatId || selectedThreadId) && (
+  const content = (showFriendInfo && (selectedChatId || selectedThreadId || instagramContent) && (
     <>
       {/*
               1536px 未満ではトークの上に重ねるドロワー。背景（暗幕）を
@@ -83,7 +85,7 @@ export default function InboxCustomerPanel({ lineContent, showFriendInfo, select
             <X aria-hidden="true" className="h-4 w-4" />
           </Button>
         )}
-        {selectedThreadId ? (
+        {instagramContent ? instagramContent : selectedThreadId ? (
           /*
             メールの相手は友だちに結びついていない。
             以前は「紐づいていません」の1行だけで、なぜなのか・
