@@ -6,12 +6,15 @@
 --   目印が0個になり「判定不能（データのみ）」に化ける。実際はスキーマを変えるため、
 --   772 と同じく `_migrations` の記録で判定する。
 --
--- 置き場所: このファイルは `packages/db/migrations-pending/` に置いてある（まだ
---   `packages/db/migrations/` に入れていない）。配備の見張りは
---   `packages/db/migrations/*.sql` を数えて「未適用が残っていたらWorkerを配らない」
---   と決めているので、ここに居るあいだは 772 を当てた時点で未適用0件になり、
---   新しいWorkerを配れる。互換性を確かめた後、後続PRで `migrations/` へ移して当てる。
---   手順は `packages/db/migrations-pending/README.md`。
+-- 置き場所: `packages/db/migrations-pending/` から
+--   `packages/db/migrations/` へ移した。移す条件（共有検証へ 772 だけを当て、
+--   接続IDで読み書きする新しいWorkerとWebを配備し、既存接続の互換性を確かめる）は
+--   済んでいる。移した結果、配備の見張り（`packages/db/migrations/*.sql` を数えて
+--   「未適用が残っていたらWorkerを配らない」）がこのファイルも数えるので、
+--   **このPRを統合した後の次のWorker配備は、773 を当ててからでないと通らない**。
+--   これは意図した順番（772 → 新Worker → 互換性確認 → 773 → 複数接続確認）であり、
+--   見張りを緩めずに段階を踏むための仕組み。手順は
+--   `packages/db/migrations-pending/README.md`。
 --
 -- 当てる時期: 772 を当て、接続IDで読み書きする新しいWorkerを配備し終えた後。
 --   772 は `ON CONFLICT(store_id)` / `ON CONFLICT(line_account_id)` と書いた

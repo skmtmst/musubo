@@ -13,6 +13,7 @@ import {
 } from './restaurant-booking.js';
 import { tzDateStr } from './availability.js';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line/index.js';
 export type CustomerReservationRow = {
   id: string;
@@ -96,9 +97,9 @@ export async function customerAvailability(
     weekday: number;
     periods: Array<{ opensAt: string; closesAt: string }>;
   }>;
-  const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-    .bind(store.id).first<{ status: string }>();
-  const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id) : null;
+  // 接続の有無の判定と写しの読み取りで**同じ1件**を見る（773で互換索引が外れ接続が2件入り得る）。
+  const googleConnection = await primaryGoogleConnection(db, store.id);
+  const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id, googleConnection.id) : null;
   if (googleConnection && !googleProfile) return null;
   const minute = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   const slots: RestaurantCustomerAvailability['slots'] = [];
