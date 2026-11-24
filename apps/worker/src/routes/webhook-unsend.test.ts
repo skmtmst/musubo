@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
+import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
 
 const lineClient = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -172,6 +173,30 @@ describe('N-024 LINE送信取消', () => {
     vi.clearAllMocks();
   });
 
+  it('同じLINE利用者から店舗別に受信し、それぞれのアカウントの登録を確認できる', async () => {
+    expect(await getLineRegistrationReceipt(db.db, 'account-b')).toMatchObject({ status: 'waiting' });
+    await postText(db, 'a', 'shared-a', 'message-a', '接続テスト', Date.now());
+    await postEvent(db, 'b', {
+      ...base('a', 'shared-b', Date.now()),
+      type: 'message',
+      replyToken: 'fixture-b',
+      message: { type: 'text', id: 'message-b', text: '接続テスト' },
+    });
+
+    const messages = db.raw.prepare(`SELECT m.line_account_id, m.friend_id, f.line_platform_user_id
+      FROM messages_log m JOIN friends f ON f.id = m.friend_id AND f.line_account_id = m.line_account_id
+      WHERE m.direction = 'incoming' ORDER BY m.line_account_id`).all() as Array<{
+      line_account_id: string; friend_id: string; line_platform_user_id: string;
+    }>;
+    expect(messages).toEqual([
+      { line_account_id: 'account-a', friend_id: 'friend-a', line_platform_user_id: 'U-a' },
+      { line_account_id: 'account-b', friend_id: expect.any(String), line_platform_user_id: 'U-a' },
+    ]);
+    expect(messages[1]?.friend_id).not.toBe('friend-a');
+    expect(await getLineRegistrationReceipt(db.db, 'account-a')).toMatchObject({ status: 'confirmed' });
+    expect(await getLineRegistrationReceipt(db.db, 'account-b')).toMatchObject({ status: 'confirmed' });
+  });
+
   it('IN-C02: 200応答後の失敗は受信箱から未完のマイルだけ再開して200になる',async()=>{
     mileage.mockRejectedValueOnce(new Error('fixture interruption after acknowledgement'));
     await postText(db,'a','missing-payload','missing-payload-message','人工の本文',1_800_000_000_000);
@@ -314,7 +339,7 @@ describe('N-024 LINE送信取消', () => {
     lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
     await postEvent(db,'a',{...base('a','stopped-follow',1_700_000_002_000),type:'follow',replyToken:'fake'});
     await postEvent(db,'a',{...base('a','stopped-new-unfollow',1_700_000_003_000),type:'unfollow'});
-    expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
+    expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_account_id='account-a' AND line_platform_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
   });
 
   it.each(['2026-10-11T10:00:00.000','2026-10-11T10:00:00.000+09:00','2026-10-11T01:00:00.000Z'])('IN-C01: 旧形式の時刻 %s も日本時間で比較する',async(stamp)=>{
@@ -327,7 +352,7 @@ describe('N-024 LINE送信取消', () => {
     db.raw.exec("DELETE FROM friends WHERE id='friend-a'");lineClient.getProfile.mockResolvedValue({displayName:'人工ユーザー'});
     await postText(db,'a','first-message','first-message-id','人工の本文',1_700_000_002_000);
     await postEvent(db,'a',{...base('a','first-message-unfollow',1_700_000_003_000),type:'unfollow'});
-    expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
+    expect(db.raw.prepare("SELECT is_following,last_followed_at FROM friends WHERE line_account_id='account-a' AND line_platform_user_id='U-a'").get()).toEqual({is_following:0,last_followed_at:'2023-11-15T07:13:22.000+09:00'});
   });
 
   it('IN-C01: 新しい解除のあとに古い追加が届いてもブロックを戻さない', async () => {
@@ -347,7 +372,7 @@ describe('N-024 LINE送信取消', () => {
     db.raw.prepare("DELETE FROM friends WHERE id='friend-a'").run();
     await postEvent(db,'a',{...base('a','unknown-unfollow',1_800_000_002_000),type:'unfollow'});
     await postEvent(db,'a',{...base('a','unknown-old-follow',1_800_000_001_000),type:'follow',replyToken:'fake'});
-    expect(db.raw.prepare("SELECT is_following,last_unfollowed_at FROM friends WHERE line_user_id='U-a'").get()).toMatchObject({is_following:0,last_unfollowed_at:'2027-01-15T17:00:02.000+09:00'});
+    expect(db.raw.prepare("SELECT is_following,last_unfollowed_at FROM friends WHERE line_account_id='account-a' AND line_platform_user_id='U-a'").get()).toMatchObject({is_following:0,last_unfollowed_at:'2027-01-15T17:00:02.000+09:00'});
   });
 
   it('R-IN01: 途中失敗の再配達で担当者の完了/返信時刻を戻さない',async()=>{

@@ -54,7 +54,7 @@ export async function eligibleLimitedAudience(db: D1Database, broadcast: Deliver
     conditions = { operator: 'AND', rules: [{ type: 'is_following', value: true }] };
   }
   const scoped = await scopeStoredBroadcastSegmentQuery(db, buildBroadcastAudienceQuery(conditions), broadcast.line_account_id);
-  return restrictSegmentInput(scoped, `trim(COALESCE(f.line_user_id,'')) != '' AND (${DELIVERY_CONSENT_ALLOWED_SQL})`);
+  return restrictSegmentInput(scoped, `trim(COALESCE(f.line_platform_user_id,'')) != '' AND (${DELIVERY_CONSENT_ALLOWED_SQL})`);
 }
 
 export async function countLimitedAudience(db: D1Database, broadcast: DeliveryDefinition) {

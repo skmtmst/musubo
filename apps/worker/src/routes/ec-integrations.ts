@@ -169,7 +169,7 @@ async function resolveAccountIdWithoutHeader(db: D1Database, lineUserId: string 
   if (lineUserId) {
     const friends = await db.prepare(
       `SELECT f.line_account_id AS id FROM friends f JOIN line_accounts a ON a.id = f.line_account_id
-        WHERE f.line_user_id = ? AND a.is_active = 1 AND a.archived_at IS NULL LIMIT 2`,
+        WHERE f.line_platform_user_id = ? AND a.is_active = 1 AND a.archived_at IS NULL LIMIT 2`,
     ).bind(lineUserId).all<{ id: string }>();
     const ids = [...new Set((friends.results ?? []).map((row) => String(row.id)))];
     if (ids.length === 1) return ids[0];

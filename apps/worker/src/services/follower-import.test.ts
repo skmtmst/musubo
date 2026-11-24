@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import {
   detectFollowerImportCapability,
   getFollowerImportState,
@@ -66,9 +67,19 @@ function makeDb(initialFriends: StoredFriend[] = [], control: DbControl = {}) {
       setting = args[0] as string;
       return { meta: { changes: 1 } };
     }
+    if (sql.includes('UPDATE friends SET line_account_id')) {
+      if (!ownershipHolds(sql, args)) return { meta: { changes: 0 } };
+      const [accountId, , lineUserId] = args as [string, string, string];
+      const existing = friends.get(lineUserId);
+      if (!existing || existing.line_account_id !== null) return { meta: { changes: 0 } };
+      existing.line_account_id = accountId;
+      existing.is_following = 1;
+      return { meta: { changes: 1 } };
+    }
     if (sql.includes('INSERT INTO friends')) {
       if (!ownershipHolds(sql, args)) return { meta: { changes: 0 } };
-      const [id, lineUserId, accountId] = args as [string, string, string];
+      const [id, storedUserId, accountId] = args as [string, string, string];
+      const lineUserId = storedUserId.replace(`musubo-scope:${id}:`, '');
       const existing = friends.get(lineUserId);
       if (!existing) {
         friends.set(lineUserId, {
@@ -80,16 +91,17 @@ function makeDb(initialFriends: StoredFriend[] = [], control: DbControl = {}) {
           picture_url: null,
           status_message: null,
         });
-      } else if (existing.line_account_id === null || existing.line_account_id === accountId) {
-        existing.line_account_id = existing.line_account_id ?? accountId;
-        existing.is_following = 1;
+        return { meta: { changes: 1 }, results: [{ id }] };
       }
-      return { meta: { changes: 1 } };
+      if (existing.is_following === 1) return { meta: { changes: 0 }, results: [] };
+      existing.is_following = 1;
+      return { meta: { changes: 1 }, results: [{ id: existing.id }] };
     }
     if (sql.includes('UPDATE friends') && sql.includes('display_name')) {
       if (!ownershipHolds(sql, args)) return { meta: { changes: 0 } };
-      const [displayName, pictureUrl, statusMessage, , id] = args;
-      const row = [...friends.values()].find((f) => f.id === id);
+      const [displayName, pictureUrl, statusMessage, , id, accountId] = args;
+      const row = [...friends.values()].find((f) => f.id === id && f.line_account_id === accountId
+        && f.is_following === 1 && f.display_name === null);
       if (row) {
         row.display_name = displayName as string | null;
         row.picture_url = pictureUrl as string | null;
@@ -112,15 +124,6 @@ function makeDb(initialFriends: StoredFriend[] = [], control: DbControl = {}) {
           throw new Error(`Unhandled first SQL: ${sql}`);
         }),
         all: vi.fn().mockImplementation(async () => {
-          if (sql.includes('line_user_id IN')) {
-            const scoped = sql.includes('line_account_id = ?');
-            const accountId = scoped ? args[0] as string : null;
-            const requested = new Set((scoped ? args.slice(1) : args) as string[]);
-            return {
-              results: [...friends.values()].filter((f) =>
-                requested.has(f.line_user_id) && (!scoped || f.line_account_id === accountId)),
-            };
-          }
           if (sql.includes('AND display_name IS NULL')) {
             const [accountId, afterId, limit] = args as [string, string, number];
             control.onProfilePageQuery?.(setting);
@@ -265,6 +268,61 @@ describe('persisted one-time follower import', () => {
     for (const lineUserId of lineUserIds) {
       expect(friends.get(lineUserId)?.display_name).not.toBeNull();
     }
+  });
+});
+
+describe('follower import uses each official account’s own LINE recipients', () => {
+  async function importFollowers(db: D1Database, accountId: string, userIds: string[]) {
+    const client = {
+      getFollowerIds: vi.fn().mockResolvedValue({ userIds }),
+      getProfile: vi.fn().mockResolvedValue({ displayName: `プロフィール ${accountId}` }),
+    };
+    await detectFollowerImportCapability(db, client, accountId);
+    await startFollowerImport(db, accountId);
+    return { result: await processFollowerImportStep(db, client, accountId), client };
+  }
+
+  test('imports a shared LINE user and hydrates the raw UID without adopting another tenant’s history', async () => {
+    const { db, raw } = createTestD1({ foreignKeys: true });
+    try {
+      raw.exec(`INSERT INTO tenants(id,name) VALUES ('t-b','別の統括');
+        INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES
+        ('a','1001','店舗A','fixture','fixture',NULL),('b','1002','店舗B','fixture','fixture','t-b');`);
+      const insert = raw.prepare('INSERT INTO friends(id,line_user_id,line_account_id,display_name,is_following) VALUES (?,?,?,?,?)');
+      insert.run('a-friend', uid('a'), 'a', '店舗Aの履歴', 1);
+      insert.run('unassigned', uid('b'), null, '未割当の履歴', 1);
+      insert.run('b-active', uid('c'), 'b', '店舗Bで登録済み', 1);
+      insert.run('b-blocked', uid('d'), 'b', '店舗Bで再登録', 0);
+
+      const { result, client } = await importFollowers(db, 'b', ['a','b','c','d'].map(uid));
+      expect(result.state).toMatchObject({ phase: 'completed', imported: 2, claimedUnassigned: 0,
+        alreadyPresent: 1, reactivated: 1, conflicts: 0, profilesUpdated: 2 });
+      expect(client.getProfile.mock.calls.map(([id]) => id).sort()).toEqual([uid('a'), uid('b')]);
+      expect(raw.prepare(`SELECT line_account_id,display_name FROM friends
+        WHERE line_platform_user_id=? ORDER BY line_account_id`).all(uid('a'))).toEqual([
+        { line_account_id: 'a', display_name: '店舗Aの履歴' },
+        { line_account_id: 'b', display_name: 'プロフィール b' },
+      ]);
+      expect(raw.prepare('SELECT line_account_id FROM friends WHERE id=?').get('unassigned')).toEqual({ line_account_id: null });
+    } finally { raw.close(); }
+  });
+
+  test('two imports sharing an unassigned friend attach the history once and both finish', async () => {
+    const { db, raw } = createTestD1({ foreignKeys: true });
+    try {
+      raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES
+         ('a','1001','店舗A','fixture','fixture'),('b','1002','店舗B','fixture','fixture')`);
+      raw.prepare('INSERT INTO friends(id,line_user_id,display_name) VALUES (?,?,?)')
+        .run('old-friend', uid('a'), '以前の履歴');
+      const outcomes = await Promise.all(['a', 'b'].map((account) => importFollowers(db, account, [uid('a')])));
+      expect(outcomes.map(({ result }) => result.state.phase)).toEqual(['completed', 'completed']);
+      expect(outcomes.map(({ result }) => result.state.imported).sort()).toEqual([0, 1]);
+      expect(outcomes.map(({ result }) => result.state.claimedUnassigned).sort()).toEqual([0, 1]);
+      const rows = raw.prepare('SELECT id,line_account_id FROM friends WHERE line_platform_user_id=?').all(uid('a')) as
+        Array<{ id: string; line_account_id: string }>;
+      expect(rows.map((row) => row.line_account_id).sort()).toEqual(['a', 'b']);
+      expect(rows.filter((row) => row.id === 'old-friend')).toHaveLength(1);
+    } finally { raw.close(); }
   });
 });
 

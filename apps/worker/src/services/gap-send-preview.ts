@@ -11,9 +11,9 @@ export async function sendAudienceCounts(db: D1Database, accountId: string, cond
   const row = await db.prepare(`SELECT COUNT(*) matched,
     COALESCE(SUM(NOT f.is_following),0) blocked,
     COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=1),0) hidden,
-    COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (f.line_user_id IS NULL OR trim(f.line_user_id)='')),0) missing,
-    COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND trim(COALESCE(f.line_user_id,''))!='' AND NOT (${DELIVERY_CONSENT_ALLOWED_SQL})),0) optedOut,
-    COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND trim(COALESCE(f.line_user_id,''))!='' AND (${DELIVERY_CONSENT_ALLOWED_SQL})),0) recipients
+    COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (f.line_platform_user_id IS NULL OR trim(f.line_platform_user_id)='')),0) missing,
+    COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND trim(COALESCE(f.line_platform_user_id,''))!='' AND NOT (${DELIVERY_CONSENT_ALLOWED_SQL})),0) optedOut,
+    COALESCE(SUM(f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND trim(COALESCE(f.line_platform_user_id,''))!='' AND (${DELIVERY_CONSENT_ALLOWED_SQL})),0) recipients
     FROM friends f WHERE f.line_account_id=? AND (${where.sql})`).bind(accountId, ...where.bindings)
     .first<{matched:number;blocked:number;hidden:number;missing:number;optedOut:number;recipients:number}>();
   if (!row) throw new Error('send_preview_unavailable');

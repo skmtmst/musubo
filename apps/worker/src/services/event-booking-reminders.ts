@@ -84,7 +84,7 @@ export async function processDueEventReminders(
               s.starts_at,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id, ast.style AS notification_style
+              f.line_platform_user_id AS line_user_id, ast.style AS notification_style
          FROM event_booking_reminders r
          INNER JOIN event_bookings b ON b.id = r.booking_id
          INNER JOIN events e ON e.id = b.event_id
@@ -167,13 +167,13 @@ export async function processDueEventReminders(
           && !!await db.prepare(`SELECT 1 ok FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
             JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
             WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.lock_version=r.booking_version
-              AND f.is_following=1 AND f.line_user_id=? AND b.line_account_id=?
+              AND f.is_following=1 AND f.line_platform_user_id=? AND b.line_account_id=?
               AND ${activeTenantLineAccountSql('b.line_account_id')}`).bind(row.id,saved.toLineUserId,row.line_account_id).first(),
         statements: next => next.phase==='started'?[db.prepare(`SELECT json(CASE WHEN EXISTS(
           SELECT 1 FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
           JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
           WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.lock_version=r.booking_version AND b.line_account_id=?
-            AND f.is_following=1 AND f.line_user_id=? AND ${activeTenantLineAccountSql('b.line_account_id')})
+            AND f.is_following=1 AND f.line_platform_user_id=? AND ${activeTenantLineAccountSql('b.line_account_id')})
           THEN 'true' ELSE 'event_reminder_obsolete' END)`).bind(row.id,row.line_account_id,input.toLineUserId)]
           : next.phase==='succeeded' ? [db.prepare(`UPDATE event_booking_reminders
               SET status='sent',sent_at=?,retry_count=?,last_error=NULL

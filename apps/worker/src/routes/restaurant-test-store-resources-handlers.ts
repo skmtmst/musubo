@@ -683,7 +683,7 @@ export const get__api_restaurant_test_customers_search_26 = async (c: Context<En
       AND (INSTR(customer_name, ?) > 0 OR INSTR(${customerPhoneSql}, ?) > 0)
       AND (customer_phone IS NOT NULL OR line_uid IS NOT NULL)
     GROUP BY COALESCE(line_uid, customer_phone) UNION
-    SELECT COALESCE(f.display_name, 'LINEの友だち') AS name, NULL AS phone, f.line_user_id AS lineUid
+    SELECT COALESCE(f.display_name, 'LINEの友だち') AS name, NULL AS phone, f.line_platform_user_id AS lineUid
     FROM friends f JOIN rt_stores s ON s.line_account_id = f.line_account_id
     WHERE s.id = ? AND f.is_following = 1 AND INSTR(COALESCE(f.display_name, ''), ?) > 0 LIMIT 20`)
     .bind(storeId, q, normalizePhone(q) || q, storeId, q).all<{ name: string; phone: string | null; lineUid: string | null }>();

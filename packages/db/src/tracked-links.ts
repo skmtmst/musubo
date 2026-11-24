@@ -354,7 +354,7 @@ export async function getLinkClicks(
            OR (f.line_account_id IS NULL AND owner.id IS NOT NULL
              AND COALESCE(owner.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
              AND NOT EXISTS (SELECT 1 FROM friends exact_friend
-               WHERE exact_friend.line_user_id = f.line_user_id AND exact_friend.line_account_id = owner.id)))
+               WHERE exact_friend.line_platform_user_id = f.line_platform_user_id AND exact_friend.line_account_id = owner.id)))
          AND (tl.line_account_id IS NOT NULL OR tl.scenario_id IS NULL OR sc.id IS NOT NULL)
        WHERE lc.tracked_link_id = ?
        ORDER BY lc.clicked_at DESC`,
