@@ -501,6 +501,8 @@
 
 - [GoogleビジネスとInstagramの複数接続（第1段）](release-log/unreleased/137-kenta-sns-multi-connections.md) — 反映履歴、確認 2026-11-21。
 
+- [GoogleビジネスとInstagramの複数接続（第2段）](release-log/unreleased/218-kenta-sns-multi-connections-drop-compat.md) — 反映履歴、確認 2026-11-24。
+
 - [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
 
 - [コース写真の保存項目を追加](release-log/unreleased/144-masato-restaurant-course-gallery-d1.md) — 反映履歴、確認 2026-11-21。

@@ -26,6 +26,11 @@ import {
   deleteGoogleContentForConnection,
   deleteGoogleContentStatements,
 } from '../services/google-business-retention.js';
+import {
+  GOOGLE_PRIMARY_KEY,
+  googleConnectionListSql,
+  googleConnectionPickSql,
+} from '../services/google-connection-primary.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
   GOOGLE_BUSINESS_REQUIRED_SCOPES,
@@ -310,14 +315,12 @@ async function ensureStoreForGoogle(c: Context<Env>): Promise<StoreContext | nul
   return store;
 }
 
-/** 主連携の正本。列は持たず account_settings に置く（sns-connection-ports.ts と同じ鍵）。 */
-const GOOGLE_PRIMARY_KEY = 'sns.google.primary_connection';
-
 /**
  * 操作対象の接続を1件に決める。
  * connectionId を渡した場合はその接続だけを見る（別の店舗の接続IDでは null になる）。
  * 省略した場合は主連携（account_settings の sns.google.primary_connection）を優先し、
  * 無ければ並び順 → 接続日時 → ID の決まった順で先頭を返す。接続が増えても取り違えない。
+ * 並べ方の正本は services/google-connection-primary.ts に1か所だけ置く。
  */
 export async function connectionForEnv(env: Env['Bindings'], storeId: string, connectionId?: string | null): Promise<ConnectionRow | null> {
   const db = dbFor(env, storeId);
@@ -328,17 +331,7 @@ export async function connectionForEnv(env: Env['Bindings'], storeId: string, co
       .first<ConnectionRow>();
   }
   return db
-    .prepare(
-      `SELECT c.* FROM rt_google_connections c
-       WHERE c.store_id = ?
-       ORDER BY CASE WHEN c.id = (
-             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
-             JOIN rt_stores s ON s.id = c.store_id
-             WHERE a.line_account_id = s.line_account_id AND a.key = ?
-           ) THEN 0 ELSE 1 END,
-         c.sort_order, COALESCE(c.connected_at, ''), c.id
-       LIMIT 1`,
-    )
+    .prepare(googleConnectionPickSql('c.*'))
     .bind(storeId, GOOGLE_PRIMARY_KEY)
     .first<ConnectionRow>();
 }
@@ -353,16 +346,7 @@ export async function connectionFor(c: Context<Env>, storeId: string, connection
  */
 async function connectionsFor(c: Context<Env>, storeId: string): Promise<ConnectionRow[]> {
   const rows = await dbFor(c.env, storeId)
-    .prepare(
-      `SELECT c.* FROM rt_google_connections c
-       WHERE c.store_id = ?
-       ORDER BY CASE WHEN c.id = (
-             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
-             JOIN rt_stores s ON s.id = c.store_id
-             WHERE a.line_account_id = s.line_account_id AND a.key = ?
-           ) THEN 0 ELSE 1 END,
-         c.sort_order, COALESCE(c.connected_at, ''), c.id`,
-    )
+    .prepare(googleConnectionListSql('c.*'))
     .bind(storeId, GOOGLE_PRIMARY_KEY)
     .all<ConnectionRow>();
   return rows.results ?? [];
