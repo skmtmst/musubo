@@ -312,3 +312,20 @@ it('統括が変わった店舗の旧転送先・会話・新着通知は引き�
   expect(data.raw.prepare("SELECT count(*) FROM notifications WHERE event_type='account_email_received'").pluck().get()).toBe(0);
   expect((await request('A','inbox')).status).toBe(404);
 });
+
+it('共通窓口と店舗メールの両方を保存ビューで数え、権限外には共通窓口を含めない', async () => {
+  const address = await connect('A');
+  await incoming(address, '店舗', '共通の検索語');
+  const at = new Date().toISOString();
+  data.raw.prepare(`INSERT INTO account_settings(id,line_account_id,key,value)
+    VALUES('legacy-fixture','A','inbox_email_legacy_enabled','true')`).run();
+  data.raw.prepare(`INSERT INTO support_email_threads
+    (id,customer_email,subject,normalized_subject,status,last_message_at,last_incoming_at,created_at,updated_at)
+    VALUES ('legacy-thread','shared@example.com','共通の検索語','共通の検索語','unread',?,?,?,?)`)
+    .run(at, at, at, at);
+  const conditions = { ...EMPTY_INBOX_SAVED_VIEW_CONDITIONS, channels: ['email'] as ('email'|'line')[], query: '共通の検索語' };
+  const both = await countInboxSavedViewMatches(data.db, { lineAccountId: 'A', staffId: 'A', canSeeUnassigned: true, conditions });
+  const scoped = await countInboxSavedViewMatches(data.db, { lineAccountId: 'A', staffId: 'A', canSeeUnassigned: false, conditions });
+  expect(both.matchCount).toBe(2);
+  expect(scoped.matchCount).toBe(1);
+});

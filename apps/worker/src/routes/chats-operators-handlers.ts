@@ -218,14 +218,15 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
     }
 
     const mode = channel === 'line' ? 'none' : await accountEmailMode(c.env.DB,lineAccountId,scope.canSeeUnassigned);
-    if (mode === 'store' && lineAccountId) {
+    if ((mode === 'store' || mode === 'both') && lineAccountId) {
       const filter = storeEmailFilter({statuses:emailStatuses(status || 'all'),
         matchUnassigned:!assignee || assignee==='unassigned',query,unreadOnly});
       const counts = await c.env.DB.prepare(`SELECT count(*) AS total,count(CASE WHEN t.status='unread' THEN 1 END) AS reply,
         count(CASE WHEN t.status='unread' AND julianday(t.last_message_at)<=julianday(?) THEN 1 END) AS overdue ${filter.sql}`)
         .bind(overdueThreshold,staff.id,lineAccountId,...filter.binds).first<{total:number; reply:number; overdue:number}>();
       email = {all:counts?.total ?? 0,reply:counts?.reply ?? 0,overdue:counts?.overdue ?? 0};
-    } else if (mode === 'legacy') {
+    }
+    if (mode === 'legacy' || mode === 'both') {
       const statusSql = !status || status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -275,9 +276,9 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       ).bind(overdueThreshold, staff.id, ...bindings)
         .first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
       email = {
-        all: emailCounts?.all_count ?? 0,
-        reply: emailCounts?.reply_count ?? 0,
-        overdue: emailCounts?.overdue_count ?? 0,
+        all: email.all + (emailCounts?.all_count ?? 0),
+        reply: email.reply + (emailCounts?.reply_count ?? 0),
+        overdue: email.overdue + (emailCounts?.overdue_count ?? 0),
       };
     }
 

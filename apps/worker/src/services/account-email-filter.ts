@@ -60,6 +60,7 @@ export async function accountEmailMode(
     )
     .bind(accountId, accountId)
     .first<{ connected: number; legacy: number }>();
+  if (row?.connected && row.legacy && canSeeUnassigned) return 'both';
   if (row?.connected) return 'store';
   return row?.legacy && canSeeUnassigned ? 'legacy' : 'none';
 }

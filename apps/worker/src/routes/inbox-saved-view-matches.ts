@@ -119,7 +119,8 @@ export async function countInboxSavedViewMatches(
   if (!conditions.channels.includes('email')) return resultCount(Number(lineRow?.count ?? 0));
   const mode = await accountEmailMode(db,input.lineAccountId,input.canSeeUnassigned);
   if (mode === 'none') return resultCount(Number(lineRow?.count ?? 0));
-  if (mode === 'store') {
+  let storeCount = 0;
+  if (mode === 'store' || mode === 'both') {
     const filter = storeEmailFilter({
       statuses:conditions.messageTypes.length && !conditions.messageTypes.includes('text') ? [] : conditions.statuses,
       needsReply:conditions.quickFilter==='reply',
@@ -129,7 +130,8 @@ export async function countInboxSavedViewMatches(
     });
     const row = await db.prepare(`SELECT COUNT(*) AS count FROM (SELECT t.id ${filter.sql} LIMIT 1001)`)
       .bind(input.staffId,input.lineAccountId,...filter.binds).first<{count:number}>();
-    return resultCount(Number(lineRow?.count ?? 0)+Number(row?.count ?? 0));
+    storeCount = Number(row?.count ?? 0);
+    if (mode === 'store') return resultCount(Number(lineRow?.count ?? 0) + storeCount);
   }
   const emailWhere: string[] = [];
   const emailBindings: unknown[] = [];
@@ -191,6 +193,6 @@ export async function countInboxSavedViewMatches(
        )`,
     ).bind(input.staffId,...emailBindings).first<{ count: number }>()
     : null;
-  const rawCount = Number(lineRow?.count ?? 0) + Number(emailRow?.count ?? 0);
+  const rawCount = Number(lineRow?.count ?? 0) + storeCount + Number(emailRow?.count ?? 0);
   return { matchCount: Math.min(rawCount, 1000), matchCountCapped: rawCount > 1000 };
 }
