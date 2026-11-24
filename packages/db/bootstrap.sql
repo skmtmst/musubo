@@ -11004,9 +11004,6 @@ CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_accou
 CREATE INDEX idx_instagram_connections_account_772
   ON instagram_connections(line_account_id, sort_order, id);
 
-CREATE UNIQUE INDEX idx_instagram_connections_account_compat_772
-  ON instagram_connections(line_account_id);
-
 CREATE UNIQUE INDEX idx_instagram_connections_account_ig_772
   ON instagram_connections(line_account_id, instagram_id);
 
@@ -11727,9 +11724,6 @@ CREATE UNIQUE INDEX idx_rt_google_connections_location_772
 CREATE INDEX idx_rt_google_connections_store_772
   ON rt_google_connections(store_id, sort_order, created_at);
 
-CREATE UNIQUE INDEX idx_rt_google_connections_store_compat_772
-  ON rt_google_connections(store_id);
-
 CREATE INDEX idx_rt_google_location_candidates_connection_772
   ON rt_google_location_candidates(connection_id);
 
@@ -11739,17 +11733,11 @@ CREATE UNIQUE INDEX idx_rt_google_location_candidates_key_772
 CREATE INDEX idx_rt_google_location_candidates_store_772
   ON rt_google_location_candidates(store_id);
 
-CREATE UNIQUE INDEX idx_rt_google_location_candidates_store_compat_772
-  ON rt_google_location_candidates(store_id, location_name);
-
 CREATE UNIQUE INDEX idx_rt_google_metrics_daily_key_772
   ON rt_google_metrics_daily(COALESCE(connection_id, 'store:' || store_id), date);
 
 CREATE INDEX idx_rt_google_metrics_daily_store_date
   ON rt_google_metrics_daily(store_id, date DESC);
-
-CREATE UNIQUE INDEX idx_rt_google_metrics_daily_store_date_compat_772
-  ON rt_google_metrics_daily(store_id, date);
 
 CREATE INDEX idx_rt_google_oauth_states_connection_772
   ON rt_google_oauth_states(connection_id);
@@ -11773,9 +11761,6 @@ CREATE UNIQUE INDEX idx_rt_google_profiles_key_772
   ON rt_google_profiles(COALESCE(connection_id, 'store:' || store_id));
 
 CREATE INDEX idx_rt_google_profiles_store_772 ON rt_google_profiles(store_id);
-
-CREATE UNIQUE INDEX idx_rt_google_profiles_store_compat_772
-  ON rt_google_profiles(store_id);
 
 CREATE INDEX idx_rt_google_reviews_connection_772
   ON rt_google_reviews(connection_id, reply_status, create_time DESC);
