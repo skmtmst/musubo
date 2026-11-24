@@ -120,23 +120,25 @@ it('取得失敗を標準へ戻さず、再読込後も保存済みの業種を�
   net.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ success: true, data: { style: 'lesson', styleSelected: true, version: 4 } })
   render(<ResumeRegistrationStyle accountId="created-account" />)
   await screen.findByText('使い方を確認・保存できませんでした')
-  expect((within(screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((within(screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: /もう一度読み込む/ }))
   await waitFor(() => expect(screen.getByRole('button', { name: '教室・レッスン（選んでいます）' })).toBeTruthy())
   expect(net.save).not.toHaveBeenCalled()
 })
 
-it('「あとで設定する」は保留を保存して次へ進み、次回の登録再開を止める', async () => {
+it('スタイルが未選択の登録再開では、窓を閉じても保留を保存せず再開できる', () => {
   sessionStorage.setItem(REGISTRATION_STYLE_KEY, 'created-account')
   render(<ResumeRegistrationStyle accountId="created-account" />)
   const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
-  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
-  await waitFor(() => expect((within(dialog).getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement).disabled).toBe(false))
-  fireEvent.click(within(dialog).getByRole('button', { name: 'あとで設定する' }))
-  await screen.findByText('登録が完了しました')
-  expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 0, styleMode: 'later' })
-  expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBeNull()
-  expect(screen.getByRole('link', { name: '次へ' }).getAttribute('href')).toBe('/hq')
+  expect((within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(within(dialog).queryByRole('button', { name: 'あとで設定する' })).toBeNull()
+  fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+  expect(screen.queryByRole('button', { name: 'あとで設定する' })).toBeNull()
+  expect(net.save).not.toHaveBeenCalled()
+  expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBe('created-account')
+  const stickyBar = document.querySelector<HTMLElement>('[data-shared-part="sticky-bar"]')!
+  fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選ぶ' }))
+  expect(screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeTruthy()
 })
 
 it('見本を切り替えただけでは未選択と示し、選ぶ操作を案内する', async () => {

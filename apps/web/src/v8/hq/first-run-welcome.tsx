@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
-import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { prefersReducedMotion } from '@/components/shared/overlay-utils'
 import { consumeRegistrationWelcome } from '@/lib/registration-welcome'
@@ -23,17 +22,16 @@ function FirstRunWelcome({ onDone }: { onDone: () => void }) {
     return () => window.clearTimeout(id)
   }, [onDone])
 
-  return <Dialog open title="ようこそ" designNode="tUZWI" designLayout="fullscreen" onCancel={onDone}>
+  return <Dialog open title="ようこそ" designNode="t5jY0" designLayout="fullscreen" onCancel={onDone}>
     <div className={styles.screen} style={welcomeMotion} data-registration-welcome>
       <div className={styles.content}>
-        {/* Pen v06 のロゴと Klee One の字形を静的な画像で配信する。 */}
+        {/* 公式ロゴと承認済みの Klee One の字形を静的な画像で配信する。 */}
         <img className={styles.logo} src="/onboarding/first-run-welcome-logo.png" alt="musubo" width={2522} height={385} />
         <picture className={styles.writing}>
           <source media="(max-width: 600px)" srcSet="/onboarding/first-run-welcome-mobile.svg" />
           <img src="/onboarding/first-run-welcome.svg" alt="" />
         </picture>
       </div>
-      <div className={styles.skip}><Button variant="text" size="inline" textTone="accent" className={styles.skipButton} onClick={onDone}><span className={styles.skipLabel}>タップでスキップ</span></Button></div>
     </div>
   </Dialog>
 }

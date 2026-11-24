@@ -7,10 +7,10 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
-import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
+import CoursePhotoPicker from './course-photo-picker'
 import styles from './course-photos.module.css'
 
 type Props = {
@@ -24,7 +24,6 @@ type Props = {
 export default function CoursePhotos({ accountId, photos, disabled, error, onChange }: Props) {
   const [picking, setPicking] = useState(false)
   const [adjusting, setAdjusting] = useState<RestaurantCoursePhoto | null>(null)
-  const [notice, setNotice] = useState('')
   const [unavailable, setUnavailable] = useState<string[]>([])
   const dragging = useRef<number | null>(null)
   const index = photos.findIndex(photo => photo.mediaId === adjusting?.mediaId)
@@ -70,22 +69,22 @@ export default function CoursePhotos({ accountId, photos, disabled, error, onCha
       ))}
       {photos.length < RESTAURANT_COURSE_PHOTO_LIMIT ? <li className={styles.tile}>
         <Button variant="text" size="thumbnail" aria-label="写真を追加" disabled={disabled || !accountId}
-          onClick={() => { setNotice(''); setPicking(true) }}>
+          onClick={() => setPicking(true)}>
           <span className={styles.addLabel}><Plus size={16} aria-hidden="true" />追加</span>
         </Button>
       </li> : null}
     </ul>
     <p className={styles.note}>ドラッグで並べ替え（先頭が表紙）。写真をタップすると表示範囲を調整できます。元の写真はそのまま残ります。</p>
-    {error || notice ? <Notice tone={error ? "danger" : "warn"}>{error ?? notice}</Notice> : null}
+    {error ? <Notice tone="danger">{error}</Notice> : null}
     {photos.some(photo => unavailable.includes(photo.mediaId)) ?
       <Notice tone="warn">画像を読めません。読めない写真を外し、登録メディアから選び直してください。</Notice> : null}
-    <MediaPickerDialog open={picking} accountId={accountId} kind="image" accountOnly
-      title="コースの写真を選ぶ" onClose={() => setPicking(false)}
-      onSelect={media => {
+    {picking && accountId && !disabled ? <CoursePhotoPicker key={accountId} accountId={accountId}
+      existing={photos.map(photo => photo.mediaId)} onClose={() => setPicking(false)}
+      onAdd={ids => {
         setPicking(false)
-        if (photos.some(photo => photo.mediaId === media.id)) { setNotice('この写真はすでに追加されています。'); return }
-        onChange([...photos, { mediaId: media.id, x: 50, y: 50 }])
-      }} />
+        const added = [...new Set(ids)].filter(id => !photos.some(photo => photo.mediaId === id))
+        onChange([...photos, ...added.map(mediaId => ({ mediaId, x: 50, y: 50 }))].slice(0, RESTAURANT_COURSE_PHOTO_LIMIT))
+      }} /> : null}
     {adjusting ? <Dialog open title="写真の表示範囲を調整" onCancel={() => setAdjusting(null)}
       footer={<DialogActions>
         <Button variant="text" onClick={() => remove(adjusting.mediaId)}>写真を外す</Button>

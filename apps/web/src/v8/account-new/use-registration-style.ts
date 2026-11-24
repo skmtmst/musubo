@@ -58,23 +58,5 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       return false
     } finally { busyLock.current = false; setBusy(false) }
   }
-  const skip = async () => {
-    if (busyLock.current || !profile) return false
-    busyLock.current = true
-    setBusy(true); setError('')
-    try {
-      const res = await styleApi.save(accountId, { expectedVersion: profile.version, styleMode: 'later' })
-      if (!res.success) throw new Error('スキップを保存できませんでした。時間をおいて、もう一度お試しください。')
-      setProfile({ version: res.data.version, hasMenuAnswer: profile.hasMenuAnswer })
-      setChoice('')
-      setBaselineChoice('')
-      accountStyleUpdated(accountId)
-      try { if (resumeKey) sessionStorage.removeItem(resumeKey) } catch { /* 設定画面であとから変更できる。 */ }
-      return true
-    } catch (caught) {
-      setError(describeApiFailure(caught, 'スキップ'))
-      return false
-    } finally { busyLock.current = false; setBusy(false) }
-  }
-  return { choice, setChoice, version: profile?.version ?? null, busy, error, dirty, discard, reload: () => setTick(n => n + 1), save, skip }
+  return { choice, setChoice, version: profile?.version ?? null, busy, error, dirty, discard, reload: () => setTick(n => n + 1), save }
 }

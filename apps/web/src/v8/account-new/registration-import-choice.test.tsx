@@ -112,7 +112,6 @@ it.each([false, true])('最終確認の選択 %s を、接続確認と登録の�
   const checkbox = await confirmation(!finalChoice)
   // 最後の確認では、事前の回答を本人が上書きできる。
   if (checkbox.checked !== finalChoice) fireEvent.click(checkbox)
-  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect(calls.check).toHaveBeenCalledTimes(1))
   expect.soft(calls.check).toHaveBeenCalledWith(expect.objectContaining({ importFriends: finalChoice }))

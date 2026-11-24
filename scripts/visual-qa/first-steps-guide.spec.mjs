@@ -327,6 +327,7 @@ test('QRで待機し、閉じている間に届いた最初の1通も再読込�
   await page.getByRole('button', { name: 'ガイドで進める', exact: true }).click()
   const receive = page.getByRole('dialog', { name: /最初の1通を受け取る/ })
   await expect(receive.getByRole('img', { name: '友だち追加のQRコード' })).toBeVisible()
+  await expect(receive.getByText('友だち追加して、あいさつメッセージを確認する')).toBeVisible()
   await expect(receive.getByText('8/8', { exact: true })).toBeVisible()
   await expect(receive.getByRole('status')).toContainText('受信を待っています')
   const receiveBounds = await receive.boundingBox()
@@ -347,6 +348,28 @@ test('QRで待機し、閉じている間に届いた最初の1通も再読込�
   await page.reload()
   await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true })).toBeVisible()
   await expect(complete).toHaveCount(0)
+})
+
+test('QRで待機する前にアカウントの接続を読み直せる（390px）', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openFixture(page, { width: 390, height: 844, initialGuide: { phase: 'active', stepKey: 'firstMessage' },
+    storeProgress: { tables: true, hours: true, menus: true, reception: true, followup: true } })
+  let recovered = false
+  await page.route(url => url.pathname === '/api/line-accounts', async route => {
+    const json = await (await page.request.get(`${mock}/api/line-accounts`)).json()
+    return route.fulfill({ json: { ...json, data: json.data.map(account => account.id === accountId && !recovered
+      ? { ...account, basicId: null } : account) } })
+  })
+  await page.goto(base)
+  const receive = page.getByRole('dialog', { name: /最初の1通を受け取る/ })
+  await expect(receive.getByRole('alert')).toContainText('QRコードを表示できませんでした')
+  await expect(receive.getByRole('img', { name: '友だち追加のQRコード' })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('guide-receive-error-390.png') })
+  recovered = true
+  await receive.getByRole('button', { name: 'もう一度読み込む' }).click()
+  await expect(receive.getByRole('img', { name: '友だち追加のQRコード' })).toBeVisible()
+  await expect(receive.getByRole('status')).toContainText('受信を待っています')
+  await page.screenshot({ path: testInfo.outputPath('guide-receive-390.png') })
 })
 
 for (const [width, height] of [[1440, 1000], [1152, 768], [390, 844], [667, 375]]) {
@@ -428,6 +451,107 @@ test('公開確認では最後の公開ボタンにガイドが移る', async ({
   await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
 })
 
+for (const { width, height, procedureIndex } of [
+  { width: 1440, height: 1000, procedureIndex: 2 },
+  { width: 390, height: 844, procedureIndex: 3 },
+]) {
+  test(`コースは直接下書き保存し、成功時だけ次へ進む（${width}px）`, async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await openFixture(page, {
+      width, height,
+      initialGuide: { phase: 'active', stepKey: 'friendAdd', procedureIndex },
+      storeProgress: { tables: true, hours: true },
+    })
+    const submissions = []
+    const verifiedStores = []
+    let courseRegistered = false
+    let releaseProof
+    const proof = new Promise(resolve => { releaseProof = resolve })
+    await page.route('**/api/restaurant-test/menu?**', async route => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      submissions.push(route.request().postDataJSON())
+      if (submissions.length === 1) {
+        return route.fulfill({ status: 500, json: { success: false, error: 'コースを保存できませんでした' } })
+      }
+      courseRegistered = true
+      return route.fulfill({ json: { success: true, data: { id: 'course-direct-1' } } })
+    })
+    await page.route('**/api/restaurant-test/setup-progress?**', async route => {
+      const { searchParams } = new URL(route.request().url())
+      const storeId = searchParams.get('storeId')
+      if (courseRegistered) {
+        verifiedStores.push({ accountId: searchParams.get('account_id'), storeId })
+        await proof
+      }
+      return route.fulfill({ json: { success: true, data: {
+        storeId, tables: true, hours: true, menus: false, courseRegistered, reception: false, followup: false,
+      } } })
+    })
+    await page.goto(`${base}/restaurant-test/menu/edit`)
+    const formGuide = page.locator('[data-guide-balloon="friendAdd:2"]')
+    const saveGuide = page.locator('[data-guide-balloon="friendAdd:3"]')
+    const save = page.getByRole('button', { name: '保存して追加する', exact: true })
+    const name = page.getByRole('textbox', { name: 'メニュー名' })
+    const price = page.getByRole('spinbutton', { name: '価格（税込）' })
+    const duration = page.getByRole('spinbutton', { name: '所要時間', exact: true })
+    const publication = page.getByRole('dialog', { name: 'このメニューを公開しますか？' })
+    await expect(formGuide).toBeVisible()
+    await expect(formGuide.getByRole('button', { name: '次へ', exact: true })).toHaveCount(0)
+    await expect(page.locator('[data-guide-spotlight="menu.form"]')).toBeVisible()
+    await expect(duration).toHaveValue('')
+    await expect(page.getByRole('button', { name: '保存する状態', exact: true })).toHaveText('下書き')
+    await expect(save).toBeDisabled()
+    await page.screenshot({ path: info.outputPath(`guided-course-empty-${width}.png`) })
+    await name.fill('ガイド検証用')
+    await price.fill('4200')
+    await expect(save).toBeDisabled()
+    await duration.fill('150')
+    await expect(saveGuide).toBeVisible()
+    await expect(formGuide).toHaveCount(0)
+    await expect(page.locator('[data-guide-spotlight="menu.save"]')).toBeVisible()
+    await expect(save).toBeEnabled()
+    await expect(save).toBeInViewport({ ratio: 1 })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
+    await expect.poll(async () => {
+      const [target, balloon, bar] = await Promise.all([
+        save.boundingBox(), saveGuide.boundingBox(), page.locator(guideBar).boundingBox(),
+      ])
+      return Boolean(target && [balloon, bar].every(box => box && (
+        box.x + box.width <= target.x || target.x + target.width <= box.x ||
+        box.y + box.height <= target.y || target.y + target.height <= box.y
+      )))
+    }).toBe(true)
+    await save.click({ trial: true })
+    await page.screenshot({ path: info.outputPath(`guided-course-save-${width}.png`) })
+    expect(submissions).toHaveLength(0)
+    await save.click()
+    await expect(page.getByRole('alert').filter({ hasText: '保存できませんでした。入力を確かめて、もう一度お試しください。' })).toBeVisible()
+    await expect(page).toHaveURL(/\/restaurant-test\/menu\/edit$/)
+    await expect(saveGuide).toBeVisible()
+    await expect(name).toHaveValue('ガイド検証用')
+    await expect(price).toHaveValue('4200')
+    await expect(duration).toHaveValue('150')
+    await expect(publication).toHaveCount(0)
+    expect(verifiedStores).toHaveLength(0)
+    await page.screenshot({ path: info.outputPath(`guided-course-save-error-${width}.png`) })
+    await save.click()
+    try {
+      await expect.poll(() => verifiedStores).toContainEqual({ accountId, storeId: 'store-sby' })
+      await expect(page).toHaveURL(/\/restaurant-test\/menu\/edit(?:\?|$)/)
+      await expect(publication).toHaveCount(0)
+    } finally {
+      releaseProof()
+    }
+    await expect(page).toHaveURL(/\/restaurant-test\/inventory(?:\?|$)/)
+    await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
+    expect(submissions).toHaveLength(2)
+    for (const submitted of submissions) {
+      expect(submitted).toMatchObject({ storeId: 'store-sby', kind: 'course', name: 'ガイド検証用', price: 4200, durationMinutes: 150, status: 'draft' })
+    }
+    await page.screenshot({ path: info.outputPath(`guided-course-next-${width}.png`) })
+  })
+}
+
 test('取り込んだ営業時間の確定は予約枠の作成成功まで次へ進めない', async ({ page }, info) => {
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'hours', procedureIndex: 2 }, storeProgress: { tables: true, hours: true } })
   let requests = 0
@@ -463,12 +587,12 @@ test('取り込んだ営業時間の確定は予約枠の作成成功まで次�
   expect(requests).toBeGreaterThan(1)
 })
 
-test('来店フォローのおすすめ候補を表示したまま後で使う選択もできる', async ({ page }, info) => {
+test('来店フォローは初回はオフで、後で使う選択もできる', async ({ page }, info) => {
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'followup', procedureIndex: 1 }, storeProgress: { tables: true, hours: true, menus: true, reception: true } })
   await page.goto(`${base}/restaurant-test/line-followup`)
-  await expect(page.getByRole('switch', { name: '予約したときを使う' })).toBeChecked()
-  await expect(page.getByRole('switch', { name: '前日の確認を使う' })).toBeChecked()
-  await expect(page.getByRole('button', { name: '保存して作る' })).toBeEnabled()
+  await expect(page.getByRole('switch', { name: '予約したときを使う' })).not.toBeChecked()
+  await expect(page.getByRole('switch', { name: '前日の確認を使う' })).not.toBeChecked()
+  await expect(page.getByRole('button', { name: '保存して作る' })).toBeDisabled()
   await page.screenshot({ path: info.outputPath('guided-followup-initial.png') })
   await page.getByRole('button', { name: '今は使わない', exact: true }).click()
   const confirmation = page.getByRole('dialog', { name: '今は使わないと設定しますか' })
@@ -525,17 +649,54 @@ test('タッチ幅の画面でもガイドがGoogle接続と来店フォロー�
     await expect(page.getByText('Googleの許可画面を開けませんでした。もう一度お試しください。')).toBeVisible()
 
     const followup = await context.newPage()
+    await followup.emulateMedia({ reducedMotion: 'reduce' })
     await openFixture(followup, { width: 390, height: 844,
       initialGuide: { phase: 'active', stepKey: 'followup', procedureIndex: 1 },
       storeProgress: { tables: true, hours: true, menus: true, reception: true } })
     await followup.goto(`${base}/restaurant-test/line-followup`)
+    const toggle = followup.getByRole('switch', { name: '予約したときを使う' })
+    await expect(followup.locator('[data-guide-spotlight="followup.start"]')).toBeVisible()
+    await toggle.tap({ trial: true })
+    await followup.screenshot({ path: info.outputPath('guided-followup-touch-initial.png') })
+    await toggle.tap()
+    const editor = followup.getByRole('dialog', { name: '予約したときを変える' })
+    const next = editor.locator('[data-guide-balloon="followup:2"]').getByRole('button', { name: '次へ' })
+    await expect(next).toBeEnabled()
+    const bodyAnchor = editor.locator('[data-guide-anchor="followup.body"][data-guide-ready]')
+    const bodyRing = editor.locator('[data-guide-spotlight="followup.body"]')
+    await expect(bodyAnchor).toBeInViewport({ ratio: 0.85 })
+    await expectFollowupSpotlight(bodyAnchor, bodyRing)
+    await followup.screenshot({ path: info.outputPath('guided-followup-touch-message-review.png') })
+    const preview = editor.getByRole('button', { name: '届き方' })
+    await preview.tap()
+    await expect(editor.getByRole('complementary', { name: '届き方' })).toBeVisible()
+    await expect(bodyRing).toBeHidden()
+    await followup.screenshot({ path: info.outputPath('guided-followup-touch-preview.png') })
+    await preview.tap()
+    await next.tap()
+    const confirm = editor.getByRole('button', { name: 'この内容でオンにする' })
+    await expect(editor.locator('[data-guide-balloon="followup:3"]')).toBeVisible()
+    await confirm.tap({ trial: true })
+    await followup.screenshot({ path: info.outputPath('guided-followup-touch-confirm.png') })
+    await confirm.tap()
+    await expect(followup.locator('[data-guide-balloon="followup:4"]')).toBeVisible()
     const save = followup.getByRole('button', { name: '保存して作る', exact: true })
     await save.tap({ trial: true })
+    await expectFollowupSpotlight(save, followup.locator('[data-guide-spotlight="followup.save"]'))
     await followup.screenshot({ path: info.outputPath('guided-followup-touch-save.png') })
   } finally {
     await context.close()
   }
 })
+
+async function expectFollowupSpotlight(anchor, spotlight) {
+  await expect.poll(async () => {
+    const [target, ring] = await Promise.all([anchor.boundingBox(), spotlight.boundingBox()])
+    if (!target || !ring) return Number.POSITIVE_INFINITY
+    return Math.abs(target.x + target.width / 2 - ring.x - ring.width / 2) +
+      Math.abs(target.y + target.height / 2 - ring.y - ring.height / 2)
+  }).toBeLessThan(5)
+}
 
 test('営業時間の編集パネル内で説明を読んで次の操作に進める', async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -552,26 +713,73 @@ test('営業時間の編集パネル内で説明を読んで次の操作に進�
   await page.screenshot({ path: info.outputPath('guided-hours-editor.png') })
 })
 
-test('来店フォローは明示保存でおすすめ2件を下書きにする', async ({ page }) => {
+test('来店フォローは本文の確認から明示保存まで案内し、実測が揃ってから次へ進む', async ({ page }, info) => {
   await openFixture(page, { initialGuide: { phase: 'active', stepKey: 'followup', procedureIndex: 1 }, storeProgress: { tables: true, hours: true, menus: true, reception: true } })
   const writes = []
   let initializedRows
+  let saved = false
+  let acknowledge
+  let progressChecks = 0
+  const proof = new Promise(resolve => { acknowledge = resolve })
+  await page.route('**/api/restaurant-test/setup-progress?**', async route => {
+    const storeId = new URL(route.request().url()).searchParams.get('storeId')
+    if (saved) {
+      progressChecks++
+      await proof
+    }
+    return route.fulfill({ json: { success: true, data: { storeId, tables: true, hours: true, menus: true, reception: true, followup: saved } } })
+  })
   await page.route('**/api/restaurant-test/followups/**', async route => {
     if (route.request().method() === 'GET') return route.fallback()
     const path = new URL(route.request().url()).pathname
     writes.push(path.split('/').pop())
     if (!path.endsWith('/engines/initialize')) return route.fulfill({ status: 403, json: { success: false } })
     initializedRows = route.request().postDataJSON().rows
+    if (writes.length === 1) return route.fulfill({ status: 500, json: { success: false, error: '来店フォローを保存できませんでした' } })
+    saved = true
     await route.fulfill({ json: { success: true, data: {} } })
   })
   await page.goto(`${base}/restaurant-test/line-followup`)
   const save = page.getByRole('button', { name: '保存して作る', exact: true })
+  const toggle = page.getByRole('switch', { name: '予約したときを使う' })
+  await expect(toggle).not.toBeChecked()
+  await expect(save).toBeDisabled()
+  await expect(page.locator('[data-guide-spotlight="followup.start"]')).toBeVisible()
+  await page.screenshot({ path: info.outputPath('followup-initial-off.png') })
+  await toggle.click()
+  const editor = page.getByRole('dialog', { name: '予約したときを変える' })
+  const next = editor.locator('[data-guide-balloon="followup:2"]').getByRole('button', { name: '次へ' })
+  await expect(next).toBeEnabled()
+  await expect(editor).toHaveCSS('opacity', '1')
+  const bodyAnchor = editor.locator('[data-guide-anchor="followup.body"][data-guide-ready]')
+  const bodyRing = editor.locator('[data-guide-spotlight="followup.body"]')
+  await expectFollowupSpotlight(bodyAnchor, bodyRing)
+  await page.screenshot({ path: info.outputPath('followup-message-review.png') })
+  await next.click()
+  await expect(editor.locator('[data-guide-spotlight="followup.confirm"]')).toBeVisible()
+  await page.screenshot({ path: info.outputPath('followup-confirm.png') })
+  await editor.getByRole('button', { name: 'この内容でオンにする' }).click()
+  await expect(toggle).toBeChecked()
+  await expect(page.getByRole('switch', { name: '前日の確認を使う' })).not.toBeChecked()
+  await expect(page.locator('[data-guide-balloon="followup:4"]')).toBeVisible()
   await expect(save).toBeEnabled()
   expect(writes).toHaveLength(0)
   await save.click()
-  await expect.poll(() => initializedRows?.filter(row => row.input.enabled).map(row => row.trigger)).toEqual(['reservation_created', 'reservation_24h'])
+  await expect.poll(() => initializedRows?.filter(row => row.input.enabled).map(row => row.trigger)).toEqual(['reservation_created'])
+  const result = page.getByRole('dialog', { name: '保存の結果' })
+  await expect(result.getByText('保存できませんでした').first()).toBeVisible()
+  await result.getByRole('button', { name: '閉じる' }).click()
+  await expect(toggle).toBeChecked()
+  await expect(page.locator('[data-guide-balloon="followup:4"]')).toBeVisible()
+  await save.click()
+  try {
+    await expect.poll(() => progressChecks).toBeGreaterThan(0)
+    await expect(page).toHaveURL(/\/restaurant-test\/line-followup/)
+  } finally {
+    acknowledge()
+  }
   await expect(page.getByRole('dialog', { name: /最初の1通を受け取る/ })).toBeVisible()
-  expect(writes).toEqual(['initialize'])
+  expect(writes).toEqual(['initialize', 'initialize'])
 })
 
 test('Googleに接続した状態で戻っても取込内容を確認する', async ({ page }, info) => {
@@ -638,19 +846,50 @@ test('スマホの上部から閉じたガイドを開き直せる', async ({ br
   }
 })
 
-test('コースの写真は5枚まで。並べ替えと正方形の表示範囲を保存する', async ({ page }, testInfo) => {
-  await openFixture(page, {
-    initialGuide: { phase: 'active', stepKey: 'friendAdd', procedureIndex: 2 },
-    storeProgress: { tables: true, hours: true },
-  })
-  const images = Array.from({ length: 5 }, (_, index) => ({
+test('コースの写真は登録メディアと端末から合計5枚を追加して保存できる', async ({ page }, testInfo) => {
+  await openFixture(page, { storeProgress: { tables: true, hours: true } })
+  const images = Array.from({ length: 12 }, (_, index) => ({
     id: `qa-dish-${index}`, lineAccountId: accountId, kind: 'image', filename: `検証写真 ${index + 1}.png`,
   }))
-  await page.route('**/api/media?**', route => route.fulfill({ json: { success: true, data: { items: images, total: images.length } } }))
+  const sourceFiles = [
+    { name: '端末の写真1.png', id: 'qa-dish-file-a' },
+    { name: '端末の写真2.png', id: 'qa-dish-file-b' },
+  ]
+  const uploaded = []
+  const attempts = []
+  await page.route('**/api/media?**', route => {
+    const query = new URL(route.request().url()).searchParams
+    const offset = Number(query.get('offset'))
+    const limit = Number(query.get('limit'))
+    const all = [...uploaded, ...images]
+    return route.fulfill({ json: { success: true, data: { items: all.slice(offset, offset + limit), total: all.length } } })
+  })
   await page.route('**/api/media/qa-dish-*/content?**', route => route.fulfill({
     contentType: 'image/svg+xml',
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200"><rect width="400" height="200" fill="green"/></svg>',
   }))
+  await page.route('**/api/media/upload-sessions', route => {
+    const { files, accountId: targetAccount } = route.request().postDataJSON()
+    expect(targetAccount).toBe(accountId)
+    const file = sourceFiles.find(entry => entry.name === files[0].filename)
+    expect(file).toBeDefined()
+    attempts.push(file.id)
+    if (file.id === sourceFiles[1].id && attempts.filter(id => id === file.id).length === 1) {
+      return route.fulfill({ status: 500, json: { success: false, error: 'アップロードを準備できませんでした' } })
+    }
+    return route.fulfill({ json: { success: true, data: { sessions: [{
+      id: file.id, method: 'PUT', uploadUrl: `${base}/qa-course-media/${file.id}`, requiredHeaders: {},
+    }] } } })
+  })
+  await page.route('**/qa-course-media/**', route => route.fulfill({ status: 200, headers: { ETag: '"course-photo"' } }))
+  await page.route('**/api/media/upload-sessions/*/complete', route => {
+    const id = new URL(route.request().url()).pathname.split('/').at(-2)
+    const file = sourceFiles.find(entry => entry.id === id)
+    uploaded.unshift({ id, filename: file.name, lineAccountId: accountId, kind: 'image' })
+    return route.fulfill({ json: { success: true, data: { status: 'completed', mediaId: id } } })
+  })
+  await page.route('**/api/file-scans/for-media?**', route =>
+    route.fulfill({ json: { success: true, data: { scan: { status: 'clean' } } } }))
   let submitted
   await page.route('**/api/restaurant-test/menu?**', route => {
     if (route.request().method() !== 'POST') return route.fallback()
@@ -659,10 +898,61 @@ test('コースの写真は5枚まで。並べ替えと正方形の表示範囲�
   })
   await page.goto(`${base}/restaurant-test/menu/edit`)
   const add = page.getByRole('button', { name: '写真を追加', exact: true })
-  for (const image of images) {
-    await add.click()
-    await page.getByRole('option', { name: `${image.filename} 画像`, exact: true }).click()
+  await add.click()
+  const picker = page.getByRole('dialog', { name: 'コースの写真を選ぶ', exact: true })
+  const upload = page.getByRole('dialog', { name: 'ファイルを入れる', exact: true })
+  const input = upload.locator('input[type="file"]')
+  const imageBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+kvfsAAAAASUVORK5CYII=', 'base64')
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+    await expect(picker.getByRole('checkbox', { name: images[0].filename, exact: true })).toBeVisible()
+    await expect.poll(() => picker.getByText('すべてのフォルダ', { exact: true }).evaluate(label => label.scrollWidth <= label.clientWidth)).toBe(true)
+    await expect(picker.getByRole('button', { name: 'フォルダ', exact: true }).locator('[data-folder-dot]')).toHaveCount(0)
+    if (width === 1440) {
+      expect(await picker.evaluate(panel => [panel.offsetWidth, panel.offsetHeight])).toEqual([960, 804])
+      expect(await picker.getByRole('textbox', { name: '写真の名前' }).evaluate(field => field.offsetWidth)).toBe(208)
+      expect(await picker.getByRole('button', { name: '検索', exact: true }).evaluate(button => button.offsetWidth)).toBe(74)
+    }
+    expect(await picker.getByRole('button', { name: 'ファイルから追加', exact: true }).evaluate(button => button.offsetHeight)).toBe(44)
+    expect(await picker.evaluate(panel => panel.scrollWidth <= panel.clientWidth)).toBe(true)
+    await page.screenshot({ animations: 'disabled', path: testInfo.outputPath(`course-photo-picker-${width}.png`) })
   }
+  await picker.getByRole('button', { name: '次のページ', exact: true }).click()
+  await expect(picker.getByRole('checkbox', { name: images[6].filename, exact: true })).toBeVisible()
+  await picker.getByRole('button', { name: '前のページ', exact: true }).click()
+  await picker.getByRole('button', { name: 'ファイルから追加', exact: true }).click()
+  await input.setInputFiles(images.slice(0, 5).map(({ filename: name }) => ({ name, mimeType: 'image/png', buffer: imageBuffer })))
+  await expect(upload.getByRole('button', { name: '5件を登録する', exact: true })).toBeEnabled()
+  await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('course-photo-upload-five-ready-390.png') })
+  await upload.getByRole('button', { name: '閉じる', exact: true }).click()
+  await page.getByRole('button', { name: '破棄する', exact: true }).click()
+  for (const image of images.slice(0, 3)) {
+    await picker.getByRole('checkbox', { name: image.filename, exact: true }).click()
+  }
+  await picker.getByRole('button', { name: 'ファイルから追加', exact: true }).click()
+  await expect(upload.getByText('2枚まで追加できます', { exact: true })).toBeVisible()
+  await expect(upload.getByRole('button', { name: '0件を登録する', exact: true })).toBeDisabled()
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+    expect(await upload.evaluate(panel => panel.scrollWidth <= panel.clientWidth)).toBe(true)
+    await page.screenshot({ animations: 'disabled', path: testInfo.outputPath(`course-photo-upload-${width}.png`) })
+  }
+  await expect(input).toHaveAttribute('accept', 'image/png,image/jpeg,image/gif,image/webp')
+  await expect(input).toHaveAttribute('multiple', '')
+  await input.setInputFiles(sourceFiles.map(file => ({ name: file.name, mimeType: 'image/png', buffer: imageBuffer })))
+  await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('course-photo-upload-ready-390.png') })
+  await upload.getByRole('button', { name: '2件を登録する', exact: true }).click()
+  await upload.getByRole('button', { name: `「${sourceFiles[1].name}」をもう一度試す`, exact: true }).click()
+  await upload.getByRole('button', { name: '1件を登録する', exact: true }).click()
+  await upload.getByRole('button', { name: '完了', exact: true }).click()
+  expect(attempts).toEqual([sourceFiles[0].id, sourceFiles[1].id, sourceFiles[1].id])
+  for (const file of sourceFiles) {
+    await expect(picker.getByRole('checkbox', { name: file.name, exact: true })).toBeChecked()
+  }
+  await expect(picker).toContainText('登録メディア 3枚 ＋ ファイルから登録 2枚')
+  await expect(picker.getByRole('checkbox', { name: images[3].filename, exact: true })).toBeDisabled()
+  await page.screenshot({ animations: 'disabled', path: testInfo.outputPath('course-photo-picker-mixed-390.png') })
+  await picker.getByRole('button', { name: '5枚を追加', exact: true }).click()
   const gallery = page.getByRole('list', { name: 'コースの写真' })
   const tile = gallery.getByRole('button', { name: /表示範囲を調整/ })
   await expect(tile).toHaveCount(5)
@@ -679,16 +969,14 @@ test('コースの写真は5枚まで。並べ替えと正方形の表示範囲�
       const box = await tile.first().boundingBox()
       return box ? Math.abs(box.width - box.height) : Infinity
     }).toBeLessThan(1)
-    await page.screenshot({ path: testInfo.outputPath(`course-photo-gallery-${width}.png`) })
+    await page.screenshot({ animations: 'disabled', path: testInfo.outputPath(`course-photo-gallery-${width}.png`) })
   }
   await page.getByRole('textbox', { name: 'メニュー名' }).fill('写真付きコース')
   await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
-  await page.getByRole('button', { name: '所要時間', exact: true }).click()
-  await page.getByRole('option', { name: '2時間（120分）', exact: true }).click()
-  await page.locator('[data-guide-balloon="friendAdd:2"]').getByRole('button', { name: '次へ', exact: true }).click()
+  await page.getByRole('spinbutton', { name: '所要時間', exact: true }).fill('120')
   await page.getByRole('button', { name: '保存して追加する', exact: true }).click()
   await expect.poll(() => submitted?.photos).toEqual([
     { mediaId: images[1].id, x: 73, y: 50 }, { mediaId: images[0].id, x: 50, y: 50 },
-    ...images.slice(2).map(image => ({ mediaId: image.id, x: 50, y: 50 })),
+    ...[images[2], ...sourceFiles].map(image => ({ mediaId: image.id, x: 50, y: 50 })),
   ])
 })

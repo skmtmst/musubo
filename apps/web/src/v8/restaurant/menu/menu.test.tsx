@@ -11,7 +11,7 @@ vi.hoisted(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
 })
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), storeContext: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 
@@ -45,6 +45,7 @@ beforeEach(() => {
   role.value = verifiedStaffRole('owner')
   nav.params = new URLSearchParams()
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
+  fixture.storeContext.mockResolvedValue({ data: { selectedStore: null } })
   fixture.createMenu.mockResolvedValue({ success: true })
   fixture.updateMenu.mockResolvedValue({ success: true })
   fetchApi.mockResolvedValue({ success: true })
@@ -357,7 +358,7 @@ describe('mauOC コースの編集ページ', () => {
     await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', name: '冬のコース', price: 7000 })))
   })
 
-  it.each(['draft', 'active'] as const)('コースを%sで保存するとき公開だけでガイドを進める', async status => {
+  it.each(['draft', 'active'] as const)('コースを%sで保存した後に登録の確認を促す', async status => {
     const advance = vi.fn()
     function MenuWithGuide() {
       useGuideSignal('menu.save', true, advance)
@@ -379,7 +380,7 @@ describe('mauOC コースの編集ページ', () => {
     }
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
     expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ status }))
-    expect(advance).toHaveBeenCalledTimes(status === 'active' ? 1 : 0)
+    expect(advance).toHaveBeenCalledOnce()
   })
 
   it('保存に失敗したら入力を残して知らせ、一覧へ戻らない', async () => {
@@ -568,20 +569,27 @@ it('所要時間を編集して保存できる', async () => {
   await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
 })
 
-it('開店準備では所要時間を30分刻みで選び、選択した分数を保存する', async () => {
+it('開店準備で通常の入力欄を使い、必須3項目で下書きを保存する', async () => {
+  const data = snapshotOf()
+  const firstStore = data.stores[0]
+  data.stores = [firstStore, { ...firstStore, id: 'store-2', line_account_id: 'account-1' }]
+  fixture.snapshot.mockResolvedValue({ data })
+  fixture.storeContext.mockResolvedValue({ data: { selectedStore: { id: 'store-2' } } })
   render(<GuideSharedProvider value={{ summary: null, guide: {
     phase: 'active', stepKey: 'friendAdd', procedureIndex: 2, anchor: null, pausedAnchor: null,
     start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
   } }}><MenuEditPage /></GuideSharedProvider>)
-  fireEvent.click(await screen.findByRole('button', { name: '所要時間' }))
-  expect(screen.getByRole('option', { name: '30分', exact: true })).toBeTruthy()
-  expect(screen.getByRole('option', { name: '6時間（360分）' })).toBeTruthy()
-  expect(screen.getAllByRole('option')).toHaveLength(13)
-  fireEvent.click(within(screen.getByRole('option', { name: '2時間30分（150分）' })).getByRole('button'))
+  const duration = await screen.findByRole('spinbutton', { name: '所要時間' })
+  expect(screen.getByRole('button', { name: '保存する状態' }).textContent).toContain('下書き')
   fireEvent.change(screen.getByRole('textbox', { name: 'メニュー名' }), { target: { value: '季節の会席コース' } })
   fireEvent.change(screen.getByRole('spinbutton', { name: '価格（税込）' }), { target: { value: '8800' } })
-  fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+  const save = screen.getByRole('button', { name: '保存して追加する' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  fireEvent.change(duration, { target: { value: '150' } })
+  fireEvent.click(save)
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({
-    kind: 'course', name: '季節の会席コース', price: 8800, durationMinutes: 150,
+    storeId: 'store-2', kind: 'course', name: '季節の会席コース', price: 8800, durationMinutes: 150, status: 'draft',
   })))
+  expect(screen.queryByText('このメニューを公開しますか？')).toBeNull()
+  expect(nav.push).not.toHaveBeenCalled()
 })
