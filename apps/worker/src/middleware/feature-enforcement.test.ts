@@ -49,6 +49,7 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.delete('/api/instagram/connection', handler);
   app.get('/api/instagram/messages', handler);
   app.get('/api/restaurant-test/google/connection', handler);
+  app.get('/api/restaurant-test/google/connections', handler);
   app.post('/api/restaurant-test/google/connect/start', handler);
   app.get('/api/restaurant-test/google/profile', handler);
   app.get('/api/restaurant-test/google/hours/workspace', handler);
@@ -91,6 +92,7 @@ describe('featureEnforcementMiddleware', () => {
     ['POST', '/api/instagram/refresh'],
     ['DELETE', '/api/instagram/connection'],
     ['GET', '/api/restaurant-test/google/connection'],
+    ['GET', '/api/restaurant-test/google/connections'],
     ['POST', '/api/restaurant-test/google/connect/start'],
     ['GET', '/api/restaurant-test/google/profile'],
     ['GET', '/api/restaurant-test/google/hours/workspace'],
@@ -103,8 +105,9 @@ describe('featureEnforcementMiddleware', () => {
     expect(mocks.accountFeatureAvailability).not.toHaveBeenCalled();
   });
 
-  test('Instagram接続一覧の設定扱いはGETの完全一致だけに限定する', () => {
+  test('SNS接続一覧の設定扱いはGETの完全一致だけに限定する', () => {
     expect(routeClassification('/api/instagram/connections', 'GET')).toMatchObject({ kind: 'core' });
+    expect(routeClassification('/api/restaurant-test/google/connections', 'GET')).toMatchObject({ kind: 'core' });
     for (const [path, method] of [
       ['/api/instagram/connections', 'POST'],
       ['/api/instagram/connections', 'DELETE'],
@@ -113,6 +116,14 @@ describe('featureEnforcementMiddleware', () => {
       ['/api/instagram/sync', 'POST'],
     ] as const) {
       expect(routeClassification(path, method)).toEqual({ kind: 'feature', featureId: 'external_integrations' });
+    }
+    for (const [path, method] of [
+      ['/api/restaurant-test/google/connections', 'POST'],
+      ['/api/restaurant-test/google/connections', 'DELETE'],
+      ['/api/restaurant-test/google/connections/extra', 'GET'],
+      ['/api/restaurant-test/google/reviews', 'GET'],
+    ] as const) {
+      expect(routeClassification(path, method)).toEqual({ kind: 'feature', featureId: 'restaurant_test' });
     }
   });
 
