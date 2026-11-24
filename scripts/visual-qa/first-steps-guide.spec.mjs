@@ -80,7 +80,7 @@ test('店舗に初めて入ったときは開店準備から始まる', async ({
 })
 
 test('接続済みなら設定を残してリッチメニューから始められる', async ({ page }) => {
-  await openFixture(page, { initialGuide: { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 } })
+  await openFixture(page, { firstStep: 'richMenu', initialGuide: { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 } })
   await page.goto(base)
   const restart = page.getByRole('button', { name: '最初から始める', exact: true })
   await expect(restart).toBeVisible()
@@ -814,7 +814,8 @@ test('枠がない日は配分を保存済みにせず、枠作成を案内す�
 test('リッチメニューがすでに公開中なら公開案内を飛ばす', async ({ page }, info) => {
   await openFixture(page, {
     initialGuide: { phase: 'active', stepKey: 'scenario', procedureIndex: 2 },
-    storeProgress: { tables: true, hours: true, menus: true, reception: true },
+    storeProgress: { tables: true, hours: true, menus: true, reception: true,
+      bookingExposure: { reservationLink: true, publicReservationMenu: true, availableCapacity: true } },
   })
   await page.route('**/api/rich-menu-groups?**', route => route.fulfill({ json: {
     success: true,

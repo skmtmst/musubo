@@ -532,6 +532,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     // 登録の接続確認は owner/admin のウィザードでのみ使う。
     'GET /api/line-accounts/:id/registration-receipt',
     'GET /api/line-accounts/:id/skipped-deliveries',
+    'GET /api/line-accounts/registration-resume',
     'GET /api/line-webhook-events',
     'GET /api/list-stats',
     'GET /api/login-audit',

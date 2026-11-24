@@ -9,24 +9,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
   重ね表示の対象が無く、案内が消えて先へ進めない。
 */
 
-const nav = vi.hoisted(() => ({ push: vi.fn(), path: '/restaurant-test/tables' }))
+const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), path: '/restaurant-test/tables', query: '', entryReady: true }))
 const state = vi.hoisted(() => ({
-  guide: { phase: 'active' as string, stepKey: 'attributes' as string | null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn() },
+  guide: { phase: 'active' as string, stepKey: 'attributes' as string | null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: vi.fn(), startAt: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn() },
   summary: {
     steps: [
       { key: 'attributes', label: '卓と席を登録する', href: '/restaurant-test/tables', done: false },
       /* 実際の行き先と同じ（first-steps-styles.test.tsx が見張る値）。 */
       { key: 'hours', label: '営業時間を決める', href: '/restaurant-test/google?tab=hours', done: false },
+      { key: 'richMenu', label: 'リッチメニューを選ぶ', href: '/?guide=richMenu', done: false },
     ],
     done: 0,
     total: 9,
   },
 }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: vi.fn() }), usePathname: () => nav.path, useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace }), usePathname: () => nav.path, useSearchParams: () => new URLSearchParams(nav.query) }))
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => ({ selectedAccountId: 'account-1' }) }))
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' } }) }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/line-account-entry', () => ({ isLineAccountEntryReady: () => nav.entryReady, subscribeLineAccountEntry: () => () => {} }))
 vi.mock('@/v8/dashboard/public/first-steps-model/index', () => ({ useFirstSteps: () => ({ status: 'success', guide: state.guide, summary: state.summary }) }))
 /* 重ね表示そのものは guide-overlay-react.test.tsx が見張る。ここは行き先だけ。 */
 vi.mock('./guide-overlay', () => ({ GuideOverlay: () => null }))
@@ -36,7 +38,12 @@ import { GuideHost } from './guide-host'
 
 beforeEach(() => {
   nav.push.mockClear()
+  nav.replace.mockClear()
+  state.guide.startAt.mockClear()
+  state.guide.resume.mockClear()
   nav.path = '/restaurant-test/tables'
+  nav.query = ''
+  nav.entryReady = true
   state.guide = { ...state.guide, phase: 'active', stepKey: 'attributes', procedureIndex: 1 }
   localStorage.setItem(guideEngineStorageKey('account-1'), JSON.stringify({ phase: 'active', stepKey: 'attributes', procedureIndex: 1 }))
 })
@@ -55,6 +62,7 @@ describe('案内の入れ物が段の画面へ移る', () => {
   it('接続済みの場合も営業時間の画面で進行する', () => {
     const view = render(<GuideHost><p>中身</p></GuideHost>)
     nav.path = '/restaurant-test/google'
+    nav.query = 'tab=hours&mode=weekly&date=2026-11-24'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).not.toHaveBeenCalled()
@@ -69,6 +77,7 @@ describe('案内の入れ物が段の画面へ移る', () => {
 
   it('1/2から2/2へ進むときは同じ営業時間の画面に留まる', () => {
     nav.path = '/restaurant-test/google'
+    nav.query = 'tab=hours'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     const view = render(<GuideHost><p>中身</p></GuideHost>)
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 2 }
@@ -97,9 +106,28 @@ describe('案内の入れ物が段の画面へ移る', () => {
   it('すでにその画面にいる時は移らない', () => {
     const view = render(<GuideHost><p>中身</p></GuideHost>)
     nav.path = '/restaurant-test/google'
+    nav.query = 'tab=hours'
     state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).not.toHaveBeenCalled()
+  })
+
+  it('Googleビジネスで別のタブを表示中なら営業時間タブを開く', () => {
+    nav.path = '/restaurant-test/google'
+    nav.query = 'tab=reviews'
+    state.guide = { ...state.guide, stepKey: 'hours', procedureIndex: 2 }
+    render(<GuideHost><p>中身</p></GuideHost>)
+    expect(nav.push).toHaveBeenCalledWith('/restaurant-test/google?tab=hours')
+  })
+
+  it('共通の入口は同じ段の一時停止から再開し、手順を最初に戻さない', () => {
+    nav.path = '/'
+    nav.query = 'guide=richMenu'
+    state.guide = { ...state.guide, phase: 'paused', stepKey: 'richMenu' }
+    render(<GuideHost><p>中身</p></GuideHost>)
+    expect(state.guide.resume).toHaveBeenCalledOnce()
+    expect(state.guide.startAt).not.toHaveBeenCalled()
+    expect(nav.replace).toHaveBeenCalledWith('/')
   })
 
   it('一時停止中は移らない', () => {
@@ -107,5 +135,15 @@ describe('案内の入れ物が段の画面へ移る', () => {
     state.guide = { ...state.guide, phase: 'paused', stepKey: 'hours', procedureIndex: 1 }
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).not.toHaveBeenCalled()
+  })
+
+  it('登録状態の照合が済んでから案内する', () => {
+    nav.path = '/'
+    nav.entryReady = false
+    const view = render(<GuideHost><p>中身</p></GuideHost>)
+    expect(nav.push).not.toHaveBeenCalled()
+    nav.entryReady = true
+    view.rerender(<GuideHost><p>中身</p></GuideHost>)
+    expect(nav.push).toHaveBeenCalledWith('/restaurant-test/tables')
   })
 })

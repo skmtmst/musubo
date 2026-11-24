@@ -12,7 +12,7 @@ import styles from './register.module.css'
 
 /** 登録完了と友だちの引き継ぎ。保存処理は親が持つ。 */
 export default function Step5Completion({ connection, accountName, createdId, importRunning, importFriends, importState, handover, idleSeconds, requestError, onRefresh, refreshing = false }: {
-  connection: LineAccountConnectData; accountName: string; createdId: string; importRunning: boolean; importFriends: boolean
+  connection: Pick<LineAccountConnectData, 'displayName' | 'basicId' | 'followerImport' | 'remainingActions' | 'verification'>; accountName: string; createdId: string; importRunning: boolean; importFriends: boolean
   importState: FollowerImportState | null; handover: HandoverProgress; idleSeconds: number; requestError: boolean
   onRefresh?: () => void; refreshing?: boolean
 }) {

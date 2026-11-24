@@ -16,12 +16,15 @@ import { InitialMenuChoice, InitialMenuPhone, type InitialMenuSelection } from '
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 export default function InitialMenuPage() {
- usePageTitle('最初のリッチメニューを選ぶ')
  const saveErrors=useSaveFormErrors()
  const {selectedAccountId}=useAccount(),role=useStaffRole(),router=useRouter()
  const profile=useAccountStyle(selectedAccountId)
+ const styleReady=profile.status==='ready'&&!profile.stale&&Boolean(profile.data?.styleSelected)
+ const useRestaurantGuide=styleReady&&profile.data?.style==='restaurant'
+ usePageTitle(styleReady&&!useRestaurantGuide?'最初のリッチメニューを選ぶ':'リッチメニュー')
  const [choice,setChoice]=useState<InitialMenuSelection>({value:'simple'}),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[dirty,setDirty]=useState(false)
  useEffect(()=>{setChoice({value:'simple'});setDirty(false);setError(null)},[selectedAccountId])
+ useEffect(()=>{if(useRestaurantGuide)router.replace('/?guide=richMenu')},[router,useRestaurantGuide])
  const allowed=canManageRole(role),style=profile.data?.style??'standard'
  const save=async()=>{
   if(!allowed||!selectedAccountId||!profile.data?.styleSelected||profile.stale||busy)return
@@ -39,9 +42,11 @@ export default function InitialMenuPage() {
    accountStyleUpdated(account);setDirty(false);router.push('/getting-started')
   }catch(error){if(!saveErrors.capture(error))setError(describeApiFailure(error,'保存'))}finally{setBusy(false)}
  }
+ if(profile.status==='error'||profile.stale)return <ListState kind="error" title="使い方を読み込めませんでした" error={profile.error} onRetry={profile.reload}/>
+ if(!selectedAccountId||profile.status!=='ready'||useRestaurantGuide)return <ListState kind="loading" title="使い方を確認しています"/>
+ if(!styleReady)return <Notice tone="info">使い方のスタイルを先に選んでください。<Button href="/?setup=0&setupReturn=accounts">使い方を選ぶ</Button></Notice>
  return <SaveErrorScope errors={saveErrors}><CreatePage title="最初のリッチメニューを選ぶ" help="画像とボタンの行き先がセットで入ります。あとから変更できます。" dirty={dirty} busy={busy} readOnly={!allowed} contentDisabled={!allowed||busy} bodyEndActions={<><Button href="/form-submissions">ページの内容を直す</Button><Button href="/rich-menus">LINEに出す前に確認する</Button></>} preview={choice.value==='simple'?<InitialMenuPhone style={style}/>:undefined} previewLabel="お客さまの見え方" footerActions={<><Button onClick={()=>router.push('/getting-started')} disabled={busy}>キャンセル</Button><Button variant="primary" onClick={()=>void save()} busy={busy} disabled={!allowed||profile.status!=='ready'||profile.stale||!profile.data?.styleSelected||(choice.value==='existing'&&!choice.resourceId)} disabledReason={!allowed?'オーナー・管理者が設定できます':null}>このメニューで進む</Button></>}>
-  {profile.status==='ready'&&!profile.data?.styleSelected?<Notice tone="info">使い方のスタイルを先に選んでください。<Button href="/">ダッシュボードを開く</Button></Notice>:null}
   {error?<Notice tone="danger">{String(error)}</Notice>:null}
-  {profile.status==='error'?<ListState kind="error" title="使い方を読み込めませんでした" error={profile.error} onRetry={profile.reload}/>:profile.status!=='ready'||!selectedAccountId?<ListState kind="loading" title="使い方を確認しています"/>:<InitialMenuChoice accountId={selectedAccountId} style={style} value={choice} onChange={next=>{setChoice(next);setDirty(true)}} disabled={!allowed||busy} disabledReason={!allowed?'オーナー・管理者が設定できます':'保存中は変更できません'}/>}
+  <InitialMenuChoice accountId={selectedAccountId} style={style} value={choice} onChange={next=>{setChoice(next);setDirty(true)}} disabled={!allowed||busy} disabledReason={!allowed?'オーナー・管理者が設定できます':'保存中は変更できません'}/>
  </CreatePage></SaveErrorScope>
 }

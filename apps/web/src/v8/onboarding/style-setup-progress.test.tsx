@@ -153,3 +153,13 @@ it('破損した予約フォームの修復案内を、選んだ店舗のダッ�
  net.restaurantProgress.mockResolvedValue({success:true,data:{storeId:'another',tables:true,hours:true,menus:true,reception:true,followup:true,reservationForm:{available:false,message,repairPath:'/other'}}});
  expect((await loadStyleSetupProgress('a','restaurant','store')).notices).toBeUndefined();
 });
+
+it('他のLINEに紐づく唯一の現役店や古い応答から飲食店の進捗を読まない', async () => {
+  net.snapshot.mockResolvedValue({ success: true, data: { stores: [{ id: 'other-store', line_account_id: 'b', status: 'active' }] } });
+  net.context.mockResolvedValue({ success: true, data: { selectedStore: null } });
+  expect((await loadStyleSetupProgress('a', 'restaurant')).steps.attributes?.complete).toBeNull();
+  expect(net.restaurantProgress).not.toHaveBeenCalled();
+
+  net.restaurantProgress.mockResolvedValue({ success: true, data: { storeId: 'store', lineAccountId: 'b', tables: true, hours: true, menus: true, reception: true, followup: true } });
+  expect((await loadStyleSetupProgress('a', 'restaurant', 'store')).steps.attributes?.complete).toBeNull();
+});

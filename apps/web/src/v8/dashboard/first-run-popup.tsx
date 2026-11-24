@@ -75,7 +75,7 @@ export function useFirstRunPopup(options: {
   const reopen = useCallback(() => { setReopened(true) }, [])
   useSetupChipReopen(reopen)
 
-  const open = eligible && guidePhase !== 'active' && guidePhase !== 'paused' && (reopened || !dismissed)
+  const open = eligible && (guidePhase === 'idle' || guidePhase === 'done') && (reopened || !dismissed)
 
   const close = useCallback(() => {
     setReopened(false)

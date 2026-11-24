@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from 'vitest'
-import { clampProcedureIndex, guideAnchor, guideEngineStorageKey, guideStateFromServer, nextGuideEngineState, nextGuidedStepKey, readGuideEngineState, writeGuideEngineState, type GuideSummary } from './guide-engine'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clampProcedureIndex, guideAnchor, guideEngineStorageKey, guideStateFromServer, nextGuideEngineState, nextGuidedStepKey, readGuideEngineState, useGuideEngine, writeGuideEngineState, type GuideSummary } from './guide-engine'
+
+const server = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
+vi.mock('@/lib/api', () => ({ api: { gettingStarted: { guide: server } } }))
 
 const summary = (overrides: Partial<GuideSummary> = {}): GuideSummary => ({
   steps: [
@@ -14,6 +18,7 @@ const summary = (overrides: Partial<GuideSummary> = {}): GuideSummary => ({
 const idle = { phase: 'idle' as const, stepKey: null, procedureIndex: 1 }
 
 beforeEach(() => { window.localStorage.clear() })
+afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 describe('ガイドの行き先', () => {
   it('まだで行き先が実在する最初の段だけを案内する', () => {
@@ -109,6 +114,21 @@ describe('ガイドの状態保存', () => {
     expect(readGuideEngineState('account-1')).toEqual({ phase: 'paused', stepKey: 'richMenu', procedureIndex: 2 })
     expect(readGuideEngineState('account-2')).toEqual(idle)
     expect(readGuideEngineState(null)).toEqual(idle)
+  })
+
+  it('サーバーが完了を確認するまで同じ担当者の一時停止を保ち、成功後だけ完了にする', async () => {
+    const paused = { phase: 'paused' as const, stepKey: 'firstMessage', procedureIndex: 1 }
+    server.get.mockResolvedValue({ success: true, data: paused })
+    server.save.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ success: true })
+    const { result } = renderHook(() => useGuideEngine('account-1', summary({ done: 3 }), true, 'staff-1'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { expect(await result.current.complete()).toBe(false) })
+    expect(result.current.phase).toBe('paused')
+    expect(readGuideEngineState('account-1', 'staff-1')).toEqual(paused)
+    expect(readGuideEngineState('account-1', 'staff-2')).toEqual(idle)
+    await act(async () => { expect(await result.current.complete()).toBe(true) })
+    expect(result.current.phase).toBe('done')
+    expect(readGuideEngineState('account-1', 'staff-1').phase).toBe('done')
   })
 
   it('壊れた記録は案内を始めていない状態として扱う', () => {

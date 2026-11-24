@@ -26,7 +26,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHi
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
-import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
+import { lineRegistration } from './line-registration.js';
 import { issuedLineTokenExpiry, issueLineAccessToken, LineTokenIssueError, type TokenResponse } from '../services/token-refresh.js';
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
@@ -495,13 +495,7 @@ lineAccounts.get(
   },
 );
 
-// 登録アカウントの署名付き受信記録だけで、設定の完了を確認する。
-lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
-  c.header('Cache-Control', 'no-store');
-  const account = await getAuthorizedLineAccount(c, c.req.param('id'));
-  if (!account || account.archived_at) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
-  return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
-});
+lineAccounts.route('/', lineRegistration);
 
 // GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
@@ -574,14 +568,6 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 });
 
 // 既存友だちの移行は、明示的な一度限りのジョブとして保存する。D1 のカーソルを正本とし、ブラウザを閉じても cron が同じロックで継続する。1ページで止めず、時間と問い合わせ予算の範囲で進める。
-lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
-  const id = c.req.param('id')!;
-  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
-    return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
-  }
-  const state = await getFollowerImportState(c.env.DB, id);
-  return c.json({ success: true, data: state });
-});
 
 lineAccounts.post(
   '/api/line-accounts/:id/follower-import/detect',
@@ -635,9 +621,8 @@ lineAccounts.post(
   inputJsonBoundary(), async (c) => {
     const account = await getAuthorizedLineAccount(c, c.req.param('id')!);
     if (!account) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
-    if (account.archived_at) {
-      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
-    }
+    if (account.archived_at) return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    if (!account.is_active) return fail(c, 409, 'LINEアカウントが停止中です。', { code: 'LINE_ACCOUNT_INACTIVE' });
     const client = new LineClient(account.channel_access_token);
     /* 画面を閉じられても、この 1 回ぶんは走り切らせる。途中で切られると進んだ分は
      * D1 に残るがロックだけ取られた状態になり、続きを拾えるまで待たされる。 */

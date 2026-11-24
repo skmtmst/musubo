@@ -20,6 +20,7 @@ export async function getLineRegistrationReceipt(
         JOIN line_accounts account ON account.id = e.line_account_id
        WHERE e.line_account_id = ? AND e.event_type = 'follow'
          AND e.status = 'succeeded'
+         AND account.is_active = 1 AND account.archived_at IS NULL
          AND e.received_at >= substr(account.created_at, 1, 23)
       UNION ALL
       SELECT m.created_at AS received_at
@@ -29,6 +30,7 @@ export async function getLineRegistrationReceipt(
         JOIN line_accounts account ON account.id = m.line_account_id
        WHERE m.line_account_id = ? AND m.direction = 'incoming'
          AND m.source = 'user' AND m.line_message_id IS NOT NULL
+         AND account.is_active = 1 AND account.archived_at IS NULL
          AND m.line_message_account_key = 'account:' || m.line_account_id
          AND m.created_at >= account.created_at
     ) ORDER BY received_at DESC LIMIT 1
@@ -39,6 +41,7 @@ export async function getLineRegistrationReceipt(
     SELECT 1 AS failed FROM line_webhook_events e
     JOIN line_accounts account ON account.id = e.line_account_id
     WHERE e.line_account_id = ? AND e.event_type IN ('follow', 'message')
+      AND account.is_active = 1 AND account.archived_at IS NULL
       AND (e.status = 'failed' OR (
         e.event_type = 'follow' AND e.status = 'succeeded'
         AND NOT EXISTS (
