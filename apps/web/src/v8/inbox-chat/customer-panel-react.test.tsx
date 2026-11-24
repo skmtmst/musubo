@@ -15,11 +15,10 @@ const render = async (wide: boolean, open = true) => {
       lineContent={<><p>選んだ相手の情報</p><input aria-label="編集中の顧客メモ" defaultValue="" /></>}
       showFriendInfo={open}
       selectedChatId="chat-a"
-      selectedThreadId={null}
+      selectedEmail={null}
       wideInfoPanel={wide}
       setShowFriendInfo={onChange}
       customerPanelRef={panelRef}
-      emailItems={[]}
     />)
   })
 }

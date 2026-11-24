@@ -37,9 +37,9 @@ export default function ConversationHead({
   /** 狭い幅で一覧へ戻る */
   onBack?: () => void
   attention?: { on: boolean; saving: boolean; onToggle: () => void; lockedReason?: string; disabled?: boolean }
-  /** 担当。担当を持たない会話（店舗のメール）では渡さず、欄ごと出さない。 */
-  operator?: { value: string; operators: OperatorOption[]; onChange: (next: string) => void }
-  status?: { value: HeadStatus; onChange: (next: HeadStatus) => void }
+  /** 担当。担当を持たない会話（店舗のメール）では渡さず、欄ごと出さない。変えられない人には lockedReason を渡して灰色にする。 */
+  operator?: { value: string; operators: OperatorOption[]; onChange: (next: string) => void; lockedReason?: string }
+  status?: { value: HeadStatus; onChange: (next: HeadStatus) => void; lockedReason?: string }
   search?: { open: boolean; onToggle: () => void }
   panel?: { open: boolean; onToggle: () => void }
   /** 頭の右端の前に足すもの（あれば） */
@@ -73,7 +73,7 @@ export default function ConversationHead({
         </div>
       </div>
       <div className={styles.cheadTools}>
-        {operator ? <HeadOperatorMenu compact={compact} value={operator.value} operators={operator.operators} onChange={operator.onChange} /> : null}
+        {operator ? <HeadOperatorMenu compact={compact} value={operator.value} operators={operator.operators} onChange={operator.onChange} lockedReason={operator.lockedReason} /> : null}
         {attention && !foldAttention ? (
           <IconButton
             variant="plain"
@@ -88,7 +88,7 @@ export default function ConversationHead({
             <Star aria-hidden="true" />
           </IconButton>
         ) : null}
-        {status ? <HeadStatusMenu value={status.value} onChange={status.onChange} /> : null}
+        {status ? <HeadStatusMenu value={status.value} onChange={status.onChange} lockedReason={status.lockedReason} /> : null}
         {extra}
         {search ? <IconButton variant="plain" aria-label="会話の中を探す" title="検索" aria-expanded={search.open} onClick={search.onToggle}><Search aria-hidden="true" /></IconButton> : null}
         {attention && foldAttention ? <><IconButton ref={moreRef} variant="plain" aria-label="その他の操作" aria-expanded={moreOpen} onClick={() => setMoreOpen(now => !now)}><MoreHorizontal aria-hidden="true" /></IconButton><ActionMenu open={moreOpen} anchorRef={moreRef} ariaLabel="その他の操作" onClose={() => setMoreOpen(false)} items={[{ id: 'attention', label: attention.on ? '注目から外す' : '注目にする', disabled: attention.saving || attention.disabled, lockedReason: attention.lockedReason, onSelect: () => { setMoreOpen(false); attention.onToggle() } }]} /></> : null}

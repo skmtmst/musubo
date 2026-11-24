@@ -23,8 +23,9 @@ export function InboxListEmpty({ filtered, onClear, channel = 'all' }: { filtere
   )
 }
 
-export type InboxSource = 'line' | 'email'
-const SOURCE_NAME: Record<InboxSource, string> = { line: 'LINE の会話', email: 'メール' }
+/** 一覧の出どころ。メールは共通と店舗の両方を出しているときだけ経路まで分けて言う。 */
+export type InboxSource = 'line' | 'email' | 'shared-email' | 'store-email'
+const SOURCE_NAME: Record<InboxSource, string> = { line: 'LINE の会話', email: 'メール', 'shared-email': '共通メール', 'store-email': '店舗メール' }
 
 /** 読めなかった物と、読めている物を 1 つの文にする。 */
 export function inboxFailureText(failed: readonly InboxSource[], shown: readonly InboxSource[]): string | null {

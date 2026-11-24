@@ -24,12 +24,14 @@ import { Suspense,useCallback,useEffect,useRef,useState } from 'react';
 import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,inboxSortFromParam,resolveInboxChannel,statusFilters,type OldestAttentionTarget } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
+import { EMAIL_SOURCE_URL_KEY, emailKey, type EmailRef } from './email-sources';
 import InboxCustomerPanel from './inbox-customer-panel';
 import InboxList from './inbox-list-view';
 import { savedViewFailureMessage } from './saved-view-failure';
 import { useInboxActions } from './use-inbox-actions';
 import { useInboxConversation } from './use-inbox-conversation';
 import { useInboxDraft } from './use-inbox-draft';
+import { useInboxEmails } from './use-inbox-emails';
 import { useInboxLists } from './use-inbox-lists';
 import { useInboxSavedViews } from './use-inbox-saved-views';
 import { useInboxSchedule } from './use-inbox-schedule';
@@ -46,7 +48,7 @@ const CHAT_PAGE_SIZE = 200
 const EMAIL_PAGE_SIZE = 200
 const CHAT_MESSAGE_PAGE_SIZE = 100
 
-function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { channel: 'all' | 'line' | 'email'; emailInboxEnabled: boolean; storeEmailAccountId: string | null }) {
+function ChatsPageInner({ channel, emailInboxEnabled, sharedEmailEnabled, storeEmailAccountId }: { channel: 'all' | 'line' | 'email'; emailInboxEnabled: boolean; sharedEmailEnabled: boolean; storeEmailAccountId: string | null }) {
 
   const saveErrors = useSaveFormErrors()
 
@@ -58,19 +60,19 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
 
   const { selectedAccountId, loading: accountsLoading } = useAccount()
 
-  // 中央ペインで開いているメール。LINEのトークと排他。
-  const emailScope = selectedAccountId + (storeEmailAccountId ? ':store' : ':shared')
-  const [selectedEmail, setSelectedEmail] = useState<{ id: string; scope: string } | null>(null)
-  const selectedThreadId = selectedEmail?.scope === emailScope ? selectedEmail.id : null
-  const setSelectedThreadId = useCallback((update: React.SetStateAction<string | null>) => {
-    setSelectedEmail(previous => {
-      const current = previous?.scope === emailScope ? previous.id : null
-      const id = typeof update === 'function' ? update(current) : update
-      return id ? { id, scope: emailScope } : null
-    })
-  }, [emailScope])
-  // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
-  const visibleThreadId = emailInboxEnabled && channel !== 'line' ? selectedThreadId : null
+  /*
+   * 中央ペインで開いているメール。LINEのトークと排他。経路（共通／店舗）と会話IDの組で持ち、
+   * 選んだときのアカウントに結ぶ。切替直後の1描画でも、前のアカウントや、つながっていない経路の会話を出さない。
+   */
+  const emailAccountScope = selectedAccountId ?? ''
+  const [selectedEmailState, setSelectedEmailState] = useState<{ ref: EmailRef; scope: string } | null>(null)
+  const selectedEmail = selectedEmailState?.scope === emailAccountScope ? selectedEmailState.ref : null
+  const setSelectedEmail = useCallback((ref: EmailRef | null) => {
+    setSelectedEmailState(ref ? { ref, scope: emailAccountScope } : null)
+  }, [emailAccountScope])
+  const visibleEmail = selectedEmail && channel !== 'line'
+    && (selectedEmail.source === 'store' ? Boolean(storeEmailAccountId) : sharedEmailEnabled)
+    ? selectedEmail : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const visibleChatId = channel === 'email' ? null : selectedChatId
@@ -234,10 +236,6 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
   const {
     chats,
     setChats,
-    emailItems,
-    setEmailItems,
-    emailError,
-    emailLoading,
     debouncedNameQuery,
     setDebouncedNameQuery,
     statusFilterRef,
@@ -251,20 +249,13 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
     setSlaReload,
     listFilterKey,
     chatListCompletedKey,
-    emailListCompletedKey,
-    loadingMoreEmails,
-    hasMoreEmails,
-    loadEmails,
     loadChats,
     loadMoreChats,
     loadChatsQuietly,
   } = useInboxLists({
     CHAT_PAGE_SIZE,
-    EMAIL_PAGE_SIZE,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: emailInboxEnabled && channel !== 'line',
-    storeEmailAccountId,
     statusFilter,
     assigneeFilter,
     unreadOnly,
@@ -273,11 +264,39 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
     setError,
   })
 
+  /* メールは共通と店舗を、LINE と同じ条件で経路ごとに読む。件数の口も同じ条件で数える。 */
+  const {
+    emailItems,
+    allEmailItems,
+    emailLoaded,
+    emailLoading,
+    hasMoreEmails,
+    loadingMoreEmails,
+    shownEmailSources,
+    failedEmailSources,
+    loadMoreEmails,
+    retryEmails,
+    markEmailRead,
+    findEmail,
+  } = useInboxEmails({
+    selectedAccountId,
+    enabled: channel !== 'line',
+    sharedEnabled: sharedEmailEnabled,
+    storeAccountId: storeEmailAccountId,
+    statusFilter,
+    nameQuery: debouncedNameQuery,
+    assigneeFilter,
+    unreadOnly,
+    quickFilter,
+    sort: sortOrder,
+    pageSize: EMAIL_PAGE_SIZE,
+  })
+
   // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
   const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
 
   const currentFilterNotLoaded = (channel !== 'email' && chatListCompletedKey !== listFilterKey)
-    || (channel !== 'line' && emailListCompletedKey !== listFilterKey)
+    || (channel !== 'line' && !emailLoaded)
 
   const inboxListLoading = nameQueryPending
     || currentFilterNotLoaded
@@ -285,7 +304,7 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
   const inboxListRefreshing = !inboxListLoading && ((channel !== 'email' && loading) || (channel !== 'line' && emailLoading))
 
   const inboxListFailed = (channel !== 'email' && chatListFailed)
-    || (channel !== 'line' && Boolean(emailError))
+    || (channel !== 'line' && failedEmailSources.length > 0)
 
   const {
     scheduledSends,
@@ -465,17 +484,18 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
   }
   const { inlineInfoPanel, narrowDesktop, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef } = useInboxPanel()
   const [narrowList, setNarrowList] = useState(true)
-  const previousSelection = useRef({ account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId })
+  const selectedEmailKey = selectedEmail ? emailKey(selectedEmail) : null
+  const previousSelection = useRef({ account: selectedAccountId, chat: selectedChatId, email: selectedEmailKey })
   const narrowFocus = useRef<'back' | 'row' | null>(null)
   const narrowBackRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     const previous = previousSelection.current
-    previousSelection.current = { account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId }
+    previousSelection.current = { account: selectedAccountId, chat: selectedChatId, email: selectedEmailKey }
     if (previous.account !== selectedAccountId) setNarrowList(true)
-    else if (previous.chat !== selectedChatId || previous.thread !== selectedThreadId) {
-      setNarrowList(!(selectedChatId || selectedThreadId))
+    else if (previous.chat !== selectedChatId || previous.email !== selectedEmailKey) {
+      setNarrowList(!(selectedChatId || selectedEmailKey))
     }
-  }, [selectedAccountId, selectedChatId, selectedThreadId])
+  }, [selectedAccountId, selectedChatId, selectedEmailKey])
   const {
     deepLinkNotice,
     setDeepLinkNotice,
@@ -485,16 +505,17 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
   } = useInboxDeepLink({
     params,
     setSelectedChatId,
-    setSelectedThreadId,
+    setSelectedEmail,
     accountsLoading,
-    emailInboxEnabled,
+    sharedEmailEnabled,
+    storeEmailEnabled: Boolean(storeEmailAccountId),
     selectedAccountId,
     router,
     channel,
     savedViewParam,
   })
 
-  const narrowMode = narrowDesktop ? (deepLinkNotice ? 'detail' : narrowList || !(visibleChatId || visibleThreadId) ? 'list' : 'detail') : undefined
+  const narrowMode = narrowDesktop ? (deepLinkNotice ? 'detail' : narrowList || !(visibleChatId || visibleEmail) ? 'list' : 'detail') : undefined
   useEffect(() => {
     if (!narrowMode) narrowFocus.current = null
     if (narrowMode === 'detail' && narrowFocus.current === 'back') {
@@ -513,6 +534,7 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
     query.delete('friend')
     query.delete('friendId')
     query.delete('thread')
+    query.delete(EMAIL_SOURCE_URL_KEY)
     const suffix = query.toString()
     router.replace(suffix ? `/chats?${suffix}` : '/chats')
   }
@@ -544,13 +566,13 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
      * メールを一度開くと、以後どのトークも開けなくなっていた。
      * メール側は逆にLINEの選択を外していたので、片側だけ抜けていた。
      */
-    setSelectedThreadId(null)
+    setSelectedEmail(null)
     // 下書きは会話ごとの預かりに移した(#962 F06)。ここで消すと、
     // 切り替えただけで書きかけが消える。預け・戻しは上の効果が担う。
   }
 
-  // メールの行（一覧）と中央の行き先（ID27）で共用する開き方。
-  const handleSelectEmail = (threadId: string) => {
+  // メールの行（一覧）と中央の行き先（ID27）で共用する開き方。既読はそのメールが届いた経路の口へだけ知らせる。
+  const handleSelectEmail = (ref: EmailRef) => {
     setNarrowList(false)
     if (narrowDesktop) { if (narrowMode === 'list') narrowFocus.current = 'back'; setShowFriendInfo(true) }
     // LINEの選択を外す。両方開いていると中央に何を
@@ -560,16 +582,18 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(null)
-    setSelectedThreadId(threadId)
+    setSelectedEmail(ref)
     clearConversationParams()
     if (staffRole === 'viewer') return
-    setEmailItems((prev) => prev.map((email) => (
-      email.threadId === threadId ? { ...email, isUnread: false } : email
-    )))
-    const marked = storeEmailAccountId
-      ? api.accountEmail.markRead(storeEmailAccountId, threadId)
-      : fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' })
-    void marked.catch(() => undefined)
+    if (ref.source === 'store') {
+      // 店舗のメールは店舗の口だけ。つながっていない間は共通の口へ回さない。
+      if (!storeEmailAccountId) return
+      markEmailRead(ref)
+      void api.accountEmail.markRead(storeEmailAccountId, ref.threadId).catch(() => undefined)
+      return
+    }
+    markEmailRead(ref)
+    void fetchApi(`/api/support/email/threads/${encodeURIComponent(ref.threadId)}/read`, { method: 'POST' }).catch(() => undefined)
   }
 
   // 未選択の中央の「いちばん古い会話を開く」（ID27）。一覧の行を押した時と同じ開き方。
@@ -578,7 +602,7 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
       handleSelectChat(target.id)
       return
     }
-    handleSelectEmail(target.threadId)
+    handleSelectEmail({ source: target.source, threadId: target.threadId })
   }
 
   const {
@@ -772,7 +796,7 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
     detailAccountRef.current = selectedAccountId
     detailRequestIdRef.current += 1
     setSelectedChatId(null)
-    setSelectedThreadId(null)
+    setSelectedEmailState(null)
     setChatDetail(null)
     setDetailLoading(false)
     setAttentionSaving(false)
@@ -821,7 +845,7 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
       {savedViewNotice ? <Notice tone="info" message={savedViewNotice} /> : null}
       <InboxPage elementRef={panesRef} boardId="eovoG" composed narrowMode={narrowMode} narrowBack={<Button ref={narrowBackRef} onClick={() => { narrowFocus.current = 'row'; if (deepLinkNotice) clearDeepLink(); setNarrowList(true) }}>‹ 一覧を表示</Button>}>
         <InboxList {...{
-          unreadOnly, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
+          unreadOnly, selectedChatId: visibleChatId, selectedEmail: visibleEmail, setFilterOpen, filterOpen, setSavedViewsOpen,
           setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
           savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
           savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
@@ -829,14 +853,14 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
           setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
           assigneeUnread, listScrollRef,
-          emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
+          shownEmailSources, failedEmailSources, retryEmails, chatListFailed, loadChats, emailItems, chats,
           handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
-          clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
+          clearInboxFilters, loadingMore, loadMoreChats, loadMoreEmails, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
         <InboxConversation {...{
-          operators, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, storeEmailAccountId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
-          loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
+          operators, selectedChatId: visibleChatId, selectedEmail: visibleEmail, storeEmailAccountId, setSelectedEmail, showFriendInfo, setShowFriendInfo,
+          deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
           openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef,
           messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage,
@@ -852,18 +876,18 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
           imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
-          overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
+          overdueTotal, chats, emailItems: allEmailItems, onOpenAttentionTarget: openAttentionTarget,
         }} />
 
         <InboxCustomerPanel
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
           selectedChatId={visibleChatId}
-          selectedThreadId={visibleThreadId}
+          selectedEmail={visibleEmail}
+          selectedEmailItem={findEmail(visibleEmail)}
           wideInfoPanel={inlineInfoPanel}
           setShowFriendInfo={setShowFriendInfo}
           customerPanelRef={customerPanelRef}
-          emailItems={emailItems}
 
         />
       </InboxPage>
@@ -874,8 +898,13 @@ function ChatsPageInner({ channel, emailInboxEnabled, storeEmailAccountId }: { c
 function ChatsPageHost() {
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading } = useAccount()
+  /*
+   * 共通（既存の共通窓口）と店舗（このアカウントの転送用アドレス）は別々の設定。両方が有効なら両方を出す。
+   * 共通は共通を出すアカウント（アカウントを選んでいない時は従来どおり）だけ。新規アカウントには出さない。
+   */
+  const sharedEmailEnabled = !loading && (!selectedAccountId || selectedAccount?.emailInboxEnabled === true)
   const storeEmailAccountId = !loading && selectedAccount?.accountEmailInboxEnabled ? selectedAccountId : null
-  const emailInboxEnabled = !loading && (!selectedAccountId || Boolean(storeEmailAccountId) || selectedAccount?.emailInboxEnabled === true)
+  const emailInboxEnabled = sharedEmailEnabled || Boolean(storeEmailAccountId)
   const channel = resolveInboxChannel(params.get('channel'), emailInboxEnabled)
 
   return (
@@ -887,7 +916,7 @@ function ChatsPageHost() {
         2か所で探すことになっていた。設計 `V2 2-1 受信箱` の一覧も
         「✉ 定期便の解約について」のように1本に混ざっている。
       */}
-      <ChatsPageInner channel={channel} emailInboxEnabled={emailInboxEnabled} storeEmailAccountId={storeEmailAccountId} />
+      <ChatsPageInner channel={channel} emailInboxEnabled={emailInboxEnabled} sharedEmailEnabled={sharedEmailEnabled} storeEmailAccountId={storeEmailAccountId} />
 
     </div>
   )
