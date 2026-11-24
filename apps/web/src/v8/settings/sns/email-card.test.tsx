@@ -83,10 +83,10 @@ it.each([
   ['未接続', 'disconnected', {}],
   ['接続済み', 'connected', { address: 'inbox-fixture@example.org', mailbox: 'shop@example.org', connectionId: 'connection-a' }],
   ['接続切れ', 'revoked', {}],
-] as const)('%sのメールの枠は、受信箱と同じ言葉で返信が準備中であることと返信の経路を伝える', async (_label, status, extra) => {
+] as const)('%sのメールの枠は、受信箱と同じ言葉で受信専用であることと返信の経路を伝える', async (_label, status, extra) => {
   fixture.connection.mockResolvedValue(response(status, extra))
   render(<EmailConnectionCard accountId="store-a" canManage lockedReason="" />)
-  expect(await screen.findByText('このメールアドレスからの返信は準備中です。返信は共通メールか LINE から')).toBeTruthy()
+  expect(await screen.findByText('転送メールは受信専用です。返信は共通メールか LINE から')).toBeTruthy()
   expect(screen.queryByText(/お店のメールソフト/)).toBeNull()
 })
 

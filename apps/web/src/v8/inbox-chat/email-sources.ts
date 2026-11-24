@@ -1,4 +1,4 @@
-import { ACCOUNT_EMAIL_REPLY_PREPARING } from '@/lib/status-labels'
+import { ACCOUNT_EMAIL_RECEIVE_ONLY_NOTE } from '@/lib/status-labels'
 
 /**
  * 受信箱のメールが届いた経路。
@@ -30,7 +30,7 @@ export function emailSourceFromParam(value: string | null | undefined): EmailSou
 }
 
 /** 店舗の会話の返信欄を押せない形にするときの吹き出し。設定のメールの枠と同じ言葉。 */
-export const STORE_EMAIL_REPLY_LOCK_REASON = ACCOUNT_EMAIL_REPLY_PREPARING
+export const STORE_EMAIL_REPLY_LOCK_REASON = ACCOUNT_EMAIL_RECEIVE_ONLY_NOTE
 
 type MergeRow = { isUnread: boolean; lastMessageAt?: string | null; lastIncomingAt: string }
 

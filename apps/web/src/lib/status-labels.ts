@@ -67,7 +67,7 @@ export const ACCOUNT_EMAIL_CONNECTION_STATUS = {
  * 店舗のメール（転送用アドレス）への返信の案内。送信の手段と差出人を確かめるまで受信専用。
  * 受信箱の返信欄の吹き出しと、設定のメールの枠で同じ言葉を使う。
  */
-export const ACCOUNT_EMAIL_REPLY_PREPARING = 'このメールアドレスからの返信は準備中です。返信は共通メールか LINE から'
+export const ACCOUNT_EMAIL_RECEIVE_ONLY_NOTE = '転送メールは受信専用です。返信は共通メールか LINE から'
 
 /** Google ビジネスの投稿の状態（API の値 → 札の言葉と色）。画面では言葉を作らず、この表だけを読む。 */
 export const GOOGLE_POST_STATUS: Record<string, { label: string; tone: StatusTone }> = {

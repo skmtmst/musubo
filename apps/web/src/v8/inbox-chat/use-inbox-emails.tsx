@@ -26,6 +26,8 @@ type EmailFilters = {
 /** 1つの経路の失敗。forbidden は共通の口が権限で断ったとき（共通を出さないだけで、失敗には数えない）。 */
 export type EmailSourceFailure = '' | 'error' | 'forbidden'
 
+const NO_EMAIL_ITEMS: EmailInboxItem[] = []
+
 /**
  * 1つの経路の一覧。共通と店舗で同じ形の状態を別々に持ち、続きの位置・続きの有無・失敗を混ぜない。
  * 読む条件（状態・検索・担当・未読だけ・要返信）は両方の経路で同じにし、件数の口と同じ条件で読む。
@@ -146,10 +148,7 @@ function useEmailSourceList({ source, accountId, enabled, filters, listKey, page
     } catch (cause) {
       if (!current()) return
       const failure = classifyEmailFailure(source, cause)
-      if (failure === 'forbidden') {
-        setItems([])
-        setHasMore(false)
-      }
+      if (failure === 'forbidden') setHasMore(false)
       setFailedPage(append ? 'more' : 'first')
       setEmailError(failure)
     } finally {
@@ -188,12 +187,13 @@ function useEmailSourceList({ source, accountId, enabled, filters, listKey, page
 
   // 条件を変えた直後の描画では、前の条件の「続き」「失敗」を出さない。
   const loaded = completedKey === listKey
+  const forbidden = loaded && emailError === 'forbidden'
   return {
     enabled: active,
-    items,
+    items: forbidden ? NO_EMAIL_ITEMS : items,
     loaded,
     loading,
-    hasMore: loaded && hasMore,
+    hasMore: loaded && !forbidden && hasMore,
     loadingMore,
     failure: loaded ? emailError : '' as EmailSourceFailure,
     failedPage,

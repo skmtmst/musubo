@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import ChatsPage from './page'
 
 /*
@@ -354,7 +355,7 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
     await open('store:s1')
     const reply = () => host.querySelector<HTMLTextAreaElement>('textarea[aria-label="メールの返信を入力"]')
     await eventually(() => expect(reply()).toBeTruthy())
-    const reason = 'このメールアドレスからの返信は準備中です。返信は共通メールか LINE から'
+    const reason = '転送メールは受信専用です。返信は共通メールか LINE から'
     expect(reply()!.readOnly).toBe(true)
     expect(reply()!.getAttribute('aria-disabled')).toBe('true')
     // 欄の中に理由の文をそのまま出す（吹き出しにも同じ文を出す）。
@@ -396,7 +397,7 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
     await open('store:s1')
     await eventually(() => expect(reply()?.readOnly).toBe(true))
     expect(reply()!.value).toBe('')
-    expect(reply()!.placeholder).toBe('このメールアドレスからの返信は準備中です。返信は共通メールか LINE から')
+    expect(reply()!.placeholder).toBe('転送メールは受信専用です。返信は共通メールか LINE から')
     await open('shared:c1')
     await eventually(() => expect(reply()?.readOnly).toBe(false))
     expect(reply()!.value).toBe('共通への書きかけ')
@@ -425,8 +426,10 @@ describe('共通と店舗のメールを1つの一覧に出す', () => {
 
 describe('経路ごとの失敗', () => {
   test('共通の口が権限で断ったら共通だけを出さず、店舗の一覧を出し、失敗のお知らせは出さない', async () => {
-    fail.shared = 403
     await renderPage()
+    await eventually(() => expect(rowKeys()).toEqual(['store:s1', 'shared:c1', 'shared:c2', 'store:s2']))
+    fail.shared = 403
+    await act(async () => { window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)) })
     await eventually(() => expect(rowKeys()).toEqual(['store:s1', 'store:s2']))
     expect(host.querySelector('[data-inbox-list-failure]')).toBeNull()
     expect(list().textContent).not.toContain('読み込めませんでした')

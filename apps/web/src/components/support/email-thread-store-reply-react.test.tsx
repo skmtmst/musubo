@@ -8,7 +8,7 @@ import EmailThread from './email-thread'
  * 受信専用の店舗のメールの会話。預かりに書きかけがあっても、欄には値を出さず理由をそのまま見せる。
  * 書きかけは消さない（同じ預かりを使う共通メールの下書きを壊さない）。
  */
-const REASON = 'このメールアドレスからの返信は準備中です。返信は共通メールか LINE から'
+const REASON = '転送メールは受信専用です。返信は共通メールか LINE から'
 const thread = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
