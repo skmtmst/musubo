@@ -66,7 +66,7 @@
 | Codex | API・DB・Worker：`apps/worker/`、`packages/db/`（migration は番号ごとにオーナー承認）、`packages/shared` の型、`apps/web/src/lib/api*`、`.github/` |
 
 - 画面の作り直しも Codex（と Gemini）が行い、確認と採否は Claude（司令塔）が行います（オーナー 2026-10-08・10-29、Google AI Ultra の Gemini は 2026-11-24。Pencil の当面の例外は §15）。機能追加（F-1〜F-25 など）の API・DB・Worker は Codex が作ります。
-- 相手の所有領域を変更するときは、作業前に Slack の対象スレッドで宣言してください。
+- 相手の所有領域を変更するときは、作業前に Slack の対象スレッドで宣言してください。ただし、司令塔が依頼した作業役・Codex・Gemini の作業は、司令塔の依頼が許可にあたるので宣言は不要です（PR の本文に「司令塔の依頼による」と書く）。
 
 ## 7. 機能追加依頼の標準自動フロー
 
