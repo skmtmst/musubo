@@ -18,6 +18,7 @@ vi.hoisted(() => {
 })
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 const calls = vi.hoisted(() => ({
   settings: vi.fn(),
   forms: vi.fn(),
@@ -54,7 +55,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/nen-campaigns/edit',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '然 - NEN -', displayName: '然 - NEN -', liffId: null }, accounts: [], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { id: account.id, name: '然 - NEN -', displayName: '然 - NEN -', liffId: null }, accounts: [], loading: false }),
 }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -83,6 +84,7 @@ let root: Root
 beforeEach(() => { clearToastsForTest();
   document.documentElement.dataset.theme = 'v8'
   role.value = verifiedStaffRole('owner')
+  account.id = 'account-a'
   for (const fn of Object.values(calls)) fn.mockReset()
   calls.settings.mockResolvedValue({ success: true, data: [REVIEW] })
   calls.forms.mockResolvedValue({ success: true, data: [{ id: 'form-review', name: '口コミ', description: null, isActive: true }] })
@@ -181,6 +183,33 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
 })
 
 describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
+  it('タグを読み込めない間は保存を止め、再読み込みできる', async () => {
+    calls.tags.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [{ id: 'tag-pet', name: 'ペット登録あり', lineAccountId: 'account-a' }] })
+    await act(async () => { root.render(<ColumnNew />) }); await flush()
+    expect(host.textContent).toContain('配信対象のタグを読み込めませんでした')
+    expect((button('下書きを保存') as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { fireEvent.click(button('下書きを保存')!) })
+    expect(calls.createColumn).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(button('もう一度読み込む')!) }); await flush()
+    expect(host.textContent).not.toContain('配信対象のタグを読み込めませんでした')
+    expect((button('下書きを保存') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('アカウント切替後は古いタグと人数の遅い返事を表示しない', async () => {
+    let resolveTags!: (value: unknown) => void
+    let resolveAudience!: (value: unknown) => void
+    calls.tags.mockResolvedValueOnce({ success: true, data: [{ id: 'a', name: '前の店', lineAccountId: 'account-a' }] }).mockReturnValueOnce(new Promise(done => { resolveTags = done }))
+    calls.audience.mockReturnValueOnce(new Promise(done => { resolveAudience = done }))
+    await act(async () => { root.render(<ColumnNew />) }); await flush()
+    account.id = 'account-b'
+    await act(async () => { root.render(<ColumnNew />) }); await flush()
+    expect((button('下書きを保存') as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { resolveAudience({ success: true, data: { count: 9999 } }) }); await flush()
+    expect(host.textContent).not.toContain('9,999 人に届きます')
+    await act(async () => { resolveTags({ success: true, data: [] }) }); await flush()
+    expect((button('下書きを保存') as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('入力した画像・分類・題名・概要を見本に出し、文字だけへ戻すと画像を外す（送信しない）', async () => {
     await act(async () => { root.render(<ColumnNew />) })
     await flush()
