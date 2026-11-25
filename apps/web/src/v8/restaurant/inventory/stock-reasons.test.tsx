@@ -83,12 +83,12 @@ describe('在庫を直すための案内', () => {
     expect(screen.queryByText(missingHours)).toBeNull()
     if (mode === 'failed') {
       await act(async () => request.reject(new Error('fixture failure')))
-      await screen.findByText('開ける時間を読み込めませんでした。再読込してください。')
+      await screen.findByText(/開ける時間を確認できません。再読み込みしてください。/)
       expect(screen.queryByText(missingHours)).toBeNull()
     }
   })
 
-  it('同じ画面でaccountをA→B→Aに戻しても古いAの成功を使わず、既存の値反映は保つ', async () => {
+  it('同じ画面でaccountをA→B→Aに戻しても古いAの成功を使わない', async () => {
     const old = pending<ReturnType<typeof hours>>(), current = pending<ReturnType<typeof hours>>()
     api.openingHours.mockReturnValueOnce(old.promise).mockResolvedValueOnce(hours(2)).mockReturnValueOnce(current.promise)
     const ctx = context(); const view = render(draw(ctx))
@@ -99,7 +99,7 @@ describe('在庫を直すための案内', () => {
     await waitFor(() => expect(api.openingHours).toHaveBeenCalledTimes(3))
     await act(async () => old.resolve(hours()))
     expect(screen.queryByText(missingHours)).toBeNull()
-    // 説明だけに判定を足す。旧応答でversion0が入る本線の動きは変えない。
+    // 最新の応答が届くまで古い時間を使わない。
     expect(generate().disabled).toBe(true)
     await act(async () => current.resolve(hours()))
     expect(screen.getAllByText(missingHours)).toHaveLength(1)
@@ -119,7 +119,7 @@ describe('在庫を直すための案内', () => {
     expect(screen.queryByText(missingHours)).toBeNull()
   })
 
-  it('同accountの再取得後に古い成功が戻っても説明を復活させず、既存data反映は変えない', async () => {
+  it('同accountの再取得後に古い成功が戻っても最新の営業時間を保つ', async () => {
     const old = pending<ReturnType<typeof hours>>()
     api.inventoryDay.mockResolvedValue({ data: [allocation] })
     api.openingHours.mockReturnValueOnce(old.promise).mockResolvedValueOnce(hours(2)).mockResolvedValueOnce(hours(2))
@@ -135,15 +135,16 @@ describe('在庫を直すための案内', () => {
     await waitFor(() => expect(api.openingHours).toHaveBeenCalledTimes(3))
     await act(async () => old.resolve(hours()))
     expect(screen.queryByText(missingHours)).toBeNull()
-    expect((screen.getByRole('button', { name: '時間帯ごとの在庫のその他操作' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '時間帯ごとの在庫のその他操作' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('要求した店と異なる成功応答を未保存と断定しない', async () => {
     api.openingHours.mockResolvedValue({ data: { ...hours().data, storeId: 'other-store' } })
     render(draw())
-    await screen.findByRole('switch', { name: '月曜日に予約を受ける' })
+    await screen.findByText(/開ける時間を確認できません。再読み込みしてください。/)
+    expect(screen.queryByRole('switch', { name: '月曜日に予約を受ける' })).toBeNull()
     expect(screen.queryByText(missingHours)).toBeNull()
-    expect(generate().disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'この日の枠を作る' })).toBeNull()
   })
 
   it('既存行の生成操作にも理由を出し、元の無効条件で要求を止める', async () => {

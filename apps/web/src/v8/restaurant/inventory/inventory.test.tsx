@@ -66,6 +66,36 @@ beforeEach(() => {
 afterEach(() => { delete document.documentElement.dataset.theme; cleanup(); vi.useRealTimers(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('Y8SjT2 予約枠・在庫', () => {
+  it.each(['available', 'closed', 'unavailable'] as const)('Googleの営業時間が%sの表示', async (status) => {
+    const googleHours = status === 'unavailable' ? null : status === 'closed' ? hours.map(day => ({ ...day, periods: [] })) : hours
+    fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: googleHours, hoursStatus: status, googleStatus: 'connected', version: 4 } })
+    render(<InventoryPage />)
+    if (status === 'unavailable') {
+      await screen.findByText(/Googleの営業時間を確認できません/)
+      expect(screen.queryByText(/曜日：休み（定休日）/)).toBeNull()
+      expect(screen.getByRole('link', { name: 'Googleビジネス画面を開く' })).not.toBeNull()
+    } else if (status === 'closed') {
+      await screen.findByText('月曜日：休み（定休日）')
+      expect(screen.queryByText(/確認できません/)).toBeNull()
+    } else {
+      await screen.findByText('火曜日：17:00〜22:00')
+      expect(screen.queryByText(/確認できません/)).toBeNull()
+    }
+  })
+  it.each([['temporarily_closed', '臨時休業中'], ['permanently_closed', '閉業']] as const)('Googleの%sを定休日と表示しない', async (status, label) => {
+    fixture.inventoryDay.mockResolvedValue({ data: [] })
+    fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: hours.map(day => ({ ...day, periods: [] })), hoursStatus: status, googleStatus: 'connected', version: 4 } })
+    render(<InventoryPage />)
+    await waitFor(() => expect(screen.getAllByText(label).length).toBeGreaterThan(0))
+    expect(screen.queryByText(/定休日/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'この日の枠を作る' })).toBeNull()
+  })
+  it('Google連携が失効したときは接続確認を案内する', async () => {
+    fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, hoursStatus: 'unavailable', googleStatus: 'expired', version: 1 } })
+    render(<InventoryPage />)
+    await screen.findByText(/Googleビジネス画面で接続状態を確認し、再読み込みしてください/)
+    expect(screen.queryByText(/曜日：休み（定休日）/)).toBeNull()
+  })
   it('卓と時間帯がないとき右の欄にも次の操作を案内する', async () => {
     fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: [] }) })
     fixture.inventoryDay.mockResolvedValue({ data: [] })

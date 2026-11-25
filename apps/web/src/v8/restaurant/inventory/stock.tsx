@@ -104,6 +104,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const [hoursDraft, setHoursDraft] = useState<Hours | null>(null)
   const [hoursError, setHoursError] = useState('')
   const [googleStatus, setGoogleStatus] = useState<RestaurantOpeningHours['googleStatus']>(null)
+  const [hoursStatus, setHoursStatus] = useState<RestaurantOpeningHours['hoursStatus'] | null>(null)
   const [channelsError,setChannelsError]=useState(false)
   const [channelsRetry,setChannelsRetry]=useState(0)
   const [channels, setChannels] = useState<RestaurantChannel[]>([])
@@ -139,19 +140,31 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const loadHours = () => {
     const request = {}; latestHoursRequest.current = request
     const scope = hoursScope.current
-    setHoursReceipt(null)
+    setHoursReceipt(null); setHours(null); setHoursDraft(null); setHoursVersion(0); setHoursStatus(null)
     if (!selectedAccountId || !storeId) return Promise.resolve()
     return restaurantTestApi.openingHours(selectedAccountId, storeId).then((res) => {
+      if (scope !== hoursScope.current || request !== latestHoursRequest.current) return res.data
+      if (res.data.storeId !== storeId) throw new Error('unexpected_store')
+      setHoursStatus(res.data.hoursStatus ?? null)
+      if (res.data.googleStatus != null && (res.data.hoursStatus === 'unavailable' || res.data.hours == null)) {
+        setHours(null); setHoursDraft(null); setHoursVersion(0); setGoogleStatus(res.data.googleStatus)
+        setHoursError(res.data.googleStatus === 'connected' ? 'Googleの営業時間を確認できません。Googleビジネス画面で設定を確認し、Googleから再読み込みしてください。' : 'Googleの営業時間を確認できません。Googleビジネス画面で接続状態を確認し、再読み込みしてください。')
+        return res.data
+      }
       const week = res.data.hours || emptyWeek()
       setHours(week); setHoursDraft(week); setHoursVersion(res.data.version); setGoogleStatus(res.data.googleStatus ?? null); setHoursError('')
       if (scope === hoursScope.current && request === latestHoursRequest.current && scope.accountId === selectedAccountId && scope.storeId === storeId && res.data.storeId === storeId) {
         setHoursReceipt({ scope, request, hours: week, version: res.data.version })
       }
       return res.data
-    }).catch(() => { setHoursError('開ける時間を読み込めませんでした。再読込してください。') })
+    }).catch(() => {
+      if (scope !== hoursScope.current || request !== latestHoursRequest.current) return
+      setHours(null); setHoursDraft(null); setHoursVersion(0)
+      setHoursError('開ける時間を確認できません。再読み込みしてください。')
+    })
   }
   useEffect(() => {
-    setHours(null); setHoursDraft(null); setHoursError(''); setGoogleStatus(null)
+    setHours(null); setHoursDraft(null); setHoursError(''); setGoogleStatus(null); setHoursStatus(null)
     void loadHours()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, storeId])
@@ -178,7 +191,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const missingHoursReason = canEdit && !busy && !hoursError && hoursReceipt && hoursReceipt.scope === hoursScope.current
     && hoursReceipt.scope.accountId === selectedAccountId && hoursReceipt.scope.storeId === storeId
     && hoursReceipt.request === latestHoursRequest.current && hoursReceipt.hours === hours && hoursReceipt.version === hoursVersion && hoursVersion === 0
-    ? '開ける時間を設定して保存してください。' : undefined
+    ? googleStatus != null ? 'Googleビジネス画面で営業時間を確認し、Googleから再読み込みしてください。' : '開ける時間を設定して保存してください。' : undefined
   const confirmedTables = ctx.tableDefinition && ctx.tableDefinition.accountId === selectedAccountId && ctx.tableDefinition.snapshot === data
     && data.organization && storeId && data.stores.some(item => item.id === storeId)
   const noActiveTablesReason = canEdit && !busy && confirmedTables && activeTables.length === 0
@@ -479,9 +492,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
               <div className={styles.stateBox}>
                 <ListState
                   kind="empty"
-                  title="この日の時間帯がありません"
-                  description="開ける時間から、30分ごとの枠を作れます。今ある枠は残します。"
-                  action={(
+                  title={hoursError ? '営業時間を確認できません' : hoursStatus === 'temporarily_closed' ? '臨時休業中' : hoursStatus === 'permanently_closed' ? '閉業' : googleStatus != null && hoursStatus === 'closed' ? '定休日' : 'この日の時間帯がありません'}
+                  description={hoursError ? '営業時間を確認してから再読み込みしてください。' : hoursStatus === 'temporarily_closed' || hoursStatus === 'permanently_closed' || (googleStatus != null && hoursStatus === 'closed') ? '予約できる時間帯はありません。' : '開ける時間から、30分ごとの枠を作れます。今ある枠は残します。'}
+                  action={hoursError || (googleStatus != null && ['closed', 'temporarily_closed', 'permanently_closed'].includes(hoursStatus ?? '')) ? undefined : (
                     <Button
                       variant="primary"
                       lockedReason={lockedReason}
@@ -555,11 +568,11 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
               </Card>
             ) : null}
             <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta={googleStatus !== null ? 'Googleビジネスの営業時間を基準にします。予約枠と席の配分は、この画面で設定します。' : '曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）'} />
-            {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
+            {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement}>{hoursError} {googleStatus == null ? <Button variant="text" size="inline" onClick={() => void loadHours()}>再読み込み</Button> : <Button variant="text" size="inline" href="/restaurant-test/google?tab=hours">Googleビジネス画面を開く</Button>}</Notice> : null}
             {googleStatus !== null ? <>
-              <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
-              <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
-              {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
+              {!hoursError ? <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice> : null}
+              {!hoursError ? <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button> : null}
+              {hoursStatus === 'temporarily_closed' ? <p>臨時休業中</p> : hoursStatus === 'permanently_closed' ? <p>閉業</p> : hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{day.periods.length === 0 ? '休み（定休日）' : periodsText(day)}</p>)}
             </> : hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0
