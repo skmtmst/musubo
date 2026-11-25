@@ -632,6 +632,24 @@ it('取得に成功して0件だったときだけ、空の一覧を出す', asy
   expect(buttonByText('もう一度読み込む')).toBeUndefined()
 })
 
+it('空の作成と上の詳しく作るは同じページへ移り、一覧内にフォームを開かない', async () => {
+  listBroadcasts.mockResolvedValue({ success: true, data: [], pagination: { total: 0, limit: 20, offset: 0 } })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  routerPush.mockClear()
+  act(() => { buttonByText('最初の一斉配信を作る')!.click() })
+  expect(routerPush).toHaveBeenCalledTimes(1)
+  const emptyDestination = routerPush.mock.lastCall?.[0] as string
+  expect(emptyDestination.split('?')[0]).toBe('/broadcasts/new')
+  expect(host.querySelector('[data-loaded-broadcast-form]')).toBeNull()
+  act(() => { buttonByText('配信を作る')!.click() })
+  await flush()
+  const detailed = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.includes('詳しく作る')) as HTMLElement
+  act(() => { detailed.click() })
+  expect(routerPush).toHaveBeenCalledTimes(2)
+  expect(routerPush).toHaveBeenLastCalledWith(emptyDestination)
+})
+
 it('WEB-014：一斉配信には手動順・つまみ・上下移動を置かない', async () => {
     await act(async () => root.render(<BroadcastListV8 />)); await flush()
     expect(host.querySelector('[data-reorder-handle]')).toBeNull()
