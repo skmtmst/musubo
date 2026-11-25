@@ -18,6 +18,8 @@ export interface Reminder {
   id: string;
   /** 所属先を取得できない古い応答や未所属では null または省略。 */
   lineAccountId?: string | null;
+  /** null は未所属、省略は古い応答。名前が null の場合は取得できなかった。 */
+  lineAccount?: { id: string; name: string | null } | null;
   name: string;
   description: string | null;
   isActive: boolean;

@@ -444,7 +444,6 @@ export const ALLOWLIST = new Set<string>([
   // 機能「reminders」の管理画面用API（OpenAPI未記載・順次記載）（17件）
   'DELETE /api/friend-reminders/{id}',
   'DELETE /api/reminders/{id}',
-  'GET /api/reminders/{id}',
   'GET /api/reminders/{id}/draft',
   'GET /api/reminders/{id}/runs',
   'PATCH /api/reminders/reorder',

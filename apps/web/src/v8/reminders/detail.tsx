@@ -619,7 +619,7 @@ function ReminderDetailV8() {
             </Button>
           </>
         )}
-      ><OperationTargetSummary accounts={[{ id: data.reminder.lineAccountId ?? '', name: data.reminder.lineAccountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} /></SheetDialog>
+      ><OperationTargetSummary accounts={[{ id: reminder?.lineAccount?.id ?? reminder?.lineAccountId ?? '', name: reminder?.lineAccount === null ? '所属なし' : reminder?.lineAccount?.name?.trim() || '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} /></SheetDialog>
 
       <ConfirmDialog
         open={confirmDelete && confirmedDeleteScope === deleteScope && confirmedDeleteGeneration === pauseContext.current.generation}

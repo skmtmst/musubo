@@ -1,4 +1,12 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
+const reminderAccountProperties = {
+  lineAccountId: { type: 'string', nullable: true },
+  lineAccount: { type: 'object', nullable: true, required: ['id', 'name'], properties: { id: { type: 'string' }, name: { type: 'string', nullable: true } } },
+};
+const reminderItemSchema = { type: 'object', required: ['id', 'lineAccountId', 'lineAccount'], properties: { id: { type: 'string' }, ...reminderAccountProperties } };
+const reminderListSchema = { type: 'object', properties: { success: { type: 'boolean' }, data: { oneOf: [{ type: 'array', items: reminderItemSchema }, { type: 'object', properties: { items: { type: 'array', items: reminderItemSchema } } }] } } };
+const reminderDetailSchema = { type: 'object', properties: { success: { type: 'boolean' }, data: reminderItemSchema } };
+
 export const actionsRemindersPaths = {
   '/api/common-actions/{id}/archive': {
     post: {
@@ -56,8 +64,11 @@ export const actionsRemindersPaths = {
         { name: 'lineAccountId', in: 'query', schema: { type: 'string' } },
         { name: 'sort', in: 'query', schema: { type: 'string', enum: ['order', 'next', 'created', 'updated', 'name'] } },
       ],
-      responses: { '200': { description: 'Visible reminders' }, '400': { description: 'Invalid sort or status' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      responses: { '200': { description: 'Visible reminders', content: { 'application/json': { schema: reminderListSchema } } }, '400': { description: 'Invalid sort or status' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
     },
+  },
+  '/api/reminders/{id}': {
+    get: { tags: ['Reminders'], summary: '閲覧可能なリマインダの詳細', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Visible reminder', content: { 'application/json': { schema: reminderDetailSchema } } }, '404': { description: 'Reminder not found in account scope' } } },
   },
   '/api/reminders/{id}/registrants': {
     get: {

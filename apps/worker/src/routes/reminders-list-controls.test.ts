@@ -170,17 +170,24 @@ beforeEach(async () => {
 test('一覧と詳細は各リマインダの実際の所属先を返す', async () => {
   const paged = await list('limit=20');
   expect(paged.status).toBe(200);
-  const pagedBody = await paged.json() as { data: { items: Array<{ id: string; lineAccountId: string | null }> } };
+  const pagedBody = await paged.json() as { data: { items: Array<{ id: string; lineAccountId: string | null; lineAccount: { id: string; name: string | null } | null }> } };
   expect(pagedBody.data.items.find(row => row.id === 'r-1')?.lineAccountId).toBe(ACC_A);
   expect(pagedBody.data.items.find(row => row.id === 'r-b')?.lineAccountId).toBe(ACC_B);
+  expect(pagedBody.data.items.find(row => row.id === 'r-1')?.lineAccount).toEqual({ id: ACC_A, name: ACC_A });
+  expect(pagedBody.data.items.find(row => row.id === 'r-b')?.lineAccount).toEqual({ id: ACC_B, name: ACC_B });
+  const scoped = await (await list('limit=20', KEY_STAFF_B)).json() as { data: { items: Array<{ id: string; lineAccount: unknown }> } };
+  expect(scoped.data.items.map(row => row.id)).toEqual(['r-b']);
+  expect(scoped.data.items[0].lineAccount).toEqual({ id: ACC_B, name: ACC_B });
   const legacy = await list('');
-  const legacyBody = await legacy.json() as { data: Array<{ id: string; lineAccountId: string | null }> };
+  const legacyBody = await legacy.json() as { data: Array<{ id: string; lineAccountId: string | null; lineAccount: { id: string; name: string | null } | null }> };
   expect(legacyBody.data.find(row => row.id === 'r-b')?.lineAccountId).toBe(ACC_B);
+  expect(legacyBody.data.find(row => row.id === 'r-b')?.lineAccount).toEqual({ id: ACC_B, name: ACC_B });
   for (const suffix of ['', '/runs']) {
     const response = await app().request(`/api/reminders/r-b${suffix}`, { headers: { Authorization: `Bearer ${KEY_OWNER}` } }, env());
     expect(response.status).toBe(200);
-    const body = await response.json() as { data: { lineAccountId?: string; reminder?: { lineAccountId: string } } };
+    const body = await response.json() as { data: { lineAccountId?: string; lineAccount?: unknown; reminder?: { lineAccountId: string } } };
     expect(suffix ? body.data.reminder?.lineAccountId : body.data.lineAccountId).toBe(ACC_B);
+    if (!suffix) expect(body.data.lineAccount).toEqual({ id: ACC_B, name: ACC_B });
     const forbidden = await app().request(`/api/reminders/r-1${suffix}`, { headers: { Authorization: `Bearer ${KEY_STAFF_B}` } }, env());
     expect(forbidden.status).toBe(404);
   }
@@ -191,7 +198,7 @@ test('所属先のないリマインダは null とし、権限がなければ�
   const row = sqlite.raw.prepare('SELECT * FROM reminders WHERE id = ?').get('r-1') as Parameters<typeof publicReminder>[0];
   expect(publicReminder(row).lineAccountId).toBeNull();
   const paged = await list('limit=20');
-  const body = await paged.json() as { data: { items: Array<{ id: string; lineAccountId: string | null }> } };
+  const body = await paged.json() as { data: { items: Array<{ id: string; lineAccountId: string | null; lineAccount: { id: string; name: string | null } | null }> } };
   expect(body.data.items.find(item => item.id === 'r-1')).toBeUndefined();
   const detail = await app().request('/api/reminders/r-1', { headers: { Authorization: `Bearer ${KEY_OWNER}` } }, env());
   expect(detail.status).toBe(404);
