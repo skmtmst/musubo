@@ -130,7 +130,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const loginUsersRequest = useRef(0)
   const searchRequest = useRef(0)
   const testSendLock = useRef<{ generation: number } | null>(null)
-  const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [pending, setPending] = useState<{ scope: string; status: 'loading' | 'ready' | 'error'; count: number | null } | null>(null)
+  const [pendingRetry, setPendingRetry] = useState(0)
   const [customMileageOpen, setCustomMileageOpen] = useState(false)
   const [customMileage, setCustomMileage] = useState('')
   const [customMileageError, setCustomMileageError] = useState('')
@@ -156,7 +157,6 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     setLoading(true)
     setSetting(null)
     setForms([])
-    setPendingCount(null)
     setError('')
     void Promise.all([
       api.nenCampaigns.settings(selectedAccountId),
@@ -176,11 +176,6 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     }).finally(() => {
       if (!cancelled) { setLoadedScope(loadScope); setLoading(false) }
     })
-    void api.nenCampaigns.overview(selectedAccountId)
-      .then((res) => {
-        if (!cancelled && res.success) setPendingCount(res.data.jobs.pendingByCampaign?.[campaignKey] ?? 0)
-      })
-      .catch(() => undefined)
     return () => { cancelled = true }
   }, [campaignKey, selectedAccountId, loadScope, loadRetry])
 
@@ -189,6 +184,18 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     contextRef.current = { accountId: selectedAccountId, campaignKey, generation: contextRef.current.generation + 1 }
   }
   useEffect(() => { setSaving(false); setTesting(false) }, [selectedAccountId, campaignKey])
+
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let active = true
+    setPending({ scope: loadScope, status: 'loading', count: null })
+    void api.nenCampaigns.overview(selectedAccountId).then(response => {
+      if (!active) return
+      if (!response.success) throw new Error('pending unavailable')
+      setPending({ scope: loadScope, status: 'ready', count: response.data.jobs.pendingByCampaign?.[campaignKey] ?? 0 })
+    }).catch(() => { if (active) setPending({ scope: loadScope, status: 'error', count: null }) })
+    return () => { active = false }
+  }, [selectedAccountId, campaignKey, loadScope, pendingRetry])
 
   // このアカウントのテスト先を読み、切替後や新しい検索の後は古い返事を捨てる。
   useEffect(() => {
@@ -405,8 +412,9 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const accountName = selectedAccount?.displayName || selectedAccount?.name || '公式アカウント'
   const kindIsRich = Boolean(merged.imageUrl)
   // 下の帯の左は短く（長いと折り返して帯が高くなる）。くわしい決めごとは見出しの説明に書く。
+  const pendingCount = pending?.scope === loadScope && pending.status === 'ready' ? pending.count : null
   const status = merged.isEnabled
-    ? pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)} 通は前の中身のまま` : '動いています'
+    ? pending?.scope === loadScope && pending.status === 'error' ? '動いています・配信待ちの件数は不明' : pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)} 通は前の中身のまま` : '動いています'
     : '停止中です（保存しても送り始めません）'
 
   const preview = (
@@ -473,6 +481,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     >
       {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
+      {pending?.scope === loadScope && pending.status === 'error' ? <Notice tone="danger">配信待ちの件数を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setPendingRetry(value => value + 1)}>件数を読み直す</Button></Notice> : null}
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 

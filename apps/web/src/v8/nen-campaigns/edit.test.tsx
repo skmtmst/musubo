@@ -140,6 +140,29 @@ describe('狭い板の配信プレビュー', () => {
 })
 
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
+  it('配信待ち件数の失敗は入力を残して読み直せる', async () => {
+    calls.overview.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: { jobs: { pendingByCampaign: { review_request: 7 } } } })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('配信待ちの件数を読み込めませんでした')
+    expect(host.textContent).toContain('動いています・配信待ちの件数は不明')
+    const input = document.getElementById('nen-edit-body') as HTMLElement
+    await act(async () => { input.textContent = '編集した本文'; fireEvent.input(input) })
+    await act(async () => { fireEvent.click(button('件数を読み直す')!) }); await flush()
+    expect(host.textContent).toContain('配信待ち 7 通')
+    expect(host.textContent).not.toContain('配信待ちの件数を読み込めませんでした')
+    expect(input.textContent).toBe('編集した本文')
+  })
+  it('切替前の配信待ち件数の遅い失敗を新しい画面に出さない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.overview.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValueOnce({ success: true, data: { jobs: { pendingByCampaign: { review_request: 4 } } } })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('配信待ち 4 通')
+    await act(async () => { resolve({ success: false }) }); await flush()
+    expect(host.textContent).toContain('配信待ち 4 通')
+    expect(host.textContent).not.toContain('配信待ちの件数を読み込めませんでした')
+  })
   it('送信先の取得失敗後に検索しても読み直しの道を残す', async () => {
     calls.loginUsers.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [{ id: 'f-1', staffName: 'Kenta', sameAccount: true }] })
     await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
