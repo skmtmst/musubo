@@ -312,7 +312,6 @@
 - [電話予約・ウォークイン（V8）の動き](../apps/web/src/v8/restaurant/front-desk/BEHAVIOR.md)
 - [Googleビジネス（V8）の動き](../apps/web/src/v8/restaurant/google/BEHAVIOR.md)
 - [予約枠・在庫の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/inventory/BEHAVIOR.md)
-- [時間帯ごとの在庫表の反映履歴](release-log/unreleased/PR-kenta-stock-rows.md) — 反映履歴・2026-11-26確認。
 - [LINE来店フォロー（V8・融合 B-186）の動き](../apps/web/src/v8/restaurant/line-followup/BEHAVIOR.md)
 - [メニュー管理の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/menu/BEHAVIOR.md)
 - [組織・権限（V8）の動き](../apps/web/src/v8/restaurant/organization/BEHAVIOR.md)
@@ -1402,4 +1401,4 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-- [今日の確認の開閉と開店準備ガイドの閉じる操作](release-log/unreleased/PR-kenta-today-fold.md) — 反映履歴、確認 2026-11-26。
+- [画面の直しの列車2（今日の確認・ガイドの閉じる・在庫の表）](release-log/unreleased/PR-kenta-train-screens2.md) — 反映履歴、確認 2026-11-26。
