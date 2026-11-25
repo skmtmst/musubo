@@ -51,14 +51,15 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 1,
         title: 'まず卓を作りましょう',
-        body: '「卓を作る」を押すと、卓の名前と席数を入れるフォームが開きます。作った卓はフロア図と右の一覧に並び、予約枠の計算に使われます。',
+        body: '「卓を作る」を押すと、卓番・表示名や席の条件を設定できます。作った卓はフロア図と右の一覧に並び、予約枠の計算に使われます。',
         anchor: 'tables.create',
         trigger: 'click',
       },
       {
         index: 2,
-        title: '名前と席数を入れて保存',
-        body: '卓の名前と席数を入れましょう。「保存する」を押すと卓が登録され、手順3/3に進みます。',
+        title: '卓の情報を入れる',
+        body: '卓番と表示名を入れ、人数と席の設定を確認します。',
+        mobileBody: '必須項目を入れたら「卓を作る」を押します。',
         anchor: 'tables.form',
         trigger: 'event',
       },
@@ -106,14 +107,38 @@ const SCRIPT: readonly GuideStepScript[] = [
       },
       {
         index: 2,
-        title: '基本を入力',
-        body: '「コースの名前」「1名の値段」「所要時間」を入力します。',
-        anchor: 'menu.form',
+        title: '保存する状態を確認する',
+        body: '「下書き」はお客さまには表示されません。あとから公開できます。',
+        anchor: 'menu.status',
         href: '/restaurant-test/menu/edit',
-        trigger: 'valid',
+        trigger: 'confirm-input',
       },
       {
         index: 3,
+        title: 'コースの名前を入れる',
+        body: 'お客さまに表示する名前を入れてください。',
+        anchor: 'menu.name',
+        href: '/restaurant-test/menu/edit',
+        trigger: 'confirm-input',
+      },
+      {
+        index: 4,
+        title: '1名の値段を入れる',
+        body: '1名あたりの税込価格を、円単位の整数で入れてください。',
+        anchor: 'menu.price',
+        href: '/restaurant-test/menu/edit',
+        trigger: 'confirm-input',
+      },
+      {
+        index: 5,
+        title: '所要時間を選ぶ',
+        body: '席を使う時間を選んでください。30分刻みで選べます。',
+        anchor: 'menu.duration',
+        href: '/restaurant-test/menu/edit',
+        trigger: 'confirm-input',
+      },
+      {
+        index: 6,
         title: '保存して完了',
         body: '「保存して追加する」を押すと、次の設定へ進みます。',
         anchor: 'menu.save',
@@ -129,14 +154,14 @@ const SCRIPT: readonly GuideStepScript[] = [
       {
         index: 1,
         title: 'LINEで受ける席数を入れる',
-        body: '登録した卓から席数が計算されます。LINEで受け付ける席数を入力してください。予約サイトや当日枠の配分はあとから調整できます。',
+        body: '1つの時間枠で、LINEから受ける席数を入れます。',
         anchor: 'reception.lineSeats',
         trigger: 'valid',
       },
       {
         index: 2,
-        title: '保存して受け付けを始める',
-        body: 'LINEの席数を確認し、「受付時間と配分を保存」を押します。日ごとの配分もこの画面から調整できます。',
+        title: '配分を保存する',
+        body: '保存すると、営業日の全時間帯に設定した席数を適用します。今後の営業日にも自動で適用します。',
         anchor: 'reception.save',
         trigger: 'event',
       },
@@ -179,6 +204,30 @@ const SCRIPT: readonly GuideStepScript[] = [
     ],
   },
 ]
+
+export function receptionGuideCopy(mode: string | null, seatCount: string | null) {
+  if (mode === 'hours') return {
+    title: '営業時間を設定する',
+    body: '営業時間を設定して戻ると、LINEで受ける席数を入力できます。',
+  }
+  if (mode === 'saving') return {
+    title: '配分を保存しています',
+    body: '保存できると、自動で次の手順へ進みます。',
+  }
+  if (mode === 'conflict') return {
+    title: '最新の配分を確かめる',
+    body: '入力した席数は残っています。最新の配分を確認してから保存してください。',
+  }
+  if (mode === 'retry') return {
+    title: 'もう一度保存する',
+    body: '入力した席数は残っています。「配分を保存する」をもう一度押してください。',
+  }
+  if (seatCount && Number(seatCount) > 0) return {
+    title: '配分を保存する',
+    body: `保存すると、営業日の全時間帯に${seatCount}席ずつ適用します。今後の営業日にも自動で適用します。`,
+  }
+  return null
+}
 
 /** その段の手順の数。台本が無い段は0（吹き出しを出さない）。 */
 export function guideProcedureTotal(stepKey: string | null): number {

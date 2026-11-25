@@ -10,6 +10,7 @@ import { validateTemplateMessage } from '../services/template-message-validation
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { validRestaurantFloor, readRestaurantFloor, firstTablePlacement, tablePlacementFits } from '../services/restaurant-floor.js';
 import { inputError } from '../lib/input-errors.js';
+import { readScopedInventoryDay, saveScopedInventoryAllocation } from './restaurant-test-inventory-allocation.js';
 import { auditLog } from '../lib/audit-log.js';
 import { publicClosure, closuresForRange, closureAffectsTable, openSeatTables } from '../services/restaurant-closures.js';
 import type { RestaurantTableLayoutInput, RestaurantFloorWrite } from '@line-crm/shared';
@@ -264,7 +265,12 @@ export const put__api_restaurant_test_inventory_allocation_6 = async (c: Context
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({success:false,error:'組織が見つかりません'},404);
-  const body = await c.req.json<{storeId:string;slots:Array<{id:string;expectedVersion:number}>;otaCapacity:number;lineCapacity:number;walkInCapacity:number;sameDayCapacity?:number}>().catch(()=>null);
+  const body = await c.req.json<{storeId:string;slots:Array<{id:string;expectedVersion:number}>;otaCapacity:number;lineCapacity:number;walkInCapacity:number;sameDayCapacity?:number;scope?:unknown}>().catch(()=>null);
+  if (body?.scope !== undefined) {
+    if (typeof body.storeId !== 'string' || !await storeBelongsTo(c, organization.id, body.storeId))
+      return inputError(c, { success: false, error: '店舗を確認してください' }, 400, ['storeId']);
+    return saveScopedInventoryAllocation(c, dbFor(c.env, body.storeId), body.storeId, body);
+  }
   if (!body || !Array.isArray(body.slots) || body.slots.length<1 || body.slots.length>200 || new Set(body.slots.map(s=>s?.id)).size!==body.slots.length
     || body.slots.some(s=>!s || typeof s.id!=='string' || !Number.isSafeInteger(s.expectedVersion) || s.expectedVersion<1)
     || !await storeBelongsTo(c,organization.id,body.storeId)) return inputError(c, {success:false,error:'店舗・枠・版を確認してください'}, 400, ["slots","storeId"]);
@@ -703,20 +709,5 @@ export const get__api_restaurant_test_inventory_day_27 = async (c: Context<Env, 
   if (!validRestaurantDate(date) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と日付を確認してください' }, 400);
   const db = dbFor(c.env, storeId);
   await expireRestaurantHolds(db, undefined, storeId);
-  const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id = ?').bind(storeId).first<{ timezone: string }>();
-  const rows = await db.prepare(`SELECT v.*, sm.name AS updated_by_name FROM rt_inventory_occupancy v
-    LEFT JOIN staff_members sm ON sm.id=v.updated_by
-    WHERE v.store_id=? AND datetime(v.starts_at)>=datetime(?) AND datetime(v.starts_at)<datetime(?) ORDER BY v.starts_at`)
-    .bind(storeId, restaurantCivilTime(date, 0, store!.timezone), restaurantCivilTime(date, 1440, store!.timezone)).all<Record<string, unknown>>();
-  const closures = await closuresForRange(db, storeId, restaurantCivilTime(date, 0, store!.timezone), restaurantCivilTime(date, 1440, store!.timezone));
-  const tables=(await db.prepare('SELECT id,max_capacity FROM rt_tables WHERE store_id=? AND is_active=1').bind(storeId).all<{id:string;max_capacity:number}>()).results;
-  return c.json({ success: true, closures: closures.map(publicClosure), data: rows.results.map(r => {
-    const occupiedTableIds=JSON.parse(String(r.occupied_table_ids_json)) as string[];
-    const from=Date.parse(String(r.starts_at)),to=from+Number(r.slot_minutes)*60_000;
-    const closed=closures.filter(c=>(JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).some(p=>Date.parse(p.startsAt)<to&&Date.parse(p.endsAt)>from));
-    const closedTables=tables.filter(t=>closed.some(c=>closureAffectsTable(c,t.id)));
-    const blockedSeats=closedTables.filter(t=>!occupiedTableIds.includes(t.id)).reduce((n,t)=>n+t.max_capacity,0);
-    return {...r,reserved_count:r.guest_count,occupiedTableIds,closedTableIds:closedTables.map(t=>t.id),
-      freeSeats:Math.max(0,Number(r.total_capacity)-Number(r.occupied_seats)-Number(r.unassigned_guests)-blockedSeats)};
-  }) });
+  return c.json(await readScopedInventoryDay(db, storeId, date));
 };

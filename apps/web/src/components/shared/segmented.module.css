@@ -50,7 +50,7 @@
   cursor: pointer;
 }
 
-.item:hover {
+.item:hover:not(:disabled) {
   color: var(--color-ink);
 }
 
@@ -69,7 +69,7 @@
 :root .root:not([data-size='booking']) .count { margin-inline-start: var(--tpl-chip-gap); }
 
 .selected,
-.selected:hover {
+.selected:hover:not(:disabled) {
   font-weight: 600;
   color: var(--color-ink);
 }
@@ -79,7 +79,7 @@
   cursor: not-allowed;
 }
 
-.root:has(.item:disabled) {
+.root[data-disabled] {
   opacity: var(--polish-disabled-opacity);
 }
 

@@ -7,6 +7,7 @@ import { createStickerMessageContent } from '@line-crm/shared';
 import { upsertFriend, updateFriendFollowStatus, getFriendByLineUserIdForAccount, upsertChatOnMessage, jstNow, toJstString, recordIncomingLineMessage, recordLineMessageUnsend } from '@line-crm/db';
 import type { Friend } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
+import { isFirstMessageTestEvent } from '../services/getting-started-first-message.js';
 
 export // 署名確認前の巨大本文による負荷を防ぐため、1MiBに制限する。大量イベントをまとめても余裕を保ち、Worker の128MBメモリを圧迫しない。
 const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024;
@@ -81,6 +82,7 @@ async function handleStoppedTenantEvent(
   lineMessageAccountKey: string,
   legacyLineMessageAccountKey?: string,
 ): Promise<void> {
+  if (isFirstMessageTestEvent(event)) return;
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,

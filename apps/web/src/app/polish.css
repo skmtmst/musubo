@@ -6,6 +6,11 @@
 /* 押せる所の最小の大きさ（§6.5 の 7）。透明な当たりで広げる時の基準。 */
 :root { --polish-hit-min: 24px; }
 
+:root {
+  --color-guide-scrim: #0f172a73;
+  --polish-guided-table-mobile-top: 66px;
+}
+
 /* 文字を選んだ時の地は、ブランドの深い緑の薄い色。文字の色は変えない。 */
 ::selection {
   background: color-mix(in srgb, var(--color-accent-deep) 20%, transparent);

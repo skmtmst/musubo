@@ -44,8 +44,9 @@ export type StyleChoiceStepProps = {
 }
 
 /** 窓の固定された帯でも、本文と同じ「見る」切り替えを使う。 */
-export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false }: Pick<StyleChoiceStepProps, 'viewing' | 'onView' | 'chosen' | 'disabled'>) {
+export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false, allowedStyles }: Pick<StyleChoiceStepProps, 'viewing' | 'onView' | 'chosen' | 'disabled'> & { allowedStyles?: readonly AccountStyle[] }) {
   const script = STYLE_EXPERIENCE_SCRIPT
+  const isUnavailable = (style: AccountStyle) => allowedStyles ? !allowedStyles.includes(style) : false
   return <div className={styles.switcher} data-style-switcher>
     <div className={styles.switcherSegments}>
       <SegmentedControl
@@ -55,15 +56,16 @@ export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false 
         disabled={disabled}
         options={STYLE_CHOICE_ORDER.map((style) => {
           const name = script.styles[style].label
+          const option = { value: style, disabled: isUnavailable(style) }
           return chosen === style
-            ? { value: style, label: <span className={styles.option}>{name}<Check aria-hidden="true" className={styles.optionCheck} /></span>, ariaLabel: `${name}（選んでいます）` }
-            : { value: style, label: name }
+            ? { ...option, label: <span className={styles.option}>{name}<Check aria-hidden="true" className={styles.optionCheck} /></span>, ariaLabel: `${name}（選んでいます）` }
+            : { ...option, label: name }
         })}
       />
     </div>
     <div className={styles.switcherSelect}>
       <Select aria-label="見るスタイル" value={viewing} onChange={value => onView(value as AccountStyle)} size="full" disabled={disabled}
-        options={STYLE_CHOICE_ORDER.map(style => ({ value: style, label: `${script.styles[style].label}${chosen === style ? '（選んでいます）' : ''}` }))} />
+        options={STYLE_CHOICE_ORDER.map(style => ({ value: style, label: `${script.styles[style].label}${chosen === style ? '（選んでいます）' : ''}`, disabled: isUnavailable(style) }))} />
     </div>
   </div>
 }

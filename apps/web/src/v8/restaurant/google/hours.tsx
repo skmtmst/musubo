@@ -117,20 +117,9 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
     return (hours.hours?.find(day => day.weekday === new Date(`${date}T12:00:00Z`).getUTCDay())?.periods.length ?? 0) > 0
    })
    if (!nextOpen) { setActionError(NO_BOOKABLE_HOURS); return }
-   const openToday = day(today)
-   const initialDays = !openToday.closed && openToday.periods.length ? [today, nextOpen] : [nextOpen]
-   let slotCount = 0
-   for (const date of initialDays) {
-    if (!mounted.current) return
-    const { data: result } = await restaurantTestApi.generateInventory(accountId, {
-     storeId: data.store.id, date, expectedHoursVersion: hours.version, otaCapacity: 0, lineCapacity: 0, walkInCapacity: 0,
-    })
-    slotCount += result.slotCount ?? result.generated
-   }
-   if (!slotCount) { setActionError(NO_BOOKABLE_HOURS); return }
    if (mounted.current) emitGuideSignal('hours.confirm', accountId)
   } catch (cause) {
-   setActionError(errorMessage(cause, '予約枠を作れませんでした。もう一度お試しください。'))
+   setActionError(errorMessage(cause, '営業時間を確認できませんでした。もう一度お試しください。'))
   } finally {
    operation.current = false
    setBusy(false)
