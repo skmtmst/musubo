@@ -213,15 +213,22 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     const context = contextRef.current
     if (!context.accountId) return null
     const response = await api.nenCampaigns.settings(context.accountId)
-    if (context !== contextRef.current && (context.accountId !== contextRef.current.accountId || context.campaignKey !== contextRef.current.campaignKey)) return null
+    if (context.generation !== contextRef.current.generation) return null
     return response.success ? response.data.find((item) => item.campaignKey === context.campaignKey) ?? null : null
   }
   const saveConflict = useSaveConflict<NenCampaignSetting>({
+    contextKey: `${loadScope}:${contextRef.current.generation}`,
     fetchLatest: latestSetting,
     reload: async () => {
-      const latest = await latestSetting()
-      if (!latest) { setError('最新の内容を読み込めませんでした。もう一度お試しください。'); return }
-      setSetting(latest); setDraft(latest); setError(''); saveConflict.clear()
+      const generation = contextRef.current.generation
+      try {
+        const latest = await latestSetting()
+        if (generation !== contextRef.current.generation) return
+        if (!latest) throw new Error('latest unavailable')
+        setSetting(latest); setDraft(latest); setError(''); saveConflict.clear()
+      } catch {
+        if (generation === contextRef.current.generation) setError('最新の内容を読み込めませんでした。もう一度お試しください。')
+      }
     },
   })
   useEffect(() => { saveConflict.clear() }, [campaignKey, selectedAccountId, saveConflict.clear])

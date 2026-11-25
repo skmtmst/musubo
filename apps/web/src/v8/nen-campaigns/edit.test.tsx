@@ -427,3 +427,44 @@ it('押された後の説明に設定のボタン名を出し、式を文字と�
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('競合の読み直し中にアカウントを往復しても古い結果を出さない', async () => {
+  const { ApiError } = await import('@/lib/api')
+  let resolve!: (value: unknown) => void
+  const pending = new Promise(done => { resolve = done })
+  calls.settings.mockResolvedValueOnce({ success: true, data: [REVIEW] })
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '比較の文' }] })
+    .mockReturnValueOnce(pending)
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: 'Bの文' }] })
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '新しいAの文' }] })
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) }); await flush()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) }); await flush()
+  const reload = [...document.querySelectorAll('button')].find(item => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) }); await flush()
+  account.id = 'account-b'; await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  account.id = 'account-a'; await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  expect(host.textContent).toContain('新しいAの文')
+  await act(async () => { resolve({ success: true, data: [{ ...REVIEW, bodyText: '前の読み直しの文' }] }) }); await flush()
+  expect(host.textContent).toContain('新しいAの文')
+  expect(host.textContent).not.toContain('前の読み直しの文')
+  expect(host.textContent).not.toContain('最新の内容を読み込めませんでした')
+})
+
+it('競合後の読み直し通信が失敗したら入力を残して知らせる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  calls.settings.mockResolvedValueOnce({ success: true, data: [REVIEW] })
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '比較の文' }] })
+    .mockRejectedValueOnce(new Error('network'))
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  const input = document.getElementById('nen-edit-body') as HTMLElement
+  await act(async () => { input.textContent = '編集中の本文'; fireEvent.input(input) })
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) }); await flush()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) }); await flush()
+  const reload = [...document.querySelectorAll('button')].find(item => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) }); await flush()
+  expect(host.textContent).toContain('最新の内容を読み込めませんでした')
+  expect(input.textContent).toBe('編集中の本文')
+})
