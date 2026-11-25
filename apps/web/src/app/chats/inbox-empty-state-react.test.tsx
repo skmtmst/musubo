@@ -6,15 +6,20 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import ChatsPage from './page'
 
-const fixture = vi.hoisted(() => ({ accountId: 'account-a', params: new URLSearchParams() }))
+const fixture = vi.hoisted(() => ({
+  accountId: 'account-a',
+  params: new URLSearchParams(),
+  push: vi.fn(),
+  emailInboxEnabled: true,
+}))
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => fixture.params,
   usePathname: () => '/chats',
-  useRouter: () => ({ push() {}, replace() {} }),
+  useRouter: () => ({ push: fixture.push, replace() {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  selectedAccountId: fixture.accountId, selectedAccount: { emailInboxEnabled: true }, loading: false,
+  selectedAccountId: fixture.accountId, selectedAccount: { emailInboxEnabled: fixture.emailInboxEnabled }, loading: false,
 }) }))
 
 type Pending = { resolve: (value: Response) => void }
@@ -135,6 +140,7 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
 beforeEach(() => {
   calls = []; pending = []; handler = base
   fixture.accountId = 'account-a'; fixture.params = new URLSearchParams()
+  fixture.push.mockReset(); fixture.emailInboxEnabled = true
   const values = new Map<string, string>()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => values.get(key) ?? null,
@@ -402,4 +408,52 @@ test('メールの一覧が空のときメール向けの案内を表示する',
   fixture.params = new URLSearchParams('channel=email')
   await act(async () => root.render(<ChatsPage />))
   await eventually(() => expect(state('empty')?.textContent).toContain('メールが届くとここに出ます。'))
+})
+
+test('未設定のInstagramタブでは右の欄に案内と設定ボタンを出し、一覧は空状態にする', async () => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('1440') || query.includes('1024'),
+    media: query,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  fixture.params = new URLSearchParams('channel=instagram')
+  handler = (url) => {
+    if (url.pathname === '/api/instagram/connections') return response({ success: true, data: { state: 'disconnected', connections: [] } })
+    if (url.pathname === '/api/staff/me') return response({ success: true, data: { id: 's1', role: 'owner', name: '担当者' } })
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  const talkPane = () => document.querySelector<HTMLElement>('[data-inbox-v4="talk-pane"]')!
+  await eventually(() => expect(talkPane().textContent).toContain('Instagram をつなぐと、DM をここで読んで返せます'))
+  expect(list().textContent).toContain('Instagram はまだつながっていません')
+  const setupButton = [...talkPane().querySelectorAll('button')].find((b) => b.textContent?.includes('Instagram を設定する'))
+  expect(setupButton).toBeTruthy()
+  await act(async () => { setupButton!.click() })
+  expect(fixture.push).toHaveBeenCalledWith('/settings/sns#instagram')
+})
+
+test('未設定のメールタブでも設定画面へ飛ばず右の欄にメール設定の案内を出す', async () => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('1440') || query.includes('1024'),
+    media: query,
+    addEventListener() {},
+    removeEventListener() {},
+  }))
+  fixture.params = new URLSearchParams('channel=email')
+  fixture.emailInboxEnabled = false
+  handler = (url) => {
+    if (url.pathname === '/api/staff/me') return response({ success: true, data: { id: 's1', role: 'owner', name: '担当者' } })
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  const talkPane = () => document.querySelector<HTMLElement>('[data-inbox-v4="talk-pane"]')!
+  await eventually(() => expect(talkPane().textContent).toContain('メールを設定すると、問い合わせメールをここで読んで返せます'))
+  expect(list().textContent).toContain('メールはまだ設定されていません')
+  const setupButton = [...talkPane().querySelectorAll('button')].find((b) => b.textContent?.includes('メールを設定する'))
+  expect(setupButton).toBeTruthy()
+  await act(async () => { setupButton!.click() })
+  expect(fixture.push).toHaveBeenCalledWith('/settings/sns')
 })
