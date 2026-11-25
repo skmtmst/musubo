@@ -319,10 +319,10 @@ export async function fingerprintOf(value: unknown): Promise<string> {
 
 export async function normalizeProfile(raw: RawLocation, locationName: string): Promise<GoogleProfile> {
   const regularHours = weeklyFromGoogle(raw.regularHours?.periods);
-  const validTime = (time: GoogleTimeOfDay | undefined) => time != null
-    && Number.isInteger(time.hours ?? 0) && (time.hours ?? 0) >= 0 && (time.hours ?? 0) <= 24
-    && Number.isInteger(time.minutes ?? 0) && (time.minutes ?? 0) >= 0 && (time.minutes ?? 0) < 60
-    && ((time.hours ?? 0) !== 24 || (time.minutes ?? 0) === 0);
+  const validTime = (time: GoogleTimeOfDay | undefined) => Number.isInteger(time?.hours ?? 0)
+    && (time?.hours ?? 0) >= 0 && (time?.hours ?? 0) <= 24
+    && Number.isInteger(time?.minutes ?? 0) && (time?.minutes ?? 0) >= 0 && (time?.minutes ?? 0) < 60
+    && ((time?.hours ?? 0) !== 24 || (time?.minutes ?? 0) === 0);
   const periods = raw.regularHours?.periods;
   const regularHoursKnown = Array.isArray(periods) && periods.every(period => period != null
     && period.openDay != null && WEEKDAYS.includes(period.openDay)

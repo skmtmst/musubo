@@ -35,6 +35,19 @@ function request(path: string, method = 'GET', body?: unknown) {
     body: body === undefined ? undefined : JSON.stringify(body) }, env);
 }
 
+it('Google接続時に予約設定の行がなくても営業時間を返し、版は0のままにする', async () => {
+  const location = 'accounts/111/locations/222';
+  database.raw.prepare(`INSERT INTO rt_google_connections(id,store_id,line_account_id,location_name,refresh_token_enc,status) VALUES(?,?,?,?,?,?)`)
+    .run('google-1', 'store-ginza', 'account-2', location, 'encrypted', 'connected');
+  const regularHours = Object.fromEntries(['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'].map(day => [day, [{ open: '10:00', close: '19:00' }]]));
+  database.raw.prepare(`INSERT INTO rt_google_profiles(store_id,location_name,profile_json,fingerprint,fetched_at,updated_at) VALUES(?,?,?,?,?,?)`)
+    .run('store-ginza', location, JSON.stringify({ profile: { name: 'locations/222', openStatus: 'OPEN', regularHours, specialHours: [] } }), 'fingerprint', '2026-11-10', '2026-11-10');
+  const data = (await (await request('/api/restaurant-test/opening-hours?account_id=account-1&storeId=store-ginza')).json() as any).data;
+  expect(data.version).toBe(0);
+  expect(data.hoursStatus).toBe('available');
+  expect(data.hours[1].periods).toEqual([{ opensAt: '10:00', closesAt: '19:00' }]);
+});
+
 it('Google接続後は特別営業時間を指定日の正として返し、旧時間への編集と失効時の代用を止める', async () => {
   const path = '/api/restaurant-test/opening-hours?account_id=account-1&storeId=store-ginza';
   const oldHours = Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: weekday === 0 ? [] : [{ opensAt: '17:00', closesAt: '23:00' }] }));
