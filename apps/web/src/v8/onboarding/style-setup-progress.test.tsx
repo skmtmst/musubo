@@ -163,3 +163,21 @@ it('他のLINEに紐づく唯一の現役店や古い応答から飲食店の進
   net.restaurantProgress.mockResolvedValue({ success: true, data: { storeId: 'store', lineAccountId: 'b', tables: true, hours: true, menus: true, reception: true, followup: true } });
   expect((await loadStyleSetupProgress('a', 'restaurant', 'store')).steps.attributes?.complete).toBeNull();
 });
+
+it('ecの進捗取得はストア接続の返事を待たずにGoogle接続の確認を始める', async () => {
+  let resolveConnector!: (value: unknown) => void
+  net.connector.mockImplementation(() => new Promise(resolve => { resolveConnector = resolve }))
+  const pending = loadStyleSetupProgress('a', 'ec')
+  await waitFor(() => expect(net.googleConnection).toHaveBeenCalledWith('a'))
+  resolveConnector({
+    success: true,
+    data: {
+      configured: true,
+      connector: { status: 'connected', secretConfigured: true, eventTypes: ['ec.order.confirmed'] },
+      health: { lastSucceededAt: '2026-10-28T00:00:00Z' },
+    },
+  })
+  const progress = await pending
+  expect(progress.steps.attributes?.complete).toBe(true)
+  expect(progress.steps.hours?.complete).toBe(true)
+})
