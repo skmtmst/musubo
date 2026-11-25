@@ -1,5 +1,5 @@
 import { responseApiError } from './errors'
-import { apiAccountContext, reportServerFailure, isSessionLostExempt, announceFeatureDisabled } from './request'
+import { apiAccountContext, clearReportedPathFailures, reportServerFailure, isSessionLostExempt, announceFeatureDisabled } from './request'
 import { fetchWithNetworkMessage, extractApiErrorCode } from './errors'
 import { API_URL } from './session'
 import { adminSessionHeaders } from '../../admin-session'
@@ -8,17 +8,24 @@ import { SESSION_LOST_EVENT } from '../../session-events'
 import { csvFileName } from '../../csv-file-name'
 
 export async function fetchApiBlob(path: string, init?: { method?: string; accountId?: string | null; body?: string }): Promise<Blob> {
+  const method = (init?.method ?? 'GET').toUpperCase()
   const context = apiAccountContext(path, init)
+  const reportDetail = {
+    method,
+    accountId: context.accountId,
+    accountIds: context.accountIds,
+    explicitNullAccount: init?.accountId === null,
+  }
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
-    method: init?.method ?? 'GET',
+    method,
     credentials: 'include',
     headers: { ...adminSessionHeaders(), ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
     body: init?.body,
   })
-  if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
+    if (res.status >= 500) reportServerFailure(path, res.status, { ...reportDetail, code, raw })
     // fetchApi と同じく、業務コード付き401（再認証など）では合図を出さない。
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
       window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
@@ -26,6 +33,7 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
     announceFeatureDisabled(res.status, code, raw, context)
     throw responseApiError(res, raw, code, undefined)
   }
+  clearReportedPathFailures(path, method, reportDetail)
   return res.blob()
 }
 
@@ -44,20 +52,34 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
  * R495: 上限で切れたCSVを見分けるため、応答の頭の件数も返す。
  * 既存の呼び出しは戻り値を使わないので、そのまま動く。
  */
-export async function downloadApiFile(path: string, fallbackFilename: string, options?: { stepUpToken?: string }): Promise<{
+export async function downloadApiFile(
+  path: string,
+  fallbackFilename: string,
+  options?: { stepUpToken?: string; accountId?: string | null; headers?: HeadersInit },
+): Promise<{
   totalCount: number | null
   returnedCount: number | null
   truncated: boolean
 }> {
-  const context = apiAccountContext(path)
+  const context = apiAccountContext(path, options)
+  const reportDetail = {
+    method: 'GET',
+    accountId: context.accountId,
+    accountIds: context.accountIds,
+    explicitNullAccount: options?.accountId === null,
+  }
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: { ...adminSessionHeaders(), ...(options?.stepUpToken ? { 'X-Step-Up-Token': options.stepUpToken } : {}) },
+    headers: {
+      ...adminSessionHeaders(),
+      ...(options?.stepUpToken ? { 'X-Step-Up-Token': options.stepUpToken } : {}),
+      ...options?.headers,
+    },
   })
-  if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
+    if (res.status >= 500) reportServerFailure(path, res.status, { ...reportDetail, code, raw })
     // fetchApi と同じく、業務コード付き401（再認証など）では合図を出さない。
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
       window.dispatchEvent(new CustomEvent<ApiAccountEventDetail>(SESSION_LOST_EVENT, { detail: context }))
@@ -65,6 +87,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string, op
     announceFeatureDisabled(res.status, code, raw, context)
     throw responseApiError(res, raw, code, undefined)
   }
+  clearReportedPathFailures(path, 'GET', reportDetail)
   const disposition = res.headers.get('Content-Disposition') ?? ''
   const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1]
   const numericHeader = (name: string): number | null => {
