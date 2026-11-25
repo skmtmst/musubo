@@ -959,6 +959,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/register/request',
   'POST /api/auth/register/resend-expired',
   'POST /api/auth/sessions/revoke-others',
+  'POST /api/auth/sessions/trust-current',
   'POST /api/auth/step-up',
   'POST /api/auth/two-factor/setup',
   'POST /api/auth/two-factor/setup/confirm',

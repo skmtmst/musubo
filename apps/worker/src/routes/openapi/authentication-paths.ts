@@ -3,6 +3,10 @@ import { STEP_UP_PURPOSES } from '../../lib/step-up.js';
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const authenticationPaths = {
 
+  '/api/auth/sessions/trust-current': {
+    post: { tags: ['Auth'], summary: '二段階認証で現在のログインを確認', parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'このセッション専用の一回限りの確認票' }], responses: { '200': { description: '現在のログインを確認済みに変更' }, '401': { description: '二段階認証が必要' }, '403': { description: 'セッションまたは端末を確認できない' }, '409': { description: 'ログイン状態が変わった' } } },
+  },
+
   '/api/auth/passkeys/login/options': {
     post: { tags: ['Auth'], summary: '一次認証後のパスキー認証課題を発行', security: [], responses: { '200': { description: '登録済みの場合だけWebAuthn optionsを返す' }, '401': { description: '一次認証が無効' } } },
   },

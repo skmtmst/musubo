@@ -57,3 +57,11 @@ it('閉じたログインは日付が変わっても出さない', async () => {
   expect(screen.queryByRole('note')).toBeNull()
   vi.useRealTimers()
 })
+
+it('二段階認証が未設定なら本人確認を押せず、設定への案内を出す', async () => {
+  rememberSessionSnapshot({ impersonation: null, unfamiliarAt: '2026-10-25T01:00:00Z', stepUpMethod: 'password' })
+  render(<UnfamiliarLoginNotice />)
+  const button = await screen.findByRole('button', { name: '自分のログインです' })
+  expect(button.getAttribute('aria-disabled') === 'true' || (button as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByRole('link', { name: '二段階認証を設定する' }).getAttribute('href')).toBe('/staff#self-security')
+})

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { adminSessionHeaders } from '@/lib/admin-session'
-import { readSessionSnapshot } from '@/lib/session-snapshot'
+import { readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
+import TrustCurrentLogin from '@/components/trust-current-login'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 
@@ -42,6 +43,12 @@ export default function UnfamiliarLoginNotice({ className }: { className?: strin
   const { closed, close } = useClosedForLogin(unfamiliarAt)
 
   useEffect(() => {
+    const update = () => setUnfamiliarAt(readSessionSnapshot()?.unfamiliarAt ?? null)
+    window.addEventListener(SESSION_SNAPSHOT_CHANGED, update)
+    return () => window.removeEventListener(SESSION_SNAPSHOT_CHANGED, update)
+  }, [])
+
+  useEffect(() => {
     let cancelled = false
     const known = readSessionSnapshot()
     const fetchWhenMissing = () =>
@@ -65,7 +72,7 @@ export default function UnfamiliarLoginNotice({ className }: { className?: strin
       tone="warn"
       heading="いつもと違う端末・場所からのログインです"
       message="大事な操作の前に毎回、本人確認をします。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください。"
-      action={<Button href="/staff?section=sessions" variant="secondary">ログイン中の端末を見る</Button>}
+      action={<><TrustCurrentLogin /><Button href="/staff?section=sessions" variant="secondary">ログイン中の端末を見る</Button></>}
       onClose={close}
     />
   )

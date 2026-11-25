@@ -1107,6 +1107,14 @@ CREATE TABLE auth_throttles (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE auth_trusted_logins (
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  marker_hash TEXT NOT NULL,
+  ip_prefix TEXT NOT NULL,
+  confirmed_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, marker_hash, ip_prefix)
+);
+
 CREATE TABLE auto_replies (
   id               TEXT PRIMARY KEY,
   keyword          TEXT NOT NULL,
@@ -12355,6 +12363,8 @@ BEGIN UPDATE audit_events SET security_created_at_jd = julianday(CASE WHEN subst
 
 CREATE TRIGGER audit_events_security_time_update AFTER UPDATE OF created_at ON audit_events
 BEGIN UPDATE audit_events SET security_created_at_jd = julianday(CASE WHEN substr(NEW.created_at, 20) NOT GLOB '*[Z+-]*' THEN NEW.created_at || '+09:00' ELSE NEW.created_at END) WHERE rowid = NEW.rowid; END;
+
+CREATE TRIGGER auth_trusted_logins_invalidate_credentials AFTER UPDATE OF totp_secret_enc, password_hash, is_active ON staff_members WHEN OLD.totp_secret_enc IS NOT NEW.totp_secret_enc OR OLD.password_hash IS NOT NEW.password_hash OR OLD.is_active IS NOT NEW.is_active BEGIN DELETE FROM auth_trusted_logins WHERE staff_id = NEW.id; END;
 
 CREATE TRIGGER automation_definitions_folder_delete AFTER DELETE ON folders
 BEGIN UPDATE automation_definitions SET folder_id = NULL WHERE folder_id = OLD.id; END;

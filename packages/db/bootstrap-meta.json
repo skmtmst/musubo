@@ -684,7 +684,8 @@
     "773_sns_multi_connections_drop_compat.sql",
     "786_restaurant_course_gallery.sql",
     "789_limit_legacy_folder_update_triggers.sql",
-    "797_scope_friend_line_user_ids.sql"
+    "797_scope_friend_line_user_ids.sql",
+    "799_auth_trusted_login.sql"
   ],
-  "migrationCount": 685
+  "migrationCount": 686
 }
