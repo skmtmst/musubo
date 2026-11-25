@@ -16,16 +16,19 @@ import {useAccount} from '@/contexts/account-context'
  * 内訳・つながる先。1152 では右の欄が表の下に積まれる（CSS だけ）。
  * 箱は予約元の色（LINE・レストランボード＝緑、予約媒体＝赤、電話＝灰）、承認待ちは黄の枠、押さえは灰の枠。
  */
-import { useEffect,useMemo,useState } from 'react'
+import { useEffect,useId,useMemo,useState } from 'react'
 import type {ReservationAxis} from '@line-crm/shared'
 import KpiCard from '@/components/shared/kpi-card'
 import Link from '@/components/shared/list-navigation'
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import Card from '@/components/shared/card'
-import SectionHeader from '@/components/shared/section-header'
+import { DisclosureItem, DisclosureToggle } from '@/components/shared/disclosure'
+import StatusBadge from '@/components/shared/status-badge'
+import { useTodayCheckFolded, useTodayCheckOpen } from '@/v8/style-dashboard/use-today-check-open'
 
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
+import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
@@ -121,6 +124,14 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   const mediaCount = countedBookings.length - lineCount - phoneCount
   const unseated = countedBookings.filter((item) => !item.departed_at && seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.length === 0).length
   const pendingSources = [...new Set(pending.map((item) => sourceName(item.source)))].join('・')
+  const sideId = useId()
+  const { folded: sideFolded, toggle: toggleSide } = useTodayCheckFolded(selectedAccountId, 'restaurant', `reservations:${storeId}`)
+  const { isOpen: sideOpen, setOpen: setSideOpen } = useTodayCheckOpen(selectedAccountId, 'restaurant', [], `reservations:${storeId}`, ['next', 'care', 'breakdown', 'links'])
+  const nextSummary = next ? `${withHonorific(next.customer_name)}・${next.guest_count}名・${hm(next.starts_at)}` : 'この日の残りの予約はありません。'
+  const careCount = pending.length + allergies.length
+  const careSummary = careCount ? `承認待ち ${pending.length}件・アレルギー ${allergies.length}件` : '承認待ち・アレルギーはありません'
+  const breakdown = `予約 ${formatNumber(countedBookings.length)}件・${guests}名 ／ LINE ${lineCount}・媒体 ${mediaCount}・電話 ${phoneCount} ／ 仮押さえ ${holds.length}枠`
+
 
   return (
     <>
@@ -132,9 +143,9 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
       </KpiBand>
       <div className={styles.todayColumns}>
         <div className={styles.calendarWrap} role="region" aria-label={`${dayTitle(day)}の時間×卓`}>
-        <ReservationBoard renderBody={columns.length===0 || axis==='floor' && shown.length===0 ? body=><>{shown.length===0 ? <LedgerEmpty noTables={tables.length===0} inactiveTables={tables.length>0&&columns.length===0} filtered={source!=='all'} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})}/> : null}{columns.length===0&&shown.length===0 ? null : body}{columns.length===0&&shown.length>0 ? <Button presentation="restaurant" onClick={()=>onView('list')}>一覧で予約を見る</Button> : null}</> : undefined} axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
+        <ReservationBoard singleRowToolbar renderBody={columns.length===0 || axis==='floor' && shown.length===0 ? body=><>{shown.length===0 ? <LedgerEmpty noTables={tables.length===0} inactiveTables={tables.length>0&&columns.length===0} filtered={source!=='all'} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})}/> : null}{columns.length===0&&shown.length===0 ? null : body}{columns.length===0&&shown.length>0 ? <Button presentation="restaurant" onClick={()=>onView('list')}>一覧で予約を見る</Button> : null}</> : undefined} axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
         <IconButton aria-label="前の日" onClick={() => onDay(addDays(day, -1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
-        <h2 className={styles.dateTitle}>{dayTitle(day)}</h2>
+        <div className={styles.datePicker}><DateField aria-label="予約日" value={toYmd(day)} displayFormat="day" clearable={false} onChange={value => { if (value) onDay(new Date(`${value}T00:00:00+09:00`)) }} /></div>
         <IconButton aria-label="次の日" onClick={() => onDay(addDays(day, 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
         <Button presentation="restaurant" onClick={() => onDay(new Date())} disabled={isToday} title={isToday ? '今日の予約を表示しています' : undefined}>今日</Button>
 
@@ -150,7 +161,8 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               {`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}
             </Notice> : null} floor={visibleFloor} dates={[toYmd(day)]}
           onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={entries}
-          resources={columns.map(t=>({id:t.id,label:`${t.code} ${t.max_capacity}名`,groupLabel:t.join_group ? `結合 ${t.join_group}` : undefined,capacity:t.max_capacity,active:!!t.is_active}))}
+          resourceNames={Object.fromEntries(columns.map(t=>[t.id,t.label?.trim() && t.label.trim() !== t.code ? `${t.label.trim()}（${t.code}）` : t.code]))}
+          resources={columns.map(t=>({id:t.id,label:t.code,groupLabel:t.join_group ? `結合 ${t.join_group}` : undefined,capacity:t.max_capacity,active:!!t.is_active}))}
           canWrite={canWrite} busy={busy} onOpen={onDetail}
           onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);onReload()}}
           printContext={`${storeName??storeId} ／ ${source==='all'?'予約元：すべて':SOURCE_LABEL[source]??source} ／ 有効な予約・押さえ`} title={`${dayTitle(day)}の予約`}
@@ -158,51 +170,33 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         />
         </div>
         <div className={styles.side}>
-          <Card frame="raised" layout="vertical" padding="roomy" gap="11px" aria-labelledby="rs-next-title">
-            <SectionHeader description={nextOtherDay ? '次の日以降の予約' : isToday ? '今日これからの予約' : '選んだ日の次の予約'} title={<span id="rs-next-title">次の予約</span>}/>
-            {next ? (
-              <>
-                <div className={styles.nextBox}>
+          <Card layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--polish-space-card)" aria-label="今日の確認">
+            <div className={styles.sideHeader}><h3>今日の確認</h3>
+              {sideFolded && next ? <StatusBadge tone="danger" size="micro" dot={false}>次の予約 1</StatusBadge> : null}
+              {sideFolded && careCount > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`注意 ${careCount}`}</StatusBadge> : null}
+              {sideFolded && countedBookings.length > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`予約 ${countedBookings.length}`}</StatusBadge> : null}
+              <DisclosureToggle open={!sideFolded} controls={sideId} onToggle={toggleSide} />
+            </div>
+            <div id={sideId} hidden={sideFolded}>
+              <DisclosureItem title="次の予約" summary={nextSummary} empty={!next} open={sideOpen('next')} onOpenChange={value => setSideOpen('next', value)}>
+                <p className={styles.sideText}>{nextOtherDay ? '次の日以降の予約' : isToday ? '今日これからの予約' : '選んだ日の次の予約'}</p>
+                {next ? <><div className={styles.nextBox}>
                   <p className={styles.nextName}>{`${withHonorific(next.customer_name)}・${next.guest_count}名`}</p>
                   <p className={styles.nextMeta}>{`${nextOtherDay ? `${mdWeek(new Date(next.starts_at))} ` : ''}${hm(next.starts_at)}〜${hm(next.ends_at)}・${next.table_id ? tableById.get(next.table_id)?.code ?? next.table_label : '未配席'}・${shortCourse(next.course_name)}`}</p>
-
-                </div>
-                <div className={styles.nextActions}><ReservationSource value={next.source}/>
-                  <Button presentation="restaurant" onClick={() => onDetail(next.id)}>詳細を見る</Button>
-
-                </div>
-              </>
-            ) : (
-              <p className={styles.sideText}>この日の残りの予約はありません。</p>
-            )}
-          </Card>
-          <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-care-title">
-            <SectionHeader title={<span id="rs-care-title">{isToday ? '今日 気をつけること' : '気をつけること'}</span>}/>
-            <p className={styles.sideText}>
-              {pending.length > 0
-                ? `・承認待ちが ${formatNumber(pending.length)} 件（${pending.map((item) => `${withHonorific(item.customer_name.split(/\s+/)[0])}・${sourceName(item.source)}`).join('、')}）`
-                : '・承認待ちはありません'}
-            </p>
-            {allergies.length > 0 ? (
-              <p className={`${styles.sideText} ${styles.sideAlert}`}>{`・アレルギー ${formatNumber(allergies.length)} 件（${allergies.map((item) => (item.allergy_note ?? '').replace(/・/g, '')).join('・')}）`}</p>
-            ) : null}
-            {peak >= 0 ? (
-              <p className={styles.sideText}>
-                {freeAtPeak.length === 0
-                  ? `・${slotLabel(peak)} に空いている卓はありません`
-                  : `・${slotLabel(peak)} に空いているのは ${freeAtPeak.map((table) => `${table.code}（${table.max_capacity}名）`).join('・')}${freeAtPeak.length === 1 ? 'だけ' : ''}`}
-              </p>
-            ) : null}
-          </Card>
-          <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-break-title">
-            <SectionHeader title={<span id="rs-break-title">{`${dayShort(day)}の内訳`}</span>}/>
-            <p className={styles.sideText}>{`予約 ${formatNumber(countedBookings.length)}件・${guests}名`}{' ／ '}{`LINE ${lineCount}・媒体 ${mediaCount}・電話 ${phoneCount}`}{' ／ '}{`仮押さえ ${holds.length}枠`}</p>
-          </Card>
-          <Card frame="raised" layout="vertical" padding="roomy" className={styles.sideCard} aria-labelledby="rs-links-title">
-            <SectionHeader title={<span id="rs-links-title">つながる先</span>}/>
-            <Link className={styles.sideLink} href="/restaurant-test/inventory">予約枠・在庫 → 時間帯ごとの空き</Link>
-            <Link className={styles.sideLink} href="/restaurant-test/tables">座席・卓管理 → 卓の結合・停止</Link>
-            <Link className={styles.sideLink} href="/restaurant-test/line-followup">LINE来店フォロー → 前日・当日のご案内</Link>
+                </div><div className={styles.nextActions}><ReservationSource value={next.source}/><Button presentation="restaurant" onClick={() => onDetail(next.id)}>詳細を見る</Button></div></> : <p className={styles.sideText}>{nextSummary}</p>}
+              </DisclosureItem>
+              <DisclosureItem title={isToday ? '今日 気をつけること' : '気をつけること'} summary={careSummary} empty={!careCount} tone={careCount ? 'warning' : undefined} open={sideOpen('care')} onOpenChange={value => setSideOpen('care', value)}>
+                <p className={styles.sideText}>{pending.length > 0 ? `・承認待ちが ${formatNumber(pending.length)} 件（${pending.map((item) => `${withHonorific(item.customer_name.split(/\s+/)[0])}・${sourceName(item.source)}`).join('、')}）` : '・承認待ちはありません'}</p>
+                {allergies.length > 0 ? <p className={`${styles.sideText} ${styles.sideAlert}`}>{`・アレルギー ${formatNumber(allergies.length)} 件（${allergies.map((item) => (item.allergy_note ?? '').replace(/・/g, '')).join('・')}）`}</p> : null}
+                {peak >= 0 ? <p className={styles.sideText}>{freeAtPeak.length === 0 ? `・${slotLabel(peak)} に空いている卓はありません` : `・${slotLabel(peak)} に空いているのは ${freeAtPeak.map((table) => `${table.code}（${table.max_capacity}名）`).join('・')}${freeAtPeak.length === 1 ? 'だけ' : ''}`}</p> : null}
+              </DisclosureItem>
+              <DisclosureItem title={`${dayShort(day)}の内訳`} summary={breakdown} empty={!countedBookings.length && !holds.length} open={sideOpen('breakdown')} onOpenChange={value => setSideOpen('breakdown', value)}><p className={styles.sideText}>{breakdown}</p></DisclosureItem>
+              <DisclosureItem title="つながる先" summary="関連する画面を開く" open={sideOpen('links')} onOpenChange={value => setSideOpen('links', value)}>
+                <div className={styles.sideLinks}><Link className={styles.sideLink} href="/restaurant-test/inventory">予約枠・在庫 → 時間帯ごとの空き</Link>
+                <Link className={styles.sideLink} href="/restaurant-test/tables">座席・卓管理 → 卓の結合・停止</Link>
+                <Link className={styles.sideLink} href="/restaurant-test/line-followup">LINE来店フォロー → 前日・当日のご案内</Link></div>
+              </DisclosureItem>
+            </div>
           </Card>
         </div>
       </div>

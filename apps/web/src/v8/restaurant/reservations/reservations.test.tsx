@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {},
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, stale: false }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({id:'staff-1'}), useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/v8/restaurant-reservations/index', async original => {
   const actual = await original<typeof import('@/v8/restaurant-reservations/index')>()
   return { ...actual, ReservationDetailDialog: (props: React.ComponentProps<typeof actual.ReservationDetailDialog>) => {
@@ -84,8 +84,9 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     render(<ReservationsPage />)
     await screen.findByText('見本 141')
     const heading = screen.getByRole('heading', { name: '次の予約' })
-    expect(heading.parentElement?.textContent).toContain('今日これからの予約')
-    expect(heading.parentElement?.textContent).not.toContain('いま')
+    const section = heading.closest('section')!
+    expect(section.textContent).toContain('今日これからの予約')
+    expect(section.textContent).not.toContain('いま')
   })
 
   it('その日が臨時休業・貸切なら、帯と「休業日・貸切を見る」を出す（予約は取り消さない）', async () => {
@@ -127,7 +128,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('箱を押すと予約の詳細（AjZhH）が開き、「内容を変える」から変更の窓へ。保存は今の口へ届く', async () => {
     render(<ReservationsPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変更する' }))
     fireEvent.change(screen.getByLabelText('お客様名'), { target: { value: '見本 116' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateReservation).toHaveBeenCalledWith('account-1', 'r1', expect.objectContaining({ customerName: '見本 116', tableId: 't1' })))
@@ -305,7 +306,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {})
     render(<ReservationsPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変更する' }))
     const name = screen.getByLabelText('お客様名')
     fireEvent.change(name, { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -331,12 +332,12 @@ describe('日本時間の今日（端末の時間帯とは別）', () => {
     render(<ReservationsPage />)
     await screen.findByRole('button', { name: /^見本 114 2名/ })
     expect(fixture.reservationsDay).toHaveBeenCalledWith('account-1', 'store-1', '2026-10-11')
-    expect(screen.getByRole('heading', { name: '10月11日（日）' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '予約日' }).textContent).toContain('10月11日（日）')
     expect(Boolean(screen.queryByRole('button', { name: '詳細を見る' }))).toBe(hasNext)
     fireEvent.click(screen.getByRole('button', { name: '次の日' }))
     await waitFor(() => expect(fixture.reservationsDay).toHaveBeenCalledWith('account-1', 'store-1', '2026-10-12'))
     fireEvent.click(screen.getByRole('button', { name: '前の日' }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: '10月11日（日）' })).not.toBeNull())
+    await waitFor(() => expect(screen.getByRole('button', { name: '予約日' }).textContent).toContain('10月11日（日）'))
   })
 })
 
@@ -381,7 +382,7 @@ describe('予約台帳の初期状態', () => {
   it('卓があれば予約0件でも空きマスから選んだ卓と時刻で電話予約へ進む', async () => {
     emptyStore(false)
     render(<ReservationsPage />)
-    const slot=await screen.findByRole('button',{name:'T2 2名 18:00に予約を入れる'})
+    const slot=await screen.findByRole('button',{name:'T2 18:00に予約を入れる'})
     fireEvent.focus(slot)
     fireEvent.click(slot)
     await screen.findByText('何を入れますか',{selector:'h2'})
