@@ -20,6 +20,7 @@ vi.mock('./posts', () => ({ PostsBoard: () => <div>投稿の見本</div>, PostEd
 vi.mock('./reviews', () => ({ ReviewsBoard: () => <div>口コミの見本</div>, ReviewDraft: () => null }))
 vi.mock('./performance', () => ({ default: () => <div>数値の見本</div> }))
 vi.mock('./profile', () => ({ default: () => <div>プロフィールの見本</div> }))
+vi.mock('./hours', () => ({ default: () => <div>営業時間の見本</div> }))
 vi.mock('./settings', () => ({ default: () => <div>設定の見本</div> }))
 let resolve!: (data: GoogleConnectionData) => void
 let reject!: (error: Error) => void
@@ -38,6 +39,8 @@ it.each(['owner', 'admin', 'viewer', null])('接続データを読む間（%s）
   identity(role); render(<GoogleV8 />)
   await screen.findByLabelText('Googleビジネスを読み込んでいます')
   expect(notices()).toHaveLength(0)
+  expect(screen.getByRole('heading', { name: 'Googleビジネス' })).toBeTruthy()
+  expect(screen.getByRole('tablist', { name: 'Googleビジネスの機能' })).toBeTruthy()
   expect(document.querySelector('[data-template-region="notice"]')).toBeNull()
 })
 it('読み込みに失敗した時は権限の帯を出さず、失敗と再読込を示す', async () => {
@@ -47,6 +50,8 @@ it('読み込みに失敗した時は権限の帯を出さず、失敗と再読�
   expect(document.querySelector('[data-list-state="error"]')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
   expect(notices()).toHaveLength(0)
+  expect(screen.getByRole('heading', { name: 'Googleビジネス' })).toBeTruthy()
+  expect(screen.getByRole('tablist', { name: 'Googleビジネスの機能' })).toBeTruthy()
   expect(document.querySelector('[data-template-region="notice"]')).toBeNull()
 })
 it('アカウント自体を読んでいる間も帯を出さない', async () => {
@@ -85,4 +90,14 @@ it.each(['owner', null])('データ取得後も、許可された人と未知の
   expect(await screen.findByText('投稿の見本')).toBeTruthy()
   expect(notices()).toHaveLength(0)
   expect(document.querySelector('[data-template-region="notice"]')).toBeNull()
+})
+
+it('営業時間は専用の識別を保ち、口コミの注意書きと権限の帯を重ねない', async () => {
+  fixture.tab = 'hours'; identity('viewer'); render(<GoogleV8 />)
+  await act(async () => { resolve({ ...data(), connection: { status: 'connected', locationName: 'locations/example' } } as GoogleConnectionData) })
+  expect(await screen.findByText('営業時間の見本')).toBeTruthy()
+  expect(document.querySelector('[data-google-hours-page]')).toBeTruthy()
+  expect(document.querySelector('[data-design-node="tYbl8"]')).toBeTruthy()
+  expect(screen.queryByText(/Google への返信は/)).toBeNull()
+  expect(notices()).toHaveLength(0)
 })
