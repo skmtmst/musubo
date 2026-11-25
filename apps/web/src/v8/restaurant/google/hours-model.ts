@@ -1,9 +1,20 @@
 import { HOURS_SERVICE_LABELS, hoursWeekday, effectiveOpeningDate, type HoursWorkspace, type HoursServiceKind, type HoursService, type OpeningPeriod } from '@line-crm/shared'
+import { formatDashRange } from '@/lib/format'
 import type { GoogleProfileData } from '@/lib/restaurant-google-api'
 import { WEEKDAY_JA } from './format'
 
 export function hoursText(periods: OpeningPeriod[], closed = '休業'): string {
-  return periods.length ? periods.map(p => `${p.open}–${p.close === '00:00' ? '翌0:00' : p.close < p.open ? `翌${p.close}` : p.close}`).join(' / ') : closed
+  return periods.length ? periods.map(p => formatDashRange(p.open, p.close === '00:00' ? '翌0:00' : p.close < p.open ? `翌${p.close}` : p.close)).join(' / ') : closed
+}
+export function hoursShortDateRange(start: string, end: string): string {
+  const from = `${Number(start.slice(5, 7))}/${Number(start.slice(8))}`
+  if (end === start) return from
+  return formatDashRange(from, `${Number(end.slice(5, 7))}/${Number(end.slice(8))}`)
+}
+export function hoursHolidayRangeNote(start: string, end: string): string {
+  const from = `${Number(start.slice(5, 7))}/${Number(start.slice(8))}`
+  const to = start.slice(0, 7) === end.slice(0, 7) ? String(Number(end.slice(8))) : `${Number(end.slice(5, 7))}/${Number(end.slice(8))}`
+  return `${formatDashRange(from, to)}の連休`
 }
 export function dateLabel(date: string, today: string, holiday = false): string {
   const [year, month, day] = date.split('-').map(Number)

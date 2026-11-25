@@ -185,6 +185,11 @@ export function formatListRecentTitle(value: DateInput, options: { fallback?: st
   return relative.endsWith('前') ? `${full}（${relative}）` : full
 }
 
+/** ダッシュ（–）でつなぐ時刻・日付・曜日の範囲（17:00 – 翌0:00、12/31 – 1/3）。左右に半角の空白を入れる。 */
+export function formatDashRange(from: string, to: string): string {
+  return `${from} – ${to}`
+}
+
 /** M月D日〜M月D日。両側とも月日を書く（9月1日〜9月30日）。年が違う側だけ `YYYY年` を付ける。 */
 export function formatRange(from: DateInput, to: DateInput, fallback = '—'): string {
   const a = toJst(from)

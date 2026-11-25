@@ -6,6 +6,7 @@ import { emptyHoursWorkspace, HOURS_WEEKDAYS, type HoursWorkspace, type OpeningW
 import type { GoogleProfileData } from '@/lib/restaurant-google-api'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import HoursPage from './hours'
+import { hoursHolidayRangeNote, hoursShortDateRange, hoursText } from './hours-model'
 const mocks=vi.hoisted(()=>({profile:vi.fn(),hoursWorkspace:vi.fn(),saveHoursWorkspace:vi.fn(),reviewHoursWorkspace:vi.fn(),sendChange:vi.fn(),change:vi.fn(),proposeHours:vi.fn(),allowed:true}))
 vi.mock('@/lib/restaurant-google-api',()=>({restaurantGoogleApi:mocks}))
 vi.mock('./use-google-permission',()=>({useGooglePermission:()=>({allowed:mocks.allowed,known:true,lockedReason:mocks.allowed?undefined:'管理者のみ変更できます'})}))
@@ -89,5 +90,21 @@ describe('営業時間ツールの操作',()=>{
  })
  it('閲覧だけの人は内容を見られるが変更・保存・送信できない',async()=>{
   mocks.allowed=false;await open();fireEvent.click(screen.getByRole('button',{name:'日付を指定'}));expect(screen.queryByRole('dialog',{name:'特別営業日の変更'})).toBeNull();expect(mocks.saveHoursWorkspace).not.toHaveBeenCalled();expect(mocks.sendChange).not.toHaveBeenCalled()
+ })
+ it('営業時間と日付の範囲はダッシュの左右に半角の空白を入れて表示する',async()=>{
+  expect(hoursText([{open:'17:00',close:'00:00'}])).toBe('17:00 – 翌0:00')
+  expect(hoursText([{open:'11:00',close:'15:00'},{open:'17:00',close:'00:00'}])).toBe('11:00 – 15:00 / 17:00 – 翌0:00')
+  expect(hoursText([{open:'18:00',close:'02:00'}])).toBe('18:00 – 翌02:00')
+  expect(hoursShortDateRange('2026-12-31','2027-01-03')).toBe('12/31 – 1/3')
+  expect(hoursShortDateRange('2026-12-31','2026-12-31')).toBe('12/31')
+  expect(hoursHolidayRangeNote('2027-01-01','2027-01-03')).toBe('1/1 – 3の連休')
+  expect(hoursHolidayRangeNote('2026-12-31','2027-01-03')).toBe('12/31 – 1/3の連休')
+  stored.draft.days=[{date:'2026-12-31',closed:true,periods:[]},{date:'2027-01-01',closed:true,periods:[]},{date:'2027-01-02',closed:true,periods:[]},{date:'2027-01-03',closed:true,periods:[]}]
+  mocks.profile.mockResolvedValue({...profile,today:{...profile.today,date:'2026-11-26',weekday:'THURSDAY',closed:false,periods:[{open:'17:00',close:'00:00'}]},profile:{...profile.profile,regularHours:{...weekly,MONDAY:[{open:'11:00',close:'15:00'},{open:'17:00',close:'00:00'}],THURSDAY:[{open:'17:00',close:'00:00'}]}}})
+  await open()
+  expect(screen.getAllByText('17:00 – 翌0:00').length).toBeGreaterThanOrEqual(2)
+  expect(screen.getAllByText('11:00 – 15:00 / 17:00 – 翌0:00').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getByText('12/31 – 1/3 休業')).toBeTruthy()
+  expect(screen.getByText('1/1 – 3の連休')).toBeTruthy()
  })
 })

@@ -221,7 +221,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         </Card>
         <Notice tone="info">ここで変えた曜日は、毎週その時間になります。「変更案を確認する」を押すまでGoogleの営業時間は変わりません。特別営業時間が設定されている日は、そちらが優先されます。</Notice>
       </>}
-      {mode !== 'text' ? <p className={styles.muted}>15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。</p> : null}
+      {mode !== 'text' ? <p className={styles.muted}>15分刻みで選べます。翌日にまたぐ時間（例：18:00 – 02:00）はそのまま入力できます。</p> : null}
       <StickyBar actions={<><Button lockedReason={lockedReason} onClick={clear} disabled={!canEdit || busy || !dirty}>入力をクリア</Button><Button lockedReason={lockedReason} variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認する</Button></>} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>

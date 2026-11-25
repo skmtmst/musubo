@@ -94,6 +94,10 @@ describe('GB-9 パフォーマンス', () => {
     // 説明の行は置かず、板の頭の「？」の中へ。期間は Google の集計が 28 日区切りなので 28 日を残して言う。
     expect(text).not.toContain('数字は Google ビジネス プロフィールの集計です')
     expect(text).toContain('過去28日（Google の集計）')
+    const trendButton = [...container.querySelectorAll('button')].find((node) => node.textContent === '表示数の推移を見る')
+    expect(trendButton).toBeTruthy()
+    await act(async () => { trendButton!.click() })
+    expect(container.textContent).toContain('2026/08/31 – 09/27')
   })
 
   it('未対応の飲食店向け指標は「—」で出す', async () => {

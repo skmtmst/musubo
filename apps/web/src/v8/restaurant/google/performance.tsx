@@ -27,7 +27,7 @@ import {
 import { errorMessage } from './format'
 import { useGooglePermission } from './use-google-permission'
 import styles from './google.module.css'
-import { formatDate as polishFormatDate, formatNumber as polishFormatNumber } from '@/lib/format'
+import { formatDashRange, formatDate as polishFormatDate, formatNumber as polishFormatNumber } from '@/lib/format'
 
 
 const METRICS: Array<{ key: keyof GooglePerformanceTotals; title: string; icon: typeof Eye }> = [
@@ -125,7 +125,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     }
   }, [accountId, canSync, load, syncing])
 
-  const range = data ? `${data.range.startDate.replace(/-/g, '/')}–${data.range.endDate.slice(5).replace('-', '/')}` : ''
+  const range = data ? formatDashRange(data.range.startDate.replace(/-/g, '/'), data.range.endDate.slice(5).replace('-', '/')) : ''
 
   return (
     <>

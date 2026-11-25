@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatBig,
+  formatDashRange,
   formatListDateTime,
   formatListDay,
   formatCount,
@@ -93,6 +94,12 @@ describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
     expect(formatDateTime('not-a-date', '?')).toBe('?')
     expect(formatNumber(NaN)).toBe('—')
     expect(formatRelative(undefined, NOW, '未実施')).toBe('未実施')
+  })
+
+  it('ダッシュでつなぐ時刻・日付の範囲は左右に半角の空白を入れる', () => {
+    expect(formatDashRange('17:00', '翌0:00')).toBe('17:00 – 翌0:00')
+    expect(formatDashRange('11:00', '15:00')).toBe('11:00 – 15:00')
+    expect(formatDashRange('12/31', '1/3')).toBe('12/31 – 1/3')
   })
 
   it('formatTime は秒を出さない', () => {

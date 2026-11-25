@@ -1,7 +1,7 @@
 /*
  * ★V8 Googleビジネスの共通の表示の道具。日時は店舗の時刻（日本時間）で出す。
  */
-import { formatDate as polishFormatDate } from '@/lib/format'
+import { formatDashRange, formatDate as polishFormatDate } from '@/lib/format'
 import type { GoogleHoursPeriod, GoogleWeekday } from '@/lib/restaurant-google-api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
@@ -68,7 +68,7 @@ export function formatPeriods(periods: GoogleHoursPeriod[], closedLabel = '休�
   return periods.map((p) => `${p.open}〜${p.close === '00:00' ? '24:00' : p.close}`).join(' / ')
 }
 
-/** 毎週の営業時間を「月–金 17:00〜23:00、火 定休日」の形に縮める。 */
+/** 毎週の営業時間を「月 – 金 17:00〜23:00、火 定休日」の形に縮める。 */
 export function summarizeWeekly(weekly: Record<GoogleWeekday, GoogleHoursPeriod[]>): string {
   const groups: Array<{ days: GoogleWeekday[]; text: string }> = []
   for (const day of WEEKDAYS) {
@@ -78,7 +78,7 @@ export function summarizeWeekly(weekly: Record<GoogleWeekday, GoogleHoursPeriod[
     else groups.push({ days: [day], text })
   }
   return groups
-    .map((g) => `${g.days.length > 2 ? `${WEEKDAY_JA[g.days[0]]}–${WEEKDAY_JA[g.days[g.days.length - 1]]}` : g.days.map((d) => WEEKDAY_JA[d]).join('・')} ${g.text}`)
+    .map((g) => `${g.days.length > 2 ? formatDashRange(WEEKDAY_JA[g.days[0]], WEEKDAY_JA[g.days[g.days.length - 1]]) : g.days.map((d) => WEEKDAY_JA[d]).join('・')} ${g.text}`)
     .join('、')
 }
 
