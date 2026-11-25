@@ -381,7 +381,7 @@ for (const width of [1152,1440,1920]) {
     try {
       const page=await browser.newPage({reducedMotion:'reduce'})
       await mount(page,width)
-      await page.getByRole('button',{name:'親候補：変える',exact:true}).click()
+      await page.getByRole('button',{name:'親候補：変更する',exact:true}).click()
       const dialog=page.getByRole('dialog',{name:'アカウントを選ぶ'})
       await dialog.waitFor()
       const radios=dialog.getByRole('radio')
@@ -782,7 +782,7 @@ for (const width of [1152,1440,1920]) {
     try {
       const page=await browser.newPage({reducedMotion:'reduce'})
       await mount(page,width)
-      await page.getByRole('button',{name:'親候補：変える',exact:true}).click()
+      await page.getByRole('button',{name:'親候補：変更する',exact:true}).click()
       const dialog=page.getByRole('dialog',{name:'アカウントを選ぶ'})
       await dialog.waitFor()
       const radios=dialog.getByRole('radio')

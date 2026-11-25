@@ -188,7 +188,7 @@ for (const width of [1152, 1440]) for (const role of ['owner', 'viewer']) {
       await page.waitForFunction(role => localStorage.getItem('lh_staff_role') === role, role)
       if (await page.locator('[data-customer-rail][data-collapsed]').count()) await page.getByRole('button', { name: '顧客情報', exact: true }).click()
       const rich = page.locator('[data-friend-profile-panel] section[aria-label="リッチメニュー"]')
-      const action = rich.getByRole(role === 'owner' ? 'link' : 'button', { name: '変える', exact: true })
+      const action = rich.getByRole(role === 'owner' ? 'link' : 'button', { name: '変更する', exact: true })
       await action.waitFor()
       assert.equal(await action.getAttribute('data-variant'), 'text')
       const color = await action.evaluate(el => {
@@ -202,7 +202,7 @@ for (const width of [1152, 1440]) for (const role of ['owner', 'viewer']) {
       assert.equal(color.actual, color.expected)
       if (role === 'owner') {
         assert.equal(await action.getAttribute('href'), '/rich-menus')
-        const delivery = page.locator('[data-friend-profile-panel] section[aria-label="配信の受け取り"]').getByRole('button', { name: '変える', exact: true })
+        const delivery = page.locator('[data-friend-profile-panel] section[aria-label="配信の受け取り"]').getByRole('button', { name: '変更する', exact: true })
         assert.equal(await delivery.getAttribute('data-variant'), 'text')
         assert.equal(await delivery.evaluate(el => getComputedStyle(el).color), color.expected)
       } else {

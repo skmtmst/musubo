@@ -221,7 +221,7 @@ for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤り
       await page.evaluate(()=>document.querySelectorAll('[data-ring-probe]').forEach(el=>el.removeAttribute('data-ring-probe')))
       await field.evaluate(el=>el.setAttribute('data-ring-probe',''))
       assertSingleStroke(await paintedStroke(page,RED), `${variant}: 誤りの追加面も赤1本`)
-      const button = host.getByRole('button', {name:'ファイルを選ぶ'})
+      const button = host.getByRole('button', {name:'ファイルを選択する'})
       await button.focus()
       const ring = await button.evaluate(el=>{const c=getComputedStyle(el);return {width:c.outlineWidth,offset:c.outlineOffset}})
       assert.deepEqual(ring,{width:'2px',offset:'2px'},`${variant}: 中の操作ボタンの輪は従来の位置`)

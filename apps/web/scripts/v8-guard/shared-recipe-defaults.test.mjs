@@ -142,7 +142,7 @@ test('選択窓をキャンセルしても、別の入力欄に入れた内容�
       await page.setViewportSize({width,height:1128})
       await page.setContent(`<html data-theme="v8"><style>${css}*{box-sizing:border-box}body{margin:0}main{width:80vw;margin:1em auto}input{width:100%}</style><div id="root"></div></html>`)
       await page.addScriptTag({content:compiled.outputFiles[0].text})
-      await page.getByRole('button',{name:'使うテンプレート：変える'}).click()
+      await page.getByRole('button',{name:'使うテンプレート：変更する'}).click()
       const dialog=page.getByRole('dialog',{name:'テンプレートを選ぶ'})
       await dialog.waitFor();await dialog.getByRole('button',{name:'キャンセル',exact:true}).click()
       for(const input of await page.locator('#controls input').all())assert.equal(await input.inputValue(),'保存前の内容')
