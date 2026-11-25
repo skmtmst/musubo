@@ -792,3 +792,26 @@ it('最新Penでは旧自動配席の説明カードを表示しない', async (
   expect(screen.queryByText('自動配席ルール')).toBeNull()
   expect(screen.queryByText(/直接来店も同じ候補を使います/)).toBeNull()
 })
+
+it('丸い卓の向かい合わせと方向を保存する', async () => {
+  render(<TablesPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '卓を作る' }))
+  const dialog = screen.getByRole('dialog', { name: '卓を作る' })
+  fireEvent.change(within(dialog).getByLabelText('卓番'), { target: { value: 'T5' } })
+  fireEvent.change(within(dialog).getByLabelText('表示名'), { target: { value: '丸い卓' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: '丸' }))
+  fireEvent.click(within(within(dialog).getByRole('group', { name: '椅子の配置' })).getByRole('button', { name: '向かい合わせ' }))
+  fireEvent.click(within(within(dialog).getByRole('group', { name: '椅子を置く側' })).getByRole('button', { name: '右' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '卓を作る' }))
+  await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ shape: 'circle', chairArrangement: 'both', chairSide: 'right' })))
+})
+
+it('以前の方向がない丸卓は全周の均等配置として編集する', async () => {
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: tables.map(t => t.id === 't3' ? { ...t, shape: 'circle', chair_arrangement: 'both', chair_side: null } : t) }) })
+  render(<TablesPage />)
+  const row = (await screen.findByText('T3 · 窓側4人卓')).closest('li')!
+  fireEvent.click(within(row).getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '変更' }))
+  const dialog = screen.getByRole('dialog', { name: '卓を変更する' })
+  expect(within(within(dialog).getByRole('group', { name: '椅子の配置' })).getByRole('button', { name: 'まわりに均等' }).getAttribute('aria-pressed')).toBe('true')
+})
