@@ -119,10 +119,10 @@ export default function StyleChoiceStep({ accountName, viewing, onView, chosen, 
 }
 
 /** 下の帯の 1 行。見ているスタイルではなく、選んでいるスタイルを言う。 */
-export function StyleChoiceStatus({ chosen }: { chosen: AccountStyle | null }) {
+export function StyleChoiceStatus({ chosen, emptyText = 'まだ選んでいません' }: { chosen: AccountStyle | null; emptyText?: string }) {
   return (
     <span className={styles.status} role="status">
-      {chosen ? `選んでいるスタイル：${STYLE_EXPERIENCE_SCRIPT.styles[chosen].label}` : 'まだ選んでいません'}
+      {chosen ? `選んでいるスタイル：${STYLE_EXPERIENCE_SCRIPT.styles[chosen].label}` : emptyText}
     </span>
   )
 }

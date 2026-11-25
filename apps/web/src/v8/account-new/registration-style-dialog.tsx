@@ -56,7 +56,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
       <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : <DialogActions>
-      <Button type="button" variant="primary" onClick={() => onSave(viewing)} disabled={busy || !ready} busy={busy} busyLabel="保存しています…">次へ<ArrowRight size={16} aria-hidden="true" /></Button>
+      <Button type="button" variant="primary" onClick={() => onSave(viewing)} disabled={busy || !ready} busy={busy} busyLabel="保存しています…">{STYLE_EXPERIENCE_SCRIPT.styles[viewing].label}で次へ<ArrowRight size={16} aria-hidden="true" /></Button>
     </DialogActions>}
   >
     <div className={styles.body}>
@@ -65,7 +65,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
         <ProgressBar appearance="quota" className={styles.track} value={4} max={5} label="登録の進み" />
         <span className={styles.progressName}>使い方のスタイル</span>
       </div>
-      {choice ? <StyleChoiceStatus chosen={choice} /> : <span role="status">次へで選ぶスタイル：{STYLE_EXPERIENCE_SCRIPT.styles[viewing].label}</span>}
+      <StyleChoiceStatus chosen={choice || null} emptyText={`次へで選ぶスタイル：${STYLE_EXPERIENCE_SCRIPT.styles[viewing].label}`} />
       <StyleChoiceStep videoPreview accountName={accountName} viewing={viewing} onView={viewStyle} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
       <p className={styles.where}><Info aria-hidden="true" className={styles.whereIcon} />あとから変えられます（設定 › アカウント）。</p>
     </div>

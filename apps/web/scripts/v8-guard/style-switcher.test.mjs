@@ -72,7 +72,7 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
       await switcher.getByRole('group', { name: '見るスタイル', exact: true }).getByRole('button', { name: /^飲食店/ }).click()
       const choose = dialog.getByRole('button', { name: 'このスタイルにする', exact: true })
       if (await choose.count()) await choose.click()
-      const name = entry === 'registration' ? '次へ' : '保存する'
+      const name = entry === 'registration' ? '飲食店で次へ' : '保存する'
       await dialog.getByRole('button', { name, exact: true }).click()
       if (entry === 'registration') {
         await page.getByText('LINEアカウントの登録が完了しました', { exact: true }).waitFor({ state: 'attached' })

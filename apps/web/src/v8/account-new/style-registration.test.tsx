@@ -84,7 +84,7 @@ it('飲食店を選び、同じアカウントへ保存して登録をやり直�
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   expect(dialog.querySelectorAll('[data-style-switcher]')).toHaveLength(1)
   expect(dialog.querySelector('[data-window-body]')?.contains(dialog.querySelector('[data-style-switcher]'))).toBe(false)
-  const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  const next = within(dialog).getByRole('button', { name: /で次へ$/ }) as HTMLButtonElement
   expect(next.disabled).toBe(false)
   fireEvent.click(next)
   await screen.findByText('LINEアカウントの登録が完了しました')
@@ -100,7 +100,7 @@ it.each(ACCOUNT_STYLES.filter(style => style !== 'restaurant'))('%sの未保存�
   render(<AccountRegisterV8 />)
   const dialog = within(await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' }))
   expect(dialog.getByRole('heading', { name: `${STYLE_EXPERIENCE_SCRIPT.styles[style].label}でできること` })).toBeTruthy()
-  fireEvent.click(dialog.getByRole('button', { name: '次へ' }))
+  fireEvent.click(dialog.getByRole('button', { name: /で次へ$/ }))
   await waitFor(() => expect(net.save).toHaveBeenCalledWith('created-account', expect.objectContaining({ style }), true))
 })
 
@@ -120,7 +120,7 @@ it('保存失敗では完了にせず、同じ選択と作成済みIDで再試�
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
-  const save = within(dialog).getByRole('button', { name: '次へ' })
+  const save = within(dialog).getByRole('button', { name: /で次へ$/ })
   await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(save)
   await screen.findByText('使い方を確認・保存できませんでした')
@@ -145,7 +145,7 @@ it('スタイルが未選択の登録再開では、窓を閉じても保留を�
   sessionStorage.setItem(REGISTRATION_STYLE_KEY, 'created-account')
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
-  expect((within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false)
+  expect((within(dialog).getByRole('button', { name: /で次へ$/ }) as HTMLButtonElement).disabled).toBe(false)
   expect(within(dialog).queryByRole('button', { name: 'あとで設定する' })).toBeNull()
   fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
   expect(screen.queryByRole('button', { name: 'あとで設定する' })).toBeNull()
@@ -160,7 +160,7 @@ it('見本を切り替えただけでは保存せず、次へで進める', asyn
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   fireEvent.click(within(dialog).getByRole('button', { name: '飲食店' }))
-  const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  const next = within(dialog).getByRole('button', { name: /で次へ$/ }) as HTMLButtonElement
   expect(next.disabled).toBe(false)
   expect(net.save).not.toHaveBeenCalled()
 })
