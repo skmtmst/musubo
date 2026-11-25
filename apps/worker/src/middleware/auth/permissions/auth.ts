@@ -46,6 +46,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // 在庫ルールと媒体受付の操作は、予約枠・在庫画面に帰属する。
   // 設定変更は route 側でも owner/admin に絞る。
   ['/api/restaurant-test/media-links', '/restaurant-test/channels'],
+  ['/api/restaurant-test/media-email-import', '/restaurant-test/channels'],
   ['/api/restaurant-test/reservation-link', '/restaurant-test/channels'],
   ['/api/restaurant-test/media', '/restaurant-test/channels'],
   ['/api/restaurant-test/closures', '/restaurant-test/inventory'],

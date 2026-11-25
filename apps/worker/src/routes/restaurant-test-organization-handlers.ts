@@ -17,6 +17,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { dbFor } from '../services/db-router.js';
 import { issueRestaurantIntakeAddress, listRestaurantIntakeAddresses, RestaurantIntakeConfigurationError } from '../services/restaurant-email-intake.js';
+import { loadStoreMediaEmailImportStates } from '../services/restaurant-media-email-import.js';
 import { issueLineAccessToken, LineTokenIssueError } from '../services/token-refresh.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import { applyDueRestaurantMenuPrices, expireRestaurantHolds } from '../services/restaurant-booking.js';
@@ -637,18 +638,33 @@ export const get__api_restaurant_test_channels_19 = async (c: Context<Env, "/api
     (SELECT COUNT(*) FROM rt_inbound_emails e WHERE e.store_id = ? AND e.media_id = m.id AND e.status = 'quarantined') AS unreadableCount
     FROM rt_media m ORDER BY m.code`).bind(storeId, from, to, storeId, storeId)
     .all<{ id: string; code: string; name: string; is_active: number; todayCount: number; lastReceivedAt: string | null; unreadableCount: number }>();
-  const data = media.results.map(({ is_active, ...row }) => ({ ...row, receiveMethod: 'email_forward', ...restaurantChannelState(row.lastReceivedAt, is_active === 1) }));
+  const importStates = await loadStoreMediaEmailImportStates(db, storeId);
+  const unsupportedImportState = {
+    emailImportSupported: false,
+    emailImportEnabled: false,
+    emailImportVersion: 0,
+    heldCount: 0,
+    expiringHeldCount: 0,
+    nearestHeldExpiresAt: null as string | null,
+    daysUntilNearestHeldExpiry: null as number | null,
+  };
+  const data = media.results.map(({ is_active, ...row }) => ({
+    ...row,
+    receiveMethod: 'email_forward',
+    ...restaurantChannelState(row.lastReceivedAt, is_active === 1),
+    ...(importStates.get(row.id) ?? unsupportedImportState),
+  }));
   for (const [code, name] of [['restaurant_board', 'レストランボード'], ['reszaiko', 'レス在庫']] as const) {
     const row = await db.prepare(`SELECT COUNT(CASE WHEN datetime(received_at) >= datetime(?) AND datetime(received_at) < datetime(?) THEN 1 END) AS todayCount,
       MAX(received_at) AS lastReceivedAt, COUNT(CASE WHEN status = 'failed' THEN 1 END) AS unreadableCount
       FROM rt_sync_events WHERE store_id = ? AND provider = ?`).bind(from, to, storeId, code)
       .first<{ todayCount: number; lastReceivedAt: string | null; unreadableCount: number }>();
-    data.push({ id: code, code, name, ...row!, receiveMethod: 'direct', ...restaurantChannelState(row!.lastReceivedAt, true) });
+    data.push({ id: code, code, name, ...row!, receiveMethod: 'direct', ...restaurantChannelState(row!.lastReceivedAt, true), ...unsupportedImportState });
   }
   const manual = await db.prepare(`SELECT COUNT(CASE WHEN datetime(created_at) >= datetime(?) AND datetime(created_at) < datetime(?) THEN 1 END) AS todayCount,
     MAX(created_at) AS lastReceivedAt FROM rt_reservations WHERE store_id = ? AND source IN ('manual', 'phone', 'line') AND inbound_email_id IS NULL`)
     .bind(from, to, storeId).first<{ todayCount: number; lastReceivedAt: string | null }>();
-  data.push({ id: 'manual', code: 'manual', name: '手入力・電話・LINE', ...manual!, unreadableCount: 0, receiveMethod: 'manual', ...restaurantChannelState(manual!.lastReceivedAt, true) });
+  data.push({ id: 'manual', code: 'manual', name: '手入力・電話・LINE', ...manual!, unreadableCount: 0, receiveMethod: 'manual', ...restaurantChannelState(manual!.lastReceivedAt, true), ...unsupportedImportState });
   return c.json({ success: true, data });
 };
 
