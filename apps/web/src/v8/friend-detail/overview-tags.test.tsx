@@ -7,14 +7,14 @@ import type { FriendDetail } from '@/lib/api'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 
-const fixture = vi.hoisted(() => ({ accountId: 'account-a', tags: vi.fn(), add: vi.fn(), remove: vi.fn(), toast: vi.fn(), confirm: undefined as (() => void) | undefined, consentStatus: 'ready' as 'ready' | 'loading' | 'error', consentCanEdit: false, consentDrawerStatus: 'ready' }))
+const fixture = vi.hoisted(() => ({ accountId: 'account-a', rank: vi.fn(), tags: vi.fn(), add: vi.fn(), remove: vi.fn(), toast: vi.fn(), confirm: undefined as (() => void) | undefined, consentStatus: 'ready' as 'ready' | 'loading' | 'error', consentCanEdit: false, consentDrawerStatus: 'ready' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, tags: { list: fixture.tags }, friends: { addTag: fixture.add, removeTag: fixture.remove } } }
 })
-vi.mock('@/lib/api/helpers/gap3', () => ({ memberRanksApi: { friend: async () => ({ success: true, data: null }) } }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ memberRanksApi: { friend: fixture.rank } }))
 vi.mock('@/components/shared/toast', () => ({ notifyToast: fixture.toast }))
 vi.mock('@/components/shared/dialog', async (original) => {
   const { default: Dialog } = await original<typeof import('@/components/shared/dialog')>()
@@ -51,6 +51,7 @@ describe('タグ編集の権限と保存後の対象', () => {
   beforeEach(() => {
     fixture.consentStatus = 'ready'
     fixture.accountId = 'account-a'
+    fixture.rank.mockReset().mockResolvedValue({ success: true, data: null })
     fixture.tags.mockReset().mockResolvedValue({ success: true, data: tags })
     fixture.add.mockReset().mockResolvedValue({ success: true })
     fixture.remove.mockReset().mockResolvedValue({ success: true })
@@ -58,6 +59,45 @@ describe('タグ編集の権限と保存後の対象', () => {
     document.documentElement.dataset.theme = 'v8'
   })
   afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
+
+  it('友だちを切り替えたら前のランクを消し、取得失敗後に読み直せる', async () => {
+    const delayed = deferred<{ success: boolean; data: null }>()
+    fixture.rank.mockResolvedValueOnce({ success: true, data: { current: { name: 'ゴールド' } } })
+      .mockReturnValueOnce(delayed.promise)
+      .mockResolvedValueOnce({ success: true, data: { current: { name: 'シルバー' } } })
+    const view = render(rail('A', vi.fn(async () => {})))
+    await screen.findByText('会員ランク：ゴールド')
+    view.rerender(rail('B', vi.fn(async () => {})))
+    expect(screen.queryByText('会員ランク：ゴールド')).toBeNull()
+    await act(async () => delayed.resolve({ success: false, data: null }))
+    expect(await screen.findByText('会員ランクを読み込めませんでした')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByText('会員ランク：シルバー')
+  })
+
+  it('アカウントを切り替えたら同じ友だちでも前のランクを表示しない', async () => {
+    const delayed = deferred<{ success: boolean; data: null }>()
+    fixture.rank.mockResolvedValueOnce({ success: true, data: { current: { name: 'ゴールド' } } }).mockReturnValueOnce(delayed.promise)
+    const view = render(rail('A', vi.fn(async () => {})))
+    await screen.findByText('会員ランク：ゴールド')
+    fixture.accountId = 'account-b'
+    view.rerender(rail('A', vi.fn(async () => {})))
+    expect(screen.queryByText('会員ランク：ゴールド')).toBeNull()
+    await act(async () => delayed.resolve({ success: false, data: null }))
+    expect(await screen.findByText('会員ランクを読み込めませんでした')).toBeTruthy()
+  })
+
+  it('切り替え前の遅い応答で現在のランクを上書きしない', async () => {
+    const delayed = deferred<{ success: boolean; data: { current: { name: string } } }>()
+    fixture.rank.mockReturnValueOnce(delayed.promise)
+      .mockResolvedValueOnce({ success: true, data: { current: { name: 'シルバー' } } })
+    const view = render(rail('A', vi.fn(async () => {})))
+    view.rerender(rail('B', vi.fn(async () => {})))
+    await screen.findByText('会員ランク：シルバー')
+    await act(async () => delayed.resolve({ success: true, data: { current: { name: 'ゴールド' } } }))
+    expect(screen.queryByText('会員ランク：ゴールド')).toBeNull()
+    expect(screen.getByText('会員ランク：シルバー')).toBeTruthy()
+  })
 
   it('配信の受け取りを開いた後に取得失敗したら編集を止める', () => {
     const view = render(rail('A', vi.fn(async () => {})))
