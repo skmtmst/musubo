@@ -113,6 +113,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
   const [forms, setForms] = useState<FormOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadRetry, setLoadRetry] = useState(0)
+  const [loadedScope, setLoadedScope] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [validationSubmitted, setValidationSubmitted] = useState(false)
@@ -128,6 +130,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [customMileageError, setCustomMileageError] = useState('')
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
+  const loadScope = JSON.stringify([selectedAccountId, campaignKey])
   const tokenNames = useInsertTokenNames(selectedAccountId)
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
@@ -138,15 +141,21 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     if (!selectedAccountId) {
       setLoading(false)
       setError('LINEアカウントを選んでください')
+      setLoadedScope(loadScope)
       return
     }
     let cancelled = false
     setLoading(true)
+    setSetting(null)
+    setForms([])
+    setPendingCount(null)
+    setError('')
     void Promise.all([
       api.nenCampaigns.settings(selectedAccountId),
       api.forms.list(selectedAccountId),
     ]).then(([settingsResponse, formsResponse]) => {
       if (cancelled) return
+      if (!settingsResponse.success || !formsResponse.success) throw new Error('settings unavailable')
       if (settingsResponse.success) {
         const found = settingsResponse.data.find((item) => item.campaignKey === campaignKey) ?? null
         setSetting(found)
@@ -155,9 +164,9 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       }
       if (formsResponse.success) setForms(formsResponse.data)
     }).catch(() => {
-      if (!cancelled) setError('読み込みに失敗しました。もう一度読み込んでください。')
+      if (!cancelled) { setSetting(null); setError('読み込みに失敗しました。もう一度読み込んでください。') }
     }).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled) { setLoadedScope(loadScope); setLoading(false) }
     })
     void api.nenCampaigns.overview(selectedAccountId)
       .then((res) => {
@@ -165,7 +174,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       })
       .catch(() => undefined)
     return () => { cancelled = true }
-  }, [campaignKey, selectedAccountId])
+  }, [campaignKey, selectedAccountId, loadScope, loadRetry])
 
   // テスト送信の相手の候補。はじめは、このアカウントのテスト送信先に登録したログインユーザー。
   useEffect(() => {
@@ -188,8 +197,11 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     return () => { cancelled = true }
   }, [selectedAccountId])
 
-  const contextRef = useRef({ accountId: selectedAccountId, campaignKey })
-  contextRef.current = { accountId: selectedAccountId, campaignKey }
+  const contextRef = useRef({ accountId: selectedAccountId, campaignKey, generation: 0 })
+  if (contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey) {
+    contextRef.current = { accountId: selectedAccountId, campaignKey, generation: contextRef.current.generation + 1 }
+  }
+  useEffect(() => { setSaving(false) }, [selectedAccountId, campaignKey])
   const latestSetting = async () => {
     const context = contextRef.current
     if (!context.accountId) return null
@@ -329,6 +341,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     setError('')
     setValidationSubmitted(true)
     if (!fields.submit()) return
+    const requestGeneration = contextRef.current.generation
     setSaving(true)
     setError('')
     setNotice('')
@@ -347,6 +360,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         afterActions: actions,
         expectedUpdatedAt: setting.updatedAt,
       })
+      if (requestGeneration !== contextRef.current.generation) return
       if (!response.success) {
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
@@ -355,6 +369,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       notifySaved('配信内容を保存しました')
       setSetting({ ...merged, updatedAt: response.data?.updatedAt ?? merged.updatedAt })
     } catch (caught) {
+      if (requestGeneration !== contextRef.current.generation) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
@@ -367,12 +382,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       { if (!fieldFailure)
       setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store')) }
     } finally {
-      setSaving(false)
+      if (requestGeneration === contextRef.current.generation) setSaving(false)
     }
   }
 
-  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="NEN配信を読み込んでいます" /></SaveErrorScope>
-  if (!setting) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={error || 'この配信が見つかりませんでした'} /></SaveErrorScope>
+  if (loading || loadedScope !== loadScope) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="NEN配信を読み込んでいます" /></SaveErrorScope>
+  if (!setting) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={error || 'この配信が見つかりませんでした'} onRetry={selectedAccountId ? () => setLoadRetry(value => value + 1) : undefined} /></SaveErrorScope>
 
   const time = merged.deliveryTime.slice(0, 5)
   const timing = `${formatCampaignTiming({ campaignKey, delayDays: merged.delayDays, deliveryTime: time })} に届きます`

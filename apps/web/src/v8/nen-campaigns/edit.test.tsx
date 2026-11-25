@@ -18,6 +18,7 @@ vi.hoisted(() => {
 })
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+const account = vi.hoisted(() => ({ id: 'account-a' }))
 const calls = vi.hoisted(() => ({
   settings: vi.fn(),
   forms: vi.fn(),
@@ -54,7 +55,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/nen-campaigns/edit',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { id: 'account-a', name: '然 - NEN -', displayName: '然 - NEN -', liffId: null }, accounts: [], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { id: account.id, name: '然 - NEN -', displayName: '然 - NEN -', liffId: null }, accounts: [], loading: false }),
 }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
@@ -83,6 +84,7 @@ let root: Root
 beforeEach(() => { clearToastsForTest();
   document.documentElement.dataset.theme = 'v8'
   role.value = verifiedStaffRole('owner')
+  account.id = 'account-a'
   for (const fn of Object.values(calls)) fn.mockReset()
   calls.settings.mockResolvedValue({ success: true, data: [REVIEW] })
   calls.forms.mockResolvedValue({ success: true, data: [{ id: 'form-review', name: '口コミ', description: null, isActive: true }] })
@@ -133,6 +135,54 @@ describe('狭い板の配信プレビュー', () => {
 })
 
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
+  it('配信設定やフォームを読めなければ編集を止め、読み直せる', async () => {
+    calls.forms.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('読み込みに失敗しました')
+    expect(host.querySelector('textarea')).toBeNull()
+    await act(async () => { fireEvent.click(button('もう一度読み込む')!) }); await flush()
+    expect(host.textContent).not.toContain('読み込みに失敗しました')
+    expect(host.textContent).toContain('口コミのお願い')
+  })
+  it('切替先で取得に失敗しても前の編集内容を出さない', async () => {
+    calls.settings.mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '前の店の文' }] }).mockResolvedValueOnce({ success: false, error: 'failed' })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('前の店の文')
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).not.toContain('前の店の文')
+    expect(host.textContent).toContain('読み込みに失敗しました')
+  })
+  it.each(['success', 'failure', 'conflict'])('切替前の保存%sが新しい編集画面を上書きしない', async outcome => {
+    const { ApiError } = await import('@/lib/api')
+    let resolve!: (value: unknown) => void
+    let reject!: (error: unknown) => void
+    calls.updateSetting.mockReturnValueOnce(new Promise((done, fail) => { resolve = done; reject = fail }))
+    calls.settings.mockImplementation(async (id: string) => ({ success: true, data: [{ ...REVIEW, bodyText: id === 'account-a' ? '前の店の文' : '新しい店の文' }] }))
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { fireEvent.click(button('配信内容を保存する')!) }); await flush()
+    expect(calls.updateSetting).toHaveBeenCalledTimes(1)
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('新しい店の文')
+    await act(async () => { if (outcome === 'conflict') reject(new ApiError(409, '競合', 'VERSION_CONFLICT')); else resolve(outcome === 'success' ? { success: true, data: { updatedAt: 'new' } } : { success: false }) }); await flush()
+    expect(host.textContent).toContain('新しい店の文')
+    expect(host.textContent).not.toContain('前の店の文')
+    expect(host.textContent).not.toContain('保存に失敗しました')
+    expect(host.textContent).not.toContain('ほかの担当者が先に保存しました')
+  })
+  it('切替前の遅い配信設定を新しいアカウントに表示しない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.settings.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '新しい店の文' }] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('新しい店の文')
+    await act(async () => { resolve({ success: true, data: [{ ...REVIEW, bodyText: '前の店の文' }] }) }); await flush()
+    expect(host.textContent).not.toContain('前の店の文')
+    expect(host.textContent).toContain('新しい店の文')
+  })
+
   it('V8 のテーマで節が並び、選んだ日数・時刻・マイルが保存に乗る', async () => {
     await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
