@@ -70,14 +70,14 @@ export function useDeliveryConsents(friendId: string) {
 }
 
 /** 左の要点の1段：宣伝の受け取りを1行で。 */
-export function DeliveryConsentSummary({ status, rows }: { status: 'loading' | 'ready' | 'error'; rows: FriendDeliveryConsent[] }) {
+export function DeliveryConsentSummary({ status, rows, onRetry }: { status: 'loading' | 'ready' | 'error'; rows: FriendDeliveryConsent[]; onRetry: () => void }) {
   if (status === 'loading') return <p className={styles.faint}>読み込んでいます</p>
-  if (status === 'error') return <p className={styles.faint}>読み込めませんでした</p>
+  if (status === 'error') return <p className={styles.faint}>読み込めませんでした <Button variant="text" size="inline" onClick={onRetry}>もう一度読み込む</Button></p>
   const marketing = rows.find((row) => row.purpose === 'marketing')
   return <p className={styles.summary}>{`キャンペーン・宣伝：${STATE_LABEL[marketing?.state ?? 'unknown']}`}</p>
 }
 
-export default function DeliveryConsentDrawer({ open, friendId, friendName, friendAccountId = null, selectedAccountId = null, rows, canEdit, onClose, onSaved }: {
+export default function DeliveryConsentDrawer({ open, friendId, friendName, friendAccountId = null, selectedAccountId = null, rows, canEdit, status = 'ready', onRetry, onClose, onSaved }: {
   open: boolean
   friendId: string
   friendName: string
@@ -85,6 +85,8 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
   selectedAccountId?: string | null
   rows: FriendDeliveryConsent[]
   canEdit: boolean
+  status?: 'loading' | 'ready' | 'error'
+  onRetry?: () => void
   onClose: () => void
   onSaved: () => Promise<void> | void
 }) {
@@ -95,6 +97,8 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
   const [warn, setWarn] = useState<{ epoch: number; friendId: string; friendName: string; accountId: string | null; purpose: string; state: FriendDeliveryConsent['state']; reason: string; version: number } | null>(null)
   const scope = useRef({ friendId, friendAccountId, selectedAccountId, canEdit, open, epoch: 0 })
   if (scope.current.friendId !== friendId || scope.current.friendAccountId !== friendAccountId || scope.current.selectedAccountId !== selectedAccountId || scope.current.canEdit !== canEdit || scope.current.open !== open) scope.current = { friendId, friendAccountId, selectedAccountId, canEdit, open, epoch: scope.current.epoch + 1 }
+  const statusRef = useRef(status)
+  statusRef.current = status
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const errors = useSaveFormErrors()
@@ -125,6 +129,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
   }
 
   const commit = async (confirmation?: NonNullable<typeof warn>) => {
+    if (statusRef.current !== 'ready') return false
     if (!editing || reviewRequired || commitLock.current || busy || !canEdit || !open) return
     if (confirmation && (confirmation.epoch !== scope.current.epoch || confirmation.friendId !== friendId || confirmation.purpose !== editing || confirmation.state !== next || confirmation.reason !== reason.trim() || confirmation.version !== (rowOf(editing)?.version ?? 0))) {
       setReviewRequired(true); setError('対象や受け取り設定が変わりました。閉じて読み直し、もう一度選んでください。'); return false
@@ -158,6 +163,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
   }
 
   const submit = () => {
+    if (statusRef.current !== 'ready') return
     if (!reason.trim()) { setReasonError('理由を入れてください。'); return }
     const current = editing ? rowOf(editing) : undefined
     /* 本人が止めた宣伝を、店が受け取るへ戻すときだけ注意の窓。 */
@@ -175,7 +181,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}
-      footer={editing && canEdit ? (
+      footer={editing && canEdit && status === 'ready' ? (
         <div className={styles.footer}>
           <Button onClick={() => setEditing(null)} disabled={busy}>キャンセル</Button>
           <Button variant="primary" onClick={submit} busy={busy} disabled={busy || reviewRequired} disabledReason={reviewRequired ? '本人の受け取り設定を確認し、理由か選択を見直してください。' : undefined}>保存する</Button>
@@ -184,7 +190,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
     >
       <div className={styles.body}>
         {error ? <Notice tone="danger" message={error} /> : null}
-        <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label="目的ごとの受け取り">
+        {status === 'loading' ? <ListState kind="loading" title="配信の受け取りを読み込んでいます" /> : status === 'error' ? <ListState kind="error" title="配信の受け取りを読み込めませんでした" onRetry={onRetry} /> : <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label="目的ごとの受け取り">
           {PURPOSES.map((purpose) => {
             const row = rowOf(purpose.key)
             const state = row?.state ?? 'unknown'
@@ -199,8 +205,8 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
               </div>
             )
           })}
-        </Card>
-        {editing && canEdit ? (
+        </Card>}
+        {editing && canEdit && status === 'ready' ? (
           <section className={styles.edit} aria-label={`${label(editing)}を変える`}>
             <h3 className={styles.sectionTitle}>{`変える（${label(editing)}）`}</h3>
             <Card padding="compact" layout="vertical" gap="var(--polish-space-field)">

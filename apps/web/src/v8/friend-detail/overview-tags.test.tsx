@@ -7,7 +7,7 @@ import type { FriendDetail } from '@/lib/api'
 import type { FriendDetailState } from './use-friend-detail'
 import type { FriendDetailPermissions } from './permissions'
 
-const fixture = vi.hoisted(() => ({ accountId: 'account-a', tags: vi.fn(), add: vi.fn(), remove: vi.fn(), toast: vi.fn(), confirm: undefined as (() => void) | undefined }))
+const fixture = vi.hoisted(() => ({ accountId: 'account-a', tags: vi.fn(), add: vi.fn(), remove: vi.fn(), toast: vi.fn(), confirm: undefined as (() => void) | undefined, consentStatus: 'ready' as 'ready' | 'loading' | 'error', consentCanEdit: false, consentDrawerStatus: 'ready' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/lib/api', async (original) => {
@@ -20,7 +20,7 @@ vi.mock('@/components/shared/dialog', async (original) => {
   const { default: Dialog } = await original<typeof import('@/components/shared/dialog')>()
   return { default: (props: import('@/components/shared/dialog').DialogProps) => { fixture.confirm = props.onConfirm; return <Dialog {...props} /> } }
 })
-vi.mock('./delivery-consent', () => ({ default: () => null, DeliveryConsentSummary: () => null, useDeliveryConsents: () => ({ rows: [], status: 'ready', reload: vi.fn() }) }))
+vi.mock('./delivery-consent', () => ({ default: (props: { canEdit: boolean; status: string }) => { fixture.consentCanEdit = props.canEdit; fixture.consentDrawerStatus = props.status; return null }, DeliveryConsentSummary: () => null, useDeliveryConsents: () => ({ rows: [], status: fixture.consentStatus, reload: vi.fn() }) }))
 
 import { FriendSummaryRail } from './overview-tab'
 
@@ -49,6 +49,7 @@ function changeTags(dialog: HTMLElement) {
 
 describe('タグ編集の権限と保存後の対象', () => {
   beforeEach(() => {
+    fixture.consentStatus = 'ready'
     fixture.accountId = 'account-a'
     fixture.tags.mockReset().mockResolvedValue({ success: true, data: tags })
     fixture.add.mockReset().mockResolvedValue({ success: true })
@@ -57,6 +58,23 @@ describe('タグ編集の権限と保存後の対象', () => {
     document.documentElement.dataset.theme = 'v8'
   })
   afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
+
+  it('配信の受け取りを開いた後に取得失敗したら編集を止める', () => {
+    const view = render(rail('A', vi.fn(async () => {})))
+    fireEvent.click(within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変える' }))
+    expect(fixture.consentCanEdit).toBe(true)
+    fixture.consentStatus = 'error'
+    view.rerender(rail('A', vi.fn(async () => {})))
+    expect(fixture.consentCanEdit).toBe(true)
+    expect(fixture.consentDrawerStatus).toBe('error')
+  })
+
+  it.each(['loading', 'error'] as const)('配信の受け取りが%sの間は編集を開かない', status => {
+    fixture.consentStatus = status
+    render(rail('A', vi.fn(async () => {})))
+    const action = within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変える' })
+    expect((action as HTMLButtonElement).disabled).toBe(true)
+  })
 
   it('開いたあとに権限を失うと窓を閉じ、保持していた保存操作もadd/removeを始めない', async () => {
     const view = render(rail('A', vi.fn(async () => {})))

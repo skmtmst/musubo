@@ -231,7 +231,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
           </span>
         </div>
       )}{mileageStatus === 'ready' && mileage?.balanceSource === 'ec' ? <p className={styles.memo}>会員ランク：{mileage.ecRank ?? '未設定'}（ECと同期）</p> : mileageStatus === 'ready' && mileage?.balanceSource !== 'ec' && rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
-        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
+        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)} disabled={consents.status !== 'ready'} disabledReason={consents.status === 'error' ? '読み直してから開いてください。' : '読み込み中です。'}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} onRetry={() => void consents.reload()} /> },
         { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変える</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変える</Button>, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
@@ -278,7 +278,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </section>
       </div>}
     />
-  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} friendAccountId={friend.lineAccountId ?? null} selectedAccountId={selectedAccountId} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
+  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} friendAccountId={friend.lineAccountId ?? null} selectedAccountId={selectedAccountId} rows={consents.rows} canEdit={perms.manage} status={consents.status} onRetry={() => void consents.reload()} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
     <SaveErrorScope errors={saveErrors}><Dialog open={tagDialogOpen && perms.editSupport} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
       <div className={styles.dialogBody} data-friend-tag-editor>
         {availableTags.map((tag) => <Checkbox key={tag.id} checked={selectedTagIds.includes(tag.id)} disabled={tagBusy} onCheckedChange={(checked) => setSelectedTagIds((current) => checked ? [...current, tag.id] : current.filter((id) => id !== tag.id))}>{tag.name}</Checkbox>)}

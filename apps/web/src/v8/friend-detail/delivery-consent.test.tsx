@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const api = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn(), history: vi.fn() }))
 vi.mock('@/lib/api/helpers/friend-delivery-consents', () => ({ friendDeliveryConsentsApi: api, friendDeliveryConsentHistoryApi: { list: api.history } }))
 
-const { default: Drawer, useDeliveryConsents } = await import('./delivery-consent')
+const { default: Drawer, useDeliveryConsents, DeliveryConsentSummary } = await import('./delivery-consent')
 
 const row = (purpose: string, state: string, source: string, version = 1) => ({ purpose, state, reason: '本人の操作', source, updatedBy: null, updatedAt: '2026-10-12T05:05:00.000Z', version })
 const ROWS = [row('transaction', 'granted', 'manual'), row('marketing', 'revoked', 'liff', 3)]
@@ -23,6 +23,20 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 const open = (canEdit = true) => render(<Drawer open friendId="f1" friendName="見本 143" rows={ROWS as never} canEdit={canEdit} onClose={() => {}} onSaved={() => {}} />)
 
 describe('配信の受け取り', () => {
+  it('右パネル内で取得に失敗したら不明と誤表示せず再取得する', async () => {
+    const retry = vi.fn()
+    render(<Drawer open friendId="f1" friendName="見本1" rows={[]} canEdit={false} status="error" onRetry={retry} onClose={() => {}} onSaved={() => {}} />)
+    expect(screen.queryByText('不明')).toBeNull()
+    expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+  it('概要の失敗表示から再読み込みできる', () => {
+    const retry = vi.fn()
+    render(<DeliveryConsentSummary status="error" rows={[]} onRetry={retry} />)
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
   it('権限の読み込みが終わっても進行中の履歴を表示する', async () => {
     let finish!: (value: unknown) => void
     api.history.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
