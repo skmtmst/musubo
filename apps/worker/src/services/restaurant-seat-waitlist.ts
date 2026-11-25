@@ -1,5 +1,6 @@
 import { openSeatTables } from './restaurant-closures.js';
 import { restaurantSeatCapacity } from './restaurant-seat-capacity.js';
+import { waitlistLineCapacityAvailable } from './restaurant-inventory-schedule.js';
 import type { Env } from '../worker-env.js';
 import { dispatchWaitlistInvites, finishExpiredWaitlists, waitlistHoldMinutes } from '../features/booking/booking-waitlist/index.js';
 export const DEFAULT_SEAT_WAITLIST_HOLD_MINUTES = 30;
@@ -23,7 +24,9 @@ export async function promoteSeatWaitlist(db: D1Database, slot: SeatWaitlistSlot
   if(next.guest_count<table.min_capacity)return {promoted:false,reason:'no_fitting_table'};
   if(next.guest_count>table.max_capacity){const capacity=table.join_group?await db.prepare('SELECT SUM(min_capacity) AS min,SUM(max_capacity) AS max FROM rt_tables WHERE store_id=? AND join_group=? AND is_active=1').bind(slot.storeId,table.join_group).first<{min:number;max:number}>():null;if(!capacity||next.guest_count<capacity.min||next.guest_count>capacity.max)return {promoted:false,reason:'no_fitting_table'};}
   const capacity=await restaurantSeatCapacity(db,slot.storeId,next.starts_at,ends);
-  if(!capacity.settings.enabled)return {promoted:false,reason:'unavailable'};
+  if (!capacity.settings.enabled || (next.line_uid && !await waitlistLineCapacityAvailable(
+    db, slot.storeId, { startsAt: next.starts_at, endsAt: ends, guestCount: next.guest_count }, capacity.state,
+  ))) return { promoted: false, reason: 'unavailable' };
   const available=await openSeatTables(db,slot.storeId,next.starts_at,ends,next.guest_count);
   if(!available.some(t=>t.id===slot.tableId||t.tableIds?.includes(slot.tableId)))return {promoted:false,reason:'unavailable'};
   const selected=capacity.select({startsAt:next.starts_at,endsAt:ends,guestCount:next.guest_count});

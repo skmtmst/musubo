@@ -29,13 +29,22 @@ test('飲食店3画面は共通タブなしで左メニューと画面内の行�
           }
           for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' })) localStorage.setItem(key, value)
         })
+        let hasActiveTables = true
         await stubApi(page, async (method, path) => {
           const response = await mockFetch(method, path)
-          if (new URL(path, base).pathname !== '/api/dashboard/style') return response
-          const body = JSON.parse(response.body)
-          body.data.style = 'restaurant'
-          body.data.styleSelected = true
-          return { ...response, body: JSON.stringify(body) }
+          const pathname = new URL(path, base).pathname
+          if (pathname === '/api/dashboard/style') {
+            const body = JSON.parse(response.body)
+            body.data.style = 'restaurant'
+            body.data.styleSelected = true
+            return { ...response, body: JSON.stringify(body) }
+          }
+          if (pathname === '/api/restaurant-test/snapshot' && !hasActiveTables) {
+            const body = JSON.parse(response.body)
+            body.data.tables = body.data.tables.map(table => ({ ...table, is_active: 0 }))
+            return { ...response, body: JSON.stringify(body) }
+          }
+          return response
         })
         for (const [route, title] of screens) {
           await page.goto(`${base}/restaurant-test/${route}`, { waitUntil: 'networkidle' })
@@ -50,6 +59,15 @@ test('飲食店3画面は共通タブなしで左メニューと画面内の行�
           assert.ok(size.content <= size.width, `${route}/${width}: horizontal overflow`)
           if (output) await page.screenshot({ path: resolve(output, `${route}-${width}.png`), fullPage: true })
         }
+        await page.getByRole('heading', { name: '営業日の基本配分', exact: true }).waitFor()
+        await page.getByRole('button', { name: '基本配分をまとめて変更', exact: true }).waitFor()
+        await page.locator('aside').getByRole('link', { name: '座席・卓管理', exact: true }).click()
+        await page.waitForURL('**/restaurant-test/tables')
+        await page.getByRole('heading', { name: '座席・卓管理', exact: true }).waitFor()
+
+        hasActiveTables = false
+        await page.goto(`${base}/restaurant-test/inventory`, { waitUntil: 'networkidle' })
+        await page.getByText('有効な卓がありません。座席・卓管理で卓を有効にしてください。').waitFor()
         await page.getByRole('link', { name: '座席・卓管理で変える →', exact: true }).click()
         await page.waitForURL('**/restaurant-test/tables')
         await page.getByRole('heading', { name: '座席・卓管理', exact: true }).waitFor()

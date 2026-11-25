@@ -353,7 +353,8 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuEditPage />)
     fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '冬のコース' } })
     fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '7000' } })
-    fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+    fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+    fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
     fireEvent.click(screen.getByRole('button', { name: /保存して追加する/ }))
     await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', name: '冬のコース', price: 7000 })))
   })
@@ -368,7 +369,8 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuWithGuide />)
     fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '春のコース' } })
     fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '8800' } })
-    fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+    fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+    fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
     if (status === 'active') {
       fireEvent.click(screen.getByRole('button', { name: '保存する状態', exact: true }))
       fireEvent.click(within(screen.getByRole('option', { name: '公開', exact: true })).getByRole('button'))
@@ -562,9 +564,10 @@ it('変更予定の価格と日時を一覧に表示する', async () => {
 it('所要時間を編集して保存できる', async () => {
   nav.params = new URLSearchParams('id=m1')
   render(<MenuEditPage />)
-  const duration = await screen.findByRole('spinbutton', { name: '所要時間' }) as HTMLInputElement
+  const duration = await screen.findByRole('button', { name: '所要時間' }) as HTMLButtonElement
   expect(duration.disabled).toBe(false)
-  fireEvent.change(duration, { target: { value: '90' } })
+  fireEvent.click(duration)
+  fireEvent.click(within(screen.getByRole('option', { name: '1時間30分（90分）' })).getByRole('button'))
   fireEvent.click(screen.getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
 })
@@ -576,16 +579,17 @@ it('開店準備で通常の入力欄を使い、必須3項目で下書きを保
   fixture.snapshot.mockResolvedValue({ data })
   fixture.storeContext.mockResolvedValue({ data: { selectedStore: { id: 'store-2' } } })
   render(<GuideSharedProvider value={{ summary: null, guide: {
-    phase: 'active', stepKey: 'friendAdd', procedureIndex: 2, anchor: null, pausedAnchor: null,
+    phase: 'active', stepKey: 'friendAdd', procedureIndex: 6, anchor: null, pausedAnchor: null,
     start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
   } }}><MenuEditPage /></GuideSharedProvider>)
-  const duration = await screen.findByRole('spinbutton', { name: '所要時間' })
+  const duration = await screen.findByRole('button', { name: '所要時間' })
   expect(screen.getByRole('button', { name: '保存する状態' }).textContent).toContain('下書き')
   fireEvent.change(screen.getByRole('textbox', { name: 'メニュー名' }), { target: { value: '季節の会席コース' } })
   fireEvent.change(screen.getByRole('spinbutton', { name: '価格（税込）' }), { target: { value: '8800' } })
   const save = screen.getByRole('button', { name: '保存して追加する' }) as HTMLButtonElement
   expect(save.disabled).toBe(true)
-  fireEvent.change(duration, { target: { value: '150' } })
+  fireEvent.click(duration)
+  fireEvent.click(within(screen.getByRole('option', { name: '2時間30分（150分）' })).getByRole('button'))
   fireEvent.click(save)
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({
     storeId: 'store-2', kind: 'course', name: '季節の会席コース', price: 8800, durationMinutes: 150, status: 'draft',

@@ -1389,10 +1389,9 @@ const RESTAURANT_SNAPSHOT = {
  */
 const GOOGLE_PROFILE = createGoogleHoursProfile(GOOGLE_STORE)
 /*
- * 板 Y8SjT2（予約枠・在庫）の1日：17:00〜20:00 の7枠・総数26席（稼働8卓）。
- * 埋まっている卓と席数は予約台帳から出す形（occupiedTableIds・occupied_seats・freeSeats）。
- * 19:00 だけ配分を直してある（OTA 6・LINE 4・当日 4）。最後に保存したのは中川さん 14:02（競合 qf3ky の文言）。
+ * 予約枠・在庫の1日（17:00〜20:00、26席）。19:00のみ時間帯の個別配分を持つ。
  */
+const RESTAURANT_STANDARD_ALLOCATION = { version: 1, standard: { otaCapacity: 8, lineCapacity: 6, walkInCapacity: 6 }, day: null, hoursStatus: 'open' }
 const RESTAURANT_INVENTORY_DAY = [
   [17, 0, ['tbl-8'], 8], [17, 30, ['tbl-8', 'tbl-3'], 12], [18, 0, ['tbl-8', 'tbl-3', 'tbl-4', 'tbl-6'], 17],
   [18, 30, ['tbl-8', 'tbl-1', 'tbl-3', 'tbl-4', 'tbl-6'], 19], [19, 0, ['tbl-8', 'tbl-1', 'tbl-2', 'tbl-3', 'tbl-4', 'tbl-6', 'tbl-7'], 22],
@@ -1401,7 +1400,8 @@ const RESTAURANT_INVENTORY_DAY = [
   id: `inv-${h}${m}`, store_id: 'store-sby', starts_at: restaurantAt(h, m), slot_minutes: 30, total_capacity: 26,
   ota_capacity: h === 19 && m === 0 ? 6 : 8, line_capacity: h === 19 && m === 0 ? 4 : 6, walk_in_capacity: h === 19 && m === 0 ? 4 : 6,
   reserved_count: seats, occupied_seats: seats, occupiedTableIds: tables, freeSeats: 26 - seats,
-  version: 3, updated_by: 'mem-2', updated_by_name: '見本 30', updated_at: restaurantAt(14, 2),
+  allocationSource: h === 19 && m === 0 ? 'slot' : 'standard', version: 3,
+  updated_by: 'mem-2', updated_by_name: '見本 30', updated_at: restaurantAt(14, 2),
 }))
 /* 開ける時間：月休み・火〜木 17:00〜22:00・金 〜23:00・土 昼夜・日 昼と 〜21:00（weekday は 0=日）。 */
 const RESTAURANT_OPENING_HOURS = {
@@ -3019,7 +3019,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/inventory/day') {
     const date = query.get('date') || ''
-    return { success: true, data: RESTAURANT_INVENTORY_DAY, closures: RESTAURANT_CLOSURES.filter((c) => c.startDate <= date && c.endDate >= date) }
+    return { success: true, data: RESTAURANT_INVENTORY_DAY, allocation: RESTAURANT_STANDARD_ALLOCATION, closures: RESTAURANT_CLOSURES.filter((c) => c.startDate <= date && c.endDate >= date) }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/closures') {
     const month = query.get('month')

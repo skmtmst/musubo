@@ -59,7 +59,8 @@ async function openEditor(mode: 'create' | 'edit', kind: 'course' | 'a_la_carte'
   if (mode === 'create') {
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '架空のメニュー' } })
     if (kind === 'course') {
-      fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+      fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+      fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
     } else {
       fireEvent.click(screen.getByRole('button', { name: '種類' }))
       fireEvent.click(within(screen.getByRole('option', { name: '単品' })).getByRole('button', { name: '単品' }))
