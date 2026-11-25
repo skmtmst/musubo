@@ -1,5 +1,5 @@
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
-import { inputError } from '../lib/input-errors.js';
+import { folderNameConflict, inputError } from '../lib/input-errors.js';
 
 import { deleteFriendAddRuleFolder, ensureFriendAddFallbackRules, listFriendAddRuleOrderIds, listFriendAddRulesPage, reorderFriendAddRulePriorities, reorderFriendAddRulePrioritiesCAS, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
 
@@ -328,7 +328,7 @@ export const post__api_friend_add_rules_folders_4 = async (c: Context<Env, "/api
     }, 201);
   } catch (error) {
     if (error instanceof Error && /unique/i.test(error.message)) {
-      return c.json({ success: false, code: 'DUPLICATE_FOLDER_NAME', error: '同じ名前のフォルダがあります' }, 409);
+      return folderNameConflict(c, 'DUPLICATE_FOLDER_NAME');
     }
     throw error;
   }
@@ -353,7 +353,7 @@ export const patch__api_friend_add_rules_folders_id_5 = async (c: Context<Env, "
     const updated = await c.env.DB.prepare('SELECT id,name,color FROM friend_add_rule_folders WHERE id=? AND line_account_id=?').bind(id, accountId).first();
     return c.json({ success: true, data: updated });
   } catch (error) {
-    if (error instanceof Error && /unique/i.test(error.message)) return c.json({ success: false, error: '同じ名前のフォルダがあります' }, 409);
+    if (error instanceof Error && /unique/i.test(error.message)) return folderNameConflict(c, 'DUPLICATE_FOLDER_NAME');
     throw error;
   }
 };

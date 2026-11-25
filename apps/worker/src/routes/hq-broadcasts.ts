@@ -7,7 +7,7 @@ import { resolveHqBroadcastAudience } from '../features/hq-broadcasts/hq-broadca
 import { copyHqBroadcast,hqBroadcastReactions } from '../features/hq-broadcasts/hq-broadcast-reactions/index.js';
 import { listHqBroadcastViews, saveHqBroadcastView, archiveHqBroadcastView } from '../features/hq-broadcasts/hq-broadcast-saved-views/index.js';
 import { listHqBroadcasts,hqBroadcastQuota } from '../features/hq-broadcasts/hq-broadcast-list/index.js';
-import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { folderInputError, folderNameConflict, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder,HqFolderError } from '@line-crm/db';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { hqBroadcastApprovalState, hqBroadcastApprovalCandidates, updateHqApproval } from '../features/hq-broadcasts/hq-broadcast-approval/index.js';
@@ -82,15 +82,16 @@ hqBroadcasts.post('/api/hq/broadcasts/folders',inputJsonBoundary({"name":["strin
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string;color?:string|null}>();
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100)throw new StampError('分類名を確認してください', 400, ["name"]);
  if(b.color!==undefined&&!isFolderSelectColor(b.color))return inputError(c, {success:false,error:'フォルダの色を確認してください'}, 422, ["color"]);
- const id=crypto.randomUUID();await db.prepare('INSERT INTO hq_broadcast_folders(id,tenant_id,name,color,display_order) SELECT ?,?,?,?,COALESCE(MAX(display_order),-1)+1 FROM hq_broadcast_folders WHERE tenant_id=? AND archived_at IS NULL').bind(id,a.tenantId,b.name.trim(),b.color??null,a.tenantId).run();
+ const id=crypto.randomUUID();try { await db.prepare('INSERT INTO hq_broadcast_folders(id,tenant_id,name,color,display_order) SELECT ?,?,?,?,COALESCE(MAX(display_order),-1)+1 FROM hq_broadcast_folders WHERE tenant_id=? AND archived_at IS NULL').bind(id,a.tenantId,b.name.trim(),b.color??null,a.tenantId).run(); }
+ catch(e){if(/UNIQUE constraint failed: hq_broadcast_folders\.tenant_id, hq_broadcast_folders\.name/i.test(String(e)))return folderNameConflict(c);throw e;}
  return c.json({success:true,data:{id,name:b.name.trim(),color:b.color??null,revision:1}},201);
 });
 hqBroadcasts.patch('/api/hq/broadcasts/folders/:id',inputJsonBoundary({"name":["string"],"expectedVersion":["number"],"color":["null","string"]}), async c=>{
  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff')),b=await c.req.json<{name:string;expectedVersion:number;color?:string|null}>();
  if(typeof b.name!=='string'||!b.name.trim()||b.name.length>100||!Number.isSafeInteger(b.expectedVersion))throw new StampError('分類名と版を確認してください', 400, ["name","expectedVersion"]);
  if(b.color!==undefined&&!isFolderSelectColor(b.color))return inputError(c, {success:false,error:'フォルダの色を確認してください'}, 422, ["color"]);
- const r=await db.prepare(`UPDATE hq_broadcast_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,revision=revision+1,updated_at=datetime('now') WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL`)
- .bind(b.name.trim(),b.color!==undefined?1:0,b.color??null,c.req.param('id'),a.tenantId,b.expectedVersion).run();if(!r.meta.changes)throw new StampError('分類が更新されました',409);
+ let r;try {r=await db.prepare(`UPDATE hq_broadcast_folders SET name=?,color=CASE WHEN ? THEN ? ELSE color END,revision=revision+1,updated_at=datetime('now') WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL`)
+ .bind(b.name.trim(),b.color!==undefined?1:0,b.color??null,c.req.param('id'),a.tenantId,b.expectedVersion).run();}catch(e){if(/UNIQUE constraint failed: hq_broadcast_folders\.tenant_id, hq_broadcast_folders\.name/i.test(String(e)))return folderNameConflict(c);throw e;}if(!r.meta.changes)return c.json({success:false,code:'VERSION_CONFLICT',error:'分類が更新されました'},409);
  const folder=await db.prepare('SELECT id,name,revision,color FROM hq_broadcast_folders WHERE id=? AND tenant_id=?').bind(c.req.param('id'),a.tenantId).first();
  return c.json({success:true,data:folder});
 });

@@ -12,6 +12,21 @@ beforeEach(()=>{f=createTestD1();f.raw.prepare("INSERT INTO line_accounts(id,nam
 });afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
 const call=(path:string,method='GET',body?:unknown,confirm=false)=>app.request(path,{method,headers:{'Content-Type':'application/json',...(confirm?{'X-Confirm-Irreversible':'broadcast-send'}:{})},...(body?{body:JSON.stringify(body)}:{})},{DB:f.db} as Env['Bindings']);
 describe('統括からの配信API',()=>{
+ it('同名の統括配信フォルダは作成時に項目の理由をつけて409で返す',async()=>{
+  expect((await call('/api/hq/broadcasts/folders','POST',{name:'テスト'})).status).toBe(201);
+  const duplicate=await call('/api/hq/broadcasts/folders','POST',{name:'テスト'});
+  expect(duplicate.status).toBe(409);
+  expect(await duplicate.json()).toMatchObject({error:'同じ名前のフォルダがあります',fields:{name:'同じ名前のフォルダがあります'}});
+ });
+ it('同じ統括の同時作成は1つだけ成功し、アーカイブ済みや別の統括は重複にならない',async()=>{
+  const responses=await Promise.all([call('/api/hq/broadcasts/folders','POST',{name:'一斉'}),call('/api/hq/broadcasts/folders','POST',{name:'一斉'})]);
+  expect(responses.map(r=>r.status).sort()).toEqual([201,409]);
+  const created=await (responses.find(r=>r.status===201)!).json() as any;
+  f.raw.prepare("UPDATE hq_broadcast_folders SET archived_at='2026-01-01' WHERE id=?").run(created.data.id);
+  expect((await call('/api/hq/broadcasts/folders','POST',{name:'一斉'})).status).toBe(201);
+  f.raw.prepare("INSERT INTO hq_broadcast_folders(id,tenant_id,name) VALUES('other-tenant','other','別統括だけ')").run();
+  expect((await call('/api/hq/broadcasts/folders','POST',{name:'別統括だけ'})).status).toBe(201);
+ });
  it('閲覧専用の担当者は再送プレビューを取得できない',async()=>{
   const r=await made();actor('owner',true);
   expect((await call(`/api/hq/broadcasts/${r.id}`)).status).toBe(200);

@@ -51,8 +51,23 @@ it('同じ店舗の別種類に同名があっても作成でき、同じ種類�
     .toEqual([{ kind: 'friend_add_rule' }, { kind: 'scenario' }]);
   const duplicate = await create('#16a34a', 'fixture-different-request-key-0002');
   expect(duplicate.status).toBe(409);
-  expect(await duplicate.json()).toMatchObject({ error: { code: 'DUPLICATE_FOLDER_NAME', message: '同じ名前のフォルダがあります' } });
+  expect(await duplicate.json()).toMatchObject({ error: { code: 'DUPLICATE_FOLDER_NAME', message: '同じ名前のフォルダがあります', fieldErrors: [{field:'name',message:'同じ名前のフォルダがあります'}] } });
   expect(fixture.raw.prepare('SELECT count(*) AS n FROM friend_add_rule_folders').get()).toEqual({ n: 1 });
+});
+
+it('別のフォルダと同じ名前への変更も項目の理由を返し、元の名前を残す', async () => {
+  await create();
+  const second=await app.request('http://localhost/api/friend-add-rules/folders',{
+    method:'POST',headers:{Authorization:'Bearer fixture-folder-admin-key','Content-Type':'application/json','Idempotency-Key':'fixture-second-folder-key-0002'},
+    body:JSON.stringify({accountId:'fixture-store',name:'別の分類'})
+  },{DB:fixture.db,DEPLOY_ENV:'test'} as Env['Bindings']);
+  expect(second.status).toBe(201);const id=((await second.json()) as {data:{id:string}}).data.id;
+  const renamed=await app.request(`http://localhost/api/friend-add-rules/folders/${id}`,{
+    method:'PATCH',headers:{Authorization:'Bearer fixture-folder-admin-key','Content-Type':'application/json'},
+    body:JSON.stringify({accountId:'fixture-store',name:'挨拶'})
+  },{DB:fixture.db,DEPLOY_ENV:'test'} as Env['Bindings']);
+  expect(renamed.status).toBe(409);expect(await renamed.json()).toMatchObject({error:{message:'同じ名前のフォルダがあります',fieldErrors:[{field:'name',message:'同じ名前のフォルダがあります'}]}});
+  expect(fixture.raw.prepare('SELECT name FROM friend_add_rule_folders WHERE id=?').get(id)).toEqual({name:'別の分類'});
 });
 
 it('担当店舗を明示された管理者も下の店舗に作成でき、担当外へは書き込まない', async () => {

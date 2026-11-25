@@ -25,7 +25,7 @@ export async function saveTemplateFolder(db: D1Database, auth: HqTemplateAuthori
       folderAudit(db,auth,id,'updated'),
     ]);
     else await db.batch([db.prepare('INSERT INTO hq_template_folders(id,tenant_id,name,color,display_order) SELECT ?,?,?,?,COALESCE(MAX(display_order),-1)+1 FROM hq_template_folders WHERE tenant_id=? AND archived_at IS NULL').bind(folderId,auth.tenantId,name,input.color ?? null,auth.tenantId),folderAudit(db,auth,folderId,'created')]);
-  } catch (e) { if (e instanceof HqTemplateError) throw e; if (String(e).includes('CONFLICT') || String(e).includes('malformed JSON')) throw new HqTemplateError('VERSION_CONFLICT',409); if (String(e).includes('UNIQUE')) throw new HqTemplateError('FOLDER_NAME_CONFLICT',409); throw e; }
+  } catch (e) { if (e instanceof HqTemplateError) throw e; if (String(e).includes('CONFLICT') || String(e).includes('malformed JSON')) throw new HqTemplateError('VERSION_CONFLICT',409); if (/UNIQUE constraint failed: hq_template_folders\.tenant_id, hq_template_folders\.name/i.test(String(e))) throw new HqTemplateError('FOLDER_NAME_CONFLICT',409); throw e; }
   return (await listTemplateFolders(db,auth)).find(f => f.id === folderId)!;
 }
 export async function deleteTemplateFolder(db: D1Database, auth: HqTemplateAuthority, id: string, revision: unknown) {
