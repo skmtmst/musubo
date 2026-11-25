@@ -1,4 +1,5 @@
 import { clearPrefetchedReads } from './api/transport/prefetch'
+import { clearReportedServerFailures } from './api/transport/request'
 import { clearFeatureSettingsCache } from './feature-settings-cache'
 import { clearFeatureVisibilityCache } from './feature-visibility-cache'
 import { clearLineAccountsCache } from './line-accounts-cache'
@@ -16,6 +17,7 @@ import { clearOperatorsCache } from './operators-cache'
  */
 export function clearCommonCaches(): void {
   clearPrefetchedReads()
+  clearReportedServerFailures()
   clearFeatureSettingsCache()
   clearFeatureVisibilityCache()
   clearLineAccountsCache()

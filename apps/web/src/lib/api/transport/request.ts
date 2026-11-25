@@ -92,12 +92,135 @@ export function isSessionLostExempt(code: string | undefined): boolean {
   return code !== undefined && SESSION_LOST_EXEMPT_CODES.has(code)
 }
 
-export function reportServerFailure(path: string, status: number): void {
+export const RECENT_SERVER_FAILURE_MS = 60_000
+export const MAX_RECENT_SERVER_FAILURES = 100
+
+type ServerFailureEntry = {
+  state: 'sending' | 'reported'
+  timestamp: number
+  generation: number
+  method: string
+  accountKey: string
+  canonicalPath: string
+}
+
+export type ServerFailureReportDetail = {
+  method?: string
+  accountId?: string | null
+  accountIds?: string[]
+  explicitNullAccount?: boolean
+  code?: string
+  raw?: string
+}
+
+const recentServerFailures = new Map<string, ServerFailureEntry>()
+let activeReportScope: string | undefined
+let reportGeneration = 0
+
+export function clearReportedServerFailures(): void {
+  reportGeneration += 1
+  recentServerFailures.clear()
+}
+
+export function reportedServerFailureCount(): number {
+  return recentServerFailures.size
+}
+
+export function synchronizeServerFailureScope(): void {
+  if (typeof window === 'undefined') return
+  const scope = apiReadScope()
+  if (activeReportScope !== scope.key) {
+    clearReportedServerFailures()
+    activeReportScope = scope.key
+  }
+}
+
+function pruneExpiredServerFailures(now: number): void {
+  for (const [oldKey, entry] of recentServerFailures) {
+    if (now - entry.timestamp >= RECENT_SERVER_FAILURE_MS) recentServerFailures.delete(oldKey)
+  }
+}
+
+function readSelectedAccountFallback(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    return window.localStorage.getItem('lh_selected_account')?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function resolveReportAccountKey(detail?: ServerFailureReportDetail): string {
+  if (detail?.explicitNullAccount) return ''
+  if (typeof detail?.accountId === 'string' && detail.accountId.trim()) return detail.accountId.trim()
+  if (detail?.accountIds?.length) return detail.accountIds.join(',')
+  return readSelectedAccountFallback()
+}
+
+function extractFailureSignature(code: string | undefined, raw: string | undefined): string {
+  if (code) return `code:${code}`
+  if (!raw) return 'code:'
+  try {
+    const parsed = JSON.parse(raw) as { code?: unknown; error?: unknown; message?: unknown }
+    if (typeof parsed?.code === 'string' && parsed.code.trim()) return `code:${parsed.code.trim().slice(0, 64)}`
+    const detail = typeof parsed?.error === 'string'
+      ? parsed.error
+      : typeof parsed?.message === 'string'
+        ? parsed.message
+        : ''
+    if (detail.trim()) return `msg:${detail.trim().slice(0, 120)}`
+  } catch {
+    const text = raw.trim()
+    if (text) return `raw:${text.slice(0, 120)}`
+  }
+  return 'code:'
+}
+
+export function clearReportedPathFailures(path: string, method = 'GET', detail?: ServerFailureReportDetail): void {
+  if (typeof window === 'undefined') return
+  synchronizeServerFailureScope()
+  pruneExpiredServerFailures(Date.now())
+  const normalizedMethod = method.toUpperCase()
+  const accountKey = resolveReportAccountKey(detail)
+  const canonicalPath = canonicalApiPath(path)
+  for (const [key, entry] of recentServerFailures) {
+    if (entry.method === normalizedMethod && entry.accountKey === accountKey && entry.canonicalPath === canonicalPath) {
+      recentServerFailures.delete(key)
+    }
+  }
+}
+
+export function reportServerFailure(path: string, status: number, detail?: ServerFailureReportDetail): void {
   if (typeof window === 'undefined' || path === '/api/client-errors') return
+  synchronizeServerFailureScope()
+  const now = Date.now()
+  pruneExpiredServerFailures(now)
+  const normalizedMethod = (detail?.method ?? 'GET').toUpperCase()
+  const accountKey = resolveReportAccountKey(detail)
+  const canonicalPath = canonicalApiPath(path)
+  const failureSig = extractFailureSignature(detail?.code, detail?.raw)
+  const pagePath = `${window.location.origin}${window.location.pathname}`
+  const reportKey = JSON.stringify([status, normalizedMethod, accountKey, canonicalPath, failureSig, pagePath])
+  const existing = recentServerFailures.get(reportKey)
+  if (existing && (existing.state === 'sending' || now - existing.timestamp < RECENT_SERVER_FAILURE_MS)) return
+  while (recentServerFailures.size >= MAX_RECENT_SERVER_FAILURES) {
+    const oldestKey = recentServerFailures.keys().next().value
+    if (oldestKey === undefined) break
+    recentServerFailures.delete(oldestKey)
+  }
+  const entry: ServerFailureEntry = {
+    state: 'sending',
+    timestamp: now,
+    generation: reportGeneration,
+    method: normalizedMethod,
+    accountKey,
+    canonicalPath,
+  }
+  recentServerFailures.set(reportKey, entry)
   const token = getCsrfToken()
   void (async () => {
     try {
-      await fetch(`${API_URL}/api/client-errors`, {
+      const reportRes = await fetch(`${API_URL}/api/client-errors`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -107,12 +230,20 @@ export function reportServerFailure(path: string, status: number): void {
         },
         body: JSON.stringify({
           message: `API ${status}: ${path}`,
-          path: `${window.location.origin}${window.location.pathname}`,
+          path: pagePath,
           occurredAt: new Date().toISOString(),
         }),
       })
+      if (!reportRes.ok) {
+        if (recentServerFailures.get(reportKey) === entry) recentServerFailures.delete(reportKey)
+        return
+      }
+      if (recentServerFailures.get(reportKey) === entry && entry.generation === reportGeneration) {
+        recentServerFailures.delete(reportKey)
+        recentServerFailures.set(reportKey, { ...entry, state: 'reported', timestamp: Date.now() })
+      }
     } catch {
-      // Slack報告自体の失敗で、元のAPIエラー処理を壊さない。
+      if (recentServerFailures.get(reportKey) === entry) recentServerFailures.delete(reportKey)
     }
   })()
 }
@@ -123,6 +254,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   const load = () => requestApi<T>(path, options, context)
   if (typeof window === 'undefined') return load()
   const scope = apiReadScope()
+  synchronizeServerFailureScope()
   synchronizeApiReadScope(scope.key)
   // Cookieだけで本人の世代を識別できない間は、別ログインの答えを共有しない。
   if (!scope.identified) return load()
@@ -179,10 +311,17 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
       ...options?.headers,
     },
   })
-  if (res.status >= 500) reportServerFailure(path, res.status)
+  const resolvedAccount = context ?? resolveApiAccountContext(path, options)
+  const reportDetail: ServerFailureReportDetail = {
+    method,
+    accountId: resolvedAccount.accountId,
+    accountIds: resolvedAccount.accountIds,
+    explicitNullAccount: options?.accountId === null,
+  }
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
+    if (res.status >= 500) reportServerFailure(path, res.status, { ...reportDetail, code, raw })
     /*
      * 401 は「セッションがサーバーに届いていない」。
      *
@@ -205,6 +344,7 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
     if (context) announceRequestFailure(detail, context, options)
     throw error
   }
+  clearReportedPathFailures(path, method, reportDetail)
   if (res.status === 204) {
     if (MUTATING_METHODS.has(method)) {
       clearApiReadCache()
