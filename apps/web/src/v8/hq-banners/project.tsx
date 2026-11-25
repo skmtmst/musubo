@@ -10,6 +10,8 @@ import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { accountAiFeaturesApi } from '@/lib/api/helpers/gap3'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -95,6 +97,9 @@ function ProjectInner() {
   const [engineReady, setEngineReady] = useState(true)
   const [accountsFailed, setAccountsFailed] = useState(false)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
+  const [aiAccounts, setAiAccounts] = useState<AccountWithStats[]>([])
+  const [aiAccountsStatus, setAiAccountsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [aiAccountId, setAiAccountId] = useState('')
   const [input, setInput] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
   const [inputBaseline, setInputBaseline] = useState<BannerGenerationInput>(EMPTY_GENERATION_INPUT)
   const inputRef = useRef(input)
@@ -189,13 +194,34 @@ function ProjectInner() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
-    void api.lineAccounts.list().then((res) => {
-      if (!res.success) throw new Error(res.error)
-      setAccounts(res.data as AccountWithStats[])
-    }).catch(() => {
-      // 生成は使えるが、配布先の取得失敗は空の一覧と区別する。
-      setAccountsFailed(true)
-    })
+    let cancelled = false
+    let accountListLoaded = false
+    void (async () => {
+      try {
+        const res = await api.lineAccounts.list()
+        if (!res.success) throw new Error(res.error)
+        const all = res.data as AccountWithStats[]
+        if (cancelled) return
+        accountListLoaded = true
+        setAccounts(all)
+        setAccountsFailed(false)
+        const active = all.filter(account => account.isActive && !account.archivedAt)
+        const settings = await Promise.all(active.map(account => accountAiFeaturesApi.get(account.id)))
+        if (settings.some(result => !result.success)) throw new Error('AI settings unavailable')
+        const eligible = active.filter((_, index) => settings[index].success && settings[index].data.items.some(item => item.feature === 'banner' && item.enabled))
+        if (cancelled) return
+        setAiAccounts(eligible)
+        let saved = ''
+        try { saved = localStorage.getItem('lh_hq_banner_ai_account') ?? '' } catch { /* storage unavailable */ }
+        const selected = eligible.some(account => account.id === saved) ? saved : eligible.length === 1 ? eligible[0].id : ''
+        setAiAccountId(selected)
+        if (selected) try { localStorage.setItem('lh_hq_banner_ai_account', selected) } catch { /* storage unavailable */ }
+        setAiAccountsStatus('ready')
+      } catch {
+        if (!cancelled) { if (!accountListLoaded) setAccountsFailed(true); setAiAccountsStatus('error') }
+      }
+    })()
+    return () => { cancelled = true }
   }, [])
 
   // 「同じ設定でもう一度生成」で戻ってきたとき、その画像の条件をパネルへ入れる。
@@ -268,11 +294,12 @@ function ProjectInner() {
   const sizePreset = presets.find((preset) => preset.key === input.presetKey)
   const sizeChipText = selectedImages.length > 0 && sizePreset ? presetSizeLabel(sizePreset) : exportSizeText(presets, input.presetKey)
   const refusal = usageRefusal(usage, input.count)
-  const blockedReason = !engineReady
+  const accountReason = aiAccountsStatus === 'loading' ? 'AI を使うアカウントを確認しています' : aiAccountsStatus === 'error' ? 'AI を使うアカウントを確認できませんでした。ページを再読み込みしてください' : aiAccounts.length === 0 ? 'AI を使えるアカウントがありません' : !aiAccountId ? 'AI を使うアカウントを選んでください' : null
+  const blockedReason = accountReason ?? (!engineReady
     ? '画像生成の接続設定がまだありません。運営にお問い合わせください'
     : project?.archivedAt
       ? 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください'
-      : validation ?? refusal
+      : validation ?? refusal)
 
   /*
    * WEB205：作り始める要求が返るまでは、もう一度押せない（連打で別の生成が2つ並ばない）。
@@ -312,7 +339,7 @@ function ProjectInner() {
         ...packedTextLines(input),
         customPrompt: input.customPrompt.trim(),
         freePrompt: input.freePrompt.trim(),
-      })
+      }, { accountId: aiAccountId })
       if (!res.success) throw new Error(res.error)
       setInputBaseline(submittedInput)
       setGenerations((prev) => [res.data, ...prev])
@@ -633,7 +660,10 @@ function ProjectInner() {
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
         <DetailColumns presentation="card" asideLabel="用途とテキストの設定" toggleLabel="用途とテキストを設定" expanded={panelExpanded} onExpandedChange={setPanelExpanded}
           aside={canManage ? <div ref={panelRef}>
-            <GenerationPanel v8Layout presets={presets} maxCount={maxCount} value={input}
+            <GenerationPanel v8Layout accountSelector={<div className="flex flex-col gap-1.5">
+              <span className="text-caption font-semibold text-ink">AI を使うアカウント</span>
+              {aiAccountsStatus === 'ready' && aiAccounts.length === 1 ? <p className="truncate text-caption text-ink" title={aiAccounts[0].displayName ?? aiAccounts[0].name}>{aiAccounts[0].displayName ?? aiAccounts[0].name}</p> : aiAccountsStatus === 'ready' && aiAccounts.length > 1 ? <EntitySelect aria-label="AI を使うアカウント" noun="アカウント" placeholder="選んでください" size="full" value={aiAccountId} options={aiAccounts.map(account => ({ ...entityOptionMetadata(account), value: account.id, label: account.displayName ?? account.name }))} onChange={id => { setAiAccountId(id); try { localStorage.setItem('lh_hq_banner_ai_account', id) } catch { /* storage unavailable */ } }} disabled={busy} /> : <p className="text-caption text-ink-secondary">{accountReason}</p>}
+            </div>} presets={presets} maxCount={maxCount} value={input}
               onChange={(next) => { setInputTouched(true); setInput(next) }} disabled={Boolean(running) || archived || !engineReady}
               referenceImages={referenceImages} onPickReference={openPicker} onUploadReference={(file) => void uploadReference(file)}
               referenceBusy={referenceBusy} usage={usage} onReloadUsage={loadUsage} usageHeading monthRemaining />
@@ -716,7 +746,7 @@ function ProjectInner() {
           </section>
 
         </DetailColumns>
-            <StickyBarRegion gap="var(--tpl-hb-gallery-gap)" feedback={blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}>
+            <StickyBarRegion gap="var(--tpl-hb-gallery-gap)" feedback={!accountReason && blockedReason && input.presetKey && !running && (inputTouched || !validation) ? <p className={styles.warnText}>{blockedReason}</p> : null}>
             {/* 入力が足りないだけの理由は、開いたばかりでは出さない（触ってから）。接続・アーカイブ・上限はすぐ出す。 */}
 
             {/* G-6（sr0Po）：左は選んだ画像の配布、右は生成の操作。0枚なら左の帯は出さない。 */}
@@ -747,7 +777,7 @@ function ProjectInner() {
                   ) : (
                     <>
                       <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
-                      <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} busy={starting}>
+                      <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || starting || Boolean(blockedReason)} disabledReason={accountReason} busy={starting}>
                         <Sparkles aria-hidden="true" className={styles.icon} />
                         {/* 板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。パネルの見出し `S0ay0i`「画像を生成」とは別。 */}
                         生成する（{formatNumber(input.count)} 枚）

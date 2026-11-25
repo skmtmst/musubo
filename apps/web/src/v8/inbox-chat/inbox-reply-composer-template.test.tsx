@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { ComponentProps } from 'react'
-const fixture = vi.hoisted(() => ({ picker: {} as { canPick?: boolean; lockedReason?: string; channel?: string }, reason: undefined as string | undefined }))
+const fixture = vi.hoisted(() => ({ picker: {} as { canPick?: boolean; lockedReason?: string; channel?: string; onPick?: (content: string) => void }, reason: undefined as string | undefined }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'acc-1', name: '本店' }, { id: 'acc-2', name: '別店舗' }] }) }))
 vi.mock('@/components/chats/template-picker', () => ({ default: (props: typeof fixture.picker) => { fixture.picker = props; return null } }))
 vi.mock('@/components/shared/use-permission-lock-reason', () => ({ usePermissionLockReason: () => fixture.reason }))
@@ -14,7 +14,7 @@ function props(role: string | null): Props {
   return {
     staffRole: role, scheduledSends: [], pendingPack: null, messageContent: '', messageLength: 0,
     pendingImage: null, pendingAttachment: null, quotedMessage: null, chatDetail: null,
-    textareaRef: { current: null }, imageInputRef: { current: null }, isComposingRef: { current: false },
+    textareaRef: { current: null }, tokenNames: {}, imageInputRef: { current: null }, isComposingRef: { current: false },
     memoPopoverRef: { current: null }, showTemplatePicker: true,
     setShowTemplatePicker: () => {}, setMessageContent: () => {}, selectedChatId: 'chat-1', selectedAccountId: 'acc-1',
   } as Props
@@ -58,7 +58,7 @@ it('差し込みがある返信だけ、解決後の見本を返信欄に出す'
   const preview = vi.spyOn(api.chats, 'renderPreview').mockResolvedValue({ success: true, data: { content: '山田さん、こんにちは', unresolved: [] } } as never)
   const view = render(<InboxReplyComposer {...props('owner')} messageContent="{{name}}さん、こんにちは" />)
   expect(await screen.findByText('送るとこうなります：')).toBeTruthy()
-  expect(screen.getByText('山田さん、こんにちは')).toBeTruthy()
+  expect(document.querySelector('[data-send-preview]')?.textContent).toBe('山田さん、こんにちは')
   expect(preview).toHaveBeenCalledTimes(1)
   view.rerender(<InboxReplyComposer {...props('owner')} messageContent="こんにちは" />)
   expect(screen.queryByText('送るとこうなります：')).toBeNull()
@@ -74,8 +74,9 @@ it('宛先を変えたら古い見本と遅れた応答を表示しない', asyn
   view.rerender(<InboxReplyComposer {...props('owner')} selectedChatId="new" messageContent="{{name}}さん" />)
   await waitFor(() => expect(pending.some(item => item.chat === 'new')).toBe(true))
   await act(async () => { pending.find(item => item.chat === 'old')!.resolve({ success: true, data: { content: '旧さん', unresolved: [] } }) })
-  expect(screen.queryByText('旧さん')).toBeNull()
+  expect(document.querySelector('[data-send-preview]')).toBeNull()
   await act(async () => { pending.find(item => item.chat === 'new')!.resolve({ success: true, data: { content: '新さん', unresolved: [] } }) })
-  expect(await screen.findByText('新さん')).toBeTruthy()
+  await waitFor(() => expect(document.querySelector('[data-send-preview]')?.textContent).toBe('新さん'))
+  expect(document.body.textContent).not.toContain('旧さん')
   preview.mockRestore()
 })

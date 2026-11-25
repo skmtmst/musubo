@@ -226,7 +226,7 @@ function TagFolderPage() {
         footer={(
           <>
             {editId ? (
-              <Button type="button" variant="danger" disabled={saving || loadState !== 'ready'} disabledReason={blockedReason} title={blockedReason ?? undefined} onClick={() => { deleteTicket.current = {}; setError(''); setDeleteOpen(true) }}>
+              <Button type="button" variant="text" textTone="danger" disabled={saving || loadState !== 'ready'} disabledReason={blockedReason} title={blockedReason ?? undefined} onClick={() => { deleteTicket.current = {}; setError(''); setDeleteOpen(true) }}>
                 <Trash2 size={16} aria-hidden="true" />削除する
               </Button>
             ) : null}

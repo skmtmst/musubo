@@ -128,16 +128,17 @@ for (const width of PC_WIDTHS) {
     await expect(page.getByText('開店準備を始めましょう')).toBeVisible()
     await page.screenshot({ path: `${OUT}/${width}-02-popup.png`, fullPage: false })
 
-    /* 「あとで」で閉じたら、帯の「開店準備 N/9」の札から開き直せる（枠02の足の注記）。 */
+    /* 「あとで」で閉じたら、上の帯の「開店準備 N/8」の札からはじめの設定へ移る。 */
     await popup.getByRole('button', { name: 'あとで', exact: true }).click()
     await expect(popup).toHaveCount(0)
-    const chip = page.locator('[data-setup-chip="open"]')
+    const chip = page.getByRole('banner').locator('[data-setup-chip="open"]')
     await expect(chip, '帯の開店準備の札が無い').toBeVisible()
     await page.screenshot({ path: `${OUT}/${width}-02-closed-chip.png`, fullPage: false })
 
     await chip.click()
-    await expect(popup, '札から開き直せない').toBeVisible()
-    await page.screenshot({ path: `${OUT}/${width}-02-reopened.png`, fullPage: false })
+    await expect(page, '札からはじめの設定へ移れない').toHaveURL(/\/getting-started\/?$/)
+    await expect(popup).toHaveCount(0)
+    await page.screenshot({ path: `${OUT}/${width}-02-getting-started.png`, fullPage: false })
   })
 
   test(`${width}px 枠14 手順別ガイド`, async ({ page }) => {

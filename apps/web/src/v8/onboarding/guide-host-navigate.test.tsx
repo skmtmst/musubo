@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), resolveEntry: vi.fn(), path: '/restaurant-test/tables',
   query: '', entryReady: true, accountId: 'account-1', staffId: 'staff-1' }))
 const state = vi.hoisted(() => ({
-  refresh: vi.fn(),
   guide: { phase: 'active' as string, stepKey: 'attributes' as string | null, procedureIndex: 1, anchor: null, pausedAnchor: null, start: vi.fn(), startAt: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn() },
   summary: {
     steps: [
@@ -22,31 +21,54 @@ const state = vi.hoisted(() => ({
       { key: 'hours', label: '営業時間を決める', href: '/restaurant-test/google?tab=hours', done: false },
       { key: 'richMenu', label: 'リッチメニューを選ぶ', href: '/?guide=richMenu', done: false },
     ],
-    done: 0,
-    total: 9,
+    done: 1,
+    total: 8,
   },
+  dismissed: false as boolean | null,
+  options: vi.fn(),
+  refresh: vi.fn(),
+  reload: vi.fn(),
+  markStale: vi.fn(),
+  invalidate: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace }), usePathname: () => nav.path, useSearchParams: () => new URLSearchParams(nav.query) }))
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => ({ selectedAccountId: nav.accountId }) }))
-vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' } }) }))
+vi.mock('@/hooks/use-account-style', () => ({ ACCOUNT_STYLE_UPDATED: 'musubo:account-style-updated', useAccountStyle: () => ({ status: 'ready', data: { style: 'restaurant' } }) }))
 vi.mock('@/lib/staff-role', () => ({ canManageRole: (role: string | null) => role === 'owner', useStaffRole: () => 'owner' }))
 vi.mock('@/lib/staff-identity-state', () => ({ readStaffIdentity: () => ({ id: nav.staffId }) }))
-vi.mock('@/lib/line-account-entry', () => ({ isLineAccountEntryReady: () => nav.entryReady,
-  subscribeLineAccountEntry: () => () => {}, resolveLineAccountEntry: nav.resolveEntry }))
-vi.mock('@/v8/dashboard/public/first-steps-model/index', () => ({ useFirstSteps: () => ({ status: 'success', guide: state.guide, summary: state.summary, refresh: state.refresh }) }))
-/* 重ね表示そのものは guide-overlay-react.test.tsx が見張る。ここは行き先だけ。 */
-vi.mock('./guide-overlay', () => ({ GuideOverlay: () => null }))
+vi.mock('@/lib/line-account-entry', () => ({ isLineAccountEntryReady: () => nav.entryReady, subscribeLineAccountEntry: () => () => {}, resolveLineAccountEntry: nav.resolveEntry }))
+vi.mock('@/v8/dashboard/public/first-steps-model/index', () => ({
+  useFirstSteps: (_account: string | null, _role: string | null, options: unknown) => (state.options(options), {
+    status: 'ready',
+    guide: state.guide,
+    summary: state.summary,
+    dismissed: state.dismissed,
+    refresh: state.refresh,
+    reload: state.reload,
+    markStale: state.markStale,
+    invalidate: state.invalidate,
+  }),
+}))
+/* 重ね表示そのものは guide-overlay-react.test.tsx が見張る。ここは行き先と引き渡しだけ。 */
+vi.mock('./guide-overlay', () => ({ GuideOverlay: ({ active, stepLabel }: { active: boolean; stepLabel: string | null }) => active ? <div data-testid="guide-overlay">{stepLabel}</div> : null }))
 
-import { writeGuideEngineState } from './guide-engine'
+import { SetupChip } from '@/components/shell/setup-chip'
+import { API_MUTATION_SUCCEEDED } from '@/lib/api/transport/mutation-events'
+import { guideEngineStorageKey, writeGuideEngineState } from './guide-engine'
 import { GuideHost } from './guide-host'
 import { emitGuideSignal } from './guide-signal'
 
 beforeEach(() => {
   nav.push.mockClear()
+  state.refresh.mockClear()
+  state.reload.mockClear()
+  state.markStale.mockClear()
+  state.invalidate.mockClear()
+  state.options.mockClear()
+  state.dismissed = false
   nav.replace.mockClear()
   nav.resolveEntry.mockReset().mockResolvedValue({ destination: 'dashboard' })
-  state.refresh.mockClear()
   state.guide.startAt.mockClear()
   state.guide.resume.mockClear()
   nav.path = '/restaurant-test/tables'
@@ -147,6 +169,44 @@ describe('案内の入れ物が段の画面へ移る', () => {
     expect(nav.push).not.toHaveBeenCalled()
   })
 
+  it('保存ごとに札とガイドを消さず裏で読み直し、接続確認の合図とも二重発火しない', async () => {
+    nav.path = '/accounts'
+    nav.entryReady = false
+    state.guide = { ...state.guide, stepKey: 'accounts' }
+    writeGuideEngineState(nav.accountId, { phase: 'active', stepKey: 'accounts', procedureIndex: 1 }, nav.staffId)
+    render(<GuideHost><SetupChip /></GuideHost>)
+    await waitFor(() => expect(nav.resolveEntry).toHaveBeenCalledExactlyOnceWith(nav.accountId))
+    await act(async () => {})
+    vi.useFakeTimers()
+    try {
+      expect(screen.getByRole('link', { name: '開店準備 1/8。はじめの設定を開く' })).toBeTruthy()
+      expect(screen.getByTestId('guide-overlay').textContent).toBe('LINEアカウント')
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(API_MUTATION_SUCCEEDED, { detail: { accountId: 'account-1' } }))
+      })
+      expect(state.invalidate).not.toHaveBeenCalled()
+      expect(state.reload).not.toHaveBeenCalled()
+      expect(state.markStale).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('link', { name: '開店準備 1/8。はじめの設定を開く' })).toBeTruthy()
+      expect(screen.getByTestId('guide-overlay').textContent).toBe('LINEアカウント')
+
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(state.refresh).toHaveBeenCalledTimes(1)
+      expect(state.reload).not.toHaveBeenCalled()
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(API_MUTATION_SUCCEEDED, { detail: { accountId: 'account-1' } }))
+        emitGuideSignal('accounts.connection', 'account-1')
+      })
+      expect(state.refresh).toHaveBeenCalledTimes(2)
+      act(() => { vi.advanceTimersByTime(600) })
+      expect(state.refresh).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('登録状態の照合が済んでから案内する', () => {
     nav.path = '/'
     nav.entryReady = false
@@ -155,6 +215,17 @@ describe('案内の入れ物が段の画面へ移る', () => {
     nav.entryReady = true
     view.rerender(<GuideHost><p>中身</p></GuideHost>)
     expect(nav.push).toHaveBeenCalledWith('/restaurant-test/tables')
+  })
+
+  it('設定画面では登録確認後に札の進捗を読み、ガイドを自動で開かない', async () => {
+    nav.path = '/settings'
+    nav.entryReady = false
+    render(<GuideHost><SetupChip /></GuideHost>)
+    await waitFor(() => expect(nav.resolveEntry).toHaveBeenCalledWith(nav.accountId))
+    await waitFor(() => expect(state.options).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true })))
+    expect(screen.getByRole('link', { name: '開店準備 1/8。はじめの設定を開く' })).toBeTruthy()
+    expect(screen.queryByTestId('guide-overlay')).toBeNull()
+    expect(nav.push).not.toHaveBeenCalled()
   })
 
   it('接続の案内中だけアカウント一覧で対象を確認し、同じアカウントの成功後は次の段へ移る', async () => {

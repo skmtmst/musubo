@@ -137,3 +137,35 @@ async function withPage(width, name, run) {
     finally { await browser.close() }
   }
 }
+
+for (const width of [390, 430, 1152, 1440]) test(`getting started rows do not overlap ${width}`, async () => {
+  await withPage(width, `getting-started-rows-${width}`, async (page, pending, dir, rows) => {
+    styleDashboardMock('PUT', '/api/dashboard/style', new URLSearchParams(), { style: 'restaurant' })
+    await page.route('**/api/restaurant-test/setup-progress?**', route => {
+      const storeId = new URL(route.request().url()).searchParams.get('storeId')
+      return route.fulfill({ json: { success: true, data: { storeId, tables: false, hours: false, menus: false, reception: false, followup: false } } })
+    })
+    await page.goto(base + '/getting-started', { waitUntil: 'domcontentloaded' })
+    await waitForNavigationContent(page, pending, 15000)
+    const table = page.getByRole('table', { name: 'はじめの設定の順路' })
+    await table.waitFor()
+    await page.waitForFunction(() => document.querySelectorAll('[aria-label="はじめの設定の順路"] [role="row"]')[2]?.getAttribute('data-step-state') === 'todo')
+    await page.evaluate(async () => { await document.fonts.ready })
+    await page.screenshot({ path: join(dir, 'settings.png'), fullPage: true, animations: 'disabled' })
+    const bounds = await table.evaluate(node => [...node.querySelectorAll('[role="row"]')].map(row => {
+      const rect = row.getBoundingClientRect()
+      const action = row.querySelector('a,button')?.getBoundingClientRect()
+      return { text: row.innerText, top: rect.top, bottom: rect.bottom, height: rect.height, actionTop: action?.top ?? null, actionBottom: action?.bottom ?? null }
+    }))
+    rows.push({ bounds })
+    assert.ok(bounds.length > 1, '設定の手順が表示される')
+    for (const [index, row] of bounds.entries()) {
+      if (row.actionBottom !== null) assert.ok(row.actionTop >= row.top - 1 && row.actionBottom <= row.bottom + 1, `行${index + 1}のボタンが行をはみ出す: ${JSON.stringify(row)}`)
+      if (index + 1 < bounds.length) assert.ok(row.bottom <= bounds[index + 1].top + 1, `行${index + 1}と次の行が重なる`)
+    }
+    const action = table.getByRole('link', { name: '座席・卓を開く' })
+    assert.equal(await action.count(), 1)
+    await action.click({ timeout: 5000 })
+    await page.waitForURL(url => url.pathname === '/restaurant-test/tables', { timeout: 15000 })
+  })
+})

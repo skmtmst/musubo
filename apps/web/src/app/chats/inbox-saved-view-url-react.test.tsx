@@ -216,7 +216,7 @@ async function openSavedViews() {
 
 /** ドロップダウン内の保存検索を名前で押す。 */
 async function clickSavedView(name: string) {
-  const item = [...host.querySelectorAll('button')].find(
+  const item = [...document.body.querySelectorAll('button')].find(
     (button) => button.textContent?.includes(name),
   )
   expect(item, `保存検索「${name}」のボタン`).toBeTruthy()
@@ -393,8 +393,8 @@ describe('受信箱の保存検索URL復元(N-021)', () => {
 
     // ドロップダウンに並ぶのはBの検索だけ。Aの名前は出ない。
     await openSavedViews()
-    expect(host.textContent).toContain('B社の検索')
-    expect(host.textContent).not.toContain('A社の検索')
+    expect(document.body.textContent).toContain('B社の検索')
+    expect(document.body.textContent).not.toContain('A社の検索')
 
     // Aの条件(status=unread, quickFilter=overdue)で一覧が取り直されていない。
     for (const query of chatsListQueries()) {

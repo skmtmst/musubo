@@ -22,6 +22,8 @@ export function useInsertReferences(accountId: string | null) {
   return loaded.scope === requestScope ? loaded : { accountId, references: EMPTY_REFERENCES, state: accountId ? 'loading' as const : 'idle' as const }
 }
 
+/** 札の名前の表。共通情報を読み終えたときだけ、一覧に無いキーを「名前なし」と言い切れる。 */
 export function useInsertTokenNames(accountId: string | null) {
-  return referenceTokenNames(useInsertReferences(accountId).references)
+  const { references, state } = useInsertReferences(accountId)
+  return { ...referenceTokenNames(references), varsComplete: state === 'ready' }
 }

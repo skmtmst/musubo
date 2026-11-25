@@ -197,6 +197,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   return (
   <><CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
     <CustomerInfoPanel
+      accountId={friend.lineAccountId}
       friendId={friendId}
       fields={fields}
       includeDiningFields={accountStyle.status === 'ready' && accountStyle.data?.style === 'restaurant'}

@@ -28,6 +28,7 @@ vi.mock('./hq/platform-notices', () => ({
 
 import AuthGuard, { invalidateAuthSessionCheck } from './auth-guard'
 import { SESSION_LOST_EVENT } from '@/lib/api'
+import { useAuthSessionRefreshing } from './auth-refresh-context'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -92,6 +93,25 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     host.remove()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  })
+
+  it('未ログインの確認中とログイン画面への移動中はメニューやロゴを出さない', async () => {
+    currentPath = '/friends'
+    let finishSession!: (response: Response) => void
+    fetchSpy.mockImplementation(async (url: unknown) => String(url).includes('/api/auth/session')
+      ? new Promise<Response>((resolve) => { finishSession = resolve })
+      : sessionOk())
+    await act(async () => {
+      root.render(<AuthGuard><aside data-sidebar>メニュー</aside><div>musubo</div></AuthGuard>)
+    })
+    expect(host.querySelector('[data-auth-pending]')).not.toBeNull()
+    expect(host.querySelector('[data-sidebar]')).toBeNull()
+    expect(host.querySelector('img')).toBeNull()
+    expect(host.textContent).not.toContain('musubo')
+    await act(async () => { finishSession(new Response(null, { status: 401 })) })
+    expect(replaceMock).toHaveBeenCalledWith('/login')
+    expect(host.querySelector('[data-sidebar]')).toBeNull()
+    expect(host.querySelector('img')).toBeNull()
   })
 
   it('初回は /api/auth/session を確認して中身を出す', async () => {
@@ -182,6 +202,51 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     // 30秒以内の遷移なら確認も一覧も初回の1回ずつだけ。
     expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(host.querySelector('[data-child]')).not.toBeNull()
+  })
+
+  it('確認済みで期限を過ぎた画面遷移では、再確認中もメニューを残して本文を待機させる', async () => {
+    const nowSpy = vi.spyOn(Date, 'now')
+    let now = 1_000_000
+    nowSpy.mockImplementation(() => now)
+    function Shell() {
+      const refreshing = useAuthSessionRefreshing()
+      return <><nav data-sidebar>メニュー</nav><header data-top-bar>上の帯</header>{refreshing ? <div data-content-pending /> : <div data-child>本文</div>}</>
+    }
+    await act(async () => { root.render(<AuthGuard><Shell /></AuthGuard>) })
+    await settle()
+    let finishSession!: (response: Response) => void
+    fetchSpy.mockImplementation(async (url: unknown) => String(url).includes('/api/auth/session')
+      ? new Promise<Response>((resolve) => { finishSession = resolve }) : sessionOk())
+    now += 31_000
+    currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><Shell /></AuthGuard>) })
+    expect(host.querySelector('[data-sidebar]')).not.toBeNull()
+    expect(host.querySelector('[data-top-bar]')).not.toBeNull()
+    expect(host.querySelector('[data-content-pending]')).not.toBeNull()
+    expect(host.querySelector('[data-child]')).toBeNull()
+    expect(host.querySelector('[data-auth-pending]')).toBeNull()
+    await act(async () => { finishSession(sessionOk()) })
+    await settle()
+    expect(host.querySelector('[data-sidebar]')).not.toBeNull()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+  })
+
+  it('表示を保った再確認が401ならメニューを隠してログインへ送る', async () => {
+    const nowSpy = vi.spyOn(Date, 'now')
+    let now = 1_000_000
+    nowSpy.mockImplementation(() => now)
+    await act(async () => { root.render(<AuthGuard><nav data-sidebar>メニュー</nav></AuthGuard>) })
+    await settle()
+    let finishSession!: (response: Response) => void
+    fetchSpy.mockImplementation(async (url: unknown) => String(url).includes('/api/auth/session')
+      ? new Promise<Response>((resolve) => { finishSession = resolve }) : sessionOk())
+    now += 31_000
+    currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><nav data-sidebar>メニュー</nav></AuthGuard>) })
+    expect(host.querySelector('[data-sidebar]')).not.toBeNull()
+    await act(async () => { finishSession(new Response(null, { status: 401 })) })
+    expect(host.querySelector('[data-sidebar]')).toBeNull()
+    expect(replaceMock).toHaveBeenCalledWith('/login')
   })
 
   it('期限（30秒）を過ぎた遷移では確認し直す', async () => {

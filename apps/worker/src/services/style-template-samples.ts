@@ -1,5 +1,6 @@
 import {
   listInterpolations,
+  TEMPLATE_SAMPLE_VARIABLE_LABELS,
   type AccountStyle,
   type IndustryStyle,
   type StyleTemplateSample,
@@ -154,29 +155,7 @@ const ecSamples: Sample[] = [
   ['purchase-thanks', '購入へのお礼', 'ご購入ありがとうございます。ご注文の内容はこちらからご確認いただけます。\n{{var.order_url}}\n{{account.name}}'],
   ['restock', '再入荷のお知らせ', '入荷のお知らせを希望された{{var.product_name}}が再入荷しました。数に限りがあります。\n{{var.product_url}}\n{{account.name}}'],
 ];
-const labels: Record<string, string> = {
-  name: 'お客さまの名前',
-  'account.name': '店名',
-  reservation_datetime: '予約の日時',
-  reservation_url: '予約の確認・変更URL',
-  review_url: '口コミのURL',
-  closure_datetime: '休業の日時',
-  business_hours: '変更後の営業時間',
-  new_item: '新メニュー・新商品の説明',
-  product_url: '商品のURL',
-  coupon_url: 'クーポンのURL',
-  payment_url: 'お支払いのURL',
-  mypage_url: 'マイページのURL',
-  course_name: 'コース名',
-  guest_count: '人数',
-  next_visit_date: '次回の目安の日',
-  aftercare: 'お手入れの内容',
-  meet_url: 'オンライン面談のURL',
-  meeting_location: '場所',
-  bring_items: '持ち物',
-  consultation_result: '面談の結果',
-  membership_url: '入会のご案内URL',
-};
+
 
 /** 一覧読取やテンプレート作成だけでは配信を予約しない。 */
 export function templateSamples(style: AccountStyle): StyleTemplateSample[] {
@@ -197,7 +176,7 @@ export function templateSamples(style: AccountStyle): StyleTemplateSample[] {
     text,
     placeholders: listInterpolations(text).map((key) => ({
       token: `{{${key}}}`,
-      label: labels[key.replace(/^var\./, '')] ?? key,
+      label: TEMPLATE_SAMPLE_VARIABLE_LABELS[key.replace(/^var\./, '')] ?? key,
       requiresConfiguration: key.startsWith('var.'),
     })),
     preparation:

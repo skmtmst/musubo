@@ -19,18 +19,19 @@ export interface DetailPageProps extends PageHeadingProps {
   /** 段の余白が異なる板は、既存の寸法変数で指定する。既定の詳細画面はそのまま。 */
   contentPadding?: string
   summaryLabel?: string
+  separators?: 'none'
   /** 狭い板では右欄を畳み、同じ内容を共通の入口から読めるようにする。 */
   summaryPreview?: { label: string; title: string }
 }
 
-export function DetailPage({ readOnly, boardId, layout, heightMode, standalone, tabSpacing, tabs, stats, summary, summaryLabel, summaryPreview, children, contentPadding, loading = false, loadingLabel, ...heading }: DetailPageProps) {
-  const summaryColumn = summary ? <aside className={summaryPreview ? styles.preview : styles.detailSummary} data-template-region={summaryPreview ? "preview" : "summary"} data-preview-narrow={summaryPreview ? "hidden" : undefined} data-preview-surface={summaryPreview ? "plain" : undefined} aria-label={summaryLabel}>{summary}</aside> : null
+export function DetailPage({ readOnly, boardId, layout, heightMode, standalone, tabSpacing, tabs, stats, summary, summaryLabel, summaryPreview, separators, children, contentPadding, loading = false, loadingLabel, ...heading }: DetailPageProps) {
+  const summaryColumn = summary ? <aside className={summaryPreview ? styles.preview : styles.detailSummary} data-template-region={summaryPreview ? "preview" : "summary"} data-preview-narrow={summaryPreview ? "hidden" : undefined} data-preview-surface={summaryPreview ? "plain" : undefined} data-detail-separators={separators} aria-label={summaryLabel}>{summary}</aside> : null
   return <PageFrame kind="detail" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone}>
     <PageHeading {...heading} readOnlyBand={readOnly || heading.readOnlyBand} bottomSpacing={tabSpacing} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     {summary && summaryPreview ? <div className={styles.asideToggle}><PreviewLauncher {...summaryPreview}>{summary}</PreviewLauncher></div> : null}
-    <div className={styles.split} data-template-region="body">
+    <div className={styles.split} data-template-region="body" data-detail-separators={separators}>
       {layout !== 'record-detail' ? summaryColumn : null}
       <div className={styles.detailContent} data-template-region="content" style={contentPadding ? { padding: contentPadding } : undefined}>{loading ? <DetailLoading label={loadingLabel} /> : children}</div>
       {layout === 'record-detail' ? summaryColumn : null}

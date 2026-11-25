@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useOptionalAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -17,7 +17,8 @@ import { GuideMenuPicker } from './guide-menu-picker'
 import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
-import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
+import { useGuideSignal } from './guide-signal'
+import { useSetupMutationRefresh } from './use-setup-mutation-refresh'
 
 /*
   開店準備ガイドの入れ物。全画面で1つ。画面側は置かない。
@@ -26,8 +27,7 @@ import { useGuideSignal, useSetupSaveSignal } from './guide-signal'
   案内する手順の対象（卓を作る・メニューを保存する…）は、はじめにやることの画面ではなく
   それぞれの設定画面にあるので、重ね表示はダッシュボードではなくアプリ全体に1つ置く。
 
-  案内中・一時停止中でない時は、はじめにやることの実測を読まない
-  （関係ない画面に読み込みを増やさない）。
+  進み具合は全画面で共有する。
 */
 
 export function GuideHost({ children }: { children: ReactNode }) {
@@ -61,7 +61,7 @@ export function GuideHost({ children }: { children: ReactNode }) {
 
   const current = remembered?.accountId === accountId && remembered.staffId === staffId ? remembered : null
   return <GuideSession accountId={accountId} staffId={staffId} role={role} armed={current?.armed ?? false}
-    watchFirstMessage={current?.watch ?? false} checkingAccount={current?.checkingAccount ?? false}>{children}</GuideSession>
+    watchFirstMessage={current?.watch ?? false} checkingAccount={current?.checkingAccount ?? false} rememberedReady={current !== null}>{children}</GuideSession>
 }
 
 function useAccountsGuideEntry(accountId: string | null, scope: string | null, checkingAccount: boolean): boolean {
@@ -85,8 +85,8 @@ function matchesGuideLocation(pathname: string, query: Pick<URLSearchParams, 'ge
   return pathname === path && Array.from(new URLSearchParams(search)).every(([key, value]) => query.get(key) === value)
 }
 
-function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, checkingAccount, children }: {
-  accountId: string | null; staffId?: string; role: string | null; armed: boolean; watchFirstMessage: boolean; checkingAccount: boolean; children: ReactNode
+function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, checkingAccount, rememberedReady, children }: {
+  accountId: string | null; staffId?: string; role: string | null; armed: boolean; watchFirstMessage: boolean; checkingAccount: boolean; rememberedReady: boolean; children: ReactNode
 }) {
   const account = useOptionalAccount()
   const style = useAccountStyle(accountId)
@@ -96,21 +96,40 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
     ? JSON.stringify([accountId, staffId]) : null
   const accountsGuideReady = useAccountsGuideEntry(accountId, accountsScope, checkingAccount)
   const canOpenGuide = accountsGuideReady || (entryReady && !isAccountIndependentRoute(pathname))
+  const independentScope = rememberedReady && pathname !== '/accounts' && isAccountIndependentRoute(pathname) && accountId && staffId
+    ? JSON.stringify([accountId, staffId]) : null
+  const independentReady = useAccountsGuideEntry(accountId, independentScope, true)
+  const canLoadSetup = entryReady || accountsGuideReady || independentReady
   const search = useSearchParams()
   const query = search.toString()
   const qrOpen = search.has('qr')
   const requestedStep = pathname === '/' ? search.get('guide') : null
   const entryStep = requestedStep === 'richMenu' || requestedStep === 'firstMessage' ? requestedStep : null
-  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: canOpenGuide && (armed || pathname === '/'), watchFirstMessage })
-  const { guide, summary } = first
-  const shared = useMemo<SharedGuide>(() => ({ guide, summary }), [guide, summary])
+  const watchers = useRef(new Set<symbol>())
+  const [sharedWatch, setSharedWatch] = useState(false)
+  const setWatch = useCallback((id: symbol, enabled: boolean) => { if (enabled) watchers.current.add(id); else watchers.current.delete(id); setSharedWatch(watchers.current.size > 0) }, [])
+  const cacheScope = JSON.stringify([staffId, role])
+  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: canLoadSetup, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch, cacheScope })
+  const retained = useRef<{ scope: string; summary: typeof first.summary; dismissed: boolean | null; style: typeof style.data extends infer T ? T extends { style: infer S } ? S : null : null }>({ scope: '', summary: null, dismissed: null, style: null })
+  const retainedScope = JSON.stringify([accountId, staffId, role])
+  if (retained.current.scope !== retainedScope || role === null || first.status === 'error' || style.status === 'error') {
+    retained.current = { scope: retainedScope, summary: first.summary, dismissed: first.dismissed ?? null, style: style.data?.style ?? null }
+  } else {
+    if (first.summary) retained.current.summary = first.summary
+    if (first.dismissed !== null && first.dismissed !== undefined) retained.current.dismissed = first.dismissed
+    if (style.data?.style) retained.current.style = style.data.style
+  }
+  const guide = first.guide
+  const summary = canLoadSetup ? first.summary ?? retained.current.summary : null
+  const dismissed = canLoadSetup ? first.dismissed ?? retained.current.dismissed : null
+  const shared = useMemo<SharedGuide>(() => ({ guide, summary, dismissed, setup: { accountId, run: first.runState, progress: first.styleProgress, setWatch } }), [guide, summary, dismissed, first.runState, first.styleProgress, accountId, setWatch])
 
   const index = summary?.steps.findIndex(step => step.key === guide.stepKey) ?? -1
   const step = index >= 0 ? summary?.steps[index] ?? null : null
   /** 9項目の済みは実データ計測の値のまま渡す（ガイドで済みにしない）。 */
   const segments = useMemo(() => summary?.steps.map(item => item.done) ?? [], [summary])
 
-  const scripted = style.data?.style === 'restaurant'
+  const scripted = (style.data?.style ?? retained.current.style) === 'restaurant'
   const procedure = scripted ? guideProcedure(guide.stepKey, guide.procedureIndex) : null
   const next = summary?.steps.slice(index + 1).find(item => !item.done && item.href)
   const advance = guide.advanceProcedure
@@ -180,10 +199,10 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
     () => { if (procedureSignal !== 'reception.save' && procedureSignal !== 'menu.save' && procedureSignal !== 'followup.save') advance() },
     procedureSignal === 'followup.start' ? accountId ?? undefined : undefined,
   )
+  const refreshNow = useSetupMutationRefresh(accountId, first.refresh, pathname, first.markStale)
   useGuideSignal('followup.confirm', Boolean(canOpenGuide && accountId && followupCanConfirm && guide.phase === 'active'),
     () => advance(false, 4), accountId ?? undefined)
-  useSetupSaveSignal(scripted && armed, first.refresh)
-  useGuideSignal('accounts.connection', accountsGuideReady && Boolean(accountId), first.refresh, accountId ?? undefined)
+  useGuideSignal('accounts.connection', accountsGuideReady && Boolean(accountId), refreshNow, accountId ?? undefined)
   useGuideSignal('reception.menuPublished', Boolean(accountId && inPublishReview), advance, accountId ?? undefined)
   const alreadyPublished = first.progress?.bookingExposure?.publicReservationMenu === true
   const skipPublishPrompt = canOpenGuide && needsPublishReview && !inPublishReview && onTargetScreen && alreadyPublished

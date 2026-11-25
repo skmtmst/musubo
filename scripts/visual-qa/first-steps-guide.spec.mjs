@@ -243,7 +243,7 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await save.click()
   await expect(page.getByText('配分を保存しました。', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
-  await expect(page.getByRole('button', { name: /開店準備 6\/8。ガイドを再開する/ })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('link', { name: /開店準備 6\/8。はじめの設定を開く/ })).toBeVisible()
   await page.getByRole('button', { name: '最初から始める', exact: true }).click()
   await page.getByRole('dialog', { name: /リッチメニューを選ぶ/ }).getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
@@ -749,7 +749,7 @@ test('リッチメニューがすでに公開中なら公開案内を飛ばす',
   await page.screenshot({ path: info.outputPath('after-already-published.png') })
 })
 
-test('スマホの上部から閉じたガイドを開き直せる', async ({ browser }, info) => {
+test('スマホの上部の開店準備からはじめの設定へ移る', async ({ browser }, info) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 900 }, hasTouch: true, isMobile: true })
   const page = await context.newPage()
   try {
@@ -758,14 +758,44 @@ test('スマホの上部から閉じたガイドを開き直せる', async ({ br
     const popup = page.getByRole('dialog', { name: '開店準備を始めましょう' })
     await popup.getByRole('button', { name: /あとで/ }).tap()
     await expect(popup).toHaveCount(0)
-    const reopen = page.getByRole('button', { name: /開店準備.*はじめにやることを開く/ })
-    await expect(reopen).toBeInViewport()
-    await page.screenshot({ path: info.outputPath('mobile-guide-reopen.png') })
-    await reopen.tap()
-    await expect(popup).toBeVisible()
+    const chip = page.getByRole('link', { name: /開店準備.*はじめの設定を開く/ })
+    await expect(chip).toBeInViewport()
+    await expect(chip).toHaveAttribute('href', '/getting-started')
+    await page.screenshot({ path: info.outputPath('mobile-guide-link.png') })
+    await chip.tap()
+    await expect(page).toHaveURL(/\/getting-started\/?$/)
+    await expect(popup).toHaveCount(0)
   } finally {
     await context.close()
   }
+})
+
+test('登録の外側の送信ボタンはEnterと必須・形式の検証を保つ', async ({ page }) => {
+  await openFixture(page)
+  await page.goto(`${base}/accounts/new`)
+  await page.getByRole('radio', { name: 'はい、あります' }).click()
+  await page.getByRole('radio', { name: 'いいえ、引き継ぎません' }).click()
+  await page.getByRole('radio', { name: '使っていません' }).click()
+  await page.getByRole('button', { name: '次へ', exact: true }).click()
+  const id = page.locator('#v8-channel-id')
+  const secret = page.locator('#v8-channel-secret')
+  const next = page.getByRole('button', { name: '次のステップへ' })
+  await expect(next).toBeDisabled()
+  await id.press('Enter')
+  await expect(id).toBeVisible()
+  await expect(next).toHaveAttribute('aria-description', 'チャネルIDとチャネルシークレットを入力してください。')
+  await id.fill('123456789')
+  await secret.fill('a'.repeat(32))
+  await expect(next).toBeEnabled()
+  await id.fill('abc')
+  await expect(secret).toHaveValue('a'.repeat(32))
+  await id.press('Enter')
+  await expect(secret).toHaveValue('a'.repeat(32))
+  await expect(page.getByText(/チャネルIDは余分な空白を除き、半角数字/)).toBeVisible()
+  await expect(id).toBeVisible()
+  await id.fill('123456789')
+  await id.press('Enter')
+  await expect(page.locator('#v8-provider-id')).toBeVisible()
 })
 
 test('コースの写真は登録メディアと端末から合計5枚を追加して保存できる', async ({ page }, testInfo) => {

@@ -18,7 +18,7 @@ import { DelayedSkeleton } from '@/components/shared/skeleton'
 import TagOverflow from '@/components/shared/tag-overflow'
 import TagPill from '@/components/shared/tag-pill'
 import { formatDateTime } from '@/lib/format'
-import { canEditFeature,isOwnerOrAdmin } from '@/lib/staff-capability'
+import { canEditFeature,canViewFeature,isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
@@ -447,7 +447,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                 */}
                 {accountId && friendId ? <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} /> : null}
                 <CustomerInfoPanel
+                  accountId={accountId}
                   labelWidth="wide"
+                  canViewFriend={canViewFeature('/friends', staffRole)}
                   friendId={friend.id}
                   profile={{ name: friend.realName || friend.displayName, pictureUrl: friend.pictureUrl, addedAt: formatAddedDate(friend.createdAt) }}
                   fields={friendFields.kind === 'data' ? friendFields.items : []}

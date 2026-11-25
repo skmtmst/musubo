@@ -8,7 +8,7 @@ test.afterEach(async ({ page }) => {
 })
 async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
   const nonce = crypto.randomUUID()
-  await page.evaluate(({ nonce, path }) => sessionStorage.setItem('lh_login_handoff', JSON.stringify({ nonce, expires: Date.now() + 600000, kind: 'challenge', path })), { nonce, path })
+  await page.evaluate(({ nonce, path }) => sessionStorage.setItem('lh_login_handoff', JSON.stringify({ nonce, expires: Date.now() + 600000, kind: 'challenge', path: path.split('?')[0] })), { nonce, path })
   const fragment = new URLSearchParams({ lh_2fa: token, lh_method: method, lh_nonce: nonce })
   await page.goto(`${path}#${fragment}`)
 }
@@ -80,10 +80,11 @@ for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons 
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/login'); await centered(page.getByRole('button', { name: 'ログイン', exact: true }))
-  // ログインの 1 段目も、二段階認証と同じ公式ロゴと手順を出す。
-  await expect(page.locator('[data-auth-head]')).toContainText('1 / 2')
+  // ログインの 1 段目も、二段階認証と同じ公式ロゴを出し、段の数は出さない。
+  await expect(page.locator('[data-auth-head]')).not.toContainText('1 / 2')
   const brandSrc = await page.locator('[data-auth-head] img[alt="musubo"]').getAttribute('src')
-  expect(brandSrc).toBe('/brand/musubo-color.png')
+  expect(brandSrc).toBe('/brand/musubo-color-188-1x.png')
+  await expect(page.locator('[data-auth-head] img[alt="musubo"]')).toHaveAttribute('srcset', '/brand/musubo-color-188-1x.png 1x, /brand/musubo-color-188-2x.png 2x, /brand/musubo-color-188-3x.png 3x')
   await page.goto('/password/reset?token=fixture-reset')
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await openPrimaryAuthenticatedChallenge(page, '/login/two-factor', 'fixture-challenge', 'password')
@@ -106,7 +107,7 @@ for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons 
   // 6 マスは 1 行、3 桁ずつの間は組の中より広い。
   expect(authLayout.oneRow).toBe(true)
   expect(authLayout.groupGap).toBeGreaterThan(authLayout.innerGap)
-  await expect(page.locator('[data-auth-head]')).toContainText('2 / 2')
+  await expect(page.locator('[data-auth-head]')).not.toContainText('2 / 2')
   await expect(page.getByRole('link', { name: '別のアカウントで入る' })).toHaveAttribute('href', '/login')
   expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
@@ -436,5 +437,28 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
     await reopened.getByRole('button', { name: '閉じる', exact: true }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     expect(writes).toEqual([])
+  }
+})
+
+test('二段階認証の説明と戻るリンクの文字をそろえる', async ({ page }) => {
+  await page.route('**/api/**', route => route.fulfill({ json: { success: true, data: { available: true } } }))
+  await page.goto('/login')
+  for (const scope of ['admin', 'ops']) {
+    const path = scope === 'ops' ? '/login/two-factor?next=ops' : '/login/two-factor'
+    await openPrimaryAuthenticatedChallenge(page, path, 'fixture-challenge', 'password')
+    const notice = page.getByText('✓ このアカウントにパスキーが登録されています')
+    const description = page.getByText('端末の顔・指紋・画面ロックで本人確認します。')
+    const hint = page.getByText('端末の確認画面が開きます')
+    const back = page.getByRole('link', { name: '別のアカウントで入る' })
+    await expect(notice).toBeVisible()
+    const fontSize = el => getComputedStyle(el).fontSize
+    expect(await notice.evaluate(fontSize)).toBe(await description.evaluate(fontSize))
+    const hintSize = await hint.evaluate(fontSize)
+    expect(await back.locator('span').evaluate(fontSize)).toBe(hintSize)
+    await expect(page.locator('[data-auth-head]')).not.toContainText('2 / 2')
+    await page.getByRole('button', { name: '認証アプリで確認' }).click()
+    await expect(page.getByRole('group', { name: '認証コード（6桁）' })).toBeVisible()
+    if (scope === 'admin') expect(await back.locator('span').evaluate(fontSize)).toBe(hintSize)
+    await expect(page.locator('[data-auth-head]')).not.toContainText('2 / 2')
   }
 })

@@ -144,7 +144,17 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
           assert.equal(await control.count(), 1, `タブの指定 ${owner} ${item.label}`)
           if (!await control.isVisible()) continue
           const label = await control.textContent()
+          const before = page.url()
           await observe(`タブ ${owner} ${label}`, () => control.click())
+          const preparing = page.locator('[role="dialog"]:has([data-shared-part="preparing-dialog"]):visible')
+          if (await preparing.count()) await observe(`案内を閉じる ${owner} ${label}`, () => preparing.getByRole('button', { name: '閉じる', exact: true }).click())
+          if (new URL(page.url()).pathname !== new URL(before).pathname) {
+            const declaredLink = item.href && page.url() === new URL(item.href, before).href
+            const connectionSettings = new URL(before).pathname === '/chats' && ['Instagram', 'メール'].includes(label.trim()) && new URL(page.url()).pathname === '/settings/sns'
+            assert.ok(declaredLink || connectionSettings, `予期しないタブの画面移動: ${before} ${label} → ${page.url()}`)
+            await observe(`タブから戻る ${owner} ${label}`, () => declaredLink ? page.goto(before, { waitUntil: 'domcontentloaded' }) : page.goBack(), before)
+            assert.equal(page.url(), before, '戻った後も元の画面と絞り込みを保つ')
+          }
         }
       }
       for (const path of routes) {
