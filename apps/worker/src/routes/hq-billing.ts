@@ -654,7 +654,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
 
   let stage = 'receipt';
   const retry = (reason: string) => {
-    logger.warn(`billing_webhook_retry.${stage}.${reason}.${event.type}`, { status: 503 });
+    logger.warn('billing_webhook_retry', { status: 503, billingWebhook: { eventType: event.type, stage, reason } });
     return c.json({ success: false, error: '決済通知を処理できませんでした' }, 503);
   };
 
@@ -844,7 +844,9 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
             subscription = await stripeApi.retrieveSubscription(c.env, subscriptionId);
           } catch {
             // The signed subscription snapshot is usable if the billing identity and status are present.
-            logger.warn(`billing_webhook_snapshot.legacy.stripe_unavailable.${event.type}`);
+            logger.warn('billing_webhook_snapshot', {
+              billingWebhook: { eventType: event.type, stage, reason: 'stripe_unavailable' },
+            });
           }
         }
         if (subscription.id !== subscriptionId || subscription.customer !== stripeExpandableId(object.customer)
@@ -901,7 +903,10 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     }
     return c.json({ success: true, data: { received: true } });
   } catch (error) {
-    logger.error(`billing_webhook_failed.${stage}.${error instanceof StripeApiError ? 'stripe' : 'internal'}.${event.type}`, { status: 500 });
+    logger.error('billing_webhook_failed', {
+      status: 500,
+      billingWebhook: { eventType: event.type, stage, reason: error instanceof StripeApiError ? 'stripe' : 'internal' },
+    });
     throw error;
   }
 });

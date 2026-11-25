@@ -3,12 +3,25 @@ import { SCHEDULED_JOB_CODES, type ScheduledJobCode, type ScheduledFailureKind }
 
 const scheduledJobs = new Set<string>([...Object.values(SCHEDULED_JOB_CODES), 'unknown']);
 const failureKinds = new Set<string>(['error','type_error','syntax_error','aborted']);
-type Metrics = { failedCount?: number; status?: number; durationMs?: number; scheduledJob?: ScheduledJobCode; failureKind?: ScheduledFailureKind; upstreamCode?: number; upstreamSubcode?: number };
+const billingWebhookEventTypes = new Set([
+  'checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated',
+  'customer.subscription.deleted', 'invoice.paid', 'invoice.payment_failed', 'invoice.voided',
+  'invoice.marked_uncollectible', 'charge.refunded',
+]);
+const billingWebhookStages = new Set(['receipt', 'invoice', 'contract', 'musubo', 'refund', 'card_setup', 'legacy', 'commit']);
+const billingWebhookReasons = new Set([
+  'invoice_id_missing', 'invoice_owner_mismatch', 'schema_missing', 'contract_missing', 'customer_missing',
+  'event_unresolved', 'plan_mismatch', 'subscription_unavailable', 'stripe_unavailable', 'subscription_mismatch',
+  'stripe', 'internal',
+]);
+type BillingWebhookMetrics = { eventType: string; stage: string; reason: string };
+type Metrics = { failedCount?: number; status?: number; durationMs?: number; scheduledJob?: ScheduledJobCode; failureKind?: ScheduledFailureKind; upstreamCode?: number; upstreamSubcode?: number; billingWebhook?: BillingWebhookMetrics };
 
 type Level = 'log' | 'info' | 'warn' | 'error' | 'debug';
 /** 固定イベント名・数値・許可済み分類だけ。例外、URL、本文、任意の文字列をログへ流さない。 */
 function write(level: Level, code: string, metrics: Metrics = {}): void {
   const context = currentInvocation();
+  const billing = metrics.billingWebhook;
   const event = {
     timestamp: new Date().toISOString(), level: level === 'log' ? 'info' : level,
     code: /^[a-zA-Z][a-zA-Z0-9_.-]{0,95}$/.test(code) ? code : 'invalid_log_event',
@@ -19,6 +32,10 @@ function write(level: Level, code: string, metrics: Metrics = {}): void {
     ...(Number.isInteger(metrics.status) && metrics.status! >= 100 && metrics.status! <= 599 ? { status: metrics.status } : {}),
     ...(Number.isInteger(metrics.upstreamCode) && metrics.upstreamCode! >= 0 && metrics.upstreamCode! <= 999999999 ? { upstreamCode: metrics.upstreamCode } : {}),
     ...(Number.isInteger(metrics.upstreamSubcode) && metrics.upstreamSubcode! >= 0 && metrics.upstreamSubcode! <= 999999999 ? { upstreamSubcode: metrics.upstreamSubcode } : {}),
+    ...(billing && billingWebhookEventTypes.has(billing.eventType) && billingWebhookStages.has(billing.stage)
+      && billingWebhookReasons.has(billing.reason) ? {
+        billingEventType: billing.eventType, billingStage: billing.stage, billingReason: billing.reason,
+      } : {}),
     ...(Number.isFinite(metrics.durationMs) && metrics.durationMs! >= 0 ? { durationMs: Math.round(metrics.durationMs!) } : {}),
   };
   console[level](JSON.stringify(event));

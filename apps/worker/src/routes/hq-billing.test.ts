@@ -434,8 +434,8 @@ describe('課金 Webhook', () => {
     expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
     const reason = missing === 'missing-row' ? 'contract_missing' : 'schema_missing';
     expect(warn.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({
-      code: `billing_webhook_retry.contract.${reason}.customer.subscription.created`,
-      timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background', status: 503,
+      code: 'billing_webhook_retry', billingEventType: 'customer.subscription.created', billingStage: 'contract',
+      billingReason: reason, timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background', status: 503,
     });
     expect(JSON.stringify(warn.mock.calls)).not.toMatch(/evt_missing_contract|cus_1|sub_musubo_core|whsec_|sk_test_/);
 

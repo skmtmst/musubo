@@ -56,6 +56,21 @@ describe('invocation context', () => {
     expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('scheduledJob');
     expect(JSON.parse(String(log.mock.calls[1][0]))).not.toHaveProperty('failureKind');
   });
+  it('決済通知のログに許可したイベント種別・処理段階・失敗理由だけを残す', () => {
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const billingWebhook = { eventType: 'invoice.paid', stage: 'contract', reason: 'schema_missing' };
+    logger.warn('billing_webhook_retry', { status: 503, billingWebhook });
+    for (const field of ['eventType', 'stage', 'reason']) {
+      logger.warn('billing_webhook_retry', { billingWebhook: { ...billingWebhook, [field]: 'private-customer-data' } });
+    }
+
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toMatchObject({
+      billingEventType: 'invoice.paid', billingStage: 'contract', billingReason: 'schema_missing', status: 503,
+    });
+    for (const [line] of log.mock.calls.slice(1)) {
+      expect(String(line)).not.toMatch(/billingEventType|billingStage|billingReason|private-customer-data/);
+    }
+  });
   it('失敗数は数値だけを記録する', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     logger.error('nen_tag_refresh.friend_failed', { failedCount: 2 });
