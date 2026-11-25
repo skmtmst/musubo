@@ -294,3 +294,12 @@ it.each(['standard', 'ec'] as const)('%sは友だち追加のカードを隠し�
   expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
   expect(net.save).not.toHaveBeenCalled()
 })
+
+it('標準の案内、集計期間、数の帯はこの順に並ぶ', async () => {
+  const view = render(<DashboardV8 />)
+  const card = (await screen.findByRole('heading', { name: 'はじめにやること', exact: true })).closest('section')!
+  const controls = screen.getByLabelText('集計期間')
+  const band = view.container.querySelector('[data-design="TodayTasks"]')!
+  expect(card.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(controls.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})

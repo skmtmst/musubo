@@ -48,6 +48,16 @@ export function DashboardPage({ boardId, standalone, layout, grouping = 'lines',
   </PageFrame>
 }
 
+/** 案内、期間の操作、数の帯を共通の順序で並べる。 */
+export function DashboardTop({ intro, controls, children }: { intro?: ReactNode; controls?: ReactNode; children: ReactNode }) {
+  return <>{intro}{controls}{children}</>
+}
+
+/** 期間操作に添える見出しの補足。 */
+export function DashboardSubtitle({ children }: { children: ReactNode }) {
+  return <p className={styles.subtitle}>{children}</p>
+}
+
 /** 段の中身。cards のときだけ共通のカードに入れ、中の右の列の段は二重のカードにしない。 */
 function GroupCell({ children }: { children: ReactNode }) {
   const { grouping } = useContext(GroupingContext)
