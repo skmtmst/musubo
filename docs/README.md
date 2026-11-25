@@ -1397,3 +1397,4 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 - [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
+- [時刻・日付の範囲のダッシュ前後空白](release-log/unreleased/PR-kenta-time-dash.md) — 営業時間や日付範囲のダッシュ左右に半角空白を入れた反映履歴。確認 2026-11-26。
