@@ -1011,6 +1011,7 @@ it('未取得の別の店では、前の店のサービスを使って停止を�
   fixture.orders.mockReturnValue(new Promise(() => {}))
   fixture.accountId.value = 'account-2'
   view.rerender(<DeliveryPage />)
+  expect(screen.getByRole('tablist', { name: '注文の状態' })).toBeTruthy()
   act(() => heldOpen('demaecan'))
   expect(screen.queryByRole('alertdialog')).toBeNull()
   expect(fixture.stopIntake).not.toHaveBeenCalled()

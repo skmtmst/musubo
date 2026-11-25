@@ -125,6 +125,11 @@ const TAB_LABELS: Record<DeliveryOrderTab, string> = {
 
 const TAB_ORDER: DeliveryOrderTab[] = ['new', 'cooking', 'handed_over', 'all']
 
+export function OrderStateTabs({ tab, onTab }: { tab: DeliveryOrderTab; onTab: (tab: DeliveryOrderTab) => void }) {
+  return <Tabs label="注文の状態" items={TAB_ORDER.map(value => ({ label: TAB_LABELS[value], current: tab === value, onClick: () => onTab(value) }))} />
+}
+
+
 /** 表の列数（選ぶ・注文番号・サービス・注文内容・金額・経過・急ぎ度・状態・操作）。 */
 const COLUMN_COUNT = 9
 /** 閲覧のみの人には「選ぶ」の列を出さないので1つ少ない（★V8 2026-10-06）。 */

@@ -46,7 +46,7 @@ import {
   type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
 import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a/public/frame/index'
-import OrdersBoard from './orders'
+import OrdersBoard, { OrderStateTabs } from './orders'
 import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
 import HistoryBoard from './history'
 import SoldOutBoard, { IntakeStopDialog } from './bulk'
@@ -789,17 +789,15 @@ function DeliveryInner() {
       )
     }
     if ((loading || accountLoading) && !data) {
-      return <ListState kind="loading" title="注文を読み込んでいます" />
+      return <><OrderStateTabs tab={tab} onTab={next => go({ tab: next === 'new' ? undefined : next })} /><ListState kind="loading" title="注文を読み込んでいます" /></>
     }
     if (error && !data) {
-      return (
-        <ListState
+      return <><OrderStateTabs tab={tab} onTab={next => go({ tab: next === 'new' ? undefined : next })} /><ListState
           kind="error"
           title="注文を表示できませんでした"
           description={error}
           onRetry={() => { void loadOrders() }}
-        />
-      )
+        /></>
     }
     if (!data) return null
     return (

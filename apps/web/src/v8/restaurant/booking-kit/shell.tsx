@@ -112,7 +112,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ initialStoreId = '', boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage }: {
+export default function RestaurantShell({ initialStoreId = '', boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage, pendingContent }: {
   /** 指定店が存在しない場合は別の店へ切り替えない。 */
   initialStoreId?: string
   /** Pencil の板 ID。外枠へ付ける。 */
@@ -152,6 +152,7 @@ export default function RestaurantShell({ initialStoreId = '', boardId, title, d
   children?: (ctx: RestaurantV8Context) => ReactNode
   /** 保存状態を持つ子が、既存PageFrameの本文と下部操作を分けて置く場合。 */
   renderPage?: (ctx: RestaurantV8Context, heading: ReactNode, notice: ReactNode) => ReactNode
+  pendingContent?: ReactNode
 }) {
   usePageTitle(title)
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -297,6 +298,7 @@ export default function RestaurantShell({ initialStoreId = '', boardId, title, d
       <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${boundary ? '' : styles.bodyFlush}`}>
         {boundary ? <BoundaryBanner /> : null}
         {noticeBand}
+        {!ctx ? pendingContent : null}
         {content}
       </div>
     </div>
