@@ -102,11 +102,14 @@ function BannersInner() {
   const [presets, setPresets] = useState<BannerPreset[]>([])
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
+  const summaryRequestRef = useRef(0)
 
   const loadSummary = useCallback(async () => {
     /* 形の違う応答は置かない（`stats.projects.active` で画面ごと落ちる。全ルート監査 A1）。数は「—」になる。 */
+    const requestId = ++summaryRequestRef.current
     setSummaryLoading(true)
     const [presetRes, statsRes] = await Promise.allSettled([api.hqBanners.presets(), api.hqBanners.stats()])
+    if (requestId !== summaryRequestRef.current) return
     if (presetRes.status === 'fulfilled' && presetRes.value.success) {
       const data = presetRes.value.data as { presets?: unknown; usage?: BannerUsage | null }
       if (Array.isArray(data?.presets)) setPresets(data.presets as BannerPreset[])
@@ -183,13 +186,13 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   const requestRef = useRef(0)
   const archivedMode = view === 'archived'
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (activeOnly = false) => {
     const requestId = ++requestRef.current
     setStatus('loading')
     setActionError('')
     try {
       const [projectRes, imageRes] = await Promise.all([
-        api.hqBanners.projects.list({ archived: archivedMode }),
+        api.hqBanners.projects.list({ archived: activeOnly ? false : archivedMode }),
         api.hqBanners.images.list({ limit: 100 }),
       ])
       if (requestId !== requestRef.current) return
@@ -225,7 +228,10 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       const res = await api.hqBanners.projects.create({ name: input.name, description: input.description || null })
       if (!res.success) throw new Error(res.error)
       setFormOpen(false)
+      setView('all')
+      setQuery('')
       onChanged()
+      void load(true)
       router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)

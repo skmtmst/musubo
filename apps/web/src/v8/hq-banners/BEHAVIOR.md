@@ -15,7 +15,7 @@
 
 ## 読み込み（既存の公開契約を保つ）
 - 一覧：`hqBanners.presets`（用途と利用量）・`hqBanners.stats`（数）・`lineAccounts.list`（渡す先）。形の違う応答は置かず「—」。
-- プロジェクト一覧：`projects.list({archived})` と `images.list({limit:100})`（カードの上の3枚）。
+- プロジェクト一覧：`projects.list({archived})` と `images.list({limit:100})`（カードの上の3枚）。作成成功後は絞り込みを解除して一覧と数を読み直し、新しいプロジェクトを表示する。
 - 画像ライブラリ：`images.list({favorite, delivered, shape, q, withCounts, limit, before})`。既定は12枚。件数表示から10・12・20・50枚を選べ、変更時は最初のページへ戻る。遅い古い応答を混ぜず、同じ画像を重複させない。数（すべて・お気に入り・渡し済み・未使用）はサーバの `counts`。
   - ページ表示は絵どおり 12 枚ずつのページ（「1–12 件 / 23 件」「次の 12 件」「前の 12 件」）。続きは既存の `before`（日時のカーソル）で読む。
 - プロジェクトの中：`projects.get(id)`・`presets`。生成は `createGeneration` → `generations.run` を1枚ずつ繰り返す（戻ったら続きから動く・止めるは `generations.cancel`）。
