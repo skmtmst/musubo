@@ -48,6 +48,14 @@ import {
   type SnsSlotsView,
 } from './connection-slots'
 import { SnsSlotAdditionDialog, SnsSlotQuoteDialog, SnsSlotRemovalDialog } from './slot-dialogs'
+import { InstagramGuideDialog } from './instagram-guide-dialog'
+import {
+  INSTAGRAM_CONNECT_LABEL,
+  INSTAGRAM_RECONNECT_LABEL,
+  INSTAGRAM_REQUIREMENT_NOTE,
+  instagramReturnNotice,
+  instagramRowRemedy,
+} from './instagram-guidance'
 
 /**
  * 設定 › SNS 連携の画面。承認デザイン（設定SNS連携 複数接続 第1段 v7）の F1〜F8。
@@ -78,13 +86,6 @@ const LOCKED_REASON = 'オーナーか管理者だけが接続を変更できま
  */
 const BILLING_UNKNOWN_REASON = '追加の料金を確かめられないため、いまは枠を超える追加ができません。しばらくしてからもう一度お試しください。'
 
-/** 戻り先（`/settings/sns?instagram=…`）で出す案内。Worker の折り返しが付ける。 */
-const FLASH: Record<string, { tone: 'success' | 'danger'; text: string }> = {
-  connected: { tone: 'success', text: 'Instagram とつながりました。Googleビジネスの投稿を Instagram にも出せます。' },
-  failed: { tone: 'danger', text: 'Instagram とつなげませんでした。ビジネスアカウント（またはクリエイターアカウント）でログインして、もう一度お試しください。' },
-}
-const ACCOUNT_OTHER_ORGANIZATION = { tone: 'danger', text: 'このInstagramは別の統括で使用されています。統括の管理者に確認してください。' } as const
-
 const GOOGLE_FLASH: Record<string, { tone: 'success' | 'warn' | 'danger'; text: string }> = {
   connected: { tone: 'success', text: 'Googleアカウントを接続しました。口コミを取得します。' },
   reconnected: { tone: 'success', text: 'Googleアカウントを再接続しました。' },
@@ -111,7 +112,7 @@ type DisconnectTicket = {
 
 export default function SnsSettingsPage() {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('SNS 連携')
+  usePageTitle('メール・SNS連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -137,6 +138,10 @@ export default function SnsSettingsPage() {
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  /* Instagram をつなぐ前の案内の窓。未接続の段と、戻ったときの知らせの［もう一度つなぐ］から開く。 */
+  const [guideOpen, setGuideOpen] = useState(false)
+  /* 窓を開いたときの LINEアカウント。切り替えたら窓は消え、進む操作もしない（別の店舗へつながないため）。 */
+  const guideScope = useRef<{ id: string | null } | null>(null)
 
   const returnedAccountId = searchParams.get('account_id')
   const accountId = returnedAccountId && accounts.some((account) => account.id === returnedAccountId) ? returnedAccountId : selectedAccountId
@@ -148,9 +153,8 @@ export default function SnsSettingsPage() {
   if (accountScope.current.id !== accountId) accountScope.current = { id: accountId }
   const renderedAccountScope = accountScope.current
   const confirmScope = useRef(accountScope.current)
-  const flash = searchParams.get('instagram') === 'failed' && searchParams.get('instagram_code') === 'instagram_account_other_organization'
-    ? ACCOUNT_OTHER_ORGANIZATION
-    : FLASH[searchParams.get('instagram') ?? ''] ?? null
+  /* 戻り先（`/settings/sns?instagram=…`）の知らせ。失敗の種類名は出さず、種類ごとの対処の1行だけを出す。 */
+  const flash = instagramReturnNotice(searchParams)
   const googleFlash = GOOGLE_FLASH[searchParams.get('google') ?? ''] ?? (searchParams.has('google') ? { tone: 'danger' as const, text: 'Googleとの接続に失敗しました。もう一度お試しください。' } : null)
 
   useEffect(() => {
@@ -366,6 +370,35 @@ export default function SnsSettingsPage() {
     }
   }
 
+  /** 案内の窓を開く。権限が無いときは開かない（押しどころは理由つきで押せない状態）。 */
+  const openGuide = () => {
+    if (!accountId || !canManage) return
+    setActionError('')
+    guideScope.current = accountScope.current
+    setGuideOpen(true)
+  }
+
+  /** 案内の窓が今の LINEアカウントのもので、操作できる人のときだけ true。 */
+  const guideValid = guideOpen && canManage && accountId !== null && guideScope.current === accountScope.current
+
+  /**
+   * 案内の窓から Instagram のログインへ進む。つなぎ直しが要る接続がちょうど1件ならその接続を、
+   * そうでなければ新しい接続を相手にする（1件目は今までどおりの接続開始・2件目からは追加）。
+   */
+  const proceedFromGuide = () => {
+    // 古い描画の押しどころから呼ばれても、いまの LINEアカウントと窓を開いたときのものが同じときだけ進む。
+    if (!guideValid || renderedAccountScope !== accountScope.current || guideScope.current !== accountScope.current) return
+    const needs = slots.instagram.connections.filter((connection) => connection.state === 'expired' || connection.dmPermissionMissing)
+    if (needs.length === 1) { void beginConnect('instagram', { connection: needs[0] }); return }
+    // 契約枠の中は窓を開いたままログインへ進む（失敗はこの窓に出す）。枠を超えるときは料金の確認の窓へ替える。
+    if (planAddition(slots, 'instagram', billing).kind === 'within-quota') {
+      void beginConnect('instagram', { add: slots.instagram.connections.length > 0 })
+      return
+    }
+    setGuideOpen(false)
+    startAddition('instagram')
+  }
+
   /**
    * 主連携を切り替える（`PUT /api/settings/sns/google-primary`・要件 §4-3）。
    * 主連携は Google の接続にだけ設けるので、この操作は Google カードにしか置かない。
@@ -469,7 +502,7 @@ export default function SnsSettingsPage() {
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="y3GGTs">
       <PageHeading
         headingSize="compact"
-        title="SNS 連携"
+        title="メール・SNS連携"
         help="Googleビジネスや Instagram とつないで、お店の情報をまとめて発信します。"
       />
       <div className={styles.body}>
@@ -478,14 +511,29 @@ export default function SnsSettingsPage() {
         ) : null}
         {searchParams.get('source') === 'hours' ? <Notice tone="info">営業時間は Google ビジネスの店舗情報を基準にします。Googleアカウントを接続し、店舗を選んでください。</Notice> : null}
         {flash ? (
-          <Notice tone={flash.tone} role="status" onClose={() => router.replace('/settings/sns', { scroll: false })}>
+          <Notice
+            tone={flash.tone}
+            role="status"
+            onClose={() => router.replace('/settings/sns', { scroll: false })}
+            action={flash.retry && igState !== 'unconfigured' ? (
+              <Button
+                variant="secondary"
+                size="compact"
+                onClick={openGuide}
+                disabled={busy}
+                lockedReason={canManage ? undefined : LOCKED_REASON}
+              >
+                {INSTAGRAM_RECONNECT_LABEL}
+              </Button>
+            ) : undefined}
+          >
             {flash.text}
           </Notice>
         ) : null}
         {googleFlash && googleStatus !== 'pending_location' ? (
           <Notice tone={googleFlash.tone} role="status" onClose={() => router.replace('/settings/sns', { scroll: false })}>{googleFlash.text}</Notice>
         ) : null}
-        {actionError && !removePlan && !addPlan ? <Notice tone="danger">{actionError}</Notice> : null}
+        {actionError && !removePlan && !addPlan && !guideValid ? <Notice tone="danger">{actionError}</Notice> : null}
 
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-google-title">
           {cardHead('googleBusiness', slots.googleBusiness, googleStatusLabel, 'sns-google-title')}
@@ -575,6 +623,8 @@ export default function SnsSettingsPage() {
                 busyId={busyId}
                 onReconnect={(connection) => { void beginConnect('instagram', { connection }) }}
                 onDisconnect={(connection) => askDisconnect('instagram', connection)}
+                rowRemedy={instagramRowRemedy}
+                reconnectLabel={INSTAGRAM_RECONNECT_LABEL}
               />
               {addNarrow('instagram')}
               {igState === 'connected' ? (
@@ -594,7 +644,7 @@ export default function SnsSettingsPage() {
                 </div>
               ) : null}
               {capabilities('instagram', true)}
-              <p className={styles.foot}>Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。</p>
+              <p className={styles.foot}>{INSTAGRAM_REQUIREMENT_NOTE}</p>
             </>
           ) : igState === 'unconfigured' ? (
             <>
@@ -607,22 +657,29 @@ export default function SnsSettingsPage() {
               <div className={styles.actions}>
                 <Button
                   variant="secondary"
-                  onClick={() => startAddition('instagram')}
+                  onClick={openGuide}
                   disabled={busy}
-                  busy={Boolean(busy)}
-                  busyLabel="処理中…"
                   lockedReason={additionLockedReason('instagram')}
                 >
                   <InstagramMark size={18} />
-                  Instagram アカウントを接続する
+                  {INSTAGRAM_CONNECT_LABEL}
                 </Button>
               </div>
-              <p className={styles.foot}>Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。</p>
+              <p className={styles.foot}>{INSTAGRAM_REQUIREMENT_NOTE}</p>
             </>
           )}
         </Card>
 
       </div>
+
+      {guideValid ? (
+        <InstagramGuideDialog
+          busy={busy}
+          error={actionError || undefined}
+          onCancel={() => { guideScope.current = null; setGuideOpen(false); setActionError('') }}
+          onProceed={proceedFromGuide}
+        />
+      ) : null}
 
       {addPlan?.kind === 'over-quota' ? (
         <SnsSlotAdditionDialog

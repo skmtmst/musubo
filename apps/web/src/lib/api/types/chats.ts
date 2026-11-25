@@ -46,6 +46,9 @@ export interface ScheduledChatSend {
 
 /** `GET /api/chats` が返す、受信箱一覧専用の会話行。 */
 export type ChatListItem = Chat & {
+  instagramId?: string
+  channel?: 'line' | 'instagram'
+  lineAccountId?: string
   friendName: string
   operatorName?: string | null
   friendPictureUrl: string | null

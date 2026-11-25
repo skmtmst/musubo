@@ -4756,6 +4756,14 @@ CREATE TABLE "instagram_connections" (
   sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0)
 );
 
+CREATE TABLE instagram_inbox_reads (
+  staff_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  sender_id TEXT NOT NULL,
+  last_read_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, line_account_id, sender_id)
+);
+
 CREATE TABLE "instagram_messages" (
  id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
@@ -4768,6 +4776,32 @@ CREATE TABLE instagram_oauth_states (
  staff_id TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('started','exchanging','selecting','connecting')),
  candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
 , connection_id TEXT REFERENCES instagram_connections(id) ON DELETE SET NULL);
+
+CREATE TABLE "instagram_outbound_messages" (
+  idempotency_key TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  instagram_id TEXT NOT NULL,
+  sender_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','sent','unknown','not_sent_confirmed')),
+  meta_message_id TEXT,
+  created_at TEXT NOT NULL,
+  sent_at TEXT,
+  resolved_by_staff_id TEXT,
+  resolved_at TEXT,
+  resolution_kind TEXT CHECK(resolution_kind IS NULL OR resolution_kind IN ('reason','meta_conversation_absent')),
+  resolution_evidence TEXT,
+  CHECK(
+    status <> 'not_sent_confirmed'
+    OR (
+      resolved_by_staff_id IS NOT NULL AND length(trim(resolved_by_staff_id)) > 0
+      AND resolved_at IS NOT NULL AND length(trim(resolved_at)) > 0
+      AND resolution_kind IS NOT NULL AND resolution_kind IN ('reason','meta_conversation_absent')
+      AND resolution_evidence IS NOT NULL AND length(trim(resolution_evidence)) > 0
+    )
+  )
+);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -11007,8 +11041,14 @@ CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_
 CREATE INDEX idx_instagram_messages_connection_772
   ON instagram_messages(connection_id, received_at, id);
 
+CREATE INDEX idx_instagram_messages_conversation_768
+  ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
+
 CREATE INDEX idx_instagram_oauth_states_connection_772
   ON instagram_oauth_states(connection_id);
+
+CREATE UNIQUE INDEX idx_instagram_outbound_pending_768
+  ON instagram_outbound_messages(instagram_id, sender_id) WHERE status IN ('pending','unknown');
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);

@@ -65,6 +65,11 @@ export type SnsConnectionView = {
    * 店舗を選び終えていない接続と Instagram の行では空。
    */
   locationName?: string | null
+  /**
+   * Instagram の DM（メッセージ）の許可が無い接続。投稿はできるが受信箱で DM を扱えないので、
+   * 行に対処の1行と［もう一度つなぐ］を出す。Google の行と、許可がそろっている行では false。
+   */
+  dmPermissionMissing?: boolean
 }
 
 /** 1サービスぶんの接続。契約枠は両サービス共通なので `SnsSlotsView` が持つ。 */
@@ -351,7 +356,13 @@ export function googleSlots(
   return { service: 'googleBusiness', connections }
 }
 
-/** Instagram の接続1件を画面の1行へ直す。期限切れかどうかは行ごとに持つ。 */
+/**
+ * 接続一覧の口の1行。DM の許可が無い印（`dmReconnectRequired`）は口が行ごとに返す。
+ * 印を返さない配備先もあるので、無いときは「許可が足りている」として扱う。
+ */
+type InstagramListRow = InstagramConnectionList['connections'][number] & { dmReconnectRequired?: boolean }
+
+/** Instagram の接続1件を画面の1行へ直す。期限切れかどうかと DM の許可の有無は行ごとに持つ。 */
 function instagramRow(
   connection: {
     id?: string | null
@@ -361,7 +372,7 @@ function instagramRow(
     version: number
     syncedAt: string | null
   },
-  expired: boolean,
+  health: { expired: boolean; dmPermissionMissing: boolean },
   formatConnected: (iso: string) => string,
 ): SnsConnectionView {
   const meta = ['ビジネスアカウント']
@@ -371,10 +382,11 @@ function instagramRow(
     service: 'instagram',
     name: connection.username ? `@${connection.username}` : connection.pageName,
     meta,
-    state: expired ? 'expired' : 'connected',
+    state: health.expired ? 'expired' : 'connected',
     primary: false,
     version: connection.version,
     connectionId: connection.id ?? null,
+    dmPermissionMissing: health.dmPermissionMissing,
   }
 }
 
@@ -392,8 +404,12 @@ export function instagramSlots(
   if (list && list.connections.length > 0) {
     return {
       service: 'instagram',
-      connections: list.connections.map((connection) =>
-        instagramRow(connection, connection.state === 'expired', formatConnected),
+      connections: list.connections.map((connection: InstagramListRow) =>
+        instagramRow(
+          connection,
+          { expired: connection.state === 'expired', dmPermissionMissing: connection.dmReconnectRequired === true },
+          formatConnected,
+        ),
       ),
     }
   }
@@ -401,7 +417,11 @@ export function instagramSlots(
   const connection = status?.connection ?? null
   const connections: SnsConnectionView[] = []
   if (connection && (status?.state === 'connected' || status?.state === 'expired')) {
-    connections.push(instagramRow(connection, status.state === 'expired', formatConnected))
+    connections.push(instagramRow(
+      connection,
+      { expired: status.state === 'expired', dmPermissionMissing: status.dmReconnectRequired === true },
+      formatConnected,
+    ))
   }
 
   return { service: 'instagram', connections }

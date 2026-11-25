@@ -2,7 +2,7 @@ import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedText } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import type {
@@ -17,6 +17,8 @@ import {
   denyReadOnly,
 } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { qaOutboundStopped } from '../services/staging-qa-safety.js';
+import { registerInstagramInboxRoutes } from './instagram-inbox.js';
 import {
   InstagramError,
   instagramConfig,
@@ -26,6 +28,8 @@ import {
   instagramLongToken,
   instagramRefreshToken,
   instagramCanPublish,
+  instagramCanMessage,
+  subscribeInstagramMessages,
   instagramUrlCode,
   instagramUrlDetail,
   instagramUrlScopes,
@@ -162,6 +166,8 @@ instagram.use(
   '/api/instagram/*',
   async (c, next) => {
     if (c.req.path === '/api/instagram/webhook') return next();
+    if (c.req.path === '/api/instagram/inbox-status' || c.req.path.startsWith('/api/instagram/conversations/') || /^\/api\/instagram\/messages\/[^/]+\/reply$/.test(c.req.path))
+      return requirePermission('/chats')(c, next);
     return requirePermission('/webhooks')(c, next);
   },
   async (c, next) => {
@@ -191,7 +197,9 @@ instagram.get('/api/instagram/connection', async (c) => {
     data: row
       ? {
           state: expired(row) ? 'expired' : 'connected',
-          replyEnabled: false,
+          replyEnabled: !expired(row) && instagramCanMessage(row.scopes) &&
+            (c.env.DEPLOY_ENV !== 'staging' || (c.env.INSTAGRAM_STAGING_SEND_ENABLED === 'true' && !qaOutboundStopped(c.env))),
+          dmReconnectRequired: !instagramCanMessage(row.scopes ?? ''),
           connection: {
             id: row.id,
             pageId: row.page_id,
@@ -231,6 +239,7 @@ instagram.get('/api/instagram/connections', async (c) => {
         id: row.id,
         // 行ごとに期限を見る。1件が切れていても他の行は使えるので、まとめて「期限切れ」にしない。
         state: expired(row) ? ('expired' as const) : ('connected' as const),
+        dmReconnectRequired: !instagramCanMessage(row.scopes),
         pageId: row.page_id,
         instagramId: row.instagram_id,
         pageName: row.page_name,
@@ -418,17 +427,19 @@ instagram.get(
       if (!short.scopes.includes(INSTAGRAM_PUBLISH_SCOPE))
         throw new InstagramError('instagram_publish_not_granted', 403);
       const long = await instagramLongToken(cfg, short.token);
-      const profile = await instagramGraph<InstagramProfile>(
+      const profile = await instagramGraph<InstagramProfile & { account_type?: string }>(
         cfg,
         'me',
         long.token,
         {
           fields:
-            'id,username,name,biography,profile_picture_url,followers_count,media_count',
+            'id,account_type,username,name,biography,profile_picture_url,followers_count,media_count',
         },
       );
       // /me の文字列IDを優先する。認可応答の user_id は大きな JSON 数値で
       // 返る場合があり、JavaScript で丸められると投稿先が存在しないIDになる。
+      if (profile.account_type && !['BUSINESS','MEDIA_CREATOR','CREATOR'].includes(profile.account_type.toUpperCase()))
+        throw new InstagramError('instagram_business_account_required', 403);
       const profileId = typeof profile.id === 'string' ? profile.id : '';
       const instagramId = /^\d{1,24}$/.test(profileId) ? profileId : short.userId;
       if (!/^\d{1,24}$/.test(instagramId))
@@ -474,6 +485,7 @@ instagram.get(
         .first();
       if (duplicate)
         throw new InstagramError('instagram_account_already_connected', 409);
+      if (instagramCanMessage(grantedScopes)) await subscribeInstagramMessages(cfg, long.token, c.env.META_APP_ID);
       const now = new Date().toISOString();
       // 新規接続は末尾に追加し、先頭を使う既存の処理の宛先を変えない。並び順は保存と同じSQLで決める。
       const result = await c.env.DB.prepare(
@@ -620,10 +632,16 @@ instagram.delete(
         'DELETE FROM instagram_oauth_states WHERE line_account_id=? AND (connection_id=? OR (connection_id IS NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=? AND id<>?))) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
       ).bind(id, target.id, id, target.id, target.id, b.expectedVersion),
       c.env.DB.prepare(
+        'DELETE FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, target.instagram_id, target.id, b.expectedVersion),
+      c.env.DB.prepare(
+        "DELETE FROM instagram_inbox_reads WHERE line_account_id=? AND CASE WHEN json_valid(sender_id) THEN json_extract(sender_id,'$[0]') END=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)",
+      ).bind(id, target.instagram_id, target.id, b.expectedVersion),
+      c.env.DB.prepare(
         'DELETE FROM instagram_connections WHERE id=? AND version=?',
       ).bind(target.id, b.expectedVersion),
     ]);
-    if (!r[2]!.meta.changes) throw new InstagramError('version_conflict', 409);
+    if (!r[r.length - 1]!.meta.changes) throw new InstagramError('version_conflict', 409);
     return c.json({ success: true, data: { disconnected: true } });
   },
 );
@@ -748,13 +766,7 @@ instagram.get('/api/instagram/messages', async (c) => {
       total: total!.n, items: responseItems, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 });
-instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {
-  await account(c);
-  return c.json(
-    { success: false, error: 'meta_review_required', enabled: false },
-    403,
-  );
-});
+registerInstagramInboxRoutes(instagram, account);
 instagram.get('/api/instagram/webhook', async (c) => {
   const token = c.env.META_WEBHOOK_VERIFY_TOKEN,
     challenge = c.req.query('hub.challenge');
@@ -771,8 +783,8 @@ instagram.get('/api/instagram/webhook', async (c) => {
 instagram.post('/api/instagram/webhook', async (c) => {
   if (!c.env.META_APP_SECRET)
     return c.json({ success: false, error: 'unconfigured' }, 503);
-  const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).length > 1048576)
+  const raw = await readBoundedText(c.req.raw, 1048576);
+  if (raw === null)
     return c.json({ success: false, error: 'payload_too_large' }, 413);
   if (
     !(await verifyInstagramSignature(

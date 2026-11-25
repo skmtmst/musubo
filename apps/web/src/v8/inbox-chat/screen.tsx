@@ -12,7 +12,7 @@ import Button from '@/components/shared/button';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { InboxPage } from '@/components/templates/inbox-page';
 import { useAccount } from '@/contexts/account-context';
-import { api,fetchApi,type ChatDetailMessage } from '@/lib/api';
+import { api,fetchApi,type ChatDetailMessage,type ChatListItem } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -26,6 +26,8 @@ import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,S
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
 import InboxList from './inbox-list-view';
+import InstagramConversation from './instagram-conversation';
+import InstagramCustomerInfo from './instagram-customer-info';
 import { savedViewFailureMessage } from './saved-view-failure';
 import { useInboxActions } from './use-inbox-actions';
 import { useInboxConversation } from './use-inbox-conversation';
@@ -37,6 +39,7 @@ import { useInboxScroll } from './use-inbox-scroll';
 import { useInboxSearch } from './use-inbox-search';
 import { useInboxSend } from './use-inbox-send';
 import { useInboxStats } from './use-inbox-stats';
+import { useInstagramThread } from './use-instagram-thread';
 import { useInboxSubscription } from './use-inbox-subscription';
 
 import { useInboxDeepLink } from './use-inbox-deep-link';
@@ -58,13 +61,27 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   const { selectedAccountId, loading: accountsLoading } = useAccount()
 
+  /*
+   * 受信経路のタブ（?channel=）。Instagram は LINE と同じ会話の一覧（会話の口の channel）で読み、
+   * 開いた会話は Instagram 用の中央と右の欄で見る。タブを移っても選んだ会話は消さず、見せる・隠すだけ。
+   */
+  const socialChannel: 'all' | 'line' | 'instagram' = params.get('channel') === 'instagram' ? 'instagram' : channel === 'line' ? 'line' : 'all'
+
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
-  const visibleThreadId = emailInboxEnabled && channel !== 'line' ? selectedThreadId : null
+  const visibleThreadId = emailInboxEnabled && channel !== 'line' && socialChannel !== 'instagram' ? selectedThreadId : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const visibleChatId = channel === 'email' ? null : selectedChatId
+  const visibleChatId = channel === 'email' || socialChannel === 'instagram' ? null : selectedChatId
+  // 開いている Instagram の会話。LINE のトーク・メールと排他。
+  const [selectedInstagram, setSelectedInstagram] = useState<ChatListItem | null>(null)
+  // 店舗を切り替えた直後の1描画でも、前の店舗の会話を出さない（全店舗を見ている時は店舗を問わない）。
+  const instagramInAccount = selectedInstagram && (!selectedAccountId || selectedInstagram.lineAccountId === selectedAccountId) ? selectedInstagram : null
+  const visibleInstagram = channel === 'email' || socialChannel === 'line' ? null : instagramInAccount
+  useEffect(() => { setSelectedInstagram(null) }, [selectedAccountId])
+  // URL の指定などで LINE・メールが開いたら、Instagram の会話は閉じる。
+  useEffect(() => { if (selectedChatId || selectedThreadId) setSelectedInstagram(null) }, [selectedChatId, selectedThreadId])
 
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
@@ -92,6 +109,12 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
 
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  // Instagram の会話には対応状況・担当が無い。Instagram のタブへ入ったら、その2つの絞り込みは外す（0件に見せない）。
+  useEffect(() => {
+    if (socialChannel !== 'instagram') return
+    setStatusFilter('all')
+    setAssigneeFilter('all')
+  }, [socialChannel])
 
   const [filterOpen, setFilterOpen] = useState(false)
 
@@ -254,14 +277,26 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     EMAIL_PAGE_SIZE,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: emailInboxEnabled && channel !== 'line',
+    emailInboxEnabled: emailInboxEnabled && channel !== 'line' && socialChannel === 'all',
     statusFilter,
     assigneeFilter,
     unreadOnly,
     quickFilter,
+    socialChannel,
     sort: sortOrder,
     setError,
   })
+
+  /*
+   * 開いている Instagram の会話は、一覧の今の行で見る。選んだ時の写しのままだと、
+   * 一覧の定期更新で届いた新着（最終受信の時刻）が会話へ伝わらず、期限切れのまま読み直さない。
+   */
+  const liveInstagram = visibleInstagram
+    ? chats.find((chat) => chat.id === visibleInstagram.id && chat.channel === 'instagram') ?? visibleInstagram
+    : null
+
+  // 開いている Instagram の会話の読み書き。中央の会話と右の欄が同じ値を見る。
+  const instagramThread = useInstagramThread(liveInstagram, staffRole, () => { void loadChatsQuietly() })
 
   // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
   const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
@@ -346,6 +381,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     assigneeFilter,
     unreadOnly,
     channel,
+    socialChannel,
   })
 
   const {
@@ -455,17 +491,18 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   }
   const { inlineInfoPanel, narrowDesktop, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef } = useInboxPanel()
   const [narrowList, setNarrowList] = useState(true)
-  const previousSelection = useRef({ account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId })
+  const previousSelection = useRef({ account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId, instagram: selectedInstagram?.id ?? null })
   const narrowFocus = useRef<'back' | 'row' | null>(null)
   const narrowBackRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     const previous = previousSelection.current
-    previousSelection.current = { account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId }
+    const instagramId = selectedInstagram?.id ?? null
+    previousSelection.current = { account: selectedAccountId, chat: selectedChatId, thread: selectedThreadId, instagram: instagramId }
     if (previous.account !== selectedAccountId) setNarrowList(true)
-    else if (previous.chat !== selectedChatId || previous.thread !== selectedThreadId) {
-      setNarrowList(!(selectedChatId || selectedThreadId))
+    else if (previous.chat !== selectedChatId || previous.thread !== selectedThreadId || previous.instagram !== instagramId) {
+      setNarrowList(!(selectedChatId || selectedThreadId || instagramId))
     }
-  }, [selectedAccountId, selectedChatId, selectedThreadId])
+  }, [selectedAccountId, selectedChatId, selectedThreadId, selectedInstagram])
   const {
     deepLinkNotice,
     setDeepLinkNotice,
@@ -484,7 +521,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     savedViewParam,
   })
 
-  const narrowMode = narrowDesktop ? (deepLinkNotice ? 'detail' : narrowList || !(visibleChatId || visibleThreadId) ? 'list' : 'detail') : undefined
+  const narrowMode = narrowDesktop ? (deepLinkNotice ? 'detail' : narrowList || !(visibleChatId || visibleThreadId || visibleInstagram) ? 'list' : 'detail') : undefined
   useEffect(() => {
     if (!narrowMode) narrowFocus.current = null
     if (narrowMode === 'detail' && narrowFocus.current === 'back') {
@@ -516,6 +553,15 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     deepLinkRequestIdRef.current += 1
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
+    const selected = chats.find(chat => chat.id === chatId)
+    if (selected?.channel === 'instagram') {
+      setSelectedChatId(null)
+      setSelectedThreadId(null)
+      setSelectedInstagram(selected)
+      clearConversationParams()
+      return
+    }
+    setSelectedInstagram(null)
     setSelectedChatId(chatId)
     // friend は外すが、一覧条件の savedView は残す(N-021)。
     clearConversationParams()
@@ -550,6 +596,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     deepLinkIdRef.current = null
     setDeepLinkNotice('')
     setSelectedChatId(null)
+    setSelectedInstagram(null)
     setSelectedThreadId(threadId)
     clearConversationParams()
     setEmailItems((prev) => prev.map((email) => (
@@ -809,20 +856,26 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
       {savedViewNotice ? <Notice tone="info" message={savedViewNotice} /> : null}
       <InboxPage elementRef={panesRef} boardId="eovoG" composed narrowMode={narrowMode} narrowBack={<Button ref={narrowBackRef} onClick={() => { narrowFocus.current = 'row'; if (deepLinkNotice) clearDeepLink(); setNarrowList(true) }}>‹ 一覧を表示</Button>}>
         <InboxList {...{
-          unreadOnly, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
+          unreadOnly, selectedChatId: visibleInstagram?.id ?? visibleChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
           setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
           savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
           savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
           dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
-          setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
+          setAssigneeFilter, setUnreadOnly, channel, socialChannel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
           assigneeUnread, listScrollRef,
           emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
           handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
-        <InboxConversation {...{
+        {liveInstagram ? <InstagramConversation
+          key={liveInstagram.id}
+          chat={liveInstagram}
+          thread={instagramThread}
+          panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
+          onBack={() => setSelectedInstagram(null)}
+        /> : <InboxConversation {...{
           operators, selectedChatId: visibleChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
           loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
@@ -839,11 +892,15 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput,
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
-          imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
-          overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
-        }} />
+          imagePreviewOpen, sendError, pendingMessages, slaEnabled, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
+          // 未選択の中央の件数は LINE の対応状況・期限の数。Instagram のタブでは出さない（別の媒体の数を混ぜない）。
+          quickCountsNow: socialChannel === 'instagram' ? null : quickCountsNow,
+          statusCountsNow: socialChannel === 'instagram' ? null : statusCountsNow,
+          overdueTotal: socialChannel === 'instagram' ? null : overdueTotal,
+        }} />}
 
         <InboxCustomerPanel
+          instagramContent={liveInstagram ? <InstagramCustomerInfo chat={liveInstagram} thread={instagramThread} /> : null}
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
           selectedChatId={visibleChatId}

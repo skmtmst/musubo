@@ -78,12 +78,19 @@ export type InboxSavedView = {
   matchCount?: number | null
 }
 
-export function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
-  return channel === 'line' ? (
+/** 受信経路の札。色は LINE が緑・Instagram が公式の2色・メールが灰。字でも経路が分かる。 */
+export function ChannelBadge({ channel }: { channel: 'line' | 'email' | 'instagram' }) {
+  if (channel === 'line') return (
     <span className={`bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium ${styles.channelBadge}`}>
       LINE
     </span>
-  ) : (
+  )
+  if (channel === 'instagram') return (
+    <span data-channel-badge="instagram" className={`inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium ${styles.channelBadge} ${styles.channelBadgeInstagram}`}>
+      Instagram
+    </span>
+  )
+  return (
     <span
       className={`bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium ${styles.channelBadge}`}
     >

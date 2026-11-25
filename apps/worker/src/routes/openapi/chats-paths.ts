@@ -1,5 +1,49 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const chatsPaths = {
+  '/api/instagram/inbox-status': {
+    get: { tags: ['Chats'], summary: 'Instagram受信箱の接続とDM権限を確認',
+      parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+      responses: { '200': { description: 'ready、permission_required、disconnected のいずれか' } } },
+  },
+  '/api/instagram/conversations/{senderId}': {
+    get: {
+      tags: ['Chats'], summary: 'Instagram の会話を取得',
+      parameters: [
+        { name: 'instagramId', in: 'query', schema: { type: 'string' }, description: '会話を受信したInstagramアカウント' },
+        { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '会話と返信可否' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' } },
+    },
+  },
+  '/api/instagram/conversations/{senderId}/read': {
+    post: {
+      tags: ['Chats'], summary: 'Instagram の会話を既読にする',
+      parameters: [
+        { name: 'instagramId', in: 'query', schema: { type: 'string' }, description: '会話を受信したInstagramアカウント' },
+        { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '既読を記録' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' }, '404': { description: '会話が見つかりません' } },
+    },
+  },
+  '/api/instagram/conversations/{senderId}/resolve': {
+    post: {
+      tags: ['Chats'], summary: 'Instagramで確認した送信結果を記録する',
+      parameters: [
+        { name: 'instagramId', in: 'query', schema: { type: 'string' }, description: '会話を受信したInstagramアカウント' },
+        { name: 'senderId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['key','outcome'],
+        properties: {
+          key: { type: 'string' },
+          outcome: { type: 'string', enum: ['sent','not_sent'] },
+          reason: { type: 'string', maxLength: 500, description: '未送信と判断した確認理由（省略時はMeta側の会話を照合する）' },
+        } } } } },
+      responses: { '200': { description: '送信結果を記録' }, '401': { description: '認証が必要' }, '403': { description: '権限がありません' }, '404': { description: '会話が見つかりません' }, '409': { description: '未確認または競合' }, '502': { description: 'Meta側の会話を確認できません' } },
+    },
+  },
   /*
    * 画像と本文を1回の送信単位にする。2回に分けると画像だけが
    * 先に届く部分送信になる。片方だけの送信もこの口で受け付ける。

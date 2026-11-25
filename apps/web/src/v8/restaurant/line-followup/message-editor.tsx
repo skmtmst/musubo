@@ -15,6 +15,7 @@ const inserts:InsertTokenSpec[]=[
  {token:'{{var.guest_count}}',label:'人数',hint:'この予約の人数',icon:'idcard'},
  {token:'{{var.store_name}}',label:'お店の名前',hint:'予約したお店の名前',icon:'store'},
 ]
+// 共通情報の形の予約の日時は、ほかの画面と同じ札の名前（共通の見本の表）で読む。画面専用の {{reservation_datetime}} は上の「予約の時間」のまま。
 const editorTokens:InsertTokenSpec[]=[...inserts,{token:'{{var.reservation_datetime}}',label:resolveDefaultToken('{{var.reservation_datetime}}')?.label??'予約の日時',hint:'この予約の日時',icon:'calendar'}]
 function MessageTextBody({value,onValueChange,guideReady,...props}:ComponentProps<typeof InsertTextField>&{guideReady?:boolean}){
  const ref=useRef<InsertTextFieldHandle>(null)

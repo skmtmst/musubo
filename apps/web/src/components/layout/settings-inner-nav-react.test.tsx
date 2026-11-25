@@ -125,7 +125,7 @@ describe('★V8 設定の中のメニュー', () => {
       '運用状態',
       'EC連携',
       // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
-      'SNS 連携',
+      'メール・SNS連携',
     ])
     expect(view.getByText('設定')).toBeTruthy()
     expect(view.queryByText('専用')).toBeNull()
@@ -193,12 +193,12 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
   })
 
-  it('SNS 連携の画面でも現在地だけを示す', async () => {
+  it('メール・SNS連携の画面でも現在地だけを示す', async () => {
     fixture.pathname = '/settings/sns'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
     const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
-    expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
+    await waitFor(() => expect(view.queryByRole('link', { name: 'メール・SNS連携' })).toBeTruthy())
+    expect(view.getByRole('link', { name: 'メール・SNS連携' }).getAttribute('aria-current')).toBe('page')
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
     expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
     expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()

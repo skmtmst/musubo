@@ -265,7 +265,7 @@ Object.assign(api9Paths, {
   },
   '/api/instagram/connection': {
     get: operation(
-      'Instagramの接続状態。設定なしはunconfigured、replyEnabledは常にfalse',
+      'Instagramの接続状態。設定なしはunconfigured、replyEnabledで現在の接続の返信可否を返す',
       [],
       undefined,
       { lineAccountId: string },
@@ -344,7 +344,7 @@ Object.assign(api9Paths, {
   },
   '/api/instagram/messages/{id}/reply': {
     post: operation(
-      '審査前は常に403 meta_review_required。外部送信しない',
+      '受信から24時間以内のDMへ返信（Idempotency-Key必須）',
       ['id'],
       { type: 'object', properties: { text: string } },
       { lineAccountId: string },

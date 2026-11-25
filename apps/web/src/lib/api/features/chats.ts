@@ -49,8 +49,9 @@ export const chatsMethods = {
     },
     searchMessages: (friendId:string,q:string,offset=0,limit=30) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationSearchResult>>(`/api/chats/${encodeURIComponent(friendId)}/messages/search?${new URLSearchParams({q,offset:String(offset),limit:String(limit)})}`),
     messagesAt: (friendId:string,params:{cursorAt?:string;cursorId?:string;direction?:'before'|'after'|'around';limit?:number}={}) => fetchApi<ApiResponse<import('@line-crm/shared').ConversationMessagePage>>(`/api/chats/${encodeURIComponent(friendId)}/messages?${new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]))}`),
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; sort?: 'unread_first' | 'latest'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
+    list: (params?: { channel?: 'all' | 'line' | 'instagram'; status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; sort?: 'unread_first' | 'latest'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
+      if (params?.channel) query.channel = params.channel
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.accountId) query.lineAccountId = params.accountId
@@ -75,7 +76,7 @@ export const chatsMethods = {
      */
     quickCounts: (params?: {
       status?: string; operatorId?: string; accountId?: string; q?: string;
-      unreadOnly?: boolean; channel?: 'all' | 'line' | 'email';
+      unreadOnly?: boolean; channel?: 'all' | 'line' | 'email' | 'instagram'; socialChannel?: 'all' | 'line' | 'instagram';
     }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
@@ -87,6 +88,7 @@ export const chatsMethods = {
       if (params?.q) query.q = params.q
       if (params?.unreadOnly) query.unreadOnly = '1'
       if (params?.channel) query.channel = params.channel
+      if (params?.socialChannel) query.socialChannel = params.socialChannel
       return fetchApi<ApiResponse<{
         all: number
         reply: number
