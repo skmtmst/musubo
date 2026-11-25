@@ -124,6 +124,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [testLoginUsers, setTestLoginUsers] = useState<Array<{ id: string; displayName: string }>>([])
   const [testTarget, setTestTarget] = useState('')
   const [testing, setTesting] = useState(false)
+  const [candidateScope, setCandidateScope] = useState<string | null>(null)
+  const [candidateError, setCandidateError] = useState<string | null>(null)
+  const [candidateRetry, setCandidateRetry] = useState(0)
+  const loginUsersRequest = useRef(0)
+  const searchRequest = useRef(0)
+  const testSendLock = useRef<{ generation: number } | null>(null)
   const [pendingCount, setPendingCount] = useState<number | null>(null)
   const [customMileageOpen, setCustomMileageOpen] = useState(false)
   const [customMileage, setCustomMileage] = useState('')
@@ -134,6 +140,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const tokenNames = useInsertTokenNames(selectedAccountId)
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
 
   useEffect(() => { setCustomMileageOpen(false) }, [campaignKey, selectedAccountId, canEdit])
 
@@ -176,32 +184,31 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     return () => { cancelled = true }
   }, [campaignKey, selectedAccountId, loadScope, loadRetry])
 
-  // テスト送信の相手の候補。はじめは、このアカウントのテスト送信先に登録したログインユーザー。
-  useEffect(() => {
-    setTestLoginUsers([])
-    setTestCandidates([])
-    setTestTarget('')
-    if (!selectedAccountId) return
-    let cancelled = false
-    void api.accountSettings.getTestRecipientLoginUsers(selectedAccountId)
-      .then((response) => {
-        if (cancelled || !response.success) return
-        const candidates = response.data
-          .filter((candidate) => candidate.sameAccount)
-          .map((candidate) => ({ id: candidate.id, displayName: candidate.staffName }))
-        setTestLoginUsers(candidates)
-        setTestCandidates(candidates)
-        setTestTarget(candidates[0]?.id ?? '')
-      })
-      .catch(() => undefined)
-    return () => { cancelled = true }
-  }, [selectedAccountId])
-
   const contextRef = useRef({ accountId: selectedAccountId, campaignKey, generation: 0 })
   if (contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey) {
     contextRef.current = { accountId: selectedAccountId, campaignKey, generation: contextRef.current.generation + 1 }
   }
-  useEffect(() => { setSaving(false) }, [selectedAccountId, campaignKey])
+  useEffect(() => { setSaving(false); setTesting(false) }, [selectedAccountId, campaignKey])
+
+  // このアカウントのテスト先を読み、切替後や新しい検索の後は古い返事を捨てる。
+  useEffect(() => {
+    setTestLoginUsers([]); setTestCandidates([]); setTestTarget(''); setTestSearch('')
+    setCandidateScope(null); setCandidateError(null)
+    const request = ++loginUsersRequest.current
+    const searchAtStart = ++searchRequest.current
+    if (!selectedAccountId) return
+    let active = true
+    void api.accountSettings.getTestRecipientLoginUsers(selectedAccountId).then(response => {
+      if (!active || request !== loginUsersRequest.current) return
+      if (!response.success) throw new Error('test recipients unavailable')
+      const candidates = response.data.filter(candidate => candidate.sameAccount).map(candidate => ({ id: candidate.id, displayName: candidate.staffName }))
+      setTestLoginUsers(candidates)
+      if (searchAtStart === searchRequest.current) {
+        setTestCandidates(candidates); setTestTarget(candidates[0]?.id ?? ''); setCandidateScope(loadScope)
+      }
+    }).catch(() => { if (active && request === loginUsersRequest.current) setCandidateError(loadScope) })
+    return () => { active = false }
+  }, [selectedAccountId, campaignKey, loadScope, candidateRetry])
   const latestSetting = async () => {
     const context = contextRef.current
     if (!context.accountId) return null
@@ -275,50 +282,46 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   }
 
   const searchFriends = async () => {
+    if (!selectedAccountId || !canEditRef.current || contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey) return
     const query = testSearch.trim()
+    const request = ++searchRequest.current
+    const generation = contextRef.current.generation
     setNotice('')
     try {
-      const response = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
+      const response = await api.friends.list({ search: query, accountId: selectedAccountId, limit: 5 })
+      if (request !== searchRequest.current || generation !== contextRef.current.generation) return
       if (!response.success) throw new Error('failed')
-      const loginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-      const friends = response.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
-      const next = [...new Map([...loginUsers, ...friends].map((candidate) => [candidate.id, candidate])).values()]
-      setTestCandidates(next)
-      setTestTarget(next[0]?.id ?? '')
+      const loginUsers = testLoginUsers.filter(candidate => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      const friends = response.data.items.map(friend => ({ id: friend.id, displayName: friend.displayName }))
+      const next = [...new Map([...loginUsers, ...friends].map(candidate => [candidate.id, candidate])).values()]
+      setTestCandidates(next); setTestTarget(next[0]?.id ?? ''); setCandidateScope(loadScope)
       if (next.length === 0) setNotice('その名前の相手は見つかりませんでした。')
     } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。') }
+      if (request !== searchRequest.current || generation !== contextRef.current.generation) return
+      if (!saveErrors.capture(saveFailure)) setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。')
     }
   }
 
   const sendTest = async () => {
-    if (!selectedAccountId || !testTarget)
-
-
- return
-    setTesting(true)
-    setError('')
-    setNotice('')
+    if (!selectedAccountId || !canEditRef.current || contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey || candidateScope !== loadScope || !testCandidates.some(candidate => candidate.id === testTarget) || testSendLock.current?.generation === contextRef.current.generation) return
+    const generation = contextRef.current.generation
+    const lock = { generation }
+    testSendLock.current = lock
+    setTesting(true); setError(''); setNotice('')
     try {
-      await api.nenCampaigns.testSend({
+      const response = await api.nenCampaigns.testSend({
         campaignKey, accountId: selectedAccountId, friendId: testTarget,
-        draft: {
-          title: merged.title, bodyText: merged.bodyText,
-          buttonLabel: merged.buttonLabel ?? '', buttonUrl: merged.buttonUrl ?? '', imageUrl: merged.imageUrl ?? '',
-        },
+        draft: { title: merged.title, bodyText: merged.bodyText, buttonLabel: merged.buttonLabel ?? '', buttonUrl: merged.buttonUrl ?? '', imageUrl: merged.imageUrl ?? '' },
       })
+      if (generation !== contextRef.current.generation) return
+      if (!response.success) throw new Error('test send failed')
       setNotice('テスト送信しました')
     } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-
-      setError('テスト送信できませんでした。時間をおいて、もう一度お試しください。') }
+      if (generation !== contextRef.current.generation) return
+      if (!saveErrors.capture(saveFailure)) setError('テスト送信できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
-      setTesting(false)
+      if (testSendLock.current === lock) testSendLock.current = null
+      if (generation === contextRef.current.generation) setTesting(false)
     }
   }
 
@@ -429,13 +432,14 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onClear={() => setTestSearch('')}
             onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
           />
+          {candidateError === loadScope ? <Notice tone="danger">テスト送信先を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setCandidateRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}
           <span className={styles.fullButton}>
-            <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'}  onClick={() => void sendTest()}>
-              <Send size={16} aria-hidden="true" />{testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
+            <Button type="button" disabled={testing || candidateScope !== loadScope || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'}  onClick={() => void sendTest()}>
+              <Send size={16} aria-hidden="true" />{candidateScope === loadScope && testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
             </Button>
           </span>
           {/* 相手が2人以上いるときだけ、送る相手を選ぶ欄を出す（ボタンの下：上の並びを動かさない）。 */}
-          {testCandidates.length > 1 ? (
+          {candidateScope === loadScope && testCandidates.length > 1 ? (
             <SaveErrorField names={["testTarget","friendId","test_target"]}><EntitySelect aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} /></SaveErrorField>
           ) : null}
         </Card>
