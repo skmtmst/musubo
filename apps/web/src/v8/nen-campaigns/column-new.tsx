@@ -63,7 +63,8 @@ export default function ColumnNew() {
   const [tagState, setTagState] = useState<{ account: string; status: 'loading' | 'ready' | 'error' } | null>(null)
   const [tagRetry, setTagRetry] = useState(0)
   const tagsReady = tagState?.account === selectedAccountId && tagState.status === 'ready'
-  const [audience, setAudience] = useState<{ key: string; count: number | null } | null>(null)
+  const [audience, setAudience] = useState<{ key: string; status: 'loading' | 'ready' | 'error'; count: number | null } | null>(null)
+  const [audienceRetry, setAudienceRetry] = useState(0)
   const audienceKey = JSON.stringify([selectedAccountId, draft.targetMode, draft.targetTagId])
   const audienceCount = tagsReady && audience?.key === audienceKey ? audience.count : null
   const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
@@ -98,11 +99,12 @@ export default function ColumnNew() {
     let active = true
     setAudience(null)
     if (!selectedAccountId || !tagsReady || (draft.targetMode === 'tag' && !draft.targetTagId)) return () => { active = false }
+    setAudience({ key: audienceKey, status: 'loading', count: null })
     void api.nenCampaigns.columnAudience(selectedAccountId, draft.targetMode, draft.targetTagId || null)
-      .then(response => { if (active) setAudience({ key: audienceKey, count: response.success ? response.data.count : null }) })
-      .catch(() => { if (active) setAudience(null) })
+      .then(response => { if (!active) return; if (!response.success) throw new Error('audience unavailable'); setAudience({ key: audienceKey, status: 'ready', count: response.data.count }) })
+      .catch(() => { if (active) setAudience({ key: audienceKey, status: 'error', count: null }) })
     return () => { active = false }
-  }, [draft.targetMode, draft.targetTagId, selectedAccountId, tagsReady, audienceKey])
+  }, [draft.targetMode, draft.targetTagId, selectedAccountId, tagsReady, audienceKey, audienceRetry])
   if (!selectedAccountId) {
     return (
       <SaveErrorScope errors={saveErrors}><ListState
@@ -290,6 +292,7 @@ export default function ColumnNew() {
               onChange={(value) => set(value ? { targetMode: 'tag', targetTagId: value } : { targetMode: 'all', targetTagId: '' })}
             /></SaveErrorField>
             <FieldError id="nen-col-targetTagId-error">{errorFor('targetTagId')}</FieldError>
+            {tagsReady && audience?.key === audienceKey && audience.status === 'error' ? <Notice tone="danger">届く人数を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setAudienceRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}
           </div>
         </SettingsFormRow>
         {publishOpen ? (

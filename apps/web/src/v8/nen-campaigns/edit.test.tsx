@@ -195,6 +195,27 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     expect((button('下書きを保存') as HTMLButtonElement).disabled).toBe(false)
   })
 
+  it('届く人数の取得失敗を知らせ、読み直せる', async () => {
+    calls.audience.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: { count: 24 } })
+    await act(async () => { root.render(<ColumnNew />) }); await flush()
+    expect(host.textContent).toContain('届く人数を読み込めませんでした')
+    await act(async () => { fireEvent.click(button('もう一度読み込む')!) }); await flush()
+    expect(host.textContent).not.toContain('届く人数を読み込めませんでした')
+    expect(host.textContent).toContain('24 人に届きます')
+  })
+
+  it('アカウント切替前の人数取得失敗を新しい画面に出さない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.audience.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValueOnce({ success: true, data: { count: 32 } })
+    await act(async () => { root.render(<ColumnNew />) }); await flush()
+    account.id = 'account-b'
+    await act(async () => { root.render(<ColumnNew />) }); await flush()
+    expect(host.textContent).toContain('32 人に届きます')
+    await act(async () => { resolve({ success: false }) }); await flush()
+    expect(host.textContent).toContain('32 人に届きます')
+    expect(host.textContent).not.toContain('届く人数を読み込めませんでした')
+  })
+
   it('アカウント切替後は古いタグと人数の遅い返事を表示しない', async () => {
     let resolveTags!: (value: unknown) => void
     let resolveAudience!: (value: unknown) => void
