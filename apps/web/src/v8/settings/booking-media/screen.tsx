@@ -61,13 +61,53 @@ export type MediaRow = {
   code: string
   name: string
   acceptsReservations: boolean
+  emailImportSupported?: boolean
   pageUrl: string | null
   loginUrl: string | null
   closeOnBooking: boolean
   version: number
 }
 
-type ChannelState = { code: string; status?: string; daysWithoutReceipt?: number | null; receiveMethod?: string }
+export type ChannelState = {
+  code: string
+  status?: string
+  daysWithoutReceipt?: number | null
+  receiveMethod?: string
+  emailImportSupported?: boolean
+  emailImportEnabled?: boolean
+  emailImportVersion?: number
+  heldCount?: number
+  expiringHeldCount?: number
+  nearestHeldExpiresAt?: string | null
+  daysUntilNearestHeldExpiry?: number | null
+}
+
+type ResumingTarget = {
+  code: string
+  name: string
+  expectedVersion: number
+  heldCount: number
+  expiringHeldCount: number
+  daysUntilNearestHeldExpiry: number | null
+}
+
+/** 予約メールの取り込みを店舗×媒体ごとに止める・再開できる媒体か。 */
+export function isEmailImportTarget(
+  row: Pick<MediaRow, 'acceptsReservations' | 'code' | 'emailImportSupported'>,
+  channel: ChannelState | undefined,
+): boolean {
+  if (!row.acceptsReservations || row.code === 'google' || row.code === 'google_reservation') return false
+  if (typeof row.emailImportSupported === 'boolean') return row.emailImportSupported
+  if (typeof channel?.emailImportSupported === 'boolean') return channel.emailImportSupported
+  return false
+}
+
+/** 取り込み設定とは別に示す「受信の状況」の文。 */
+export function receiptStatusText(channel: ChannelState | undefined): string {
+  if (channel?.status === 'receiving') return '受信：届いています'
+  if (channel?.status === 'not_receiving') return `受信：${formatNumber(channel.daysWithoutReceipt ?? 0)}日届いていません`
+  return '受信：まだ届いていません'
+}
 
 /** https だけ。ID・パスワード入りの URL は断る（口と同じ条件）。空は「消す」。 */
 export function checkHttpsUrl(value: string): { ok: true; value: string | null } | { ok: false; message: string } {
@@ -208,6 +248,10 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
   const [members, setMembers] = useState<RestaurantMembership[]>([])
   const [picking, setPicking] = useState<Pick<NoticeSettings, 'recipientMode' | 'membershipIds'> | null>(null)
   const [pickError, setPickError] = useState('')
+  const [resuming, setResuming] = useState<ResumingTarget | null>(null)
+  const [resumeHeldAction, setResumeHeldAction] = useState<'import' | 'archive'>('import')
+  const [resumeError, setResumeError] = useState('')
+  const [togglingCode, setTogglingCode] = useState<string | null>(null)
 
   /*
    * WEB005：読み直し（媒体を足したあとなど）は、まだ保存していない行の入力を消さない。
@@ -226,6 +270,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         code: row.code,
         name: row.name,
         acceptsReservations: !!row.acceptsReservations,
+        ...(row.emailImportSupported !== undefined ? { emailImportSupported: !!row.emailImportSupported } : {}),
         pageUrl: row.pageUrl,
         loginUrl: row.loginUrl,
         closeOnBooking: !!row.closeOnBooking,
@@ -410,6 +455,119 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
 
   const askLink = () => setLinkAsked(true)
 
+  const openResumeDialog = (row: MediaRow, channel: ChannelState | undefined) => {
+    setResuming({
+      code: row.code,
+      name: row.name,
+      expectedVersion: channel?.emailImportVersion ?? 0,
+      heldCount: channel?.heldCount ?? 0,
+      expiringHeldCount: channel?.expiringHeldCount ?? 0,
+      daysUntilNearestHeldExpiry: channel?.daysUntilNearestHeldExpiry ?? null,
+    })
+    setResumeHeldAction('import')
+    setResumeError('')
+  }
+
+  const stopEmailImport = async (row: MediaRow, channel: ChannelState | undefined) => {
+    if (!selectedAccountId || !storeId || togglingCode !== null) return
+    setTogglingCode(row.code)
+    setSaveError('')
+    try {
+      await fetchApi<{
+        success: true
+        data: {
+          emailImportEnabled: boolean
+          emailImportVersion: number
+          heldCount: number
+        }
+      }>(`/api/restaurant-test/media-email-import/${encodeURIComponent(row.code)}?account_id=${encodeURIComponent(selectedAccountId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          storeId,
+          enabled: false,
+          expectedVersion: channel?.emailImportVersion ?? 0,
+        }),
+      })
+      if (!mounted.current) return
+      notifySaved(`「${row.name}」の予約メールの取り込みを止めました。止めている間に届くメールは最長30日保管し、予約台帳には入れません`)
+      await load({ keepEdits: true })
+    } catch (caught) {
+      if (!mounted.current) return
+      if (isStoreMismatch(caught)) {
+        await storeSelection.recheckContext()
+        if (mounted.current) setSaveError('別の画面で表示中の店舗が変わった可能性があります。店舗を確認してから、もう一度操作してください。')
+        return
+      }
+      if (caught instanceof ApiError && caught.status === 409) {
+        setConflict(true)
+        return
+      }
+      setSaveError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
+    } finally {
+      if (mounted.current) setTogglingCode(null)
+    }
+  }
+
+  const confirmResume = async () => {
+    if (!resuming || !selectedAccountId || !storeId || togglingCode !== null) return
+    const target = resuming
+    setTogglingCode(target.code)
+    setResumeError('')
+    setSaveError('')
+    try {
+      const res = await fetchApi<{
+        success: true
+        data: {
+          importedCount: number
+          archivedCount: number
+          failedHeldCount: number
+        }
+      }>(`/api/restaurant-test/media-email-import/${encodeURIComponent(target.code)}?account_id=${encodeURIComponent(selectedAccountId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          storeId,
+          enabled: true,
+          expectedVersion: target.expectedVersion,
+          heldAction: resumeHeldAction,
+        }),
+      })
+      if (!mounted.current) return
+      setResuming(null)
+      if ((res.data?.failedHeldCount ?? 0) > 0) {
+        setSaveError(`「${target.name}」の取り込みは再開しましたが、保留中のメールのうち ${formatNumber(res.data.failedHeldCount)} 通を処理できませんでした。時間をおいて確認してください。`)
+      } else if (resumeHeldAction === 'import') {
+        notifySaved(
+          (res.data?.importedCount ?? 0) > 0
+            ? `「${target.name}」の取り込みを再開し、保留分 ${formatNumber(res.data.importedCount)} 通を取り込みました`
+            : `「${target.name}」の予約メールの取り込みを再開しました`,
+        )
+      } else {
+        notifySaved(
+          (res.data?.archivedCount ?? 0) > 0
+            ? `「${target.name}」の取り込みを再開しました（保留分 ${formatNumber(res.data.archivedCount)} 通は取り込まず保管のみにしました）`
+            : `「${target.name}」の予約メールの取り込みを再開しました`,
+        )
+      }
+      await load({ keepEdits: true })
+    } catch (caught) {
+      if (!mounted.current) return
+      if (isStoreMismatch(caught)) {
+        setResuming(null)
+        await storeSelection.recheckContext()
+        if (mounted.current) setSaveError('別の画面で表示中の店舗が変わった可能性があります。店舗を確認してから、もう一度操作してください。')
+        return
+      }
+      if (caught instanceof ApiError && caught.status === 409) {
+        setResuming(null)
+        setConflict(true)
+        return
+      }
+      setResumeError(withPermissionFailure(caught, describeSaveFailure(caught), 'store'))
+    } finally {
+      if (mounted.current) setTogglingCode(null)
+    }
+  }
+
 
   const navigationLeaveDialog = (<UnsavedLeaveDialog
         open={leaveTarget !== null}
@@ -443,6 +601,22 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
     </PageFrame>{navigationLeaveDialog}{storeLeaveDialog}</>
   }
 
+  const expiringWarnings = rows.flatMap((row) => {
+    const channel = channels.find((item) => item.code === row.code)
+    if (!isEmailImportTarget(row, channel)) return []
+    const expiringHeldCount = channel?.expiringHeldCount ?? 0
+    const daysUntilNearestHeldExpiry = channel?.daysUntilNearestHeldExpiry ?? null
+    if (expiringHeldCount <= 0 || daysUntilNearestHeldExpiry === null) return []
+    return [{
+      code: row.code,
+      row,
+      channel,
+      enabled: channel?.emailImportEnabled !== false,
+      expiringHeldCount,
+      daysUntilNearestHeldExpiry,
+    }]
+  })
+
   let table
   if (loadError && !saved) table = <ListState kind="error" title="媒体を読み込めませんでした" error={loadError} onRetry={() => void load()} />
   else if (!saved) table = <ListState kind="loading" />
@@ -455,13 +629,23 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
             <Th truncate>媒体</Th>
             <Th truncate>店舗ページの URL</Th>
             <Th truncate>管理画面（ログイン）の URL</Th>
-            <Th truncate>予約メールの取り込み</Th>
+            <Th truncate className={styles.colImport}>予約メールの取り込み</Th>
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
         <tbody>
           {rows.map((row) => {
-            const badge = importBadge(row, channels.find((c) => c.code === row.code))
+            const channel = channels.find((c) => c.code === row.code)
+            const target = isEmailImportTarget(row, channel)
+            const badge = importBadge(row, channel)
+            const enabled = channel?.emailImportEnabled !== false
+            const heldCount = channel?.heldCount ?? 0
+            const expiringCount = channel?.expiringHeldCount ?? 0
+            const remainingDays = channel?.daysUntilNearestHeldExpiry ?? null
+            const receiptText = receiptStatusText(channel)
+            const metaText = !enabled && expiringCount > 0 && remainingDays !== null
+              ? `${receiptText}・保管期限まであと${formatNumber(remainingDays)}日`
+              : receiptText
             const changed = dirty.some((d) => d.code === row.code)
             return (
               <Tr key={row.code} data-dirty={changed || undefined}>
@@ -473,8 +657,32 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
                 </FolderDotName></Td>
                 <Td><UrlCell url={row.pageUrl} /></Td>
                 <Td><UrlCell url={row.loginUrl} /></Td>
-                <Td>
-                  <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                <Td className={styles.colImport}>
+                  {target ? (
+                    <div className={styles.importCell}>
+                      <div className={styles.importTop}>
+                        <StatusBadge tone={enabled ? 'success' : 'warning'}>
+                          {enabled ? '有効' : `止めています（保留 ${formatNumber(heldCount)} 通）`}
+                        </StatusBadge>
+                        <PermissionGatedButton
+                          allowed={canManage}
+                          size="compact"
+                          busy={togglingCode === row.code && enabled}
+                          busyLabel="処理中…"
+                          disabled={togglingCode !== null && togglingCode !== row.code}
+                          onClick={() => {
+                            if (enabled) void stopEmailImport(row, channel)
+                            else openResumeDialog(row, channel)
+                          }}
+                        >
+                          {enabled ? '止める' : '再開する'}
+                        </PermissionGatedButton>
+                      </div>
+                      <span className={styles.importMeta} title={metaText}>{metaText}</span>
+                    </div>
+                  ) : (
+                    <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
+                  )}
                 </Td>
                 <Td className={styles.colMenu}>
                   {canManage ? (
@@ -527,6 +735,20 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
             </Notice>
           ) : null}
           {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
+          {expiringWarnings.map((item) => (
+            <Notice
+              key={item.code}
+              tone="warn"
+              role="status"
+              action={canManage && !item.enabled ? (
+                <Button size="compact" onClick={() => openResumeDialog(item.row, item.channel)}>
+                  再開・保管を選ぶ
+                </Button>
+              ) : undefined}
+            >
+              {`「${item.row.name}」で保留中の予約メール ${formatNumber(item.expiringHeldCount)} 通が、あと ${formatNumber(item.daysUntilNearestHeldExpiry)} 日で保管期限（30日）を迎えます。期限を過ぎると決まりどおり削除して監査に残します。［再開する］からまとめて取り込むか、取り込まず保管だけにするかを選んでください。`}
+            </Notice>
+          ))}
 
           <section className={styles.section} aria-label="つないでいる媒体">
             <SectionHeader
@@ -705,6 +927,32 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
             ) : null}
           </div>
         ) : null}
+      </Dialog>
+
+      <Dialog
+        open={resuming !== null}
+        title={resuming ? `${resuming.name}の予約メールの取り込みを再開` : '予約メールの取り込みを再開'}
+        description={resuming ? (resuming.heldCount > 0 ? `止めている間に届いた保留中のメールが ${formatNumber(resuming.heldCount)} 通あります。再開するにあたり、保留分を予約台帳へまとめて取り込むか、取り込まず保管だけにするかを選んでください。` : '止めている間に届いた保留中のメールはありません（0 通）。再開すると、これから届く予約メールを予約台帳へ取り込みます。') : undefined}
+        confirmLabel="再開する"
+        busy={resuming !== null && togglingCode === resuming.code}
+        onConfirm={() => void confirmResume()}
+        onCancel={() => { if (!togglingCode) { setResuming(null); setResumeError('') } }}
+        error={resumeError || undefined}
+      >
+        <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: storeId, name: stores.find(store => store.id === storeId)?.name }} />
+        {resuming && resuming.expiringHeldCount > 0 && resuming.daysUntilNearestHeldExpiry !== null ? (
+          <Notice tone="warn" role="status">
+            {`保留中のうち ${formatNumber(resuming.expiringHeldCount)} 通が、あと ${formatNumber(resuming.daysUntilNearestHeldExpiry)} 日で保管期限（30日）を迎えます。`}
+          </Notice>
+        ) : null}
+        <div className={styles.dialogFields} role="radiogroup" aria-label="保留中のメールの扱い">
+          <Radio name="resume-held-action" checked={resumeHeldAction === 'import'} onChange={() => setResumeHeldAction('import')}>
+            保留分をまとめて取り込む（新規・変更・取消を受信順に予約台帳へ反映します）
+          </Radio>
+          <Radio name="resume-held-action" checked={resumeHeldAction === 'archive'} onChange={() => setResumeHeldAction('archive')}>
+            取り込まない（保管だけにする・予約台帳には入れません）
+          </Radio>
+        </div>
       </Dialog>
 
       <Dialog
