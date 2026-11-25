@@ -11,6 +11,8 @@ import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoic
 import { readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
 import styles from '@/v8/onboarding/wizard.module.css'
 
+const REGISTRATION_STYLES = ['restaurant'] as const
+
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
 export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onClose, presentationKey = null }: {
   accountName?: string
@@ -27,7 +29,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
   const [initial] = useState(() => readRegistrationPresentation(presentationKey))
   const [demoOpen, setDemoOpen] = useState(initial.demoOpen === true)
   const [demoPage, setDemoPage] = useState(initial.demoPage ?? 0)
-  const [viewing, setViewing] = useState<AccountStyle>(initial.viewing || choice || 'restaurant')
+  const [viewing, setViewing] = useState<AccountStyle>('restaurant')
   useEffect(() => { if (!open) { setDemoOpen(false); setDemoPage(0) } }, [open])
   useEffect(() => {
     rememberRegistrationPresentation(presentationKey, { viewing, demoOpen, demoPage })
@@ -42,7 +44,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
     designTop={60}
     fitViewport
     contentLayout="form"
-    steps={<StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} />}
+    steps={<StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} allowedStyles={REGISTRATION_STYLES} />}
     designNode="xxpM9"
     onCancel={demoOpen ? () => setDemoOpen(false) : onClose}
     busy={busy}

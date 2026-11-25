@@ -11,7 +11,8 @@ import { isAccountIndependentRoute } from '@/lib/store-route-guard'
 import { useFirstSteps } from '@/v8/dashboard/public/first-steps-model/index'
 import { GUIDE_ENGINE_EVENT, readGuideEngineState } from './guide-engine'
 import { GuideOverlay } from './guide-overlay'
-import { GuideReceiveFirstMessage, GuideSetupComplete } from './guide-last-step'
+import { GuideSetupComplete } from './guide-last-step'
+import { GuideFirstMessage } from './guide-first-message'
 import { GuideMenuPicker } from './guide-menu-picker'
 import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
@@ -88,7 +89,6 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
   accountId: string | null; staffId?: string; role: string | null; armed: boolean; watchFirstMessage: boolean; checkingAccount: boolean; children: ReactNode
 }) {
   const account = useOptionalAccount()
-  const basicId = account?.selectedAccount?.basicId
   const style = useAccountStyle(accountId)
   const pathname = usePathname()
   const entryReady = useSyncExternalStore(subscribeLineAccountEntry, () => isLineAccountEntryReady(accountId), () => false)
@@ -148,11 +148,10 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
   const firstMessageStep = scripted && step?.key === 'firstMessage'
   const menuPickerStep = scripted && step?.key === 'richMenu'
   const targetHref = firstMessageStep || menuPickerStep ? '/' : procedureHref ?? stepHref
-  const checkingFirstMessage = firstMessageStep && (pathname === '/scenarios' || pathname.startsWith('/scenarios/'))
   const needsPublishReview = scripted && step?.key === 'scenario' && step.done &&
     guide.procedureIndex === 2 && guide.phase === 'active'
   const inPublishReview = needsPublishReview && pathname.startsWith('/rich-menus')
-  const onTargetScreen = inPublishReview || !targetHref || matchesGuideLocation(pathname, search, targetHref) || checkingFirstMessage
+  const onTargetScreen = inPublishReview || !targetHref || matchesGuideLocation(pathname, search, targetHref)
   const place = `${accountId}:${guide.stepKey}:${guide.procedureIndex}`
   const leavingGuideScreen = !onTargetScreen && reachedPlace.current === place
   useEffect(() => {
@@ -226,10 +225,9 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
       {showMenuPicker && summary && style.data ? <GuideMenuPicker key={accountId} accountId={accountId}
         version={style.data.version} step={index + 1} total={summary.total} onLater={advance} onSaved={advance}
         onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
-      {showReceive && summary ? <GuideReceiveFirstMessage key={accountId} basicId={basicId}
-        step={index + 1} total={summary.total} watchExpired={first.watchExpired}
-        onReload={account?.refreshAccounts}
-        onRewatch={first.rewatch} onTest={() => { first.rewatch(); router.push('/scenarios') }} onLater={pause} /> : null}
+      {showReceive && summary ? <GuideFirstMessage key={JSON.stringify([accountId, staffId])}
+        accountId={accountId} accountName={account?.selectedAccount?.name}
+        step={index + 1} total={summary.total} onReceived={first.refresh} onLater={pause} /> : null}
       {showComplete ? <GuideSetupComplete key={accountId} exposure={first.progress?.bookingExposure}
         onAcknowledge={async () => {
           const saved = await guide.complete?.()

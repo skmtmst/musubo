@@ -35,7 +35,7 @@ export default function SegmentedControl<T extends string>({
   id?: string
   selectionMode?: 'buttons' | 'radio'
   invalid?: boolean
-  options: { value: T; label: ReactNode; ariaLabel?: string; title?: string; count?: number | string }[]
+  options: { value: T; label: ReactNode; ariaLabel?: string; title?: string; count?: number | string; disabled?: boolean }[]
   value: T
   onChange: (value: T) => void
   /** 選択中をもう一度押したときだけ解除する。キーボードの移動では解除しない。 */
@@ -112,13 +112,14 @@ export default function SegmentedControl<T extends string>({
   useLayoutEffect(() => { queueMeasure.current() }, [options, selectedIndex, appearance, size, className, disabled, equalWidth, fit, bad])
 
   const onKeyDown = (event: React.KeyboardEvent) => {
-    if (disabled || options.length === 0) return
-    let next: number
-    if (event.key === 'Home') next = 0
-    else if (event.key === 'End') next = options.length - 1
-    else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') next = (selectedIndex + (event.key === 'ArrowRight' ? 1 : -1) + options.length) % options.length
-    else return
+    if (disabled || !['Home', 'End', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    const available = options.flatMap((option, index) => option.disabled ? [] : [index])
+    if (!available.length) return
     event.preventDefault()
+    const current = available.indexOf(selectedIndex)
+    const offset = event.key === 'ArrowLeft' ? -1 : 1
+    const next = event.key === 'Home' ? available[0] : event.key === 'End' ? available.at(-1)!
+      : current < 0 ? available[0] : available[(current + offset + available.length) % available.length]
     onChange(options[next].value)
     itemRefs.current[next]?.focus()
   }
@@ -126,6 +127,7 @@ export default function SegmentedControl<T extends string>({
   return (
     <div
       data-segmented-control
+      data-disabled={disabled || undefined}
       data-sliding={thumb.width > 0 || undefined}
       ref={rootRef}
       id={id ?? field?.controlId}
@@ -149,7 +151,7 @@ export default function SegmentedControl<T extends string>({
             itemRefs.current[index] = el
           }}
           type="button"
-          disabled={disabled}
+          disabled={disabled || option.disabled}
           className={[styles.item, option.value === value ? styles.selected : null]
             .filter(Boolean)
             .join(' ')}

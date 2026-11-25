@@ -5,6 +5,9 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedRestaurantFixture } from '../test-utils/restaurant-fixture.js';
 import { restaurantTest } from './restaurant-test.js';
+import { tzDateStr } from '../services/availability.js';
+import { restaurantCivilTime } from '../services/restaurant-booking.js';
+import { saveInventoryAllocation } from '../services/restaurant-inventory-allocation.js';
 
 let database: SqliteD1;
 let staff: AuthenticatedStaff;
@@ -33,10 +36,10 @@ function hours(store = 'store-ginza') {
   database.raw.prepare('INSERT INTO rt_opening_hours_settings(store_id,hours_json,updated_by) VALUES(?,?,?)')
     .run(store, JSON.stringify([{ weekday: 1, periods: [{ opensAt: '09:00', closesAt: '18:00' }] }]), 'owner');
 }
-function googleHours(store = 'store-ginza') {
+function googleHours(store = 'store-ginza', weekdays = ['MONDAY']) {
   const location = `accounts/111/locations/${store}`;
   const weekly = Object.fromEntries(['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']
-    .map(day => [day, day === 'MONDAY' ? [{ open: '09:00', close: '18:00' }] : []]));
+    .map(day => [day, weekdays.includes(day) ? [{ open: '09:00', close: '18:00' }] : []]));
   database.raw.prepare(`INSERT INTO rt_google_connections
     (id,store_id,line_account_id,location_name,refresh_token_enc,status) VALUES(?,?,?,?,?,?)`)
     .run(`connection-${store}`, store, 'account-2', location, 'encrypted', 'connected');
@@ -131,6 +134,30 @@ it('受付設定を残しながら現在の予約リンク、公開ボタン、�
 
   database.raw.exec(`UPDATE rt_inventory_slots SET line_capacity=0,auto_line_original=4 WHERE id='future-slot'`);
   expect(await progress()).toMatchObject({ reception: true, bookingExposure: { publicReservationMenu: true, availableCapacity: false } });
+});
+
+it('基本配分で受付設定を判定し、休業の翌営業日も空き枠を調べる', async () => {
+  const timezone = 'Asia/Tokyo';
+  const store = 'store-ginza';
+  const now = new Date();
+  const today = tzDateStr(timezone, now);
+  const tomorrow = tzDateStr(timezone, new Date(now.getTime() + 86_400_000));
+  const periods = [today, tomorrow].map(date => ({
+    startsAt: restaurantCivilTime(date, 0, timezone),
+    endsAt: restaurantCivilTime(date, 1440, timezone),
+  }));
+  hours();
+  googleHours(store, ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']);
+  database.raw.prepare(`INSERT INTO rt_closures
+    (id,store_id,start_date,end_date,all_day,kind,table_ids_json,periods_json) VALUES('closed',?,?,?,1,'temporary_closed','[]',?)`)
+    .run(store, today, tomorrow, JSON.stringify(periods));
+  database.raw.exec("INSERT INTO rt_reservation_links(store_id,token) VALUES ('store-ginza','current-token')");
+  expect(await progress()).toMatchObject({ reception: false });
+  await saveInventoryAllocation(database.db, store, 'owner', 0, {
+    scope: 'standard', allocation: { lineCapacity: 2, otaCapacity: 0, walkInCapacity: 0 },
+  });
+  expect(await progress()).toMatchObject({ reception: true, bookingExposure: { availableCapacity: true } });
+  expect(database.raw.prepare('SELECT COUNT(*) AS n FROM rt_inventory_slots').get()).toEqual({ n: 0 });
 });
 
 it('未確認・使わない保存・送り方オンの根拠を同じ店舗の初期設定へ返す', async () => {
