@@ -5,7 +5,6 @@
 
 /* 頭の下の段（日付・担当・比べる・読み直す） */
 .head { display: flex; flex-direction: column; gap: var(--polish-space-row); }
-.subtitle { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rs-lh-13); }
 .filters { display: flex; align-items: center; gap: var(--polish-space-row); min-inline-size: 0; }
 .filters > * { flex: 0 0 auto; }
 .filters > .grow { flex: 1 1 auto; }

@@ -33,7 +33,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
 import TestModeNote from '@/components/shared/test-mode-note'
 import { notifyToast } from '@/components/shared/toast'
-import { DashboardPage, DashboardTop } from '@/components/templates/dashboard-page'
+import { DashboardPage, DashboardTop, DashboardSubtitle } from '@/components/templates/dashboard-page'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate, formatNumber } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
@@ -263,7 +263,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           feedback={<>{start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
             {setup.error && canManageRole(role) ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}</>} /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
-        </>} controls={<div className={styles.head}>{subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}{filters}</div>}>
+        </>} controls={<div className={styles.head}>{subtitle ? <DashboardSubtitle>{subtitle}</DashboardSubtitle> : null}{filters}</div>}>
         {today && today.kpis.length === 0 ? null : <KpiBand layout="link-row" maxColumns={5} data-style-dashboard={style}>
           {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
         </KpiBand>}

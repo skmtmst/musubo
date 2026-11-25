@@ -107,6 +107,15 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの専用画�
   const band = view.container.querySelector('[data-style-dashboard]')!
   expect(card.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
+it('飲食の案内、期間の操作、数の帯はこの順に並ぶ', async () => {
+  const view = render(<StyleDashboard style="restaurant" />)
+  const card = (await screen.findByRole('heading', { name: 'はじめにやること' })).closest('section')!
+  const controls = screen.getByLabelText('期間')
+  const band = view.container.querySelector('[data-style-dashboard]')!
+  expect(card.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(controls.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
 it('専用画面の閲覧のみでもカードを隠さず、設定の操作を灰色で残す', async () => {
   state.role = 'viewer'
   render(<StyleDashboard style="restaurant" />)
