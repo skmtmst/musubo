@@ -320,11 +320,9 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
         kind="empty"
         title="まだプロジェクトがありません"
         description="案件やキャンペーンごとにプロジェクトを作り、その中で画像を生成します。作った画像はアカウントへ配れます。"
-        action={canManage ? (
-          <Button variant="primary" onClick={() => setFormOpen(true)}>
-            <Plus aria-hidden="true" className={styles.buttonIcon} />最初のプロジェクトを作る
-          </Button>
-        ) : undefined}
+        action={<PermissionGatedButton allowed={canManage} need="tenantWide" variant="primary" onClick={() => setFormOpen(true)}>
+          <Plus aria-hidden="true" className={styles.buttonIcon} />最初のプロジェクトを作る
+        </PermissionGatedButton>}
       />
     )
   ) : visible.length === 0 ? (
