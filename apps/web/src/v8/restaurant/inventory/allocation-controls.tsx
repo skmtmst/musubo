@@ -1,9 +1,10 @@
 'use client'
 
+import { useId } from 'react'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
 import NumberField from '@/components/shared/number-field'
 import type { RestaurantInventoryAllocationWrite } from '@/lib/restaurant-test-api'
@@ -124,6 +125,7 @@ export function AllocationDialog({ scope, dateLabel, time, allocation, totalSeat
       : `${dateLabel} ${time}の枠に適用します。`
   const label = scope === 'standard' ? '基本配分を保存' : scope === 'day' ? 'この日だけ保存' : 'この時間帯だけ保存'
   const valid = validAllocation(totalSeats, allocation)
+  const allocationErrorId = useId()
   return (
     <Dialog open title={title} description={description} designWidth={560} designLayout="stacked" designMinHeight={407} onCancel={onClose} busy={busy}
       footer={<DialogActions align="center" layout="inline">
@@ -135,6 +137,7 @@ export function AllocationDialog({ scope, dateLabel, time, allocation, totalSeat
         <div className={styles.allocationFields}>
           {dialogFields.map(([key, label]) => <Field key={key} label={label} optional={false} labelWrap>
             <NumberField aria-label={label} min={0} max={totalSeats} value={String(allocation[key])} unit="席" note={false}
+              aria-describedby={valid ? undefined : allocationErrorId}
               invalid={!valid} disabled={busy} onChange={event => onChange({ ...allocation, [key]: Number(event.currentTarget.value) })} />
           </Field>)}
           <div className={styles.allocField}>
@@ -142,7 +145,7 @@ export function AllocationDialog({ scope, dateLabel, time, allocation, totalSeat
             <span className={styles.remainder}>{valid ? `${remainingSeats(totalSeats, allocation)}席` : '—'}</span>
           </div>
         </div>
-        {!valid ? <p role="alert" className={styles.noteInvalid}>各項目に0以上の整数を入力し、合計を{totalSeats}席以内にしてください。</p> : null}
+        <FieldError id={allocationErrorId}>{!valid ? `各項目に0以上の整数を入力し、合計を${totalSeats}席以内にしてください。` : null}</FieldError>
         {scope === 'standard' ? <p className={styles.note}>予約サイトの配分はmusubo内で管理します。</p> : null}
         {canRestore ? <Button variant="text" disabled={busy || Boolean(reload)} onClick={onRestore}>{restoreLabel}</Button> : null}
         {error ? <Notice tone="danger" action={reload ? <Button onClick={reload}>最新の配分を確認する</Button> : undefined}>{error}</Notice> : null}

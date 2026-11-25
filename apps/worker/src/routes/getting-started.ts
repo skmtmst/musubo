@@ -341,7 +341,7 @@ async function restaurantFirstMessageDone(db: D1Database, scope: { staffId: stri
 }
 
 const firstMessageRole = requireRole('owner', 'admin', 'staff');
-const firstMessagePermission: MiddlewareHandler<Env> = (c, next) => {
+const firstMessagePermission: MiddlewareHandler<Env> = async (c, next) => {
   if (!canAdvance(c.get('staff'), 'firstMessage')) {
     return c.json({ success: false, error: 'この操作を実行する権限がありません' }, 403);
   }

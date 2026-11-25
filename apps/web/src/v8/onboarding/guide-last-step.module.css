@@ -118,11 +118,6 @@
   font-size: var(--text-body);
 }
 
-:root [role='dialog']:has(> [class] > .testMessage) {
-  padding: var(--space-24) 23px var(--space-14);
-  gap: var(--space-12);
-}
-
 .testMessage {
   display: grid;
   gap: var(--space-12);

@@ -149,7 +149,7 @@ export function GuideFirstMessage({ accountId, accountName, step, total, onRecei
       return <Button variant="primary" className={styles.testAction} onClick={send}>もう一度送信する</Button>
     }
     if (status === 'connection' || status === 'failed' || status === 'friend_required') {
-      return <Button variant="primary" className={styles.testAction} href={'/accounts/detail?' + new URLSearchParams({ id: accountId })} target="_blank" rel="noopener noreferrer" onClick={() => setConnectionOpened(true)}>LINEの接続を確認する</Button>
+      return <Button variant="primary" className={styles.testAction} href={'/accounts/detail?' + new URLSearchParams({ id: accountId })} external onClick={() => setConnectionOpened(true)}>LINEの接続を確認する</Button>
     }
     return null
   })()
