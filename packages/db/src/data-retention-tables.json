@@ -3134,6 +3134,15 @@
       "parentColumn": "id"
     }
   },
+  "rt_held_reservation_emails": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
   "rt_inbound_emails": {
     "category": "purge",
     "scope": {
@@ -4053,6 +4062,15 @@
     }
   },
   "rt_store_media_links": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_store_media_email_settings": {
     "category": "purge",
     "scope": {
       "by": "parent",
