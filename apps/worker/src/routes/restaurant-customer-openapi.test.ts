@@ -16,5 +16,8 @@ it('公開仕様も席予約の任意欄・席種・休業理由・遅刻案内�
   expect(spec.components.schemas.RestaurantCustomerBooking.properties).toHaveProperty('seatType');
   expect(input('/api/restaurant-test/opening-hours','put')).toHaveProperty('lateArrivalPolicy');
   expect(output('/api/restaurant-test/opening-hours').properties).toHaveProperty('lateArrivalPolicy');
+  expect(output('/api/restaurant-test/opening-hours').required).toContain('hoursStatus');
+  expect(output('/api/restaurant-test/opening-hours').properties.hoursStatus.enum).toEqual(['available','closed','temporarily_closed','permanently_closed','unavailable','unconfigured']);
+  expect(output('/api/restaurant-test/opening-hours').properties.googleStatus.enum).toContain('expired');
   expect(output('/api/restaurant-test/reservation-link','post').properties.url.description).toContain('https://liff.line.me/<店舗のLIFF ID>?page=restaurant&token=<token>');
 });

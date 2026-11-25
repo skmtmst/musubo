@@ -13,6 +13,7 @@ export type RestaurantCustomerHistory = { visitCount: number; visits: Restaurant
 export type RestaurantOpeningDay = { weekday: number; periods: Array<{ opensAt: string; closesAt: string }> };
 export type RestaurantOpeningHours = {
   storeId: string; hours: RestaurantOpeningDay[] | null; version: number;
+  hoursStatus: 'available' | 'closed' | 'temporarily_closed' | 'permanently_closed' | 'unavailable' | 'unconfigured';
   updatedBy: string | null; updatedAt: string | null;
   googleStatus?: 'connected' | 'pending_location' | 'expired' | 'no_permission' | 'disconnected' | null;
   lateArrivalPolicy?: import('./restaurant-customer-booking.js').RestaurantLateArrivalPolicy | null;

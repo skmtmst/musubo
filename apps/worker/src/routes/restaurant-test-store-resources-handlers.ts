@@ -334,13 +334,17 @@ export const get__api_restaurant_test_opening_hours_8 = async (c: Context<Env, "
   // store_id だけで接続を引くと、接続が2件あるとき「接続Aの状態 × 接続Bの営業時間」を返し得る。
   const connection = await primaryGoogleConnection(dbFor(c.env, storeId), storeId);
   const profile = connection ? await connectedGoogleProfile(dbFor(c.env, storeId), storeId, connection.id) : null;
-  const week = connection ? row && profile && googleOpeningWeek(profile) : row ? JSON.parse(row.hours_json) as import('@line-crm/shared').RestaurantOpeningDay[] : null;
+  const week = connection ? profile && googleOpeningWeek(profile) : row ? JSON.parse(row.hours_json) as import('@line-crm/shared').RestaurantOpeningDay[] : null;
   const day = date && profile ? googleOpeningDay(profile, date) : null;
   const weekday = date ? new Date(`${date}T12:00:00Z`).getUTCDay() : null;
   const hours = week && (date && profile ? day !== null : true)
     ? weekday === null || !profile ? week : week.map(item => item.weekday === weekday ? { weekday, periods: day! } : item)
     : null;
-  return c.json({ success: true, data: { storeId, hours, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, googleStatus: (connection?.status ?? null) as import('@line-crm/shared').RestaurantOpeningHours['googleStatus'], lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
+  const hoursStatus = !hours ? connection ? 'unavailable' : 'unconfigured'
+    : profile?.openStatus === 'CLOSED_TEMPORARILY' ? 'temporarily_closed'
+    : profile?.openStatus === 'CLOSED_PERMANENTLY' ? 'permanently_closed'
+    : hours.some(item => item.periods.length > 0) ? 'available' : 'closed';
+  return c.json({ success: true, data: { storeId, hours, hoursStatus, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, googleStatus: (connection?.status ?? null) as import('@line-crm/shared').RestaurantOpeningHours['googleStatus'], lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
 };
 
 export const put__api_restaurant_test_opening_hours_9 = async (c: Context<Env, "/api/restaurant-test/opening-hours">) => {

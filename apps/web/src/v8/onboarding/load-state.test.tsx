@@ -23,6 +23,20 @@ it('入口の確認中は進捗を隠し、同じアカウントの確認後は�
   expect(net.progress).toHaveBeenCalledTimes(1)
 })
 
+it('入口の確認中に先読みを始めても確認完了まで隠し、完了時は同じ取得結果を使う', async () => {
+  let resolveLoad!: (value: unknown) => void
+  net.progress.mockReset().mockImplementationOnce(() => new Promise(resolve => { resolveLoad = resolve }))
+  const view = renderHook(({ enabled }) => useFirstRun('a', enabled, false, 'staff-owner', true), { initialProps: { enabled: false } })
+  expect(net.progress).toHaveBeenCalledTimes(1)
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.steps).toEqual([])
+  view.rerender({ enabled: true })
+  expect(net.progress).toHaveBeenCalledTimes(1)
+  await act(async () => { resolveLoad(ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'done', href: '/tags', reason: null }] })) })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.progress).toHaveBeenCalledTimes(1)
+})
+
 it('担当者や権限が変わった直後は前の進捗を表示しない', async () => {
   let resolveNext!: (value: unknown) => void
   const payload = ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'done', href: '/tags', reason: null }] })

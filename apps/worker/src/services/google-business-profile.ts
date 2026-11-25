@@ -52,6 +52,7 @@ export interface GoogleProfile {
   description: string | null;
   openStatus: string | null; // OPEN / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY
   regularHours: WeeklyHours;
+  regularHoursKnown?: boolean;
   specialHours: SpecialDay[];
   moreHours?: Array<{ hoursTypeId: string; weekly: WeeklyHours }>;
   moreHoursTypes?: Array<{ id: string; label: string }>;
@@ -318,6 +319,15 @@ export async function fingerprintOf(value: unknown): Promise<string> {
 
 export async function normalizeProfile(raw: RawLocation, locationName: string): Promise<GoogleProfile> {
   const regularHours = weeklyFromGoogle(raw.regularHours?.periods);
+  const validTime = (time: GoogleTimeOfDay | undefined) => Number.isInteger(time?.hours ?? 0)
+    && (time?.hours ?? 0) >= 0 && (time?.hours ?? 0) <= 24
+    && Number.isInteger(time?.minutes ?? 0) && (time?.minutes ?? 0) >= 0 && (time?.minutes ?? 0) < 60
+    && ((time?.hours ?? 0) !== 24 || (time?.minutes ?? 0) === 0);
+  const periods = raw.regularHours?.periods;
+  const regularHoursKnown = Array.isArray(periods) && periods.every(period => period != null
+    && period.openDay != null && WEEKDAYS.includes(period.openDay)
+    && period.closeDay != null && WEEKDAYS.includes(period.closeDay)
+    && validTime(period.openTime) && validTime(period.closeTime));
   const specialHours = specialFromGoogle(raw.specialHours?.specialHourPeriods);
   const base = {
     name: raw.name ?? locationName.replace(/^accounts\/[^/]+\//, ''),
@@ -335,6 +345,7 @@ export async function normalizeProfile(raw: RawLocation, locationName: string): 
     description: raw.profile?.description ?? null,
     openStatus: raw.openInfo?.status ?? null,
     regularHours,
+    regularHoursKnown,
     specialHours,
     moreHours: (raw.moreHours ?? []).map(h => ({ hoursTypeId: h.hoursTypeId, weekly: weeklyFromGoogle(h.periods) })).sort((a, b) => a.hoursTypeId.localeCompare(b.hoursTypeId)),
     moreHoursTypes: (raw.categories?.primaryCategory?.moreHoursTypes ?? []).map(h => ({ id: h.hoursTypeId, label: h.localizedDisplayName ?? h.displayName ?? h.hoursTypeId })),

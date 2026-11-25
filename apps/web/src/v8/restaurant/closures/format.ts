@@ -125,8 +125,9 @@ export function upcoming(closures: RestaurantClosure[], today: string): Restaura
 }
 
 /** 曜日ごとの営業時間で、時間帯が1つも無い曜日＝定休。営業時間を読めていないときは無し。 */
-export function regularHolidays(hours: Array<{ weekday: number; periods: unknown[] }> | null | undefined): Set<number> {
+export function regularHolidays(hours: Array<{ weekday: number; periods: unknown[] }> | null | undefined, status?: string | null): Set<number> {
   const set = new Set<number>()
+  if (status === 'temporarily_closed' || status === 'permanently_closed' || status === 'unavailable') return set
   if (!hours || hours.length === 0) return set
   for (let weekday = 0; weekday < 7; weekday += 1) {
     const day = hours.find((h) => h.weekday === weekday)
