@@ -37,12 +37,16 @@ export default function ConfirmDialog({
   onCancel,
   surface = 'dialog',
   footer,
+  titleAside,
+  panelClassName = '',
 }: {
   open: boolean;
   surface?: 'dialog' | 'sheet';
   footer?: ReactNode;
+  titleAside?: ReactNode;
+  panelClassName?: string;
   title: string;
-  description: string;
+  description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;
@@ -105,7 +109,10 @@ export default function ConfirmDialog({
     }
     const first = focusables[0];
     const last = focusables[focusables.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    if (!focusables.some((focusable) => focusable === document.activeElement)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
       last.focus();
     } else if (!event.shiftKey && document.activeElement === last) {
@@ -131,7 +138,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         onKeyDown={trapTab}
-        className="w-full max-w-[480px] rounded-xl border border-hairline bg-canvas p-5"
+        className={`w-full max-w-[480px] rounded-xl border border-hairline bg-canvas p-5 ${panelClassName}`}
       >
         {surface === 'sheet' ? <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-hairline" /> : null}
         <div className="flex items-start gap-2">
@@ -143,10 +150,13 @@ export default function ConfirmDialog({
           <p className="min-w-0 flex-1 text-sm font-bold leading-6 text-ink [word-break:auto-phrase]">
             {title}
           </p>
+          {titleAside}
         </div>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary [word-break:auto-phrase]">
-          {description}
-        </p>
+        {description !== undefined && (
+          <p className="mt-2 text-sm leading-6 text-ink-secondary [word-break:auto-phrase]">
+            {description}
+          </p>
+        )}
         {children}
         {error && (
           <p role="alert" className="mt-2 text-sm leading-6 text-danger">

@@ -63,6 +63,8 @@ export interface TapActionFieldProps {
   kinds?: readonly TapActionKind[]
   /** 6つの後ろに足す種類。中身は renderBody で描く。 */
   extraKinds?: readonly TapActionExtraKind[]
+  /** 専用画面で種類の並びを指定する。候補にない種類は飛ばす。 */
+  kindOrder?: readonly string[]
   /**
    * 中身を画面が描く（足した種類の中身・リッチメニューの計測リンクなど）。undefined を返した種類は部品の既定の中身。
    * LIFF の案内が出る場合は案内が先。
@@ -95,23 +97,29 @@ export interface TapActionFieldProps {
   extrasError?: string | null
 }
 
-function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActionExtraKind[], current: string) {
+function kindOptionsOf(kinds: readonly TapActionKind[], extras: readonly TapActionExtraKind[], current: string, order?: readonly string[]) {
   const base = TAP_ACTION_DEFS.filter((def) => kinds.includes(def.kind) || def.kind === current).map((def) => ({
     value: def.kind as string,
     label: def.label,
     description: def.description,
     icon: TAP_ACTION_ICONS[def.kind],
   }))
-  return [...base, ...extras.map((extra) => ({ value: extra.value, label: extra.label, description: extra.description, icon: extra.icon }))]
+  const options = [...base, ...extras.map((extra) => ({ value: extra.value, label: extra.label, description: extra.description, icon: extra.icon }))]
+  if (!order) return options
+  const rank = (value: string) => {
+    const index = order.indexOf(value)
+    return index === -1 ? order.length : index
+  }
+  return options.sort((a, b) => rank(a.value) - rank(b.value))
 }
 
 export default function TapActionField({
   id, invalid, 'aria-describedby': saveDescription,
-  name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], renderBody,
+  name, value, onChange, kinds = TAP_ACTION_KINDS, extraKinds = [], kindOrder, renderBody,
   scope = 'shop', hasLiff, liffSettingsHref = '/accounts', readOnly = false, sources,
   layout = 'row', labelControl, kindPresentation = 'select', textMax, kindLabel, allowExtras = false, accountId, extrasUnavailable, extrasError, uriPlaceholder = 'https://example.com',
 }: TapActionFieldProps) {
-  const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind), [kinds, extraKinds, value.kind])
+  const options = useMemo(() => kindOptionsOf(kinds, extraKinds, value.kind, kindOrder), [kinds, extraKinds, value.kind, kindOrder])
   const current = options.find((option) => option.value === value.kind)
   const CurrentIcon = current?.icon
   const def = tapActionDef(value.kind)
@@ -125,7 +133,7 @@ export default function TapActionField({
       <span className={styles.readText}>{current?.label?.trim() ? current.label : '—'}</span>
     </span>
   ) : kindPresentation === 'grid' ? (
-    <fieldset className={styles.choices} data-shared-part="tap-action-choices">
+    <fieldset className={styles.choices} data-shared-part="tap-action-choices" data-wrap-choice={kindOrder ? true : undefined}>
       <legend className="sr-only">{kindLabel ?? `${name}を押したら`}</legend>
       <div className={styles.choiceGrid}>{options.map(({ value: optionValue, label, description, icon: Icon }) => (
         <label key={optionValue} className={styles.choice} title={description}>

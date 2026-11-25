@@ -94,6 +94,7 @@ export const get__api_restaurant_test_stores_7 = async (c: Context<Env, "/api/re
   const scopedAccountId = c.get('restaurantScopedAccountId') ?? null;
   const stores = await dbFor(c.env).prepare(`SELECT
       s.*, la.name AS line_account_name,
+      (SELECT token FROM rt_reservation_links WHERE store_id = s.id) AS reservation_token,
       CASE WHEN s.line_account_id IS NULL THEN NULL ELSE (
         SELECT COUNT(*) FROM friends f
         WHERE f.line_account_id = s.line_account_id AND f.is_following = 1

@@ -5,6 +5,7 @@ import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { normalizePhone } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { identity } from './restaurant-customer-identity.js';
+import { registerRestaurantCustomerMenuRoutes } from './restaurant-customer-menu.js';
 import { restaurantSeatCapacity } from '../services/restaurant-seat-capacity.js';
 import { referralCandidates } from '../services/restaurant-referrals.js';
 import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/shared';
@@ -51,6 +52,7 @@ restaurantCustomerBooking.use('/api/liff/restaurant/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   await next();
 });
+registerRestaurantCustomerMenuRoutes(restaurantCustomerBooking);
 async function storeFor(
   c: Context<Env>,
   accountId: string,

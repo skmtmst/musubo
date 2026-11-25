@@ -157,6 +157,11 @@ export function standardStarter(style: AccountStyle): StarterDefinition {
     ],
   };
 }
+function isRetiredRestaurantMenuForm(item: StarterItem, style: AccountStyle) {
+  return style === 'restaurant' && item.kind === 'form' && item.formTarget === 'menu'
+    && item.key === initialFormKey('restaurant', 'menu');
+}
+
 export function readDefinition(
   value: unknown,
   style: AccountStyle,
@@ -219,7 +224,8 @@ export function readDefinition(
     if (item.initialMenu !== undefined && (item.kind !== 'rich_menu' || item.initialMenu !== style
       || item.buttons?.length !== 4 || item.buttons.some((button,index) => { const expected=INITIAL_MENUS[style].buttons[index]!; return button.label!==expected.label || button.feature!==expected.feature || button.target!==expected.target || button.actionType!==undefined || button.actionData!==undefined; })))
       throw new StyleError('invalid_initial_menu');
-    if (item.kind === 'form' && (!item.formTarget || !initialMenuFormTargets(style).includes(item.formTarget)
+    if (item.kind === 'form' && (!item.formTarget
+      || (!isRetiredRestaurantMenuForm(item, style) && !initialMenuFormTargets(style).includes(item.formTarget))
       || item.key !== initialFormKey(style,item.formTarget) || item.sourceId))
       throw new StyleError('invalid_initial_form');
     if (item.kind !== 'form' && item.formTarget !== undefined) throw new StyleError('invalid_initial_form');
@@ -288,5 +294,6 @@ export function readDefinition(
     )
   )
     throw new StyleError('duplicate_confirmation_automation', 422);
-  return input;
+  // Older saved sets may contain the retired sample. Existing forms and published URLs remain valid.
+  return style === 'restaurant' ? { ...input, items: input.items.filter(item => !isRetiredRestaurantMenuForm(item, style)) } : input;
 }

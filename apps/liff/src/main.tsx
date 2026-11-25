@@ -19,7 +19,7 @@ function CustomerContext() {
   const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
   const independentEntry = search.has('couponRef') || search.has('eventWaitlistToken')
     || (page === 'webinar' && search.has('slug')) || (page === 'research' && search.has('researchId'))
-    || (page === 'restaurant' && search.has('token')) || action?.kind === 'form' || action?.kind === 'visit_stamp';
+    || (page === 'restaurant' && search.has('token')) || page === 'restaurant-menu' || action?.kind === 'form' || action?.kind === 'visit_stamp';
   const required = /^\/(?:booking|events|mypage)(?:\/|$)/.test(location.pathname)
     || (location.pathname === '/' && !independentEntry);
   return <CustomerStyleScope required={required}><App /></CustomerStyleScope>;

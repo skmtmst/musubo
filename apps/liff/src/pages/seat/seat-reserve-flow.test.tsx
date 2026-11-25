@@ -25,6 +25,7 @@ vi.mock('../../lib/api.js', () => ({
   },
   restaurantBookingApi: {
     link: vi.fn(),
+    menu: vi.fn(),
     courses: vi.fn().mockResolvedValue({success:true,data:[]}),
     referrals: vi.fn().mockResolvedValue({success:true,data:[]}),
     referral: vi.fn(),
@@ -102,6 +103,29 @@ afterEach(() => {
 });
 
 describe('席の予約の流れ', () => {
+  it('メニューを開いて戻ると人数・時刻・コースがそのまま残る', async () => {
+    vi.mocked(seat.menu).mockResolvedValue({
+      storeId: 'st', storeName: '見本店', items: [], bookingUrl: 'https://liff.line.me/demo/?page=restaurant&token=tok',
+    });
+    vi.mocked(seat.courses).mockResolvedValueOnce({
+      success: true, data: [{ id: 'course', name: '季節のコース', price: 8800, durationMinutes: 120, allergens: [] }],
+    });
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: /コース：席のみ/ }));
+    fireEvent.click(await screen.findByRole('radio', { name: /季節のコース/ }));
+    fireEvent.click(screen.getByRole('button', { name: '人数を増やす' }));
+    fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
+    fireEvent.click(screen.getByRole('button', { name: 'メニューを見る' }));
+    expect(await screen.findByText('メニューは準備中です')).toBeTruthy();
+    expect(seat.menu).toHaveBeenCalledWith({ storeId: 'st' });
+    expect(screen.queryByRole('link', { name: '席を予約する' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '予約に戻る' }));
+    expect(screen.getByText('3名')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: '19:00 空きあり' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('button', { name: /コース：季節のコース/ })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'メニューを見る' }));
+  });
+
   it('時刻を選ぶと仮押さえし、返った版で確定して受け付けましたへ進む', async () => {
     vi.mocked(seat.hold).mockResolvedValue({ success: true, data: held() });
     vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ status: 'confirmed', version: 4, holdExpiresAt: null }) });

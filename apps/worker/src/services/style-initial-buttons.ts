@@ -1,5 +1,5 @@
 import { initialRestaurantStore } from './style-initial-store.js';
-import { INITIAL_MENUS, RESTAURANT_GUIDE_MENUS, type RestaurantGuideMenu, initialMenuBounds, initialFormKey, initialMenuFormTargets, initialMenuIsDocument, initialMenuDestination, liffActionUrl, type AccountStyle, type InitialMenuTarget } from '@line-crm/shared';
+import { INITIAL_MENUS, RESTAURANT_GUIDE_MENUS, type RestaurantGuideMenu, initialMenuBounds, initialFormKey, initialMenuFormTargets, initialMenuIsDocument, initialMenuDestination, liffActionUrl, restaurantMenuLiffUrl, type AccountStyle, type InitialMenuTarget } from '@line-crm/shared';
 
 export type StyleMenuButton = {label:string;feature:string;target?:InitialMenuTarget;actionType:string;actionData:string;intent:string;formId?:string|null;bounds?:{x:number;y:number;width:number;height:number};ready?:boolean;reason?:string;destination?:string};
 export type PlannedInitialForms = Map<string,string>;
@@ -12,18 +12,20 @@ async function formTarget(db:D1Database,account:string,style:AccountStyle,target
    AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?)
    AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(account,key,account).first<FormTarget>();
 }
-async function restaurantHistory(db:D1Database,account:string,base:string,planned?:PlannedInitialForms):Promise<string> {
- const store=await initialRestaurantStore(db,account);
- if(!store)return '';
- const prepared=planned?.get('restaurant-history-token');
- const link=prepared?{token:prepared}:await db.prepare('SELECT token FROM rt_reservation_links WHERE store_id=?').bind(store).first<{token:string}>();
- return link?`${base}/?${new URLSearchParams({page:'restaurant',token:link.token,view:'mine'})}`:'';
+async function restaurantToken(db: D1Database, accountId: string, planned?: PlannedInitialForms): Promise<string | null> {
+  const prepared = planned?.get('restaurant-history-token');
+  if (prepared) return prepared;
+  const storeId = await initialRestaurantStore(db, accountId);
+  if (!storeId) return null;
+  const link = await db.prepare('SELECT token FROM rt_reservation_links WHERE store_id=?').bind(storeId).first<{ token: string }>();
+  return link?.token ?? null;
 }
 /** 1面も詰め直さない。準備中の移動先は未設定の下書きに保ち、公開の門で止める。 */
 export async function initialMenuButtons(db:D1Database,account:string,style:AccountStyle,planned?:PlannedInitialForms,preset?:RestaurantGuideMenu):Promise<StyleMenuButton[]> {
  const line=await db.prepare('SELECT liff_id FROM line_accounts WHERE id=? AND is_active=1 AND archived_at IS NULL').bind(account).first<{liff_id:string|null}>();
  const base=line?.liff_id?`https://liff.line.me/${encodeURIComponent(line.liff_id)}`:'';
  const forms=new Set(initialMenuFormTargets(style));
+ const token = style === 'restaurant' && base ? await restaurantToken(db, account, planned) : null;
  const buttons = await Promise.all(INITIAL_MENUS[style].buttons.map(async (button,index) => {
    let actionData='',formId:string|null=null,intent='url',ready=false,reason='LINEのページを設定してください';
    if(forms.has(button.target)) {
@@ -32,9 +34,20 @@ export async function initialMenuButtons(db:D1Database,account:string,style:Acco
      if(base&&form) actionData=initialMenuIsDocument(button.target)?`${base}/information/${encodeURIComponent(form.id)}`:liffActionUrl({kind:'form',liffId:line!.liff_id!,formId:form.id});
      ready=!!actionData && form?.is_active===1 && form.status==='active' && !!form.current_published_version_id;
      reason=form?'ページの内容を確認して公開してください':'初期セットを保存するとページの下書きが入ります';
+   } else if (style === 'restaurant' && button.target === 'menu') {
+     if (line?.liff_id && token) actionData = restaurantMenuLiffUrl({ liffId: line.liff_id, token });
+     ready = Boolean(actionData);
+     if (base) reason = '料理メニューを表示する店舗を確認してください';
    } else if(base) {
-     if(button.target==='history') actionData=style==='restaurant'?await restaurantHistory(db,account,base,planned):style==='lesson'?`${base}/events/me`:liffActionUrl({kind:'booking_history',liffId:line!.liff_id!});
-     else if(button.target==='classes'||button.target==='schedule')actionData=`${base}/events`;
+     if (button.target === 'history') {
+       if (style === 'restaurant' && token) {
+         actionData = `${base}/?${new URLSearchParams({ page: 'restaurant', token, view: 'mine' })}`;
+       } else if (style === 'lesson') {
+         actionData = `${base}/events/me`;
+       } else if (style !== 'restaurant') {
+         actionData = liffActionUrl({ kind: 'booking_history', liffId: line!.liff_id! });
+       }
+     } else if(button.target==='classes'||button.target==='schedule')actionData=`${base}/events`;
      else if(button.target==='mypage')actionData=`${base}/mypage`;
      ready=!!actionData; reason='店舗とLINEのページを確認してください';
    }

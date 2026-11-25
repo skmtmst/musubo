@@ -455,7 +455,28 @@ export const visitStampsApi = {
 };
 
 /** 飲食店の席予約。既存get/postと同じくliffIdと本人のIDトークンを送る。 */
+export type RestaurantMenuPhoto = { id: string; url: string; x: number; y: number };
+export type RestaurantMenuItem = {
+  id: string;
+  kind: 'course' | 'a_la_carte';
+  name: string;
+  price: number;
+  description: string | null;
+  durationMinutes: number | null;
+  servicePeriods: string[];
+  photos: RestaurantMenuPhoto[];
+};
+export type RestaurantMenuData = {
+  storeId: string;
+  storeName: string;
+  bookingUrl: string | null;
+  items: RestaurantMenuItem[];
+};
+export type RestaurantMenuScope = { storeId: string } | { token: string };
+
 export const restaurantBookingApi = {
+  menu: (scope: RestaurantMenuScope) =>
+    getData<RestaurantMenuData>(`/api/liff/restaurant/menu?${new URLSearchParams(scope)}`),
   courses: (storeId:string)=>get<{success:true;timezone?:string;data:import('@line-crm/shared').RestaurantCustomerCourse[]}>(`/api/liff/restaurant/courses?${new URLSearchParams({storeId})}`),
   referrals: (storeId:string,date:string,guestCount:number,startsAt?:string,courseId?:string|null)=>get<{success:true;data:import('@line-crm/shared').RestaurantReferralCandidate[]}>(`/api/liff/restaurant/referrals?${new URLSearchParams({storeId,date,guestCount:String(guestCount),...(startsAt ? {startsAt}: {}),...(courseId ? {courseId}: {})})}`),
   referral: (body:{storeId:string;targetStoreId:string;date:string;startsAt:string;guestCount:number;courseId?:string|null})=>post<{success:true;data:{bookingUrl:string}}>('/api/liff/restaurant/referrals',body),

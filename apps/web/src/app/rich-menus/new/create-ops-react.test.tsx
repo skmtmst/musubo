@@ -202,11 +202,11 @@ describe('切り替えの面', () => {
     current = { ...GROUP, pages: [...GROUP.pages, { id: 'p-tab', orderIndex: 1, name: 'タブB', aliasId: 'a-tab', lineRichmenuId: null, imageR2Key: null, imageContentType: null, areas: [area('b-1', 0)] }] }
     await open('?id=rmg-x&step=buttons')
     // 開き直すと最初の面が選ばれている。
-    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'メニューを切り替える', exact: false })) })
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'リッチメニューを切り替える', exact: false })) })
     const patches = requests.filter((r) => r.method === 'PATCH').length
     await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存' })) })
     await settle()
-    expect(screen.getByText('「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。')).toBeTruthy()
+    expect(screen.getByText('「リッチメニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。')).toBeTruthy()
     expect(requests.filter((r) => r.method === 'PATCH').length).toBe(patches)
   })
 })

@@ -37,7 +37,10 @@ export function initialMenuImageKey(accountId: string, style: AccountStyle, pres
 
 const DOCUMENT_TARGETS: readonly InitialMenuTarget[] = ['menu','access','about','news','guide','products'];
 export const initialMenuIsDocument = (target: InitialMenuTarget) => DOCUMENT_TARGETS.includes(target);
-export const initialMenuFormTargets = (style: AccountStyle) => INITIAL_MENUS[style].buttons.filter(button => initialMenuIsDocument(button.target) || ['booking','application','contact'].includes(button.target)).map(button => button.target);
+export const initialMenuFormTargets = (style: AccountStyle) => INITIAL_MENUS[style].buttons
+  .filter(({ target }) => style !== 'restaurant' || target !== 'menu')
+  .filter(({ target }) => initialMenuIsDocument(target) || ['booking', 'application', 'contact'].includes(target))
+  .map(({ target }) => target);
 export function initialMenuDestination(style: AccountStyle, target: InitialMenuTarget): string {
  if(target==='booking') return '予約用の回答フォーム';
  if(target==='history') return style==='restaurant'?'自分の席予約一覧':style==='lesson'?'自分のクラス予約':'自分の予約一覧';
@@ -45,6 +48,7 @@ export function initialMenuDestination(style: AccountStyle, target: InitialMenuT
  if(target==='mypage')return 'マイページ';
  if(target==='application')return 'お申し込みフォーム';
  if(target==='contact')return 'お問い合わせフォーム';
+ if(style==='restaurant' && target==='menu') return '料理メニュー';
  return target==='access'?'住所と行き方':target==='menu'?'メニューのご案内':target==='products'?'商品のご案内':'ご案内ページ';
 }
 

@@ -22,6 +22,7 @@ const EventWaitlistOffer = lazy(() => import('./pages/event-waitlist-offer.js'))
 const VisitStampQr = lazy(() => import('./pages/visit-stamp-qr.js'));
 const VisitStamps = lazy(() => import('./pages/visit-stamps.js'));
 const SeatReserve = lazy(() => import('./pages/seat/seat-reserve.js'));
+const RestaurantMenu = lazy(() => import('./pages/restaurant-menu/menu.js'));
 const EntryRouteCoupon = lazy(() => import('./pages/entry-route-coupon.js'));
 const FileOpen = lazy(() => import('./pages/file-open.js'));
 const StatementOpen = lazy(() => import('./pages/statement-open.js'));
@@ -68,6 +69,10 @@ export default function App() {
     return <Navigate to={{ pathname: `/restaurant/reserve/${encodeURIComponent(search.get('token')!)}`, search: location.search }} replace />;
   }
 
+  if (location.pathname === '/' && search.get('page') === 'restaurant-menu') {
+    return <Navigate to={{ pathname: '/restaurant/menu', search: location.search }} replace />;
+  }
+
   const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
   if (location.pathname === '/' && action) {
     const pathname = action.kind === 'visit_stamp' ? '/visit-stamps'
@@ -99,6 +104,7 @@ export default function App() {
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/information/:id" element={<Form readOnlyDocument />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
+        <Route path="/restaurant/menu" element={<RestaurantMenu />} />
         <Route path="/" element={<Navigate to={{ pathname: style === 'ec' ? '/mypage' : style === 'lesson' ? '/events/me' : '/booking', search: location.search }} replace />} />
         {/* どの住所にも当たらないとき（板 aLU3r）。 */}
         <Route path="*" element={<NotFound />} />

@@ -55,6 +55,7 @@ function getPage(): string | null {
   if (path === 'book') return 'book';
   if (path === 'booking' || path === 'booking/history') return 'salon-book';
   if (/^restaurant\/reserve\/[^/]+$/.test(path)) return 'restaurant';
+  if (path === 'restaurant/menu') return 'restaurant-menu';
   const params = new URLSearchParams(window.location.search);
   return params.get('page');
 }
@@ -346,7 +347,7 @@ async function linkAndAddFlow() {
 
 export async function initRestaurantForm(): Promise<void> { await initSalonBooking('form'); }
 
-async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' | 'restaurant' | 'form' = 'salon-book'): Promise<void> {
+async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-coupon' | 'restaurant' | 'restaurant-menu' | 'form' = 'salon-book'): Promise<void> {
   // 既存 linkAndAddFlow と同じ初期化シーケンスを踏む:
   //   ① profile + idToken + friendFlag を並列取得
   //   ② /api/liff/link で UUID 確定 (ref/ig 含む) — booking エンドポイントが
@@ -419,7 +420,7 @@ async function initSalonBooking(page: 'salon-book' | 'visit-stamps' | 'entry-cou
     showError('mount target #app が見つかりません');
     return;
   }
-  if (page === 'restaurant' || page === 'form') {
+  if (page === 'restaurant' || page === 'restaurant-menu' || page === 'form') {
     if (!await linked) { showError('画面を開けませんでした。もう一度お試しください。'); return; }
     const { mountRestaurant } = await import('./restaurant/main.js');
     mountRestaurant(container,{liffId:LIFF_ID,lineUserId:profile.userId,idToken,sdk:liff},page);
@@ -726,8 +727,8 @@ async function openPage(): Promise<void> {
       await initSalonBooking('entry-coupon');
     } else if (page === 'book') {
       await initBooking();
-    } else if (page === 'restaurant') {
-      await initSalonBooking('restaurant');
+    } else if (page === 'restaurant' || page === 'restaurant-menu') {
+      await initSalonBooking(page);
     } else if (page === 'salon-book') {
       await initSalonBooking();
     } else if (page === 'visit-stamps') {

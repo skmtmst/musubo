@@ -24,10 +24,10 @@ export function liffDocumentTitle(title: string): string {
  * onBack を渡した段では、左の × は「この段を閉じる」（前の段へ戻る）にする（絵 kwC8E の × のまま）。
  * ページの中に戻るリンクは置かない。backLabel は読み上げの名前。
  */
-export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { title: string; onBack?: () => void; backLabel?: string }) {
+export default function LiffHeader({ title, onBack, backLabel = '戻る', storeName }: { title: string; onBack?: () => void; backLabel?: string; storeName?: string }) {
   const key = accountKey();
   const [loadedName, setLoadedName] = useState<{ key: string; name: string } | null>(null);
-  const shopName = loadedName?.key === key ? loadedName.name : cachedShopNames.get(key) ?? null;
+  const shopName = storeName ?? (loadedName?.key === key ? loadedName.name : cachedShopNames.get(key) ?? null);
 
   // ブラウザ・LINE の上に出る題も、帯の題と同じ画面名にする（「<画面名> | musubo」）。
   useEffect(() => {
@@ -35,7 +35,7 @@ export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { ti
   }, [title]);
 
   useEffect(() => {
-    if (cachedShopNames.has(key)) return;
+    if (storeName !== undefined || cachedShopNames.has(key)) return;
     let alive = true;
     api
       .liffConfig()
@@ -47,7 +47,7 @@ export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { ti
         logFailure('liff-config', e);
       });
     return () => { alive = false; };
-  }, [key]);
+  }, [key, storeName]);
 
   return (
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">

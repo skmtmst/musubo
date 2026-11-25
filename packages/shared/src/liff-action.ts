@@ -36,6 +36,22 @@ export function liffActionUrl(input: LiffAction & { liffId: string; allowEmptyFo
   return `https://liff.line.me/${identifier(input.liffId)}/?${actionQuery(input, input.allowEmptyForm)}`;
 }
 
+/** 店舗の予約リンクと同じトークンを使う、店舗専用の料理メニュー。 */
+export function restaurantMenuLiffUrl(input: { liffId: string; token: string }): string {
+  const query = new URLSearchParams({ page: 'restaurant-menu', token: identifier(input.token) });
+  return `https://liff.line.me/${identifier(input.liffId)}/?${query}`;
+}
+
+export function restaurantMenuLiffToken(value: string, liffId?: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    const path = /^\/([A-Za-z0-9_-]{1,128})\/?$/.exec(url.pathname);
+    if (url.origin !== 'https://liff.line.me' || url.username || url.password || !path
+      || (liffId !== undefined && path[1] !== liffId) || url.searchParams.get('page') !== 'restaurant-menu') return null;
+    return identifier(url.searchParams.get('token') ?? '');
+  } catch { return null; }
+}
+
 function fromQuery(params: URLSearchParams, allowEmptyForm = false): LiffAction | null {
   const page = params.get('page');
   const formId = page === 'form' ? params.get('id') : !page ? params.get('form') : null;
