@@ -873,7 +873,7 @@ export default function RemindersListV8() {
   const tableHeadCells = (
     <>
       <Th aria-label="並び替え" />
-      <Th>リマインダ（基準日・いつ送るか）</Th>
+      <Th truncate>リマインダ（基準日・いつ送るか）</Th>
       <Th>状態</Th>
       <Th>これから送る</Th>
       <Th>次に送る</Th>
