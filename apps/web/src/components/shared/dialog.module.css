@@ -407,7 +407,8 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 }
 :root .panel[data-design-layout='stacked-picker'] { gap: var(--space-10); }
 :root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .title { width: 100%; }
-:root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .actions { justify-content: flex-start; }
+:root .panel[data-design-layout='stacked-guided'] .actions { justify-content: center; gap: var(--space-12); }
+:root .panel[data-design-layout='stacked-picker'] .actions { justify-content: flex-start; }
 :root .panel[data-design-layout='stacked-centered'] .buttonPair { gap: var(--space-12); }
 :root .panel[data-design-layout='stacked-centered'] .buttonPair > button {
   min-height: calc(var(--control-h) + var(--space-4));

@@ -84,9 +84,9 @@ export function GuideFirstMessage({ accountId, accountName, step, total, onRecei
     return () => { mounted.current = false }
   }, [run])
 
-  const status = pending === 'send' ? 'sending' : data?.status
-  const shouldPoll = status === 'sending' || status === 'sent' || status === 'unknown' ||
-    (status === 'busy' && checkedAt < (data?.retryAt ?? 0)) || Boolean(data?.verificationPending || verificationUrl) || friendOpened
+  const messageStatus = pending === 'send' ? 'sending' : data?.status
+  const shouldPoll = messageStatus === 'sending' || messageStatus === 'sent' || messageStatus === 'unknown' ||
+    (messageStatus === 'busy' && checkedAt < (data?.retryAt ?? 0)) || Boolean(data?.verificationPending || verificationUrl) || friendOpened
 
   useEffect(() => {
     const read = () => { if (!document.hidden) void run('status', true) }
@@ -101,11 +101,11 @@ export function GuideFirstMessage({ accountId, accountName, step, total, onRecei
   }, [run, shouldPoll])
 
   useEffect(() => {
-    if (status !== 'received') return
+    if (messageStatus !== 'received') return
     receivedAction.current()
     const timer = window.setInterval(() => receivedAction.current(), POLL_MS)
     return () => window.clearInterval(timer)
-  }, [status])
+  }, [messageStatus])
 
   useEffect(() => {
     if (!verificationUrl) return
@@ -122,33 +122,33 @@ export function GuideFirstMessage({ accountId, accountName, step, total, onRecei
     tone: 'warn' as const,
     title: '確認できませんでした',
     detail: 'もう一度お試しください。',
-  } : status ? messages[status] : { tone: 'info' as const, title: '送信先を確認しています…' }
+  } : messageStatus ? messages[messageStatus] : { tone: 'info' as const, title: '送信先を確認しています…' }
   const read = () => void run('status')
   const send = () => void run('send')
   const checkIdentity = () => void run('identity')
   const disableRetry = checkedAt < (data?.retryAt ?? 0)
   const profileLink = data?.friendUrl
-  const expanded = error || status === 'busy' || status === 'unknown' || status === 'identity_required' || status === 'connection' || status === 'friend_required' || status === 'failed' || status === 'sending_stopped'
+  const expanded = error || messageStatus === 'busy' || messageStatus === 'unknown' || messageStatus === 'identity_required' || messageStatus === 'connection' || messageStatus === 'friend_required' || messageStatus === 'failed' || messageStatus === 'sending_stopped'
 
   const action = (() => {
-    if (error || status === 'sending_stopped') return <Button variant="primary" className={styles.testAction} onClick={read}>もう一度確認する</Button>
-    if (status === 'ready') return <Button variant="primary" className={styles.testAction} onClick={send}>自分のLINEにテスト送信</Button>
-    if (status === 'sending') return <Button variant="primary" className={styles.testAction} busy busyLabel="送信中…">送信中…</Button>
-    if (status === 'sent' || status === 'received') return <Button variant="primary" className={styles.testAction} disabled>確認を待っています…</Button>
-    if (status === 'busy') return <Button variant="primary" className={styles.testAction} onClick={send} disabled={disableRetry}>もう一度送信する</Button>
-    if (status === 'unknown') return <Button variant="primary" className={styles.testAction} onClick={read} busy={pending === 'status'} busyLabel="確認中…">送信結果を確認する</Button>
-    if (status === 'identity_required') {
+    if (error || messageStatus === 'sending_stopped') return <Button variant="primary" className={styles.testAction} onClick={read}>もう一度確認する</Button>
+    if (messageStatus === 'ready') return <Button variant="primary" className={styles.testAction} onClick={send}>自分のLINEにテスト送信</Button>
+    if (messageStatus === 'sending') return <Button variant="primary" className={styles.testAction} busy busyLabel="送信中…">送信中…</Button>
+    if (messageStatus === 'sent' || messageStatus === 'received') return <Button variant="primary" className={styles.testAction} disabled>確認を待っています…</Button>
+    if (messageStatus === 'busy') return <Button variant="primary" className={styles.testAction} onClick={send} disabled={disableRetry}>もう一度送信する</Button>
+    if (messageStatus === 'unknown') return <Button variant="primary" className={styles.testAction} onClick={read} busy={pending === 'status'} busyLabel="確認中…">送信結果を確認する</Button>
+    if (messageStatus === 'identity_required') {
       return verificationUrl
         ? <Button variant="primary" className={styles.testAction} href={verificationUrl} external>お店のLINEを開く</Button>
         : <Button variant="primary" className={styles.testAction} onClick={checkIdentity} busy={pending === 'identity'} busyLabel="確認中…">自分のLINEを確認</Button>
     }
-    if (status === 'friend_required' && profileLink) {
+    if (messageStatus === 'friend_required' && profileLink) {
       return <Button variant="primary" className={styles.testAction} href={profileLink} external onClick={() => setFriendOpened(true)}>お店のLINEを開く</Button>
     }
-    if ((status === 'connection' || status === 'failed') && connectionOpened && data?.accountName) {
+    if ((messageStatus === 'connection' || messageStatus === 'failed') && connectionOpened && data?.accountName) {
       return <Button variant="primary" className={styles.testAction} onClick={send}>もう一度送信する</Button>
     }
-    if (status === 'connection' || status === 'failed' || status === 'friend_required') {
+    if (messageStatus === 'connection' || messageStatus === 'failed' || messageStatus === 'friend_required') {
       return <Button variant="primary" className={styles.testAction} href={'/accounts/detail?' + new URLSearchParams({ id: accountId })} external onClick={() => setConnectionOpened(true)}>LINEの接続を確認する</Button>
     }
     return null
@@ -160,22 +160,22 @@ export function GuideFirstMessage({ accountId, accountName, step, total, onRecei
       <strong>{TITLE}</strong>
     </span>} designNode="waX3A" designLayout="stacked-guided" designWidth={650} exactDesignWidth designMinHeight={expanded ? 368 : 350}
       headerIcon={false} onCancel={onLater} footerDivider={false}
-      footer={<div className={styles.testFooter}><DialogActions align="center" layout="inline">
+      footer={<DialogActions align="center" layout="inline">
         {action}
         <Button variant="text" size="inline" onClick={onLater}>あとで</Button>
-      </DialogActions></div>}
+      </DialogActions>}
     >
       <div className={styles.testMessage}>
-        <p className={styles.testDescription}>{status === 'identity_required' ? '自分のLINEを確認してからテスト送信します。' : 'お店のLINEから、ご自身のLINEにテストメッセージを送ります。'}</p>
+        <p className={styles.testDescription}>{messageStatus === 'identity_required' ? '自分のLINEを確認してからテスト送信します。' : 'お店のLINEから、ご自身のLINEにテストメッセージを送ります。'}</p>
         <dl className={styles.testDestination}>
           <div><dt>お店のLINE</dt><dd>{data?.accountName ?? accountName ?? '接続中のお店のLINE'}</dd></div>
-          <div><dt>送信先</dt><dd>{status === 'identity_required' ? '自分のLINEを確認する' : '自分のLINE'}</dd></div>
+          <div><dt>送信先</dt><dd>{messageStatus === 'identity_required' ? '自分のLINEを確認する' : '自分のLINE'}</dd></div>
         </dl>
         <div className={styles.testStatus} data-tone={message.tone} role="status">
           <strong>{message.title}</strong>
           {message.detail ? <p>{message.detail}</p> : null}
         </div>
-        {status === 'identity_required' && verificationUrl ? <div className={styles.testVerification}>
+        {messageStatus === 'identity_required' && verificationUrl ? <div className={styles.testVerification}>
           {qr ? <img src={qr} alt="本人確認用のQRコード" width={144} height={144} /> : null}
           <p>スマホでQRコードを読み取るか、お店のLINEを開いて、トークに表示された確認メッセージを送ってください。</p>
         </div> : null}

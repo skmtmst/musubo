@@ -194,11 +194,6 @@
   font-size: var(--text-caption);
 }
 
-:root .testFooter [data-dialog-actions] {
-  justify-content: center;
-  gap: var(--space-12);
-}
-
 .testAction {
   inline-size: min(228px, 100%);
 }
