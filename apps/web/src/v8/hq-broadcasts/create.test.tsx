@@ -1102,6 +1102,9 @@ it('配信名が空では進めず、入力後は戻っても値を保つ', asyn
   const next = screen.getByRole('button', { name: '対象設定へ' }) as HTMLButtonElement
   expect(next.disabled).toBe(true)
   expect(screen.getByText('配信名を入れてください')).toBeTruthy()
+  fireEvent.blur(screen.getByLabelText('配信名'))
+  expect(screen.getAllByText('配信名を入れてください')).toHaveLength(2)
+  expect(screen.getByLabelText('配信名').getAttribute('aria-invalid')).toBe('true')
   fireEvent.change(screen.getByLabelText('配信名'), { target: { value: 'お知らせ' } })
   expect(next.disabled).toBe(false)
   fireEvent.click(next)

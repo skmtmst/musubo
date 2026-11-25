@@ -183,7 +183,7 @@ export default function HqAttentionV8() {
       {items === null ? (error ? null : <ListState kind="loading" title="読み込んでいます…" />) : shown.length === 0 && !error ? (
         <ListState kind="empty" title="今、対応が要るものはありません" emptyPreset="readonly" />
       ) : (
-        <div className={styles.table}><GridTable label="対応が要るもの" design={{ columns: 'minmax(0, 1fr) var(--hqa-col-wide) var(--hqa-col-wide) var(--hqa-col-narrow) var(--hqa-col-mid) var(--hqa-col-mid) var(--hqa-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hqa-row-h)', fontSize: 'var(--text-body)' }}>
+        <div className={styles.table}><GridTable label="対応が要るもの" design={{ columns: 'minmax(0, 1fr) var(--hqa-col-wide) var(--hqa-col-wide) var(--hqa-col-narrow) var(--hqa-col-mid) var(--hqa-col-mid) var(--hqa-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '8px var(--polish-space-section)', rowHeight: 'auto', fontSize: 'var(--text-body)' }}>
           <GridHeadRow>
             <GridCell role="columnheader">アカウント</GridCell>
             {KINDS.map((item) => <GridCell key={item.key} role="columnheader">{item.label}</GridCell>)}
@@ -193,8 +193,8 @@ export default function HqAttentionV8() {
             <GridRow key={item.accountId}>
               <GridCell className={styles.account}>
                 <RowNameButton className={styles.name} title={item.name} onClick={() => router.push(`/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>{item.name}</RowNameButton>
-                {item.style ? <span className={styles.style}>{styleLabel(item.style)}</span> : null}
-                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.style} title={state === '要確認' ? connectionReasonLine(account).title : undefined}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
+                {item.style ? <span className={styles.style} title={styleLabel(item.style)}>{styleLabel(item.style)}</span> : null}
+                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.style} title={state === '要確認' ? connectionReasonLine(account).title : '未確認：接続を確認できていません'}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
               </GridCell>
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)

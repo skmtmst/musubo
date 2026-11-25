@@ -814,8 +814,8 @@ export default function HqBroadcastCreate() {
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
-  const messagePreview = <div className={formStyles.phonePreview}>
-              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
+  const messagePreview = (compact: boolean) => <div className={formStyles.phonePreview}>
+              <LinePreview compact={compact} accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
                   {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
@@ -827,7 +827,7 @@ export default function HqBroadcastCreate() {
   const previewContent = (inDialog = false) => <>            <div className={formStyles.previewHead}>
               <h3>LINE の見え方</h3>
             </div>
-            {messagePreview}
+            {messagePreview(!inDialog)}
             <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
             <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
               ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
@@ -837,7 +837,7 @@ export default function HqBroadcastCreate() {
             ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
             <div className={formStyles.previewActions}>
               <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={16} aria-hidden /> テストを送る</Button>
-              {!inDialog ? <PreviewLauncher key={previewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview}</PreviewLauncher> : null}
+              {!inDialog ? <PreviewLauncher key={previewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview(false)}</PreviewLauncher> : null}
             </div>
             <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed} disabled={!previewReview.ready} disabledReason="配信イメージを開いて確認してください">{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
 </>

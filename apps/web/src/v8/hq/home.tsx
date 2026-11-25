@@ -325,7 +325,7 @@ export default function HqHomeV8() {
 
   const connectionTotal = accountsReadable ? totals.warnings + totals.unconfirmed : null
   const connectionDetail = loadError ? '読み込めませんでした' : null
-  const connectionBadgeText = connectionTotal ? `要確認 ${formatNumber(totals.warnings)}・未確認 ${formatNumber(totals.unconfirmed)}` : undefined
+  const connectionBadgeText = connectionTotal ? [totals.warnings && `要確認 ${formatNumber(totals.warnings)}`, totals.unconfirmed && `未確認 ${formatNumber(totals.unconfirmed)}`].filter(Boolean).join('・') : undefined
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
