@@ -599,6 +599,15 @@ html:root .panel[data-confirmation='compact'][data-design-layout^='stacked'] > .
   :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] .buttonPair { grid-column: 1; justify-self: stretch; }
 }
 
+html:root .actions[data-dialog-action-pair][data-action-layout='inline'] { grid-template-columns: minmax(0, 1fr); }
+html:root .actions[data-action-layout='inline'] > .buttonPair {
+  grid-column: 1;
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+}
+html:root .actions[data-action-layout='inline'] > .buttonPair > :is(button, a) { align-self: center; }
+
 .confirmReason { grid-column: 1 / -1; margin: 0; min-width: 0; text-align: center; color: var(--color-ink-secondary); font-size: var(--text-caption); overflow-wrap: anywhere; }
 
 /* 表示を指定した題だけ、親の内容幅を使わず省略できる幅へ縮める。 */
@@ -663,7 +672,30 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
   }
 }
 
-:root .overlay:has(> .panel > [data-guide-slot="tables.form"] [data-guide-table-editor]) {
+:root .overlay:has(> .panel > [data-guide-slot="tables.form"] :is([data-guide-table-editor], [data-guide-table-compact])) {
+  --guide-table-dim: #0f172a73;
+  background: var(--guide-table-dim);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+@media (min-width: 1424px) and (min-height: 800px) {
+  :root .overlay:has(> .panel > [data-guide-slot="tables.form"]) {
+    justify-content: flex-start;
+    padding-inline-start: calc(50% - 471px);
+  }
+}
+
+:root .panel:has(> [data-guide-slot="tables.form"] [data-inline-guide]) > .content { order: 1; }
+:root .panel:has(> [data-guide-slot="tables.form"] [data-inline-guide]) > .footer { order: 2; }
+
+@media (max-width: 480px) and (min-height: 800px) {
+  :root .overlay[data-viewport-fit][data-design-top]:has(> .panel > [data-guide-slot="tables.form"]) {
+    --guide-table-top: 66px;
+    padding-top: var(--guide-table-top);
+  }
+
+  :root .overlay[data-viewport-fit][data-design-top] > .panel:has(> [data-guide-slot="tables.form"]) {
+    max-height: calc(100dvh - var(--guide-table-top) - var(--space-24));
+  }
 }

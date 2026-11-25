@@ -50,8 +50,7 @@
 
 .columns :is(button, input, [role='switch']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
-.guidedFields { display: grid; gap: var(--space-12); }
-.guidedSeats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-16); }
-.guidedSeats .stepper { width: 100%; }
-.guidedFields :is(button, input):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
+}
+@media (max-width: 480px) {
+  .columns[data-guided-conditions] > .col:first-child { display: none; }
 }

@@ -52,6 +52,11 @@
   pointer-events: none;
 }
 
+.tableRing {
+  border-width: var(--space-2);
+  box-shadow: none;
+}
+
 /* 吹き出し。Pen 04-1 mkzrI。 */
 .balloon {
   position: fixed;
@@ -291,11 +296,20 @@ html:root .barHeader button[class][class][class] { height: auto; }
 }
 
 .root[data-guide-table-editor] .balloon {
-  width: var(--tpl-guideov-complete-balloon-w);
+  width: var(--guide-table-balloon-width);
 }
 
 .root[data-guide-table-editor] .bar {
   inset-block-end: var(--space-12);
+}
+
+[data-guide-table-compact] .stack {
+  margin-inline: var(--space-14);
+}
+
+[data-guide-course-compact] .balloon {
+  margin-inline: var(--space-16);
+  border-radius: var(--tpl-guideov-radius);
 }
 
 .root[data-guide-course-basics] {

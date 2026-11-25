@@ -97,7 +97,8 @@ it.each(['success', 'failure'])('画面を離れた後の保存の%sで一覧へ
 async function fillNewMenu() {
  fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '試しのコース' } })
  fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '4200' } })
- fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+ fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+ fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
 }
 async function choosePublication() {
  fireEvent.click(screen.getByLabelText('保存する状態'))

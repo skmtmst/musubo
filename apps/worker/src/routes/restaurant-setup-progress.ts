@@ -7,7 +7,9 @@ import { readRestaurantFollowupSetupProgress } from '../services/restaurant-foll
 import { dbFor } from '../services/db-router.js';
 import { tzDateStr } from '../services/availability.js';
 import { customerAvailability, type CustomerStore } from '../services/restaurant-customer-booking.js';
-import { connectedGoogleProfile, googleOpeningWeek } from '../services/restaurant-google-hours-source.js';
+import { connectedGoogleProfile, googleOpeningDay, googleOpeningWeek } from '../services/restaurant-google-hours-source.js';
+import { readInventoryAllocation } from '../services/restaurant-inventory-allocation.js';
+import { scheduledInventoryWindows } from '../services/restaurant-inventory-schedule.js';
 import { restaurantReservationEmbed } from '../services/restaurant-media-links.js';
 import { accountId, authenticatedTenantId, hasOrganizationSelector, organizationFor, requiredAccount, storeBelongsTo } from './restaurant-test-definition.js';
 
@@ -24,12 +26,20 @@ function matchesReservationLink(value: string, expected: URL): boolean {
 
 async function readBookingExposure(
   db: D1Database, store: CustomerStore, liffId: string | null, token: string | null,
-  candidate: { startsAt: string; guestCount: number } | null,
+  dates: readonly string[], guestCount: number | null,
 ): Promise<RestaurantBookingExposure> {
   if (!liffId || !token) return { reservationLink: false, publicReservationMenu: false, availableCapacity: false };
 
+  async function hasAvailability() {
+    if (!guestCount) return false;
+    for (const date of dates) {
+      const availability = await customerAvailability(db, store, date, guestCount);
+      if (availability?.data.slots.some(slot => slot.available)) return true;
+    }
+    return false;
+  }
   const expected = new URL(restaurantReservationEmbed(liffId, token).url);
-  const [buttons, availability] = await Promise.all([
+  const [buttons, availableCapacity] = await Promise.all([
     db.prepare(`SELECT a.action_data FROM rich_menu_groups g
        JOIN rich_menu_pages p ON p.id=g.default_page_id AND p.group_id=g.id
        JOIN rich_menu_areas a ON a.page_id=p.id AND a.action_type='uri'
@@ -38,12 +48,12 @@ async function readBookingExposure(
          AND NOT EXISTS(SELECT 1 FROM rich_menu_groups other WHERE other.account_id=g.account_id
            AND other.id<>g.id AND other.status='published' AND other.is_default_for_all=1)`)
       .bind(store.line_account_id).all<{ action_data: string }>(),
-    candidate ? customerAvailability(db, store, tzDateStr(store.timezone, new Date(candidate.startsAt)), candidate.guestCount) : null,
+    hasAvailability(),
   ]);
   return {
     reservationLink: true,
     publicReservationMenu: buttons.results.some(button => matchesReservationLink(button.action_data, expected)),
-    availableCapacity: availability?.data.slots.some(slot => slot.available) === true,
+    availableCapacity,
   };
 }
 
@@ -84,25 +94,32 @@ export function registerRestaurantSetupProgressRoutes(routes: Hono<Env>) {
     if (!row) return c.json({ success: false, error: '店舗が見つかりません' }, 404);
     // JSON不正は想定外のエラーとして共通の報告経路へ渡す。空配列だけが未設定。
     const hours: unknown = row.hours_json === null ? [] : JSON.parse(row.hours_json);
-    const profile = await connectedGoogleProfile(db, storeId);
+    const [profile, allocation] = await Promise.all([connectedGoogleProfile(db, storeId), readInventoryAllocation(db, storeId)]);
     const googleWeek = profile ? googleOpeningWeek(profile) : null;
     const hoursReady = Boolean(googleWeek?.some(day => day.periods.length > 0));
     const bookingHoursReady = Array.isArray(hours) && hours.some(day => day && Array.isArray(day.periods)
       && day.periods.some((period: { opensAt?: string; closesAt?: string }) => /^\d{2}:\d{2}$/.test(period.opensAt ?? '')
         && /^\d{2}:\d{2}$/.test(period.closesAt ?? '') && period.opensAt !== period.closesAt));
-    const reception = Boolean(row.tables_ready && hoursReady && bookingHoursReady && row.liff_id && row.line_capacity_configured);
+    const lineConfigured = allocation.standard === null ? Boolean(row.line_capacity_configured) : allocation.standard.lineCapacity > 0;
+    const reception = Boolean(row.tables_ready && hoursReady && bookingHoursReady && row.liff_id && lineConfigured);
     const lineAccountId = row.line_account_id;
     const bookingStore = lineAccountId ? {
       id: row.id, name: row.name, timezone: row.timezone, line_account_id: lineAccountId, tenant_id: authenticatedTenantId(c),
     } : null;
     // 行き先と空席の照合は任意の追加情報。読めなくても設定済みの判定を保つ。
-    const candidate = reception && row.next_line_slot_at && row.minimum_guest_count
-      ? { startsAt: row.next_line_slot_at, guestCount: row.minimum_guest_count }
-      : null;
+    const now = new Date();
+    const today = tzDateStr(row.timezone, now);
+    let dates: string[] = [];
+    if (reception && profile && allocation.standard) {
+      const schedule = scheduledInventoryWindows(today, row.timezone, day => googleOpeningDay(profile, day), [-1,0,1,2,3,4,5,6,7]);
+      dates = [...new Set(schedule.filter(window => Date.parse(window.startsAt) > now.getTime()).map(window => window.date))];
+    } else if (reception && row.next_line_slot_at) {
+      dates = [tzDateStr(row.timezone, new Date(row.next_line_slot_at))];
+    }
     const [followupSetup, reservationForm, bookingExposure] = await Promise.all([
       readRestaurantFollowupSetupProgress(db, storeId),
       lineAccountId ? readRestaurantReservationFormHealth(db, storeId, lineAccountId) : null,
-      bookingStore ? readBookingExposure(db, bookingStore, row.liff_id, row.reservation_token, candidate).catch(() => undefined) : null,
+      bookingStore ? readBookingExposure(db, bookingStore, row.liff_id, row.reservation_token, dates, row.minimum_guest_count).catch(() => undefined) : null,
     ]);
     const data: RestaurantSetupProgress = {
       storeId: row.id, lineAccountId, tables: Boolean(row.tables_ready), hours: hoursReady, menus: Boolean(row.menus_ready),

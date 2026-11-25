@@ -18,6 +18,7 @@ import { validRestaurantDate, restaurantCivilTime } from '../services/restaurant
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { hasOrganizationSelector, requiredAccount, organizationFor, storeBelongsTo, acquireLock, adjustInventoryReservedCount, releaseLock } from './restaurant-test-definition.js';
 import type { Context } from 'hono';
+import { readScopedInventoryDay } from './restaurant-test-inventory-allocation.js';
 
 export const post__api_restaurant_test_inventory_generate_1 = async (c: Context<Env, "/api/restaurant-test/inventory/generate">) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
@@ -132,6 +133,15 @@ export const get__api_restaurant_test_inventory_rules_4 = async (c: Context<Env,
  if(date===undefined)return c.json({success:true,data});
  const store=await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{timezone:string}>();
  const state=await getRestaurantInventoryRuleState(db,storeId,restaurantCivilTime(date,0,store!.timezone),restaurantCivilTime(date,1440,store!.timezone));
+ if(data.stopLine){
+   const {data:slots}=await readScopedInventoryDay(db,storeId,date);
+   const stopped=slots.filter(slot=>slot.id.startsWith('operating:')&&slot.auto_line_original!==null).map(slot=>({
+     slotId:slot.id,startsAt:slot.starts_at,lineOriginal:slot.auto_line_original,sameDayOriginal:null,
+     remainingSeats:slot.total_capacity-slot.occupied_seats-slot.unassigned_guests,threshold:data.threshold,
+   }));
+   state.stoppedTotal+=stopped.length;
+   state.stopped=[...state.stopped,...stopped].sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt)).slice(0,100);
+ }
  return c.json({success:true,data,state});
 };
 

@@ -436,11 +436,11 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children, leadingAction, align, padding, note, summary }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; padding?: 'none'; note?: ReactNode; summary?: ReactNode }) {
+export function DialogActions({ children, leadingAction, align, layout, padding, note, summary }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; layout?: 'inline'; padding?: 'none'; note?: ReactNode; summary?: ReactNode }) {
   const centered = align === 'center' || leadingAction !== undefined
   const hasSummary = summary != null
   const ref = useDialogActionWidth()
-  return <div ref={ref} className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-dialog-action-summary={hasSummary || undefined} data-padding={padding}>
+  return <div ref={ref} className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-dialog-action-summary={hasSummary || undefined} data-action-layout={layout} data-padding={padding}>
     {hasSummary ? <div role="status">{summary}</div> : null}
     {leadingAction ? <span data-dialog-action-leading className={centered ? styles.actionStart : styles.actionLead}>{typeof leadingAction === 'string' ? <span className={styles.footerLead}>{leadingAction}</span> : leadingAction}</span> : null}
     {centered || hasSummary ? <span className={styles.buttonPair}>{children}</span> : children}

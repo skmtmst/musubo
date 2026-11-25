@@ -79,8 +79,12 @@
   cursor: not-allowed;
 }
 
-.root:has(.item:disabled) {
+.root[data-disabled] {
   opacity: var(--polish-disabled-opacity);
+}
+
+.root:not([data-disabled]) .item:disabled {
+  color: var(--color-ink-faint);
 }
 
 .item:focus-visible {

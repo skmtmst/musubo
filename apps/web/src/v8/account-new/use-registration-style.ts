@@ -30,12 +30,13 @@ export function useRegistrationStyle(accountId: string, enabled: boolean, presen
       setProfile({ version: res.data.version, hasMenuAnswer: Boolean(res.data.answers?.image), selected: res.data.styleSelected })
       const loadedChoice = res.data.styleSelected ? res.data.style : ''
       setBaselineChoice(loadedChoice)
-      setChoice(res.data.styleSelected ? loadedChoice : readRegistrationPresentation(presentationKey).choice || '')
+      const draft = readRegistrationPresentation(presentationKey).choice
+      setChoice(res.data.styleSelected ? loadedChoice : draft === 'restaurant' ? draft : '')
     }).catch(caught => { if (active) setError(describeApiFailure(caught, '読み込み')) })
     return () => { active = false }
   }, [accountId, enabled, presentationKey, tick])
   const save = async () => {
-    if (busyLock.current || !choice || !profile) return false
+    if (busyLock.current || !choice || !profile || (!profile.selected && choice !== 'restaurant')) return false
     busyLock.current = true
     setBusy(true); setError('')
     try {

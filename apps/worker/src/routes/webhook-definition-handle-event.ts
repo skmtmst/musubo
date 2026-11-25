@@ -30,6 +30,7 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 
 import { snapshotLineReplyPolicy } from '../services/line-webhook-reply-policy.js';
 import { ensureFriendFromWebhookUser } from './webhook-definition-is-friend-scope-conflict.js';
+import { handleFirstMessageTestEvent, isFirstMessageTestEvent } from '../services/getting-started-first-message.js';
 
 export async function handleEvent(
   db: D1Database,
@@ -47,6 +48,10 @@ export async function handleEvent(
   legacyLineMessageAccountKey?: string,
 ): Promise<void> {
   const replay=<T>(key:string,work:()=>Promise<T>):Promise<T>=>execution?execution.step(key,work):work();
+  if (isFirstMessageTestEvent(event)) {
+    await replay('first_message_test', () => handleFirstMessageTestEvent(execution?.mutationDb('first_message_test') ?? db, lineAccountId, event));
+    return;
+  }
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,
