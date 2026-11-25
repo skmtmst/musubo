@@ -14,7 +14,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import styles from './first-steps.module.css'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 
-import { nextFirstStepKey, type FirstStepsGuide, type FirstStepsSummary } from './first-steps-model'
+import { isFirstStepsComplete, nextFirstStepKey, type FirstStepsGuide, type FirstStepsSummary } from './first-steps-model'
 
 /* 状態・保存・実測は first-steps-model に置く。呼び出し元の入口を変えないため、ここから名前を通す。 */
 export {
@@ -51,8 +51,9 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   カードは「見出し → 手順 → 続きから/最初から」を表示する。
   「選んだ機能の設定」ブロックと「使い方の設定を開く」は置かない（利用者判断）。
 */
-export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false, firstMessageInline = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; firstMessageInline?: boolean }) {
-  const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total)
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false, firstMessageInline = false, keepVisible = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; firstMessageInline?: boolean; keepVisible?: boolean }) {
+  const complete = isFirstStepsComplete(summary)
+  if (isFirstStepsComplete(summary) && !keepVisible) return null
   const nextKey = summary ? nextFirstStepKey(summary) : null
   /* 再開の導線はガイド進行中だけ（承認済み Pen：通常 la9o6/FJ6Xd には無く、進行中 sL2CD/rvGC6 にだけある）。
      始めるのは各行の「開く」なので、まだ始めていない間はカードに同じ操作を増やさない。 */

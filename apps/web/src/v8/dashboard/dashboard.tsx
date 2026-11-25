@@ -30,6 +30,7 @@ import { Fragment,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,FirstStepsFeedback,summarizeFirstSteps,useFirstSteps } from './first-steps'
+import { isFirstStepsComplete } from './first-steps-model'
 import { FirstRunDoneDialog } from './first-run-done'
 import { FirstRunPopup, useFirstRunPopup } from './first-run-popup'
 import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
@@ -357,12 +358,13 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       onChanged={() => { start.reload(); setup.reload() }} />
   ) : null
   const onboardingSummary = start.summary ?? (start.status === 'ready' && canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
-  const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
+  const keepOnboarding = start.status !== 'ready' || setup.status === 'loading' || Boolean(start.error || setup.error)
+  const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage) && (keepOnboarding || !isFirstStepsComplete(onboardingSummary))
   /* 初回ポップアップ（枠 02 / 02b）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
     accountId: d.selectedAccountId, canManage, summary: onboardingSummary, guidePhase: wizard.dialog || start.guide.loading ? 'loading' : start.guide.phase,
   })
-  const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || viewer || d.error || d.periodNotice || looseFailures.length ? (
+  const notice = start.error || setup.error || start.progress?.notices?.length || showOnboarding || starterRetry || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
@@ -370,7 +372,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
       {starterRetry}
       {showOnboarding ? <FirstStepsCard
-        onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle} guide={start.guide}
+        onRetry={start.reload} summary={onboardingSummary} keepVisible={keepOnboarding} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle} guide={start.guide}
         onRecheck={start.watchExpired ? start.rewatch : undefined}
         feedback={<>
           {start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}

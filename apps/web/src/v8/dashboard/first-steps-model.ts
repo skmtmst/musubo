@@ -21,6 +21,11 @@ export type FirstStepsSummary = {
   total: number
 }
 
+/** 全段の状態を確認できた場合だけ、完了した案内を隠せる。 */
+export function isFirstStepsComplete(summary: FirstStepsSummary | null): boolean {
+  return Boolean(summary && summary.total > 0 && summary.done === summary.total && summary.steps.length === summary.total && summary.steps.every(step => step.state === 'done'))
+}
+
 /** ガイドの操作だけを受け取る。完了判定は持たず、はじめにやることの実測に従う。 */
 export type FirstStepsGuide = GuideControl
 
