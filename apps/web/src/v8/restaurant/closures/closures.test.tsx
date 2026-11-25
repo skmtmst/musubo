@@ -75,6 +75,26 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('UVnvR 休業日・貸切', () => {
+  it.each([['temporarily_closed', '臨時休業中'], ['permanently_closed', '閉業'], ['unavailable', '営業時間を確認できません']] as const)('%sは全曜日を定休と表示しない', async (status, label) => {
+    fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: status === 'unavailable' ? null : hours.map(item => ({ ...item, periods: [] })), hoursStatus: status, version: 1 } })
+    render(<InventoryPage />)
+    await waitFor(() => expect(screen.getAllByText(new RegExp(label)).length).toBeGreaterThan(0))
+    expect(screen.queryAllByRole('gridcell', { name: /・定休/ })).toHaveLength(0)
+    if (status !== 'unavailable') expect(screen.getAllByRole('gridcell', { name: status === 'temporarily_closed' ? /・臨時休業/ : /・閉業/ }).length).toBeGreaterThan(0)
+  })
+  it('旧WorkerでhoursStatusがなくても営業時間から定休を表示する', async () => {
+    render(<InventoryPage />)
+    await waitFor(() => expect(screen.getAllByText('定休').length).toBeGreaterThan(0))
+  })
+  it('通信に失敗したときは再読み込みでき、Googleの設定が原因と決めつけない', async () => {
+    fixture.openingHours.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: { storeId: 'store-1', hours, version: 1 } })
+    render(<InventoryPage />)
+    const retry = await screen.findByRole('button', { name: '再読み込み' })
+    expect(screen.queryByText(/Googleビジネス画面で設定や接続を確認/)).toBeNull()
+    fireEvent.click(retry)
+    await waitFor(() => expect(screen.getAllByText('定休').length).toBeGreaterThan(0))
+    expect(fixture.openingHours).toHaveBeenCalledTimes(2)
+  })
   it('?tab=closures で開き、頭の説明・カレンダーの札・定休・右の列・上の知らせを出す', async () => {
     render(<InventoryPage />)
     const card = await waitFor(() => {

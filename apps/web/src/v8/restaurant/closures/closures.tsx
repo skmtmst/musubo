@@ -2,7 +2,7 @@
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay } from '@line-crm/shared'
+import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay, RestaurantOpeningHours } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -86,6 +86,9 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   const [closures, setClosures] = useState<RestaurantClosure[] | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
+  const [hoursStatus, setHoursStatus] = useState<RestaurantOpeningHours['hoursStatus'] | null>(null)
+  const [hoursReadFailed, setHoursReadFailed] = useState(false)
+  const [hoursRetry, setHoursRetry] = useState(0)
   const [tasksError,setTasksError]=useState(false)
   const [mediaError,setMediaError]=useState(false)
   const [mediaRetry,setMediaRetry]=useState(0)
@@ -136,7 +139,10 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
   useEffect(() => {
     if (!accountId || !storeId) return
     let current = true
-    void restaurantTestApi.openingHours(accountId, storeId).then((res) => { if (current) setHours(res.data.hours ?? []) }).catch(() => { if (current) setHours(null) })
+    setHours(null); setHoursStatus(null); setHoursReadFailed(false)
+    void restaurantTestApi.openingHours(accountId, storeId).then((res) => {
+      if (current) { setHours(res.data.hours ?? null); setHoursStatus(res.data.hoursStatus ?? (res.data.googleStatus != null && res.data.hours == null ? 'unavailable' : null)) }
+    }).catch(() => { if (current) { setHours(null); setHoursStatus(null); setHoursReadFailed(true) } })
     void restaurantTestApi.mediaLinks(accountId, storeId)
       .then((res) => { if (current) {setMediaError(false);setMedia(res.data.map((m) => ({ code: m.code, name: m.name, loginUrl: m.loginUrl, closeOnBooking: Boolean(m.closeOnBooking) })));} })
       .catch(() => { if (current) setMediaError(true) })
@@ -144,7 +150,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       .then((res) => { if (current) setSpecial(res.profile.specialHours ?? []) })
       .catch(() => { if (current) setSpecial('none') })
     return () => { current = false }
-  }, [accountId, storeId, mediaRetry])
+  }, [accountId, storeId, mediaRetry, hoursRetry])
 
   useEffect(() => {
     if (!accountId) return
@@ -157,7 +163,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
     return () => { current = false }
   }, [accountId, storeId, range])
 
-  const holidays = useMemo(() => regularHolidays(hours), [hours])
+  const holidays = useMemo(() => regularHolidays(hours, hoursStatus), [hours, hoursStatus])
   const list = useMemo(() => upcoming(closures ?? [], today), [closures, today])
 
   /* 右の列に出す記録だけ、連絡の状況を読む（読めない記録は予約の数だけ出す）。 */
@@ -270,6 +276,10 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
 
   return (
     <SaveErrorScope errors={saveErrors}><>
+      {hoursReadFailed ? <Notice tone="danger">営業時間を確認できません。再読み込みしてください。 <Button variant="text" size="inline" onClick={() => setHoursRetry(n => n + 1)}>再読み込み</Button></Notice> : null}
+      {hoursStatus === 'unavailable' ? <Notice tone="danger">営業時間を確認できません。Googleビジネス画面で設定や接続を確認し、再読み込みしてください。 <Button variant="text" size="inline" href="/restaurant-test/google?tab=hours">Googleビジネス画面を開く</Button></Notice> : null}
+      {hoursStatus === 'temporarily_closed' ? <Notice tone="warn">Googleビジネスでは臨時休業中です。</Notice> : null}
+      {hoursStatus === 'permanently_closed' ? <Notice tone="warn">Googleビジネスでは閉業しています。</Notice> : null}
       {tasksError?<ListState kind="error" title="枠を閉じる知らせを読み込めませんでした" onRetry={()=>void loadTasks()}/>:null}
       {mediaError?<ListState kind="error" title="予約サイトを読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
       {first && firstItem ? (
@@ -325,7 +335,8 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                   const clickable = canWrite && !past
                   const tone = hit ? kindTone(hit.kind) : null
                   const count = hit ? countOf(hit) : null
-                  const label = `${dayTitle(day)}${hit ? `・${KIND_LABEL[hit.kind]}` : holiday ? '・定休' : ''}`
+                  const globalClosed = day < today ? null : hoursStatus === 'temporarily_closed' ? '臨時休業' : hoursStatus === 'permanently_closed' ? '閉業' : null
+                  const label = `${dayTitle(day)}${globalClosed ? `・${globalClosed}` : ''}${hit ? `・${KIND_LABEL[hit.kind]}` : holiday ? '・定休' : ''}`
                   const content = (
                     <>
                       <span className={`${styles.date} ${day === today ? styles.dateToday : faint ? styles.dateFaint : ''}`}>{Number(day.slice(8))}</span>
@@ -336,6 +347,8 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                           <span className={styles.cellNote}>{hit.allDay ? (count === null ? '' : `予約 ${formatNumber(count)} 件`) : tablesText(hit.tableIds, tables)}</span>
                           {hits.length > 1 ? <span className={styles.cellNote}>{`ほか ${hits.length - 1} 件`}</span> : null}
                         </>
+                      ) : globalClosed ? (
+                        <span className={`${styles.mark} ${styles.markClosed}`}>{globalClosed}</span>
                       ) : holiday ? (
                         <span className={`${styles.mark} ${styles.markHoliday}`}>定休</span>
                       ) : null}

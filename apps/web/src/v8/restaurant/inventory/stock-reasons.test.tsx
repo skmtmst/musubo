@@ -38,9 +38,15 @@ beforeEach(() => {
   api.generateInventory.mockResolvedValue({ success: true }); api.saveOpeningHours.mockResolvedValue(hours(1))
   api.saveScopedInventoryAllocation.mockResolvedValue({ success: true })
 })
-afterEach(() => { cleanup(); vi.resetAllMocks(); verifiedStaffRole(null) })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks(); verifiedStaffRole(null) })
 
 describe('在庫を直すための案内', () => {
+  it('Googleの営業時間は読めても予約設定の版が0なら再取込を案内する', async () => {
+    api.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: week(), version: 0, googleStatus: 'connected', hoursStatus: 'closed' } })
+    render(draw())
+    await screen.findByText(/Googleビジネス画面で営業時間を確認し、Googleから再読み込みしてください/)
+    expect(changeStandard().disabled).toBe(true)
+  })
   it('未保存の時間を取得できた時だけ理由と開ける時間への入口を出し、書き込まない', async () => {
     render(draw())
     await screen.findByText(missingHours)
@@ -68,12 +74,25 @@ describe('在庫を直すための案内', () => {
     api.openingHours.mockResolvedValue(hours(3))
     api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'closed' } })
     render(draw())
-    await screen.findByText('この日は休業日です')
+    await screen.findByText('定休日')
     expect(changeStandard().disabled).toBe(false)
     expect(screen.queryByText(missingHours)).toBeNull()
     fireEvent.click(changeStandard())
     expect(screen.getByRole('dialog', { name: '営業日の基本配分を変更' })).not.toBeNull()
     expect(api.generateInventory).not.toHaveBeenCalled()
+  })
+
+  it('営業のある週でも選んだ曜日が休みなら定休日を表示する', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00+09:00'))
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date())
+    const weekday = new Date(`${today}T12:00:00Z`).getUTCDay()
+    const days = week().map(day => ({ ...day, periods: day.weekday === weekday ? [] : [{ opensAt: '17:00', closesAt: '22:00' }] }))
+    api.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: days, version: 3, googleStatus: 'connected', hoursStatus: 'available' } })
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'closed' } })
+    render(draw())
+    await screen.findByText('定休日')
+    expect(screen.queryByRole('button', { name: 'この日の枠を作る' })).toBeNull()
   })
 
   it.each(['pending', 'failed'] as const)('%sの時間を未保存と断定しない', async (mode) => {
@@ -85,6 +104,7 @@ describe('在庫を直すための案内', () => {
     if (mode === 'failed') {
       await act(async () => request.reject(new Error('fixture failure')))
       await screen.findByText(/開ける時間を確認できません。再読み込みしてください。/)
+      expect(screen.getByRole('button', { name: '再読み込み' })).toBeTruthy()
       expect(screen.queryByText(missingHours)).toBeNull()
     }
   })
