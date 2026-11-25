@@ -134,6 +134,8 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     expect((await sendReply(member, crypto.randomUUID())).status).toBe(409);
     expect(sendMock).toHaveBeenCalledTimes(1);
 
+    db.raw.prepare("UPDATE instagram_outbound_messages SET created_at=? WHERE idempotency_key=?").run(new Date(Date.now() - 360000).toISOString(), firstKey);
+    sendMock.mockReset().mockResolvedValueOnce(Response.json({ data: [] })).mockResolvedValueOnce(Response.json({ message_id: 'meta-msg-2' }));
     // 管理者が理由を添えて未送信確定する。
     const resolved = await resolveReply(admin, {
       key: firstKey,
@@ -151,8 +153,7 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
       staff_id: 'staff-1',
       status: 'not_sent_confirmed',
       resolved_by_staff_id: 'admin-1',
-      resolution_kind: 'reason',
-      resolution_evidence: 'Instagramアプリの受信箱で該当返信が無いことを確認',
+      resolution_kind: 'meta_conversation_absent',
     });
     expect(Number.isFinite(Date.parse(row.resolved_at))).toBe(true);
 
@@ -204,6 +205,7 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
 
     expect((await sendReply(owner, firstKey)).status).toBe(502);
 
+    db.raw.prepare("UPDATE instagram_outbound_messages SET created_at=? WHERE idempotency_key=?").run(new Date(Date.now() - 360000).toISOString(), firstKey);
     // 理由文が無くても Meta 側の会話に返信が無かった事実を確認できれば確定できる。
     const resolved = await resolveReply(owner, { key: firstKey, outcome: 'not_sent' });
     expect(resolved.status).toBe(200);
@@ -217,7 +219,7 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
 
     // Meta 側の会話に同じ返信が届いていた場合は未送信確定を拒み、再送も許さない。
     const deliveredKey = crypto.randomUUID();
-    const createdAt = new Date().toISOString();
+    const createdAt = new Date(Date.now() - 360000).toISOString();
     db.raw.prepare(
       `INSERT INTO instagram_outbound_messages
          (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
@@ -237,7 +239,7 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
       }],
     })));
     expect((await resolveReply(owner, { key: deliveredKey, outcome: 'not_sent' })).status).toBe(409);
-    expect((await sendReply(owner, crypto.randomUUID(), '別の返信')).status).toBe(409);
+    expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(deliveredKey)).toEqual({ status: 'sent' });
   });
 
   it('根拠を示せないとき（理由文がなくMeta側の会話取得も失敗または接続不可）は未送信確定も再送も許さない', async () => {
@@ -246,6 +248,7 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValueOnce(new Error('timeout')));
     expect((await sendReply(admin, key)).status).toBe(502);
 
+    db.raw.prepare("UPDATE instagram_outbound_messages SET created_at=? WHERE idempotency_key=?").run(new Date(Date.now() - 360000).toISOString(), key);
     // 1) Meta 会話取得が通信失敗
     const sendOrRead = vi.fn().mockRejectedValue(new Error('meta_down'));
     vi.stubGlobal('fetch', sendOrRead);
@@ -338,7 +341,8 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     }));
     expect((await resolveReply(owner, { key, outcome: 'not_sent' })).status).toBe(409);
     expect(messagePageCalls).toBe(1);
-    expect((await sendReply(owner, crypto.randomUUID())).status).toBe(409);
+    expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(key)).toEqual({ status: 'sent' });
+    db.raw.prepare("UPDATE instagram_outbound_messages SET status='unknown',meta_message_id=NULL WHERE idempotency_key=?").run(key);
 
     // 3) ページ数が多すぎて照合下限より古い時刻へ到達できない場合は確定しない
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
@@ -431,9 +435,9 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     const ambiguousRes = await resolveReply(owner, { key: ambiguousKey, outcome: 'not_sent' });
     expect(ambiguousRes.status).toBe(409);
     const ambiguousBody = await ambiguousRes.json() as { error: string };
-    expect(ambiguousBody.error).toContain('識別子');
-    expect(ambiguousBody.error).not.toContain('送信済みとして記録してください');
-    expect((await sendReply(owner, crypto.randomUUID(), '追送テスト')).status).toBe(409);
+    expect(ambiguousBody.error).toContain('送信済み');
+    expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(ambiguousKey)).toEqual({ status: 'sent' });
+    db.raw.prepare("UPDATE instagram_outbound_messages SET status='unknown',meta_message_id=NULL WHERE idempotency_key=?").run(ambiguousKey);
 
     // 2) 過去の同文返信（照合下限より前）や、DBの別送信行で meta_message_id が既知の同文返信は対象と取り違えない
     const knownSentKey = crypto.randomUUID();
@@ -487,9 +491,10 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     })));
     const exactHit = await resolveReply(owner, { key: withIdKey, outcome: 'not_sent' });
     expect(exactHit.status).toBe(409);
-    expect(((await exactHit.json()) as { error: string }).error).toContain('送信済みとして記録してください');
+    expect(((await exactHit.json()) as { error: string }).error).toContain('送信済みとして記録しました');
+    db.raw.prepare("UPDATE instagram_outbound_messages SET status='unknown' WHERE idempotency_key=?").run(withIdKey);
 
-    // 別IDの同文返信しか無く対象IDが存在しない場合は取り違えない
+    // 別IDでも同文があれば、未送信とは確定しない
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       data: [{
         id: 'conv-1',
@@ -503,7 +508,89 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
         },
       }],
     })));
-    expect((await resolveReply(owner, { key: withIdKey, outcome: 'not_sent' })).status).toBe(200);
+    expect((await resolveReply(owner, { key: withIdKey, outcome: 'not_sent' })).status).toBe(409);
+    expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(withIdKey)).toEqual({ status: 'sent' });
+  });
+
+  it('Metaの反映待ちの5分間は理由を入力しても未送信を確定できない', async () => {
+    await seedConnectedDmInbox();
+    const key = crypto.randomUUID();
+    db.raw.prepare(`INSERT INTO instagram_outbound_messages
+      (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+      VALUES (?,'a1','20','customer','owner-1','返信','unknown',?)`).run(key, new Date().toISOString());
+    expect((await resolveReply(owner, { key, outcome: 'not_sent', reason: '確認した' })).status).toBe(409);
+  });
+
+  it('理由があってもMetaを照合し改行と前後空白を揃えた同文を送信済みとする', async () => {
+    await seedConnectedDmInbox();
+    const key = crypto.randomUUID(), at = new Date(Date.now() - 360000).toISOString();
+    db.raw.prepare(`INSERT INTO instagram_outbound_messages
+      (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+      VALUES (?,'a1','20','customer','owner-1','返信\nです','unknown',?)`).run(key, at);
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ data: [{ messages: { data: [
+      { id: 'echo1', message: ' 返信\r\nです ', created_time: at, from: { id: '20' } },
+    ] } }] })));
+    expect((await resolveReply(owner, { key, outcome: 'not_sent', reason: '確認した' })).status).toBe(409);
+    expect(db.raw.prepare('SELECT status,meta_message_id FROM instagram_outbound_messages WHERE idempotency_key=?').get(key))
+      .toEqual({ status: 'sent', meta_message_id: 'echo1' });
+  });
+
+  it.each(['invalid', 'message-limit', 'conversation-limit'])('照合履歴を読み切れない %s は未送信と確定しない', async kind => {
+    await seedConnectedDmInbox();
+    const key = crypto.randomUUID(), at = new Date(Date.now() - 360000).toISOString();
+    db.raw.prepare(`INSERT INTO instagram_outbound_messages
+      (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+      VALUES (?,'a1','20','customer','owner-1','返信','unknown',?)`).run(key, at);
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | RequestInfo) => {
+      calls++;
+      const next = kind === 'invalid' ? 'https://evil.example/v24.0/messages' : 'https://graph.instagram.com/v24.0/next';
+      if (kind === 'conversation-limit') return Response.json({ data: [], paging: { next } });
+      const box = { data: [{ id: `m${calls}`, message: '別', created_time: at, from: { id: 'customer' } }], paging: { next } };
+      return Response.json(new URL(String(input)).pathname.endsWith('/conversations') ? { data: [{ messages: box }] } : box);
+    }));
+    expect((await resolveReply(owner, { key, outcome: 'not_sent', reason: '確認' })).status).toBe(502);
+    expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(key)).toEqual({ status: 'unknown' });
+    expect(calls).toBe(kind === 'invalid' ? 1 : 5);
+  });
+
+  it('照合中に他の担当者が確定して更新が0件なら成功を返さない', async () => {
+    await seedConnectedDmInbox();
+    const key = crypto.randomUUID(), at = new Date(Date.now() - 360000).toISOString();
+    db.raw.prepare(`INSERT INTO instagram_outbound_messages
+      (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+      VALUES (?,'a1','20','customer','owner-1','返信','unknown',?)`).run(key, at);
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      db.raw.prepare("UPDATE instagram_outbound_messages SET status='sent' WHERE idempotency_key=?").run(key);
+      return Response.json({ data: [] });
+    }));
+    expect((await resolveReply(owner, { key, outcome: 'not_sent' })).status).toBe(409);
+  });
+
+  it.each(['pending','unknown','not_sent_confirmed'])('echoで%sの返信を送信済みにして遅れた証拠を残す', async status => {
+    await seedConnectedDmInbox();
+    const key = crypto.randomUUID(), now = Date.now(), at = new Date(now - 1000).toISOString();
+    db.raw.prepare(`INSERT INTO instagram_outbound_messages
+      (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at,resolved_by_staff_id,resolved_at,resolution_kind,resolution_evidence)
+      VALUES (?,'a1','20','customer','owner-1','返信',?,?, 'owner-1',?,'reason','確認')`).run(key, status, at, at);
+    if (status === 'not_sent_confirmed') {
+      db.raw.prepare(`INSERT INTO instagram_outbound_messages
+        (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at,sent_at)
+        VALUES (?,'a1','20','customer','owner-1','返信','sent',?,?)`).run(crypto.randomUUID(), new Date(now + 1000).toISOString(), new Date(now + 1000).toISOString());
+    }
+    const raw = JSON.stringify({ object: 'instagram', entry: [{ id: '20', messaging: [{ sender: { id: '20' }, recipient: { id: 'customer' }, timestamp: now, message: { mid: 'late-mid', text: '返信', is_echo: true } }] }] });
+    const cryptoKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(config.META_APP_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const signature = Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(raw))), x => x.toString(16).padStart(2,'0')).join('');
+    const response = await app().request('/api/instagram/webhook', { method: 'POST', headers: { 'X-Hub-Signature-256': `sha256=${signature}` }, body: raw });
+    expect(response.status).toBe(200);
+    const row = db.raw.prepare('SELECT status,meta_message_id,resolution_evidence FROM instagram_outbound_messages WHERE idempotency_key=?').get(key) as { status: string; meta_message_id: string; resolution_evidence: string };
+    expect(row.status).toBe('sent');
+    expect(row.meta_message_id).toBe('late-mid');
+    expect(row.resolution_evidence.includes('[echo_after_not_sent]')).toBe(status === 'not_sent_confirmed');
+    if (status === 'not_sent_confirmed') {
+      const detail = await app().request('/api/instagram/conversations/customer?lineAccountId=a1&instagramId=20');
+      expect(((await detail.json()) as {data: {lateEchoNotice: string}}).data.lateEchoNotice).toContain('二重送信');
+    }
   });
 
   it('DB制約で未送信確定時の根拠種別や確認情報のNULL・空文字を拒否する', () => {

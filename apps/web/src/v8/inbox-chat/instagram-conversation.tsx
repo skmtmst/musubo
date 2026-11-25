@@ -73,7 +73,7 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
   const resolveActions = pending?.canResolve && canEdit
     ? <>
         <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('sent') }}>送信済みにする</Button>
-        {canConfirmNotSent ? <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('not_sent') }}>未送信にする</Button> : null}
+        {canConfirmNotSent && pending.canResolveNotSent ? <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('not_sent') }}>未送信にする</Button> : null}
       </>
     : <Button variant="text" size="inline" onClick={() => void reload()}>読み直す</Button>
 
@@ -111,8 +111,9 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
         </InboxThreadLoading>
       </InboxMessages>
       <InboxComposer>
+        {detail?.lateEchoNotice ? <Notice tone="warn" role="alert" message={detail.lateEchoNotice} /> : null}
         {pending ? (
-          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={`「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。`} action={resolveActions} />
+          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={pending.canResolveNotSent || !pending.resolveAt ? `「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。` : `送信結果の反映を待っています。未送信の確定まで${formatReplyWindowLeft(Date.parse(pending.resolveAt ?? ""), now)}です。`} action={resolveActions} />
         ) : blockedReason ? (
           <Notice tone="warn" role="status" message={blockedReason} action={openSettings} />
         ) : null}
@@ -159,7 +160,7 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
       >
         {pending ? <p className="text-ink-secondary text-sm">{`返信：「${quoteHead(pending.content)}」`}</p> : null}
         {confirming === 'not_sent' ? (
-          <Field label="確認した理由" optional htmlFor="ig-resolve-reason" note="自動照合できない場合は入力が必要です">
+          <Field label="確認した理由" optional htmlFor="ig-resolve-reason" note="Instagram で本当に届いていないか確かめてください。自動照合できない場合は確定できません。">
             <TextArea
               id="ig-resolve-reason"
               aria-label="確認した理由"

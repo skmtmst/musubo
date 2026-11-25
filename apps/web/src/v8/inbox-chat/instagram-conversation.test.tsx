@@ -149,6 +149,14 @@ describe('Instagram の会話を開いて返す', () => {
 describe('結果の分からない返信', () => {
   const pendingReply = { key: 'k1', content: '在庫はあります', canResolve: true }
 
+  it('未送信の確定までの残り時間を表示する', async () => {
+    mockConversation({ messages: [incoming('m1', 1)], pendingReply: { ...pendingReply, canResolveNotSent: false, resolveAt: new Date(Date.now() + 4 * 60000).toISOString() } })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({ success: true })
+    render(<Harness />)
+    expect(await screen.findByText(/未送信の確定まであと4分/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '未送信にする' })).toBeNull()
+  })
+
   it('ある間は送らず、Instagram で確かめるよう知らせる', async () => {
     mockConversation({ messages: [incoming('m1', 1)], pendingReply: { ...pendingReply, canResolve: false } })
     vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})

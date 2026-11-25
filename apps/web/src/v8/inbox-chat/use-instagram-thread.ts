@@ -11,8 +11,8 @@ import { canAdministerRole } from '@/lib/staff-role'
 
 export type InstagramMessage = { id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }
 export type InstagramReplyState = 'ready' | 'disconnected' | 'permission_required'
-export type InstagramPendingReply = { key: string; content: string; canResolve: boolean }
-type Detail = { messages: InstagramMessage[]; replyState: InstagramReplyState; pendingReply?: InstagramPendingReply | null }
+export type InstagramPendingReply = { key: string; content: string; canResolve: boolean; canResolveNotSent?: boolean; resolveAt?: string }
+type Detail = { lateEchoNotice?: string | null; messages: InstagramMessage[]; replyState: InstagramReplyState; pendingReply?: InstagramPendingReply | null }
 export type InstagramResolveOutcome = 'sent' | 'not_sent'
 
 /** Instagram の決まり：お客さまの最後のメッセージから24時間だけ返信できる。Worker も同じ物差しで断る。 */
@@ -140,7 +140,8 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
 
   const target = detail ? latestIncoming(detail.messages) : null
   const deadline = detail ? instagramReplyDeadline(detail.messages) : null
-  const pending = detail?.pendingReply ?? null
+  const pendingRaw = detail?.pendingReply ?? null
+  const pending = pendingRaw ? { ...pendingRaw, canResolveNotSent: pendingRaw.canResolveNotSent ?? pendingRaw.canResolve, ...(pendingRaw.resolveAt && now >= Date.parse(pendingRaw.resolveAt) ? { canResolve: true, canResolveNotSent: true } : {}) } : null
   const blockedReason = detail ? instagramBlockedReason(detail, deadline, now) : ''
   const canSend = canEdit && detail !== null && !pending && !blockedReason && target !== null
   const lockedReason = role === null ? undefined : permissionLockReason(role, canEdit)
@@ -176,7 +177,7 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
   }
 
   const resolve = async (outcome: InstagramResolveOutcome, reason?: string): Promise<boolean> => {
-    if (!pending || !pending.canResolve || !canEdit || (outcome === 'not_sent' && !canConfirmNotSent) || resolving) return false
+    if (!pending || !pending.canResolve || (outcome === 'not_sent' && !pending.canResolveNotSent) || !canEdit || (outcome === 'not_sent' && !canConfirmNotSent) || resolving) return false
     const current = generation.current
     setResolving(true)
     setResolveError('')

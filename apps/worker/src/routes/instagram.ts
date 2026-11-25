@@ -849,6 +849,31 @@ instagram.post('/api/instagram/webhook', async (c) => {
       continue;
     for (const row of rows) for (const event of entry.messaging ?? []) {
       const msg = event?.message;
+      if (msg?.is_echo) {
+        if (typeof msg.mid !== 'string' || !msg.mid || msg.mid.length > 512 ||
+            event.sender?.id !== row.instagram_id || typeof event.recipient?.id !== 'string' ||
+            !Number.isSafeInteger(event.timestamp) || event.timestamp! <= 0 || event.timestamp! > 8640000000000000) continue;
+        const alreadyRecorded = await c.env.DB.prepare("SELECT 1 FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND meta_message_id=? AND status='sent' LIMIT 1")
+          .bind(row.line_account_id, row.instagram_id, msg.mid).first();
+        if (alreadyRecorded) continue;
+        const echoTime = event.timestamp!;
+        const candidates = await c.env.DB.prepare(`SELECT idempotency_key,content,status,meta_message_id,created_at
+          FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND sender_id=?
+          AND status IN ('pending','unknown','not_sent_confirmed')`)
+          .bind(row.line_account_id, row.instagram_id, event.recipient.id)
+          .all<{ idempotency_key: string; content: string; status: string; meta_message_id: string | null; created_at: string }>();
+        const normalize = (value: string) => value.replace(/\r\n?/g, '\n').trim();
+        const hits = candidates.results.filter(candidate => candidate.meta_message_id === msg.mid ||
+          (!candidate.meta_message_id && typeof msg.text === 'string' && normalize(candidate.content) === normalize(msg.text) &&
+            echoTime >= Date.parse(candidate.created_at) - 5000 && echoTime <= Date.parse(candidate.created_at) + 5 * 60 * 1000));
+        if (hits.length !== 1) continue;
+        const hit = hits[0];
+        await c.env.DB.prepare(`UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=?,
+          resolution_evidence=CASE WHEN status='not_sent_confirmed' THEN COALESCE(resolution_evidence,'') || '\n[echo_after_not_sent]' ELSE resolution_evidence END
+          WHERE idempotency_key=? AND status IN ('pending','unknown','not_sent_confirmed')`)
+          .bind(msg.mid, new Date(echoTime).toISOString(), hit.idempotency_key).run();
+        continue;
+      }
       if (
         typeof msg?.mid !== 'string' ||
         msg.mid.length > 512 ||

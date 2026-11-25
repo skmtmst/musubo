@@ -25,7 +25,8 @@ export type InstagramConnectionList = {
 type InstagramReplyState = 'ready' | 'disconnected' | 'permission_required'
 type InstagramConversationDetail = {
   messages: Array<{ id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }>
-  pendingReply?: { key: string; content: string; canResolve: boolean } | null
+  lateEchoNotice?: string | null
+  pendingReply?: { key: string; content: string; canResolve: boolean; canResolveNotSent?: boolean; resolveAt?: string } | null
   replyState: InstagramReplyState
 }
 
