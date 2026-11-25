@@ -2,7 +2,7 @@
    寸法は app/globals.css の [data-theme="v8"] の --tpl-htn-* に1か所。ここには数字を書かない。 */
 
 .body {
-  display: flex; flex-direction: column; gap: var(--tpl-htn-gap);
+  display: flex; flex: 1; flex-direction: column; gap: var(--tpl-htn-gap);
   padding: var(--tpl-acct-register-body-pad); min-width: 0; color: var(--color-ink);
 }
 
@@ -302,7 +302,7 @@
 /* 段より下を押し下げて、自動の説明をいちばん下に置く（t8JqzS）。 */
 .outlineSpacer { flex: 1 1 auto; }
 .outlineRow {
-  display: flex; align-items: flex-start; gap: var(--tpl-htn6-ac-row-gap);
+  display: flex; width: 100%; align-items: flex-start; gap: var(--tpl-htn6-ac-row-gap);
   padding: var(--tpl-htn6-ac-row-pad); border-radius: var(--tpl-htn6-ac-radius); background: transparent;
 }
 .outlineNum {
@@ -310,7 +310,7 @@
   width: var(--tpl-htn6-ac-num); height: var(--tpl-htn6-ac-num); border-radius: var(--tpl-htn-radius-pill);
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); font-weight: 700;
 }
-.outlineText { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-text-gap); min-width: 0; }
+.outlineText { display: flex; text-align: left; flex-direction: column; gap: var(--tpl-htn6-ac-text-gap); min-width: 0; }
 .outlineRowTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; }
 .outlineRowNote { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 /* 済んだ段。 */

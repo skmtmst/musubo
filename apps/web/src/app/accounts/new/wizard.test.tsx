@@ -163,6 +163,25 @@ describe('LINEアカウント作成ウィザード', () => {
     expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
   })
 
+  it.each(['一覧', '下の帯'])('%s から前の接続ステップに戻っても入力を保つ', (method) => {
+    render(<NewLineAccountPage />)
+    passPrecheck()
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    expect(screen.queryByRole('button', { name: /プロバイダーID.*LINE Developersからコピー/ })).toBeNull()
+    nextStep()
+    expect(screen.queryByRole('button', { name: /Webhookの設定.*URLを貼り付けて/ })).toBeNull()
+    const back = method === '一覧'
+      ? screen.getByRole('button', { name: /Messaging APIの2項目.*公式アカウントで取得/ })
+      : screen.getByRole('button', { name: 'Messaging API へ戻る', exact: true })
+    back.focus()
+    expect(document.activeElement).toBe(back)
+    fireEvent.click(back)
+    expect(screen.getByRole('heading', { name: 'Messaging API の情報を入れる' })).toBeTruthy()
+    expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+    expect((document.getElementById('v8-channel-secret') as HTMLInputElement).value).toBe('synthetic-secret')
+  })
+
   it('①の質問に答えてから②の4つの小さな段へ順に進む', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()

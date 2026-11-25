@@ -70,7 +70,7 @@ const ACCOUNT: AccountWithStats = {
 
 /** 文脈の中身を DOM に出すだけの観測点。 */
 function Probe() {
-  const { accounts, selectedAccountId, error, loading, refreshing, refreshAccounts } = useAccount()
+  const { accounts, selectedAccountId, error, loading, refreshing, refreshAccounts, clearSelectedAccountId } = useAccount()
   return (
     <div>
       <span data-probe="loading">{String(loading)}</span>
@@ -79,6 +79,7 @@ function Probe() {
       <span data-probe="count">{accounts.length}</span>
       <span data-probe="picture">{accounts[0]?.pictureUrl ?? ''}</span>
       <span data-probe="selected">{selectedAccountId ?? ''}</span>
+      <button type="button" data-probe="clear" onClick={clearSelectedAccountId}>clear</button>
       <button type="button" data-probe="refresh" onClick={() => { void refreshAccounts() }}>
         refresh
       </button>
@@ -139,6 +140,44 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('1店の自動選択', () => {
+  it('店の画面で1店を選び、設定へ移っても保持する', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('selected').textContent).toBe(ACCOUNT.id))
+    fixture.pathname = '/staff'
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    expect(probe('selected').textContent).toBe(ACCOUNT.id)
+    expect(storage.getItem('lh_selected_account')).toBe(ACCOUNT.id)
+  })
+  it('統括へ戻る解除を維持し、店に戻ると1店を選ぶ', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('selected').textContent).toBe(ACCOUNT.id))
+    await act(async () => { probe('clear').click() })
+    expect(probe('selected').textContent).toBe('')
+    fixture.pathname = '/hq'
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    expect(probe('selected').textContent).toBe('')
+    fixture.pathname = '/friends'
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('selected').textContent).toBe(ACCOUNT.id))
+  })
+  it('複数あるときは勝手に選ばない', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT, { ...ACCOUNT, id: 'account-2' }] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('loading').textContent).toBe('false'))
+    expect(probe('selected').textContent).toBe('')
+  })
+  it('統括の画面では1店でも自動選択しない', async () => {
+    fixture.pathname = '/hq'
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('loading').textContent).toBe('false'))
+    expect(probe('selected').textContent).toBe('')
+  })
+})
+
 describe('アカウント一覧の取得失敗（Issue #978）', () => {
   it('後からLINE公式アカウント画像が登録されても一覧のアイコンへ反映する', async () => {
     let now = Date.now()
@@ -156,7 +195,7 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     clock.mockRestore()
   })
 
-  it('アーカイブ済みは切り替え一覧から除き、保存された選択も解除する', async () => {
+  it('アーカイブ済みを除き、残る1店を選択する', async () => {
     const archived = { ...ACCOUNT, id: 'old-shed', name: 'THE SHED（旧登録）', archivedAt: '2026-10-28T00:00:00Z' }
     const active = { ...ACCOUNT, id: 'current-shed', name: 'THE SHED', archivedAt: null }
     storage.setItem('lh_selected_account', archived.id)
@@ -165,8 +204,8 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
     await eventually(() => { expect(probe('loading').textContent).toBe('false') })
     expect(probe('count').textContent).toBe('1')
-    expect(probe('selected').textContent).toBe('')
-    expect(storage.getItem('lh_selected_account')).toBeNull()
+    await eventually(() => expect(probe('selected').textContent).toBe(active.id))
+    expect(storage.getItem('lh_selected_account')).toBe(active.id)
 
     storage.setItem('lh_selected_account', active.id)
     await act(async () => { probe('refresh').click() })

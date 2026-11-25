@@ -481,6 +481,68 @@
 
 ## 反映履歴
 
+- [統括のアカウントの数の帯の未確認をまとめる](release-log/unreleased/181-kenta-hq-kpi-unconfirmed.md)
+
+- [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)
+
+- [受信箱の検索と顧客情報の修正](release-log/unreleased/196-kenta-inbox-search-field.md)
+
+- [予約台帳と来店スタンプの操作を修正](release-log/unreleased/197-kenta-booking-stamp-tweaks.md)
+
+- [飲食メニューの画像とアレルギーの追加](release-log/unreleased/198-kenta-menu-image-upload.md)
+
+- [休業日カレンダーの過去の日付の表示を修正](release-log/unreleased/199-kenta-closures-day-click.md)
+
+- [イベント編集と公開設定を修正](release-log/unreleased/200-kenta-event-edit.md)
+
+- [二段階認証のお知らせを修正](release-log/unreleased/201-kenta-settings-notice-gray.md)
+
+- [LINEアカウント登録の事前確認を修正](release-log/unreleased/207-kenta-account-new-precheck.md)
+
+- [削除ボタンの表示を統一](release-log/unreleased/203-kenta-delete-button-rule.md)
+
+- [色を選ぶ窓の修正](release-log/unreleased/204-kenta-color-well-clip.md)
+
+- [狭い画面の受信箱の表示を変更](release-log/unreleased/206-kenta-inbox-narrow.md)
+
+- [はじめにやることの案内ボタンを修正](release-log/unreleased/211-kenta-setup-buttons-center.md)
+
+- [今日の確認カードを追加](release-log/unreleased/213-kenta-dashboard-today-card.md)
+
+- [受信箱の受信経路タブを追加](release-log/unreleased/219-kenta-inbox-channel-tabs.md)
+
+- [いつもと違うログインのお知らせを閉じられるように](release-log/unreleased/188-kenta-unfamiliar-dismiss.md)
+
+- [Googleビジネスのつなぐ前の説明の文字をそろえる](release-log/unreleased/189-kenta-google-connect-text.md)
+
+- [ページの題を一回り小さく](release-log/unreleased/195-kenta-page-title-24.md)
+
+- [ログイン確認中の表示](release-log/unreleased/175-kenta-login-polish.md) — 反映履歴。
+
+- [LINEアカウント未選択時の案内](release-log/unreleased/177-kenta-sidebar-unselected.md) — 反映履歴、確認 2026-11-23。
+
+- [比較・分析とログイン中の端末の表示を修正](release-log/unreleased/178-kenta-compare-bands.md) — 反映履歴、確認 2026-11-23。
+
+- [統括のバナー生成に使うアカウント](release-log/unreleased/179-kenta-banner-ai-account.md) — 反映履歴。
+
+- [配信のLINEプレビュー表示](release-log/unreleased/180-kenta-preview-phone-only.md) — 反映履歴。
+
+- [ログイン画面とメニューのロゴ表示](release-log/unreleased/184-kenta-logo-sharp.md) — 反映履歴。
+
+- [統括メンバー画面の設定メニューを整える](release-log/unreleased/185-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
+
+- [受信箱のマイル表示](release-log/unreleased/191-kenta-friend-mileage-error.md) — マイルを使っていない店舗の表示に関する修正履歴。
+
+- [受信箱のテンプレートの差し込みを名前の札で読む](release-log/unreleased/194-kenta-template-unresolved-vars.md) — 反映履歴、確認 2026-11-23。
+
+- [説明文の文字サイズの修正履歴](release-log/unreleased/192-kenta-inherited-font-size.md) — 反映履歴、確認 2026-11-23。
+
+- [開店準備の進み具合の表示](release-log/unreleased/205-kenta-setup-chip.md)
+
+- [開店準備の進み具合が変わる操作](../apps/web/src/v8/onboarding/setup-chip-progress.md) — 更新対象の説明。
+
+- [ウォークインの階・エリア切り替え](release-log/unreleased/210-kenta-walkin-floor-tabs.md)
+
 - [開店準備ガイドと予約枠・在庫の改善](release-log/unreleased/230-masato-opening-guide-and-inventory.md) — 反映履歴、確認 2026-11-25。
 - [LINEアカウント登録と開店準備の再開](release-log/unreleased/224-masato-line-onboarding-resume.md) — 反映履歴、確認 2026-11-24。
 - [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
@@ -1334,3 +1396,4 @@
 - [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
+- [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。

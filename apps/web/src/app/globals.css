@@ -575,7 +575,7 @@
   --polish-table-hover: var(--color-canvas-sunken);
 }
 :root {
-  --polish-text-page: 32px;
+  --polish-text-page: 32px; --polish-text-page-title: 24px; /* page-title はページの題。page はクーポンの大きな数字 */
   --polish-text-section: 15px;
   --polish-text-body: 13px;
   --polish-text-support: 12px;
@@ -946,7 +946,7 @@
   --tpl-bc-cell-pad-block: 8px; --tpl-bc-head-pad-block: 12px; --tpl-bc-col-gap: 16px; --tpl-bc-edge-pad: 20px; --tpl-bc-cell-lh: 18px; --tpl-bc-result-lh: 19px;
   --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-delivered: 88px; --tpl-bc-col-rate: 72px; --tpl-bc-col-menu: 56px; --tpl-bc-col-select: 48px;
   --tpl-bc-badge-gap: 4px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 24px 24px; --tpl-bc-state-icon: 32px;
-  --tpl-title-size: var(--polish-text-page); --tpl-title-weight: 600; --tpl-title-lh: 40px; --tpl-title-tracking: -0.01em;
+  --tpl-title-size: var(--polish-text-page-title); --tpl-title-weight: 600; --tpl-title-lh: 40px; --tpl-title-tracking: -0.01em;
   /* ウェビナーの編集・参加者・分析・コメント演出（・・・・・・・・・）。 */
   --tpl-wc-back-gap: 4px; --tpl-wc-head-gap: 12px; --tpl-wc-tab-gap: 24px; --tpl-wc-tab-line: 2px; --tpl-wc-tab-lh: 19px; --tpl-wc-tab-pad-bottom: 8px;
   --tpl-wc-step-line-w: 24px; --tpl-wc-step-line-h: 2px; --tpl-wc-step-no-size: 12px; --tpl-wc-stats-notice-pad: 12px 24px; --tpl-wc-state-pad: 32px 24px;
@@ -967,7 +967,7 @@
   --tpl-wc-rv-band-pad: 10px 12px; --tpl-wc-rv-summary-gap: 14px;
   --tpl-head-gap: var(--polish-space-row); --tpl-desc-size: var(--polish-text-body); --tpl-desc-lh: 19px;
   /* 業種ダッシュボード（XBkC2：NqAvL・mOAX5・R0FFqz・k2MBw・KcRVI・hqQLV・UTxFu・tMIuZ・UtmIg・R28Jqt・wFmQa・wXOm6）。 */
-  --tpl-sd-side-w: 300px; --tpl-sd-roster-w: 380px; --polish-space-none: 0; --polish-space-auto: auto; --tpl-next-booking-line: 20px; --tpl-next-booking-meta-line: 18px; --tpl-e1-sns-row-min: 20px; --tpl-rich-menu-area-label-pad: 4px; --tpl-style-inset-line: inset 0 0 0 1px var(--color-hairline); --tpl-sidebar-mask-color: #000; --tpl-next-booking-gap-1: 12px; --tpl-next-booking-gap-2: 12px; --tpl-next-booking-gap-3: 8px; --tpl-next-booking-gap-4: 12px; --tpl-next-booking-gap-5: 8px; --tpl-next-booking-gap-6: 8px; --tpl-friend-list-width-1: 160px; --tpl-friend-list-width-2: 132px; --tpl-friend-list-width-3: 88px; --tpl-friend-list-width-4: 160px; --tpl-friend-list-width-5: 112px; --tpl-hq-auto-reply-gap-1: var(--space-4, 4px); --tpl-hq-auto-reply-gap-2: 2px; --tpl-e1-sns-gap-1: 16px; --tpl-e1-sns-gap-2: 16px; --tpl-e1-sns-padding-3: 24px; --tpl-e1-sns-gap-4: 24px; --tpl-e1-sns-min-height-5: 17px; --tpl-e1-sns-gap-6: 14px; --tpl-e1-sns-gap-7: 4px; --tpl-sd-text-margin: 0; --tpl-sd-col-gap: 20px; --tpl-sd-side-gap: 10px; --tpl-sd-row-h: 56px; --tpl-sd-head-h: 36px;
+  --tpl-sd-side-w: 300px; --tpl-sd-roster-w: 380px; --tpl-sd-today-title-size: 16px; --polish-space-none: 0; --polish-space-auto: auto; --tpl-next-booking-line: 20px; --tpl-next-booking-meta-line: 18px; --tpl-e1-sns-row-min: 20px; --tpl-rich-menu-area-label-pad: 4px; --tpl-style-inset-line: inset 0 0 0 1px var(--color-hairline); --tpl-sidebar-mask-color: #000; --tpl-next-booking-gap-1: 12px; --tpl-next-booking-gap-2: 12px; --tpl-next-booking-gap-3: 8px; --tpl-next-booking-gap-4: 12px; --tpl-next-booking-gap-5: 8px; --tpl-next-booking-gap-6: 8px; --tpl-friend-list-width-1: 160px; --tpl-friend-list-width-2: 132px; --tpl-friend-list-width-3: 88px; --tpl-friend-list-width-4: 160px; --tpl-friend-list-width-5: 112px; --tpl-hq-auto-reply-gap-1: var(--space-4, 4px); --tpl-hq-auto-reply-gap-2: 2px; --tpl-e1-sns-gap-1: 16px; --tpl-e1-sns-gap-2: 16px; --tpl-e1-sns-padding-3: 24px; --tpl-e1-sns-gap-4: 24px; --tpl-e1-sns-min-height-5: 17px; --tpl-e1-sns-gap-6: 14px; --tpl-e1-sns-gap-7: 4px; --tpl-sd-text-margin: 0; --tpl-sd-col-gap: 20px; --tpl-sd-side-gap: 10px; --tpl-sd-row-h: 56px; --tpl-sd-head-h: 36px;
   --tpl-sd-col-time: 40px; --tpl-sd-col-time-wide: 72px; --tpl-sd-col-people: 32px; --tpl-sd-col-seat: 44px; --tpl-sd-col-course: 108px; --tpl-sd-col-pay: 92px; --tpl-sd-col-pay-narrow: 92px;
   --tpl-sd-col-people-seat: 76px; --tpl-sd-col-pay-short: 40px; --tpl-sd-col-state-pay: 112px; --tpl-sd-col-restaurant-state: 112px; --tpl-sd-col-state: 80px; --tpl-sd-col-state-narrow: 84px; --tpl-sd-col-action: 112px; --tpl-sd-col-action-wide: 168px; --tpl-sd-col-staff: 40px; --tpl-sd-col-meet: 98px; --tpl-sd-col-fill: 88px; --tpl-sd-col-menu: 28px;
   --tpl-sd-fill-w: 72px; --tpl-sd-fill-h: 4px; --tpl-sd-search-w: 220px; --tpl-sd-hour: 52px; --tpl-sd-week-hour: 48px; --tpl-sd-board-top: 8px; --tpl-sd-entry-gap: 4px; --tpl-sd-free-h: 22px;
@@ -1612,7 +1612,7 @@
   --tpl-fdt-form-pad: 16px 24px 24px; --tpl-fdt-form-gap: 14px; --tpl-fdt-card-pad: var(--polish-space-card); --tpl-fdt-card-head-gap: 10px; --tpl-fdt-form-icon: 28px; --tpl-fdt-form-label-w: 216px; --tpl-fdt-form-row-pad: 10px 0; --tpl-fdt-orphan-size: 12px; --tpl-fdt-changed-line: 2px;
   --tpl-fdt-empty-pad: 40px 24px; --tpl-fdt-empty-gap: 8px; --tpl-fdt-empty-icon: 40px;
   /* 手作業扱いだった板（hb2）：設定の板の頭と中身・運用者へのお知らせ（・）。 */
-  --tpl-hb2-board-bleed: -20px -24px -28px; --tpl-hb2-head-pad: 20px 24px 12px 24px; --tpl-hb2-head-gap: 4px; --tpl-hb2-head-title: var(--polish-text-page); --tpl-hb2-content-pad: 16px 24px 24px 0;
+  --tpl-hb2-board-bleed: -20px -24px -28px; --tpl-hb2-head-pad: 20px 24px 12px 24px; --tpl-hb2-head-gap: 4px; --tpl-hb2-head-title: var(--polish-text-page-title); --tpl-hb2-content-pad: 16px 24px 24px 0;
   --tpl-hb2-op-gap: 14px; --tpl-hb2-op-col-gap: 12px; --tpl-hb2-op-side-w: 340px; --tpl-hb2-op-card-pad: var(--polish-space-card); --tpl-hb2-op-card-radius: var(--polish-radius-card); --tpl-hb2-op-head-gap: 2px; --tpl-hb2-op-field-gap: var(--polish-space-field); --tpl-hb2-op-lh: 20px; --tpl-hb2-op-note-lh: 18px;
   --tpl-hb2-op-control-h: 36px; --tpl-hb2-op-control-radius: var(--polish-radius-control); --tpl-hb2-op-input-pad: 0 12px; --tpl-hb2-op-box-pad: 16px; --tpl-hb2-op-row-h: var(--polish-table-row); --tpl-hb2-op-row-pad: 8px 0; --tpl-hb2-op-chip-gap: 8px; --tpl-hb2-op-band-pad: 10px 14px;
   --tpl-hb2-op-preview-pad: 10px 12px; --tpl-hb2-op-preview-bg: #8fa9c4; --tpl-hb2-op-bubble-gap: 2px; --tpl-hb2-op-bubble-pad: 8px 10px; --tpl-hb2-op-bubble-radius: var(--polish-radius-card); --tpl-hb2-op-link-gap: 12px;

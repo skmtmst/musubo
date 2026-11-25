@@ -1,3 +1,5 @@
+import { compareRestaurantTables } from './restaurant-table-order'
+export { compareRestaurantTables } from './restaurant-table-order'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosurePreview, RestaurantClosureSaveResult, RestaurantSeatAvailability } from '@line-crm/shared'
 export type { RestaurantClosure, RestaurantClosureInput, RestaurantClosurePreview, RestaurantClosureSaveResult, RestaurantSeatAvailability } from '@line-crm/shared'
 import type { RestaurantInventoryRules, RestaurantInventoryRulesInput, RestaurantChannelCloseTask } from '@line-crm/shared'
@@ -177,7 +179,7 @@ export const restaurantTestApi = {
     if (query?.limit) params.set('reservationLimit', String(query.limit));
     if (query?.offset) params.set('reservationOffset', String(query.offset));
     const suffix = params.size ? `&${params.toString()}` : '';
-    return fetchApi<{ success: true; data: RestaurantSnapshot }>(`${withAccount('/api/restaurant-test/snapshot', accountId)}${suffix}`);
+    return fetchApi<{ success: true; data: RestaurantSnapshot }>(`${withAccount('/api/restaurant-test/snapshot', accountId)}${suffix}`).then(result => ({ ...result, data: { ...result.data, tables: [...result.data.tables].sort(compareRestaurantTables) } }));
   },
   createStore: (accountId: string, body: { name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/stores', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateStore: (accountId: string, id: string, body: { name: string; code: string; area: string; capacity: number; status: RestaurantStore['status']; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount(`/api/restaurant-test/stores/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),

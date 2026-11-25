@@ -80,3 +80,5 @@ html:root .root[data-emphasis='row-step'] .label {
 /* 幅が限られる短い操作名だけを省略する。文中・長い名前の既定は変えない。 */
 .root[data-truncate] { min-width: 0; max-width: 100%; white-space: nowrap; }
 .root[data-truncate] .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+:root .root[data-tone='menu'] { align-self: flex-start; color: var(--color-action); font-size: var(--text-caption); font-weight: 600; }

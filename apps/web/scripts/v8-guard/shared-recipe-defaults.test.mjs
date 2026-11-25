@@ -238,7 +238,7 @@ for (const width of [1440, 1152]) test(`共通の面と10画面の型は${width}
       const style = getComputedStyle(el)
       return { size: style.fontSize, weight: style.fontWeight }
     })
-    assert.deepEqual(heading, { size: '32px', weight: '600' })
+    assert.deepEqual(heading, { size: '24px', weight: '600' })
     const iconColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-ink-secondary').trim())
     // 色の表記（hex/rgb）を同じ実CSSの計算結果へそろえて比較する。
     const neutral = await page.evaluate(color => { const el = document.createElement('span'); el.style.color = color; document.body.append(el); const result = getComputedStyle(el).color; el.remove(); return result }, iconColor)

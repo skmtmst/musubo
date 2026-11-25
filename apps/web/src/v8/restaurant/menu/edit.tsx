@@ -27,7 +27,10 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import RegisteredImageSelect from '@/components/shared/registered-image-select'
-import { parseRestaurantCoursePhotos, readRestaurantCoursePhotos, type RestaurantCoursePhoto } from '@line-crm/shared'
+import MediaSlot from '@/components/shared/media-slot'
+import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
+import AllergyField from '@/components/shared/allergy-field'
+import { allergyValues, parseRestaurantCoursePhotos, readRestaurantCoursePhotos, type RestaurantCoursePhoto } from '@line-crm/shared'
 import CoursePhotos from './course-photos'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
@@ -55,7 +58,7 @@ import styles from './edit.module.css'
  */
 
 type Period = '' | 'lunch' | 'dinner' | 'both'
-type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string; description: string; imageMediaId: string | null; photos: RestaurantCoursePhoto[]; status: 'draft' | 'active' }
+type Draft = { duration: string; kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string[]; description: string; imageMediaId: string | null; photos: RestaurantCoursePhoto[]; status: 'draft' | 'active' }
 const LIST_HREF = '/restaurant-test/menu'
 const COURSE_DURATION_MINUTES = Array.from({ length: 12 }, (_, index) => (index + 1) * 30)
 
@@ -69,12 +72,12 @@ function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
-  if (!item) return { duration: '', kind: 'course', name: '', price: '', period: '', effectiveAt: '', allergens: '', description: '', imageMediaId: null, photos: [], status: 'draft' }
+  if (!item) return { duration: '', kind: 'course', name: '', price: '', period: '', effectiveAt: '', allergens: [], description: '', imageMediaId: null, photos: [], status: 'draft' }
   const periods = storedStringList(item.service_periods_json)
   return {
     duration: item.duration_minutes == null ? '' : String(item.duration_minutes), kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' || periods[0] === 'dinner' ? periods[0] : '',
-    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, photos: readRestaurantCoursePhotos(item.photo_gallery_json, item.image_media_id), status: item.status === 'draft' ? 'draft' : 'active',
+    effectiveAt: '', allergens: storedStringList(item.allergens_json), description: item.description ?? '', imageMediaId: item.image_media_id ?? null, photos: readRestaurantCoursePhotos(item.photo_gallery_json, item.image_media_id), status: item.status === 'draft' ? 'draft' : 'active',
   }
 }
 
@@ -87,7 +90,7 @@ function restoreCourseDraft(key: string | null, baseline: Draft): Draft {
   return {
     ...baseline,
     name: text('name'), price: text('price', 15), duration: text('duration', 10), description: text('description'),
-    allergens: text('allergens'), effectiveAt: text('effectiveAt', 25),
+    allergens: Array.isArray(input.allergens) ? allergyValues(JSON.stringify(input.allergens)) : baseline.allergens, effectiveAt: text('effectiveAt', 25),
     kind: input.kind === 'a_la_carte' ? input.kind : 'course',
     period: input.period === 'lunch' || input.period === 'dinner' || input.period === 'both' ? input.period : '',
     status: input.status === 'active' ? 'active' : 'draft',
@@ -119,6 +122,9 @@ function MenuEditBody() {
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [courseSaved, setCourseSaved] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
+  const uploadPermission = useRef({ canEdit, contextKey, storeAccountId })
+  if (uploadPermission.current.canEdit !== canEdit || uploadPermission.current.contextKey !== contextKey || uploadPermission.current.storeAccountId !== storeAccountId) uploadPermission.current = { canEdit, contextKey, storeAccountId }
   const [error, setError] = useState<string | null>(null)
   const [menuConflict, setMenuConflict] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -215,7 +221,7 @@ function MenuEditBody() {
   useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setCourseSaved(false); setMenuConflict(false); setError(null) }, [contextKey])
 
   async function save(version = confirmedRevision) {
-    if (!canEdit || !selectedAccountId || !guideFormReady || !guideCanSave || menuConflict || courseSaved) return
+    if (!canEdit || !selectedAccountId || !guideFormReady || !guideCanSave || menuConflict || courseSaved || imageUploading) return
     if (editing && (!dirty || !Number.isSafeInteger(version) || !version)) return
     const isCurrent = captureResource()
     if (!isCurrent()) return
@@ -230,7 +236,7 @@ function MenuEditBody() {
           ? { photos: draft.photos } : {})
         : (editing && draft.imageMediaId === (editing.image_media_id ?? null) ? {} : { imageMediaId: draft.imageMediaId })),
       effectiveAt: draft.effectiveAt ? datetimeLocalJstToUtcIso(draft.effectiveAt) : null,
-      allergens: draft.allergens.split(',').map((part) => part.trim()).filter(Boolean),
+      allergens: draft.allergens,
       servicePeriods: draft.period === 'both' ? ['lunch', 'dinner'] : draft.period ? [draft.period] : [],
     }
     try {
@@ -359,7 +365,7 @@ function MenuEditBody() {
         footerActions={<>
           <Button onClick={() => { writeGuideDraft(guideCourseKey, null); router.push(LIST_HREF) }} disabled={busy}>キャンセル</Button>
           {/* 開店準備ガイド⑥の手順3/3（枠14 hYTr8）の光らせる先。 */}
-          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={menuConflict || Boolean(saveDisabledReason)} disabledReason={saveDisabledReason} onClick={() => {
+          {canEdit ? <Button data-guide-anchor="menu.save" variant="primary" busy={busy} disabled={imageUploading || menuConflict || Boolean(saveDisabledReason)} disabledReason={imageUploading ? '画像を取り込んでいます。' : saveDisabledReason} onClick={() => {
             const version = editing?.confirmation_revision ?? null
             const publishing = (!editing || draftItem) && draft.status === 'active'
             if (!publishing && !priceChanged) return save(version)
@@ -369,6 +375,7 @@ function MenuEditBody() {
             if (publishing) setConfirmingPublish(true)
             else setConfirmingPrice(true)
           }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}{menuConflict ? <Button onClick={() => { void load() }}>最新を読み込む</Button> : null}</Notice> : null}
@@ -410,19 +417,31 @@ function MenuEditBody() {
               <SaveErrorField names={['description', 'draft.description']}><TextArea id="rs-menu-description" aria-label="メニューの説明" rows={3} maxLength={2000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></SaveErrorField>
             </Field>
             {!course ? <Field label="メニューの画像" error={imageError ?? undefined}>
-              <RegisteredImageSelect accountId={storeAccountId} imageId={draft.imageMediaId} imageName={mediaName} disabled={busy}
+              <MediaSlot title="画像を追加" accept="image/png,image/jpeg,image/gif,image/webp" maxBytes={10 * 1024 * 1024}
+                scope={JSON.stringify([contextKey, storeAccountId, draft.imageMediaId])} disabled={busy || !storeAccountId}
+                lockedReason={!canEdit ? '閲覧のみの権限では画像を変更できません。' : undefined}
+                onBusyChange={setImageUploading}
+                upload={async (file, progress) => {
+                  if (!storeAccountId) throw new Error('店舗にLINEアカウントを設定してください。')
+                  const lease = uploadPermission.current
+                  const allowed = () => uploadPermission.current === lease && lease.canEdit
+                  const result = await uploadToMediaLibrary(file, storeAccountId, 'image', progress, allowed)
+                  return result.item.id
+                }}
+                onChange={imageMediaId => { setImageError(null); setDraft(current => ({ ...current, imageMediaId })) }} />
+              <RegisteredImageSelect accountId={storeAccountId} imageId={draft.imageMediaId} imageName={mediaName} disabled={busy || imageUploading}
                 onSelect={media => { setImageError(null); setDraft(current => ({ ...current, imageMediaId: media.id })); setMediaName(media.filename) }}
                 onRemove={() => { setImageError(null); setDraft(current => ({ ...current, imageMediaId: null })) }} />
             </Field> : null}
-            <Field label="アレルギー（カンマ区切り）" htmlFor="rs-menu-allergens">
-              <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
+            <Field label="アレルギー">
+              <SaveErrorField names={['allergens', 'draft.allergens']}><AllergyField accountId={storeAccountId} value={JSON.stringify(draft.allergens)} onChange={value => setDraft(current => ({ ...current, allergens: allergyValues(value) }))} /></SaveErrorField>
             </Field>
             <p className={styles.note}>{editing
               ? `価格を変える場合は保存時に確認します。開始日時を空欄にすると保存後すぐに反映します。現在の価格は${formatYen(editing.price)}です。`
               : '追加したメニューは予約台帳で使います。説明と画像は管理画面で確認できます。'}</p>
           </Card>
         </>) : (
-          <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? (editing.priceChangeStatus === 'approved' ? '確定した新価格は指定した開始日時に反映します。' : '以前の価格変更申請が残っています。メニュー一覧から確認してください。') : undefined} rows={[
+          <> <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? (editing.priceChangeStatus === 'approved' ? '確定した新価格は指定した開始日時に反映します。' : '以前の価格変更申請が残っています。メニュー一覧から確認してください。') : undefined} rows={[
             { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
             { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
             { label: '価格（税込）', value: editing ? formatYen(editing.price) : emptyValue('unconfigured') },
@@ -431,9 +450,10 @@ function MenuEditBody() {
             { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
             { label: '説明', value: draft.description || emptyValue('unconfigured') },
             { label: '画像', value: draft.imageMediaId ? (mediaName || '画像名を確認中') : emptyValue('unconfigured') },
-            { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
+            { label: 'アレルギー', value: draft.allergens.join('、') || emptyValue('none') },
             { label: '変更後の価格の開始日時', value: editing?.pendingEffectiveAt ? polishFormatDateTime(new Date(editing.pendingEffectiveAt)) : emptyValue('unconfigured') },
           ]} />
+          {!course ? <Card variant="form"><Field label="メニューの画像"><MediaSlot title="画像を追加" onFile={() => {}} lockedReason="閲覧のみの権限では画像を変更できません。" /></Field></Card> : null}</>
         )}
         {course && editing ? (
           <Card variant="form" gap="normal">

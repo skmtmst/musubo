@@ -74,7 +74,7 @@
 
 .visibleLegend { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); min-width: 0; width: 100%; }
 .visibleLegendInline { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); flex: 1 1 auto; min-width: 0; width: auto; }
-.legendHelp { flex: none; }
+.legendHelp { flex: none; font-size: var(--text-caption); }
 @media print { .legendHelp { display: none; } }
 
 .cardDetails { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-width: 0; }
@@ -113,3 +113,5 @@
   :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: var(--space-8); height: var(--space-8); flex: none; }
   .cardMeta [data-booking-count-unit] { display: none; }
 }
+
+.visibleLegend:has(> .legend:empty) { width: auto; }

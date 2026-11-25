@@ -7,12 +7,14 @@ import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '
 import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
 import IconButton from '@/components/shared/icon-button';
-import SegmentedControl from '@/components/shared/segmented';
-import { InboxFloatingPanel } from '@/components/shared/inbox-content';
+import MenuPortal, { SavedSearchMenuSurface } from '@/components/shared/menu-portal';
 import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
+import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
+import StatusBadge from '@/components/shared/status-badge';
+import { STATUS_WORD } from '@/components/chats/friend-info-status';
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
 import { InboxListPane } from '@/components/templates/inbox-page';
 import { PageTitle } from '@/components/templates/page-frame';
@@ -20,6 +22,7 @@ import { api, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
 import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
+import { InboxChannelTabs } from './inbox-channel-tabs';
 import { ArrowUpDown, Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -104,6 +107,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
   const savedSearchRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -115,6 +119,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     }
     const onPointerDown = (event: PointerEvent) => {
       if (savedViewMenuId && event.target instanceof Element && event.target.closest('[data-menu-portal]')) return
+      if (event.target instanceof Element && event.target.closest('[data-saved-views-panel]')) return
       if (event.target instanceof Node && !savedSearchRef.current?.contains(event.target)) {
         setSavedViewsOpen(false)
         setSavedViewMenuId(null)
@@ -129,8 +134,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   }, [savedViewsOpen, savedViewMenuId, setSavedViewsOpen, setSavedViewMenuId])
   const sortLabel = INBOX_SORT_OPTIONS.find((option) => option.value === sortOrder)?.label ?? INBOX_SORT_OPTIONS[0].label
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
-    {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
-
     <InboxListHeader
       data-design="Filters"
       data-inbox-v4="quick-filters"
@@ -145,8 +148,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <IconButton variant="plain" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <IconButton ref={filterButtonRef} variant="plain" className={styles.toolDotWrap} aria-label="絞り込み" aria-description={hasInboxFilters ? "絞り込みを適用中" : undefined} title={hasInboxFilters ? "絞り込み（適用中）" : "絞り込み"} onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
+          {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
         </IconButton>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -168,7 +172,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             <Bookmark aria-hidden size={16} />
             {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
           </IconButton>
-          <InboxFloatingPanel open={savedViewsOpen} placement="below">
+          <MenuPortal open={savedViewsOpen} align="start" getAnchor={() => savedSearchRef.current} onClose={() => setSavedViewsOpen(false)}>
+            <SavedSearchMenuSurface data-saved-views-panel>
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
@@ -243,7 +248,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
-            </InboxFloatingPanel>
+            </SavedSearchMenuSurface>
+          </MenuPortal>
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
         {(
@@ -274,25 +280,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           </>
         ) : null}
       </InboxListHeadline>
-      <SegmentedControl<'all' | 'reply' | 'overdue'>
-        aria-label="受信箱のクイック絞り込み"
-        equalWidth={false}
-        value={quickFilter}
-        onChange={(next) => { setQuickFilter(next); dropSavedViewParam() }}
-        options={[
-          { key: 'all' as const, label: 'すべて' },
-          { key: 'reply' as const, label: '要返信' },
-          slaEnabled
-            ? { key: 'overdue' as const, label: '期限超過' }
-            : { key: 'overdue' as const, label: '1時間以上待ち' },
-        ].map((filter) => ({
-          value: filter.key,
-          label: filter.label,
-          count: slaEnabled && filter.key === 'overdue'
-            ? overdueTotal ?? undefined
-            : quickCountsNow?.[filter.key],
-        }))}
-      />
+      <InboxChannelTabs />
       <SavedViewDialog
         open={saveDialogOpen}
         emailInboxEnabled={emailInboxEnabled}
@@ -324,9 +312,12 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           `}</style>
       ) : null}
       <InboxFilterPanel
+        anchorRef={filterButtonRef}
         open={filterOpen}
-        emailInboxEnabled={emailInboxEnabled}
-        value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
+        emailInboxEnabled={false}
+        value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly, quickFilter }}
+        slaEnabled={slaEnabled}
+        quickCounts={quickCountsNow && slaEnabled ? { ...quickCountsNow, overdue: overdueTotal } : quickCountsNow}
         operators={operators}
         assigneeUnread={assigneeUnread}
         assigneeUnreadStatus={assigneeUnreadStatus}
@@ -334,6 +325,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           setStatusFilter(next.status as StatusFilter)
           setAssigneeFilter(next.assignee)
           setUnreadOnly(next.unreadOnly)
+          setQuickFilter(next.quickFilter ?? 'all')
           if (next.channel !== channel) {
             // 手動の条件変更なので savedView は残さない(N-021)。
             router.push(buildInboxUrl(next.channel, null))
@@ -343,9 +335,10 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         }}
         onReset={() => {
           setStatusFilter('all')
+          setQuickFilter('all')
           setAssigneeFilter('all')
           setUnreadOnly(false)
-          router.push('/chats')
+          dropSavedViewParam()
         }}
         onClose={() => setFilterOpen(false)}
       />
@@ -378,7 +371,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     ) : null}
     {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
     <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
-      <>
         {/*
                   メール一覧の失敗行。LINEだけ見ているときは出さない。
                   以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
@@ -449,27 +441,26 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
+                      <div className={styles.rowColumns}>
+                        <div className={styles.rowMain}>
                           <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
-                          {(
-                            <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
-                          )}
-                        </div>
-                        <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
-                          <p className={`text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`}>
-                            {item.subject || item.preview}
-                          </p>
-                        </div>
-                        <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                          <ChannelBadge channel="email" />
-                          <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                            <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                              {(item.assignedStaffName ?? '未').charAt(0)}
+                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                            <p className={`text-ink-faint min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`} title={item.subject || item.preview || undefined}>
+                              {item.subject || item.preview}
+                            </p>
+                          </div>
+                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
+                            <ChannelBadge channel="email" />
+                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                                {(item.assignedStaffName ?? '未').charAt(0)}
+                              </span>
+                              <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
                             </span>
-                            <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
-                          </span>
+                          </div>
+                        </div>
+                        <div className={styles.rowAside}>
+                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -521,41 +512,42 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                             <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                           )}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
-                              <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                        <div className={styles.rowColumns}>
+                          <div className={styles.rowMain}>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
+                                <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                              </div>
+                              <InboxListAttention on={chat.isAttention} id={`chat-row-attention-${chat.id}`} />
                             </div>
-                            <InboxListAttention on={chat.isAttention} id={`chat-row-attention-${chat.id}`} />
-                            {(
-                              /* 右上は「17:51」「昨日」「木曜日」「10/18」。未読は濃い字・太字。待ち時間の札は置かず、全文と一緒に title へ。 */
-                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
-                            )}
-                          </div>
-                          {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
-                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
-                            <p
-                              id={`chat-row-preview-${chat.id}`}
-                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
-                                }`}
-                              title={preview}
-                            >
-                              {chat.lastMessageDirection === 'outgoing' && (
-                                <span className="text-ink-faint mr-1">返信：</span>
-                              )}
-                              {preview || <span className="text-ink-faint italic">（まだメッセージなし）</span>}
-                            </p>
-                          </div>
-                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                            <ChannelBadge channel="line" />
-                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                                {(operatorName ?? '未').charAt(0)}
+                            <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                              <p
+                                id={`chat-row-preview-${chat.id}`}
+                                className={`min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
+                                  }`}
+                                title={preview}
+                              >
+                                {chat.lastMessageDirection === 'outgoing' && (
+                                  <span className="text-ink-faint mr-1">返信：</span>
+                                )}
+                                {preview || <span className="text-ink-faint italic">（まだメッセージなし）</span>}
+                              </p>
+                            </div>
+                            <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
+                              <ChannelBadge channel="line" />
+                              <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                                <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                                  {(operatorName ?? '未').charAt(0)}
+                                </span>
+                                <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
                               </span>
-                              <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
-                            </span>
-                            <span className="ml-auto shrink-0"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></span>
+                            </div>
+                          </div>
+                          <div className={styles.rowAside}>
+                            <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
+                            <StatusBadge data-status-pill="" tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusBadge>
+                            <SlaBadge fields={chat as ChatSlaFields} now={Date.now()} />
                           </div>
                         </div>
                       </div>
@@ -619,7 +611,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           }
           // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
           if (inboxListFailed) return null
-          return <InboxListEmpty filtered={hasInboxFilters} onClear={clearInboxFilters} />
+          return <InboxListEmpty channel={channel} filtered={hasInboxFilters} onClear={clearInboxFilters} />
         })()}
 
         {hasMoreChats && (
@@ -640,7 +632,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             メールの続きを読み込む
           </InboxHistoryButton>
         )}
-      </>
     </div>
   </InboxListPane>)
 }

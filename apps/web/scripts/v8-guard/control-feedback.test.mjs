@@ -212,7 +212,7 @@ test('設定の型を切り替えても段間を16pxに保つ', async () => {
     const gaps=()=>contents.evaluateAll(els=>els.map(el=>getComputedStyle(el).gap))
     assert.deepEqual(await gaps(),['16px','16px','16px','16px'])
     const headings=await page.locator('[data-measure-settings] [data-template-region="heading"] h1').evaluateAll(els=>els.map(el=>{const s=getComputedStyle(el);return{size:s.fontSize,weight:s.fontWeight,line:s.lineHeight}}))
-    assert.deepEqual(headings,Array.from({length:4},()=>({size:'32px',weight:'600',line:'40px'})))
+    assert.deepEqual(headings,Array.from({length:4},()=>({size:'24px',weight:'600',line:'40px'})))
     const headingInsets=await page.locator('[data-measure-settings] [data-template-region="heading"]').evaluateAll(els=>els.map(el=>{const s=getComputedStyle(el);return{top:s.paddingTop,bottom:s.paddingBottom}}))
     assert.deepEqual(headingInsets,Array.from({length:4},()=>({top:'16px',bottom:'8px'})))
 

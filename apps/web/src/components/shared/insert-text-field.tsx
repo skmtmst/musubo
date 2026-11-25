@@ -34,6 +34,7 @@ import {
   useMemo,
   useRef,
   type ClipboardEvent,
+  type CompositionEvent,
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
@@ -42,8 +43,9 @@ import {
 } from 'react'
 import { Ellipsis, Plus } from 'lucide-react'
 import {
+  insertDisplayPieces,
+  missingInsertText,
   splitInsertTokens,
-  splitResolvedInsertTokens,
   type InsertPiece,
   type InsertTokenIcon,
   type InsertTokenNames,
@@ -64,7 +66,7 @@ export interface InsertTextFieldHandle extends InsertTextTarget {
 }
 
 export interface InsertTextFieldProps
-  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'onChange'> {
+  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'defaultValue' | 'onChange' | 'onCompositionStart' | 'onCompositionEnd'> {
   /** 高さ72の短い本文欄。指定しなければ従来の呼び出し側の見た目。 */
   compact?: boolean
   /** 本文／コードの大きさと内側の余白を共通にする。 */
@@ -75,6 +77,11 @@ export interface InsertTextFieldProps
   extraTokens?: readonly InsertTokenSpec[]
   /** 友だち情報・共通情報のキー → 名前。札の文字に使う。 */
   tokenNames?: InsertTokenNames
+  /** 名前の分からない {{…}} も「不明な差し込み」の札にする（生の記号を見せない画面）。保存の値は変えない。 */
+  markUnknown?: boolean
+  /** 日本語の変換の始まり・終わり（送るキーの判定など、呼ぶ側が変換中を知る口）。 */
+  onCompositionStart?: (event: CompositionEvent<HTMLDivElement>) => void
+  onCompositionEnd?: (event: CompositionEvent<HTMLDivElement>) => void
 }
 
 /*
@@ -92,6 +99,7 @@ const ICON_SHAPES: Record<InsertTokenIcon, readonly IconShape[]> = {
   video: [['path', { d: 'm16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5' }], ['rect', { x: '2', y: '6', width: '14', height: '12', rx: '2' }]],
   store: [['path', { d: 'm2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7' }], ['path', { d: 'M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8' }], ['path', { d: 'M2 7h20' }]],
   link: [['path', { d: 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' }], ['path', { d: 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' }]],
+  help: [['circle', { cx: '12', cy: '12', r: '10' }], ['path', { d: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3' }], ['path', { d: 'M12 17h.01' }]],
 }
 
 const escapeHtml = (text: string) =>
@@ -101,15 +109,15 @@ const shapesHtml = (shapes: readonly IconShape[]) =>
   shapes.map(([tag, attrs]) => `<${tag} ${Object.entries(attrs).map(([name, value]) => `${name}="${escapeHtml(value)}"`).join(' ')}/>`).join('')
 
 function chipHtml(spec: InsertTokenSpec): string {
-  return `<span class="${styles.chip}" contenteditable="false" data-token="${escapeHtml(spec.token)}" title="${escapeHtml(spec.hint)}">`
+  return `<span class="${styles.chip}" contenteditable="false" data-token="${escapeHtml(spec.token)}"${spec.unknown ? ' data-unknown=""' : ''} title="${escapeHtml(spec.hint)}">`
     + `<svg class="${styles.chipIcon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shapesHtml(ICON_SHAPES[spec.icon])}</svg>`
     + `<span class="${styles.chipLabel}">${escapeHtml(spec.label)}</span></span>`
 }
 
 function piecesHtml(pieces: InsertPiece[]): string {
-  return pieces.map((piece) => (piece.kind === 'chip'
-    ? chipHtml(piece.spec)
-    : escapeHtml(piece.text).replace(/\n/g, '<br>'))).join('')
+  return pieces.map((piece) => (piece.kind === 'text'
+    ? escapeHtml(piece.text).replace(/\n/g, '<br>')
+    : chipHtml(piece.spec))).join('')
 }
 
 const isElement = (node: Node): node is HTMLElement => node.nodeType === 1
@@ -231,10 +239,10 @@ function domPointAt(root: HTMLElement, target: number): [Node, number] {
 }
 
 /** 札の中で切れない位置か（文字の並びの境目か）。 */
-function isPieceBoundary(value: string, at: number, extra: readonly InsertTokenSpec[], names: InsertTokenNames): boolean {
+function isPieceBoundary(value: string, at: number, extra: readonly InsertTokenSpec[], names: InsertTokenNames, markUnknown: boolean): boolean {
   let pos = 0
-  for (const piece of splitInsertTokens(value, extra, names)) {
-    const length = piece.kind === 'chip' ? piece.spec.token.length : piece.text.length
+  for (const piece of splitInsertTokens(value, extra, names, { markUnknown })) {
+    const length = piece.kind === 'text' ? piece.text.length : piece.spec.token.length
     if (piece.kind === 'chip' && at > pos && at < pos + length) return false
     pos += length
   }
@@ -257,10 +265,10 @@ function fragmentOf(html: string): DocumentFragment {
 }
 
 const InsertTextField = forwardRef<InsertTextFieldHandle | HTMLTextAreaElement, InsertTextFieldProps>(function InsertTextField(
-  { value, onValueChange, extraTokens, tokenNames, compact, ...rest },
+  { value, onValueChange, extraTokens, tokenNames, compact, markUnknown, ...rest },
   ref,
 ) {
-  return <ChipEditor ref={ref as React.Ref<InsertTextFieldHandle>} value={value} onValueChange={onValueChange} extraTokens={extraTokens} tokenNames={tokenNames} compact={compact} {...rest} />
+  return <ChipEditor ref={ref as React.Ref<InsertTextFieldHandle>} value={value} onValueChange={onValueChange} extraTokens={extraTokens} tokenNames={tokenNames} compact={compact} markUnknown={markUnknown} {...rest} />
 })
 
 export default InsertTextField
@@ -274,6 +282,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     onValueChange,
     extraTokens = EMPTY_TOKENS,
     tokenNames = EMPTY_NAMES,
+    markUnknown = false,
     className,
     compact,
     editorSize,
@@ -286,6 +295,8 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     id,
     onFocus,
     onBlur,
+    onCompositionStart,
+    onCompositionEnd,
     ...rest
   },
   ref,
@@ -297,10 +308,10 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
   const touched = useRef(false)
   const applying = useRef(false)
   const savedSelection = useRef<[number, number] | null>(null)
-  const latest = useRef({ onValueChange, maxLength, extraTokens, tokenNames })
-  latest.current = { onValueChange, maxLength, extraTokens, tokenNames }
+  const latest = useRef({ onValueChange, maxLength, extraTokens, tokenNames, markUnknown })
+  latest.current = { onValueChange, maxLength, extraTokens, tokenNames, markUnknown }
 
-  const html = useCallback((text: string) => piecesHtml(splitInsertTokens(text, latest.current.extraTokens, latest.current.tokenNames)), [])
+  const html = useCallback((text: string) => piecesHtml(splitInsertTokens(text, latest.current.extraTokens, latest.current.tokenNames, { markUnknown: latest.current.markUnknown })), [])
 
   const rebuild = useCallback((text: string) => {
     const root = rootRef.current
@@ -355,7 +366,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
   const hasLooseToken = useCallback((root: HTMLElement) => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (splitInsertTokens((node as Text).data, latest.current.extraTokens, latest.current.tokenNames).some((piece) => piece.kind === 'chip')) return true
+      if (splitInsertTokens((node as Text).data, latest.current.extraTokens, latest.current.tokenNames, { markUnknown: latest.current.markUnknown }).some((piece) => piece.kind === 'chip')) return true
     }
     return false
   }, [])
@@ -410,9 +421,9 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     while (prefix < limit && previous[prefix] === value[prefix]) prefix += 1
     let suffix = 0
     while (suffix < limit - prefix && previous[previous.length - 1 - suffix] === value[value.length - 1 - suffix]) suffix += 1
-    const { extraTokens: extra, tokenNames: names } = latest.current
-    const clean = [prefix, previous.length - suffix].every((at) => isPieceBoundary(previous, at, extra, names))
-      && [prefix, value.length - suffix].every((at) => isPieceBoundary(value, at, extra, names))
+    const { extraTokens: extra, tokenNames: names, markUnknown: unknown } = latest.current
+    const clean = [prefix, previous.length - suffix].every((at) => isPieceBoundary(previous, at, extra, names, unknown))
+      && [prefix, value.length - suffix].every((at) => isPieceBoundary(value, at, extra, names, unknown))
       && serialize(root, true) === previous
     if (!clean) {
       rebuild(value)
@@ -444,16 +455,25 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
     extraTokens.map((spec) => [spec.token, spec.label, spec.hint, spec.icon]),
     tokenNames.fields instanceof Map ? [...tokenNames.fields] : tokenNames.fields ?? null,
     tokenNames.vars instanceof Map ? [...tokenNames.vars] : tokenNames.vars ?? null,
-  ]), [extraTokens, tokenNames])
+    tokenNames.varsComplete ?? false,
+    tokenNames.unavailableVars ? [...tokenNames.unavailableVars] : null,
+    markUnknown,
+  ]), [extraTokens, tokenNames, markUnknown])
   const firstNames = useRef(true)
-  useLayoutEffect(() => {
-    if (firstNames.current) { firstNames.current = false; return }
+  /* 日本語の変換中に名前が届いたら、確定するまで付け直さない（未確定の文字を巻き戻さない）。 */
+  const namesPending = useRef(false)
+  const applyNames = useCallback(() => {
     const root = rootRef.current
     if (!root || shown.current === null) return
     const selection = document.activeElement === root ? readSelection() : null
     rebuild(shown.current)
     if (selection) select(selection[0], selection[1])
-  }, [namesKey, readSelection, rebuild, select])
+  }, [readSelection, rebuild, select])
+  useLayoutEffect(() => {
+    if (firstNames.current) { firstNames.current = false; return }
+    if (composing.current) { namesPending.current = true; return }
+    applyNames()
+  }, [namesKey, applyNames])
 
   /* カーソルの位置を覚えておく（差し込むボタンを押すと箱から焦点が外れるため）。 */
   useEffect(() => {
@@ -655,8 +675,14 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
         onBlur?.(event as unknown as React.FocusEvent<HTMLTextAreaElement>)
       }}
       onInput={() => { if (!composing.current) emit() }}
-      onCompositionStart={() => { composing.current = true }}
-      onCompositionEnd={() => { composing.current = false; emit() }}
+      onCompositionStart={(event) => { composing.current = true; onCompositionStart?.(event) }}
+      onCompositionEnd={(event) => {
+        composing.current = false
+        emit()
+        /* 確定した文字を値へ取り込んでから、待たせていた札の名前を付け直す。 */
+        if (namesPending.current) { namesPending.current = false; applyNames() }
+        onCompositionEnd?.(event)
+      }}
       onKeyDown={onKeyDown}
       onPaste={onPaste}
       onCopy={(event) => onCopy(event, false)}
@@ -699,15 +725,29 @@ export const InsertButton = forwardRef<HTMLButtonElement, {
 })
 
 
-/** 閲覧用の本文。差し込みの札は入力欄と同じ形で、元の文字列を変えずに描く。 */
-export function InsertText({ value, resolvedValue, tokenNames = EMPTY_NAMES, extraTokens = EMPTY_TOKENS }: { value: string; resolvedValue?: string; tokenNames?: InsertTokenNames; extraTokens?: readonly InsertTokenSpec[] }) {
-  const pieces = resolvedValue === undefined ? splitInsertTokens(value, extraTokens, tokenNames) : splitResolvedInsertTokens(value, resolvedValue, tokenNames)
-  return <>{pieces.map((piece, index) => piece.kind === 'text' ? piece.text : (
-    <span key={index} className={styles.chip} title={piece.spec.hint} data-token={piece.spec.token}>
-      <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        {ICON_SHAPES[piece.spec.icon].map(([Shape, attrs], shape) => <Shape key={shape} {...attrs} />)}
-      </svg>
-      <span className={styles.chipLabel}>{piece.spec.label}</span>
-    </span>
-  ))}</>
+/**
+ * 閲覧用の本文。差し込みの札は入力欄と同じ形で、元の文字列を変えずに描く。
+ * 相手に合わせた値（resolvedValue）を渡すと、入った値を札に、入らなかった差し込みを
+ * 「（入りません：名前）」にする（解決できない差し込みを値の札に見せない・記号も見せない）。
+ */
+export function InsertText({ value, resolvedValue, tokenNames = EMPTY_NAMES, extraTokens = EMPTY_TOKENS, markUnknown = false }: { value: string; resolvedValue?: string; tokenNames?: InsertTokenNames; extraTokens?: readonly InsertTokenSpec[]; markUnknown?: boolean }) {
+  return <InsertPieces pieces={insertDisplayPieces(value, { resolvedValue, names: tokenNames, extra: extraTokens, markUnknown })} />
+}
+
+/** 並べた札・文字・「入りません」を描く。 */
+function InsertPieces({ pieces }: { pieces: InsertPiece[] }) {
+  return <>{pieces.map((piece, index) => {
+    if (piece.kind === 'text') return piece.text
+    if (piece.kind === 'missing') return (
+      <span key={index} className={styles.missing} title={`「${piece.spec.label}」の値が入りません`} data-missing-token={piece.spec.token}>{missingInsertText(piece.spec.label)}</span>
+    )
+    return (
+      <span key={index} className={styles.chip} title={piece.spec.hint} data-token={piece.spec.token} data-unknown={piece.spec.unknown ? '' : undefined} data-resolved={piece.resolved ? '' : undefined}>
+        <svg className={styles.chipIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {ICON_SHAPES[piece.spec.icon].map(([Shape, attrs], shape) => <Shape key={shape} {...attrs} />)}
+        </svg>
+        <span className={styles.chipLabel}>{piece.spec.label}</span>
+      </span>
+    )
+  })}</>
 }

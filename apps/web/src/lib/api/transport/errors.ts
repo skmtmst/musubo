@@ -12,6 +12,8 @@ export class ApiError extends Error {
   readonly fields: ApiFieldErrors
   readonly status: number
   readonly code: string | undefined
+  /** 無効な機能を識別する公開ID。対象応答ごとに保持する。 */
+  readonly featureId: string | undefined
   /** 409などで画面を最新状態へ描き直すための機械データ。利用者へ直接表示しない。 */
   readonly data: unknown
   /**
@@ -26,12 +28,13 @@ export class ApiError extends Error {
    */
   readonly retryAfterSeconds: number | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number, fields: ApiFieldErrors = {}) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string, retryAfterSeconds?: number, fields: ApiFieldErrors = {}, featureId?: string) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.fields = fields
     this.status = status
     this.code = code
+    this.featureId = featureId
     this.data = data
     this.trackingId = trackingId
     this.requestId = trackingId
@@ -254,6 +257,25 @@ export function extractApiErrorData(raw: string): unknown {
   }
 }
 
+/** 機能停止の応答から公開IDだけを取り出す。 */
+function extractDisabledFeatureId(raw: string, status: number, code: string | undefined): string | undefined {
+  if (status !== 403 || code !== 'FEATURE_DISABLED') return undefined
+  try {
+    const value: unknown = JSON.parse(raw)?.featureId
+    return typeof value === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(value) ? value : undefined
+  } catch { return undefined }
+}
+
+/** 未解決の差し込みだけ、表示名への変換に必要な安全な識別子を残す。本文や他の値は渡さない。 */
+export function extractUnresolvedVariableData(raw: string): { variables: string[] } | undefined {
+  const data = extractApiErrorData(raw)
+  if (!data || typeof data !== 'object' || !('variables' in data) || !Array.isArray(data.variables)) return undefined
+  const variables = data.variables.filter((value): value is string =>
+    typeof value === 'string' && /^[a-zA-Z0-9_.:+-]{1,128}$/.test(value),
+  ).slice(0, 100)
+  return { variables }
+}
+
 /** HTTP応答から公開エラーを作る。本文の採用とdataの公開範囲は呼出元が決める。 */
 export function responseApiError(response: Response, raw: string, code: string | undefined = extractApiErrorCode(raw), data?: unknown,
   options: { fallbackMessage?: string; retryAfterSeconds?: number; preserveBodyMessage?: boolean } = {}): ApiError {
@@ -265,5 +287,6 @@ export function responseApiError(response: Response, raw: string, code: string |
     extractApiErrorTrackingId(raw) ?? response.headers.get('X-Request-ID') ?? undefined,
     options.retryAfterSeconds ?? parseRetryAfterSeconds(response.headers.get('Retry-After')),
     extractApiFieldErrors(raw, response.status),
+    extractDisabledFeatureId(raw, response.status, code),
   )
 }

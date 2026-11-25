@@ -370,7 +370,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
       {starterRetry}
       {showOnboarding ? <FirstStepsCard
-        onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle}
+        onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle} guide={start.guide}
         onRecheck={start.watchExpired ? start.rewatch : undefined}
         feedback={<>
           {start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}

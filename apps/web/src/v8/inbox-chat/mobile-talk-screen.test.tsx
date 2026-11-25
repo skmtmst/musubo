@@ -171,9 +171,10 @@ describe('電話の画面のトーク', () => {
     await eventually(() => expect(draft()).not.toBeNull())
     await type('{{name}}さん {{var.guest_count}}')
     await eventually(() => expect(host.textContent).toContain('送るとこうなります：'))
-    expect(host.textContent).toContain('山田さん {{var.guest_count}}')
-    expect(host.textContent).toContain('予約の値がないため')
-    expect(host.querySelector('[title="山田さん {{var.guest_count}}"]')).not.toBeNull()
+    // 入った値はそのまま、入らない差し込みは名前で「入りません」。生の {{…}} は見本にも title にも出さない。
+    expect(host.querySelector('[data-send-preview]')?.textContent).toBe('山田さん （入りません：人数）')
+    expect(host.textContent).toContain('「人数」はこの方の予約情報から値を取得できないため入りません。')
+    expect([...host.querySelectorAll('[title]')].filter(node => node.getAttribute('title')?.includes('{{'))).toEqual([])
     expect(fixture.previewCalls).toBe(1)
     await type('こんにちは')
     expect(host.textContent).not.toContain('送るとこうなります：')

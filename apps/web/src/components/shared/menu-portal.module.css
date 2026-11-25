@@ -23,6 +23,8 @@
   :root .motion.motion { animation: none; }
 }
 
+.savedSearchSurface { width: min(320px, calc(100vw - 16px)); max-height: min(600px, calc(100vh - 100px)); overflow-y: auto; padding: var(--space-16); background: var(--color-canvas); border: 1px solid var(--surface-edge); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
+
 .filterSurface { width: var(--tpl-bc-popover-w); }
 .panel { display: flex; flex-direction: column; gap: var(--tpl-cell-gap-half); padding: var(--tpl-rule-row-gap); }
 .heading { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 600; }

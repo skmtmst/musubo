@@ -76,3 +76,11 @@ it('opens a store-scoped verification link and waits before enabling test send',
   expect(await screen.findByRole('button', { name: '自分のLINEにテスト送信' })).toBeTruthy()
   expect(screen.queryByRole('img', { name: '本人確認用のQRコード' })).toBeNull()
 })
+
+it('closes the first message guide from the close button', async () => {
+  api.status.mockResolvedValue(state('ready'))
+  const callbacks = props()
+  render(<GuideFirstMessage {...callbacks} />)
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  expect(callbacks.onLater).toHaveBeenCalledOnce()
+})
