@@ -1,9 +1,10 @@
+import { displayRange } from '@/lib/display-range'
 import { HOURS_SERVICE_LABELS, hoursWeekday, effectiveOpeningDate, type HoursWorkspace, type HoursServiceKind, type HoursService, type OpeningPeriod } from '@line-crm/shared'
 import type { GoogleProfileData } from '@/lib/restaurant-google-api'
 import { WEEKDAY_JA } from './format'
 
 export function hoursText(periods: OpeningPeriod[], closed = '休業'): string {
-  return periods.length ? periods.map(p => `${p.open}–${p.close === '00:00' ? '翌0:00' : p.close < p.open ? `翌${p.close}` : p.close}`).join(' / ') : closed
+  return periods.length ? periods.map(p => displayRange(p.open, p.close === '00:00' ? '翌0:00' : p.close < p.open ? `翌${p.close}` : p.close)).join(' / ') : closed
 }
 export function dateLabel(date: string, today: string, holiday = false): string {
   const [year, month, day] = date.split('-').map(Number)

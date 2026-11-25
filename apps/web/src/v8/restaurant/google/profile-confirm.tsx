@@ -19,6 +19,7 @@ import { errorMessage, formatYmdShort, formatPeriods, WEEKDAYS, WEEKDAY_JA } fro
 import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import { formatNumber } from '@/lib/format'
+import { displayRange } from '@/lib/display-range'
 
 // Missing profile workflows use the current shared V8 parts; ordinary profile board stays intact.
 const formatYmdJa = (date: string, _withYear = false) => formatYmdShort(date)
@@ -47,7 +48,7 @@ function describeHours(value: unknown, kind: GoogleChange['kind']): ReactNode {
       <div key={d.date}>
         {days.length > 1 ? <p>{formatYmdShort(d.date)}</p> : null}
         {d.remove ? <p>特別営業時間を外す</p> : null}
-        {d.remove ? <p><span>通常</span>{d.closed ? '定休日' : d.periods.map((p) => `${p.open}–${p.close === '00:00' ? '24:00' : p.close}`).join(' ／ ')}</p> : d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>)}
+        {d.remove ? <p><span>通常</span>{d.closed ? '定休日' : d.periods.map((p) => displayRange(p.open, p.close === '00:00' ? '24:00' : p.close)).join(' ／ ')}</p> : d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{displayRange(p.open, p.close === '00:00' ? '24:00' : p.close)}</p>)}
       </div>
     ))
   }
