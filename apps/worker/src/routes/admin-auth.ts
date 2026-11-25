@@ -901,8 +901,51 @@ adminAuth.post('/api/auth/sessions/trust-current', inputJsonBoundary(), async (c
   if (Number(result[2]?.meta?.changes ?? 0) !== 1) return c.json({ success: false, error: 'ログインの状態が変わりました。読み直してください' }, 409);
   if (staff.email && c.env.DEPLOY_ENV !== 'test' && c.env.DEPLOY_ENV !== 'staging') {
     try { await sendPlainMail(c.env, { to: staff.email, subject: '【musubo】ログインを本人として確認しました', body: `${staff.name} 様\n\nmusubo のログインが本人の操作として確認されました。\n接続元: ${prefix}\n心当たりがない場合はパスワードを変更し、他のログインを終了してください。` }); }
-    catch { logger.error('admin_auth.trusted_login_notification_failed'); }
+    catch {
+      logger.error('admin_auth.trusted_login_notification_failed');
+      await recordAuditEvent(c.env.DB, { category: 'auth', action: 'auth.login_trusted.notify_failed', actorPrincipalId: staff.id, tenantId: staff.tenant_id, targetKind: 'staff', targetId: staff.id, result: 'failed', retentionClass: 'security', ipPrefix: prefix }).catch(() => logger.error('admin_auth.trusted_login_notification_audit_failed'));
+    }
   }
+  return c.json({ success: true, data: null });
+});
+
+type TrustedLoginRow = { marker_hash: string; ip_prefix: string; confirmed_at: string };
+async function trustedLoginId(staffId: string, row: TrustedLoginRow): Promise<string> {
+  return sha256Hex(JSON.stringify(['trusted-login', staffId, row.marker_hash, row.ip_prefix]));
+}
+async function ownTrustedRows(c: Context<Env>, staffId: string): Promise<TrustedLoginRow[]> {
+  const rows = await c.env.DB.prepare("SELECT marker_hash, ip_prefix, confirmed_at FROM auth_trusted_logins WHERE staff_id = ? AND datetime(confirmed_at) > datetime('now', '-90 days') ORDER BY confirmed_at DESC").bind(staffId).all<TrustedLoginRow>();
+  return rows.results;
+}
+adminAuth.get('/api/auth/trusted-logins', async (c) => {
+  const staff = c.get('staff');
+  const token = adminSessionTokenFromCookie(c);
+  const hash = token ? await sha256Hex(token) : null;
+  const session = hash ? await getAdminSessionByTokenHash(c.env.DB, hash) : null;
+  if (!staff || !hash || hash !== await adminSessionTokenHashFromRequest(c) || !session || session.staff_id !== staff.id || session.expires_at <= new Date().toISOString()) return c.json({ success: false, error: '本人のログインが必要です' }, 403);
+  const marker = readCookie(c.req.header('Cookie'), 'lh_login_device');
+  const markerHash = marker && /^[A-Za-z0-9_-]{20,128}$/.test(marker) ? await sha256Hex(`login-device:${marker}`) : null;
+  const prefix = maskIpPrefix(clientIp(c));
+  const rows = await ownTrustedRows(c, staff.id);
+  const data = await Promise.all(rows.map(async row => ({ id: await trustedLoginId(staff.id, row), ipPrefix: row.ip_prefix, confirmedAt: row.confirmed_at, expiresAt: new Date(Date.parse(row.confirmed_at) + 90 * 86400_000).toISOString(), current: !!markerHash && row.marker_hash === markerHash && row.ip_prefix === prefix })));
+  return c.json({ success: true, data });
+});
+adminAuth.delete('/api/auth/trusted-logins/:id', async (c) => {
+  const staff = c.get('staff');
+  const csrf = csrfTokenFromCookie(c);
+  const token = adminSessionTokenFromCookie(c);
+  const hash = token ? await sha256Hex(token) : null;
+  const session = hash ? await getAdminSessionByTokenHash(c.env.DB, hash) : null;
+  if (!staff || !csrf || csrf !== c.req.header(CSRF_HEADER) || !hash || hash !== await adminSessionTokenHashFromRequest(c) || !session || session.staff_id !== staff.id || session.expires_at <= new Date().toISOString()) return c.json({ success: false, error: '本人のログインが必要です' }, 403);
+  const rows = await ownTrustedRows(c, staff.id);
+  const matches = await Promise.all(rows.map(async row => ({ row, id: await trustedLoginId(staff.id, row) })));
+  const found = matches.find(item => item.id === c.req.param('id'));
+  if (!found) return c.json({ success: false, error: '信頼済みの端末が見つかりません' }, 404);
+  const [deleted] = await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM auth_trusted_logins WHERE staff_id = ? AND marker_hash = ? AND ip_prefix = ? AND confirmed_at = ?').bind(staff.id, found.row.marker_hash, found.row.ip_prefix, found.row.confirmed_at),
+    auditEventStatement(c.env.DB, { category: 'auth', action: 'auth.login_trust_removed', actorPrincipalId: staff.id, tenantId: staff.tenantId, targetKind: 'staff', targetId: staff.id, result: 'success', retentionClass: 'security', ipPrefix: maskIpPrefix(clientIp(c)) }, { sql: 'changes() = 1', params: [] }),
+  ]);
+  if (!deleted.meta.changes) return c.json({ success: false, error: '状態が変わりました。読み直してください' }, 409);
   return c.json({ success: true, data: null });
 });
 
@@ -961,8 +1004,13 @@ adminAuth.post('/api/auth/sessions/revoke-others', inputJsonBoundary(), async (c
   const staff = c.get('staff');
   if (!staff) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const currentHash = await adminSessionTokenHashFromRequest(c);
+  const marker = readCookie(c.req.header('Cookie'), 'lh_login_device');
+  const ipPrefix = maskIpPrefix(clientIp(c));
+  const currentSession = currentHash ? await getAdminSessionByTokenHash(c.env.DB, currentHash) : null;
+  const keepTrust = marker && /^[A-Za-z0-9_-]{20,128}$/.test(marker) && ipPrefix && currentSession?.staff_id === staff.id && currentSession.ip_prefix === ipPrefix
+    ? { markerHash: await sha256Hex(`login-device:${marker}`), ipPrefix } : null;
   const revoked = currentHash
-    ? await deleteOtherAdminSessions(c.env.DB, staff.id, currentHash)
+    ? await deleteOtherAdminSessions(c.env.DB, staff.id, currentHash, keepTrust)
     : 0;
   // 一括失効は乗っ取り対応で使われる高危険操作。記録失敗で失効自体は止めない。
   try {

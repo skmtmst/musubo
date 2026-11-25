@@ -74,6 +74,42 @@ afterEach(() => {
 });
 
 describe('POST /api/auth/step-up の試行回数制限', () => {
+  it('本人通知の送信失敗を監査に残す', async () => {
+    testDb.raw.prepare("UPDATE staff_members SET email = 'owner@example.invalid' WHERE id = 'staff-1'").run();
+    const token = 'current-session-token'; const hash = await sha256Hex(token);
+    testDb.raw.prepare(`INSERT INTO admin_sessions (token_hash, staff_id, expires_at, unfamiliar_at, ip_prefix) VALUES (?, 'staff-1', ?, ?, '203.0.*.*')`).run(hash, '2026-09-09T00:00:00.000Z', NOW);
+    const headers = { 'content-type': 'application/json', cookie: `lh_admin_session=${token}; lh_csrf=csrf; lh_login_device=marker_abcdefghijklmnopqrstuvwx`, 'x-csrf-token': 'csrf', 'cf-connecting-ip': '203.0.113.4' };
+    const verified = await app().request('/api/auth/step-up', { method: 'POST', headers, body: JSON.stringify({ code: await currentCode(), purpose: 'auth.login.trust' }) }, bindings());
+    const grant = await verified.json() as { data: { token: string } };
+    mail.mockRejectedValueOnce(new Error('mail unavailable'));
+    const res = await app().request('/api/auth/sessions/trust-current', { method: 'POST', headers: { ...headers, 'x-step-up-token': grant.data.token }, body: '{}' }, { ...bindings(), DEPLOY_ENV: 'production' });
+    expect(res.status).toBe(200);
+    expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='auth.login_trusted.notify_failed'").get()).toEqual({ n: 1 });
+  });
+  it('セッションに紐づかない旧形式の確認票で信頼しない', async () => {
+    const token = 'current-session-token'; const hash = await sha256Hex(token);
+    testDb.raw.prepare(`INSERT INTO admin_sessions (token_hash, staff_id, expires_at, unfamiliar_at, ip_prefix) VALUES (?, 'staff-1', ?, ?, '203.0.*.*')`).run(hash, '2026-09-09T00:00:00.000Z', NOW);
+    await createStepUpGrant(testDb.db, { tokenHash: await sha256Hex('legacy'), staffId: 'staff-1', purpose: 'auth.login.trust', expiresAt: '2026-09-09T00:00:00.000Z' });
+    const res = await app().request('/api/auth/sessions/trust-current', { method: 'POST', headers: { 'content-type': 'application/json', cookie: `lh_admin_session=${token}; lh_csrf=csrf; lh_login_device=marker_abcdefghijklmnopqrstuvwx`, 'x-csrf-token': 'csrf', 'x-step-up-token': 'legacy', 'cf-connecting-ip': '203.0.113.4' }, body: '{}' }, bindings());
+    expect(res.status).toBe(401);
+  });
+  it('有効な確認票があっても二段階認証が無効なら信頼しない', async () => {
+    const token = 'current-session-token'; const hash = await sha256Hex(token);
+    testDb.raw.prepare(`INSERT INTO admin_sessions (token_hash, staff_id, expires_at, unfamiliar_at, ip_prefix) VALUES (?, 'staff-1', ?, ?, '203.0.*.*')`).run(hash, '2026-09-09T00:00:00.000Z', NOW);
+    await createStepUpGrant(testDb.db, { tokenHash: await sha256Hex('valid'), staffId: 'staff-1', purpose: 'auth.login.trust', sessionTokenHash: hash, expiresAt: '2026-09-09T00:00:00.000Z', issuedPolicyVersion: 1 });
+    testDb.raw.prepare("UPDATE staff_members SET totp_enabled_at = NULL WHERE id = 'staff-1'").run();
+    const res = await app().request('/api/auth/sessions/trust-current', { method: 'POST', headers: { 'content-type': 'application/json', cookie: `lh_admin_session=${token}; lh_csrf=csrf; lh_login_device=marker_abcdefghijklmnopqrstuvwx`, 'x-csrf-token': 'csrf', 'x-step-up-token': 'valid', 'cf-connecting-ip': '203.0.113.4' }, body: '{}' }, bindings());
+    expect(res.status).toBe(403);
+    expect(testDb.raw.prepare('SELECT COUNT(*) n FROM auth_trusted_logins').get()).toEqual({ n: 0 });
+  });
+
+  it('別の認証セッションの票とCookieを混ぜて信頼しない', async () => {
+    const cookieHash = await sha256Hex('cookie-session'); const bearerHash = await sha256Hex('bearer-session');
+    for (const hash of [cookieHash, bearerHash]) testDb.raw.prepare(`INSERT INTO admin_sessions (token_hash, staff_id, expires_at, unfamiliar_at, ip_prefix) VALUES (?, 'staff-1', ?, ?, '203.0.*.*')`).run(hash, '2026-09-09T00:00:00.000Z', NOW);
+    await createStepUpGrant(testDb.db, { tokenHash: await sha256Hex('valid'), staffId: 'staff-1', purpose: 'auth.login.trust', sessionTokenHash: bearerHash, expiresAt: '2026-09-09T00:00:00.000Z', issuedPolicyVersion: 1 });
+    const res = await app().request('/api/auth/sessions/trust-current', { method: 'POST', headers: { 'content-type': 'application/json', cookie: 'lh_admin_session=cookie-session; lh_csrf=csrf; lh_login_device=marker_abcdefghijklmnopqrstuvwx', authorization: 'Bearer lh_session:bearer-session', 'x-csrf-token': 'csrf', 'x-step-up-token': 'valid', 'cf-connecting-ip': '203.0.113.4' }, body: '{}' }, bindings());
+    expect(res.status).toBe(403);
+  });
   it('本人が確認したことを登録メールアドレスに通知する', async () => {
     testDb.raw.prepare("UPDATE staff_members SET email = 'owner@example.invalid' WHERE id = 'staff-1'").run();
     const token = 'current-session-token';

@@ -32,6 +32,7 @@ import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
 import TrustCurrentLogin from '@/components/trust-current-login';
+import TrustedLogins from './trusted-logins';
 import { readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot';
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome';
@@ -211,6 +212,7 @@ function SessionsCard() {
       if (!res.success) throw new Error(res.error)
       setConfirmOthers(false)
       if (res.success) { notifyToast(res.data.revoked > 0 ? `この端末以外の ${res.data.revoked} 件のログインを終了しました` : '他にログイン中の端末はありませんでした') }
+      window.dispatchEvent(new Event('lh-trusted-logins-changed'))
       await load()
       return true
     } catch (caught) { setError(messageOf(caught)); return false } finally { setRevokingId(null) }
@@ -235,6 +237,7 @@ function SessionsCard() {
         </li>)}
       </ul>
     )}
+    <TrustedLogins />
     <ConfirmDialog
       open={confirmCurrent}
       title="この端末のログインを終了しますか？"

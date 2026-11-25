@@ -19,12 +19,17 @@ import { deleteExpiredRestaurantRawEmails } from '../services/restaurant-email-i
 import { runIsolatedScheduledJobs, type ScheduledJob } from '../services/scheduled-job-isolation.js';
 
 import { googleBusinessEnabled, restaurantTestEnabled } from '../lib/environment-features.js';
+import { purgeExpiredTrustedLogins } from '../services/trusted-login-retention.js';
 
 export async function runSixHourlyHeavyJobs(
   event: ScheduledEvent,
   env: Env['Bindings'],
 ): Promise<void> {
   const jobs: ScheduledJob[] = [
+    {
+      name: 'expired trusted logins',
+      run: () => purgeExpiredTrustedLogins(env.DB, new Date(event.scheduledTime)),
+    },
     {
       name: 'NEN tag refresh',
       run: async () => {

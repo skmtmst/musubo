@@ -16,6 +16,7 @@ vi.mock('@/components/shell/page-chrome', async (importOriginal) => {
   return { ...actual, usePageTitle: () => undefined, usePageCrumbs: () => undefined }
 })
 vi.mock('./self-security', () => ({ default: () => <div>自分の二段階認証</div> }))
+vi.mock('./trusted-logins', () => ({ default: () => <div>信頼済みの端末</div> }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
