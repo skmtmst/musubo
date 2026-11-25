@@ -166,56 +166,54 @@ const styleChoiceButtons = dialog => dialog.getByRole('group', { name: '見る�
 
 async function expectStyleChoices(dialog) {
   await expect(styleChoiceButtons(dialog)).toHaveCount(STYLE_CHOICE_ORDER.length)
-  for (const name of ['あとで設定する', '手動で設定する']) await expect(dialog.getByRole('button', { name, exact: true })).toBeVisible()
+  for (const name of ['あとで設定する', '手動で設定する']) await expect(dialog.getByRole('button', { name, exact: true })).toHaveCount(0)
 }
 
-test('new style selection opens once, explicit later and legacy later stay deferred', async ({ page }) => {
+test('only the explicit account settings entry changes a style and returns to accounts', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
+  const { mockFetch } = await import('../../../scripts/v8-guard/mock-local.mjs')
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
-    // 初回だけ出る案内は閉じた印を置く。ここで見るのは別の画面と窓なので重ねない。
     localStorage.setItem('lh:v8:first-run-popup-dismissed:visual-qa-account', '1')
   })
-  const fixture = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/dashboard/style`)).json()
-  let pending = true, mode = 'later', selected = false, version = 1, writes = 0
+  let style = 'standard', selected = false, version = 1
+  const writes = []
   await page.route('**/api/**', async route => {
-    const url = new URL(route.request().url())
-    if (url.pathname === '/api/dashboard/style') {
-      if (route.request().method() === 'PUT') {
-        const body = route.request().postDataJSON()
-        expect(body).toMatchObject({ expectedVersion: version, styleMode: 'later' })
-        pending = false; version++; writes++
-      }
-      return route.fulfill({ json: { success: true, data: { ...fixture.data, style: 'standard', styleSelected: selected, styleMode: mode, shouldPromptStyleSelection: pending, version, inserted: [], changedAnswers: {}, bookingSettingsChanges: [], answers: { style: { mode } } } } })
+    const url = new URL(route.request().url()), method = route.request().method()
+    const response = await mockFetch(method, url.pathname + url.search)
+    const headers = { ...response.headers, 'access-control-allow-origin': route.request().headers().origin ?? 'null', 'access-control-allow-credentials': 'true' }
+    if (url.pathname !== '/api/dashboard/style') {
+      return route.fulfill({ status: response.status, headers, body: response.body })
     }
-    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
+    if (method === 'PUT') {
+      const body = route.request().postDataJSON()
+      expect(body).toEqual({ expectedVersion: version, style: 'restaurant' })
+      writes.push(body)
+      style = body.style; version++; selected = true
+    }
+    const body = JSON.parse(response.body)
+    return route.fulfill({ headers, json: { success: true, data: { ...body.data, style, styleSelected: selected, styleMode: selected ? 'configured' : 'later', shouldPromptStyleSelection: !selected, version, inserted: [], changedAnswers: {}, bookingSettingsChanges: [] } } })
   })
   const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
+  await expect(dialog).toHaveCount(0)
+  await page.goto('/?setup=0')
+  await expect(page).toHaveURL(/\/$/)
+  await expect(dialog).toHaveCount(0)
+  expect(writes).toEqual([])
+
+  await page.goto('/?setup=0&setupReturn=accounts')
   await expect(dialog).toBeVisible()
   await expectStyleChoices(dialog)
-  await dialog.getByRole('button', { name: 'あとで設定する', exact: true }).click()
+  await styleChoiceButtons(dialog).first().click()
+  await dialog.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
+  await dialog.getByRole('button', { name: '保存する', exact: true }).click()
+  await expect(page).toHaveURL(/\/accounts$/)
   await expect(dialog).toHaveCount(0)
-  expect(writes).toBe(1)
-  await page.reload()
-  await page.waitForLoadState('networkidle')
-  await expect(dialog).toHaveCount(0)
-  // A separate visit with the explicit entry still permits resuming.
-  await page.goto('/?setup=0')
-  await expect(dialog).toBeVisible()
-  await page.goto('/')
-  for (const state of [
-    { mode: 'later', pending: undefined, selected: false },
-    { mode: 'manual', pending: false, selected: false },
-    { mode: 'configured', pending: false, selected: true },
-  ]) {
-    mode = state.mode; pending = state.pending; selected = state.selected
-    await page.reload()
-    await page.waitForLoadState('networkidle')
-    await expect(dialog).toHaveCount(0)
-  }
-  expect(writes).toBe(1)
+  await expect(page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toHaveCount(0)
+  expect(writes).toHaveLength(1)
 })
 
 async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
@@ -253,19 +251,57 @@ async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
   })
 }
 
-for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', 'ダッシュボード'], ['restaurant', 'お店'], ['salon', 'サロン'], ['consult', '面談'], ['lesson', '教室']]) test(`${style} resumes shared setup and summary, then returns without changing the style`, async ({ page }) => {
+for (const style of STYLE_CHOICE_ORDER) test(`${style} removes retired setup routes and keeps the current dashboard`, async ({ page }) => {
   await useIndustryFixture(page, style)
-  for (const [step, title] of [['0', '使い方のスタイルを選ぶ'], ['summary', '準備ができました']]) {
-    await page.goto(`/?setup=${step}`)
-    const dialog = page.getByRole('dialog', { name: title })
-    await expect(dialog).toBeVisible()
-    if (step === '0') await expectStyleChoices(dialog)
-    await dialog.getByRole('button', { name: '閉じる', exact: true }).click()
-    await expect(dialog).toHaveCount(0)
-    await expect(page).toHaveURL(/\/$/)
+  for (const step of ['0', 'summary']) {
+    await page.goto(`/?setup=${step}&range=week`)
+    await expect(page).toHaveURL(/\/\?range=week$/)
+    await expect(page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: '準備ができました' })).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
-    if (['restaurant','salon','consult','lesson'].includes(style)) await expect(page.locator(`[data-style-dashboard="${style}"]`)).toBeVisible()
+    if (['restaurant', 'salon', 'consult', 'lesson'].includes(style)) await expect(page.locator(`[data-style-dashboard="${style}"]`)).toBeVisible()
   }
+})
+
+test('the old restaurant menu step is handed to the current opening guide', async ({ page }) => {
+  await useIndustryFixture(page, 'restaurant')
+  const handedToGuide = page.waitForURL(/\/\?guide=richMenu$/, { waitUntil: 'commit' })
+  await page.goto('/?setup=1')
+  await handedToGuide
+  await expect(page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toHaveCount(0)
+})
+
+test('a verified LINE registration saves style and reaches the actual completion step', async ({ page }) => {
+  const { mockRegistrationResume, registrationAccountId } = await import('../../../scripts/v8-guard/registration-resume-mock.mjs')
+  const writes = []
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.route('**/api/**', async route => {
+    const request = route.request(), url = new URL(request.url())
+    const response = await mockRegistrationResume(request.method(), url.pathname + url.search)
+    const body = JSON.parse(response.body)
+    if (url.pathname === '/api/staff/me') body.data.accountScope = 'all'
+    if (url.pathname === '/api/dashboard/style' && request.method() === 'PUT') writes.push(request.postDataJSON())
+    if (url.pathname === '/api/dashboard/style' && url.searchParams.get('registration') === '1' && request.method() === 'GET' && writes.length) {
+      body.data = { ...body.data, styleSelected: true, style: writes.at(-1).style, styleMode: 'configured', version: 2 }
+    }
+    return route.fulfill({ status: response.status, headers: {
+      ...response.headers,
+      'access-control-allow-origin': request.headers().origin ?? 'null',
+      'access-control-allow-credentials': 'true',
+    }, json: body })
+  })
+  await page.goto(`/accounts/new?resume=${registrationAccountId}`)
+  const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  await expect(dialog).toBeVisible()
+  await styleChoiceButtons(dialog).first().click()
+  await dialog.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
+  await dialog.getByRole('button', { name: '次へ', exact: true }).click()
+  await expect(page.getByText('LINEアカウントの登録が完了しました', { exact: true })).toBeAttached()
+  await expect(page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByText('LINEアカウントの登録が完了しました', { exact: true })).toBeAttached()
+  await expect(dialog).toHaveCount(0)
+  expect(writes).toEqual([expect.objectContaining({ style: 'restaurant' })])
 })
 
 test('salon keeps existing KPI slots and forwards real staff, time and booking identity', async ({ page }) => {
@@ -368,14 +404,12 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
   })
   for (const [width, close] of [[1152, 'button'], [1440, 'escape'], [1920, 'backdrop']]) {
     await page.setViewportSize({ width, height: 1000 })
-    await page.goto('/?setup=0')
+    await page.goto('/?setup=0&setupReturn=accounts')
     const selection = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
     await styleChoiceButtons(selection).nth(STYLE_CHOICE_ORDER.indexOf(style)).click()
     await selection.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
-    await selection.getByRole('button', { name: '次へ', exact: true }).click()
-    const question = page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
-    await expect(question.getByRole('button', { name: '途中保存して閉じる', exact: true })).toBeEnabled()
-    await expect.poll(() => question.evaluate(dialog => {
+    await expect(selection.getByRole('button', { name: '保存する', exact: true })).toBeEnabled()
+    await expect.poll(() => selection.evaluate(dialog => {
       const bounds = dialog.getBoundingClientRect()
       const buttons = [...dialog.querySelectorAll('[data-dialog-actions] button')].map(button => button.getBoundingClientRect()).filter(box => box.width > 0)
       const clipped = buttons.filter(box => box.left < bounds.left || box.right > bounds.right).length
@@ -387,15 +421,15 @@ for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup nev
       return { clipped, overlap, horizontal: document.documentElement.scrollWidth - innerWidth }
     })).toEqual({ clipped: 0, overlap: 0, horizontal: 0 })
     await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`discard-${style}-${width}.png`) })
-    if (close === 'button') await question.getByRole('button', { name: '閉じる', exact: true }).click()
+    if (close === 'button') await selection.getByRole('button', { name: '閉じる', exact: true }).click()
     else if (close === 'escape') await page.keyboard.press('Escape')
-    else await question.locator('..').click({ position: { x: 2, y: 2 } })
+    else await selection.locator('..').click({ position: { x: 2, y: 2 } })
     await page.getByRole('button', { name: '破棄する', exact: true }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await expect(page).toHaveURL(/\/$/)
+    await expect(page).toHaveURL(/\/accounts$/)
     await page.reload()
-    await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 1 })).toBeVisible()
-    await page.goto('/?setup=0')
+    await expect(page).toHaveURL(/\/accounts$/)
+    await page.goto('/?setup=0&setupReturn=accounts')
     const reopened = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
     const saved = styleChoiceButtons(reopened).nth(STYLE_CHOICE_ORDER.indexOf('standard'))
     await expect(saved).toHaveAttribute('aria-pressed', 'true')

@@ -3,6 +3,7 @@ import type {
   FriendAddRouting,
   FriendAddRoutingVersion,
   LineAccount,
+  RestaurantBookingExposure,
   Scenario,
   StaffMember,
 } from '@line-crm/shared'
@@ -87,6 +88,7 @@ export interface GettingStartedInput {
 
 /** 業種の設定画面で実物を読んだ結果。未取得・失敗はnull、対象外の段は省略できる。 */
 export type StyleSetupProgress = {
+  bookingExposure?: RestaurantBookingExposure
   richMenuPublished?: boolean
   notices?:Array<{message:string;href:string}>
   style: AccountStyle
@@ -135,9 +137,11 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
           copy.splice(before < 0 ? copy.length : before, 0, step)
         }
         /* ③は卓と席の前。実在する「最初のリッチメニューを選ぶ」画面へ案内し、下書きが1つでもあれば済みにする。 */
-        add('richMenu', 'リッチメニューを選ぶ', '/getting-started/rich-menu', 'リッチメニューの下書きが1つ以上ある', 'リッチメニューを選ぶ')
+        add('richMenu', 'リッチメニューを選ぶ', '/?guide=richMenu', 'リッチメニューの下書きが1つ以上ある', 'リッチメニューを選ぶ')
         add('hours', '営業時間を設定する', '/restaurant-test/google?tab=hours', 'Googleビジネスの店舗と営業時間が設定されている')
         add('followup', 'LINE来店フォローを確認する', '/restaurant-test/line-followup', '選んだ来店フォローの設定を確認している')
+        const firstMessage = copy.find(step => step.key === 'firstMessage')
+        if (firstMessage?.action) firstMessage.action = { ...firstMessage.action, href: '/?guide=firstMessage' }
       }
       break
     case 'lesson':

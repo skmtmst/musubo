@@ -508,6 +508,7 @@
 - [ログイン画面とメニューのロゴ表示](release-log/unreleased/184-kenta-logo-sharp.md) — 反映履歴。
 - [統括メンバー画面の設定メニューを整える](release-log/unreleased/185-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
 - [受信箱のマイル表示](release-log/unreleased/191-kenta-friend-mileage-error.md) — マイルを使っていない店舗の表示に関する修正履歴。
+- [LINEアカウント登録と開店準備の再開](release-log/unreleased/224-masato-line-onboarding-resume.md) — 反映履歴、確認 2026-11-24。
 
 - [受信箱のテンプレートの差し込みを名前の札で読む](release-log/unreleased/194-kenta-template-unresolved-vars.md) — 反映履歴、確認 2026-11-23。
 - [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。

@@ -40,8 +40,8 @@ const BOOKING_PLACE: Record<AccountStyle, string> = {
   restaurant: '予約台帳', salon: '予約管理', consult: '予約管理', lesson: 'イベント予約', ec: '予約管理', standard: '予約管理',
 }
 
-export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
-  const { style, answers, step, setStep, dirty, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, discard, saveAndClose, saveStyleMode, chooseStyle, activate } = useWizard({ accountId, state, initialStep, onClose })
+export default function StyleSetupWizard({ accountId, state, initialStep = 0, styleOnly = false, onClose }: Props) {
+  const { style, answers, step, setStep, dirty, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, discard, saveAndClose, saveStyleMode, chooseStyle, activate } = useWizard({ accountId, state, initialStep, styleOnly, onClose })
 
   const { accounts, selectedAccount } = useAccount()
   const accountName = accounts?.find(account => account.id === accountId)?.name ?? (selectedAccount?.id === accountId ? selectedAccount.name : undefined)
@@ -64,7 +64,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       <StyleChooseAction primary viewing={viewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : (
-    <DialogActions leadingAction={step === 0 ? <>
+    <DialogActions leadingAction={step === 0 ? styleOnly ? undefined : <>
           <Button variant="text" onClick={() => void saveStyleMode('later')} disabled={busy}>あとで設定する</Button>
           <Button variant="text" onClick={() => void saveStyleMode('manual')} disabled={busy}>手動で設定する</Button>
         </> : <>
@@ -74,11 +74,11 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${formatNumber(onCount)}件）`}</Button>
-          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>{step===1?'このメニューで進む':'次へ'}<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
+          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>{styleOnly ? '保存する' : step===1?'このメニューで進む':'次へ'}<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
     </DialogActions>
   )
 
-  const progress = (
+  const progress = styleOnly ? null : (
     <div className={styles.progress}>
       <span className={styles.progressCount}>{`はじめの質問 ${Math.min(index + 1, total)} / ${total}`}</span>
       <ProgressBar appearance="quota" className={styles.track} value={Math.min(index + 1, total)} max={total} label="はじめの質問の進み" />

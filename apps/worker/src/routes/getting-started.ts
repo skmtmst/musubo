@@ -9,6 +9,7 @@ import {
   acknowledgeOnboardingWelcome,
 } from '@line-crm/db';
 import type { OnboardingGuidePhase, OnboardingGuideProgressRow } from '@line-crm/db';
+import { hasStaffAccess } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -47,9 +48,7 @@ const STEP_PERMISSIONS: Record<keyof typeof STEP_HREFS, string[]> = {
 };
 
 function canAdvance(staff: AuthenticatedStaff | undefined, key: keyof typeof STEP_HREFS) {
-  if (!staff) return false;
-  if (staff.role === 'owner' || staff.role === 'admin') return true;
-  return STEP_PERMISSIONS[key].some((permission) => staff.permissionKeys?.includes(permission));
+  return STEP_PERMISSIONS[key].some((permission) => hasStaffAccess(staff, permission));
 }
 
 function withAccess(

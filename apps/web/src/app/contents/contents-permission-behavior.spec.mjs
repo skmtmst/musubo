@@ -110,7 +110,7 @@ async function respond(url, staffMe, role) {
     )
   }
   if (path === '/api/staff/me') return staffMe()
-  if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) return ok({ phase: 'complete' })
+  if (/^\/api\/line-accounts\/[^/]+\/follower-import$/.test(path)) return ok(url.searchParams.get('entry') === '1' ? { destination: 'dashboard', canResume: false } : { phase: 'complete' })
   if (path === '/api/settings/features/visibility') return ok({ features: { media: true }, favoriteItemIds: [], restaurantHiddenItemIds: [] })
   if (path === '/api/dashboard/style') return ok({ style: 'line' })
   if (path === '/api/line-accounts') return ok(ACCOUNTS)

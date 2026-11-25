@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { mockFetch } from './mock-local.mjs'
+import { mockRegistrationResume, registrationAccountId } from './registration-resume-mock.mjs'
 import { stubApi } from './speed-budget.mjs'
 import { PARITY_INIT } from '../../../../scripts/visual-qa/v8-parity.mjs'
 import { styleDashboardMock } from '../../../../scripts/visual-qa/style-dashboard-mock.mjs'
@@ -26,19 +27,19 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
   const base = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310', output = join(process.env.V8_GUARD_ARTIFACT_DIR || '/tmp/v8-guard', 'style-switcher', `${entry}-${width}`)
   mkdirSync(output, { recursive: true })
   const browser = await connectGuardBrowser(), context = await browser.newContext({ viewport: { width, height: 1080 }, locale: 'ja-JP' }), page = await context.newPage()
-  const identity = JSON.parse((await mockFetch('GET', '/api/staff/me')).body).data
-  const resumeKey = `musubo-registration-style:${encodeURIComponent(identity.tenantId)}:${encodeURIComponent(identity.id)}`
   const errors = [], writes = [], rows = []; let failure = null
   page.on('pageerror', error => errors.push(error.message))
-  await page.addInitScript(({ values, resumeKey, registration }) => { for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value); if (registration) sessionStorage.setItem(resumeKey, 'visual-qa-account') }, { values: PARITY_INIT, resumeKey, registration: entry === 'registration' })
+  await page.addInitScript(values => { for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value) }, PARITY_INIT)
   await stubApi(page, async (method, path) => {
     if (method !== 'GET') writes.push({ method, path: new URL(path, base).pathname })
-    const response = await mockFetch(method, path)
+    const response = await (entry === 'registration' ? mockRegistrationResume : mockFetch)(method, path)
     if (new URL(path, base).pathname === '/api/staff/me') { const body = JSON.parse(response.body); body.data.accountScope = 'all'; response.body = JSON.stringify(body) }
     return response
   })
   try {
-    assert.ok((await page.goto(base + (entry === 'setup' ? '/?setup=0' : '/accounts/new'), { waitUntil: 'domcontentloaded' }))?.ok())
+    const path = entry === 'setup' ? '/?setup=0&setupReturn=accounts' : `/accounts/new?resume=${registrationAccountId}`
+    const response = await page.goto(base + path, { waitUntil: 'domcontentloaded' })
+    assert.ok(response?.ok(), `${path}: HTTP ${response?.status() ?? '不明'}`)
     const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true })
     await dialog.waitFor()
     const body = dialog.locator('[data-window-body]'), switcher = dialog.locator('[data-style-switcher]')
@@ -71,25 +72,17 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
       await switcher.getByRole('group', { name: '見るスタイル', exact: true }).getByRole('button', { name: /^飲食店/ }).click()
       const choose = dialog.getByRole('button', { name: 'このスタイルにする', exact: true })
       if (await choose.count()) await choose.click()
-      await dialog.getByRole('button', { name: '次へ', exact: true }).click()
-      const next = page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ', exact: true })
+      const name = entry === 'registration' ? '次へ' : '保存する'
+      await dialog.getByRole('button', { name, exact: true }).click()
       if (entry === 'registration') {
-        await page.getByRole('heading', { name: '使い方を保存しました', exact: true }).waitFor()
-        assert.equal(await next.count(), 0, '登録時にリッチメニューの段を出さない')
-        assert.deepEqual(writes.filter(write => write.path === '/api/dashboard/style'), [{ method: 'PUT', path: '/api/dashboard/style' }])
-        await page.screenshot({ animations: 'disabled', path: join(output, 'completed.png') })
+        await page.getByText('LINEアカウントの登録が完了しました', { exact: true }).waitFor({ state: 'attached' })
       } else {
-        await next.waitFor()
-        assert.equal(await next.locator('[data-style-switcher]').count(), 0, 'メニューの段では固定帯を出さない')
-        await page.screenshot({ animations: 'disabled', path: join(output, 'menu-step.png') })
-        await next.getByRole('button', { name: 'スタイルを選び直す', exact: true }).click()
-        await dialog.waitFor()
-        assert.deepEqual(await page.evaluate(scanStyleSwitcher), [])
-        const returned = await dialog.evaluate(node => ({ focusInside: node.contains(document.activeElement), focus: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.slice(0, 100), scrollTop: node.querySelector('[data-window-body]').scrollTop }))
-        assert.equal(returned.focusInside, true, '戻ったあとの焦点も窓の中にある')
-        rows.push({ returned })
-        await page.screenshot({ animations: 'disabled', path: join(output, 'returned.png') })
+        await page.waitForURL('**/accounts')
       }
+      await dialog.waitFor({ state: 'hidden' })
+      assert.equal(await page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ', exact: true }).count(), 0)
+      assert.deepEqual(writes.filter(write => write.path === '/api/dashboard/style'), [{ method: 'PUT', path: '/api/dashboard/style' }])
+      await page.screenshot({ animations: 'disabled', path: join(output, 'completed.png') })
     }
     assert.deepEqual(errors, [])
   } catch (error) { failure = error.stack ?? String(error); await page.screenshot({ animations: 'disabled', path: join(output, 'failure.png') }); writeFileSync(join(output, 'body.txt'), await page.locator('body').innerText()); throw error }

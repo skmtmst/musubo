@@ -95,6 +95,38 @@
   flex: none;
 }
 
+.existingFriend,
+.completeFailure {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-10);
+}
+
+.existingFriend h3,
+.existingFriend p {
+  margin: 0;
+  font-size: var(--text-body);
+}
+
+.existingFriend p {
+  color: var(--color-ink-secondary);
+}
+
+.receiveFooter {
+  padding: var(--space-12) var(--space-24) var(--space-20);
+}
+
+.confirmAction {
+  --first-run-start-bg: var(--color-accent-soft);
+  --first-run-start-bg-hover: var(--color-accent-soft);
+  --first-run-start-gap: var(--space-8);
+  --first-run-start-ink: var(--color-accent-deep);
+  --first-run-start-lh: var(--space-20);
+  --first-run-start-radius: var(--radius-control);
+  --first-run-start-text: var(--text-body);
+  --first-run-start-weight: var(--font-weight-bold);
+}
+
 .completeTitle {
   display: grid;
   justify-items: center;

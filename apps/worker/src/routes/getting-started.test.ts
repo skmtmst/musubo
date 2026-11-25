@@ -95,10 +95,10 @@ function database(): D1Database {
 
 const { gettingStarted } = await import('./getting-started.js');
 
-function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = []) {
+function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = [], hqRole?: 'operator') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', name: '担当', role, readOnly: false, permissionKeys });
+    c.set('staff', { id: 'staff-1', name: '担当', role, readOnly: false, permissionKeys, hqRole });
     return next();
   });
   app.route('/', gettingStarted);
@@ -251,6 +251,16 @@ describe('GET /api/getting-started', () => {
     expect(body.data.steps.find((step) => step.key === 'attributes')).toMatchObject({
       state: 'forbidden', href: null,
     });
+  });
+
+  it('統括の業務担当には店舗設定につながる未完了段を返す', async () => {
+    state.tags = 0;
+    const response = await makeApp('staff', [], 'operator').fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { steps: Array<{ key: string; state: string; href: string | null }> } };
+    expect(body.data.steps.find(step => step.key === 'attributes')).toMatchObject({ state: 'todo', href: '/tags?tab=tags' });
   });
 
   it('担当外アカウントは存在を隠して404にする', async () => {

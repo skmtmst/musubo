@@ -49,7 +49,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: checkConnection,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: accounts, followerImportState: importState, restore: restoreApi },
+      lineAccounts: { ...actual.api.lineAccounts, list: accounts, accountEntry: importState, restore: restoreApi },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: accountFolders, remove: removeAccountFolder },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
@@ -119,7 +119,7 @@ beforeEach(() => {
   checkConnection.mockReset()
   checkConnection.mockResolvedValue({ success: true, data: {} })
   importState.mockReset()
-  importState.mockResolvedValue({ success: true, data: { phase: 'completed' } })
+  importState.mockResolvedValue({ success: true, data: { destination: 'dashboard', canResume: false } })
   push.mockReset()
   select.mockReset()
   role.value = 'owner'
@@ -380,13 +380,26 @@ describe('統括のアカウント', () => {
   })
 
   it('引き継ぎ中は店舗を選択せず登録時と同じ進捗画面へ戻す', async () => {
-    importState.mockResolvedValue({ success: true, data: { phase: 'importing_ids' } })
+    importState.mockResolvedValue({ success: true, data: { destination: 'handover', canResume: false } })
     await render()
     const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
     await act(async () => { enter.click() })
     await act(async () => { await Promise.resolve() })
     expect(importState).toHaveBeenCalledWith('acc-1')
     expect(push).toHaveBeenCalledWith('/accounts/new/handover?accountId=acc-1')
+    expect(select).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['registration', '/accounts/new?resume=acc-1'],
+    ['billing', '/hq/billing/line-addition?accountId=acc-1'],
+  ])('登録中のカードは%sの現在の段へ向かう', async (destination, href) => {
+    importState.mockResolvedValue({ success: true, data: { destination, canResume: destination === 'registration' } })
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    expect(importState).toHaveBeenCalledExactlyOnceWith('acc-1')
+    expect(push).toHaveBeenCalledExactlyOnceWith(href)
     expect(select).not.toHaveBeenCalled()
   })
 
@@ -398,7 +411,7 @@ describe('統括のアカウント', () => {
     await act(async () => { await Promise.resolve() })
     expect(push).toHaveBeenCalledWith('/accounts/new/handover?accountId=acc-1')
     expect(select).not.toHaveBeenCalled()
-    importState.mockResolvedValue({ success: true, data: { phase: 'completed' } })
+    importState.mockResolvedValue({ success: true, data: { destination: 'dashboard', canResume: false } })
     await act(async () => { enter.click() })
     await act(async () => { await Promise.resolve() })
     expect(select).toHaveBeenCalledWith('acc-1')

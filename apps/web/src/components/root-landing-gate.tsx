@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import PagePending from '@/components/templates/page-pending'
 import { api } from '@/lib/api'
+import { savedLineRegistrationAccount } from '@/lib/line-account-entry'
 import { decideRootLanding, musuboOnboardingResumePath } from '@/lib/hq-navigation'
 
 export default function RootLandingGate({ children }: { children: React.ReactNode }) {
@@ -17,11 +18,13 @@ export default function RootLandingGate({ children }: { children: React.ReactNod
   const decision = pathname === '/' && !loadFailed
     ? decideRootLanding(loading, selectedAccountId, accounts.map((account) => account.id))
     : { action: 'show-dashboard' as const }
-  const decisionAccountId = decision.action === 'select-account' ? decision.accountId : null
+  const saved = pathname === '/' && !loading && !selectedAccountId ? savedLineRegistrationAccount() : null
+  const decisionAccountId = saved && accounts.some(account => account.id === saved) ? saved
+    : decision.action === 'select-account' ? decision.accountId : null
   const needsOnboardingLookup = decision.action === 'go-hq' && accounts.length === 0
 
   useEffect(() => {
-    if (decision.action === 'select-account' && decisionAccountId) {
+    if (decisionAccountId) {
       setSelectedAccountId(decisionAccountId)
     } else if (decision.action === 'go-hq' && !needsOnboardingLookup) {
       router.replace('/hq')

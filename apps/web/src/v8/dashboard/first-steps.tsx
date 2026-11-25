@@ -95,8 +95,10 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
                 if (firstMessageInline && step.key === 'firstMessage' && guide?.startAt) {
                   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
                   event.preventDefault()
+                  guide.startAt(step.key)
+                  return
                 }
-                guide?.startAt?.(step.key)
+                if (!step.href?.startsWith('/?guide=')) guide?.startAt?.(step.key)
               }}>{actionLabel}</TextLink>
             )}
           </SetupStepRow>

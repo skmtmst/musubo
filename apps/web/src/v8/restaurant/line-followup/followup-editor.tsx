@@ -13,9 +13,15 @@ import { FollowupMessageSample } from './message-sample'
 import { FollowupTimingFields } from './timing-fields'
 import { FOLLOWUP_NAMES,followupTimingError,type FollowupCardModel } from './board-model'
 import styles from './board.module.css'
+import { followupHasMessage, type FollowupDraftContent } from './followup-guide-draft'
 const origins={reservation_created:'予約が完了した人',reservation_24h:'予約が完了した人',reservation_2h:'予約が完了した人',post_visit:'退店した人',review_request:'退店した人',waitlist_invited:'キャンセル待ちで席が空いた人',anniversary_before:'記念日が登録されている人'}
-export function FollowupEditor({row,accountId,storeName,pageDirty,pageBusy,guideSlot,onDiscardPage,onCancel,onConfirm}:{row:FollowupCardModel;accountId:string;storeName:string;pageDirty:boolean;pageBusy:boolean;guideSlot?:'followup.body'|'followup.confirm';onDiscardPage:()=>void;onCancel:()=>void;onConfirm:(next:FollowupCardModel)=>void}){
- const [draft,setDraft]=useState(()=>structuredClone(row)),[expanded,setExpanded]=useState(false),[error,setError]=useState('')
+export function FollowupEditor({row,initialDraft,accountId,storeName,pageDirty,pageBusy,guideSlot,onDraftChange,onDiscardPage,onCancel,onConfirm}:{row:FollowupCardModel;initialDraft?:FollowupDraftContent;accountId:string;storeName:string;pageDirty:boolean;pageBusy:boolean;guideSlot?:'followup.body'|'followup.confirm';onDraftChange?:(next:FollowupCardModel)=>void;onDiscardPage:()=>void;onCancel:()=>void;onConfirm:(next:FollowupCardModel)=>void}){
+ const [draft,setDraft]=useState(()=>structuredClone(initialDraft ? {...row,timing:initialDraft.timing,bubbles:initialDraft.bubbles} : row)),[expanded,setExpanded]=useState(false),[error,setError]=useState('')
+ function changeDraft(next: FollowupCardModel) {
+  setError('')
+  setDraft(next)
+  onDraftChange?.(next)
+ }
  const depth=useContext(OverlayDepthContext)
  const localDirty=JSON.stringify(row)!==JSON.stringify(draft)
  const pageGuard=useUnsavedGuard({dirty:pageDirty||localDirty,busy:pageBusy,onDiscard:onDiscardPage})
@@ -49,7 +55,7 @@ export function FollowupEditor({row,accountId,storeName,pageDirty,pageBusy,guide
   pageGuard.disarm();pageGuard.confirmLeave()
  }
  const timingError=followupTimingError(row.trigger,draft.timing)
- const hasBody = draft.bubbles.length > 0 && draft.bubbles.every(bubble => bubble.type !== 'text' || String(bubble.content.text ?? '').trim())
+ const hasBody = followupHasMessage(draft.bubbles)
  return <><Dialog open size="wide" title={`${FOLLOWUP_NAMES[row.trigger]}を変える`} dirty={localDirty} onCancel={onCancel} guideSlot={guideSlot} guideSlotNarrow confirmLabel="この内容でオンにする" confirmDisabled={!!timingError} confirmDisabledReason={timingError?'送る時期を直してから確定してください':undefined} error={error} onConfirm={()=>{
   if(timingError)return
   if(!hasBody){setError('送る本文を入れるか、テンプレートを選んでください');return}
@@ -58,8 +64,8 @@ export function FollowupEditor({row,accountId,storeName,pageDirty,pageBusy,guide
   <DetailColumns variant="followup-editor" asideLabel="届き方" expanded={expanded} onExpandedChange={setExpanded} aside={<FollowupMessageSample bubbles={draft.bubbles} storeName={storeName}/>}>
    <div className={styles.stack} ref={setEditor}>
     <Field label="だれに（きっかけ）"><TextField readOnly value={origins[row.trigger]}/></Field>
-    <FollowupTimingFields trigger={row.trigger} value={draft.timing} onChange={timing=>{setError('');setDraft({...draft,timing})}}/>
-    <Field label="送るもの" help="テンプレートなら、リッチメッセージ・カードタイプ・カルーセル・クーポンも選べます。"><FollowupMessageEditor bubbles={draft.bubbles} accountId={accountId} storeName={storeName} guideReady={guideSlot === 'followup.body' ? hasBody && !timingError : undefined} onChange={bubbles=>{setError('');setDraft({...draft,bubbles})}}/></Field>
+    <FollowupTimingFields trigger={row.trigger} value={draft.timing} onChange={timing=>changeDraft({...draft,timing})}/>
+    <Field label="送るもの" help="テンプレートなら、リッチメッセージ・カードタイプ・カルーセル・クーポンも選べます。"><FollowupMessageEditor bubbles={draft.bubbles} accountId={accountId} storeName={storeName} guideReady={guideSlot === 'followup.body' ? hasBody && !timingError : undefined} onChange={bubbles=>changeDraft({...draft,bubbles})}/></Field>
     {row.trigger==='reservation_24h'&&<Notice tone="info">来店の返事のボタンを含めて、吹き出しは5つ以内です。</Notice>}
     {guideSlot && <div className={styles.guideSlot} data-guide-slot={guideSlot}/>}
    </div>

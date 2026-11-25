@@ -42,7 +42,8 @@ import PlatformNotices from '@/components/hq/platform-notices';
 import { accountIconUrl } from '@/components/hq/account-list';
 import { api, ApiError, bookingApi, fetchApi } from '@/lib/api';
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared';
-import { resolveStoreReturnPath } from '@/lib/hq-navigation';
+import { resolveStoreReturnPath } from '@/lib/hq-navigation'
+import { resolveLineAccountEntry } from '@/lib/line-account-entry';
 import { formatNumber } from '@/lib/format';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { readSessionSnapshot } from '@/lib/session-snapshot';
@@ -298,27 +299,27 @@ export default function HqHomeV8() {
     }
   }
 
-  const [enteringAccountId, setEnteringAccountId] = useState<string | null>(null)
+  const enteringAccount = useRef<string | null>(null)
+  useEffect(() => () => { enteringAccount.current = null }, [])
   const login = async (accountId: string) => {
-    if (enteringAccountId) return
-    setEnteringAccountId(accountId)
+    if (enteringAccount.current) return
+    enteringAccount.current = accountId
     try {
-      // 保存済みの引き継ぎ状態を毎回確認する。未完了・確認失敗時に店舗へ入れない。
-      const response = await api.lineAccounts.followerImportState(accountId)
-      if (!response.success) throw new Error(response.error || '引き継ぎの状態を確認できませんでした')
-      if (response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles') {
-        router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+      const entry = await resolveLineAccountEntry(accountId)
+      if (enteringAccount.current !== accountId) return
+      if ('href' in entry || entry.destination === 'unavailable') {
+        router.push('href' in entry ? entry.href : `/accounts/new?resume=${encodeURIComponent(accountId)}`)
         return
       }
     } catch (failure) {
+      if (enteringAccount.current !== accountId) return
       saveErrors.capture(failure)
       router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
       return
     } finally {
-      setEnteringAccountId(null)
+      enteringAccount.current = null
     }
     setSelectedAccountId(accountId)
-    // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
     router.push(back ?? '/')
   }

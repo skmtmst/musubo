@@ -16,7 +16,7 @@ beforeEach(() => {
   staff = { id: 'env-owner', name: '試験', role: 'owner', readOnly: false };
 });
 afterEach(() => database.raw.close());
-const request = (store = 'store-ginza', query = '', account = 'account-1') => {
+const request = (store = 'store-ginza', query = '', account = store === 'store-yokohama' ? 'account-3' : 'account-2') => {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => { c.set('staff', { ...staff }); return next(); });
   app.route('/', restaurantTest);
@@ -90,7 +90,8 @@ it('別統括・見えない店舗・存在しない店舗を読ませず、閲�
   expect((await request('missing')).status).toBe(404);
   expect((await request('store-ginza', '&tenant_id=outside')).status).toBe(403);
   staff = { ...staff, featureEnabledLineAccountIds: ['account-1', 'account-3'] };
-  expect((await request()).status).toBe(404);
+  expect((await request()).status).toBe(403);
+  expect((await request('store-ginza', '', 'account-1')).status).toBe(404);
   staff = { id: 'read-only', name: '閲覧', role: 'staff', readOnly: true };
   expect((await request()).status).toBe(200);
 });
@@ -98,6 +99,38 @@ it('別統括・見えない店舗・存在しない店舗を読ませず、閲�
 it('店に絞られたアカウントから同じ統括の別店舗を読ませない', async () => {
  expect((await request('store-yokohama', '', 'account-2')).status).toBe(404);
  expect((await request('store-ginza', '', 'account-2')).status).toBe(200);
+ expect((await request('store-ginza', '', 'account-1')).status).toBe(404);
+});
+
+it('受付設定を残しながら現在の予約リンク、公開ボタン、空き枠を別に確認する', async () => {
+  hours();
+  googleHours();
+  const now = new Date();
+  const nextMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + ((8 - now.getUTCDay()) % 7 || 7)));
+  database.raw.prepare('INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity,line_capacity) VALUES(?,?,?,?,?)')
+    .run('future-slot', 'store-ginza', nextMonday.toISOString(), 4, 4);
+  expect(await progress()).toMatchObject({ reception: true, bookingExposure: {
+    reservationLink: false, publicReservationMenu: false, availableCapacity: false,
+  } });
+
+  database.raw.exec(`INSERT INTO rt_reservation_links(store_id,token) VALUES ('store-ginza','current-token');
+    INSERT INTO rich_menu_groups(id,account_id,name,chat_bar_text,size,status,default_page_id,is_default_for_all)
+    VALUES ('menu','account-2','案内','開く','large','published','menu-page',0);
+    INSERT INTO rich_menu_pages(id,group_id,order_index,name,alias_id,line_richmenu_id)
+    VALUES ('menu-page','menu',0,'案内','menu-alias','line-menu-id');
+    INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data)
+    VALUES ('booking','menu-page',0,0,100,100,'uri','https://liff.line.me/store-liff?page=restaurant&token=current-token')`);
+  expect(await progress()).toMatchObject({ bookingExposure: { reservationLink: true, publicReservationMenu: false } });
+
+  database.raw.exec(`UPDATE rich_menu_groups SET is_default_for_all=1 WHERE id='menu';
+    UPDATE rich_menu_areas SET action_data='https://liff.line.me/store-liff?page=restaurant&token=old-token' WHERE id='booking'`);
+  expect(await progress()).toMatchObject({ bookingExposure: { publicReservationMenu: false } });
+
+  database.raw.exec(`UPDATE rich_menu_areas SET action_data='https://liff.line.me/store-liff?token=current-token&page=restaurant' WHERE id='booking'`);
+  expect(await progress()).toMatchObject({ bookingExposure: { publicReservationMenu: true, availableCapacity: true } });
+
+  database.raw.exec(`UPDATE rt_inventory_slots SET line_capacity=0,auto_line_original=4 WHERE id='future-slot'`);
+  expect(await progress()).toMatchObject({ reception: true, bookingExposure: { publicReservationMenu: true, availableCapacity: false } });
 });
 
 it('未確認・使わない保存・送り方オンの根拠を同じ店舗の初期設定へ返す', async () => {

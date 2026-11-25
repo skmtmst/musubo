@@ -2,60 +2,44 @@
 
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { canManageRole } from '@/lib/staff-role'
 import type { StyleState } from './model'
 
 const StyleSetupWizard = dynamic(() => import('./wizard'))
-type Step = number | 'summary'
 
-/** 選択中のホームで質問を開き、別の店や取得前の設定を使わない。 */
+/** 登録や開店準備とは独立した、設定からのスタイル変更だけを開く。 */
 export function useSetupWizard(accountId: string | null, state: StyleState | null | undefined, role: string | null, onChanged: () => void) {
   const router = useListNavigationRouter()
   const params = useSearchParams()
   const setupParam = params.get('setup')
+  const fromAccountSettings = params.get('setupReturn') === 'accounts'
   const qrRequested = params.has('qr')
-  const canManage = canManageRole(role)
-  const closedAccount = useRef<string | null>(null)
-  const [opened, setOpened] = useState<{ accountId: string; step: Step } | null>(null)
+  const [closed, setClosed] = useState<string | null>(null)
+  const requestKey = accountId && fromAccountSettings && setupParam === '0' ? accountId : null
+  const blockedByGuide = params.has('guide')
 
-  useEffect(() => { closedAccount.current = null }, [accountId])
+  useEffect(() => { if (!requestKey) setClosed(null) }, [requestKey])
   useEffect(() => {
-    if (!accountId) { setOpened(null); return }
-    if (setupParam === 'summary') setOpened({ accountId, step: 'summary' })
-    else if (setupParam !== null && /^\d+$/.test(setupParam)) setOpened({ accountId, step: Number(setupParam) })
-    else setOpened(null)
-  }, [setupParam, accountId])
-  useEffect(() => {
-    if (!state || !canManage || state.styleSelected || !accountId || qrRequested || closedAccount.current === accountId) return
-    if (state.shouldPromptStyleSelection !== true) return
-    setOpened(current => current?.accountId === accountId ? current : { accountId, step: 0 })
-  }, [state, canManage, accountId, qrRequested])
+    if (!accountId || !state || setupParam === null || requestKey || blockedByGuide) return
+    const next = new URLSearchParams(params.toString())
+    next.delete('setup')
+    next.delete('setupReturn')
+    if (setupParam === '1' && state.styleSelected && state.style === 'restaurant') next.set('guide', 'richMenu')
+    router.replace(next.size ? `/?${next.toString()}` : '/')
+  }, [accountId, state, setupParam, requestKey, blockedByGuide, params, router])
 
-  const openStep = (value: string | number) => {
-    if (!canManage || !accountId || !state) return
-    const step = typeof value === 'number' ? value : value === 'summary' ? value : ['style', 'image'].indexOf(value)
-    if (typeof step === 'number' && (!Number.isFinite(step) || step < 0)) return
-    setOpened({ accountId, step })
-  }
   const close = (changed: boolean) => {
-    closedAccount.current = accountId
-    setOpened(null)
-    if (setupParam !== null) {
-      const next = new URLSearchParams(params.toString())
-      const returnToAccounts = next.get('setupReturn') === 'accounts'
-      next.delete('setup')
-      next.delete('setupReturn')
-      router.replace(returnToAccounts ? '/accounts' : next.size ? `/?${next.toString()}` : '/')
-    }
+    setClosed(requestKey)
+    router.replace('/accounts')
     if (changed) onChanged()
   }
 
   return {
-    openStep,
     qrRequested,
-    dialog: opened && opened.accountId === accountId && accountId && state && canManage
-      ? <StyleSetupWizard key={accountId} accountId={accountId} state={state} initialStep={opened.step} onClose={close} /> : null,
+    dialog: requestKey && closed !== requestKey && !blockedByGuide && !qrRequested && state && canManageRole(role)
+      ? <StyleSetupWizard key={requestKey} accountId={requestKey} state={state} initialStep={0} styleOnly onClose={close} />
+      : null,
   }
 }

@@ -9,13 +9,12 @@ import AccountRegisterV8 from './register'
 import { allV06RowsOk, checkErrorText, LOGIN_ACKS, toV06CheckRows, toV8CheckRows, WEBHOOK_ACKS } from './logic'
 
 const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), check: vi.fn(), receipt: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.check, registrationReceipt: calls.receipt } } }))
+vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.check, registrationReceipt: calls.receipt, get: vi.fn(async () => ({ success: false })) } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/qr-image', () => ({ qrToDataURL: vi.fn(async () => '') }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
-vi.mock('./resume-style', () => ({ default: () => null }))
 
 const result = (): LineAccountConnectData => ({
   steps: [1, 2, 3, 4, 5].map(order => ({ order: order as 1, state: 'passed', message: '認証済み' })),

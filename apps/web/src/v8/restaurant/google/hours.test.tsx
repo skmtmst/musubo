@@ -2,8 +2,9 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { emptyHoursWorkspace, HOURS_WEEKDAYS, type HoursWorkspace, type OpeningWeek } from '@line-crm/shared'
+import { emptyHoursWorkspace, HOURS_WEEKDAYS, type HoursWorkspace, type OpeningWeek, type StaffMember } from '@line-crm/shared'
 import type { GoogleProfileData } from '@/lib/restaurant-google-api'
+import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import HoursPage from './hours'
 const mocks=vi.hoisted(()=>({profile:vi.fn(),hoursWorkspace:vi.fn(),saveHoursWorkspace:vi.fn(),reviewHoursWorkspace:vi.fn(),sendChange:vi.fn(),change:vi.fn(),proposeHours:vi.fn(),allowed:true}))
 vi.mock('@/lib/restaurant-google-api',()=>({restaurantGoogleApi:mocks}))
@@ -20,7 +21,7 @@ beforeEach(()=>{
  mocks.reviewHoursWorkspace.mockResolvedValue({changes:[{id:'change-a',kind:'special_hours',status:'draft',target:{dates:['2026-11-14','2026-11-18']},before:[{date:'2026-11-14',periods:weekly.SATURDAY}],after:[{date:'2026-11-14',closed:true,periods:[]},{date:'2026-11-18',closed:true,periods:[]}],reservationImpactCount:0}]})
  mocks.sendChange.mockResolvedValue({success:true})
 })
-afterEach(cleanup)
+afterEach(()=>{cleanup();forgetStaffIdentity();sessionStorage.clear()})
 async function open(){render(<HoursPage accountId="a" tabs={<span>営業時間</span>}/>);await screen.findByRole('heading',{name:'毎週の営業時間'})}
 async function dates(){fireEvent.click(screen.getByRole('button',{name:'日付を指定'}));return await screen.findByRole('dialog',{name:'特別営業日の変更'})}
 async function pick(dialog:HTMLElement,date:string){fireEvent.click(within(dialog).getByRole('button',{name:date,exact:true}));await waitFor(()=>expect(mocks.saveHoursWorkspace).toHaveBeenCalled())}
@@ -51,6 +52,30 @@ describe('営業時間ツールの操作',()=>{
   await pick(dialog,'2026-11-14');await pick(dialog,'2026-11-18');await waitFor(()=>expect(stored.draft.days.map(d=>d.date)).toEqual(['2026-11-14','2026-11-18']))
   expect(stored.draft.days.some(d=>d.date==='2026-11-15')).toBe(false)
   expect(mocks.sendChange).not.toHaveBeenCalled();cleanup();await open();expect(screen.getByRole('button',{name:'変更内容を確認'})).toBeTruthy()
+ })
+ it('再読み込みで同じ日付の編集と未保存入力を戻し、保存を実行しない',async()=>{
+  rememberStaffIdentity({id:'owner',tenantId:'tenant',name:'担当者',role:'owner'} as StaffMember)
+  await open();const dialog=await dates()
+  fireEvent.click(within(dialog).getByRole('button',{name:'2026-11-14',exact:true}))
+  cleanup();await open()
+  const restored=await screen.findByRole('dialog',{name:'特別営業日の変更'})
+  expect(within(restored).getByRole('button',{name:'2026-11-14',exact:true}).getAttribute('aria-pressed')).toBe('true')
+  expect(mocks.saveHoursWorkspace).not.toHaveBeenCalled()
+  expect(mocks.reviewHoursWorkspace).not.toHaveBeenCalled()
+  expect(mocks.sendChange).not.toHaveBeenCalled()
+ })
+ it('変更内容を確認中の再読み込みは保存済みの変更案だけを読み直す',async()=>{
+  rememberStaffIdentity({id:'owner',tenantId:'tenant',name:'担当者',role:'owner'} as StaffMember)
+  await open();const dialog=await dates();await pick(dialog,'2026-11-14')
+  fireEvent.click(within(dialog).getByRole('button',{name:'変更内容を確認'}))
+  await screen.findByRole('heading',{name:'選択した2日の営業時間'})
+  const reviewed=await mocks.reviewHoursWorkspace.mock.results[0].value
+  mocks.change.mockResolvedValue({change:reviewed.changes[0]})
+  cleanup();render(<HoursPage accountId="a" tabs={<span>営業時間</span>}/>)
+  await screen.findByRole('heading',{name:'選択した2日の営業時間'})
+  expect(mocks.change).toHaveBeenCalledWith('a','change-a')
+  expect(mocks.reviewHoursWorkspace).toHaveBeenCalledTimes(1)
+  expect(mocks.sendChange).not.toHaveBeenCalled()
  })
  it('確認前にGoogleへ送らず、送信失敗後も同じ変更案で再試行する',async()=>{
   await open();const dialog=await dates();await pick(dialog,'2026-11-14');await waitFor(()=>expect(within(dialog).getByRole('button',{name:'変更内容を確認'})).toHaveProperty('disabled',false))

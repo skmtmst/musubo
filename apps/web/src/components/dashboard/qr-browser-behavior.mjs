@@ -123,12 +123,19 @@ async function openDashboard(browser) {
       const response = await route.fetch({ url: `${baseUrl}${url.pathname}${url.search}` })
       return route.fulfill({ response })
     }
-    const json = (body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+    const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (url.pathname === '/api/auth/session') {
       return json({ success: true, data: { id: 'viewer', name: '管理者', role: 'owner', permissionKeys: [] }, csrfToken: 'test-csrf' })
     }
     if (url.pathname === '/api/staff/me') return json({ success: true, data: { id: 'viewer', name: '管理者', role: 'owner', permissionKeys: [] } })
     if (url.pathname === '/api/line-accounts') return json({ success: true, data: accounts })
+    const accountEntry = url.pathname.match(/^\/api\/line-accounts\/([^/]+)\/follower-import$/)
+    if (route.request().method() === 'GET' && accountEntry && url.searchParams.get('entry') === '1') {
+      if (!accounts.some(account => account.id === accountEntry[1])) {
+        return json({ success: false, error: 'LINE_ACCOUNT_NOT_FOUND' }, 404)
+      }
+      return json({ success: true, data: { destination: 'dashboard', canResume: false } })
+    }
     if (url.pathname === '/api/entry-routes') {
       return json({ success: true, data: [{ id: 'route-1', name: '店頭POP', refCode: 'pop2026', isActive: true }] })
     }
