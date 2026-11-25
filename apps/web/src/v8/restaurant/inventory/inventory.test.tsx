@@ -88,7 +88,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     render(<InventoryPage />)
     await waitFor(() => expect(screen.getAllByText(label).length).toBeGreaterThan(0))
     expect(screen.queryByText(/定休日/)).toBeNull()
-    expect(screen.queryByRole('button', { name: 'この日の枠を作る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'この日の配分を変更' })).toBeNull()
   })
   it('Google連携が失効したときは接続確認を案内する', async () => {
     fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, hoursStatus: 'unavailable', googleStatus: 'expired', version: 1 } })

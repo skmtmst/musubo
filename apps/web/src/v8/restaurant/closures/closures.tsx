@@ -336,7 +336,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                   const tone = hit ? kindTone(hit.kind) : null
                   const count = hit ? countOf(hit) : null
                   const globalClosed = day < today ? null : hoursStatus === 'temporarily_closed' ? '臨時休業' : hoursStatus === 'permanently_closed' ? '閉業' : null
-                  const label = `${dayTitle(day)}${globalClosed ? `・${globalClosed}` : ''}${hit ? `・${KIND_LABEL[hit.kind]}` : holiday ? '・定休' : ''}`
+                  const label = `${dayTitle(day)}${globalClosed && (!hit || KIND_LABEL[hit.kind] !== globalClosed) ? `・${globalClosed}` : ''}${hit ? `・${KIND_LABEL[hit.kind]}` : holiday ? '・定休' : ''}`
                   const content = (
                     <>
                       <span className={`${styles.date} ${day === today ? styles.dateToday : faint ? styles.dateFaint : ''}`}>{Number(day.slice(8))}</span>

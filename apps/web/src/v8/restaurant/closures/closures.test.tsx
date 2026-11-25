@@ -81,6 +81,10 @@ describe('UVnvR 休業日・貸切', () => {
     await waitFor(() => expect(screen.getAllByText(new RegExp(label)).length).toBeGreaterThan(0))
     expect(screen.queryAllByRole('gridcell', { name: /・定休/ })).toHaveLength(0)
     if (status !== 'unavailable') expect(screen.getAllByRole('gridcell', { name: status === 'temporarily_closed' ? /・臨時休業/ : /・閉業/ }).length).toBeGreaterThan(0)
+    if (status === 'temporarily_closed') {
+      const cell = screen.getAllByRole('gridcell', { name: /臨時休業を変える/ })[0]
+      expect(cell.getAttribute('aria-label')).not.toContain('臨時休業・臨時休業')
+    }
   })
   it('旧WorkerでhoursStatusがなくても営業時間から定休を表示する', async () => {
     render(<InventoryPage />)

@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { snapshotOf } from '../booking-kit/test-data'
 import type { RestaurantV8Context } from '../booking-kit/public/shell'
-import StockBoard from './stock'
+import StockBoard, { HoursFailureNotice } from './stock'
 import InventoryPage from './inventory'
 
 const state = vi.hoisted(() => ({ account: 'account-1', role: 'owner' as string | null }))
@@ -92,7 +92,73 @@ describe('在庫を直すための案内', () => {
     api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'closed' } })
     render(draw())
     await screen.findByText('定休日')
-    expect(screen.queryByRole('button', { name: 'この日の枠を作る' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'この日の配分を変更' })).toBeNull()
+  })
+
+  it('Googleの営業時間を読んだ後に再取得が失敗したら、再読み込みを選べる', () => {
+    const retry = vi.fn()
+    const view = render(<HoursFailureNotice error="" readFailed={false} googleStatus="connected" onRetry={retry} />)
+    expect(screen.queryByRole('button', { name: '再読み込み' })).toBeNull()
+    view.rerender(<HoursFailureNotice error="開ける時間を確認できません。再読み込みしてください。" readFailed googleStatus="connected" onRetry={retry} />)
+    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    expect(retry).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('link', { name: 'Googleビジネス画面を開く' })).toBeNull()
+  })
+
+  it('Googleの営業時間が確認できない場合、時間帯の箱にも原因と確認先を表示する', async () => {
+    api.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, version: 3, googleStatus: 'connected', hoursStatus: 'unavailable' } })
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'unavailable' } })
+    render(draw())
+    const title = await screen.findByText('Google の営業時間を確認できないため、時間帯を出せません')
+    const box = title.closest('[data-list-state]') as HTMLElement
+    expect(within(box).getByRole('link', { name: 'Googleビジネス画面を開く' })).toBeTruthy()
+    expect(box.textContent).not.toContain('お問い合わせ')
+  })
+
+  it('営業時間の取得待ちに時間帯だけ確認不能でも原因を決めつけない', async () => {
+    const request = pending<ReturnType<typeof hours>>()
+    api.openingHours.mockReturnValue(request.promise)
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'unavailable' } })
+    render(draw())
+    await waitFor(() => expect(api.inventoryDay).toHaveBeenCalled())
+    expect(document.querySelector('[data-list-state="loading"]')).toBeTruthy()
+    expect(screen.queryByText('営業時間を確認できないため、時間帯を出せません')).toBeNull()
+    await act(async () => request.resolve(hours(3)))
+    await screen.findByText('営業時間を確認できないため、時間帯を出せません')
+  })
+
+  it('Google未接続で時間帯を確認できない場合は再読み込みを案内する', async () => {
+    api.openingHours.mockResolvedValue(hours(3))
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'unavailable' } })
+    render(draw())
+    const title = await screen.findByText('営業時間を確認できないため、時間帯を出せません')
+    expect(within(title.closest('[data-list-state]') as HTMLElement).getByRole('button', { name: '再読み込み' })).toBeTruthy()
+  })
+
+  it('Googleからの予約用設定がない場合はGoogleからの再取込を案内する', async () => {
+    api.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: week(), version: 0, googleStatus: 'connected', hoursStatus: 'closed' } })
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'unconfigured' } })
+    render(draw())
+    const title = await screen.findByText('予約用の営業時間を取り込めません')
+    expect(within(title.closest('[data-list-state]') as HTMLElement).getByText('Googleから営業時間を再読み込みしてください。')).toBeTruthy()
+  })
+
+  it.each([['temporarily_closed', '臨時休業中'], ['permanently_closed', '閉業'], ['unconfigured', '開ける時間が未設定です']] as const)('時間帯の箱に%sの理由を表示する', async (status, label) => {
+    api.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: status === 'unconfigured' ? null : week(), version: 3, googleStatus: status === 'unconfigured' ? null : 'connected', hoursStatus: status } })
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: status === 'unconfigured' ? 'unconfigured' : 'closed' } })
+    render(draw())
+    await waitFor(() => expect(screen.getAllByText(label).some(element => element.closest('[data-list-state]'))).toBe(true))
+  })
+
+  it('予約用の設定行がなくてもGoogleの臨時休業を優先して案内する', async () => {
+    api.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: week(), version: 0, googleStatus: 'connected', hoursStatus: 'temporarily_closed' } })
+    api.inventoryDay.mockResolvedValue({ data: [], allocation: { ...allocationState, hoursStatus: 'unconfigured' } })
+    render(draw())
+    await waitFor(() => {
+      const box = screen.getAllByText('臨時休業中').map(element => element.closest('[data-list-state]')).find(Boolean) as HTMLElement
+      expect(within(box).getByText('この日のLINE予約は受け付けていません。')).toBeTruthy()
+      expect(within(box).queryByText('Googleから営業時間を再読み込みしてください。')).toBeNull()
+    })
   })
 
   it.each(['pending', 'failed'] as const)('%sの時間を未保存と断定しない', async (mode) => {

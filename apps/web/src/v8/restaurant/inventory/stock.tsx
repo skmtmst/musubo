@@ -68,6 +68,11 @@ function storeToday(timezone: string | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'Asia/Tokyo' }).format(new Date())
 }
 
+export function HoursFailureNotice({ error, readFailed, googleStatus, onRetry }: { error: string; readFailed: boolean; googleStatus: RestaurantOpeningHours['googleStatus']; onRetry: () => void }) {
+  if (!error) return null
+  return <Notice tone="danger" className={styles.hoursErrorNoticePlacement}>{error} {readFailed || googleStatus == null ? <Button variant="text" size="inline" onClick={onRetry}>再読み込み</Button> : <Button variant="text" size="inline" href="/restaurant-test/google?tab=hours">Googleビジネス画面を開く</Button>}</Notice>
+}
+
 export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notice, tabs }: { ctx: RestaurantV8Context; canEdit: boolean; heading?: ReactNode; notice?: ReactNode; tabs: ReactNode }) {
   const role = useStaffRole()
   const lockedReason = usePermissionLockReason(allowedByRole)
@@ -207,6 +212,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   }
 
   const closedDay = allocationState?.hoursStatus === 'closed'
+  const businessClosed = hoursStatus === 'temporarily_closed' || hoursStatus === 'permanently_closed'
   const regularDayClosed = Boolean((hoursVersion || googleStatus != null) && hours && hoursStatus !== 'temporarily_closed' && hoursStatus !== 'permanently_closed' && hoursStatus !== 'unavailable' && hours.find(day => day.weekday === new Date(`${date}T12:00:00Z`).getUTCDay())?.periods.length === 0)
   const slots: SlotInfo[] = (closedDay ? [] : rows).map((row) => {
     const start = new Date(row.starts_at).getTime()
@@ -475,17 +481,25 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             {slots.length > 0 && !guidingReception ? <div className={styles.allocationTableActions}>
               <Button variant="text" lockedReason={lockedReason} disabled={!canWriteAllocation || allocationState?.hoursStatus !== 'open'} onClick={() => openEditor('day')}>この日の配分を変更</Button>
             </div> : null}
-            {loadError || hoursUnavailable ? (
+            {loadError ? (
               <div className={styles.stateBox}>
                 <ListState kind="error" title="この日の時間帯を読み込めませんでした" onRetry={() => setRefresh(current => current + 1)} />
+              </div>
+            ) : (hoursUnavailable || allocationState?.hoursStatus === 'unconfigured') && !hoursReceipt && !hoursError ? (
+              <div className={styles.stateBox}><ListState kind="loading" /></div>
+            ) : hoursUnavailable ? (
+              <div className={styles.stateBox}>
+                <ListState kind="empty" title={googleStatus != null ? 'Google の営業時間を確認できないため、時間帯を出せません' : '営業時間を確認できないため、時間帯を出せません'}
+                  description={googleStatus != null ? 'Googleビジネスの設定と接続を確認してください。' : '営業時間を再読み込みしてください。'}
+                  action={googleStatus != null ? <Button href="/restaurant-test/google?tab=hours">Googleビジネス画面を開く</Button> : <Button onClick={() => { void loadHours(); setRefresh(current => current + 1) }}>再読み込み</Button>} />
               </div>
             ) : dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
               <div className={styles.stateBox}>
-                <ListState kind="empty" title={hoursStatus === 'temporarily_closed' ? '臨時休業中' : hoursStatus === 'permanently_closed' ? '閉業' : closedDay && regularDayClosed ? '定休日' : closedDay ? 'この日は休業日です' : 'この日の時間帯がありません'}
-                    description={closedDay ? 'この日のLINE予約は受け付けていません。' : undefined}
-                    action={closedDay ? <Button href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</Button> : undefined} />
+                <ListState kind="empty" title={hoursStatus === 'temporarily_closed' ? '臨時休業中' : hoursStatus === 'permanently_closed' ? '閉業' : allocationState?.hoursStatus === 'unconfigured' ? googleStatus != null ? '予約用の営業時間を取り込めません' : '開ける時間が未設定です' : closedDay && regularDayClosed ? '定休日' : closedDay ? 'この日は休業日です' : 'この日の時間帯がありません'}
+                    description={closedDay || businessClosed ? 'この日のLINE予約は受け付けていません。' : allocationState?.hoursStatus === 'unconfigured' ? googleStatus != null ? 'Googleから営業時間を再読み込みしてください。' : '営業時間を設定してから確認してください。' : undefined}
+                    action={closedDay || businessClosed ? <Button href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</Button> : allocationState?.hoursStatus === 'unconfigured' ? <Button href={googleStatus != null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を確認する</Button> : undefined} />
               </div>
             ) : (
               <DataTable presentation="inventory">
@@ -545,7 +559,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-hours-title">
             <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta={googleStatus !== null ? 'Googleビジネスの営業時間を基準にします。予約枠と席の配分は、この画面で設定します。' : '曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）'} />
-            {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement}>{hoursError} {hoursReadFailed || googleStatus == null ? <Button variant="text" size="inline" onClick={() => void loadHours()}>再読み込み</Button> : <Button variant="text" size="inline" href="/restaurant-test/google?tab=hours">Googleビジネス画面を開く</Button>}</Notice> : null}
+            <HoursFailureNotice error={hoursError} readFailed={hoursReadFailed} googleStatus={googleStatus} onRetry={() => void loadHours()} />
             {googleStatus !== null ? <>
               {!hoursError ? <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice> : null}
               {!hoursError ? <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button> : null}
