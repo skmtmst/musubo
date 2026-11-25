@@ -38,7 +38,7 @@ export function HeadOperatorMenu({
   value,
   operators,
   onChange,
-  ariaLabel = '担当者を変える',
+  ariaLabel = '担当者を変更する',
   compact = false,
 }: {
   /** 担当者ID。未割り当ては 'unassigned' */
@@ -66,7 +66,7 @@ export function HeadOperatorMenu({
 export function HeadStatusMenu({
   value,
   onChange,
-  ariaLabel = '対応状況を変える',
+  ariaLabel = '対応状況を変更する',
 }: {
   value: HeadStatus
   onChange: (next: HeadStatus) => void

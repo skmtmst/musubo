@@ -16,7 +16,7 @@ vi.mock('@/lib/api', async importOriginal => {
 vi.mock('./detail', () => ({
   PhotoReviewDetail: ({ loading, notice, rotationSaving, assetProcessing, onSaveRotation, onProcessReviewAsset }: ComponentProps<typeof import('./detail').PhotoReviewDetail>) => <>
     <p role="status">{notice}</p>
-    <button disabled={loading || rotationSaving} onClick={() => void onSaveRotation(90)}>向きを変える</button>
+    <button disabled={loading || rotationSaving} onClick={() => void onSaveRotation(90)}>向きを変更する</button>
     <button disabled={loading || assetProcessing} onClick={onProcessReviewAsset}>作り直す</button>
   </>,
 }))
@@ -38,9 +38,9 @@ function show(canEdit = true) {
 
 describe('写真詳細の操作が失敗した時の案内', () => {
   it.each([
-    ['向きを変える', 500, '写真の向きを保存できませんでした。'],
+    ['向きを変更する', 500, '写真の向きを保存できませんでした。'],
     ['作り直す', 500, '審査用画像を作り直せませんでした。'],
-    ['向きを変える', 403, '写真を操作する権限がありません。管理者に権限を確認してください。'],
+    ['向きを変更する', 403, '写真を操作する権限がありません。管理者に権限を確認してください。'],
     ['作り直す', 403, '写真を操作する権限がありません。管理者に権限を確認してください。'],
   ])('%s が%dで失敗しても内部の英語を出さず、処理中を解除する', async (label, status, message) => {
     const error = new ApiError(status, `API error: ${status}`)
@@ -53,7 +53,7 @@ describe('写真詳細の操作が失敗した時の案内', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe(message))
     expect(screen.getByRole('status').textContent).not.toContain('API error:')
     await waitFor(() => expect(button.disabled).toBe(false))
-    if (label === '向きを変える') {
+    if (label === '向きを変更する') {
       expect(rotate).toHaveBeenCalledWith('photo-1', { accountId: 'account-1', rotation: 90, expectedVersion: 1 }, expect.any(String))
       const key = rotate.mock.calls[0][2]
       fireEvent.click(button)
@@ -66,8 +66,8 @@ describe('写真詳細の操作が失敗した時の案内', () => {
 
   it('閲覧のみの担当は、操作の処理を直接呼ばれても更新しない', async () => {
     show(false)
-    await waitFor(() => expect((screen.getByRole('button', { name: '向きを変える' }) as HTMLButtonElement).disabled).toBe(false))
-    fireEvent.click(screen.getByRole('button', { name: '向きを変える' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: '向きを変更する' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: '向きを変更する' }))
     fireEvent.click(screen.getByRole('button', { name: '作り直す' }))
     expect(rotate).not.toHaveBeenCalled()
     expect(processAsset).not.toHaveBeenCalled()

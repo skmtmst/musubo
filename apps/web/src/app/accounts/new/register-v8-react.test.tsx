@@ -72,6 +72,7 @@ afterEach(() => {
 })
 beforeEach(() => {
   sessionStorage.clear()
+  localStorage.clear()
   vi.clearAllMocks()
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account' } })
@@ -91,8 +92,7 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 const chooseStyle = async (label: string) => {
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   fireEvent.click(within(dialog).getByRole('button', { name: label }))
-  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
-  const save = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  const save = within(dialog).getByRole('button', { name: /で次へ$/ }) as HTMLButtonElement
   await waitFor(() => expect(save.disabled).toBe(false))
   fireEvent.click(save)
 }
@@ -150,12 +150,16 @@ describe('V8 登録ウィザードの gated 進行', () => {
     render(<RegisterV8 />)
     clearPrecheck()
     const button = screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
-    expect(button.disabled).toBe(true)
-    expect(button.getAttribute('aria-description')).toBe('チャネルIDとチャネルシークレットを入力してください。')
+    expect(button.disabled).toBe(false)
+    expect(screen.getByText('チャネルIDとチャネルシークレットを入力してください。')).toBeTruthy()
     nextStep()
+    expect(screen.getByText('チャネルIDを入力してください。')).toBeTruthy()
+    expect(screen.getByText('チャネルシークレットを入力してください。')).toBeTruthy()
     expect(screen.queryByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeNull()
     fill('v8-channel-id', '2007123456')
-    expect(button.disabled).toBe(true)
+    nextStep()
+    expect(screen.getByText('チャネルシークレットを入力してください。')).toBeTruthy()
+    expect(screen.queryByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeNull()
     fill('v8-channel-secret', 'a'.repeat(32))
     expect(button.disabled).toBe(false)
     expect(calls.connectCheck).not.toHaveBeenCalled()
@@ -216,7 +220,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(screen.queryByText('LINEアカウントの登録が完了しました')).toBeNull()
     expect(calls.styleSave).not.toHaveBeenCalled()
     const stickyBar = document.querySelector<HTMLElement>('[data-shared-part="sticky-bar"]')!
-    fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選ぶ' }))
+    fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選択する' }))
     await chooseStyle('飲食店')
     expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
     expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } }, true)

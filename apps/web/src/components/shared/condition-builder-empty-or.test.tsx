@@ -72,7 +72,7 @@ function Harness({
 }
 
 function pickers() {
-  return screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
+  return screen.getAllByRole('button', { name: '追加する条件を選択する' })
 }
 
 function groupRemovers() {

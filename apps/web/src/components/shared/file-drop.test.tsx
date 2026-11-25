@@ -59,12 +59,12 @@ describe('ファイルを落とす場所（★管理画面 NQMnx）', () => {
     render(<FileDropzone title="ここに画像を落とす" hint="JPEG・PNG、10MB まで" onFiles={() => {}} />)
     expect(screen.getByText('ここに画像を落とす')).not.toBeNull()
     expect(screen.getByText('JPEG・PNG、10MB まで')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'ファイルを選ぶ' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'ファイルを選択する' })).not.toBeNull()
   })
 
   it('キーボードの「ファイルを選ぶ」でファイル選択が開く', () => {
     render(<FileDropzone title="ここに画像を落とす" onFiles={() => {}} />)
-    const button = screen.getByRole('button', { name: 'ファイルを選ぶ' })
+    const button = screen.getByRole('button', { name: 'ファイルを選択する' })
     const input = document.querySelector('input[type="file"]') as HTMLInputElement | null
     expect(input).not.toBeNull()
     const clicks: string[] = []
@@ -144,7 +144,7 @@ describe('ファイルを落とす場所（★管理画面 NQMnx）', () => {
     )
     expect(screen.getByText('3件を取り込んでいます…')).not.toBeNull()
     expect(screen.getByText('この画面を閉じても止まりません')).not.toBeNull()
-    expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'ファイルを選択する' })).toBeNull()
   })
 })
 

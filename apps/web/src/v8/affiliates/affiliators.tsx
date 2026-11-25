@@ -643,7 +643,7 @@ export default function AffiliatorsTab() {
       {table}
       <BulkBar count={readonly ? 0 : selected.size} total={shownRows.length} onSelectAll={() => setSelected(new Set(shownRows.map(item => item.id)))} unit="人" hint="対象を確認してから操作を選んでください">
         <Button type="button" onClick={() => { bulkArchiveAccount.current = accountId; bulkArchiveTargets.current = bulkTargets; setBulkError(''); setBulkConfirm(true) }} disabled={bulkTargets.length === 0}>まとめて紹介を止める</Button>
-        <Button type="button" onClick={() => setSelected(new Set())}>選ぶのをやめる</Button>
+        <Button type="button" onClick={() => setSelected(new Set())}>選択するのをやめる</Button>
       </BulkBar>
     </>
   )

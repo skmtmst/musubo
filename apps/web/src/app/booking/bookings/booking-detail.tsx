@@ -90,7 +90,7 @@ export default function BookingDetailV8({
                 取り消す
               </Button>
               <Button variant="primary" href={detailHref}>
-                変える
+                変更する
               </Button>
         </DialogActions>
       ) : undefined}

@@ -88,10 +88,10 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 async function selectAccounts(...names: string[]) {
-  fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選択する|変更する)$/ }))
   const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
   for (const name of names) fireEvent.click(within(dialog).getByRole('checkbox', { name, exact: true }))
-  fireEvent.click(within(dialog).getByRole('button', { name: `選ぶ（${names.length}件）` }))
+  fireEvent.click(within(dialog).getByRole('button', { name: `選択する（${names.length}件）` }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 
@@ -142,6 +142,6 @@ it('HQ carousel choices use the shared picker without an unused background reque
  render(<HqBroadcastCreate/>);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'人工配信'}})
  fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店')
  fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));fireEvent.click(screen.getByRole('tab',{name:'カルーセル',exact:true}))
- await waitFor(()=>expect(screen.getAllByRole('button',{name:'テンプレートから選ぶ'}).length).toBeGreaterThan(0))
+ await waitFor(()=>expect(screen.getAllByRole('button',{name:'テンプレートから選択する'}).length).toBeGreaterThan(0))
  expect(tpl.listByKind).not.toHaveBeenCalled()
 })

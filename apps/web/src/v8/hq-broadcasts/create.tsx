@@ -902,10 +902,10 @@ export default function HqBroadcastCreate() {
                 {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}
                 {method === 'template' ? selectedTemplate ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={selectedTemplate.item} folders={selectedTemplate.folders} onChange={() => setBasicPicker('template')} />
-                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('template')}>テンプレートを選ぶ</Button> : null}
+                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('template')}>テンプレートを選択する</Button> : null}
                 {method === 'duplicate' ? copiedRun ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={broadcastPickerItem(copiedRun)} folders={hqFolders} onChange={() => setBasicPicker('duplicate')} />
-                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
+                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選択する</Button> : null}
                 <Field label="配信名" requirement={fields.requirement('title')} count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><SharedTextField {...fields.bind('title')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
 <small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}

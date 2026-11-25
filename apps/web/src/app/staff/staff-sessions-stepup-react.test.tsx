@@ -191,7 +191,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
     })
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変更する' })) })
     await screen.findByText('ログインユーザーを編集する')
   }
 

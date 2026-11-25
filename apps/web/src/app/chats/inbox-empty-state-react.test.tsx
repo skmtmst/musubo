@@ -132,7 +132,7 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
   await click('絞り込み')
   if (kind === 'assignee') {
     // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
-    await pickEntity('担当者で絞り込む', '担当A（0）', '選ぶ', '担当者を選ぶ')
+    await pickEntity('担当者で絞り込む', '担当A（0）', '選択する', '担当者を選ぶ')
     return
   }
   await act(async () => { document.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
@@ -298,7 +298,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
     expect(searchCall.searchParams.get('q')).toBe('見つからない')
   })
   await pickStatus('未対応')
-  await pickEntity('担当者で絞り込む', '担当A（0）', '選ぶ', '担当者を選ぶ')
+  await pickEntity('担当者で絞り込む', '担当A（0）', '選択する', '担当者を選ぶ')
   await eventually(() => {
     const assigneeCall = calls.filter((url) => url.pathname === '/api/chats').at(-1)!
     expect(assigneeCall.searchParams.get('operatorId')).toBe('operator-a')

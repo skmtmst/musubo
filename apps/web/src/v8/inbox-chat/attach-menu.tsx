@@ -39,7 +39,7 @@ export default function AttachMenu({
         type="button"
         size="compact"
         className={styles.attachTrigger}
-        aria-label="添付するものを選ぶ"
+        aria-label="添付するものを選択する"
         title="画像・動画・ファイルを添付"
         aria-haspopup="menu"
         aria-expanded={open}

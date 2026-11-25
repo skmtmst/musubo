@@ -191,7 +191,7 @@ describe('一斉配信のテンプレート選択（IDEA-11）', () => {
       await renderPicker()
       expect(templateRows().find(row=>row.getAttribute('aria-label') === 'お店紹介の動画')?.closest('label')?.textContent).toContain('リッチビデオ')
       await clickRow('お店紹介の動画')
-      const insert=[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent === '選ぶ')
+      const insert=[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent === '選択する')
       expect(insert).toBeDefined()
       await act(async()=>insert!.dispatchEvent(new MouseEvent('click',{bubbles:true})))
       await flush()

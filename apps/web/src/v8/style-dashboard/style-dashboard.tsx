@@ -129,7 +129,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       {cfg.walkIn ? <Button disabled={role === null} lockedReason={writeLock || storeLock} onClick={() => { if (canWrite && restaurantStoreReady) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />{restaurantWalkIn}</Button> : null}
       <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
-      <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>
+      <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変更する</Button>
       {cfg.walkIn || (today && !hasEmptyBookingAction) ? <Button variant="primary" disabled={role === null} lockedReason={writeLock || reservationLock} onClick={() => { if (canWrite && (!cfg.walkIn || (restaurantStoreReady && today))) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
     </>
   )

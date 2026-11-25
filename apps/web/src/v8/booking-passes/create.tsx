@@ -277,7 +277,7 @@ function PassCreateInner() {
             {form.menuIds.map((id) => (
               <Button key={id} variant="secondary" onClick={() => patch({ menuIds: form.menuIds.filter((value) => value !== id) })} title="押すと外します">{`${menuNameOf(id)} ×`}</Button>
             ))}
-            <Button variant="secondary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setPickerOpen(true)}>選ぶ</Button>
+            <Button variant="secondary" icon={<Plus size={16} aria-hidden="true" />} onClick={() => setPickerOpen(true)}>選択する</Button>
           </div>
           <div><Button variant="primary" onClick={() => setOpen(3)}>次へ</Button></div>
         </>

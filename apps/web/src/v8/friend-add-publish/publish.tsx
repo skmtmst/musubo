@@ -402,7 +402,7 @@ function FriendAddPublish() {
               <dt>{row.label}</dt>
               <dd title={row.value}>{row.value}</dd>
               <dd className={styles.rowAction}>
-                {<PermissionGatedButton allowed={canEdit} href={row.href} variant="text">変える</PermissionGatedButton>}
+                {<PermissionGatedButton allowed={canEdit} href={row.href} variant="text">変更する</PermissionGatedButton>}
               </dd>
             </div>
           ))}

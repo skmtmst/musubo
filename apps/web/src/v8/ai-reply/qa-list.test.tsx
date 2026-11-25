@@ -106,7 +106,7 @@ it('アカウント切替後は古い Q&A 削除確定を送らない', async ()
 
 it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓で押すまで段は変わらない', async () => {
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '自動で答える' }))
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByText('自動で答える前の確かめ')).toBeTruthy()
@@ -121,7 +121,7 @@ it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓�
 
 it('AI を使わない確認に操作先と環境を示す', async () => {
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '使わない' }))
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
@@ -131,7 +131,7 @@ it('AI を使わない確認に操作先と環境を示す', async () => {
 
 it('AI の使い方を選んだ後に切り替えて戻しても古い確定を送らない', async () => {
   const view = render(<QaListV8 />)
-  fireEvent.click(await screen.findByRole('button', { name: '変える' }))
+  fireEvent.click(await screen.findByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '自動で答える' }))
   const button = within(screen.getByRole('dialog')).getByRole('button', { name: /自動で答えるをオンにする/ })
   const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
@@ -145,21 +145,21 @@ it('AI の使い方を選んだ後に切り替えて戻しても古い確定を�
 it('切替先の AI 設定を読んでいる間は前のアカウントの操作を出さない', async () => {
   const seen: boolean[] = []
   function Probe() {
-    React.useLayoutEffect(() => { if (account.id === 'acc-2') seen.push(Boolean(screen.queryByRole('button', { name: '変える' }))) })
+    React.useLayoutEffect(() => { if (account.id === 'acc-2') seen.push(Boolean(screen.queryByRole('button', { name: '変更する' }))) })
     return <QaListV8 />
   }
   const view = render(<Probe />)
-  expect(await screen.findByRole('button', { name: '変える' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: '変更する' })).toBeTruthy()
   apiMock.settings.mockReturnValueOnce(new Promise(() => {}))
   account.id = 'acc-2'; view.rerender(<Probe />)
   expect(seen).toEqual([false])
-  expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
 })
 
 it('管理者には自動で答えるの選択肢を出さない（オーナーだけ）', async () => {
   role.value = verifiedStaffRole('admin')
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   expect(screen.queryByRole('button', { name: '自動で答える' })).toBeNull()
   expect(screen.getByText('自動で答えるのオンはオーナーだけが変えられます')).toBeTruthy()
 })
@@ -170,7 +170,7 @@ it('閲覧のみには追加・取り込み・変える・行の「…」を出�
   expect(screen.getByText(/閲覧のみで見ています。Q&A の追加/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: /Q&A を追加/ })).toBeNull()
   expect(screen.queryByRole('button', { name: /取り込む/ })).toBeNull()
-  expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '「駐車場はありますか」の操作' })).toBeNull()
   expect(screen.getByText('駐車場はありますか')).toBeTruthy()
 })

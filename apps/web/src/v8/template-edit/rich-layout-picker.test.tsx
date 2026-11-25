@@ -55,7 +55,7 @@ it('画像の上の面か右の一覧で選んだ面だけ、下で動きを決�
   expect(rows[0].textContent).toContain('https://nen.example/summer')
   expect((screen.getByLabelText('面 A のURL') as HTMLInputElement).value).toBe('https://nen.example/summer')
   expect(screen.queryByRole('group', { name: '面 B' })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選択する' }))
   expect(screen.getByRole('group', { name: '面 B' })).toBeTruthy()
   expect(screen.queryByLabelText('面 A のURL')).toBeNull()
   fireEvent.click(rows[0])
@@ -69,11 +69,11 @@ it.each(['shop', 'hq'] as const)('%sでもテキストの追加処理を開き�
     busy: false, onSave: vi.fn(), onCancel: vi.fn(),
   } : undefined
   render(<TemplateRichEditor visual host={host} />)
-  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選択する' }))
   fireEvent.click(screen.getByRole('button', { name: '押されたときにあわせて行うことを足す' }))
   const score = screen.getByRole('spinbutton', { name: /面 B.*の足すスコア/ }) as HTMLInputElement
   fireEvent.change(score, { target: { value: '10' } })
-  fireEvent.click(screen.getByRole('button', { name: '面 A「上」を選ぶ' }))
-  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 A「上」を選択する' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選択する' }))
   expect((screen.getByRole('spinbutton', { name: /面 B.*の足すスコア/ }) as HTMLInputElement).value).toBe('10')
 })

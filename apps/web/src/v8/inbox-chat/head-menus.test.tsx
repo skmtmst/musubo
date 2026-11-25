@@ -36,7 +36,7 @@ describe('会話の頭のメニュー', () => {
     document.documentElement.dataset.theme = 'v8'
     const onChange = vi.fn()
     const { rerender } = render(<HeadStatusMenu value="unread" onChange={onChange} />)
-    const button = screen.getByRole('button', { name: '対応状況を変える' })
+    const button = screen.getByRole('button', { name: '対応状況を変更する' })
     expect(button.dataset.tone).toBe('danger')
     fireEvent.click(button)
     fireEvent.click(screen.getByRole('option', { name: '保留' }).querySelector('button')!)
@@ -50,7 +50,7 @@ describe('会話の頭のメニュー', () => {
 
   test('対応状況は1つだけ選ぶ一覧。チェックボックスは出さず、選ぶと変わる', () => {
     const { onStatus } = mount()
-    fireEvent.click(screen.getByRole('button', { name: '対応状況を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '対応状況を変更する' }))
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
     const options = screen.getAllByRole('option')
     expect(options.map((o) => o.textContent)).toEqual(['未対応', '対応中', '保留', '対応済み'])
@@ -61,14 +61,14 @@ describe('会話の頭のメニュー', () => {
 
   test('担当は1つだけ選ぶ一覧で、選ぶと変わる。未割り当ても選べる', async () => {
     const { onOperator } = mount()
-    expect(screen.getByRole('button', { name: '担当者を変える' }).parentElement?.textContent).toContain('Kenta')
-    fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
+    expect(screen.getByRole('button', { name: '担当者を変更する' }).parentElement?.textContent).toContain('Kenta')
+    fireEvent.click(screen.getByRole('button', { name: '担当者を変更する' }))
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
     const options = screen.getAllByRole('radio')
     expect(options.map((o) => o.getAttribute('aria-label'))).toEqual(['Kenta', 'Masato', '未割り当て'])
     expect((options[0] as HTMLInputElement).checked).toBe(true)
     fireEvent.click(options[1])
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する' }))
     expect(onOperator).toHaveBeenCalledWith('op-m')
   })
 
@@ -103,16 +103,16 @@ test('長い名前と担当は省略しても全文を確認できる', () => {
   const longOperator = '鈴木 とても長い担当者のお名前'
   mount({ name: longName, operator: { value: 'long', operators: [{ id: 'long', name: longOperator }], onChange: vi.fn() } })
   expect(screen.getByTitle(longName).getAttribute('title')).toBe(longName)
-  expect(screen.getByRole('button', { name: '担当者を変える' }).parentElement?.querySelector('[data-choice-value]')?.getAttribute('title')).toContain(longOperator)
+  expect(screen.getByRole('button', { name: '担当者を変更する' }).parentElement?.querySelector('[data-choice-value]')?.getAttribute('title')).toContain(longOperator)
 })
 
  test('狭い会話の担当は頭文字でも同じ候補を選べる', () => {
   const onChange = vi.fn()
   render(<HeadOperatorMenu compact value="op-k" operators={operators} onChange={onChange} />)
   expect(screen.getAllByTitle('担当：Kenta').find(el => el.hasAttribute('data-compact-operator'))?.getAttribute('data-initial')).toBe('K')
-  fireEvent.click(screen.getByRole('button', {name:'担当者を変える'}))
+  fireEvent.click(screen.getByRole('button', {name:'担当者を変更する'}))
   fireEvent.click(screen.getByRole('radio', {name:'Masato'}))
-  fireEvent.click(screen.getByRole('button', {name:'選ぶ'}))
+  fireEvent.click(screen.getByRole('button', {name:'選択する'}))
   expect(onChange).toHaveBeenCalledWith('op-m')
 })
 
@@ -127,7 +127,7 @@ test('狭い会話では注目をメニューから変更でき、検索と状�
   mount({ attention: { on: false, saving: false, onToggle }, search: {open: false, onToggle: vi.fn()} })
   expect(screen.queryByRole('button', {name:'注目にする'})).toBeNull()
   expect(screen.getByRole('button', {name:'会話の中を探す'})).toBeTruthy()
-  expect(screen.getByRole('button', {name:'対応状況を変える'})).toBeTruthy()
+  expect(screen.getByRole('button', {name:'対応状況を変更する'})).toBeTruthy()
   fireEvent.click(screen.getByRole('button', {name:'その他の操作'}))
   fireEvent.click(screen.getByRole('menuitem', {name:'注目にする'}))
   expect(onToggle).toHaveBeenCalledOnce()

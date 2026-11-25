@@ -621,7 +621,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
                       look="bare"
                       className={styles.grip}
                       label={`問 ${index + 1}`}
-                      ariaLabel={`問 ${index + 1} の並びを変える。ドラッグ・上下キー・押して上へ／下へ`}
+                      ariaLabel={`問 ${index + 1} の並びを変更する。ドラッグ・上下キー・押して上へ／下へ`}
                       aria-haspopup="menu"
                       aria-expanded={orderMenu === question.key}
                       onClick={(event) => { orderAnchor.current = event.currentTarget; setOrderMenu(orderMenu === question.key ? null : question.key) }}
@@ -746,7 +746,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
       <ActionMenu
         open={orderMenu !== null}
         anchorRef={orderAnchor}
-        ariaLabel="質問の並びを変える"
+        ariaLabel="質問の並びを変更する"
         onClose={() => setOrderMenu(null)}
         items={orderMenu ? questionOrder.menuItems(orderMenu, () => setOrderMenu(null)).map((item) => ({ ...item, id: item.id === 'move-up' ? 'up' : 'down', disabledReason: undefined })) : []}
       />

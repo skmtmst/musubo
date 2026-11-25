@@ -406,7 +406,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */}
-        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>}
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変更する</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変更する</Button>}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : <Button variant="primary" lockedReason={manageLockReason} disabled={!manageLockReason}><Plus size={16} aria-hidden="true" />配信を作る</Button>}
       </>}
       notice={notice}

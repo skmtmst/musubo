@@ -17,10 +17,10 @@ afterEach(() => { cleanup(); document.documentElement.removeAttribute('data-them
 it('名前・画像が空、面 B の URL が空なら送らず、それぞれの欄に理由を出し、名前へ移る。面 B に赤い丸', async () => {
   render(<TemplateRichEditor />)
   fireEvent.click(screen.getByRole('radio', { name: '上下2面（面 A・B）' }))
-  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 B「下」を選択する' }))
   fireEvent.click(screen.getByRole('button', { name: '面 B を押したら' }))
   fireEvent.click(within(screen.getByRole('listbox')).getByText('URLを開く'))
-  fireEvent.click(screen.getByRole('button', { name: '面 A「上」を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 A「上」を選択する' }))
   fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
   const name = document.getElementById('te-rich-name') as HTMLInputElement
   await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))

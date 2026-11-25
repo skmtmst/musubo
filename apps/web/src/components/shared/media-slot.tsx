@@ -472,7 +472,7 @@ export default function MediaSlot({
         ) : null}
         {onMediaPick ? (
           <Button lockedReason={lockedReason} variant="text" size="inline" textTone="accent" type="button" disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); if (canChange()) onMediaPick() }}>
-            <Images size={14} aria-hidden="true" />登録メディアから選ぶ
+            <Images size={14} aria-hidden="true" />登録メディアから選択する
           </Button>
         ) : null}
       </span>

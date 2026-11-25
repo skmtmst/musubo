@@ -559,7 +559,7 @@ it('管理者は実際の受け取り口の中で、受信後の行動を追加�
   await act(async () => fireEvent.click(within(document.body).getByRole('menuitem', { name: /タグを付ける/ })))
   const picker = within(document.body).getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
   await act(async () => fireEvent.click(within(picker).getByRole('radio', { name: '申し込み済み' })))
-  await act(async () => fireEvent.click(within(picker).getByRole('button', { name: '選ぶ', exact: true })))
+  await act(async () => fireEvent.click(within(picker).getByRole('button', { name: '選択する', exact: true })))
   await act(async () => fireEvent.click(within(host).getByRole('button', { name: '行うことを保存する' })))
   await waitFor(() => expect(posted.filter(call => call.url.includes('/config'))).toHaveLength(1))
   expect(posted.find(call => call.url.includes('/config'))?.body).toMatchObject({ expectedVersion: 1,
@@ -654,7 +654,7 @@ it('受け取り口を切り替える前に名前と行うことの両方を確�
   await act(async () => { add.click() })
   await act(async () => { within(document.body).getByRole('menuitem', { name: /タグを付ける/ }).click() })
   const picker = within(document.body).getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
-  await act(async () => { within(picker).getByRole('radio', { name: '新しいタグ' }).click(); within(picker).getByRole('button', { name: '選ぶ' }).click() })
+  await act(async () => { within(picker).getByRole('radio', { name: '新しいタグ' }).click(); within(picker).getByRole('button', { name: '選択する' }).click() })
   await act(async () => { within(host).getByText('二つ目の窓口').click() })
   const dialog = within(document.body).getByRole('dialog', { name: '保存していない変更があります' })
   expect(dialog.textContent).toContain('受け取り口の変更')

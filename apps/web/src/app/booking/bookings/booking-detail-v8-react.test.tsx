@@ -102,7 +102,7 @@ describe('予約の詳細のV8（AjZhH）', () => {
     expect(document.body.textContent).toContain('秋の鹿肉コース')
     expect(document.body.textContent).toContain('3回')
     expect(document.querySelector('[role="dialog"] button[aria-label="閉じる"]')).not.toBeNull()
-    for (const label of ['取り消す', '変える']) {
+    for (const label of ['取り消す', '変更する']) {
       expect(document.body.textContent).toContain(label)
     }
   })

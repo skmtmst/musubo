@@ -169,7 +169,7 @@ it('統括のフォルダは色の保存に失敗しても窓を残し、再試�
   render(<HqBroadcastList />)
   await screen.findByRole('button', { name: 'フォルダ「キャンペーン」の操作' })
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ「キャンペーン」の操作' }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '色を変更する' }))
   const dialog = within(screen.getByRole('dialog', { name: 'フォルダを編集する' }))
   fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：青' }))
   expect(screen.getAllByRole('radio')).toHaveLength(9) // 9色だけ。色なしは選べない（2026-10-09 オーナー）

@@ -216,7 +216,7 @@ export default function TagCsvImportDialog({
               title="ここにCSVを置く"
               hint="UTF-8・最大500件・1MB以下"
               accept=".csv,text/csv"
-              chooseLabel="CSVを選ぶ"
+              chooseLabel="CSVを選択する"
               onFiles={(files) => void pickFile(files[0])}
             />
             {fileName ? (

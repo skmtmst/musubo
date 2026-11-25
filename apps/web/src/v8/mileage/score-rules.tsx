@@ -498,7 +498,7 @@ export default function ActionScoreRulesPage() {
             <Card spacing="normal">
               <p className="text-sm font-semibold text-ink">つながる先</p>
               <div className="mt-3 grid gap-2 text-xs">
-                <Link href="/broadcasts/new" className="text-action hover:underline">一斉配信 <span className="text-ink-faint">— 帯で相手を選ぶ</span></Link>
+                <Link href="/broadcasts/new" className="text-action hover:underline">一斉配信 <span className="text-ink-faint">— 帯で相手を選択する</span></Link>
                 <Link href="/scenarios" className="text-action hover:underline">シナリオ配信 <span className="text-ink-faint">— 帯を条件にする</span></Link>
                 <Link href="/automations" className="text-action hover:underline">オートメーション <span className="text-ink-faint">— 点が下がったときに動かす</span></Link>
                 <Link href="/analytics" className="text-action hover:underline">分析 <span className="text-ink-faint">— 帯ごとの成果を見る</span></Link>

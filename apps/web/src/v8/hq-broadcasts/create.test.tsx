@@ -131,10 +131,10 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 async function selectAccounts(...names: string[]) {
-  fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選ぶ|変える)$/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /^送るアカウント：(選択する|変更する)$/ }))
   const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
   for (const name of names) fireEvent.click(within(dialog).getByRole('checkbox', { name, exact: true }))
-  fireEvent.click(within(dialog).getByRole('button', { name: `選ぶ（${names.length}件）` }))
+  fireEvent.click(within(dialog).getByRole('button', { name: `選択する（${names.length}件）` }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 
@@ -261,7 +261,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     hq.get.mockResolvedValue({ data: { id: 'run-1', status: 'prepared', version: 1, input } })
     render(<HqBroadcastCreate />)
     await screen.findByText('銀座店・新宿店 ほか1')
-    fireEvent.click(screen.getByRole('button', { name: '送るアカウント：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '送るアカウント：変更する' }))
     const dialog = await screen.findByRole('dialog', { name: '送るアカウントを選ぶ' })
     for (const name of ['銀座店', '新宿店', '梅田店']) expect((within(dialog).getByRole('checkbox', { name }) as HTMLInputElement).checked).toBe(true)
   })
@@ -299,7 +299,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '1月の限定メニュー' } })
     fireEvent.click(screen.getByRole('button', { name: '対象設定へ' }))
-    await screen.findByRole('button', { name: '送るアカウント：選ぶ' })
+    await screen.findByRole('button', { name: '送るアカウント：選択する' })
     const steps = screen.getByRole('navigation', { name: '配信作成の進み' })
     /* 今の段（配信対象）とまだの段は押せない。 */
     expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain('配信対象')
@@ -363,7 +363,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     fireEvent.click(getPageAction({ name: '下書きを保存する' }))
     expect((await screen.findByRole('alert')).textContent).toContain('送るアカウントを選んでください')
     expect(await screen.findByRole('heading', { name: '送るアカウント' })).toBeTruthy()
-    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('送るアカウント：選ぶ'))
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('送るアカウント：選択する'))
     expect(hq.create).not.toHaveBeenCalled()
   })
 
@@ -429,7 +429,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     await selectAccounts('銀座店')
     fireEvent.click(screen.getByRole('radio', { name: /タグで絞り込んで配信する/ }))
     await waitFor(() => expect(tagList).toHaveBeenCalledWith({ accountId: 'a1' }))
-    await waitFor(() => expect((screen.getByRole('button', { name: '含めるタグ：選ぶ' }) as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect((screen.getByRole('button', { name: '含めるタグ：選択する' }) as HTMLButtonElement).disabled).toBe(false))
     await pickEntity('含めるタグ', 'VIP')
     fireEvent.click(screen.getByRole('button', { name: 'メッセージ設定へ' }))
     fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'ご案内' } })
@@ -450,7 +450,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     /* 店に属する素材（銀座店だけ）は出さない。 */
     expect(screen.queryByRole('radio', { name: '銀座店だけ' })).toBeNull()
     fireEvent.click(await screen.findByRole('radio', { name: '冬の10%オフ' }))
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する' }))
     fireEvent.click(getPageAction({ name: '下書きを保存する' }))
     await waitFor(() => expect(hq.create).toHaveBeenCalled())
     const input = hq.create.mock.calls[0][0]
@@ -475,7 +475,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     await toMessage()
     const tabs = within(screen.getByRole('tablist', { name: '1通目のメッセージ形式' })).getAllByRole('tab').map((tab) => tab.textContent)
     expect(tabs).toEqual(['テキスト', '画像', '動画', '音声', 'スタンプ', 'カルーセル', 'リッチメッセージ', 'リッチビデオ', '位置情報', 'リサーチ', '質問', '紹介', 'クーポン'])
-    expect(screen.getByRole('button', { name: 'テンプレートから選ぶ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'テンプレートから選択する' })).toBeTruthy()
   })
 
   it('画像はどの店にも属さない置き場へ上げ、店の一斉配信と同じ吹き出し（image）で送る', async () => {
@@ -515,7 +515,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'カルーセル' }))
     expect(tpl.listByKind).not.toHaveBeenCalled()
-    fireEvent.click(within(screen.getByLabelText('1通目の吹き出し')).getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(within(screen.getByLabelText('1通目の吹き出し')).getByRole('button', { name: 'テンプレートから選択する' }))
     await waitFor(() => expect(tpl.listByKind).toHaveBeenCalledWith())
     fireEvent.click(await screen.findByRole('radio', { name: '秋の新商品 3種' }))
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
@@ -534,7 +534,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('tab', { name: 'カルーセル' }))
-    fireEvent.click(within(screen.getByLabelText('1通目の吹き出し')).getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(within(screen.getByLabelText('1通目の吹き出し')).getByRole('button', { name: 'テンプレートから選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '秋の新商品 3種' }))
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
     await screen.findByRole('button', { name: '開いて直す' })
@@ -565,7 +565,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     })
     render(<HqBroadcastCreate />)
     await toMessage()
-    fireEvent.click(screen.getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'テンプレートから選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '定休日のお知らせ' }))
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
     await waitFor(() => expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('{店名}は明日お休みです'))
@@ -586,7 +586,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(aside.querySelector('[data-line-preview-part="device-frame"]')).not.toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: /テンプレートを選択/ }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'テンプレートを選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'テンプレートを選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '予約前日のご案内' }))
     expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('')
     expect(within(aside).queryByText('明日のご予約をお待ちしています')).toBeNull()
@@ -611,7 +611,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     await waitFor(() => expect((screen.getByRole('radio', { name: /過去の配信を複製/ }) as HTMLInputElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('radio', { name: /過去の配信を複製/ }))
     hq.get.mockResolvedValue({ data: (await hq.list()).data[0] })
-    fireEvent.click(screen.getByRole('button', { name: '過去の配信を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '過去の配信を選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '9月キャンペーンのお知らせ' }))
     expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('')
     fireEvent.click(screen.getByRole('button', { name: 'この配信を写す' }))
@@ -678,7 +678,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     tpl.get.mockResolvedValue(detail(flex({ type: 'uri', label: '見る', uri: 'https://shop.example/' })))
     render(<HqBroadcastCreate />)
     await toMessage()
-    fireEvent.click(screen.getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'テンプレートから選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '秋の新商品のお知らせ' }))
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
     expect(await screen.findByText(/のカードをそのまま送ります/)).toBeTruthy()
@@ -689,7 +689,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     tpl.get.mockResolvedValue(detail(flex({ type: 'postback', label: '申し込む', data: 'form=1' })))
     render(<HqBroadcastCreate />)
     await toMessage()
-    fireEvent.click(screen.getByRole('button', { name: 'テンプレートから選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'テンプレートから選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '秋の新商品のお知らせ' }))
     fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
     await screen.findByText(/のカードをそのまま送ります/)
@@ -768,7 +768,7 @@ it('統括でリサーチの質問と公開版を読み込み下書きへ保存�
  tpl.get.mockResolvedValue({template:{id:'research1',name:'健康調査',template_type:'template',current_version_id:'v1'},definition:{schemaVersion:1,media:[],template:{id:'source1',name:'健康調査',messageType:'text',messageContent:''},asset:{kind:'research',payload:{questions:[{text:'体調',format:'free',required:true}],answerActions:[]}}}});
  render(<HqBroadcastCreate />);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'健康調査'}});fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店');fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));
  expect(screen.getByRole('tab',{name:'リサーチ'}).getAttribute('aria-disabled')).not.toBe('true');
- fireEvent.click(screen.getByRole('button',{name:'テンプレートから選ぶ'}));
+ fireEvent.click(screen.getByRole('button',{name:'テンプレートから選択する'}));
  fireEvent.click(await screen.findByRole('radio',{name:'健康調査'}));fireEvent.click(screen.getByRole('button',{name:'このテンプレートを使う'}));
  await waitFor(()=>expect(screen.queryByRole('radio',{name:'健康調査'})).toBeNull());
  fireEvent.click(getPageAction({name:'下書きを保存する'}));
@@ -1043,7 +1043,7 @@ describe('読み込めない配信の保護', () => {
     fireEvent.change(screen.getByLabelText('配信名'), { target: { value: '編集中の名前' } })
     await waitFor(() => expect((screen.getByRole('radio', { name: /過去の配信を複製/ }) as HTMLInputElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('radio', { name: /過去の配信を複製/ }))
-    fireEvent.click(screen.getByRole('button', { name: '過去の配信を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '過去の配信を選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '過去の配信' }))
     fireEvent.click(screen.getByRole('button', { name: 'この配信を写す' }))
     expect((await screen.findByRole('alert')).textContent).toContain('複製できません')

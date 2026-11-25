@@ -21,7 +21,7 @@ import { TextField as SharedTextField } from '@/components/shared/text-field'
  * **6つとも「まとめて実行する口」が無いだけで、1人ぶんの口は全部ある。**
  * これまで人数によらず押せない形にしていたので、1人のときもできなかった。
  *
- *   対応状況を変える        PUT  /api/chats/<friendId>       （友だちIDで引ける）
+ *   対応状況を変更する        PUT  /api/chats/<friendId>       （友だちIDで引ける）
  *   テンプレートを送る      POST /api/chats/<friendId>/send
  *   シナリオを開始          POST /api/scenarios/:id/enroll/:friendId
  *   タグを付ける・外す      POST/DELETE /api/friends/:id/tags
@@ -43,8 +43,8 @@ export type FriendAction =
   | 'schedule'
 
 const LABELS: Record<FriendAction, string> = {
-  status: '対応状況を変える',
-  operator: '担当者を変える',
+  status: '対応状況を変更する',
+  operator: '担当者を変更する',
   template: 'テンプレートを送る',
   scenario: 'シナリオを開始',
   tag: 'タグを付ける・外す',

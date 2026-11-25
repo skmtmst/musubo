@@ -22,7 +22,7 @@ vi.mock('@/lib/api/helpers/reservation-board',async importOriginal=>{const origi
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'staff-1' }), useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import ReservationsPage from '../restaurant/reservations/reservations'
 import ReservationDetailDialog from './detail-dialog'
@@ -122,7 +122,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(text()).toContain('アレルギー：なし')
     await waitFor(() => expect(text()).toContain('これまでの来店 3 回・前回 08/14'))
     expect(fixture.customerHistory).toHaveBeenCalledWith('account-1', 'store-1', { phone: '090-0000-5678', lineUid: undefined })
-    expect(within(dialog).getByRole('button', { name: '内容を変える' })).not.toBeNull()
+    expect(within(dialog).getByRole('button', { name: '内容を変更する' })).not.toBeNull()
   })
 
   it('「次の予約」の「詳細を見る」でも開く', async () => {
@@ -144,7 +144,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
 
   it('内容を変えるで今の変更の窓へ移る', async () => {
     const dialog = await openDetail()
-    fireEvent.click(within(dialog).getByRole('button', { name: '内容を変える' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '内容を変更する' }))
     expect(await screen.findByRole('dialog', { name: '見本 182さんの予約を変更' })).not.toBeNull()
     expect(screen.queryByRole('dialog', { name: '見本 182さん・4名' })).toBeNull()
   })
@@ -153,7 +153,7 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     render(<ReservationsPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^押さえ / }))
     expect(await screen.findByRole('button', { name: '押さえを解除' })).not.toBeNull()
-    expect(screen.queryByRole('button', { name: '内容を変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '内容を変更する' })).toBeNull()
   })
 
   it('閲覧のみは詳細の変更操作を理由付きで押せない', async () => {
@@ -162,8 +162,8 @@ describe('AjZhH 予約台帳 予約の詳細', () => {
     expect(within(dialog).getAllByRole('button', { name: '閉じる' }).length).toBe(1)
     fireEvent.click(within(dialog).getByRole('button', { name: '見本 182のその他操作' }))
     expect(screen.getByRole('menuitem', { name: '取り消す' }).getAttribute('aria-disabled')).toBe('true')
-    expect(within(dialog).getByRole('button', { name: '内容を変える' }).getAttribute('aria-disabled')).toBe('true')
-    expect(screen.queryByRole('button', { name: '卓を変える' })).toBeNull()
+    expect(within(dialog).getByRole('button', { name: '内容を変更する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.queryByRole('button', { name: '卓を変更する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /電話の予約を入れる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /に予約を入れる$/ })).toBeNull()
   })

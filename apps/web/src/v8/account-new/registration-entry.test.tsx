@@ -172,7 +172,7 @@ it('途中保存して閉じるを下の帯に置き、入力を下書きに残�
   fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
   fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
   fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
-  expect(screen.queryByRole('button', { name: '事前確認を変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '事前確認を変更する' })).toBeNull()
   const input = document.getElementById('v8-channel-id') as HTMLInputElement
   fireEvent.change(input, { target: { value: '1234567890' } })
   const close = screen.getByRole('link', { name: '途中保存して閉じる' })

@@ -66,7 +66,7 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => { root.unmount() }); container.remove(); delete document.documentElement.dataset.theme })
 async function openPriority() {
   await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
-  fireEvent.click(await screen.findByRole('button', { name: '順番を変える' }))
+  fireEvent.click(await screen.findByRole('button', { name: '順番を変更する' }))
   return screen.getByRole('dialog', { name: '出す順番' })
 }
 async function openUnpublish() {
@@ -105,7 +105,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     const input = within(dialog).getByRole('textbox', { name: '出す順番' }) as HTMLInputElement
     expect(input.value).toBe('3')
     fireEvent.change(input, { target: { value: '1' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: '順番を変える' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '順番を変更する' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '出す順番' })).toBeNull())
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(net.update).toHaveBeenCalledWith('g1', expect.objectContaining({ targetingPriority: 0 })))
@@ -117,7 +117,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     const discard = await screen.findByRole('dialog', { name: '入力を破棄しますか？' })
     fireEvent.click(within(discard).getByRole('button', { name: '破棄する' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '出す順番' })).toBeNull())
-    fireEvent.click(screen.getByRole('button', { name: '順番を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '順番を変更する' }))
     expect((screen.getByRole('textbox', { name: '出す順番' }) as HTMLInputElement).value).toBe('3')
     expect(net.update).not.toHaveBeenCalled()
   })
@@ -125,7 +125,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     net.role = 'viewer'
     await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
     await screen.findByRole('heading', { name: '出す順番' })
-    expect(screen.queryByRole('button', { name: '順番を変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '順番を変更する' })).toBeNull()
   })
   it.each([{ pages: [] }, { id: 'g1', name: 'メニュー', pages: undefined }])('形の違う取得結果（%j）で編集画面を落とさない', async data => {
     net.get.mockResolvedValue({ success: true, data })

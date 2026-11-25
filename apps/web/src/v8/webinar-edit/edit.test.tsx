@@ -245,7 +245,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.querySelector('[data-page-template="create"] [data-template-region="content"]')?.textContent).toContain('通知とリマインド')
     expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('通知')
     expect(host.querySelector('[aria-label="設定済みの内容"]')?.textContent).toContain('動画あり・配信枠 1件')
-    const video = host.querySelector('[aria-label="動画を変える"]') as HTMLButtonElement | null
+    const video = host.querySelector('[aria-label="動画を変更する"]') as HTMLButtonElement | null
     expect(video).toBeTruthy()
     await act(async () => { video!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})
@@ -260,7 +260,7 @@ describe('V8 ウェビナーの編集', () => {
     const dialog = screen.getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
     await act(async () => fireEvent.click(within(dialog).getByRole('radio', { name: '完了のタグ' })))
     expect(puts.filter(item => item.path.endsWith('/actions'))).toHaveLength(0)
-    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })))
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })))
     await act(async () => buttonText('下書きを保存')!.click())
     expect(puts.find(item => item.path.endsWith('/actions'))?.body).toEqual({ actions: [{ trigger: 'completed', actionType: 'add_tag', config: { tagId: 'tag-owner' } }] })
     expect(screen.getByRole('button', { name: '完了のタグ' })).toBeTruthy()
@@ -404,8 +404,8 @@ describe('V8 ウェビナーの編集', () => {
     const folder = await within(picker).findByRole('button', { name: /相談受付/ })
     await act(async () => { fireEvent.click(folder) })
     await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '相談の申込' })) })
-    await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選ぶ', exact: true })) })
-    expect(screen.getByRole('button', { name: '申込に使う回答フォーム：変える' })).toBeTruthy()
+    await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: '選択する', exact: true })) })
+    expect(screen.getByRole('button', { name: '申込に使う回答フォーム：変更する' })).toBeTruthy()
     expect(puts).toHaveLength(0)
   })
 });

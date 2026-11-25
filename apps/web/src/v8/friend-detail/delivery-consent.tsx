@@ -190,7 +190,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
                   <span className={styles.rowNote}>{purpose.note}</span>
                 </div>
                 <StatusBadge tone={STATE_TONE[state]}><span>{STATE_LABEL[state]}</span></StatusBadge>
-                {<PermissionGatedButton allowed={canEdit} variant="secondary" onClick={() => begin(purpose.key)} disabled={busy}>変える</PermissionGatedButton>}
+                {<PermissionGatedButton allowed={canEdit} variant="secondary" onClick={() => begin(purpose.key)} disabled={busy}>変更する</PermissionGatedButton>}
               </div>
             )
           })}

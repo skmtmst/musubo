@@ -660,7 +660,7 @@ describe('V8 コンバージョンの一覧：止める・差し替える・削�
     fireEvent.click(screen.getByRole('button', { name: '差し替え先の成果地点' }))
     const picker = screen.getAllByRole('dialog').at(-1)!
     fireEvent.click(within(picker).getByRole('radio', { name: /新しい購入/ }))
-    fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(picker).getByRole('button', { name: '選択する' }))
     await flush()
     fireEvent.click(confirmButton())
     await flush()

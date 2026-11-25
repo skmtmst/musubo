@@ -138,7 +138,7 @@ it('店舗の切替中と切替後の全描画に旧503を残さず、新店舗�
   fireEvent.click(screen.getByRole('button', { name: '店舗', exact: true }))
   const picker = within(await screen.findByRole('dialog'))
   fireEvent.click(picker.getByRole('radio', { name: 'second', exact: true }))
-  commits.length = 0; fireEvent.click(picker.getByRole('button', { name: '選ぶ', exact: true }))
+  commits.length = 0; fireEvent.click(picker.getByRole('button', { name: '選択する', exact: true }))
   fireEvent.click(await screen.findByRole('button', { name: 'この店舗に切り替えて表示する' }))
   await areaReady()
   expect(commits.length).toBeGreaterThan(0)

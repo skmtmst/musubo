@@ -481,7 +481,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
                     <RowActions
                       subjectName={row.name}
                       menuItems={[
-                        { id: 'edit', label: 'URL を変える', onSelect: () => openEdit(row) },
+                        { id: 'edit', label: 'URL を変更する', onSelect: () => openEdit(row) },
                         ...(row.acceptsReservations ? [{
                           id: 'close',
                           label: row.closeOnBooking ? '枠を閉じる知らせの対象から外す' : '枠を閉じる知らせの対象にする',
@@ -652,7 +652,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         title={editing ? `${editing.name}の URL` : 'URL'}
         headerIcon={<Link2 />}
         description="https:// で始まる URL を入れます。空にすると消えます。保存は画面の下の［保存する］で行います。"
-        confirmLabel="変える"
+        confirmLabel="変更する"
         onConfirm={applyEdit}
         onCancel={() => setEditing(null)}
       >

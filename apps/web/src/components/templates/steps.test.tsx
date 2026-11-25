@@ -122,9 +122,9 @@ it('完了した内容だけを1行で要約し、変える操作を元の段へ
   expect(screen.getByText('夏のお知らせ').getAttribute('title')).toBe('夏のお知らせ')
   expect(screen.getByText('タグ：会員')).toBeTruthy()
   expect(screen.queryByText('未完成の本文')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '基本を変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '基本を変更する' }))
   expect(change).toHaveBeenCalledOnce()
-  expect(screen.queryByRole('button', { name: '対象を変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '対象を変更する' })).toBeNull()
 })
 
 it('閲覧のみでは要約を読めるが、変えるボタンを出さない', () => {
@@ -133,7 +133,7 @@ it('閲覧のみでは要約を読めるが、変えるボタンを出さない'
     { key: 'next', label: '確認', state: 'todo' },
   ]} />)
   expect(screen.getByText('保存済みの名前')).toBeTruthy()
-  expect(screen.queryByRole('button', { name: '基本を変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '基本を変更する' })).toBeNull()
 })
 
 

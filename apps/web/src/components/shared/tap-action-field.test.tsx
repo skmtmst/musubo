@@ -65,14 +65,14 @@ test('作ってあるものは窓で仮に選び、［選ぶ］でだけ値を�
   const value: TapActionValue = { kind: 'form', uri: '', text: '', refId: '' }
   render(<TapActionField name="ボタン1" value={value} onChange={change} hasLiff sources={{ form: [{ id: 'f1', name: 'アンケート' }, { id: 'f2', name: '申し込み' }] }} />)
   expect(screen.getByText('（回答フォームを選んでください）')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'ボタン1の回答フォームを選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: 'ボタン1の回答フォームを選択する' }))
   const dialog = screen.getByRole('dialog')
   // 回答フォームは必ず選ぶので「選ばない」の行は無い。
   expect(within(dialog).queryByText(/選んでください/)).toBeNull()
   // 共通の選ぶ窓（EntityPicker・dJZ7Q）で選ぶ。
   fireEvent.click(within(dialog).getByRole('radio', { name: '申し込み' }))
   expect(change).not.toHaveBeenCalled()
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
   expect(change).toHaveBeenCalledWith({ refId: 'f2' })
 })
 
@@ -80,10 +80,10 @@ test('予約メニューは任意：選んだら名前と［変える］、窓�
   const change = vi.fn()
   render(<TapActionField name="面 A" value={{ kind: 'booking', uri: '', text: '', refId: 'm1' }} onChange={change} hasLiff sources={{ booking: [{ id: 'm1', name: 'カット＋カラー' }] }} />)
   expect(screen.getByText('カット＋カラー')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: '面 Aの予約メニューを変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '面 Aの予約メニューを変更する' }))
   const dialog = screen.getByRole('dialog')
   fireEvent.click(within(dialog).getByRole('radio', { name: 'メニューを決めずに開く（予約ページの最初）' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
   expect(change).toHaveBeenCalledWith({ refId: '' })
 })
 

@@ -1073,7 +1073,7 @@ export default function NewProxyBookingPage() {
             <aside data-design="Right" className="space-y-4">
               <Card title="空いている時間" note={`${selectedStaff.display_name}の ${date || '選択日'} で、続けて取れるところです。`}>
                 <div className="space-y-2">
-                  {(conflictAlternatives?.nearbySlots ?? slots.filter((slot) => slot.date === date && slot.start !== time).slice(0, 3)).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setConflictAlternatives(null); setError('') }}>この時間に変える</Button></div>)}
+                  {(conflictAlternatives?.nearbySlots ?? slots.filter((slot) => slot.date === date && slot.start !== time).slice(0, 3)).map((slot) => <div key={slot.start} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0"><span className="text-sm font-semibold">{slot.start} 〜 {slot.end}</span><Button onClick={() => { setTime(slot.start); setStep('input'); setConflictAlternatives(null); setError('') }}>この時間に変更する</Button></div>)}
                 </div>
               </Card>
               <Card title="ほかの担当なら入れられます">
@@ -1081,7 +1081,7 @@ export default function NewProxyBookingPage() {
                   <div className="space-y-2">{conflictAlternatives.alternateStaff.map((candidate) => (
                     <div key={candidate.staffId} className="border-hairline flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
                       <span className="text-sm font-semibold">{candidate.displayName}　{candidate.slot.start}〜{candidate.slot.end}</span>
-                      <Button onClick={() => { pendingSelect.current = { staffId: candidate.staffId, date: candidate.slot.date, time: candidate.slot.start }; setStaffId(candidate.staffId); setTime(''); setStep('input'); setConflictAlternatives(null); setError('') }}>この担当に変える</Button>
+                      <Button onClick={() => { pendingSelect.current = { staffId: candidate.staffId, date: candidate.slot.date, time: candidate.slot.start }; setStaffId(candidate.staffId); setTime(''); setStep('input'); setConflictAlternatives(null); setError('') }}>この担当に変更する</Button>
                     </div>
                   ))}</div>
                 ) : <p className="text-ink-faint text-xs">同じ時刻に空いている別担当はいません。</p>}
