@@ -209,6 +209,11 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     expect(igCard().getByText('つなぐとできること')).toBeTruthy()
     expect(screen.getByText('Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。')).toBeTruthy()
     expect(igCard().getByRole('button', { name: 'Instagram アカウントを接続する' })).toBeTruthy()
+    const igCardEl = screen.getByRole('region', { name: 'Instagram' })
+    expect(igCardEl.getAttribute('id')).toBe('instagram')
+    const marks = igCardEl.querySelectorAll('svg[data-brand-mark="instagram"]')
+    expect(marks).toHaveLength(2)
+    expect(igCardEl.querySelectorAll('radialGradient')).toHaveLength(2)
     // ページを選ぶ段（利用者の決めで出さない）
     expect(screen.queryByText(/ページを選/)).toBeNull()
     // 接続が1件も無いので個数と［接続を追加する］は出さない（札だけ）。

@@ -28,7 +28,7 @@ import { formatDate, formatNumber } from '@/lib/format'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { isSaveConflict } from '@/components/shared/save-conflict'
 import SnsConnectionList from './connection-list'
-import { GoogleMark, InstagramMark } from './brand-marks'
+import { GoogleMark, InstagramMark } from '@/components/shared/brand-marks'
 import {
   asConnectionPorts,
   googleSlots,
@@ -199,6 +199,15 @@ export default function SnsSettingsPage() {
   }, [accountId])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (loadedAccountId !== accountId) return
+    if (window.location.hash !== '#instagram') return
+    const target = document.getElementById('instagram')
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'auto', block: 'start' })
+    }
+  }, [loadedAccountId, accountId])
 
   const visibleGoogle = loadedAccountId === accountId ? google : null
   const visibleGoogleError = loadedAccountId === accountId ? googleError : null
@@ -558,7 +567,7 @@ export default function SnsSettingsPage() {
           )}
         </Card>
 
-        <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-instagram-title">
+        <Card id="instagram" appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="sns-instagram-title">
           {cardHead('instagram', slots.instagram, igStatusLabel, 'sns-instagram-title')}
           {!accountId ? (
             <ListState kind="empty" title="LINEアカウントを選んでください" description="画面右上で接続先のLINEアカウントを選んでください。" />
