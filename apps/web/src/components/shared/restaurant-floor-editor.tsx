@@ -112,7 +112,7 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
     const label=`${sourceLabel}（コピー${copyNo++}）`
     used.add(code)
     usedNames.add(label)
-    const result=await restaurantTestApi.createTable(accountId,{storeId,floorId:destination.id,code,label,seatType:original.seatType??'table',seatDetailType:original.seatDetailType??original.seatType??'table',minCapacity:original.minCapacity??1,maxCapacity:original.maxCapacity??2,floorX:spot.x,floorY:spot.y,shape:original.shape,width:original.width,height:original.height,rotation:original.rotation,smokingPolicy:original.smokingPolicy??'non_smoking',partition:original.partition??'open',shoesAllowed:original.shoesAllowed??true,visibleOnMap:original.visibleOnMap??true,chairArrangement:original.chairArrangement??'both',chairSide:original.chairSide??null,isActive:false}) as {data?:{id?:string}}
+    const result=await restaurantTestApi.createTable(accountId,{storeId,floorId:destination.id,code,label,seatType:original.seatType??'table',seatDetailType:original.seatDetailType??original.seatType??'table',minCapacity:original.minCapacity??1,maxCapacity:original.maxCapacity??2,floorX:spot.x,floorY:spot.y,shape:original.shape,width:original.width,height:original.height,rotation:original.rotation,smokingPolicy:original.smokingPolicy??'non_smoking',partition:original.partition??'open',shoesAllowed:original.shoesAllowed??true,visibleOnMap:original.visibleOnMap??true,chairArrangement:original.chairArrangement??(original.shape==='circle'?'all':'both'),chairSide:original.chairSide??null,isActive:false}) as {data?:{id?:string}}
     if(result.data?.id)createdIds.push(result.data.id)
     created++
    }

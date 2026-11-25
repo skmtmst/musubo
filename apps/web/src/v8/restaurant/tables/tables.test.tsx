@@ -276,6 +276,73 @@ describe('BERxg 座席・卓管理', () => {
     expect(within(dialog).getByRole('group', { name: '椅子を置く側' })).toBeTruthy()
   })
 
+  it('丸卓の椅子配置（均等・片側・向かい合わせ）をプレビューして保存できる', async () => {
+    render(<TablesPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '卓を作る' }))
+    const dialog = screen.getByRole('dialog', { name: '卓を作る' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '丸' }))
+
+    // 既定は「まわりに均等」で、最大人数2名の椅子が 0° と 180° に等間隔配置される
+    const arrangement = within(dialog).getByRole('group', { name: '椅子の配置' })
+    expect(within(arrangement).getByRole('button', { name: 'まわりに均等' }).getAttribute('aria-pressed')).toBe('true')
+    expect(within(dialog).queryByRole('group', { name: '椅子を置く側' })).toBeNull()
+    const evenAngles = [...dialog.querySelectorAll('[class*="previewChair"]')].map(c => Number(c.getAttribute('data-angle')))
+    expect(evenAngles).toEqual([0, 180])
+
+    // 最大人数を5名に変えると 72° 刻みで5席が描かれる
+    fireEvent.change(within(dialog).getByLabelText('最大人数'), { target: { value: '5' } })
+    const fiveAngles = [...dialog.querySelectorAll('[class*="previewChair"]')].map(c => Number(c.getAttribute('data-angle')))
+    expect(fiveAngles).toEqual([0, 72, 144, 216, 288])
+
+    // 「向かい合わせ」は左右2つの側に分かれる
+    fireEvent.change(within(dialog).getByLabelText('最大人数'), { target: { value: '4' } })
+    fireEvent.click(within(arrangement).getByRole('button', { name: '向かい合わせ' }))
+    expect(within(dialog).queryByRole('group', { name: '椅子を置く側' })).toBeNull()
+    const bothChairs = [...dialog.querySelectorAll('[class*="previewChair"]')]
+    expect(bothChairs).toHaveLength(4)
+    expect(bothChairs.filter(c => c.getAttribute('data-side') === 'left')).toHaveLength(2)
+    expect(bothChairs.filter(c => c.getAttribute('data-side') === 'right')).toHaveLength(2)
+
+    // 「片側（壁ぞい）」は椅子を置く側を選べ、選んだ側（下）の円弧に集まる・保存へ渡る
+    fireEvent.click(within(arrangement).getByRole('button', { name: '片側（壁ぞい）' }))
+    const side = within(dialog).getByRole('group', { name: '椅子を置く側' })
+    fireEvent.click(within(side).getByRole('button', { name: '下' }))
+    const oneChairs = [...dialog.querySelectorAll('[class*="previewChair"]')]
+    expect(oneChairs).toHaveLength(4)
+    expect(oneChairs.every(c => {
+      const angle = Number(c.getAttribute('data-angle'))
+      return angle >= 110 && angle <= 250
+    })).toBe(true)
+
+    // 保存時に丸の配置・側がそのまま送信される
+    fireEvent.change(within(dialog).getByLabelText('卓番'), { target: { value: 'R1' } })
+    fireEvent.change(within(dialog).getByLabelText('表示名'), { target: { value: '丸テーブル1' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /^卓を作る$/ }))
+    await waitFor(() => expect(fixture.createTable).toHaveBeenCalled())
+    expect(fixture.createTable.mock.calls.at(-1)?.[1]).toMatchObject({
+      code: 'R1',
+      label: '丸テーブル1',
+      shape: 'circle',
+      chairArrangement: 'one',
+      chairSide: 'bottom',
+    })
+
+    // 再度開いて「丸」→既定の「まわりに均等」で保存すると chairArrangement:'all', chairSide:null が送られる
+    fireEvent.click(await screen.findByRole('button', { name: '卓を作る' }))
+    const dialog2 = screen.getByRole('dialog', { name: '卓を作る' })
+    fireEvent.click(within(dialog2).getByRole('button', { name: '丸' }))
+    fireEvent.change(within(dialog2).getByLabelText('卓番'), { target: { value: 'R2' } })
+    fireEvent.change(within(dialog2).getByLabelText('表示名'), { target: { value: '丸テーブル2' } })
+    fireEvent.click(within(dialog2).getByRole('button', { name: /^卓を作る$/ }))
+    await waitFor(() => expect(fixture.createTable).toHaveBeenCalledTimes(2))
+    expect(fixture.createTable.mock.calls.at(-1)?.[1]).toMatchObject({
+      code: 'R2',
+      shape: 'circle',
+      chairArrangement: 'all',
+      chairSide: null,
+    })
+  })
+
   it('卓一覧の階タブは座席図と別に一覧を絞る', async () => {
     const base = { storeId:'store-1', width:500, height:500, version:1, outline:[], fixtures:[], tables:[] }
     floorApi.floors.mockResolvedValue({ success:true, data:[{...base,id:'floor-a',name:'1階'},{...base,id:'floor-b',name:'テラス'}] })

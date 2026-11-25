@@ -60,3 +60,18 @@ it('広いフロアの縮小表示ではマークと椅子を隠し、卓の操�
  view.rerender(<RestaurantFloorMap floor={wide} labels={props.resources} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
  expect(screen.getByRole('button',{name:'T1'}).querySelector('.lucide-cigarette-off')).toBeTruthy()
 })
+it('座席図の丸卓でも選んだ配置と最大人数どおりの角度に椅子を描く',()=>{
+ const roundAll={...floor,tables:[{id:'t',x:100,y:100,width:80,height:80,rotation:0,shape:'circle' as const,maxCapacity:3,chairArrangement:'all' as const}]}
+ const view=render(<RestaurantFloorMap floor={roundAll} labels={[{id:'t',label:'R1',active:true,capacity:3}]} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
+ const allChairs=[...screen.getByRole('button',{name:'R1'}).querySelectorAll('rect[class*="chair"]')]
+ expect(allChairs.map(c=>Number(c.getAttribute('data-angle')))).toEqual([0,120,240])
+ expect(allChairs.every(c=>/^rotate\(.+ 40 40\)$/.test(c.getAttribute('transform')??''))).toBe(true)
+
+ const roundOne={...floor,tables:[{id:'t',x:100,y:100,width:80,height:80,rotation:0,shape:'circle' as const,maxCapacity:2,chairArrangement:'one' as const,chairSide:'right' as const}]}
+ view.rerender(<RestaurantFloorMap floor={roundOne} labels={[{id:'t',label:'R1',active:true,capacity:2}]} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
+ expect([...screen.getByRole('button',{name:'R1'}).querySelectorAll('rect[class*="chair"]')].map(c=>Number(c.getAttribute('data-angle')))).toEqual([73,107])
+
+ const roundBoth={...floor,tables:[{id:'t',x:100,y:100,width:80,height:80,rotation:0,shape:'circle' as const,maxCapacity:2,chairArrangement:'both' as const}]}
+ view.rerender(<RestaurantFloorMap floor={roundBoth} labels={[{id:'t',label:'R1',active:true,capacity:2}]} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
+ expect([...screen.getByRole('button',{name:'R1'}).querySelectorAll('rect[class*="chair"]')].map(c=>Number(c.getAttribute('data-angle')))).toEqual([270,90])
+})
