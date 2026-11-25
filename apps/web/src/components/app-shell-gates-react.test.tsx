@@ -8,7 +8,10 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({ pathname: '/friends' }))
-vi.mock('next/navigation', () => ({ usePathname: () => fixture.pathname, useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
+  usePathname: () => fixture.pathname,
+}))
 const { gate } = await vi.hoisted(async () => {
   const { createElement } = await import('react')
   return { gate: (name: string) => ({ default: ({ children }: { children: React.ReactNode }) => createElement('div', { 'data-gate': name }, children) }) }
@@ -21,6 +24,7 @@ vi.mock('./store-selection-gate', () => gate('store-selection'))
 vi.mock('./feature-disabled-gate', () => gate('feature-disabled'))
 /* 開店準備ガイドの入れ物（全画面で1つ）が店を見るので、選んでいない状態を返す。 */
 vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>, useOptionalAccount: () => null }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('./shell/app-top-bar', () => ({ default: () => <header data-top-bar="" /> }))
 vi.mock('./layout/sidebar', () => ({ default: () => <nav data-sidebar="" /> }))
 vi.mock('./session-lost-notice', () => ({ default: () => null }))

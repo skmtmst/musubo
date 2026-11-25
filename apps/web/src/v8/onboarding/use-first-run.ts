@@ -39,12 +39,12 @@ export async function loadFirstRunSteps(accountId: string | null): Promise<StepR
 }
 
 type Snapshot =
-  | ({ accountId: string | null; status: 'ready'; error: null } & FirstRunLoad)
-  | { accountId: string | null; status: 'error'; error: unknown }
+  | ({ accountId: string | null; scope: string; status: 'ready'; error: null } & FirstRunLoad)
+  | { accountId: string | null; scope: string; status: 'error'; error: unknown }
 
 type Revalidation =
-  | { accountId: string | null; status: 'loading'; error: null }
-  | { accountId: string | null; status: 'error'; error: unknown }
+  | { accountId: string | null; scope: string; status: 'loading'; error: null }
+  | { accountId: string | null; scope: string; status: 'error'; error: unknown }
 
 /**
  * はじめにやることの状態。開いた時のほか、タブが前に戻った時・スタイルや機能の設定を保存した時に読み直す。
@@ -52,7 +52,8 @@ type Revalidation =
  * 15 分たったら止めて `watchExpired` を立てる（［もう一度確かめる］で `rewatch`）。
  * 後ろで読み直す時は今の表示を消さない（読み込み中に戻さない）。
  */
-export function useFirstRun(accountId: string | null, enabled = true, watch = false) {
+export function useFirstRun(accountId: string | null, enabled = true, watch = false, cacheScope?: string) {
+  const scope = JSON.stringify([accountId, cacheScope])
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [revalidation, setRevalidation] = useState<Revalidation | null>(null)
   const [tick, setTick] = useState(0)
@@ -60,41 +61,58 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   const [watchExpired, setWatchExpired] = useState(false)
   const generation = useRef(0)
   const pendingReload = useRef(false)
+  const cached = useRef<Snapshot | null>(null)
+  const needsRefresh = useRef(false)
+  const wasDisabled = useRef(!enabled)
   const markStale = useCallback(() => {
+    needsRefresh.current = true
     if (!enabled) return
     generation.current += 1
-    setRevalidation({ accountId, status: 'loading', error: null })
-  }, [accountId, enabled])
-  const invalidate = useCallback(() => { generation.current += 1; setRevalidation(null); setSnapshot(null) }, [])
+    setRevalidation({ accountId, scope, status: 'loading', error: null })
+  }, [accountId, enabled, scope])
+  const invalidate = useCallback(() => { generation.current += 1; cached.current = null; setRevalidation(null); setSnapshot(null) }, [])
   const reload = useCallback(() => { pendingReload.current = true; invalidate(); setTick((n) => n + 1) }, [invalidate])
   const refresh = useCallback(() => {
+    needsRefresh.current = true
     if (!enabled || pendingReload.current) return
     const at = ++generation.current
     void loadFirstRun(accountId).then((loaded) => {
       if (generation.current === at) {
+        needsRefresh.current = false
+        cached.current = { accountId, scope, ...loaded, status: 'ready', error: null }
         setRevalidation(null)
-        setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
+        setSnapshot(cached.current)
       }
     }).catch((error: unknown) => {
       /* 後ろの読み直しの失敗では、札用の直前の表示は消さず、保存後の再確認と未取得は失敗として記録する。 */
       if (generation.current !== at) return
-      setRevalidation((prev) => (prev?.accountId === accountId ? { accountId, status: 'error', error } : null))
-      setSnapshot((prev) => (prev?.accountId === accountId && prev.status === 'ready' ? prev : { accountId, status: 'error', error }))
+      setRevalidation((prev) => (prev?.scope === scope ? { accountId, scope, status: 'error', error } : null))
+      setSnapshot((prev) => (prev?.scope === scope && prev.status === 'ready' ? prev : { accountId, scope, status: 'error', error }))
     })
-  }, [accountId, enabled])
+  }, [accountId, enabled, scope])
   useEffect(() => {
-    pendingReload.current = false
     const at = ++generation.current
+    if (!enabled) { wasDisabled.current = true; return }
+    wasDisabled.current = false
+    if (!pendingReload.current && !needsRefresh.current && cached.current?.scope === scope && cached.current.status === 'ready') {
+      setSnapshot(cached.current)
+      return () => { generation.current += 1 }
+    }
+    pendingReload.current = false
     setRevalidation(null)
     setSnapshot(null)
-    if (!enabled) return
+    cached.current = null
     void loadFirstRun(accountId).then((loaded) => {
-      if (generation.current === at) setSnapshot({ accountId, ...loaded, status: 'ready', error: null })
+      if (generation.current === at) {
+        needsRefresh.current = false
+        cached.current = { accountId, scope, ...loaded, status: 'ready', error: null }
+        setSnapshot(cached.current)
+      }
     }).catch((error: unknown) => {
-      if (generation.current === at) setSnapshot({ accountId, status: 'error', error })
+      if (generation.current === at) setSnapshot({ accountId, scope, status: 'error', error })
     })
     return () => { generation.current += 1 }
-  }, [accountId, enabled, tick])
+  }, [accountId, enabled, tick, scope])
   useEffect(() => {
     const featureSaved = (event: Event) => {
       const detail = (event as CustomEvent<FeatureSettingsUpdate>).detail
@@ -130,8 +148,8 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
     return () => { stop(); document.removeEventListener('visibilitychange', changed) }
   }, [enabled, watch, watchExpired, watchRound, refresh])
   const rewatch = useCallback(() => { setWatchExpired(false); setWatchRound((n) => n + 1); refresh() }, [refresh])
-  const current = enabled && snapshot?.accountId === accountId ? snapshot : null
-  const currentRevalidation = enabled && revalidation?.accountId === accountId ? revalidation : null
+  const current = enabled && !(wasDisabled.current && (needsRefresh.current || pendingReload.current)) && snapshot?.scope === scope ? snapshot : null
+  const currentRevalidation = enabled && revalidation?.scope === scope ? revalidation : null
   return {
     steps: current?.status === 'ready' ? current.steps : [],
     firstRun: current?.status === 'ready' ? current.firstRun : null,

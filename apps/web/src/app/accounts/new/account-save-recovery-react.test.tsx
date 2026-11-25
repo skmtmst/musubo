@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import NewLineAccountPage from './page'
 import { ApiError } from '@/lib/api'
+import { deferred } from '@/test-utils/race'
 
 /**
  * R523: LINEアカウント登録の保存応答を失うと未保存と誤案内し、再試行で重複する。
+ * - 本人の途中登録がサーバーで確認できれば、保存済みのIDで接続確認から再開する。
  * - 応答のない保存失敗は「DBには保存していません」と断定せず、同じチャネルIDの
  *   登録済みを照合して詳細への復帰を出す。
  * - 重複エラー（同じ情報での再試行）は行き止まりにせず、登録済みの詳細へ案内する。
@@ -13,6 +15,7 @@ import { ApiError } from '@/lib/api'
  */
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(),
+  registrationResume: vi.fn(), registrationReceipt: vi.fn(), get: vi.fn(), styleGet: vi.fn(),
 }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
@@ -22,6 +25,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.styleGet } }))
 
 const passedSteps = [
   'チャネルIDとシークレットでアクセストークンを発行',
@@ -50,6 +54,10 @@ beforeEach(() => {
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
   calls.list.mockResolvedValue({ success: true, data: [] })
+  calls.registrationResume.mockReset().mockRejectedValue(new ApiError(404, 'LINE_ACCOUNT_NOT_FOUND'))
+  calls.registrationReceipt.mockReset().mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
+  calls.get.mockResolvedValue({ success: true, data: { id: 'acc-resume', name: '登録途中のアカウント', basicId: '@fixture' } })
+  calls.styleGet.mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
   notices.lineRegistration.mockResolvedValue({ success: true, data: { available: false } })
 })
 
@@ -111,6 +119,41 @@ async function save() {
 }
 
 describe('R523 保存の応答消失と重複（本物のReact）', () => {
+  it('保存応答を失っても本人の途中登録のIDを受け取り、LINEの受信確認後に使い方へ進む', async () => {
+    await enterSaveStep()
+    calls.connect.mockRejectedValue(new Error('fetch failed'))
+    calls.registrationResume.mockResolvedValueOnce({ success: true, data: { accountId: 'acc-resume' } })
+    const waiting = deferred<{ success: true; data: { status: 'waiting'; receivedAt: null } }>()
+    calls.registrationReceipt.mockReturnValueOnce(waiting.promise).mockResolvedValueOnce({
+      success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02+09:00' },
+    })
+    calls.list.mockClear()
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      await act(async () => { await save() })
+      expect(screen.getByLabelText('登録の状態を確認しています')).toBeTruthy()
+      expect(calls.registrationResume).toHaveBeenCalledExactlyOnceWith('123456789')
+      expect(calls.registrationReceipt).toHaveBeenCalledExactlyOnceWith('acc-resume')
+      expect(calls.list).not.toHaveBeenCalled()
+      expect(calls.get).not.toHaveBeenCalled()
+
+      await act(async () => waiting.resolve({ success: true, data: { status: 'waiting', receivedAt: null } }))
+      expect(screen.getByRole('heading', { name: '友だち追加できるか確かめます' })).toBeTruthy()
+      expect(screen.getByText('接続を待っています…')).toBeTruthy()
+      expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
+      expect(calls.get).toHaveBeenCalledExactlyOnceWith('acc-resume')
+
+      await act(async () => vi.advanceTimersByTimeAsync(5000))
+      expect(screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeTruthy()
+      expect(calls.registrationReceipt.mock.calls).toEqual([['acc-resume'], ['acc-resume']])
+      expect(calls.styleGet).toHaveBeenCalledExactlyOnceWith('acc-resume', true)
+      expect(calls.connect).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('応答を失っても未保存と断定せず、登録済みの詳細へ復帰する', async () => {
     await enterSaveStep()
     // サーバ側では行が作られたが、応答だけ届かない。
@@ -125,6 +168,8 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
     expect(screen.queryByText(/DBには保存していません/)).toBeNull()
     const back = screen.getByRole('link', { name: '登録したアカウントを見る' })
     expect(back.getAttribute('href')).toBe('/accounts/detail?id=acc-9')
+    expect(calls.registrationResume).toHaveBeenCalledExactlyOnceWith('123456789')
+    expect(calls.registrationReceipt).not.toHaveBeenCalled()
     // 重複作成はしない（保存口は1回だけ）。
     expect(calls.connect).toHaveBeenCalledTimes(1)
   })
@@ -140,6 +185,8 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
 
     await screen.findByText('このチャネルIDは登録済みです。登録済みのアカウントを開いて確認してください。')
     expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toBe('/accounts/detail?id=acc-9')
+    expect(calls.registrationResume).toHaveBeenCalledExactlyOnceWith('123456789')
+    expect(calls.registrationReceipt).not.toHaveBeenCalled()
   })
 
   it('行が無い真の失敗は失敗として出す', async () => {
@@ -150,6 +197,8 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
 
     await screen.findByText('登録できませんでした。時間をおいて、もう一度お試しください。')
     expect(screen.queryByText(/DBには保存していません/)).toBeNull()
+    expect(calls.registrationResume).toHaveBeenCalledExactlyOnceWith('123456789')
+    expect(calls.registrationReceipt).not.toHaveBeenCalled()
   })
 })
 

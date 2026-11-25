@@ -8,11 +8,13 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { ProgressBar } from '@/components/shared/progress'
 import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus, StyleChooseAction } from '@/v8/onboarding/public/style-choice'
+import { readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
 import styles from '@/v8/onboarding/wizard.module.css'
 
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
-export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onClose }: {
+export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onClose, presentationKey = null }: {
   accountName?: string
+  presentationKey?: string | null
   open: boolean
   choice: AccountStyle | ''
   busy: boolean
@@ -22,11 +24,14 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
   onSave: () => void
   onClose: () => void
 }) {
-  const [demoOpen, setDemoOpen] = useState(false)
-  const [demoPage, setDemoPage] = useState(0)
-  const [viewing, setViewing] = useState<AccountStyle>(() => choice || 'restaurant')
-  useEffect(() => { if (choice) setViewing(choice) }, [choice])
+  const [initial] = useState(() => readRegistrationPresentation(presentationKey))
+  const [demoOpen, setDemoOpen] = useState(initial.demoOpen === true)
+  const [demoPage, setDemoPage] = useState(initial.demoPage ?? 0)
+  const [viewing, setViewing] = useState<AccountStyle>(initial.viewing || choice || 'restaurant')
   useEffect(() => { if (!open) { setDemoOpen(false); setDemoPage(0) } }, [open])
+  useEffect(() => {
+    rememberRegistrationPresentation(presentationKey, { viewing, demoOpen, demoPage })
+  }, [presentationKey, viewing, demoOpen, demoPage])
   if (!open) return null
   return <Dialog
     open

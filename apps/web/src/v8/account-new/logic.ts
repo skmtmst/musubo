@@ -1,5 +1,6 @@
 
 import { jstDateOffset } from '@/lib/jst-datetime'
+import { ApiError } from '@/lib/api/transport/errors'
 /*
  * ★V8 LINEアカウントを登録の、画面に依らない小さな計算。
  * src/v8 からは @/app を読めないので、今の登録（app/accounts/connection-check-view.ts・
@@ -7,7 +8,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
  * 中身・判定は同じ。片方を直したらもう片方も同じに直す。
  */
 // 下の readDraft で使う。下の `export * from './precheck'` は出し直しだけで、ここでは使えない。
-import { readPrecheckAnswers, readPrecheckAt, type PrecheckAnswers, type PrecheckAt } from './precheck'
+import { PRECHECK_VERIFIED_ACK, readPrecheckAnswers, readPrecheckAt, type PrecheckAnswers, type PrecheckAt } from './precheck'
 
 /** R523: 同じチャネルIDで作られた行が1件だけなら、その ID。 */
 export function matchRegisteredAccountId(accounts: Array<{ id: string; channelId: string }>, channelId: string): string | null {
@@ -19,7 +20,13 @@ export function matchRegisteredAccountId(accounts: Array<{ id: string; channelId
 
 /** サーバの重複エラーの目印（英語のまま返ることがある）。 */
 export function isDuplicateChannelError(message: string): boolean {
-  return /already registered|UNIQUE constraint/i.test(message)
+  return /already registered|UNIQUE constraint|このLINEチャネルは登録済みです/i.test(message)
+}
+
+export function isDuplicateChannelResponse(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409) return false
+  const { message } = error
+  return isDuplicateChannelError(message)
 }
 
 /** 友だち数の統計は前日分。日本時間の昨日を yyyyMMdd で返す。 */
@@ -40,6 +47,7 @@ export interface DraftState {
   /** ①事前確認の答えと、今出している面。古い下書きには無いので既定へ寄せる。 */
   precheck: PrecheckAnswers
   precheckAt: PrecheckAt
+  acks?: Record<string, boolean>
   name: string; channelId: string; providerId: string; loginChannelId: string; lineId: string
   tagIds: string[]; parentId: string; staffIds: string[]; liffId: string; importFriends: boolean
   importFriendsExplicit?: boolean
@@ -61,6 +69,9 @@ export function readDraft(storage: Pick<Storage, 'getItem'>, key = DRAFT_KEY): D
     const draft: DraftState = {
       step: parsed.step, sub, connectionStepsVersion: 4, accountMethod: parsed.accountMethod === 'new' ? 'new' : 'existing',
       precheck, precheckAt: readPrecheckAt(parsed.precheckAt, precheck),
+      acks: Object.fromEntries(
+        [...WEBHOOK_ACKS.map(item => item.key), ...LOGIN_ACKS.map(item => item.key), PRECHECK_VERIFIED_ACK].flatMap(key => parsed.acks?.[key] === true ? [[key, true]] : []),
+      ),
       name: text(parsed.name), channelId: text(parsed.channelId), providerId: text(parsed.providerId), loginChannelId: text(parsed.loginChannelId), lineId: text(parsed.lineId),
       tagIds: ids(parsed.tagIds), parentId: text(parsed.parentId), staffIds: ids(parsed.staffIds), liffId: text(parsed.liffId),
       importFriends: parsed.importFriends !== false,

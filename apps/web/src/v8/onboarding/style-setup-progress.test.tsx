@@ -38,6 +38,40 @@ beforeEach(() => {
 afterEach(cleanup)
 const values = (progress: Awaited<ReturnType<typeof loadStyleSetupProgress>>) => Object.values(progress.steps).map(step => step?.complete)
 
+it('入口の確認中は飲食店の進捗を隠し、確認後は取得済みの値を使う', async () => {
+  const view = renderHook(({ enabled }) => useStyleSetupProgress('a', 'restaurant', enabled, 'store'), { initialProps: { enabled: true } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  view.rerender({ enabled: false })
+  expect(view.result.current.status).toBe('idle')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+  view.rerender({ enabled: true })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.restaurantProgress).toHaveBeenCalledTimes(1)
+})
+
+it('担当者や権限が変わった直後は飲食店の前の進捗を表示しない', async () => {
+  const view = renderHook(({ identity }) => useStyleSetupProgress('a', 'restaurant', true, 'store', identity), { initialProps: { identity: 'staff-owner' } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  view.rerender({ identity: 'staff-viewer' })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.restaurantProgress).toHaveBeenCalledTimes(2)
+})
+
+it('保存後に入口の確認が入った場合は飲食店の古い進捗を隠して再取得する', async () => {
+  const view = renderHook(({ enabled }) => useStyleSetupProgress('a', 'restaurant', enabled, 'store'), { initialProps: { enabled: true } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  act(() => view.result.current.markStale())
+  view.rerender({ enabled: false })
+  net.restaurantProgress.mockResolvedValueOnce({ success: true, data: { storeId: 'store', tables: false, hours: true, menus: true, reception: true, followup: true, followupRequired: true } })
+  act(() => view.result.current.refresh())
+  view.rerender({ enabled: true })
+  expect(view.result.current.status).toBe('loading')
+  await waitFor(() => expect(view.result.current.progress?.steps.attributes?.complete).toBe(false))
+  expect(net.restaurantProgress).toHaveBeenCalledTimes(2)
+})
+
 it.each(ACCOUNT_STYLES)('%sはその段の既存APIの実設定だけを使う', async style => {
   const progress = await loadStyleSetupProgress('a', style)
   expect(progress.style).toBe(style)
@@ -252,3 +286,13 @@ it('業種進捗でも保存より前に始まったrefreshの応答では結果
   expect(view.result.current.revalidationStatus).toBe('idle')
   expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
 })
+
+it('他のLINEに紐づく唯一の現役店や古い応答から飲食店の進捗を読まない', async () => {
+  net.snapshot.mockResolvedValue({ success: true, data: { stores: [{ id: 'other-store', line_account_id: 'b', status: 'active' }] } });
+  net.context.mockResolvedValue({ success: true, data: { selectedStore: null } });
+  expect((await loadStyleSetupProgress('a', 'restaurant')).steps.attributes?.complete).toBeNull();
+  expect(net.restaurantProgress).not.toHaveBeenCalled();
+
+  net.restaurantProgress.mockResolvedValue({ success: true, data: { storeId: 'store', lineAccountId: 'b', tables: true, hours: true, menus: true, reception: true, followup: true } });
+  expect((await loadStyleSetupProgress('a', 'restaurant', 'store')).steps.attributes?.complete).toBeNull();
+});

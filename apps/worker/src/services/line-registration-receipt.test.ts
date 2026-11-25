@@ -61,5 +61,10 @@ describe('LINE registration receipt', () => {
     expect(await getLineRegistrationReceipt(item.db, 'a'))
       .toEqual({ status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' });
     expect(await getLineRegistrationReceipt(item.db, 'b')).toEqual({ status: 'waiting', receivedAt: null });
+
+    item.raw.prepare("UPDATE line_accounts SET is_active = 0 WHERE id = 'a'").run();
+    expect(await getLineRegistrationReceipt(item.db, 'a')).toEqual({ status: 'waiting', receivedAt: null });
+    item.raw.prepare("UPDATE line_accounts SET is_active = 1, archived_at = ? WHERE id = 'a'").run(createdAt);
+    expect(await getLineRegistrationReceipt(item.db, 'a')).toEqual({ status: 'waiting', receivedAt: null });
   });
 });

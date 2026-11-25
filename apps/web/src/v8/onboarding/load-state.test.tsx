@@ -11,6 +11,48 @@ import { API_MUTATION_SUCCEEDED } from '@/lib/api/transport/mutation-events'
 afterEach(cleanup)
 const ok = (data: unknown) => ({ success: true, data })
 
+it('入口の確認中は進捗を隠し、同じアカウントの確認後は取得済みの値を使う', async () => {
+  net.progress.mockReset().mockResolvedValue(ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'done', href: '/tags', reason: null }] }))
+  const view = renderHook(({ enabled }) => useFirstRun('a', enabled), { initialProps: { enabled: true } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  view.rerender({ enabled: false })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.steps).toEqual([])
+  view.rerender({ enabled: true })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.progress).toHaveBeenCalledTimes(1)
+})
+
+it('担当者や権限が変わった直後は前の進捗を表示しない', async () => {
+  let resolveNext!: (value: unknown) => void
+  const payload = ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state: 'done', href: '/tags', reason: null }] })
+  net.progress.mockReset().mockResolvedValueOnce(payload).mockImplementationOnce(() => new Promise(resolve => { resolveNext = resolve }))
+  const view = renderHook(({ identity }) => useFirstRun('a', true, false, identity), { initialProps: { identity: 'staff-owner' } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  view.rerender({ identity: 'staff-viewer' })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.steps).toEqual([])
+  await act(async () => { resolveNext(payload) })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.progress).toHaveBeenCalledTimes(2)
+})
+
+it('保存後に入口の確認が入った場合は、確認後に読み直して古い進捗を表示しない', async () => {
+  let resolveNext!: (value: unknown) => void
+  const payload = (state: string) => ok({ steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }, { key: 'attributes', state, href: '/tags', reason: null }] })
+  net.progress.mockReset().mockResolvedValueOnce(payload('done')).mockImplementationOnce(() => new Promise(resolve => { resolveNext = resolve }))
+  const view = renderHook(({ enabled }) => useFirstRun('a', enabled), { initialProps: { enabled: true } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  act(() => view.result.current.markStale())
+  view.rerender({ enabled: false })
+  act(() => view.result.current.refresh())
+  view.rerender({ enabled: true })
+  expect(view.result.current.status).toBe('loading')
+  await waitFor(() => expect(net.progress).toHaveBeenCalledTimes(2))
+  await act(async () => { resolveNext(payload('todo')) })
+  await waitFor(() => expect(view.result.current.steps.find(step => step.key === 'attributes')?.state).toBe('todo'))
+})
+
 it('初期設定の取得失敗を表示用のerrorにし、再取得で保存済み状態へ戻る', async () => {
   net.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(ok({ style: 'consult', version: 3 }))
   net.warnings.mockResolvedValue(ok({ items: [] }))

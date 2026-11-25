@@ -176,16 +176,13 @@ it('使い方の状態が遅れたときは案内と数字を一緒に出す', a
   expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
 })
 
-it.each(['restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['0', 'summary'].map(step => [style, step])))('%sはsetup=%sを同じ専用画面で開き、閉じても期間を残す', async (style, step) => {
+it.each(['restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['0', 'summary'].map(step => [style, step])))('%sは旧setup=%sでも同じ専用画面を保つ', async (style, step) => {
   state.search = `setup=${step}&range=week`
   state.get.mockResolvedValue({ success: true, data: { style, styleSelected: true, version: 2, answers: {} } })
   const view = render(<StyleDashboard style={style as 'restaurant' | 'salon' | 'consult' | 'lesson'} />)
-  await screen.findByRole('dialog', { name: step === 'summary' ? '準備ができました' : '使い方のスタイルを選ぶ' }, { timeout: 5000 })
-  if (step === 'summary') await screen.findByRole('heading', { name: '入った物', exact: true })
+  await waitFor(() => expect(state.replace).toHaveBeenLastCalledWith('/?range=week'))
   expect(view.container.querySelector('[data-style-dashboard]')?.getAttribute('data-style-dashboard')).toBe(style)
-  fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(state.replace).toHaveBeenLastCalledWith('/?range=week')
+  expect(screen.queryByRole('dialog', { name: /使い方のスタイル|準備ができました/ })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
 })
 
@@ -198,7 +195,7 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sはQRを1つ�
 })
 
 it.each(['viewer', 'staff'])('役割%sでは専用画面のURLでも質問を開かない', async role => {
-  state.search = 'setup=0'
+  state.search = 'setup=0&setupReturn=accounts'
   const view = render(<StyleDashboard style="restaurant" />)
   await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   state.role = role

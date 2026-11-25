@@ -21,25 +21,40 @@ import { DateEditor, type DateEditorValue } from './hours-date-editor'
 import { dateLabel, googleTypeFor, hoursText, workspaceDay } from './hours-model'
 import { WEEKDAY_JA, errorMessage } from './format'
 import styles from './hours.module.css'
+import { readGuideDraft, writeGuideDraft } from '@/lib/scoped-guide-draft'
 
 export type HoursPanel = { kind:'weekly'; weekday?:HoursWeekday } | {kind:'holiday'} | {kind:'dates'; dates?:string[]; mode?:'dates'|'range'; group?:Array<{date:string;name?:string}>} | {kind:'service'; service?:HoursService} | {kind:'text'}
-export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes, onDraft, onReview, onClose, onEditDates, onUnsavedChange, saving, saved, disabled, lockedReason }: { panel:HoursPanel;data:GoogleProfileData;workspace:HoursWorkspace;holidays:Array<{date:string;name:string}>;serviceTypes:Array<{id:string;label:string}>;onUnsavedChange?:(dirty:boolean)=>void;onDraft:(w:HoursWorkspace)=>void;onReview:()=>void;onClose:()=>void;onEditDates:(dates:string[])=>void;saving:boolean;saved:boolean;disabled:boolean;lockedReason?:string }) {
+type HoursEditorDraft = {
+ version?: number; panel: string; weekdays: HoursWeekday[]; weekPeriods: OpeningPeriod[]; weekClosed: boolean;
+ dateValue: DateEditorValue | null; service: HoursService; text: string; parsed: GoogleChange | null; valid: boolean; editing: boolean;
+}
+
+export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes, onDraft, onReview, onClose, onEditDates, onUnsavedChange, saving, saved, disabled, lockedReason, draftKey = null, draftVersion }: { panel:HoursPanel;data:GoogleProfileData;workspace:HoursWorkspace;holidays:Array<{date:string;name:string}>;serviceTypes:Array<{id:string;label:string}>;onUnsavedChange?:(dirty:boolean)=>void;onDraft:(w:HoursWorkspace)=>void;onReview:()=>void;onClose:()=>void;onEditDates:(dates:string[])=>void;saving:boolean;saved:boolean;disabled:boolean;lockedReason?:string;draftKey?:string|null;draftVersion?:number }) {
+ const panelKey=JSON.stringify(panel)
+ const [restored]=useState(()=>{
+  const value=readGuideDraft<HoursEditorDraft>(draftKey)
+  return value?.version===draftVersion&&value?.panel===panelKey?value:null
+ })
  const [base]=useState(()=>structuredClone(workspace))
  const weekly=workspace.draft.weekly??data.profile.regularHours
  const first=panel.kind==='weekly'?(panel.weekday??HOURS_WEEKDAYS.find(d=>weekly[d].length)??'MONDAY'):'MONDAY'
- const [weekdays,setWeekdays]=useState<HoursWeekday[]>(panel.kind==='weekly'&&panel.weekday?[first]:HOURS_WEEKDAYS.filter(d=>JSON.stringify(weekly[d])===JSON.stringify(weekly[first])))
- const [weekPeriods,setWeekPeriods]=useState<OpeningPeriod[]>(weekly[first].length?weekly[first]:[{open:'11:00',close:'22:00'}])
- const [weekClosed,setWeekClosed]=useState(weekly[first].length===0)
- const [dateValue,setDateValue]=useState<DateEditorValue|null>(null)
- const [service,setService]=useState<HoursService>(panel.kind==='service'&&panel.service?panel.service:{id:crypto.randomUUID(),kind:'lunch',label:'ランチ',googleTypeId:googleTypeFor('lunch',serviceTypes),sameWeekdays:true,weekdays:HOURS_WEEKDAYS.filter(d=>weekly[d].length),periods:[{open:'11:00',close:'15:00'}],orderDeadline:'',menu:''})
+ const [weekdays,setWeekdays]=useState<HoursWeekday[]>(restored?.weekdays??(panel.kind==='weekly'&&panel.weekday?[first]:HOURS_WEEKDAYS.filter(d=>JSON.stringify(weekly[d])===JSON.stringify(weekly[first]))))
+ const [weekPeriods,setWeekPeriods]=useState<OpeningPeriod[]>(restored?.weekPeriods??(weekly[first].length?weekly[first]:[{open:'11:00',close:'22:00'}]))
+ const [weekClosed,setWeekClosed]=useState(restored?.weekClosed??weekly[first].length===0)
+ const [dateValue,setDateValue]=useState<DateEditorValue|null>(restored?.dateValue??null)
+ const [service,setService]=useState<HoursService>(restored?.service??(panel.kind==='service'&&panel.service?panel.service:{id:crypto.randomUUID(),kind:'lunch',label:'ランチ',googleTypeId:googleTypeFor('lunch',serviceTypes),sameWeekdays:true,weekdays:HOURS_WEEKDAYS.filter(d=>weekly[d].length),periods:[{open:'11:00',close:'15:00'}],orderDeadline:'',menu:''}))
  const [deleteOpen,setDeleteOpen]=useState(false)
- const [text,setText]=useState('')
- const [parsed,setParsed]=useState<GoogleChange|null>(null)
+ const [text,setText]=useState(restored?.text??'')
+ const [parsed,setParsed]=useState<GoogleChange|null>(restored?.parsed??null)
  const [parsing,setParsing]=useState(false)
  const [parseError,setParseError]=useState('')
  const [question,setQuestion]=useState('')
- const [valid,setValid]=useState(false)
- const [editing,setEditing]=useState(false)
+ const [valid,setValid]=useState(restored?.valid??false)
+ const [editing,setEditing]=useState(restored?.editing??false)
+ useEffect(()=>{
+  if(!draftKey)return
+  writeGuideDraft(draftKey,{version:draftVersion,panel:panelKey,weekdays,weekPeriods,weekClosed,dateValue,service,text,parsed,valid,editing} satisfies HoursEditorDraft)
+ },[draftKey,draftVersion,panelKey,weekdays,weekPeriods,weekClosed,dateValue,service,text,parsed,valid,editing])
  const localUnsaved=panel.kind==='text'?Boolean(text.trim())&&!parsed:editing&&(!saved||!valid)
  useEffect(()=>{onUnsavedChange?.(localUnsaved);return()=>onUnsavedChange?.(false)},[localUnsaved,onUnsavedChange])
  const title=panel.kind==='weekly'?'毎週の営業時間を編集':panel.kind==='holiday'?'祝日の営業時間':panel.kind==='service'?'サービスの営業時間':panel.kind==='text'?'文章で入力':panel.group?'連休の営業時間':'特別営業日の変更'
@@ -81,7 +96,7 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
     {workspace.holiday.mode==='custom'?<><h3>祝日の営業時間</h3><PeriodFields value={workspace.holiday.periods} disabled={disabled} onChange={periods=>draftHoliday({periods})}/></>:null}
     {workspace.holiday.mode!=='weekly'?<div className={styles.holidayOverride}><ToggleField size="large" checked={workspace.holiday.overrideClosedWeekday} disabled={disabled} lockedReason={lockedReason} onChange={overrideClosedWeekday=>draftHoliday({overrideClosedWeekday})}>定休日でも、祝日は{workspace.holiday.mode==='closed'?'休業する':'営業する'}</ToggleField></div>:null}
     <p className={styles.muted}>振替休日も祝日として扱います。</p><Card surface="preview" layout="vertical" padding="default" gap="var(--space-12)"><h3 className={styles.previewTitle}>祝日の営業予定</h3>{holidays.slice(0,3).map(h=><div className={styles.splitRow} key={h.date}><span>{dateLabel(h.date,data.today.date,true)}</span><strong className={workspaceDay(h.date,data,workspace,holidays).periods.length?styles.green:styles.previewClosed}>{hoursText(workspaceDay(h.date,data,workspace,holidays).periods)}</strong></div>)}<p className={styles.muted}>祝日と指定した休業期間が重なる日は、休業になります。</p></Card><Notice tone="info" appearance="subtle">日付を指定した休業がある場合は、その日は休業します。</Notice>
-  </>:panel.kind==='dates'?<DateEditor weekly={weekly} today={data.today.date} initialDates={panel.dates} initialMode={panel.mode} groupDates={panel.group} initialMemo={base.notes[panel.dates?.[0]??'']??''} initialPeriods={panel.group?workspace.holiday.periods:undefined} removableDates={data.profile.specialHours.map(d=>d.date)} individualDates={[...new Set([...data.profile.specialHours,...base.draft.days.filter(d=>!d.remove)].filter(d=>d.closed).map(d=>d.date))]} original={date=>workspaceDay(date,data,base,holidays)} onChange={draftDate} disabled={disabled}/>:panel.kind==='service'?<>
+  </>:panel.kind==='dates'?<DateEditor weekly={weekly} today={data.today.date} initialDates={panel.dates} initialMode={panel.mode} groupDates={panel.group} initialMemo={base.notes[panel.dates?.[0]??'']??''} initialPeriods={panel.group?workspace.holiday.periods:undefined} removableDates={data.profile.specialHours.map(d=>d.date)} individualDates={[...new Set([...data.profile.specialHours,...base.draft.days.filter(d=>!d.remove)].filter(d=>d.closed).map(d=>d.date))]} original={date=>workspaceDay(date,data,base,holidays)} onChange={draftDate} disabled={disabled} draftKey={draftKey?`${draftKey}:dates`:null} draftVersion={draftVersion}/>:panel.kind==='service'?<>
     <Field optional={false} label="種類"><Select textSize="body" size="full" aria-label="サービスの種類" value={service.kind} disabled={disabled} options={Object.entries(HOURS_SERVICE_LABELS).map(([value,label])=>({value,label}))} onChange={e=>{const kind=e as HoursService['kind'];draftService({kind,label:HOURS_SERVICE_LABELS[kind],googleTypeId:googleTypeFor(kind,serviceTypes)})}}/></Field>
     {service.kind==='other'?<Field optional={false} label="サービス名"><TextField textSize="body" value={service.label} maxLength={80} disabled={disabled} onChange={e=>draftService({label:e.target.value})}/></Field>:null}
     <ToggleField size="large" checked={service.sameWeekdays} disabled={disabled} lockedReason={lockedReason} onChange={sameWeekdays=>draftService({sameWeekdays})}>店舗と同じ曜日に提供する</ToggleField>

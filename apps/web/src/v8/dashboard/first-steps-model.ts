@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { canManageRole } from '@/lib/staff-role'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, stepsForStyle, type StepResult, type StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
@@ -76,7 +77,7 @@ export function useFirstMessageArrived(accountId: string | null, steps: Readonly
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }
 }
 
-export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null; enabled?: boolean; watchFirstMessage?: boolean; watchWaiting?: boolean } = {}) {
+export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null; enabled?: boolean; watchFirstMessage?: boolean; watchWaiting?: boolean; cacheScope?: string } = {}) {
   const enabled = options.enabled !== false && Boolean(accountId) && role !== null
   const [folded, setFolded] = useState(false)
   const [waiting, setWaiting] = useState(false)
@@ -90,9 +91,9 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     sharedSetup.setWatch(id, ownWatch)
     return () => sharedSetup.setWatch(id, false)
   }, [sharedSetup?.setWatch, ownWatch])
-  const ownRun = useFirstRun(accountId, enabled && !sharedSetup, ownWatch)
+  const ownRun = useFirstRun(accountId, enabled && !sharedSetup, ownWatch, options.cacheScope)
   const style = options.style === undefined ? 'standard' : options.style
-  const ownProgress = useStyleSetupProgress(accountId, style, enabled && !sharedSetup, options.storeId)
+  const ownProgress = useStyleSetupProgress(accountId, style, enabled && !sharedSetup, options.storeId, options.cacheScope)
   const state = sharedSetup?.run ?? ownRun
   const progress = sharedSetup?.progress ?? ownProgress
   const displaySteps = stepsForStyle(state.steps, style, progress.progress)
@@ -105,7 +106,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     ガイドの持ち主は全画面で1つ（GuideHost）。貸してもらえる時はそれを使い、
     同じ状態を2つの持ち主がサーバーへ書かないように自前の持ち主は動かさない。
   */
-  const ownGuide = useGuideEngine(shared || !canManageRole(role) ? null : accountId, canManageRole(role) ? summary : null, style === 'restaurant')
+  const ownGuide = useGuideEngine(shared || !canManageRole(role) ? null : accountId, canManageRole(role) ? summary : null, style === 'restaurant', readStaffIdentity()?.id)
   const guide = shared?.guide ?? ownGuide
   useEffect(() => { setFolded(readFirstStepsFolded(accountId)) }, [accountId])
   const toggle = useCallback(() => {

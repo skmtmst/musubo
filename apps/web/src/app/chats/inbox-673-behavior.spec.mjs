@@ -184,6 +184,13 @@ async function prepareInbox(page, options = {}) {
       ] })
       return
     }
+    const accountEntry = path.match(/^\/api\/line-accounts\/([^/]+)\/follower-import$/)
+    if (request.method() === 'GET' && accountEntry && url.searchParams.get('entry') === '1') {
+      if (accountEntry[1] !== SELECTED_ACCOUNT && accountEntry[1] !== OTHER_ACCOUNT) {
+        return fulfillJson(route, { success: false, error: 'LINE_ACCOUNT_NOT_FOUND' }, 404)
+      }
+      return fulfillJson(route, { success: true, data: { destination: 'dashboard', canResume: false } })
+    }
     if (path === '/api/settings/features') {
       await fulfillJson(route, { success: true, data: {
         features: {}, sidebarOrder: null, sidebarItemOrder: null,

@@ -45,6 +45,7 @@ import {planFloorTables} from '@/components/shared/restaurant-floor-placement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import { notifyToast } from '@/components/shared/toast'
+import { guideDraftKey, readGuideDraft, writeGuideDraft } from '@/lib/scoped-guide-draft'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 
 
@@ -143,25 +144,30 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
   const { guide } = useSharedGuide() ?? {}
   const guidingCreate = guide?.phase === 'active' && guide.stepKey === 'attributes' && guide.procedureIndex <= 2
   const [quickCreate, setQuickCreate] = useState(false)
+  const guideTableKey = guideDraftKey('tables', selectedAccountId, store?.id)
 
-  const openNew = useCallback((floorId?: string) => {
+  const openNew = useCallback((floorId?: string, restore = false) => {
+    const savedInput = restore ? readGuideDraft<{ label?: string; maxCapacity?: string }>(guideTableKey) : null
+    const label = typeof savedInput?.label === 'string' ? savedInput.label : ''
+    const maxCapacity = typeof savedInput?.maxCapacity === 'string' ? savedInput.maxCapacity : '2'
     setQuickCreate(guidingCreate)
     setEditorError('')
-    setDraft({ code: '', label: '', seatType: 'table', seatDetailType:'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floorId??floors[0]?.id??'floor-'+store?.id,shape:'rectangle',orientation:'horizontal',smokingPolicy:'non_smoking',partition:'open',shoesAllowed:true,isActive:true,visibleOnMap:true,chairArrangement:'both',chairSide:'left' })
+    setDraft({ code: '', label, seatType: 'table', seatDetailType:'table', minCapacity: '1', maxCapacity, floorX: '', floorY: '', joinGroup: '',floorId:floorId??floors[0]?.id??'floor-'+store?.id,shape:'rectangle',orientation:'horizontal',smokingPolicy:'non_smoking',partition:'open',shoesAllowed:true,isActive:true,visibleOnMap:true,chairArrangement:'both',chairSide:'left' })
     setCreateCount(1)
     setFieldErrors({})
     setEditor('new')
-  }, [floors, store?.id, guidingCreate])
+  }, [floors, store?.id, guidingCreate, guideTableKey])
   const resumeForm = guide?.phase === 'active' && guide.stepKey === 'attributes' && guide.procedureIndex === 2
   const reopened = useRef(false)
   useEffect(() => {
     if (!resumeForm) { reopened.current = false; return }
     if (!canEdit || !store || !snapshotAccountCurrent || reopened.current) return
     reopened.current = true
-    if (!editor) openNew()
+    if (!editor) openNew(undefined, true)
   }, [resumeForm, canEdit, store, snapshotAccountCurrent, editor, openNew])
   const cancelEditor = () => {
     setEditor(null)
+    if (quickCreate) writeGuideDraft(guideTableKey, null)
     if (quickCreate && resumeForm) guide?.pause()
   }
   const openEdit = (table: RestaurantTable) => {
@@ -287,7 +293,10 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
     }
     if (ok) {
       /* 開店準備ガイドの手順2/3（枠14 F8mSog）は保存できた時に次へ進む。 */
-      if (!editing) emitGuideSignal('tables.form')
+      if (!editing) {
+        if (quickCreate) writeGuideDraft(guideTableKey, null)
+        emitGuideSignal('tables.form')
+      }
       setEditor(null)
       if(editing&&editing.is_active&&!draft.isActive){
         if (saveScope === scope.current && canEditRef.current) setPendingStop({ id: editing.id, scope: saveScope, before: beforeSave })
@@ -451,7 +460,10 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
         {draft && selectedAccountId && store ? <form id="rs-table-editor" data-guide-anchor="tables.form" ref={editorRef} className={styles.editorFields} noValidate onSubmit={(event) => { event.preventDefault(); void save() }}>
           {editorError ? <Notice tone="danger" role="alert">{editorError}</Notice> : null}
           {quickCreate
-            ? <GuidedTableFields draft={draft} onChange={setDraft} errors={fieldErrors}/>
+            ? <GuidedTableFields draft={draft} onChange={next => {
+                writeGuideDraft(guideTableKey, { label: next.label, maxCapacity: next.maxCapacity })
+                setDraft(next)
+              }} errors={fieldErrors}/>
             : <TablePenEditor draft={draft} onChange={setDraft} floors={floors} errors={fieldErrors} onCapacity={changeCapacity} count={createCount} onCount={setCreateCount} canBatch={!editing}/>}
         </form> : null}
       </RsDialog>

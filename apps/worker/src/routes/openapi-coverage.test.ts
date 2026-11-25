@@ -835,6 +835,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/integrations/google-sheets/runs',
   'GET /api/integrations/tiktok-pnl/status',
   'GET /api/line-accounts',
+  'GET /api/line-accounts/registration-resume',
   'GET /api/line-accounts/{id}',
   'GET /api/line-accounts/{id}/registration-receipt',
   'GET /api/line-accounts/{id}/handovers',

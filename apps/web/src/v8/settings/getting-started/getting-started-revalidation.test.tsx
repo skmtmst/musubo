@@ -49,6 +49,7 @@ vi.mock('@/lib/restaurant-google-api', () => ({
 
 import { SetupChip } from '@/components/shell/setup-chip'
 import { API_MUTATION_SUCCEEDED } from '@/lib/api/transport/mutation-events'
+import { markLineAccountEntryReady } from '@/lib/line-account-entry'
 import { GuideHost } from '@/v8/onboarding/guide-host'
 import GettingStarted from './getting-started'
 
@@ -76,7 +77,9 @@ function AppShell() {
   )
 }
 
+let clearEntry: (() => void) | undefined
 beforeEach(() => {
+  clearEntry = markLineAccountEntryReady('acc-1')
   window.localStorage.clear()
   nav.path = '/tags'
   nav.push.mockClear()
@@ -89,7 +92,7 @@ beforeEach(() => {
   net.googleProfile.mockReset().mockResolvedValue(null)
 })
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); clearEntry?.() })
 
 it('保存後の読み直しが失敗したとき、札は直前の数を保ち、一覧は古い済みを戻さずエラーと再試行から回復する', async () => {
   nav.path = '/getting-started'

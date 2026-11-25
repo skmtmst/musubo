@@ -8,7 +8,7 @@ import { registrationStorageKey } from './registration-storage'
 import { REGISTRATION_STYLE_KEY } from './use-registration-style'
 
 const mocks = vi.hoisted(() => ({
-  state: vi.fn(), step: vi.fn(), select: vi.fn(), push: vi.fn(), replace: vi.fn(),
+  entry: vi.fn(), state: vi.fn(), step: vi.fn(), select: vi.fn(), push: vi.fn(), replace: vi.fn(),
 }))
 vi.mock('next/navigation', async () => ({
   ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -20,7 +20,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   setSelectedAccountId: mocks.select,
 }) }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
-vi.mock('@/lib/api', () => ({ api: { lineAccounts: { followerImportState: mocks.state, stepFollowerImport: mocks.step } } }))
+vi.mock('@/lib/api', () => ({ api: { lineAccounts: { accountEntry: mocks.entry, followerImportState: mocks.state, stepFollowerImport: mocks.step } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'restaurant' } })) } }))
 
 const importState = (over: Record<string, unknown> = {}) => ({
@@ -35,12 +35,22 @@ beforeEach(() => {
   verifiedStaffRole('owner')
   rememberStaffIdentity({ ...readStaffIdentity()!, id: 'owner-a', tenantId: 'tenant-a' })
   vi.clearAllMocks()
+  mocks.entry.mockResolvedValue({ success: true, data: { destination: 'handover', canResume: false } })
   mocks.state.mockResolvedValue({ success: true, data: importState() })
   mocks.step.mockImplementation(() => new Promise(() => {}))
 })
 afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('統括から友だち引き継ぎへ戻る画面', () => {
+  it('古い引き継ぎリンクでも本人の登録が途中なら同じ登録へ進み、引き継ぎを動かさない', async () => {
+    mocks.entry.mockResolvedValue({ success: true, data: { destination: 'registration', canResume: true } })
+    render(<ResumeFollowerHandover />)
+    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith('/accounts/new?resume=the-shed'))
+    expect(mocks.state).not.toHaveBeenCalled()
+    expect(mocks.step).not.toHaveBeenCalled()
+    expect(mocks.select).not.toHaveBeenCalled()
+  })
+
   it('引き継がず登録した人は未開始をエラーにせず完了へ進める', async () => {
     const key = registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity())!
     localStorage.setItem(`${key}:import:${encodeURIComponent('the-shed')}`, 'false')
@@ -74,7 +84,7 @@ describe('統括から友だち引き継ぎへ戻る画面', () => {
   it('Penの探索中カードを表示して実際のジョブを進める', async () => {
     render(<ResumeFollowerHandover />)
     await screen.findByText('友だちを確認しています', { selector: 'h2' })
-    expect(screen.getByText('飲食店')).toBeTruthy()
+    expect(await screen.findByText('飲食店')).toBeTruthy()
     const bar = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
     expect(bar.childElementCount).toBe(0)
     expect(screen.queryByRole('button', { name: 'アカウントに入る' })).toBeNull()

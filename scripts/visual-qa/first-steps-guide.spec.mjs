@@ -80,7 +80,7 @@ test('店舗に初めて入ったときは開店準備から始まる', async ({
 })
 
 test('接続済みなら設定を残してリッチメニューから始められる', async ({ page }) => {
-  await openFixture(page, { initialGuide: { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 } })
+  await openFixture(page, { firstStep: 'richMenu', initialGuide: { phase: 'paused', stepKey: 'attributes', procedureIndex: 2 } })
   await page.goto(base)
   const restart = page.getByRole('button', { name: '最初から始める', exact: true })
   await expect(restart).toBeVisible()
@@ -332,7 +332,9 @@ test('QRで待機し、閉じている間に届いた最初の1通も再読込�
   await expect(receive.getByRole('status')).toContainText('受信を待っています')
   const receiveBounds = await receive.boundingBox()
   expect(receiveBounds.width).toBeCloseTo(640, 0)
-  expect(Math.abs(receiveBounds.height - 368)).toBeLessThanOrEqual(1)
+  expect(receiveBounds.height).toBeGreaterThan(368)
+  expect(receiveBounds.y + receiveBounds.height).toBeLessThanOrEqual(page.viewportSize().height)
+  await expect(receive.getByRole('button', { name: 'テスト送信を開く' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('guide-receive.png') })
   await receive.getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(receive).toHaveCount(0)
@@ -423,18 +425,21 @@ test('公開確認では最後の公開ボタンにガイドが移る', async ({
   await expect(page.locator('[data-guide-spotlight="menu.form"]')).toBeVisible()
   const basics = page.locator('[data-guide-balloon="friendAdd:2"]')
   const duration = page.getByRole('spinbutton', { name: '所要時間', exact: true })
+  const save = page.getByRole('button', { name: '保存して追加する', exact: true })
   await expect(duration).toHaveValue('')
   await expect(page.getByRole('button', { name: '提供時間', exact: true })).toHaveText('提供時間帯を選ぶ')
   await page.screenshot({ path: info.outputPath('guided-course-empty.png') })
   await page.getByRole('textbox', { name: 'メニュー名' }).fill('ガイド検証用')
   await page.getByRole('spinbutton', { name: '価格（税込）' }).fill('4200')
   await expect(basics).toBeVisible()
+  await expect(save).toBeDisabled()
   await duration.fill('150')
   await page.screenshot({ path: info.outputPath('guided-course-basics.png') })
   await expect(page.locator('[data-guide-balloon="friendAdd:3"]')).toBeVisible()
+  await expect(save).toBeEnabled()
   await page.getByRole('button', { name: '保存する状態', exact: true }).click()
   await page.getByRole('option', { name: '公開', exact: true }).click()
-  await page.getByRole('button', { name: '保存して追加する', exact: true }).click()
+  await save.click()
   const confirmation = page.getByRole('dialog', { name: 'このメニューを公開しますか？' })
   await expect(confirmation.locator(guideBar)).toBeVisible()
   await confirmation.getByRole('button', { name: '一時停止', exact: true }).click({ trial: true })
@@ -810,7 +815,8 @@ test('枠がない日は配分を保存済みにせず、枠作成を案内す�
 test('リッチメニューがすでに公開中なら公開案内を飛ばす', async ({ page }, info) => {
   await openFixture(page, {
     initialGuide: { phase: 'active', stepKey: 'scenario', procedureIndex: 2 },
-    storeProgress: { tables: true, hours: true, menus: true, reception: true },
+    storeProgress: { tables: true, hours: true, menus: true, reception: true,
+      bookingExposure: { reservationLink: true, publicReservationMenu: true, availableCapacity: true } },
   })
   await page.route('**/api/rich-menu-groups?**', route => route.fulfill({ json: {
     success: true,

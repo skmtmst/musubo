@@ -3534,6 +3534,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 止まった段を撮る板（v2KMj）は対応表の api で Webhook だけ止めた返事に差し替える。
    * アカウントのタグ（GET /api/line-account-tags）は一覧と同じ LINE_ACCOUNT_TAGS を下の口で返す（同じ口を2つ置かない）。
    */
+  if (query.get('entry') === '1' && /^\/api\/line-accounts\/[^/]+\/follower-import$/.test(pathname)) {
+    return { success: true, data: { destination: pathname.includes('/visual-qa-account-new/') ? 'handover' : 'dashboard', canResume: false } }
+  }
   if (pathname === '/api/line-accounts/visual-qa-account-new/follower-import') {
     return { success: true, data: { version: 1, capability: 'available', phase: 'importing_ids', eligibilityCheckedAt: null, startedAt: '2026-10-07T01:00:00.000Z', completedAt: null, updatedAt: '2026-10-07T01:02:00.000Z', received: 820, imported: 820, reactivated: 0, claimedUnassigned: 0, alreadyPresent: 0, conflicts: 0, invalid: 0, profilesProcessed: 0, profilesUpdated: 0, profileErrors: 0, lastError: null } }
   }

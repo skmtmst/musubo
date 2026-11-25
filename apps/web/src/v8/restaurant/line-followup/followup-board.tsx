@@ -16,10 +16,12 @@ import { describeSaveFailure } from '@/lib/api/transport/errors'
 import { followupBoardApi,type FollowupBoardSnapshot } from '@/lib/api/helpers/restaurant-followup-board'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
+import { guideDraftKey, writeGuideDraft } from '@/lib/scoped-guide-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { boardRows,draftInput,FOLLOWUP_NAMES,followupTimingLabel,rowContentKey,rowVersionKey,type FollowupCardModel } from './board-model'
 import { FollowupEditor } from './followup-editor'
+import { readFollowupGuideDraft, saveFollowupGuideDraft, type FollowupDraftContent } from './followup-guide-draft'
 import { ReservationFormEditor,ReservationFormSample } from './reservation-form-editor'
 import { FollowupMessageSample } from './message-sample'
 import { TestStartDialog } from './test-start-dialog'
@@ -29,7 +31,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  const { guide } = useSharedGuide() ?? {}
  const guiding = guide?.phase === 'active' && guide.stepKey === 'followup'
  const [snapshot,setSnapshot]=useState<FollowupBoardSnapshot|null>(null),[rows,setRows]=useState<FollowupCardModel[]>([]),[form,setForm]=useState<RestaurantReservationForm|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(false)
- const [editor,setEditor]=useState<FollowupCardModel|null>(null),[formEditor,setFormEditor]=useState(false),[test,setTest]=useState<RestaurantFollowupTrigger|null>(null),[progress,setProgress]=useState<Progress[]|null>(null),[notUsing,setNotUsing]=useState(false)
+ const [editor,setEditor]=useState<{row:FollowupCardModel;initialDraft?:FollowupDraftContent}|null>(null),[formEditor,setFormEditor]=useState(false),[test,setTest]=useState<RestaurantFollowupTrigger|null>(null),[progress,setProgress]=useState<Progress[]|null>(null),[notUsing,setNotUsing]=useState(false)
  const saveErrors=useSaveFormErrors(),fieldFailure=useRef<{error:unknown;row?:FollowupCardModel}|null>(null)
  const errorFields=['messageBubbles','timing','timing.offsetMinutes','timing.offsetDays','timing.sendAtTime','definition','title','definition.title','completionMessage','definition.completionMessage',...Array.from({length:5},(_,i)=>`messageBubbles.${i}.content.text`),...Array.from({length:6},(_,i)=>`definition.fields.${i}.label`)]
  useEffect(()=>{
@@ -47,6 +49,8 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  const [formRepairAccepted,setFormRepairAccepted]=useState(false)
  const lock=useRef(false),alive=useRef(true),canManage=role==='owner'||role==='admin',permission=useRef(canManage)
  permission.current=canManage
+ const draftKey = canManage ? guideDraftKey('followup', accountId, storeId) : null
+ const resumedProcedure = useRef<number | null>(null)
  const lockedReason=role&&!canManage?'オーナーか管理者が決めます':undefined
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const install=useCallback((next:FollowupBoardSnapshot)=>{const nextRows=boardRows(next),nextForm=structuredClone(next.form.definition);setFormRepairAccepted(false);setSnapshot(next);setRows(nextRows);setForm(nextForm);if(repairForm&&next.formError)setFormEditor(true)},[repairForm])
@@ -57,22 +61,49 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  const formChanged=!!form&&!!snapshot&&(JSON.stringify(form)!==JSON.stringify(snapshot.form.definition)||!!snapshot.formError&&formEditor===false&&formRepairAccepted)
  const dirty=changed.length>0||formChanged
  const editingFollowup=editor!==null||formEditor
- const guard=useUnsavedGuard({dirty:editingFollowup?false:dirty,busy:editingFollowup?false:busy,onDiscard:()=>{if(snapshot)install(snapshot)}})
+ function discardPage() {
+  if (snapshot) install(snapshot)
+  writeGuideDraft(draftKey, null)
+  resumedProcedure.current = null
+ }
+ const guard=useUnsavedGuard({dirty:editingFollowup?false:dirty,busy:editingFollowup?false:busy,onDiscard:discardPage})
  const guideRow = rows.find(row => row.trigger === 'reservation_created' && row.editable)
+ const savedGuideRow = savedRows.find(row => row.trigger === 'reservation_created')
  const procedureIndex = guiding ? guide?.procedureIndex : undefined
+ const update = useCallback((row: FollowupCardModel) => {
+  setRows(current => current.map(item => item.trigger === row.trigger ? row : item))
+ }, [])
  useEffect(() => {
-  if (!canManage || !snapshot || !guide || !guideRow || editor || formEditor || busy || progress) return
-  if (procedureIndex === 2 || procedureIndex === 3 || (procedureIndex === 4 && !dirty && !guideRow.enabled)) {
-   guide.startAt?.('followup')
+  if (!canManage || !guide || !guideRow || !savedGuideRow || !procedureIndex || editor || formEditor || busy || progress) return
+  const draft = readFollowupGuideDraft(draftKey, savedGuideRow)
+  const next = draft?.phase === 'confirmed' ? 4 : 2
+  if (draft?.phase === 'confirmed') {
+   // Reapply the previously reviewed content as an unsaved change. The save button still owns the write.
+   const restored = { ...savedGuideRow, enabled: true, timing: draft.timing, bubbles: draft.bubbles }
+   if (rowContentKey(restored) !== rowContentKey(guideRow)) update(restored)
+  } else if (draft?.phase === 'editing' && procedureIndex < 4) {
+   setEditor({ row: guideRow, initialDraft: draft })
+  } else {
+   if (procedureIndex === 2 || procedureIndex === 3 || (procedureIndex === 4 && !dirty && !guideRow.enabled)) {
+    guide.startAt?.('followup')
+   }
+   return
   }
- }, [canManage, snapshot, guide, guideRow, editor, formEditor, busy, progress, procedureIndex, dirty])
+  if (procedureIndex < next && resumedProcedure.current !== next) {
+   resumedProcedure.current = next
+   guide.advanceProcedure(false, next)
+  }
+ }, [canManage, guide, guideRow, savedGuideRow, editor, formEditor, busy, progress, procedureIndex, draftKey, dirty, update])
  function openEditor(row:FollowupCardModel){
   guard.cancelLeave()
-  setEditor(row)
-  if (guiding && row.trigger === 'reservation_created') emitGuideSignal('followup.start', accountId)
+  setEditor({ row })
+  if (guiding && row.trigger === 'reservation_created') {
+   resumedProcedure.current = null
+   saveFollowupGuideDraft(draftKey, row, 'editing')
+   emitGuideSignal('followup.start', accountId)
+  }
  }
  function openFormEditor(){guard.cancelLeave();setFormEditor(true)}
- const update = (row: FollowupCardModel) => setRows(current => current.map(item => item.trigger === row.trigger ? row : item))
  function assertCurrent(){if(!alive.current||!permission.current)throw new Error('操作する権限を確認してください。読み直してからお試しください')}
  async function save(){
   if(lock.current||!canManage||!snapshot||!form||!dirty)return false
@@ -101,6 +132,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
      }catch(e){saveErrors.capture(e);rememberFieldFailure(e,row);mark([row.trigger],'failed',describeSaveFailure(e))}
     }
    }
+   if (done.has('reservation_created')) writeGuideDraft(draftKey, null)
    const latest=await followupBoardApi.read(accountId,storeId)
    const latestRows=boardRows(latest)
    if(alive.current){setSnapshot(latest);if(done.has('form'))setFormRepairAccepted(false);setRows(latestRows.map(row=>done.has(row.trigger)?row:draftRows.find(item=>item.trigger===row.trigger)??row));setForm(done.has('form')?latest.form.definition:draftForm)}
@@ -118,7 +150,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  const testRow=rows.find(row=>row.trigger===test)
  const selectedOn=rows.filter(row=>row.enabled).length
  const alreadySelected = rows.some(row => row.enabled)
- const guideEditor = editor?.trigger === 'reservation_created' && guiding ? procedureIndex === 3 ? 'followup.confirm' : 'followup.body' : undefined
+ const guideEditor = editor?.row.trigger === 'reservation_created' && guiding ? procedureIndex === 3 ? 'followup.confirm' : 'followup.body' : undefined
  return <SaveErrorScope errors={saveErrors}><div className={styles.stack}>
   <NoticeStack>
   {role==='viewer'&&<ReadOnlyNotice/>}
@@ -147,9 +179,21 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
     {row.trigger==='review_request'&&<p className={styles.support} role="status">{snapshot.reviewCount==null?'送信履歴は読めませんでした':`送信履歴 ${snapshot.reviewCount}件`}</p>}
    </Card>)}
   </ListPageCards>
-  <StickyBar status={`オン ${selectedOn}つ・変更 ${changed.length+(formChanged?1:0)}件`} actions={<><Button variant="secondary" disabled={!canManage||busy||dirty||alreadySelected} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':alreadySelected?'オンの送り方を止めて保存してから選べます':undefined} onClick={()=>setNotUsing(true)}>今は使わない</Button><Button variant="secondary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} onClick={()=>install(snapshot)}>元に戻す</Button><Button data-guide-anchor="followup.save" variant="primary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} busy={busy} onClick={()=>void save().then(ok=>{if(ok&&alive.current)emitGuideSignal('followup.save',accountId)})}>保存して作る</Button></>}/>
-  {editor&&<FollowupEditor key={editor.trigger} row={editor} accountId={accountId} storeName={storeName} pageDirty={dirty} pageBusy={busy} guideSlot={guideEditor} onDiscardPage={()=>{install(snapshot);saveErrors.reset();setEditor(null)}} onCancel={()=>{saveErrors.reset();setEditor(null)}} onConfirm={row=>{if(permission.current){update(row);setEditor(null);if(guideEditor)emitGuideSignal('followup.confirm',accountId)}}}/>}
-  {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} pageDirty={dirty} pageBusy={busy} onDiscardPage={()=>{install(snapshot);saveErrors.reset();setFormEditor(false)}} onCancel={()=>{saveErrors.reset();setFormEditor(false)}} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
+  <StickyBar status={`オン ${selectedOn}つ・変更 ${changed.length+(formChanged?1:0)}件`} actions={<><Button variant="secondary" disabled={!canManage||busy||dirty||alreadySelected} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':alreadySelected?'オンの送り方を止めて保存してから選べます':undefined} onClick={()=>setNotUsing(true)}>今は使わない</Button><Button variant="secondary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} onClick={discardPage}>元に戻す</Button><Button data-guide-anchor="followup.save" variant="primary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} busy={busy} onClick={()=>void save().then(ok=>{if(ok&&alive.current)emitGuideSignal('followup.save',accountId)})}>保存して作る</Button></>}/>
+  {editor&&<FollowupEditor key={editor.row.trigger} row={editor.row} initialDraft={editor.initialDraft} accountId={accountId}
+   storeName={storeName} pageDirty={dirty} pageBusy={busy} guideSlot={guideEditor}
+   onDraftChange={guideEditor ? row=>saveFollowupGuideDraft(draftKey,row,'editing') : undefined}
+   onDiscardPage={()=>{discardPage();saveErrors.reset();setEditor(null)}}
+   onCancel={()=>{if(guideEditor)writeGuideDraft(draftKey,null);saveErrors.reset();setEditor(null)}}
+   onConfirm={row=>{
+    if(!permission.current)return
+    update(row);setEditor(null)
+    if(guideEditor){
+     saveFollowupGuideDraft(draftKey,row,'confirmed')
+     emitGuideSignal('followup.confirm',accountId)
+    }
+   }}/>}
+  {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} pageDirty={dirty} pageBusy={busy} onDiscardPage={()=>{discardPage();saveErrors.reset();setFormEditor(false)}} onCancel={()=>{saveErrors.reset();setFormEditor(false)}} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
   {testRow&&<TestStartDialog key={testRow.trigger} row={testRow} accountId={accountId} storeId={storeId} storeName={storeName} recipient={snapshot.board.testRecipient} canManage={canManage} lockedReason={lockedReason} onCancel={()=>{setTest(null);void load().catch(()=>{})}} onStarted={load}/>}
   {notUsing&&<Dialog open title="今は使わないと設定しますか" guideSlot={procedureIndex===1?'followup.start':'followup.save'} description="この店の『LINE来店フォローを確認する』を済みにします。送り方はすべてオフのままです。" confirmLabel="今は使わない" onCancel={()=>setNotUsing(false)} onConfirm={()=>void decideNotUsing()} busy={busy}/>}
   {progress&&!editor&&!formEditor&&<Dialog open title={busy?'保存しています…':'保存の結果'} busy={busy} onCancel={()=>setProgress(null)}>
