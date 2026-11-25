@@ -11,7 +11,8 @@
 import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
-import { useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { useAccountStyle, STALE_STYLE_TEXT } from '@/hooks/use-account-style'
 import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
 import Notice from '@/components/shared/notice'
@@ -45,9 +46,13 @@ export default function GettingStartedV8() {
   usePageTitle('はじめの設定')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
+  const shared = useSharedGuide()
   const profile = useAccountStyle(selectedAccountId)
-  const firstRun = useFirstRun(selectedAccountId, !accountLoading)
-  const progress = useStyleSetupProgress(selectedAccountId, profile.data?.style ?? null, !accountLoading)
+  const sharedSetup = selectedAccountId && role !== null && shared?.setup?.accountId === selectedAccountId ? shared.setup : undefined
+  const ownFirstRun = useFirstRun(selectedAccountId, !accountLoading && !sharedSetup)
+  const ownProgress = useStyleSetupProgress(selectedAccountId, profile.data?.style ?? null, !accountLoading && !sharedSetup)
+  const firstRun = sharedSetup?.run ?? ownFirstRun
+  const progress = sharedSetup?.progress ?? ownProgress
   const steps = stepsForStyle(firstRun.steps, profile.data?.style ?? null, progress.progress)
   const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : profile.status === 'ready' && progress.status !== 'loading' ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
   const loadError = firstRun.error ?? profile.error
@@ -75,6 +80,7 @@ export default function GettingStartedV8() {
           />
         ) : (
           <>
+            {shared?.guide.phase === 'paused' && canManageRole(role) ? <Notice tone="info" action={<Button onClick={shared.guide.resume}>ガイドを再開</Button>}>開店準備ガイドを一時停止しています。</Notice> : null}
             <div className={styles.progress} role="note">
               <strong className={styles.progressText}>{progressHeadline(steps)}</strong>
               <ProgressBar className={styles.bar} value={100 * done / Math.max(steps.length, 1)} label="はじめの設定の進み具合" />

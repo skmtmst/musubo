@@ -12,7 +12,7 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let active = true
-    if (!enabled || !accountId || !style || style === 'standard') return
+    if (!enabled || !accountId || !style) return
     void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
       if (active) setSnapshot({ scope, progress })
     }).catch(() => {
@@ -29,7 +29,7 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
     return () => { window.removeEventListener(ACCOUNT_STYLE_UPDATED, reload); document.removeEventListener('visibilitychange', reload) }
   }, [accountId])
   return {
-    status: !enabled || !accountId || !style || style === 'standard' ? 'idle' as const : snapshot?.scope === scope ? 'ready' as const : 'loading' as const,
+    status: !enabled || !accountId || !style ? 'idle' as const : snapshot?.scope === scope ? 'ready' as const : 'loading' as const,
     progress: enabled && snapshot?.scope === scope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
     reload: () => setTick(value => value + 1),
   }

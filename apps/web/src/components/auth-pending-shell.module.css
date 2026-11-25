@@ -1,33 +1,4 @@
 .pending {
-  position: relative;
   min-height: 100dvh;
-  background: var(--color-ground);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  height: 64px;
-  padding: 0 20px;
-}
-
-.progress {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--space-32);
-  height: var(--space-32);
-  margin: calc(var(--space-16) * -1);
-  border: var(--space-2) solid var(--color-progress-track);
-  border-top-color: var(--color-progress-on);
-  border-radius: 50%;
-  animation: spin var(--motion-spin) linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .progress { animation: none; }
+  background: var(--tpl-auth-page-bg);
 }

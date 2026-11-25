@@ -44,7 +44,7 @@ function slotChangeText(plan: Extract<SnsAdditionPlan, { kind: 'over-quota' }>):
 
 type AdditionDialogProps = {
   plan: Extract<SnsAdditionPlan, { kind: 'over-quota' }>
-  /** LINE アカウントの呼び名（「然（zen）」）。 */
+  /** LINE アカウントの呼び名（「見本アカウント」）。 */
   accountName: string
   busy?: boolean
   error?: string

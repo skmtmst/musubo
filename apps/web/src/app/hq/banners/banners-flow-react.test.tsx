@@ -16,7 +16,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   presets: vi.fn(), stats: vi.fn(), listProjects: vi.fn(), listImages: vi.fn(), getProject: vi.fn(), upload: vi.fn(),
-  createGeneration: vi.fn(), getGeneration: vi.fn(), cancel: vi.fn(), push: vi.fn(), replace: vi.fn(), query: '',
+  listAccounts: vi.fn(), aiSettings: vi.fn(), createGeneration: vi.fn(), getGeneration: vi.fn(), cancel: vi.fn(), push: vi.fn(), replace: vi.fn(), query: '',
 }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
@@ -33,11 +33,12 @@ vi.mock('@/lib/api', async (original) => {
         images: { ...actual.api.hqBanners.images, list: mocks.listImages },
         generations: { ...actual.api.hqBanners.generations, get: mocks.getGeneration, cancel: mocks.cancel },
       },
-      lineAccounts: { ...actual.api.lineAccounts, list: vi.fn(async () => ({ success: true, data: [] })) },
+      lineAccounts: { ...actual.api.lineAccounts, list: mocks.listAccounts },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [] } })) },
     },
   }
 })
+vi.mock('@/lib/api/helpers/gap3', () => ({ accountAiFeaturesApi: { get: mocks.aiSettings } }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -74,6 +75,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   flushListUrlState()
   mocks.query = ''
+  localStorage.removeItem('lh_hq_banner_ai_account')
+  mocks.listAccounts.mockResolvedValue({ success: true, data: [{ id: 'a1', name: '本店', isActive: true }] })
+  mocks.aiSettings.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: true }] } })
   window.history.replaceState(null, '', '/hq/banners')
   document.documentElement.dataset.theme = 'v8'
   mocks.presets.mockResolvedValue({ success: true, data: { presets: [PRESET], maxCount: 4, engineReady: true, usage: { month: { used: 1, limit: 150, remaining: 149 }, today: { used: 1, limit: 30, remaining: 29 }, paused: false, pausedReason: null } } })
@@ -154,13 +158,46 @@ describe('バナー生成のプロジェクトの中', () => {
     const start = await screen.findByRole('button', { name: /^生成する（\d+ 枚）$/ })
     expect(start.closest('[data-shared-part="sticky-bar"]')).not.toBeNull()
     expect(screen.getByRole('button', { name: '条件をクリア' }).closest('[data-shared-part="sticky-bar"]')).not.toBeNull()
+    await screen.findByText('本店')
+    expect(screen.queryByRole('button', { name: 'AI を使うアカウント' })).toBeNull()
     fireEvent.change(document.querySelector('input[placeholder]:not([type="file"])')!, { target: { value: '秋の新商品' } })
     await act(async () => { fireEvent.click(start) })
     await waitFor(() => expect(mocks.getGeneration).toHaveBeenCalledWith('g-new'))
-    expect(mocks.createGeneration).toHaveBeenCalledWith('p1', expect.objectContaining({ presetKey: 'line_rich_message' }))
+    expect(mocks.createGeneration).toHaveBeenCalledWith('p1', expect.objectContaining({ presetKey: 'line_rich_message' }), { accountId: 'a1' })
     // 読み直しの間隔（1.5秒）より長く待っても、終わった生成をもう一度読まない。
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 1800)) })
     expect(mocks.getGeneration).toHaveBeenCalledTimes(1)
+  })
+
+  it('複数の候補から前回選んだ利用可能なアカウントを復元する', async () => {
+    mocks.listAccounts.mockResolvedValue({ success: true, data: [{ id: 'a1', name: '本店', isActive: true }, { id: 'a2', name: '支店', isActive: true }, { id: 'a3', name: '停止店', isActive: true }] })
+    mocks.aiSettings.mockImplementation(async (id: string) => ({ success: true, data: { items: [{ feature: 'banner', enabled: id !== 'a3' }] } }))
+    localStorage.setItem('lh_hq_banner_ai_account', 'a2')
+    mocks.createGeneration.mockResolvedValue({ success: true, data: generation('g-new', 'queued') })
+    mocks.getGeneration.mockResolvedValue({ success: true, data: generation('g-new', 'done') })
+    render(<HqBannerProjectV8 />)
+    // 選ぶ部品（EntitySelect）は選んだ名前を押す所の外側の行に出す。
+    expect((await screen.findByRole('button', { name: 'AI を使うアカウント' })).parentElement?.textContent).toContain('支店')
+    fireEvent.change(document.querySelector('input[placeholder]:not([type="file"])')!, { target: { value: '秋の新商品' } })
+    fireEvent.click(screen.getByRole('button', { name: /^生成する（\d+ 枚）$/ }))
+    await waitFor(() => expect(mocks.createGeneration).toHaveBeenCalledWith('p1', expect.anything(), { accountId: 'a2' }))
+  })
+
+  it('利用できるアカウントがないと生成できず理由を表示する', async () => {
+    mocks.aiSettings.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
+    render(<HqBannerProjectV8 />)
+    expect((await screen.findAllByText('AI を使えるアカウントがありません')).length).toBeGreaterThan(0)
+    const start = screen.getByRole('button', { name: /^生成する（\d+ 枚）$/ }) as HTMLButtonElement
+    expect(start.disabled).toBe(true)
+    fireEvent.click(start)
+    expect(mocks.createGeneration).not.toHaveBeenCalled()
+  })
+
+  it('設定を確認できないときは0件と区別して生成を止める', async () => {
+    mocks.aiSettings.mockRejectedValue(new Error('offline'))
+    render(<HqBannerProjectV8 />)
+    expect((await screen.findAllByText(/AI を使うアカウントを確認できませんでした/)).length).toBeGreaterThan(0)
+    expect((screen.getByRole('button', { name: /^生成する（\d+ 枚）$/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('走っている生成は「生成をやめる」で止める口へ送る', async () => {

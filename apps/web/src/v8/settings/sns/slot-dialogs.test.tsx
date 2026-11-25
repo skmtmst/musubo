@@ -36,7 +36,7 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
 
-const ACCOUNT = '然（zen）'
+const ACCOUNT = '見本アカウント'
 const PAID: SnsSlotBilling = { kind: 'paid', monthlyDaysRemaining: 15, monthlyDaysInPeriod: 30 }
 const TRIAL: SnsSlotBilling = { kind: 'trialing' }
 

@@ -2,7 +2,8 @@
 .titleLine { display:flex; align-items:center; gap:var(--tpl-e78-field-gap); }
 .titleLine h3 { margin:var(--tpl-e78-qr-zero); font-size:var(--tpl-e78-label-size); font-weight:600; line-height:var(--tpl-e78-label-lh); }
 .storeRow { display:flex; align-items:center; gap:var(--tpl-e78-pair-gap); min-width:0; }
-.storeDetails { display:flex; flex-direction:column; gap:var(--tpl-e78-step-gap); min-width:0; }
+.storeInfo { display:flex; align-items:center; justify-content:space-between; gap:var(--tpl-e78-step-gap); min-width:0; }
+.storeDetails { flex:1; display:flex; flex-direction:column; gap:var(--tpl-e78-step-gap); min-width:0; }
 .thumb { width:var(--tpl-e78-qr-thumb); height:var(--tpl-e78-qr-thumb); flex-shrink:0; border-radius:var(--tpl-e78-qr-progress); outline:1px solid var(--color-hairline); outline-offset:-1px; }
 .actions { display:flex; align-items:center; flex-wrap:wrap; gap:var(--tpl-e78-step-gap); }
 .sub { font-size:var(--tpl-e78-sub-size); line-height:var(--tpl-e78-sub-lh); color:var(--color-ink-secondary); margin:var(--tpl-e78-qr-zero); }

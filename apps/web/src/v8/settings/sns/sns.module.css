@@ -169,6 +169,34 @@
   min-width: 0;
 }
 
+/* 行の対処の1行（Instagram の期限切れ・DM の許可なし）。知らせの印は文の前の色の点だけ。 */
+.remedy {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-folder-dot-gap);
+  margin: var(--polish-space-none);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-sns-meta-lh);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.remedy::before {
+  content: '';
+  flex: 0 0 var(--tpl-folder-dot-size);
+  width: var(--tpl-folder-dot-size);
+  height: var(--tpl-folder-dot-size);
+  border-radius: 50%;
+  background: var(--polish-status-danger-dot);
+  transform: translateY(-1px);
+}
+
+.remedy[data-tone='warn']::before {
+  background: var(--polish-status-warning-dot);
+}
+
 /* 行の最後の段：行の中の移動（「営業時間へ →」）。 */
 .btnRow {
   grid-column: 1 / -1;

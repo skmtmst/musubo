@@ -243,7 +243,8 @@
 .composer[data-drop-over] .inputBox { outline-color: var(--color-accent-deep); background: var(--color-accent-soft); }
 .attachNote { min-width: 0; flex: 1; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
 .attachNote[data-error] { color: var(--color-danger); }
-.attachLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
+/* 左のクリップは押せる大きさを必ず残す。送信の操作と並びきらない幅では、操作を次の行へ回す（重ねない）。 */
+.attachLead { display: flex; min-width: var(--tpl-inbox-composer-btn-h); flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
 
 /* 会話の中の動画・ファイル */
 .sentVideo { display: block; width: var(--tpl-inbox-sent-video-w); max-width: 100%; border-radius: var(--tpl-inbox-composer-input-radius); background: var(--color-canvas-sunken); }
@@ -263,3 +264,6 @@ a.sentFile:hover .sentFileName { text-decoration: underline; }
 .sentFileSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
 
 .tpError, .tpErrorNoticePlacement { width: 100%; }
+
+/* 送るとこうなります：改行はそのまま、会話を読む場所を残すため2行で切る（全文は［全文を見る］の窓で読む）。 */
+.sendPreviewText { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: pre-wrap; overflow-wrap: anywhere; }

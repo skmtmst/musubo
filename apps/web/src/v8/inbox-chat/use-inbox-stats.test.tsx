@@ -76,3 +76,17 @@ it('未読で絞った件数にも一覧と同じアカウント・検索・担�
   expect(api.chats.quickCounts).toHaveBeenCalledWith({ status: undefined, accountId: 'account-b', q: '確認', operatorId: 'staff-b', unreadOnly: true, channel: 'line' })
   expect(view.result.current.quickCountsNow?.all).toBe(230)
 })
+
+it('Instagramを選ぶとInstagramの件数を読み込む', async () => {
+  vi.mocked(api.chats.quickCounts).mockResolvedValue({ success: true, data: { all: 2, reply: 1, overdue: 0 } })
+  const view = renderHook(() => useInboxStats({ ...options, socialChannel: 'instagram' }))
+  await act(async () => {})
+  expect(api.chats.quickCounts).toHaveBeenCalledWith(expect.objectContaining({ channel: 'instagram', socialChannel: 'instagram' }))
+  expect(view.result.current.quickCountsNow).toEqual({ all: 2, reply: 1, overdue: 0 })
+})
+
+it('メール専用では媒体がすべてでもメールの件数を読み込む', async () => {
+  renderHook(() => useInboxStats({ ...options, channel: 'email', socialChannel: 'all' }))
+  await act(async () => {})
+  expect(api.chats.quickCounts).toHaveBeenCalledWith(expect.objectContaining({ channel: 'email', socialChannel: 'all' }))
+})

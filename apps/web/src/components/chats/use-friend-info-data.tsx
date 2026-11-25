@@ -1,10 +1,26 @@
 'use client'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { asArray, isFriendDetailShape } from './friend-detail-shape'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useEffect,useState } from 'react'
 import { FriendFieldsState,MileageState,PurchaseState,RichMenuState,UpcomingState } from './friend-info-model'
 import { type FriendDetail } from './friend-info-types'
+
+const MILEAGE_FEATURE_ID = 'mileage'
+
+/**
+ * 顧客のマイルを読む。店でマイルを使っていない（403 FEATURE_DISABLED・featureId=mileage）ときは
+ * 'disabled' を返し、取得失敗と分ける。それ以外の失敗はそのまま投げる。
+ */
+async function loadFriendMileage(friendId: string) {
+  try {
+    return await api.friends.mileage(friendId, 10)
+  } catch (reason) {
+    if (reason instanceof ApiError && reason.status === 403 && reason.code === 'FEATURE_DISABLED'
+      && reason.featureId === MILEAGE_FEATURE_ID) return 'disabled' as const
+    throw reason
+  }
+}
 
 type Options = {
   friendId: string | null
@@ -69,9 +85,11 @@ export function useFriendInfoData({ friendId, accountId }: Options) {
     }
     let cancelled = false
     setMileage({ kind: 'loading' })
-    api.friends.mileage(friendId, 10).then((res) => {
+    loadFriendMileage(friendId).then((res) => {
       if (cancelled) return
-      if (res.success && res.data?.summary) {
+      if (res === 'disabled') {
+        setMileage({ kind: 'disabled' })
+      } else if (res.success && res.data?.summary) {
         setMileage({ kind: 'data', summary: res.data.summary, history: asArray(res.data.history) })
       } else {
         setMileage({ kind: 'error' })

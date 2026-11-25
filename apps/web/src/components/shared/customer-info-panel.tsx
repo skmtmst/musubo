@@ -2,7 +2,7 @@
 import TextLink from '@/components/shared/text-link'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { FileText, Settings2 } from 'lucide-react'
 import HelpTip from './help-tip'
 import Avatar from './avatar'
@@ -27,14 +27,16 @@ export function CustomerInfoViewport({ children }: { children: ReactNode }) {
 }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
-  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard', includeDiningFields = false,
+  friendId, accountId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard', includeDiningFields = false, canViewFriend = false,
 }: {
   friendId: string
+  accountId?: string | null
   profile?: { name: string | null; pictureUrl?: string | null; addedAt: string }
   fields: FriendField[]
   state: 'loading' | 'ready' | 'error'
   onRetry?: () => void
   canEdit: boolean
+  canViewFriend?: boolean
   sections: CustomerInfoSection[]
   more?: ReactNode
   extraSections?: CustomerInfoSection[]
@@ -91,13 +93,7 @@ export default function CustomerInfoPanel({
     return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
   })
   const choices = [{ key: 'names', label: '基本' }, ...[...sorted, ...extraSections].map(({ key, label }) => ({ key, label }))]
-  return <div className={styles.panel} data-customer-info-panel data-label-width={labelWidth === 'wide' ? 'wide' : undefined}>
-    {profile ? <div className={styles.profile}>
-      <Avatar name={profile.name} src={profile.pictureUrl} size={32} />
-      <span className={styles.profileName} title={profile.name ?? '名前なし'}>{profile.name ?? '名前なし'}</span>
-      <span className={styles.profileDate} title={profile.addedAt}>{profile.addedAt.replace(/(\d+)年(\d+)月(\d+)日に友だち追加/, '$1/$2/$3 追加')}</span>
-    </div> : null}
-    {!hidden.includes('names') ? <section ref={basicSectionRef} className={styles.section} aria-label="基本" onKeyDown={event => {
+  const basicSection = <section ref={basicSectionRef} className={styles.section} aria-label="基本" onKeyDown={event => {
       if (event.key !== 'Escape' || !editing || saving || event.defaultPrevented || !event.currentTarget.contains(event.target as Node) || (event.target as HTMLElement).closest('[aria-expanded="true"]')) return
       const innerDialog = (event.target as HTMLElement).closest('[role="dialog"], [role="alertdialog"]')
       if (innerDialog && event.currentTarget.contains(innerDialog)) return
@@ -122,7 +118,7 @@ export default function CustomerInfoPanel({
             const field = shownFields.find(field => field.fixedKey === spec.key)!
             return <div className={styles.row} key={spec.key} data-layout={spec.key === 'allergy' && editing ? 'stack' : undefined}>
               <dt>{spec.label}</dt>
-              <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
+              <dd>{spec.key === 'allergy' ? <AllergyField accountId={accountId} value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
                 : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />
                 : <span className={value?.trim() ? styles.value : styles.note} title={display?.trim() ? display : undefined}>{display?.trim() ? display : '未設定'}</span>}{source && !editing ? <HelpTip hover label={`${spec.label}の出どころ`} icon={<FileText aria-hidden="true" />}>{source}</HelpTip> : null}</dd>
             </div>
@@ -138,27 +134,28 @@ export default function CustomerInfoPanel({
         finally { if (generation.current === started) setSaving(false) }
       }}>保存する</Button></div>{saveError ? <p className={styles.note} role="alert">{saveError}</p> : null}</> : null}
       {hiddenPersonalCount > 0 ? <p className={styles.note}>個人情報は閲覧権限が必要です。</p> : null}
-    </section> : null}
-    {sorted.filter(section => !hidden.includes(section.key)).map(section => <section className={styles.section} key={section.key} aria-label={section.label}>
+    </section>
+  return <div className={styles.panel} data-customer-info-panel data-label-width={labelWidth === 'wide' ? 'wide' : undefined}>
+    {profile ? <div className={styles.profile}>
+      {canViewFriend ? <TextLink inline className={styles.profileLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`} aria-label={`友だちの詳細を開く：${profile.name ?? '名前なし'}`} title={profile.name ?? '名前なし'}><Avatar name={profile.name} src={profile.pictureUrl} size={32} /><span className={styles.profileName}>{profile.name ?? '名前なし'}</span></TextLink> : <><Avatar name={profile.name} src={profile.pictureUrl} size={32} /><span className={styles.profileName} title={profile.name ?? '名前なし'}>{profile.name ?? '名前なし'}</span></>}
+      <span className={styles.profileDate} title={profile.addedAt}>{profile.addedAt.replace(/(\d+)年(\d+)月(\d+)日に友だち追加/, '$1/$2/$3 追加')}</span>
+    </div> : null}
+    {[{ key: 'names', content: basicSection }, ...[...sorted, ...(expanded ? extraSections : [])].map(section => ({ key: section.key, content: <section className={styles.section} key={section.key} aria-label={section.label}>
       <div className={styles.head}><h3>{section.label}{section.key === 'memo' ? <HelpTip label="メモの説明">この人について担当者同士で共有するメモです。お客さまには送られません。</HelpTip> : null}</h3>{section.action}</div>
       <div className={styles.content}>{section.content}</div>
-    </section>)}
+    </section> }))].sort((a, b) => (order.indexOf(a.key) < 0 ? 999 : order.indexOf(a.key)) - (order.indexOf(b.key) < 0 ? 999 : order.indexOf(b.key))).filter(section => !hidden.includes(section.key)).map(section => <Fragment key={section.key}>{section.content}</Fragment>)}
     <Button onClick={() => setExpanded(current => !current)} aria-expanded={expanded}>
       {expanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
     </Button>
     {expanded ? <div className={styles.more}>
       <TextLink inline href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>情報欄をすべて見る</TextLink>
-      {extraSections.filter(section => !hidden.includes(section.key)).map(section => <section className={styles.section} key={section.key} aria-label={section.label}>
-        <div className={styles.head}><h3>{section.label}{section.key === 'memo' ? <HelpTip label="メモの説明">この人について担当者同士で共有するメモです。お客さまには送られません。</HelpTip> : null}</h3>{section.action}</div>
-        <div className={styles.content}>{section.content}</div>
-      </section>)}
       {more}
     </div> : null}
     <PermissionGatedButton allowed={canEdit} variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</PermissionGatedButton>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="基本情報の変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
-      ...choices.map(choice => ({...choice, group:'顧客情報の段'})),
-      ...fixedSpecs.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
+    {settings && canEdit ? <DisplayItemsDialog title="表示項目" hierarchy items={[
+      ...choices.map(choice => { const section = [...sections, ...extraSections].find(item => item.key === choice.key); return {...choice, group:'顧客情報の段', note: section && (section.content == null || section.content === false || (Array.isArray(section.content) && section.content.length === 0)) ? 'いまは出ていません（中身が無い）' : undefined} }),
+      ...fixedSpecs.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本', note: state === 'ready' && (!fields.some(field => field.fixedKey === spec.key) || (spec.key === 'age' && birthdayVisible)) ? 'いまは出ていません' : undefined})),
     ]} selected={[...choices.map(choice => choice.key),...fixedSpecs.map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
       manageHref="/friend-fields" onCancel={() => setSettings(false)} onConfirm={keys => {
         const all = [...choices.map(choice => choice.key),...fixedSpecs.map(spec => `fixed:${spec.key}`)]

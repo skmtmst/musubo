@@ -158,6 +158,170 @@
     height: auto;
   }
 }
+
+/*
+ * 開閉の項目（DisclosureItem）。1枚のカードの中に縦に並べ、項目の間は線でなく余白で分ける。
+ *
+ *   見出しの行  項目名 12/500 の灰・「？」・閉じている時は右に行き先・右端に ∨（要約があるときは2行の真ん中）
+ *   要約        見出しの下に 14/500 の黒。注意は色の点＋文字。中身が無い（なし・—）時は灰
+ *   押せる範囲  見出しの行いっぱい（開閉のボタンの ::after）。「？」と行き先はその上に重ねる
+ *   開く        ∨ が motion-base で 180° 回る。中身は motion-fast で薄く出る。行き先は中身の下（12）へ移る
+ */
+.item {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.item + .item {
+  margin-block-start: var(--polish-space-card);
+}
+
+.itemHead {
+  position: relative;
+  min-inline-size: 0;
+}
+
+.itemRow {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'title help . action chevron';
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.itemTitle {
+  grid-area: title;
+  min-inline-size: 0;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--text-lh);
+}
+
+.itemToggle {
+  display: block;
+  max-inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.itemToggle::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--space-4) * -1) calc(var(--polish-space-row) * -1);
+  border-radius: var(--radius-control);
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.itemToggle:hover::after {
+  background: var(--polish-hover);
+}
+
+.itemToggle:active::after {
+  background: var(--polish-active);
+}
+
+.itemHead:has(.itemToggle:focus-visible) {
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--space-4);
+  border-radius: var(--radius-control);
+}
+
+.itemHelp,
+.itemAction {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: var(--polish-space-row);
+  white-space: nowrap;
+}
+
+.itemHelp {
+  grid-area: help;
+}
+
+.itemAction {
+  grid-area: action;
+}
+
+.itemChevron {
+  grid-area: chevron;
+  inline-size: var(--polish-icon-small);
+  block-size: var(--polish-icon-small);
+  margin-inline-start: var(--polish-space-row);
+  color: var(--color-ink-secondary);
+  pointer-events: none;
+  transition: rotate var(--motion-base) var(--motion-ease-out);
+}
+
+.item[data-open] .itemChevron {
+  rotate: 180deg;
+}
+
+.itemSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-inline-size: 0;
+  margin: var(--space-2) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-callout);
+  font-weight: var(--font-weight-ui);
+  line-height: var(--text-lh);
+}
+
+.itemSummary[data-empty] {
+  color: var(--color-ink-secondary);
+}
+
+.itemSummaryText {
+  min-inline-size: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.itemDot {
+  flex: 0 0 var(--polish-status-dot-size);
+  inline-size: var(--polish-status-dot-size);
+  block-size: var(--polish-status-dot-size);
+  border-radius: var(--radius-pill);
+}
+
+.itemDot[data-tone='danger'] {
+  background: var(--polish-status-danger-dot);
+}
+
+.itemDot[data-tone='warning'] {
+  background: var(--polish-status-warning-dot);
+}
+
+.item[data-open] .itemBody {
+  padding-top: var(--polish-space-field);
+}
+
+.itemFoot {
+  display: flex;
+  min-inline-size: 0;
+  margin-block-start: var(--polish-space-field);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .item[data-open] .itemBody {
+    animation: disclosure-in var(--motion-fast) var(--motion-ease-out);
+  }
+}
 }
 
 .note {
@@ -169,3 +333,5 @@
 }
 
 html:root .root[data-size='body'] .title { font-size:14px; font-weight:600; }
+/* 全体の焦点輪より優先し、外側の行の輪だけを表示する。 */
+html:root .itemToggle.itemToggle:focus-visible { outline: none; }

@@ -11,6 +11,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { listOutboundSendFailures } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { Context } from 'hono';
+import { instagramInboxCounts } from '../services/instagram-inbox-list.js';
 
 export const get__api_operators_1 = async (c: Context<Env, "/api/operators">) => {
   try {
@@ -92,7 +93,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
     const assignee = c.req.query('assignee') ?? operatorId;
     const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
     const channel = c.req.query('channel') || 'all';
-    if (channel !== 'all' && channel !== 'line' && channel !== 'email') {
+    if (channel !== 'all' && channel !== 'line' && channel !== 'email' && channel !== 'instagram') {
       return c.json({ success: false as const, error: 'invalid_channel' }, 400);
     }
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
@@ -110,7 +111,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
     let line = { all: 0, reply: 0, overdue: 0 };
     let email = { all: 0, reply: 0, overdue: 0 };
 
-    if (channel !== 'email') {
+    if (channel !== 'email' && channel !== 'instagram') {
       // ── LINE 側。一覧クエリと同じ候補集合（messages_log ∪ chats）を
       // 同じ条件で数える。preview 用の集約は不要なので CTE 2本だけ。 ──
     const accountFilterBindings: string[] = [];
@@ -222,7 +223,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
      * メールは LINE アカウントに所属しないため、選択中のアカウントが
      * あっても数える（一覧と同じ）。 ──
      */
-    if (channel !== 'line' && scope.canSeeUnassigned) {
+    if (channel !== 'line' && channel !== 'instagram' && scope.canSeeUnassigned) {
       const statusSql = !status || status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -278,14 +279,19 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       };
     }
 
+    const includeInstagram = (channel === 'instagram' || channel === 'all' || c.req.query('socialChannel') === 'all') && channel !== 'email' && !status && !assignee;
+    const instagram = includeInstagram ? await instagramInboxCounts(c.env.DB, {
+      accounts: lineAccountId ? [lineAccountId] : scope.allowedAccountIds, staffId: staff.id, query, unreadOnly,
+    }) : { all: 0, reply: 0, overdue: 0 };
     return c.json({
       success: true as const,
       data: {
-        all: line.all + email.all,
-        reply: line.reply + email.reply,
+        all: line.all + email.all + instagram.all,
+        reply: line.reply + email.reply + instagram.reply,
         overdue: line.overdue + email.overdue,
         line,
         email,
+        instagram,
       },
     });
   } catch (err) {

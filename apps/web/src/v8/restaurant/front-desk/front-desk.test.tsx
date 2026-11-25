@@ -12,6 +12,8 @@ vi.hoisted(() => {
 const api = vi.hoisted(() => ({
   createReservation: vi.fn(), postSeatVisitMark: vi.fn(), reservationsDay: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(),
 }))
+const floorApi = vi.hoisted(() => ({ floors: vi.fn(async () => ({ data: [] })) }))
+vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: floorApi }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
@@ -90,6 +92,7 @@ describe('ウォークイン（E-3）', () => {
     for (let i = 0; i < 4; i += 1) fireEvent.click(screen.getByRole('button', { name: '人数を増やす' }))
     await waitFor(() => expect(screen.queryByText('T1')).toBeNull())
     expect(screen.getByText('個室A')).not.toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: /個室A/ }))
     fireEvent.click(screen.getByRole('button', { name: /入店にする/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ seated: true }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({ guestCount: 6, tableId: 'pa' }))
@@ -196,4 +199,75 @@ it.each([{accountId:'other',storeId:'store-1'},{accountId:'acc',storeId:'other'}
  view.rerender(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props} {...next}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
  view.rerender(<PhoneReservationDrawer staffRole="owner" storeName="人工店舗" {...props}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
  expect(api.createReservation).not.toHaveBeenCalled()
+})
+
+it('電話予約は中央の窓で開き、入力中のキャンセルで破棄を確認する', async () => {
+  const onClose = vi.fn()
+  render(<PhoneReservationDrawer staffRole="owner" open accountId="acc" storeId="store-1" tables={T} onClose={onClose} onSaved={vi.fn()} />)
+  expect(await screen.findByRole('dialog', { name: '電話予約を入れる' })).toBeTruthy()
+  fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '見本 太郎' } })
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+  expect(await screen.findByRole('dialog', { name: '入力を破棄しますか？' })).toBeTruthy()
+  expect(onClose).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+  expect(screen.getByRole('textbox', { name: 'お名前' })).toHaveProperty('value', '見本 太郎')
+})
+
+it('電話予約も階のタブで卓を選び、選んだ卓を保存する', async () => {
+  floorApi.floors.mockResolvedValueOnce({ data: [{ id: 'one', name: '1階' }, { id: 'terrace', name: 'テラス' }] } as never)
+  const scopedTables = T.map((table, index) => ({ ...table, floor_id: index === 1 ? 'terrace' : 'one' }))
+  const onSaved = vi.fn()
+  render(<PhoneReservationDrawer staffRole="owner" open accountId="acc" storeId="store-1" tables={scopedTables} onClose={() => {}} onSaved={onSaved} />)
+  fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '見本 太郎' } })
+  fireEvent.click(screen.getByText(/明日/))
+  fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
+  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(await screen.findByRole('tab', { name: /テラス/ }))
+  expect((screen.getByRole('button', { name: /予約を入れる/ }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('radio', { name: /T2/ }))
+  expect(screen.getByRole('tab', { name: /テラス/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '決める' }))
+  expect(screen.queryByRole('tablist', { name: '階・エリア' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
+  await waitFor(() => expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({ tableId: 't2', guestCount: 2 })))
+  expect(onSaved).toHaveBeenCalled()
+})
+
+it('選んだ階の卓が人数に合わなくなっても別の階の卓を勝手に選ばない', async () => {
+  floorApi.floors.mockResolvedValueOnce({ data: [{ id: 'one', name: '1階' }, { id: 'terrace', name: 'テラス' }] } as never)
+  const scoped = T.map((table, index) => ({ ...table, floor_id: index === 1 ? 'terrace' : 'one' }))
+  render(<PhoneReservationDrawer staffRole="owner" open accountId="acc" storeId="store-1" tables={scoped} onClose={() => {}} onSaved={vi.fn()} />)
+  fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '見本 太郎' } })
+  fireEvent.click(screen.getByText(/明日/))
+  fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
+  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(await screen.findByRole('tab', { name: /テラス/ }))
+  fireEvent.click(screen.getByRole('radio', { name: /T2/ }))
+  fireEvent.click(screen.getByRole('button', { name: '人数を増やす' }))
+  expect((screen.getByRole('button', { name: /予約を入れる/ }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('radio', { checked: true })).toBeNull()
+  expect(api.createReservation).not.toHaveBeenCalled()
+})
+
+it('保存中に続けて押されても電話予約を二重に作らない', async () => {
+  let finish!: (value: unknown) => void
+  api.createReservation.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<PhoneReservationDrawer staffRole="owner" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+  fireEvent.change(screen.getByRole('textbox', { name: 'お名前' }), { target: { value: '見本 太郎' } })
+  fireEvent.click(screen.getByText(/明日/))
+  fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
+  const submit = screen.getByRole('button', { name: /予約を入れる/ })
+  fireEvent.click(submit); fireEvent.click(submit)
+  expect(api.createReservation).toHaveBeenCalledTimes(1)
+  finish({ success: true, data: { id: 'new', lineNotice: { sent: true } } })
+  await waitFor(() => expect(api.createReservation).toHaveBeenCalledTimes(1))
+})
+
+it('閲覧のみでは予約ボタンに権限が必要な理由を付けて保存しない', async () => {
+  render(<PhoneReservationDrawer staffRole="viewer" open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
+  const submit = await screen.findByRole('button', { name: /予約を入れる/ })
+  expect(submit.getAttribute('aria-disabled')).toBe('true')
+  expect(submit.hasAttribute('data-permission-locked')).toBe(true)
+  fireEvent.click(submit)
+  expect(api.createReservation).not.toHaveBeenCalled()
 })

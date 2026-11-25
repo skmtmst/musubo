@@ -201,10 +201,10 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       {googleTabs}
       <Card className={styles.guideConnection} layout="vertical" gap="normal" padding="spacious">
         <CardHeader size="stacked" title="Googleビジネスプロフィールとつなぐ" />
-        <p>お店のGoogleアカウントとつなぐと、営業時間がここに取り込まれ、予約枠の計算に使われます。口コミの確認・返信もできるようになります。</p>
+        <p className={styles.guideText}>お店のGoogleアカウントとつなぐと、営業時間がここに取り込まれ、予約枠の計算に使われます。口コミの確認・返信もできるようになります。</p>
         {connectFailure || searchParams.get('google')?.startsWith('error:') ? <Notice tone="danger">{connectFailure || 'Googleに接続できませんでした。もう一度お試しください。'}</Notice> : null}
         {canManage && data.permissions.canManageConnection && data.oauthConfigured
-          ? <div><Button data-guide-anchor="hours.googleConnect" variant="primary" onClick={() => void connect(accountId)} busy={connectBusy} disabled={connectBusy}>Googleアカウントとつなぐ</Button></div>
+          ? <div><Button data-guide-anchor="hours.googleConnect" variant="primary" onClick={() => void connect(accountId)} busy={connectBusy} busyLabel="Google に移動しています…" disabled={connectBusy}>Googleアカウントとつなぐ</Button></div>
           : <Notice tone="warn">{canManage && data.permissions.canManageConnection ? 'Google接続の設定を管理者にご確認ください。' : '管理者にGoogleビジネスの接続を依頼してください。'}</Notice>}
       </Card>
     </>

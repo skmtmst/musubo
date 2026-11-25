@@ -6,7 +6,7 @@ import MessageInsertRow,{MessageBody,MessageInsertButton} from '@/components/sha
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Button from '@/components/shared/button'
-import type { InsertTokenSpec } from '@/components/shared/insert-tokens'
+import { resolveDefaultToken, type InsertTokenSpec } from '@/components/shared/insert-tokens'
 import { FollowupTemplatePicker } from './followup-template-picker'
 import styles from './board.module.css'
 const inserts:InsertTokenSpec[]=[
@@ -15,7 +15,8 @@ const inserts:InsertTokenSpec[]=[
  {token:'{{var.guest_count}}',label:'人数',hint:'この予約の人数',icon:'idcard'},
  {token:'{{var.store_name}}',label:'お店の名前',hint:'予約したお店の名前',icon:'store'},
 ]
-const editorTokens:InsertTokenSpec[]=[...inserts,{token:'{{var.reservation_datetime}}',label:'予約の時間',hint:'この予約の日時',icon:'calendar'}]
+// 共通情報の形の予約の日時は、ほかの画面と同じ札の名前（共通の見本の表）で読む。画面専用の {{reservation_datetime}} は上の「予約の時間」のまま。
+const editorTokens:InsertTokenSpec[]=[...inserts,{token:'{{var.reservation_datetime}}',label:resolveDefaultToken('{{var.reservation_datetime}}')?.label??'予約の日時',hint:'この予約の日時',icon:'calendar'}]
 function MessageTextBody({value,onValueChange,guideReady,...props}:ComponentProps<typeof InsertTextField>&{guideReady?:boolean}){
  const ref=useRef<InsertTextFieldHandle>(null)
  function insert(token:string){const at=ref.current?.selectionStart??value.length,end=ref.current?.selectionEnd??at;onValueChange(value.slice(0,at)+token+value.slice(end));requestAnimationFrame(()=>{ref.current?.focus();ref.current?.setSelectionRange(at+token.length,at+token.length)})}

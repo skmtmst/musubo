@@ -6,7 +6,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import TotpQr from '@/components/shared/totp-qr'
 
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
-import ListToolbar from '@/components/shared/list-toolbar'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { avatarInitials } from '@/components/shared/avatar';
@@ -57,6 +57,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import EditorSurface from '@/components/shared/editor-surface'
 import { PageFooter } from '@/components/templates/page-footer'
 import ListState from '@/components/shared/list-state'
+import AccountRequiredState from '@/components/shared/account-required-state'
 import { useSearchParams } from 'next/navigation';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -772,7 +773,17 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const router = useRouter()
 
   const tab = useMergedTab(STAFF_TAB_KEYS, 'tab', 'members')
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, accounts } = useAccount()
+  const section = useSearchParams().get('section')
+  const sessionsRef = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    if (section !== 'sessions' || tab !== 'members') return
+    const details = sessionsRef.current
+    if (!details) return
+    details.open = true
+    const frame = requestAnimationFrame(() => details.scrollIntoView({ block: 'start' }))
+    return () => cancelAnimationFrame(frame)
+  }, [section, tab])
   const [members, setMembers] = useState<StaffMember[]>([])
   const [membersAccountId, setMembersAccountId] = useState<string | null>(null)
   const [accessUsers, setAccessUsers] = useState<AccessUserItem[]>([])
@@ -814,7 +825,14 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     setSummaryReady(false)
     try {
       const scope = selectedAccountId ?? undefined
-      if (!scope) throw new Error('アカウントを選択してください')
+      if (!scope) {
+        setMembers([])
+        setMembersAccountId(null)
+        setAccessUsers([])
+        setUsersTotal(0)
+        setAccessRoles([])
+        return
+      }
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
         api.staff.list(scope),
         loadStaffIdentity(),
@@ -1090,8 +1108,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             return (
               <GridRow key={user.id}>
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
-                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}{me?.id === user.id ? '（自分）' : ''}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
-                <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><span className={styles.personNameLine}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}{me?.id === user.id ? '（自分）' : ''}</button></span>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
+                <GridCell stack className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}{user.status === 'active' && user.mfaEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastLoginAt ? formatStaffDate(user.lastLoginAt) : undefined}>{lastLoginDay(user.lastLoginAt)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
@@ -1130,29 +1148,22 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             </>
           ) : (
             <>
-              <ListToolbar
-                search={{ width: 220, label: '名前・メールで探す', placeholder: '名前・メールで探す', value: query, onChange: setQuery }}
-                filters={tab === 'members' ? (
-                  <SegmentedControl<'active' | 'suspended' | 'all'>
-                    aria-label="利用状態で絞り込む"
-                    fit="content"
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={[
-                      { value: 'active', label: '有効', count: summaryReady ? activeCount : undefined },
-                      { value: 'suspended', label: '止めた', count: summaryReady ? suspendedCount : undefined },
-                      { value: 'all', label: 'すべて' },
-                    ]}
-                  />
-                ) : null}
-                trailing={administrator ? (
-                  <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
-                ) : (
+              {selectedAccountId ? <ListToolbarFrame singleRow><ListToolbarRow>
+                <ListToolbarSearchSlot width={180} search={{ label: '名前・メールで探す', placeholder: '名前・メールで探す', value: query, onChange: setQuery }} />
+                {tab === 'members' ? <SegmentedControl<'active' | 'suspended' | 'all'>
+                  aria-label="利用状態で絞り込む" fit="content" value={statusFilter} onChange={setStatusFilter}
+                  options={[
+                    { value: 'active', label: '有効', count: summaryReady ? activeCount : undefined },
+                    { value: 'suspended', label: '止めた', count: summaryReady ? suspendedCount : undefined },
+                    { value: 'all', label: 'すべて' },
+                  ]}
+                /> : null}
+                {administrator ? <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
                   /* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */
-                  <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>
-                )}
-              />
+                  : <Button variant="primary" lockedReason={inviteLockReason} disabled={!inviteLockReason}><UserPlus size={16} aria-hidden="true" />招待する</Button>}
+              </ListToolbarRow></ListToolbarFrame> : null}
               {resendError ? <Notice tone="danger" message={resendError} /> : null}
+              {tab === 'members' && summaryReady && missing > 0 ? <Notice tone="warn" message={`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`} /> : null}
               {tab === 'roles' ? (
                 <div className={styles.roleCards}>
                   {accessRoles.map((role) => (
@@ -1164,9 +1175,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   ))}
                 </div>
               ) : null}
-              {listCard}
-              {tab === 'members' && missing > 0 ? <p className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</p> : null}
-              {!loading && !error ? (
+              {selectedAccountId ? listCard : <AccountRequiredState hasAccounts={(accounts?.length ?? 0) > 0} />}
+              {selectedAccountId && !loading && !error ? (
                 <div className={styles.listFoot}>
                   <p>{`ユーザー ${formatNumber(filteredUsers.length)} 人中 ${formatNumber(shown.length)} 人を表示${usersTotal > accessUsers.length ? `（全${formatNumber(usersTotal)} 人中${formatNumber(accessUsers.length)} 人まで読み込み）` : ''}`}</p>
                   {usersTotal > accessUsers.length ? (
@@ -1176,7 +1186,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} correctOutOfRange={!loading && !error} />
                 </div>
               ) : null}
-              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
+              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認" detailsRef={sessionsRef}><SessionsCard /></Disclosure> : null}
               {administrator && tab === 'roles' ? <MfaPolicy compact key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
             </>
           )}

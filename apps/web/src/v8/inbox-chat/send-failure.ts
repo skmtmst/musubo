@@ -1,6 +1,8 @@
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 import { formatTime } from '@/lib/format'
+import type { InsertTokenNames } from '@/components/shared/insert-tokens'
+import { unresolvedSendFailureText } from './chat-inserts'
 
 type SendFailureData = {
   retryable?: boolean
@@ -32,7 +34,7 @@ function describeWaitUntil(nextRetryAt: string | null | undefined, now: Date): s
  * 区別し、429系は安全な待機時間まで添える。文言は機械codeから作り、
  * 例外本文や内部文言は画面へ出さない。
  */
-export function describeSendFailure(error: unknown, now: Date = new Date()): string {
+export function describeSendFailure(error: unknown, now: Date = new Date(), names: InsertTokenNames = {}): string {
   if (!(error instanceof ApiError)) {
     return '通信状況を確認して、もう一度送信してください。'
   }
@@ -63,12 +65,9 @@ export function describeSendFailure(error: unknown, now: Date = new Date()): str
   }
 
   // N-026: 差し込みが残ったままだと送信口が止める。LINEの拒否ではなく
-  // 本文側の問題なので、直せる変数名をそのまま伝える。
+  // 本文側の問題なので、直す差し込みを札の名前で伝える（生の {{…}} は出さない）。
   if (error.code === 'UNRESOLVED_TEMPLATE_VARIABLES') {
-    const vars = (error.data as { variables?: string[] } | undefined)?.variables
-    return vars?.length
-      ? `差し込みを解決できませんでした: ${vars.map((v) => `{{${v}}}`).join(' ')}。内容を修正して送り直してください。`
-      : '差し込みを解決できませんでした。内容を修正して送り直してください。'
+    return unresolvedSendFailureText((error.data as { variables?: string[] } | undefined)?.variables ?? [], names)
   }
 
   if (error.status === 400) {

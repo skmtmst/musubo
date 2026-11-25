@@ -9,9 +9,15 @@ import type {
   TemplateFolderOption,
   TemplateFolderStatus,
 } from './template-folder-select'
-import { TemplatePickerView, type TemplatePickerSideKey } from '@/v8/inbox-chat/public/template-picker-view/index'
+import { TemplatePickerView, type TemplatePickCheck, type TemplatePickerSideKey } from '@/v8/inbox-chat/public/template-picker-view/index'
 
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
+
+/** 今の相手で確かめた結果（送信と同じ解決器）。確かめられなかった時は failed（「問題なし」にしない）。 */
+type PickPreview = { status: 'ready'; content: string; unresolved: string[] } | { status: 'failed' }
+type PreviewTarget = { id: string; name: string; content: string }
+const EMPTY_PREVIEWS: ReadonlyMap<string, PickPreview> = new Map()
+const previewKey = (target: PreviewTarget) => `${target.id}\u0000${target.content}`
 
 /**
  * 一覧口が返す使用数。shared の `Template` には無いが、GET /api/templates
@@ -90,12 +96,17 @@ export default function TemplatePicker({
   const [foldersStatus, setFoldersStatus] = useState<TemplateFolderStatus>('loading')
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(selectedAccountId)
-  const [resolvedPreview, setResolvedPreview] = useState<{
-    forId: string
-    chatId: string
-    content: string
-    unresolved: string[]
-  } | null>(null)
+  /*
+   * 確かめた結果の控え。開く・閉じる・アカウント・会話が変わるたびに世代を進め、
+   * 前の世代の結果と遅れて届いた応答は使わない（行き来しても前の相手の値を出さない）。
+   */
+  const previewScopeRef = useRef({ key: '', generation: 0 })
+  const previewScopeKey = `${open ? 'open' : 'closed'}\u0000${selectedAccountId ?? ''}\u0000${chatId ?? ''}`
+  if (previewScopeRef.current.key !== previewScopeKey) previewScopeRef.current = { key: previewScopeKey, generation: previewScopeRef.current.generation + 1 }
+  const previewGeneration = previewScopeRef.current.generation
+  const [previewCache, setPreviewCache] = useState<{ generation: number; items: ReadonlyMap<string, PickPreview> }>({ generation: 0, items: EMPTY_PREVIEWS })
+  const previewItems = previewCache.generation === previewGeneration ? previewCache.items : EMPTY_PREVIEWS
+  const previewRequested = useRef(new Set<string>())
   const accountDataCurrent = loadedAccountId === selectedAccountId
   const emptyTemplates = useMemo<UsageAwareTemplate[]>(() => [], [])
   const emptyFolders = useMemo<Folder[]>(() => [], [])
@@ -306,7 +317,6 @@ export default function TemplatePicker({
     [selectedId, shown],
   )
   const previewTemplate = shown.find(template => template.id === previewId) ?? null
-  const renderTarget = previewTemplate ?? selectedTemplate
 
   /* INBOX-15: よく使うの実績が1件も無いときは、推測と実績を区別して断る。 */
   const frequentHasUsage = useMemo(
@@ -314,41 +324,79 @@ export default function TemplatePicker({
     [category, shown],
   )
 
-  // N-026: 差し込みを含むテンプレートは、送信と同じ解決器の結果をプレビューに
-  // 出す。生の `{{name}}` のまま見せると「送ったらどう届くか」が分からず、
-  // 解決できない差し込みも送信まで気づけない。
+  /*
+   * 差し込みを含むテンプレートは、送信と同じ解決器の結果をプレビューに出す。
+   * 確かめるのは見ている1件と、まとめて送るときに選んだもの（最大5件）だけ。一覧の全部には問い合わせない。
+   */
+  const previewTargets = useMemo<PreviewTarget[]>(() => {
+    // 入れるもの（選択中）と、右に中身を見ているものは別々に確かめる（同じとは限らない）。
+    const list: PreviewTarget[] = []
+    const add = (target: PreviewTarget) => { if (!list.some((item) => item.id === target.id)) list.push(target) }
+    for (const template of [selectedTemplate, previewTemplate]) if (template) add({ id: template.id, name: template.name, content: template.messageContent })
+    if (packMode) packItems.forEach(add)
+    return list.filter((target) => target.content.includes('{{'))
+  }, [selectedTemplate, previewTemplate, packMode, packItems])
   useEffect(() => {
-    if (!open || !renderTarget || !chatId || !renderTarget.messageContent.includes('{{')) {
-      setResolvedPreview(null)
-      return
+    if (!open || !chatId) return
+    const generation = previewGeneration
+    // 前の世代の問い合わせの印は持ち越さない（開き直し・相手の切り替えで取り直す）。
+    if (![...previewRequested.current].every((key) => key.startsWith(`${generation}\u0000`))) {
+      previewRequested.current = new Set([...previewRequested.current].filter((key) => key.startsWith(`${generation}\u0000`)))
     }
-    let cancelled = false
-    const templateId = renderTarget.id
-    void api.chats.renderPreview(chatId, {
-      content: renderTarget.messageContent,
-      messageType: 'text',
-    }).then((res) => {
-      if (cancelled) return
-      setResolvedPreview(
-        res.success
-          ? { forId: templateId, chatId, content: res.data.content, unresolved: res.data.unresolved }
-          : null,
-      )
-    }).catch(() => {
-      if (!cancelled) setResolvedPreview(null)
-    })
-    return () => {
-      cancelled = true
+    for (const target of previewTargets) {
+      const key = previewKey(target)
+      const requestKey = `${generation}\u0000${key}`
+      if (previewItems.has(key) || previewRequested.current.has(requestKey)) continue
+      previewRequested.current.add(requestKey)
+      const store = (result: PickPreview) => {
+        if (previewScopeRef.current.generation !== generation) return
+        setPreviewCache((prev) => {
+          const items = new Map(prev.generation === generation ? prev.items : EMPTY_PREVIEWS)
+          items.set(key, result)
+          return { generation, items }
+        })
+      }
+      void api.chats.renderPreview(chatId, { content: target.content, messageType: 'text' })
+        .then((res) => store(res.success ? { status: 'ready', content: res.data.content, unresolved: res.data.unresolved } : { status: 'failed' }))
+        .catch(() => store({ status: 'failed' }))
     }
-  }, [open, renderTarget, chatId])
+  }, [open, chatId, previewGeneration, previewTargets, previewItems])
+
+  const pickerTemplates = useMemo(() => shown.map((template) => ({ id: template.id, name: template.name, content: template.messageContent })), [shown])
 
   if (!open) return null
 
   const selected = selectedTemplate
-  const previewContent =
-    resolvedPreview && renderTarget && resolvedPreview.forId === renderTarget.id && resolvedPreview.chatId === chatId
-      ? resolvedPreview.content
-      : null
+  const resultOf = (target: PreviewTarget) => (chatId ? previewItems.get(previewKey(target)) : undefined)
+  /* 一覧・右の中身は、それぞれのテンプレートで確かめた値を見せる。 */
+  const resolvedPreviews: Record<string, string> = {}
+  for (const target of previewTargets) {
+    const result = resultOf(target)
+    if (result?.status === 'ready') resolvedPreviews[target.id] = result.content
+  }
+  /*
+   * 注意は口が実際に解決できなかった差し込みだけで出す（予約がある相手には予約の値が入る）。
+   * 1通のときは入力欄に入れる選択中のもので決める（右で別のものを見ていても混ぜない）。
+   * まとめて送るときは、選んだもの全部の結果を合わせ、該当するテンプレートの名前を添える。
+   */
+  const pickCheck: TemplatePickCheck | null = (() => {
+    if (!chatId) return null
+    const pack = packMode && onPickPack
+    const targets: PreviewTarget[] = pack
+      ? packItems.filter((item) => item.content.includes('{{'))
+      : selected && selected.messageContent.includes('{{') ? [{ id: selected.id, name: selected.name, content: selected.messageContent }] : []
+    const results = targets.map((target) => ({ target, result: resultOf(target) }))
+    const unresolvedResults = results.filter(({ result }) => result?.status === 'ready' && result.unresolved.length > 0)
+    if (unresolvedResults.length) {
+      return {
+        status: 'unresolved',
+        names: [...new Set(unresolvedResults.flatMap(({ result }) => (result?.status === 'ready' ? result.unresolved : [])))],
+        // 右で別のものを見ているときは、どれの話かを名前で添える。
+        templates: pack || (previewTemplate && previewTemplate.id !== selected?.id) ? unresolvedResults.map(({ target }) => target.name) : [],
+      }
+    }
+    return results.some(({ result }) => result?.status === 'failed') ? { status: 'failed' } : null
+  })()
 
   const togglePackItem = (template: UsageAwareTemplate) => {
     setPackItems((prev) => {
@@ -411,7 +459,7 @@ export default function TemplatePicker({
       status={visibleTemplatesStatus}
       emptyText={search.trim() || folderId || category !== 'all' ? '見つかりませんでした。' : '文字のテンプレートがまだありません。'}
       frequentNote={category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage}
-      templates={shown.map((template) => ({ id: template.id, name: template.name, content: template.messageContent }))}
+      templates={pickerTemplates}
       selectedId={selected?.id ?? null}
       previewId={previewTemplate?.id ?? null}
       onPreview={(id) => {
@@ -439,8 +487,8 @@ export default function TemplatePicker({
       remaining={visibleTemplatesStatus === 'ready' && category !== 'frequent' ? Math.max(0, total - templates.length) : 0}
       loadingMore={loadingMore}
       onLoadMore={loadMore}
-      resolvedPreview={previewContent === null || !renderTarget ? null : { id: renderTarget.id, content: previewContent }}
-      unresolved={previewContent !== null && resolvedPreview?.unresolved.length ? resolvedPreview.unresolved : null}
+      resolvedPreviews={resolvedPreviews}
+      check={pickCheck}
       onConfirm={confirmPick}
       confirmDisabled={packMode && onPickPack ? packItems.length === 0 : !selected}
     />

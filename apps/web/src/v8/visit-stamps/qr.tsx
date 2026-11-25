@@ -51,10 +51,11 @@ export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCa
   return <section className={styles.storefront} aria-label="店頭の QR（印刷用）">
     <div className={styles.titleLine}><h3>店頭の QR（印刷用）</h3><HelpTip label="店頭のQRの説明">店頭に貼るQRです。読んだ人に押します。同じ日は1回までです。作り直すと古いQRは使えません。</HelpTip></div>
     <div className={styles.storeRow}>{image.src?<img width={96} height={96} className={styles.thumb} src={image.src} alt="店頭のQR" />:null}
-      <div className={styles.storeDetails}><span className={styles.sub}>{`${card.name}・この店で1つ`}</span>
+      <div className={styles.storeDetails}><div className={styles.storeInfo}><span className={styles.sub}>{`${card.name}・この店で1つ`}</span>
+        {qr?.status!=='active'?(loaded?canManage?<Button variant="secondary" busy={busy} busyLabel="発行しています…" onClick={()=>issue()}>{qr?'店頭のQRを作り直す':'店頭のQRを作る'}</Button>:<span className={styles.sub}>店頭のQRは管理者が発行します。</span>:<span className={styles.sub}>QRを読み込んでいます…</span>):null}</div>
         {qr?.status==='active'?<><div className={styles.actions}><Button variant="secondary" disabled={!image.src} onClick={()=>setPrint(true)}><QrCode size={16} aria-hidden="true" />保存・印刷</Button></div>
           <div className={styles.actions}>{canManage?<Button variant="text" onClick={()=>{pending.current=null;confirmTicket.current={};setConfirmScope(scope);setConfirm(true)}}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>:null}<span className={styles.sub}>{`最後に作り直した日 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'}).format(new Date(qr.issuedAt))}`}</span></div></>
-          :loaded?canManage?<Button variant="secondary" busy={busy} busyLabel="発行しています…" onClick={()=>issue()}>{qr?'店頭のQRを作り直す':'店頭のQRを作る'}</Button>:<span className={styles.sub}>店頭のQRは管理者が発行します。</span>:<span className={styles.sub}>QRを読み込んでいます…</span>}
+          :null}
       </div>
     </div>
     {error||image.error?<Notice tone="danger" message={error||image.error}/>:null}

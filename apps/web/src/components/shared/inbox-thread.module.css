@@ -31,28 +31,20 @@
 .bubbleIn { background: var(--color-canvas); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .bubbleOut { background: var(--tpl-inbox-bubble-out); }
 .delivery { display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
-.meta { position: relative; display: inline-flex; flex: none; align-items: center; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
-/*
- * 引用：絵の時刻の横は時刻だけ。引用は時刻の外側に浮かせ、行の幅を取らない
- * （相手の吹き出しは時刻の右、こちらの吹き出しは時刻の左）。行にマウスを置く・触れる・
- * フォーカスしたときに出る。マウスの無い端末では常に出す。
- */
+.meta { position: relative; display: inline-flex; flex: none; align-items: flex-end; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
+/* 操作の幅を確保し、表示しても吹き出しの折り返しが変わらないようにする。 */
+.actions { display: flex; gap: var(--tpl-inbox-head-tools-gap); opacity: 0; pointer-events: none; }
 .quoteBtn {
-  position: absolute;
-  top: 0;
-  left: 100%;
-  margin-left: var(--tpl-inbox-head-tools-gap);
   border: 0;
   background: none;
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
   cursor: pointer;
-  opacity: 0;
 }
-.rowOut .quoteBtn { right: 100%; left: auto; margin-right: var(--tpl-inbox-head-tools-gap); margin-left: 0; }
-.rowIn:hover .quoteBtn, .rowOut:hover .quoteBtn, .quoteBtn:focus-visible { opacity: 1; }
-@media (hover: none) { .quoteBtn { opacity: 1; } }
+.rowIn:hover .actions, .rowOut:hover .actions, .actions:focus-within { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .actions { opacity: 1; pointer-events: auto; } }
 .quoteBtn:hover { color: var(--color-action); text-decoration: underline; }
+.quoteBtn:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 .quoted {
   margin-bottom: var(--tpl-inbox-chip-gap);
   padding-left: var(--tpl-inbox-chead-gap);
