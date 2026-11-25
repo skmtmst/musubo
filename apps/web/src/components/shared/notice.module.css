@@ -44,6 +44,8 @@
 .success .dot { background: var(--color-success); }
 .warn .dot { background: var(--color-status-warn); }
 .danger .dot { background: var(--color-status-danger); }
+.detailAction { display: flex; flex-direction: column; align-items: flex-start; gap: var(--polish-space-field); margin-top: var(--polish-space-field); }
+.detailAction > p { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .message { min-width: 0; flex: 1; overflow-wrap: anywhere; text-wrap: pretty; }
 /* 全体の自動句切りで文の途中に空きを残さず、本文・リンク・強調も同じ改行規則で幅を使う。 */
 .message, .message :where(:not([data-notice-heading], [data-notice-heading] *, [data-notice-status-word])) { word-break: normal; }
@@ -79,6 +81,8 @@
 .notice[data-action-layout='stack-on-narrow'] .content { flex-basis: 24em; }
 
 }
+
+:root .notice .detailAction > [data-shared-button] { align-self: flex-start; }
 
 /* 配置先の帯用クラスや余白の指定に頼らず、前後の部品から最低12px離す。 */
 :root .notice { margin-block: var(--polish-space-field); }

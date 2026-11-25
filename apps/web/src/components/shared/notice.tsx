@@ -13,6 +13,11 @@ export function NoticeStack({children}:{children:ReactNode}){
   return <div className={styles.stack} data-notice-stack>{children}</div>
 }
 
+/** 本文の後に置く操作と補足の間隔を揃える。 */
+export function NoticeDetailAction({ children, note }: { children: ReactNode; note?: ReactNode }) {
+  return <div className={styles.detailAction}>{children}{note ? <p>{note}</p> : null}</div>
+}
+
 /** 知らせは案内・成功・注意・危険の4種類。呼び名と見た目はここが持つ。 */
 export type NoticeTone = 'info' | 'success' | 'warn' | 'danger'
 type CanonicalTone = NoticeTone

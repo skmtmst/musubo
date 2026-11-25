@@ -31,24 +31,25 @@ export function useRegistrationStyle(accountId: string, enabled: boolean, presen
       const loadedChoice = res.data.styleSelected ? res.data.style : ''
       setBaselineChoice(loadedChoice)
       const draft = readRegistrationPresentation(presentationKey).choice
-      setChoice(res.data.styleSelected ? loadedChoice : draft === 'restaurant' ? draft : '')
+      setChoice(res.data.styleSelected ? loadedChoice : draft || '')
     }).catch(caught => { if (active) setError(describeApiFailure(caught, '読み込み')) })
     return () => { active = false }
   }, [accountId, enabled, presentationKey, tick])
-  const save = async () => {
-    if (busyLock.current || !choice || !profile || (!profile.selected && choice !== 'restaurant')) return false
+  const save = async (selectedStyle: AccountStyle = choice as AccountStyle) => {
+    if (busyLock.current || !selectedStyle || !profile) return false
+    setChoice(selectedStyle)
     busyLock.current = true
     setBusy(true); setError('')
     try {
       // 登録時はメニューを作らず、はじめの設定に引き継ぐ。保存済みの回答がある場合は保持する。
       const res = await styleApi.save(accountId, {
         expectedVersion: profile.version,
-        style: choice,
+        style: selectedStyle,
         ...(!profile.hasMenuAnswer ? { answers: { image: { mode: 'later' } } } : {}),
       }, true)
       if (!res.success) throw new Error('使い方を保存できませんでした。時間をおいて、もう一度お試しください。')
       setProfile({ version: res.data.version, hasMenuAnswer: true, selected: true })
-      setBaselineChoice(choice)
+      setBaselineChoice(selectedStyle)
       accountStyleUpdated(accountId)
       return true
     } catch (caught) {

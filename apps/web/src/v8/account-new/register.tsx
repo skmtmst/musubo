@@ -1,5 +1,6 @@
 'use client'
 
+import type { AccountStyle } from '@line-crm/shared'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
@@ -120,6 +121,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
   const [connection, setConnection] = useState<LineAccountConnectData | null>(null)
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [focusErrorRequest, setFocusErrorRequest] = useState(0)
   const [touchedFields, setTouchedFields] = useState<Partial<Record<Step2Field, boolean>>>({})
   const [reviewedLengthStep, setReviewedLengthStep] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -185,8 +187,9 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     setStyleDialogOpen(open)
     rememberRegistrationPresentation(presentationKey, { styleOpen: open })
   }
-  const finishStyle = async () => {
-    const succeeded = await registrationStyle.save()
+  const finishStyle = async (style: AccountStyle) => {
+    rememberRegistrationPresentation(presentationKey, { choice: style })
+    const succeeded = await registrationStyle.save(style)
     if (succeeded) { setStyleDialogOpen(false); setCurrentStep(5); setSub(1) }
   }
   const basicId = connection?.basicId ?? resumedAccount?.basicId ?? ''
@@ -208,7 +211,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
     invalid?.focus()
     invalid?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
-  }, [fieldErrors, currentStep, sub])
+  }, [focusErrorRequest])
 
   // 本人の手順と入力を復元する。秘密値と接続確認の結果は保存しない。
   useEffect(() => {
@@ -454,6 +457,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     const nextErrors = channelErrors(form)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
+      setFocusErrorRequest(n => n + 1)
       setCurrentStep(2)
       setSub(nextErrors.channelId || nextErrors.channelSecret ? 1 : nextErrors.providerId ? 2 : 4)
       setError('')
@@ -574,14 +578,14 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     if (currentStep === 2) {
       if (sub === 1) {
         const nextErrors = messagingApiErrors(form)
-        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
+        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); setFocusErrorRequest(n => n + 1); return }
         if (reviewLengthWarnings(['channelId', 'channelSecret'])) return
         setSub(2)
         return
       }
       if (sub === 2) {
         const nextErrors = providerIdErrors(form)
-        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
+        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); setFocusErrorRequest(n => n + 1); return }
         if (reviewLengthWarnings(['providerId'])) return
         setSub(3)
         return
@@ -592,7 +596,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
         return
       }
       const loginErrors = loginChannelErrors(form)
-      if (Object.keys(loginErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...loginErrors })); return }
+      if (Object.keys(loginErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...loginErrors })); setFocusErrorRequest(n => n + 1); return }
       if (reviewLengthWarnings(['loginChannelId', 'loginChannelSecret'])) return
       if (!allAcked(LOGIN_ACKS, acks)) return
       setCurrentStep(3)
@@ -673,7 +677,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
             label="登録の進捗"
             summaryLayout="aligned"
             hideSummaryChangeKeys={['1']}
-            summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
+            summaries={{ '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
             /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
             steps={V8_STEPS.map((step) => ({
