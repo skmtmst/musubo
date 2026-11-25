@@ -75,3 +75,5 @@
 .generationInfo.warnText { color: var(--color-status-warn-deep); }
 .limitText { color: var(--color-status-warn-deep); }
 .nowrap { white-space: nowrap; }
+
+.errorText { color: var(--color-status-danger); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); }
