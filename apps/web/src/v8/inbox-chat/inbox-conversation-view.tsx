@@ -16,17 +16,23 @@ import { CORRECTION_TEMPLATE, Chat, formatByteSize, formatInboxDatetime } from '
 
 import { useMemo } from 'react';
 import type { Props } from './inbox-conversation-view-types';
-import InboxEmptyGuide from './inbox-empty-guide';
+import InboxEmptyGuide, { InboxChannelSetupGuide } from './inbox-empty-guide';
 import InboxReplyComposer from './inbox-reply-composer';
 import { InboxMessageRow } from './message-row';
 import { withHonorific } from '@line-crm/shared'
 import { canEditFeature } from '@/lib/staff-capability'
 import { lockReason } from '@/components/shared/permission-lock'
 
-export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget }: Props) {
+export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget, unconfiguredChannel = null, onOpenChannelSettings }: Props) {
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
   return (<InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || selectedThreadId)}>
-    {selectedThreadId ? (
+    {unconfiguredChannel ? (
+      <InboxChannelSetupGuide
+        channel={unconfiguredChannel}
+        staffRole={staffRole}
+        onOpenSettings={(href) => onOpenChannelSettings?.(href)}
+      />
+    ) : selectedThreadId ? (
       /* メールの往復。LINEのトークと同じ場所に出す。 */
       <EmailThread
         threadId={selectedThreadId}
