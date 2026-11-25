@@ -242,7 +242,7 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
         onPause={pause}
       />
       {showMenuPicker && summary && style.data ? <GuideMenuPicker key={accountId} accountId={accountId}
-        version={style.data.version} step={index + 1} total={summary.total} onLater={advance} onSaved={advance}
+        version={style.data.version} step={index + 1} total={summary.total} onLater={pause} onSaved={advance}
         onCreate={() => { pause(); router.push('/rich-menus/new') }} onReload={style.reload} /> : null}
       {showReceive && summary ? <GuideFirstMessage key={JSON.stringify([accountId, staffId])}
         accountId={accountId} accountName={account?.selectedAccount?.name}

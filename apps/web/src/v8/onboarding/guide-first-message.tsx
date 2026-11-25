@@ -159,7 +159,7 @@ export function GuideFirstMessage({ accountId, accountName, step, total, onRecei
       <span className={styles.step}>{step}/{total}</span>
       <strong>{TITLE}</strong>
     </span>} designNode="waX3A" designLayout="stacked-guided" designWidth={650} exactDesignWidth designMinHeight={expanded ? 368 : 350}
-      headerIcon={false} onCancel={onLater} footerDivider={false} showCloseButton
+      headerIcon={false} onCancel={onLater} footerDivider={false} showCloseButton plainCloseButton
       footer={<DialogActions align="center" layout="inline">
         {action}
         <Button variant="text" size="inline" onClick={onLater}>あとで</Button>

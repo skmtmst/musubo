@@ -532,6 +532,14 @@ html:root .panel .close {
   border-radius: var(--radius-pill);
   box-shadow: none;
 }
+html:root .panel[data-plain-close] .close:not(:focus-visible) {
+  outline-color: transparent;
+  background: transparent;
+}
+html:root .panel[data-plain-close] .close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
 html:root .headerContent { gap: var(--space-4); }
 /* 題の実際の行高を継ぎ、説明の行数に関係なく最初の行へそろえる。 */
 html:root .title[data-has-heading-icon] { display: flex; align-items: flex-start; gap: var(--space-12); }

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -34,7 +34,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: nav.replace }), usePathname: () => nav.path, useSearchParams: () => new URLSearchParams(nav.query) }))
 vi.mock('@/contexts/account-context', () => ({ useOptionalAccount: () => ({ selectedAccountId: nav.accountId }) }))
-vi.mock('@/hooks/use-account-style', () => ({ ACCOUNT_STYLE_UPDATED: 'musubo:account-style-updated', useAccountStyle: () => ({ status: 'ready', data: { style: 'restaurant' } }) }))
+vi.mock('@/hooks/use-account-style', () => ({ ACCOUNT_STYLE_UPDATED: 'musubo:account-style-updated', useAccountStyle: () => ({ status: 'ready', data: { style: 'restaurant', styleSelected: true, version: 1 } }) }))
 vi.mock('@/lib/staff-role', () => ({ canManageRole: (role: string | null) => role === 'owner', useStaffRole: () => 'owner' }))
 vi.mock('@/lib/staff-identity-state', () => ({ readStaffIdentity: () => ({ id: nav.staffId }) }))
 vi.mock('@/lib/line-account-entry', () => ({ isLineAccountEntryReady: () => nav.entryReady, subscribeLineAccountEntry: () => () => {}, resolveLineAccountEntry: nav.resolveEntry }))
@@ -282,4 +282,18 @@ describe('案内の入れ物が段の画面へ移る', () => {
     expect(nav.resolveEntry).toHaveBeenCalledOnce()
     expect(nav.push).not.toHaveBeenCalled()
   })
+})
+
+
+it.each(['close', 'escape', 'later'])('リッチメニューの%sは同じ手順を一時停止する', (method) => {
+  nav.path = '/'
+  state.guide = { ...state.guide, phase: 'active', stepKey: 'richMenu', pause: vi.fn(), advanceProcedure: vi.fn() }
+  render(<GuideHost><p>中身</p></GuideHost>)
+  const dialog = screen.getByRole('dialog', { name: /リッチメニューを選ぶ/ })
+  if (method === 'close') fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  else if (method === 'escape') fireEvent.keyDown(document, { key: 'Escape' })
+  else fireEvent.click(screen.getByRole('button', { name: 'あとで' }))
+  expect(dialog).toBeTruthy()
+  expect(state.guide.pause).toHaveBeenCalledOnce()
+  expect(state.guide.advanceProcedure).not.toHaveBeenCalled()
 })

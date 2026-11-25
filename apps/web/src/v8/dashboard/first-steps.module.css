@@ -162,31 +162,6 @@ html:root .guideFooter button[class][class][class] {
   min-width: 0;
 }
 
-.fold {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-d23-ob-fold-gap);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink-secondary);
-  cursor: pointer;
-  font: inherit;
-  /* 正本の「畳む」は 13/19・#4A5565・500（OGTSv）。 */
-  font-size: var(--step-head-text);
-  font-weight: var(--font-weight-ui);
-  line-height: var(--step-head-text-lh);
-  white-space: nowrap;
-}
-
-.fold:hover { color: var(--color-ink); }
-
-.foldIcon {
-  width: var(--tpl-d23-ob-fold-icon);
-  height: var(--tpl-d23-ob-fold-icon);
-  flex-shrink: 0;
-}
-
 /*
  * 段の「開く／確かめる」の字は正本（12/500・緑の操作色）で、
  * これは共通 TextLink の `emphasis="row-step"` の既定と同じなので値を足さない。
