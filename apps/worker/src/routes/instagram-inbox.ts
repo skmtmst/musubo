@@ -40,6 +40,10 @@ async function businessConnection(c: Context<Env>, lineAccount: string, business
     .bind(lineAccount, business).first<DmConnection>();
 }
 
+const metaClockSkewMs = 5 * 1000;
+const maxMetaConversationPages = 5;
+const maxMetaMessagePagesPerThread = 5;
+
 type TargetOutboundRow = {
   idempotency_key: string;
   content: string;
@@ -51,6 +55,56 @@ type TargetOutboundRow = {
 type MetaAbsenceCheck =
   | { ok: true; kind: 'meta_conversation_absent'; evidence: string }
   | { ok: false; status: 409 | 502; error: string };
+
+function safeGraphNextUrl(next: unknown, version: string): URL | null {
+  if (typeof next !== 'string' || !next) return null;
+  try {
+    const parsed = new URL(next);
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.hostname !== 'graph.instagram.com' ||
+      parsed.port !== '' ||
+      parsed.username !== '' ||
+      parsed.password !== '' ||
+      !parsed.pathname.startsWith(`/${version}/`)
+    ) {
+      return null;
+    }
+    parsed.searchParams.delete('access_token');
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function parseMetaPagingNext(paging: unknown, version: string): { ok: true; nextUrl: URL | null } | { ok: false } {
+  if (paging === undefined || paging === null) return { ok: true, nextUrl: null };
+  if (typeof paging !== 'object' || Array.isArray(paging)) return { ok: false };
+  const next = (paging as { next?: unknown }).next;
+  if (next === undefined || next === null || next === '') return { ok: true, nextUrl: null };
+  const nextUrl = safeGraphNextUrl(next, version);
+  return nextUrl ? { ok: true, nextUrl } : { ok: false };
+}
+
+async function fetchMetaGraphJson(url: URL, token: string): Promise<Record<string, unknown> | null> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return null;
+  }
+  if ((response.type as string) === 'opaqueredirect' || (response.status >= 300 && response.status < 400) || !response.ok) {
+    return null;
+  }
+  const payload = await response.json().catch(() => null);
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  return payload as Record<string, unknown>;
+}
 
 async function verifyAbsentInMetaConversation(
   c: Context<Env>,
@@ -73,76 +127,136 @@ async function verifyAbsentInMetaConversation(
   if (!Number.isFinite(targetCreatedMs)) {
     return { ok: false, status: 502, error: '送信記録の時刻を確認できないため未送信と確定できません。' };
   }
+  const windowStartMs = targetCreatedMs - metaClockSkewMs;
   let token: string;
   try {
     token = await decryptInstagramCredential(conn.user_token_encrypted, cfg.encryptionKey);
   } catch {
     return { ok: false, status: 502, error: 'Instagramの認証情報を確認できないため未送信と確定できません。' };
   }
-  const url = new URL(`https://graph.instagram.com/${cfg.version}/${encodeURIComponent(business)}/conversations`);
-  url.searchParams.set('platform', 'instagram');
-  url.searchParams.set('user_id', sender);
-  url.searchParams.set('fields', 'messages.limit(25){id,message,created_time,from}');
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: 'GET',
-      redirect: 'manual',
-      signal: AbortSignal.timeout(15000),
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    return { ok: false, status: 502, error: 'Meta側の会話を取得できないため未送信と確定できません。' };
-  }
-  if ((response.type as string) === 'opaqueredirect' || (response.status >= 300 && response.status < 400) || !response.ok) {
-    return { ok: false, status: 502, error: 'Meta側の会話を取得できないため未送信と確定できません。' };
-  }
-  const payload = await response.json().catch(() => null) as { data?: unknown } | null;
-  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.data)) {
-    return { ok: false, status: 502, error: 'Meta側の会話応答を確認できないため未送信と確定できません。' };
-  }
+  const knownRows = await c.env.DB.prepare(
+    'SELECT idempotency_key,meta_message_id FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND sender_id=? AND meta_message_id IS NOT NULL',
+  ).bind(lineAccount, business, sender).all<{ idempotency_key: string; meta_message_id: string }>();
+  const otherKnownMetaIds = new Set(
+    knownRows.results
+      .filter(row => row.idempotency_key !== targetRow.idempotency_key && row.meta_message_id)
+      .map(row => row.meta_message_id),
+  );
+
+  let convUrl: URL | null = new URL(`https://graph.instagram.com/${cfg.version}/${encodeURIComponent(business)}/conversations`);
+  convUrl.searchParams.set('platform', 'instagram');
+  convUrl.searchParams.set('user_id', sender);
+  convUrl.searchParams.set('fields', 'messages.limit(25){id,message,created_time,from}');
+
+  let convPages = 0;
+  let checkedThreads = 0;
   let checkedMessages = 0;
-  for (const rawThread of payload.data) {
-    if (!rawThread || typeof rawThread !== 'object') {
-      return { ok: false, status: 502, error: 'Meta側の会話応答を確認できないため未送信と確定できません。' };
+  const seenMessageIds = new Set<string>();
+
+  while (convUrl) {
+    convPages += 1;
+    const payload = await fetchMetaGraphJson(convUrl, token);
+    if (!payload || !Array.isArray(payload.data)) {
+      return { ok: false, status: 502, error: 'Meta側の会話を取得できないため未送信と確定できません。' };
     }
-    const messagesBox = (rawThread as { messages?: { data?: unknown; paging?: { next?: unknown } } }).messages;
-    if (!messagesBox || !Array.isArray(messagesBox.data)) {
-      return { ok: false, status: 502, error: 'Meta側の会話本文を取得できないため未送信と確定できません。' };
-    }
-    let oldestTime = Infinity;
-    for (const rawMsg of messagesBox.data) {
-      if (!rawMsg || typeof rawMsg !== 'object') {
-        return { ok: false, status: 502, error: 'Meta側の会話本文を確認できないため未送信と確定できません。' };
+    for (const rawThread of payload.data) {
+      if (!rawThread || typeof rawThread !== 'object' || Array.isArray(rawThread)) {
+        return { ok: false, status: 502, error: 'Meta側の会話応答を確認できないため未送信と確定できません。' };
       }
-      const msg = rawMsg as { id?: unknown; message?: unknown; created_time?: unknown; from?: { id?: unknown } };
-      if (targetRow.meta_message_id && msg.id === targetRow.meta_message_id) {
-        return { ok: false, status: 409, error: 'Meta側の会話に同じ返信が見つかりました。送信済みとして記録してください。' };
+      checkedThreads += 1;
+      let currentBox = (rawThread as { messages?: unknown }).messages as { data?: unknown; paging?: unknown } | undefined;
+      if (!currentBox || typeof currentBox !== 'object' || !Array.isArray(currentBox.data)) {
+        return { ok: false, status: 502, error: 'Meta側の会話本文を取得できないため未送信と確定できません。' };
       }
-      const msgTime = typeof msg.created_time === 'string' ? Date.parse(msg.created_time) : NaN;
-      if (!Number.isFinite(msgTime)) {
-        return { ok: false, status: 502, error: 'Meta側の送信時刻を確認できないため未送信と確定できません。' };
-      }
-      if (msgTime < oldestTime) oldestTime = msgTime;
-      const fromId = msg.from && typeof msg.from === 'object' ? msg.from.id : undefined;
-      if ((fromId === undefined || fromId === business) && msgTime >= targetCreatedMs - 5000) {
-        if (typeof msg.message !== 'string') {
-          return { ok: false, status: 502, error: 'Meta側の送信内容を確認できないため未送信と確定できません。' };
+      let msgPages = 0;
+      let oldestTime = Infinity;
+      let prevTime = Infinity;
+      let monotonicDesc = true;
+
+      while (true) {
+        msgPages += 1;
+        const batch = currentBox.data as unknown[];
+        for (const rawMsg of batch) {
+          if (!rawMsg || typeof rawMsg !== 'object' || Array.isArray(rawMsg)) {
+            return { ok: false, status: 502, error: 'Meta側の会話本文を確認できないため未送信と確定できません。' };
+          }
+          const msg = rawMsg as { id?: unknown; message?: unknown; created_time?: unknown; from?: unknown };
+          if (typeof msg.id !== 'string' || !msg.id.trim()) {
+            return { ok: false, status: 502, error: 'Meta側のメッセージ識別子を確認できないため未送信と確定できません。' };
+          }
+          const msgTime = typeof msg.created_time === 'string' ? Date.parse(msg.created_time) : NaN;
+          if (!Number.isFinite(msgTime)) {
+            return { ok: false, status: 502, error: 'Meta側の送信時刻を確認できないため未送信と確定できません。' };
+          }
+          if (msgTime > prevTime) monotonicDesc = false;
+          prevTime = msgTime;
+          if (msgTime < oldestTime) oldestTime = msgTime;
+
+          if (seenMessageIds.has(msg.id)) continue;
+          seenMessageIds.add(msg.id);
+          checkedMessages += 1;
+
+          if (targetRow.meta_message_id !== null) {
+            if (msg.id === targetRow.meta_message_id) {
+              return { ok: false, status: 409, error: 'Meta側の会話でこの返信の送信を確認しました。送信済みとして記録してください。' };
+            }
+            continue;
+          }
+          if (otherKnownMetaIds.has(msg.id)) continue;
+          if (msg.from !== undefined && (!msg.from || typeof msg.from !== 'object' || typeof (msg.from as { id?: unknown }).id !== 'string' || !(msg.from as { id: string }).id)) {
+            return { ok: false, status: 502, error: 'Meta側の送信者情報を確認できないため未送信と確定できません。' };
+          }
+          const fromId = msg.from ? (msg.from as { id: string }).id : undefined;
+          if ((fromId === undefined || fromId === business) && msgTime >= windowStartMs) {
+            if (typeof msg.message !== 'string') {
+              return { ok: false, status: 502, error: 'Meta側の送信内容を確認できないため未送信と確定できません。' };
+            }
+            if (msg.message === targetRow.content) {
+              return {
+                ok: false,
+                status: 409,
+                error: 'Meta側に同じ文面の返信がありますが識別子で一致を照合できないため、自動では確定できません。Instagramの画面で確認した理由を入力してください。',
+              };
+            }
+          }
         }
-        if (msg.message === targetRow.content) {
-          return { ok: false, status: 409, error: 'Meta側の会話に同じ返信が見つかりました。送信済みとして記録してください。' };
+
+        const innerPaging = parseMetaPagingNext(currentBox.paging, cfg.version);
+        if (!innerPaging.ok) {
+          return { ok: false, status: 502, error: 'Meta側の会話履歴の続きを確認できないため未送信と確定できません。' };
         }
+        if (!innerPaging.nextUrl) break;
+        // 降順が確認でき、かつ照合下限より厳密に古い時刻まで到達した場合のみ後続ページを省略できる。
+        if (monotonicDesc && batch.length > 0 && oldestTime < windowStartMs) break;
+        if (msgPages >= maxMetaMessagePagesPerThread) {
+          return { ok: false, status: 502, error: 'Meta側の会話履歴を送信時刻まで最後まで確認できないため未送信と確定できません。' };
+        }
+        const nextMessages = await fetchMetaGraphJson(innerPaging.nextUrl, token);
+        if (!nextMessages || !Array.isArray(nextMessages.data)) {
+          return { ok: false, status: 502, error: 'Meta側の会話履歴の続きを取得できないため未送信と確定できません。' };
+        }
+        currentBox = nextMessages as { data: unknown[]; paging?: unknown };
       }
-      checkedMessages += 1;
     }
-    if (messagesBox.paging?.next && (messagesBox.data.length === 0 || oldestTime > targetCreatedMs)) {
-      return { ok: false, status: 502, error: 'Meta側の会話履歴を送信時刻まで確認できないため未送信と確定できません。' };
+
+    const outerPaging = parseMetaPagingNext(payload.paging, cfg.version);
+    if (!outerPaging.ok) {
+      return { ok: false, status: 502, error: 'Meta側の会話一覧の続きを確認できないため未送信と確定できません。' };
     }
+    if (!outerPaging.nextUrl) {
+      convUrl = null;
+      break;
+    }
+    if (convPages >= maxMetaConversationPages) {
+      return { ok: false, status: 502, error: 'Meta側の会話一覧を最後まで確認できないため未送信と確定できません。' };
+    }
+    convUrl = outerPaging.nextUrl;
   }
+
   return {
     ok: true,
     kind: 'meta_conversation_absent',
-    evidence: `meta_conversation_absent:threads=${payload.data.length}:messages=${checkedMessages}:checked_at=${resolvedAt}`,
+    evidence: `meta_conversation_absent:threads=${checkedThreads}:messages=${checkedMessages}:checked_at=${resolvedAt}`,
   };
 }
 
@@ -276,6 +390,7 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
       (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at) VALUES (?,?,?,?,?,?,'pending',?)`)
       .bind(key, id, row.instagram_id, message.sender_id, c.get('staff').id, body.text, now).run();
     if (!reservation.meta.changes) return c.json({ success: false, error: '送信結果の確認待ちです。Instagramを複数店舗で共有している場合は、返信した店舗の受信箱で確認してください。' }, 409);
+    let receivedMessageId: string | null = null;
     try {
       const response = await fetch(`https://graph.instagram.com/${cfg.version}/${row.instagram_id}/messages`, {
         method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000),
@@ -306,11 +421,13 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
       }
       const sent = await response.json() as { message_id?: unknown };
       if (typeof sent.message_id !== 'string' || !sent.message_id) throw new Error('invalid_response');
+      receivedMessageId = sent.message_id;
       await c.env.DB.prepare("UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=? WHERE idempotency_key=? AND status='pending'")
         .bind(sent.message_id, new Date().toISOString(), key).run();
       return c.json({ success: true, data: { messageId: sent.message_id, replayed: false } });
     } catch {
-      await c.env.DB.prepare("UPDATE instagram_outbound_messages SET status='unknown' WHERE idempotency_key=? AND status='pending'").bind(key).run();
+      await c.env.DB.prepare("UPDATE instagram_outbound_messages SET status='unknown',meta_message_id=COALESCE(meta_message_id,?) WHERE idempotency_key=? AND status='pending'")
+        .bind(receivedMessageId, key).run();
       return c.json({ success: false, error: '送信結果を確認できません。Instagramで確認してください' }, 502);
     }
   });

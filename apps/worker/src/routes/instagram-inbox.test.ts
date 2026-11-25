@@ -281,6 +281,243 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
       .toEqual({ status: 'unknown', resolved_by_staff_id: null });
     expect((await sendReply(member, crypto.randomUUID())).status).toBe(409);
   });
+
+  it('会話一覧とメッセージ履歴を照合下限より厳密に古い時刻まで読み切ったときだけ不在と判定する', async () => {
+    await seedConnectedDmInbox();
+    const key = crypto.randomUUID();
+    const createdAt = '2025-05-01T00:00:00.700Z';
+    db.raw.prepare(
+      `INSERT INTO instagram_outbound_messages
+         (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+       VALUES (?,'a1','20','customer','owner-1','在庫がございます','unknown',?)`,
+    ).run(key, createdAt);
+
+    // 1) 外側の会話一覧に未確認の次ページがあり取得できない場合は確定しない
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      if (url.searchParams.get('after') === 'conv-page-2') {
+        return Response.json({ error: { code: 2 } }, { status: 500 });
+      }
+      return Response.json({
+        data: [],
+        paging: { next: 'https://graph.instagram.com/v24.0/20/conversations?after=conv-page-2' },
+      });
+    }));
+    expect((await resolveReply(owner, { key, outcome: 'not_sent' })).status).toBe(502);
+    expect((await sendReply(owner, crypto.randomUUID())).status).toBe(409);
+
+    // 2) 1ページ目の末尾が 23:59:59Z（照合下限 23:59:55.700Z より新しい）で次ページに返信がある場合は拒否する
+    let messagePageCalls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/conv-1/messages')) {
+        messagePageCalls += 1;
+        return Response.json({
+          data: [{
+            id: 'meta-page2-hit',
+            message: '在庫がございます',
+            created_time: '2025-04-30T23:59:58+0000',
+            from: { id: '20' },
+          }],
+        });
+      }
+      return Response.json({
+        data: [{
+          id: 'conv-1',
+          messages: {
+            data: [{
+              id: 'm-cust-1',
+              message: '確認お願いします',
+              created_time: '2025-04-30T23:59:59+0000',
+              from: { id: 'customer' },
+            }],
+            paging: { next: 'https://graph.instagram.com/v24.0/conv-1/messages?after=msg-page-2' },
+          },
+        }],
+      });
+    }));
+    expect((await resolveReply(owner, { key, outcome: 'not_sent' })).status).toBe(409);
+    expect(messagePageCalls).toBe(1);
+    expect((await sendReply(owner, crypto.randomUUID())).status).toBe(409);
+
+    // 3) ページ数が多すぎて照合下限より古い時刻へ到達できない場合は確定しない
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{
+        id: 'conv-1',
+        messages: {
+          data: [{
+            id: 'm-recent',
+            message: '最近の会話',
+            created_time: '2025-05-01T00:00:00+0000',
+            from: { id: 'customer' },
+          }],
+          paging: { next: 'https://graph.instagram.com/v24.0/conv-1/messages?after=endless' },
+        },
+      }],
+    })));
+    expect((await resolveReply(owner, { key, outcome: 'not_sent' })).status).toBe(502);
+    expect((await sendReply(owner, crypto.randomUUID())).status).toBe(409);
+
+    // 4) 同一時刻のページ境界（oldestTime === windowStartMs）でも次ページを読み、厳密に古い時刻まで確認してから確定する
+    const exactBoundaryKey = crypto.randomUUID();
+    db.raw.prepare('UPDATE instagram_outbound_messages SET idempotency_key=?,created_at=? WHERE idempotency_key=?')
+      .run(exactBoundaryKey, '2025-05-01T00:00:00.000Z', key);
+    let boundaryPage2Fetched = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | RequestInfo) => {
+      const url = new URL(String(input));
+      if (url.searchParams.get('after') === 'conv-page-2') {
+        return Response.json({
+          data: [{
+            id: 'conv-1',
+            messages: {
+              data: [{
+                id: 'm-boundary',
+                message: '境界時刻の受信',
+                created_time: '2025-04-30T23:59:55.000Z',
+                from: { id: 'customer' },
+              }],
+              paging: { next: 'https://graph.instagram.com/v24.0/conv-1/messages?after=boundary-page-2' },
+            },
+          }],
+        });
+      }
+      if (url.pathname.endsWith('/conv-1/messages')) {
+        boundaryPage2Fetched = true;
+        return Response.json({
+          data: [{
+            id: 'm-older',
+            message: 'さらに古い受信',
+            created_time: '2025-04-30T23:59:54.000Z',
+            from: { id: 'customer' },
+          }],
+          paging: { next: 'https://graph.instagram.com/v24.0/conv-1/messages?after=boundary-page-3' },
+        });
+      }
+      return Response.json({
+        data: [],
+        paging: { next: 'https://graph.instagram.com/v24.0/20/conversations?after=conv-page-2' },
+      });
+    }));
+    expect((await resolveReply(owner, { key: exactBoundaryKey, outcome: 'not_sent' })).status).toBe(200);
+    expect(boundaryPage2Fetched).toBe(true);
+    expect(db.raw.prepare('SELECT status,resolution_kind FROM instagram_outbound_messages WHERE idempotency_key=?').get(exactBoundaryKey))
+      .toEqual({ status: 'not_sent_confirmed', resolution_kind: 'meta_conversation_absent' });
+  });
+
+  it('返信の識別子で対象を照合し、識別子で照合できない同文返信は送信済みと決めつけず保留する', async () => {
+    await seedConnectedDmInbox();
+
+    // 1) 識別子未取得（meta_message_id = null）で、後から別経路で送られた同文返信（01:00:00Z）がある場合：
+    //    「送信済みとして記録してください」とは案内せず、照合不能として自動確定と再送を止める。
+    const ambiguousKey = crypto.randomUUID();
+    db.raw.prepare(
+      `INSERT INTO instagram_outbound_messages
+         (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
+       VALUES (?,'a1','20','customer','owner-1','ありがとうございます','unknown','2025-05-01T00:00:00.700Z')`,
+    ).run(ambiguousKey);
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{
+        id: 'conv-1',
+        messages: {
+          data: [{
+            id: 'mid-manual-later',
+            message: 'ありがとうございます',
+            created_time: '2025-05-01T01:00:00.000Z',
+            from: { id: '20' },
+          }],
+        },
+      }],
+    })));
+    const ambiguousRes = await resolveReply(owner, { key: ambiguousKey, outcome: 'not_sent' });
+    expect(ambiguousRes.status).toBe(409);
+    const ambiguousBody = await ambiguousRes.json() as { error: string };
+    expect(ambiguousBody.error).toContain('識別子');
+    expect(ambiguousBody.error).not.toContain('送信済みとして記録してください');
+    expect((await sendReply(owner, crypto.randomUUID(), '追送テスト')).status).toBe(409);
+
+    // 2) 過去の同文返信（照合下限より前）や、DBの別送信行で meta_message_id が既知の同文返信は対象と取り違えない
+    const knownSentKey = crypto.randomUUID();
+    db.raw.prepare(
+      `INSERT INTO instagram_outbound_messages
+         (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,meta_message_id,created_at,sent_at)
+       VALUES (?,'a1','20','customer','owner-1','ありがとうございます','sent','mid-known-sent','2025-05-01T00:10:00.000Z','2025-05-01T00:10:01.000Z')`,
+    ).run(knownSentKey);
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{
+        id: 'conv-1',
+        messages: {
+          data: [
+            {
+              id: 'mid-known-sent',
+              message: 'ありがとうございます',
+              created_time: '2025-05-01T00:10:01.000Z',
+              from: { id: '20' },
+            },
+            {
+              id: 'mid-before-attempt',
+              message: 'ありがとうございます',
+              created_time: '2025-04-30T23:50:00.000Z',
+              from: { id: '20' },
+            },
+          ],
+        },
+      }],
+    })));
+    expect((await resolveReply(owner, { key: ambiguousKey, outcome: 'not_sent' })).status).toBe(200);
+
+    // 3) 対象行に meta_message_id がある場合は識別子の一致だけで厳密に判定する
+    const withIdKey = crypto.randomUUID();
+    db.raw.prepare(
+      `INSERT INTO instagram_outbound_messages
+         (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,meta_message_id,created_at)
+       VALUES (?,'a1','20','customer','owner-1','ありがとうございます','unknown','mid-target-exact','2025-05-01T00:20:00.000Z')`,
+    ).run(withIdKey);
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{
+        id: 'conv-1',
+        messages: {
+          data: [{
+            id: 'mid-target-exact',
+            message: 'ありがとうございます',
+            created_time: '2025-05-01T00:20:01.000Z',
+            from: { id: '20' },
+          }],
+        },
+      }],
+    })));
+    const exactHit = await resolveReply(owner, { key: withIdKey, outcome: 'not_sent' });
+    expect(exactHit.status).toBe(409);
+    expect(((await exactHit.json()) as { error: string }).error).toContain('送信済みとして記録してください');
+
+    // 別IDの同文返信しか無く対象IDが存在しない場合は取り違えない
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({
+      data: [{
+        id: 'conv-1',
+        messages: {
+          data: [{
+            id: 'mid-different-id',
+            message: 'ありがとうございます',
+            created_time: '2025-05-01T00:20:02.000Z',
+            from: { id: '20' },
+          }],
+        },
+      }],
+    })));
+    expect((await resolveReply(owner, { key: withIdKey, outcome: 'not_sent' })).status).toBe(200);
+  });
+
+  it('DB制約で未送信確定時の根拠種別や確認情報のNULL・空文字を拒否する', () => {
+    const insertStmt = db.raw.prepare(
+      `INSERT INTO instagram_outbound_messages
+         (idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at,resolved_by_staff_id,resolved_at,resolution_kind,resolution_evidence)
+       VALUES (?,'a1','20','customer','owner-1','本文','not_sent_confirmed','2025-05-01T00:00:00.000Z',?,?,?,?)`,
+    );
+    expect(() => insertStmt.run(crypto.randomUUID(), 'owner-1', '2025-05-01T00:05:00.000Z', null, '根拠あり')).toThrow(/CHECK constraint failed/);
+    expect(() => insertStmt.run(crypto.randomUUID(), null, '2025-05-01T00:05:00.000Z', 'reason', '根拠あり')).toThrow(/CHECK constraint failed/);
+    expect(() => insertStmt.run(crypto.randomUUID(), 'owner-1', null, 'reason', '根拠あり')).toThrow(/CHECK constraint failed/);
+    expect(() => insertStmt.run(crypto.randomUUID(), 'owner-1', '2025-05-01T00:05:00.000Z', 'reason', null)).toThrow(/CHECK constraint failed/);
+    expect(() => insertStmt.run(crypto.randomUUID(), 'owner-1', '2025-05-01T00:05:00.000Z', 'reason', '   ')).toThrow(/CHECK constraint failed/);
+  });
 });
 
 describe('Instagram Webhook 1MB 境界のストリーム検査', () => {
