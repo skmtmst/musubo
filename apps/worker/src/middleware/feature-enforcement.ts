@@ -180,6 +180,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/friends', 'core', '友だち管理は必須機能'),
   exempt('/api/tags', 'core', 'タグは複数機能が参照する共通基盤'),
   exempt('/api/tag-groups', 'core', 'タグは複数機能が参照する共通基盤'),
+  exempt('/api/account-email', 'core', '店舗メール受信箱'),
   exempt('/api/inbox', 'core', '受信箱は必須機能'),
   exempt('/api/chats', 'core', '受信箱の会話基盤'),
   exempt('/api/conversations', 'core', '受信箱の会話基盤'),

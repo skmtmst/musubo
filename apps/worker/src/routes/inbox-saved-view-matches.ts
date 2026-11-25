@@ -1,3 +1,4 @@
+import { storeEmailFilter, accountEmailMode } from '../services/account-email-filter.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { type InboxSavedViewConditions } from '@line-crm/db';
 
@@ -114,6 +115,24 @@ export async function countInboxSavedViewMatches(
      )`,
   ).bind(input.staffId, ...bindings).first<{ count: number }>() : null;
 
+  const resultCount = (count: number) => ({matchCount:Math.min(count,1000),matchCountCapped:count>1000});
+  if (!conditions.channels.includes('email')) return resultCount(Number(lineRow?.count ?? 0));
+  const mode = await accountEmailMode(db,input.lineAccountId,input.canSeeUnassigned);
+  if (mode === 'none') return resultCount(Number(lineRow?.count ?? 0));
+  let storeCount = 0;
+  if (mode === 'store' || mode === 'both') {
+    const filter = storeEmailFilter({
+      statuses:conditions.messageTypes.length && !conditions.messageTypes.includes('text') ? [] : conditions.statuses,
+      needsReply:conditions.quickFilter==='reply',
+      matchUnassigned:!conditions.assignees.length || conditions.assignees.includes('unassigned'),
+      query:conditions.query,unreadOnly:conditions.unread==='mine',overdue:conditions.due==='overdue' || conditions.quickFilter==='overdue',
+      from:conditions.receivedFrom,to:conditions.receivedTo,
+    });
+    const row = await db.prepare(`SELECT COUNT(*) AS count FROM (SELECT t.id ${filter.sql} LIMIT 1001)`)
+      .bind(input.staffId,input.lineAccountId,...filter.binds).first<{count:number}>();
+    storeCount = Number(row?.count ?? 0);
+    if (mode === 'store') return resultCount(Number(lineRow?.count ?? 0) + storeCount);
+  }
   const emailWhere: string[] = [];
   const emailBindings: unknown[] = [];
   if (conditions.statuses.length < 4) {
@@ -172,8 +191,8 @@ export async function countInboxSavedViewMatches(
           ${emailWhere.length > 0 ? `WHERE ${emailWhere.join(' AND ')}` : ''}
           LIMIT 1001
        )`,
-    ).bind(input.staffId, ...emailBindings).first<{ count: number }>()
+    ).bind(input.staffId,...emailBindings).first<{ count: number }>()
     : null;
-  const rawCount = Number(lineRow?.count ?? 0) + Number(emailRow?.count ?? 0);
+  const rawCount = Number(lineRow?.count ?? 0) + storeCount + Number(emailRow?.count ?? 0);
   return { matchCount: Math.min(rawCount, 1000), matchCountCapped: rawCount > 1000 };
 }

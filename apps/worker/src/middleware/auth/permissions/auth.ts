@@ -5,7 +5,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/auth/two-factor/policy', 'auth.mfa.policy'],
   ...DELIVERY_API_PERMISSIONS,
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
-  ['/api/support', '/chats'], ['/api/operators', '/chats'],
+  ['/api/account-email', '/chats'], ['/api/support', '/chats'], ['/api/operators', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],

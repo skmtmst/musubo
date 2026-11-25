@@ -26,6 +26,7 @@ export type WorkerBindings = {
     OPS_SUPPORT_AI_MODEL?: string;
     EMAIL?: SendEmail;
     CONTACT_EMAIL?: string;
+    ACCOUNT_EMAIL_DOMAIN?: string;
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RESTAURANT_TEST_ENABLED?: string;

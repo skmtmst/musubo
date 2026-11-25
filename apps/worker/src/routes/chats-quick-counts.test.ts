@@ -19,6 +19,7 @@ beforeEach(() => {
   db = createTestD1();
   db.raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
     VALUES ('account-a', 'channel-a', '本店', 'token', 'secret')`).run();
+  db.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('fixture-legacy','account-a','inbox_email_legacy_enabled','true')");
 });
 afterEach(() => { db.raw.close(); vi.restoreAllMocks(); });
 
@@ -213,4 +214,16 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
     expect((await counts({ channel: 'bogus' })).status).toBe(400);
     expect((await counts({ lineAccountId: 'account-x' })).status).toBe(404);
   });
+});
+
+test('同じ店舗の共通メールと店舗メールを合算する', async () => {
+  seedEmail('legacy-shared', {status: 'unread'});
+  const at = new Date(NOW - 30 * 60_000).toISOString();
+  db.raw.exec(`INSERT INTO account_email_connections(id,account_id,address,mailbox,status,created_at)
+    VALUES ('connected-a','account-a','inbox-a@example.test','shop@example.test','connected','2026-01-01')`);
+  db.raw.prepare(`INSERT INTO account_email_threads(id,connection_id,customer_email,subject,last_message_at)
+    VALUES('store-a','connected-a','customer@example.test','問い合わせ',?)`).run(at);
+  db.raw.prepare(`INSERT INTO account_email_messages(id,thread_id,dedup_key,subject,body_text,created_at)
+    VALUES('mail-a','store-a','dedup-a','問い合わせ','本文',?)`).run(at);
+  expect((await counts({channel:'email',lineAccountId:'account-a'})).body.data?.email.all).toBe(2);
 });

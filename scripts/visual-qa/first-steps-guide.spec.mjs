@@ -244,6 +244,7 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await expect(page.getByText('配分を保存しました。', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
   await expect(page.getByRole('banner').getByRole('link', { name: /開店準備 6\/8。はじめの設定を開く/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: '続きから進める', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '最初から始める', exact: true }).click()
   await page.getByRole('dialog', { name: /リッチメニューを選ぶ/ }).getByRole('button', { name: 'あとで', exact: true }).click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })

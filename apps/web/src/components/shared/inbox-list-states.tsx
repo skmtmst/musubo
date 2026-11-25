@@ -31,8 +31,8 @@ export function InboxListEmpty({ filtered, onClear, channel = 'all', description
   )
 }
 
-export type InboxSource = 'line' | 'instagram' | 'email'
-const SOURCE_NAME: Record<InboxSource, string> = { line: 'LINE の会話', instagram: 'Instagram の会話', email: 'メール' }
+export type InboxSource = 'line' | 'instagram' | 'email' | 'shared-email' | 'store-email'
+const SOURCE_NAME: Record<InboxSource, string> = { line: 'LINE の会話', instagram: 'Instagram の会話', email: 'メール', 'shared-email': '共通メール', 'store-email': '店舗メール' }
 
 /** 読めなかった物と、読めている物を 1 つの文にする。 */
 export function inboxFailureText(failed: readonly InboxSource[], shown: readonly InboxSource[]): string | null {

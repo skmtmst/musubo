@@ -8,13 +8,15 @@ import { InboxHistoryButton } from '@/components/shared/inbox-list';
 import { InboxThreadLoading } from '@/components/shared/inbox-thread';
 import EmailThread from '@/components/support/email-thread';
 import { InboxConversationPane, InboxMessages } from '@/components/templates/inbox-page';
+import { EMAIL_SOURCE_LABEL, STORE_EMAIL_REPLY_LOCK_REASON } from './email-sources';
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { formatListRecent } from '@/lib/format';
 import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary } from '@/v8/ai-reply/public/inbox-ai/index'
 import ConversationHead from '@/v8/inbox-chat/conversation-head';
 import { ChatSearchBar } from '@/v8/inbox-search/public/chat-search-bar/index'
 import { CORRECTION_TEMPLATE, Chat, formatByteSize, formatInboxDatetime } from './inbox-model';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { Props } from './inbox-conversation-view-types';
 import InboxEmptyGuide from './inbox-empty-guide';
 import InboxReplyComposer from './inbox-reply-composer';
@@ -23,19 +25,30 @@ import { withHonorific } from '@line-crm/shared'
 import { canEditFeature } from '@/lib/staff-capability'
 import { lockReason } from '@/components/shared/permission-lock'
 
-export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget }: Props) {
+export default function InboxConversation({ operators, selectedChatId, selectedEmail, storeEmailAccountId, setSelectedEmail, showFriendInfo, setShowFriendInfo, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget }: Props) {
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
-  return (<InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || selectedThreadId)}>
-    {selectedThreadId ? (
-      /* メールの往復。LINEのトークと同じ場所に出す。 */
+  // 店舗の会話は店舗の口だけで開く。つながっていない間は共通の口で開き直さない。
+  const openEmail = selectedEmail && (selectedEmail.source === 'shared' || storeEmailAccountId) ? selectedEmail : null
+  // 共通メールの下書きはここで預かる。店舗の会話や LINE を見てから戻っても書きかけが残る。
+  const sharedEmailDrafts = useRef(new Map<string, string>())
+  return (<InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || openEmail)}>
+    {openEmail ? (
+      /* メールの往復。LINEのトークと同じ場所に出す。会話・対応状況・既読・返信は届いた経路の口を使う。 */
       <EmailThread
-        threadId={selectedThreadId}
-        onBack={() => setSelectedThreadId(null)}
+        key={openEmail.source === 'store' ? `store:${storeEmailAccountId}` : 'shared'}
+        threadId={openEmail.threadId}
+        storeAccountId={openEmail.source === 'store' ? storeEmailAccountId : null}
+        sourceLabel={EMAIL_SOURCE_LABEL[openEmail.source]}
+        replyLockedReason={openEmail.source === 'store' ? STORE_EMAIL_REPLY_LOCK_REASON : undefined}
+        draftStore={openEmail.source === 'shared' ? sharedEmailDrafts.current : undefined}
+        readOnly={staffRole === 'viewer'}
+        onBack={() => setSelectedEmail(null)}
         customerInfoOpen={showFriendInfo}
         onOpenCustomerInfo={() => setShowFriendInfo(true)}
         onCloseCustomerInfo={() => setShowFriendInfo(false)}
         onChanged={() => {
-          void loadEmails()
+          // 一覧（共通と店舗）と件数・左のメニューの数を同じ知らせで読み直す。
+          window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
         }}
       />
     ) : deepLinkNotice ? (

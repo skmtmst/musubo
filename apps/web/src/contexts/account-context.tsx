@@ -24,6 +24,8 @@ export interface AccountWithStats {
   isActive: boolean
   /** 既存のメール受信箱をこのアカウントで表示できるか。新規アカウントは未接続。 */
   emailInboxEnabled?: boolean
+  /** このアカウント専用の転送用アドレスでメールを受け取っているか（接続済みのときだけ true）。 */
+  accountEmailInboxEnabled?: boolean
   country: string | null
   role: string | null
   displayOrder: number

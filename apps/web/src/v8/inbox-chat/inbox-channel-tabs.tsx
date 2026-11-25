@@ -73,9 +73,9 @@ export function InboxChannelTabs() {
   }, [pending, instagram, role])
   useEffect(() => {
     if (current !== 'email' || loading || !selectedAccountId) return
-    if (error || !selectedAccount || selectedAccount.emailInboxEnabled === undefined) {
+    if (error || !selectedAccount || (selectedAccount.emailInboxEnabled === undefined && selectedAccount.accountEmailInboxEnabled === undefined)) {
       setMessage(EMAIL_STATUS_FAILED)
-    } else if (!selectedAccount.emailInboxEnabled) {
+    } else if (!selectedAccount.emailInboxEnabled && !selectedAccount.accountEmailInboxEnabled) {
       notConnected(false)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,8 +96,8 @@ export function InboxChannelTabs() {
     if (channel === 'email') {
       if (error) { setMessage(EMAIL_STATUS_FAILED); return }
       if (loading || !selectedAccountId) { setMessage('接続状態を確認しています。'); return }
-      if (!selectedAccount || selectedAccount.emailInboxEnabled === undefined) { setMessage(EMAIL_STATUS_FAILED); return }
-      if (!selectedAccount.emailInboxEnabled) { if (role === null) setPending('email'); notConnected(); return }
+      if (error || !selectedAccount || (selectedAccount.emailInboxEnabled === undefined && selectedAccount.accountEmailInboxEnabled === undefined)) { setMessage(EMAIL_STATUS_FAILED); return }
+      if (!selectedAccount.emailInboxEnabled && !selectedAccount.accountEmailInboxEnabled) { if (role === null) setPending('email'); notConnected(); return }
     }
     select(channel)
   }

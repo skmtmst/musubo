@@ -9,7 +9,7 @@ import Button from '@/components/shared/button';
 import IconButton from '@/components/shared/icon-button';
 import MenuPortal, { SavedSearchMenuSurface } from '@/components/shared/menu-portal';
 import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
-import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
+import { InboxListEmpty, InboxListFailure, type InboxSource } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
@@ -28,7 +28,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import ActionMenu from '@/components/shared/action-menu';
-import { ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd } from './inbox-model';
+import { ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, emailShownUnread, formatWaitingDuration, sameYmd } from './inbox-model';
+import { emailKey, sameEmail, type EmailRef, type EmailSource } from './email-sources';
 import { chatListPreview } from './list-preview';
 import styles from './list-parts.module.css';
 import { savedViewSummary } from './saved-view-summary';
@@ -38,7 +39,7 @@ import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla';
 type Props = {
   unreadOnly: boolean
   selectedChatId: string | null
-  selectedThreadId: string | null
+  selectedEmail: EmailRef | null
   setFilterOpen: Dispatch<SetStateAction<boolean>>
   filterOpen: boolean
   setSavedViewsOpen: Dispatch<SetStateAction<boolean>>
@@ -82,14 +83,16 @@ type Props = {
   assigneeUnreadStatus: "error" | "ready" | "loading"
   assigneeUnread: { operatorId: string | null; operatorName: string | null; unread: number; }[] | null
   listScrollRef: RefObject<HTMLDivElement | null>
-  emailError: string
-  loadEmails: (offset?: number, append?: boolean) => Promise<void>
+  /** 一覧に出しているメールの経路と、読めなかった経路。共通の口が権限で断ったときは出している側に入らない。 */
+  shownEmailSources: readonly EmailSource[]
+  failedEmailSources: readonly EmailSource[]
+  retryEmails: () => void
   chatListFailed: boolean
   loadChats: () => Promise<void>
   emailItems: EmailInboxItem[]
   chats: ChatListItem[]
   handleSelectChat: (chatId: string) => void
-  handleSelectEmail: (threadId: string) => void
+  handleSelectEmail: (ref: EmailRef) => void
   inboxListLoading: boolean
   inboxListRefreshing: boolean
   hasMoreChats: boolean
@@ -99,12 +102,18 @@ type Props = {
   clearInboxFilters: () => void
   loadingMore: boolean
   loadMoreChats: () => Promise<void>
+  loadMoreEmails: () => void
   loadingMoreEmails: boolean
   sortOrder: InboxSort
   setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, socialChannel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+/** 失敗のお知らせでのメールの呼び名。共通と店舗の両方を出しているときだけ経路まで言う。 */
+function emailFailureNames(sources: readonly EmailSource[], shown: readonly EmailSource[]): InboxSource[] {
+  return sources.map((source) => (shown.length > 1 ? (source === 'store' ? 'store-email' : 'shared-email') : 'email'))
+}
+
+export default function InboxList({ unreadOnly, selectedChatId, selectedEmail, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, socialChannel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, shownEmailSources, failedEmailSources, retryEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadMoreEmails, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
@@ -135,7 +144,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     }
   }, [savedViewsOpen, savedViewMenuId, setSavedViewsOpen, setSavedViewMenuId])
   const sortLabel = INBOX_SORT_OPTIONS.find((option) => option.value === sortOrder)?.label ?? INBOX_SORT_OPTIONS[0].label
-  return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
+  const emailShownNames = emailFailureNames(shownEmailSources, shownEmailSources)
+  const emailFailedNames = emailFailureNames(failedEmailSources, shownEmailSources)
+  return (<InboxListPane selected={Boolean(selectedChatId || selectedEmail)}>
     <InboxListHeader
       data-design="Filters"
       data-inbox-v4="quick-filters"
@@ -385,12 +396,15 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         <InboxListFailure
           failed={socialChannel === 'instagram' ? (chatListFailed ? ['instagram' as const] : []) : [
             ...(channel !== 'email' && chatListFailed ? ['line' as const] : []),
-            ...(channel !== 'line' && emailError ? ['email' as const] : []),
+            ...(channel !== 'line' ? emailFailedNames : []),
           ]}
-          shown={socialChannel === 'instagram' ? ['instagram'] : channel === 'line' ? ['line'] : channel === 'email' ? ['email'] : ['line', 'email']}
+          shown={socialChannel === 'instagram' ? ['instagram'] : [
+            ...(channel !== 'email' ? ['line' as const] : []),
+            ...(channel !== 'line' ? emailShownNames : []),
+          ]}
           onRetry={() => {
             if (channel !== 'email' && chatListFailed) void loadChats()
-            if (channel !== 'line' && socialChannel !== 'instagram' && emailError) void loadEmails()
+            if (channel !== 'line' && socialChannel !== 'instagram' && failedEmailSources.length > 0) retryEmails()
           }}
         />
         {/*
@@ -414,55 +428,56 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   残したまま、混ぜ方だけそろえる。
                 */}
         {(() => {
+          /*
+            共通と店舗のメールは口が同じ条件（検索は本文まで）で絞って返すので、画面では絞り直さない。
+            手元で名前・件名だけで絞ると、本文で当たった会話が件数にはあるのに一覧から消える。
+            並びは use-inbox-emails が両方の経路を混ぜて渡す。
+          */
           const mailRows = (channel === 'line' || socialChannel !== 'all' ? [] : emailItems)
-            .filter((item) =>
-              nameQuery.trim() === ''
-                ? true
-                : [item.customerName, item.customerIdentifier, item.subject, item.preview]
-                  .filter(Boolean)
-                  .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
-            )
             .filter((item) => statusFilter === 'all' || item.status === statusFilter)
             .map((item) => ({
               at: item.lastMessageAt ?? item.lastIncomingAt,
               unread: item.isUnread,
-              key: `email:${item.id}`,
+              key: `email:${emailKey(item)}`,
               // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
               render: () => (
                 // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
                 // 直書きボタンの借金に数えられる (design-debt)。
-                <div key={item.id} className="border-b border-hairline">
-                  <InboxListRow selected={selectedThreadId === item.threadId}
-                    onClick={() => handleSelectEmail(item.threadId)}
+                <div key={emailKey(item)} className="border-b border-hairline" data-email-row={emailKey(item)}>
+                  <InboxListRow selected={sameEmail(selectedEmail, item)}
+                    onClick={() => handleSelectEmail({ source: item.source, threadId: item.threadId })}
                   >
                     <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                       <div className="relative shrink-0">
                         {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
                         <Avatar name={item.customerName} size={34} />
-                        {item.isUnread && (
+                        {emailShownUnread(item) && (
                           <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
                         )}
                       </div>
                       <div className={styles.rowColumns}>
                         <div className={styles.rowMain}>
-                          <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
+                          <p className={`text-ink truncate text-sm ${emailShownUnread(item) ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
                           <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
                             <p className={`text-ink-faint min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`} title={item.subject || item.preview || undefined}>
                               {item.subject || item.preview}
                             </p>
                           </div>
                           <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                            <ChannelBadge channel="email" />
-                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                                {(item.assignedStaffName ?? '未').charAt(0)}
+                            <ChannelBadge channel="email" emailSource={item.source} />
+                            {/* 店舗のメールは担当を付けない会話なので、担当は共通のメールだけに出す。 */}
+                            {item.source === 'shared' ? (
+                              <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                                <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                                  {(item.assignedStaffName ?? '未').charAt(0)}
+                                </span>
+                                <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
                               </span>
-                              <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
-                            </span>
+                            ) : null}
                           </div>
                         </div>
                         <div className={styles.rowAside}>
-                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
+                          <span className={styles.rowTime} data-unread={emailShownUnread(item) || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
                         </div>
                       </div>
                     </div>
@@ -567,7 +582,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           // 既定は両方とも口側で「未読が先・新しい順」。未読の有無が違う
           // 行同士は時刻に関わらず未読が先、同じ中では新しい順。
           // 新しい順のときは未読を見ず時刻だけで混ぜる。メールの口には並びの指定が無いので、
-          // 読み込んだ範囲の中で新しい順に並べ直してから混ぜる。
+          // 読み込んだ範囲を新しい順に並べた行を use-inbox-emails が渡す。
           const latest = sortOrder === 'latest'
           const precedes = (
             a: { at: string; unread: boolean },
@@ -575,7 +590,6 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           ): number =>
             (latest ? 0 : Number(b.unread) - Number(a.unread))
             || String(b.at).localeCompare(String(a.at))
-          if (latest) mailRows.sort((a, b) => String(b.at).localeCompare(String(a.at)))
           const rows: ChatListWindowItem[] = []
           if (slaEnabled) {
             // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。
@@ -630,12 +644,12 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           </InboxHistoryButton>
         )}
         {/*
-                  メールの続き。メールは上限200件で切れていた分を offset で遡る。
+                  メールの続き。共通と店舗はそれぞれ200件ずつ、経路ごとの位置から続きを読む。
                   LINEの「さらに読み込む」とは別物なので文言を分ける。
                 */}
         {hasMoreEmails && (
           <InboxHistoryButton context="list" busy={loadingMoreEmails}
-            onClick={() => { void loadEmails(emailItems.length, true) }}
+            onClick={loadMoreEmails}
           >
             メールの続きを読み込む
           </InboxHistoryButton>
