@@ -1,10 +1,36 @@
 import { api } from '@/lib/api'
+import { apiReadCacheGeneration } from '@/lib/api/transport/read-cache'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 
 const keys = ['attributes', 'friendAdd', 'scenario', 'hours', 'followup', 'richMenu'] as const
 export function unknownRestaurantSetup(reason: string): StyleSetupProgress {
   return { style: 'restaurant', steps: Object.fromEntries(keys.map(key => [key, { complete: null, reason }])) }
+}
+
+type StoreSelectionLoad = [
+  Awaited<ReturnType<typeof restaurantTestApi.listStores>>,
+  Awaited<ReturnType<typeof restaurantTestApi.storeContext>>,
+]
+const PRELOAD_TTL_MS = 10_000
+const preloadedStoreSelections = new Map<string, { generation: number; expiresAt: number; promise: Promise<StoreSelectionLoad> }>()
+
+export function clearPreloadedRestaurantStoreSelection(accountId?: string | null): void {
+  if (!accountId) preloadedStoreSelections.clear()
+  else preloadedStoreSelections.delete(accountId)
+}
+
+export function preloadRestaurantStoreSelection(accountId: string): void {
+  const now = Date.now()
+  const generation = apiReadCacheGeneration()
+  const existing = preloadedStoreSelections.get(accountId)
+  if (existing && existing.generation === generation && existing.expiresAt > now) return
+  const promise = Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)])
+  const entry = { generation, expiresAt: now + PRELOAD_TTL_MS, promise }
+  preloadedStoreSelections.set(accountId, entry)
+  void promise.catch(() => {
+    if (preloadedStoreSelections.get(accountId) === entry) preloadedStoreSelections.delete(accountId)
+  })
 }
 
 /**
@@ -33,7 +59,11 @@ export async function loadRestaurantSetupProgress(accountId: string, selectedSto
 async function loadRestaurantStoreProgress(accountId: string, selectedStoreId?: string | null): Promise<StyleSetupProgress> {
   let storeId = selectedStoreId
   if (storeId === undefined) {
-    const [stores, context] = await Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)])
+    const preloaded = preloadedStoreSelections.get(accountId)
+    if (preloaded) preloadedStoreSelections.delete(accountId)
+    const validPreload = preloaded && preloaded.generation === apiReadCacheGeneration() && preloaded.expiresAt > Date.now()
+      ? preloaded.promise : null
+    const [stores, context] = await (validPreload ?? Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)]))
     if (!stores.success || !context.success) return unknownRestaurantSetup('店舗の設定を読み込めませんでした')
     const selected = context.data.selectedStore?.id
     const owned = stores.data.stores.filter(store => store.status === 'active' && store.line_account_id === accountId)
