@@ -402,8 +402,8 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-design-layout='stacked-centered'] > .description { text-align: center; font-weight: var(--font-weight-reading); }
 :root .panel:is([data-design-layout='stacked-centered'], [data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) > .content::after { content: none; }
 :root .panel[data-design-layout='stacked-guided'] {
-  --dialog-stack-gap: var(--space-12);
   padding: var(--space-24) 23px var(--space-14);
+  gap: var(--space-12);
 }
 :root .panel[data-design-layout='stacked-picker'] { gap: var(--space-10); }
 :root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .title { width: 100%; }
@@ -677,8 +677,7 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
 }
 
 :root .overlay:has(> .panel > [data-guide-slot="tables.form"] :is([data-guide-table-editor], [data-guide-table-compact])) {
-  --guide-table-dim: #0f172a73;
-  background: var(--guide-table-dim);
+  background: var(--color-guide-scrim);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -695,11 +694,10 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
 
 @media (max-width: 480px) and (min-height: 800px) {
   :root .overlay[data-viewport-fit][data-design-top]:has(> .panel > [data-guide-slot="tables.form"]) {
-    --guide-table-top: 66px;
-    padding-top: var(--guide-table-top);
+    padding-top: var(--polish-guided-table-mobile-top);
   }
 
   :root .overlay[data-viewport-fit][data-design-top] > .panel:has(> [data-guide-slot="tables.form"]) {
-    max-height: calc(100dvh - var(--guide-table-top) - var(--space-24));
+    max-height: calc(100dvh - var(--polish-guided-table-mobile-top) - var(--space-24));
   }
 }

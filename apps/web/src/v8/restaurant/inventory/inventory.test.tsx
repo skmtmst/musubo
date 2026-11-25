@@ -86,6 +86,16 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(board.textContent).toContain('休み（定休日）・お客さまの画面に出ません')
   })
 
+  it('在庫の取得失敗では一覧を空扱いせず、読み直しで戻せる', async () => {
+    fixture.inventoryDay.mockRejectedValueOnce(new Error('取得エラー'))
+    render(<InventoryPage />)
+    const error = await screen.findByText('この日の時間帯を読み込めませんでした')
+    expect(screen.queryByText('この日の時間帯がありません')).toBeNull()
+    fireEvent.click(within(error.closest('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByText('19:00 の卓')
+    expect(screen.queryByText('この日の時間帯を読み込めませんでした')).toBeNull()
+  })
+
   const openStandard = async () => {
     fireEvent.click(await screen.findByRole('button', { name: '基本配分をまとめて変更' }))
     return screen.getByRole('dialog', { name: '営業日の基本配分を変更' })

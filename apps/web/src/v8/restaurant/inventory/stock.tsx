@@ -112,7 +112,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
         setDayRows(Array.isArray(res.data) ? res.data : [])
         setAllocationState(res.allocation ?? null)
       }
-    }).catch(() => { if (current) { setDayRows([]); setLoadError('在庫を読み込めませんでした。再読込してください。') } })
+    }).catch(() => {
+      if (current) setLoadError('在庫を読み込めませんでした。再読込してください。')
+    })
     return () => { current = false }
   }, [selectedAccountId, storeId, date, refresh])
 
@@ -456,14 +458,17 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             {slots.length > 0 && !guidingReception ? <div className={styles.allocationTableActions}>
               <Button variant="text" lockedReason={lockedReason} disabled={!canWriteAllocation || allocationState?.hoursStatus !== 'open'} onClick={() => openEditor('day')}>この日の配分を変更</Button>
             </div> : null}
-            {dayRows === null ? (
+            {loadError || hoursUnavailable ? (
+              <div className={styles.stateBox}>
+                <ListState kind="error" title="この日の時間帯を読み込めませんでした" onRetry={() => setRefresh(current => current + 1)} />
+              </div>
+            ) : dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
               <div className={styles.stateBox}>
-                {loadError || hoursUnavailable ? <ListState kind="error" title="この日の時間帯を表示できませんでした" onRetry={() => setRefresh(current => current + 1)} />
-                  : <ListState kind="empty" title={closedDay ? 'この日は休業日です' : 'この日の時間帯がありません'}
+                <ListState kind="empty" title={closedDay ? 'この日は休業日です' : 'この日の時間帯がありません'}
                     description={closedDay ? 'この日のLINE予約は受け付けていません。' : undefined}
-                    action={closedDay ? <Button href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</Button> : undefined} />}
+                    action={closedDay ? <Button href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</Button> : undefined} />
               </div>
             ) : (
               <DataTable presentation="inventory">

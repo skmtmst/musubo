@@ -99,6 +99,7 @@
 }
 
 .testTitle {
+  --first-message-step-size: 45px;
   display: flex;
   align-items: flex-start;
   gap: var(--space-12);
@@ -110,7 +111,7 @@
   display: grid;
   place-items: center;
   flex: none;
-  inline-size: 45px;
+  inline-size: var(--first-message-step-size);
   aspect-ratio: 1;
   border: var(--space-2) solid var(--color-accent);
   border-radius: var(--radius-pill);
@@ -145,7 +146,8 @@
 }
 
 .testDestination {
-  min-block-size: 60px;
+  --first-message-destination-min-height: 60px;
+  min-block-size: var(--first-message-destination-min-height);
 }
 
 .testDestination > div {
@@ -165,13 +167,14 @@
 }
 
 .testStatus {
-  min-block-size: 43px;
+  --first-message-status-min-height: 43px;
+  min-block-size: var(--first-message-status-min-height);
   padding-inline: var(--space-14);
   color: var(--color-ink-secondary);
 }
 
 .testStatus:has(p) {
-  min-block-size: 77px;
+  --first-message-status-min-height: 77px;
 }
 
 .testStatus[data-tone='success'] {
@@ -195,15 +198,21 @@
 }
 
 .testAction {
-  inline-size: min(228px, 100%);
+  --first-message-action-width: 228px;
+  --first-message-action-space: 100%;
+  inline-size: min(var(--first-message-action-width), var(--first-message-action-space));
 }
 
 @media (max-width: 540px) {
   .testDescription { min-block-size: calc(2 * var(--space-20)); }
-  .testAction { inline-size: min(208px, calc(100% - 48px)); }
+  .testAction {
+    --first-message-action-width: 208px;
+    --first-message-action-space: calc(100% - 2 * var(--space-24));
+  }
 }
 
 .testVerification {
+  --first-message-verification-copy-width: 14em;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -217,7 +226,7 @@
 }
 
 .testVerification p {
-  flex: 1 1 14em;
+  flex: 1 1 var(--first-message-verification-copy-width);
   margin: 0;
   font-size: var(--text-body);
   color: var(--color-ink-secondary);
