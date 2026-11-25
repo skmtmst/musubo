@@ -10,6 +10,8 @@ const closingTime = (open: string, close: string) => open === '00:00' && close =
 export function googleOpeningWeek(profile: GoogleProfile): OpeningDay[] | null {
   if (profile.openStatus === 'CLOSED_TEMPORARILY' || profile.openStatus === 'CLOSED_PERMANENTLY')
     return weekdayName.map((_, weekday) => ({ weekday, periods: [] }));
+  // 古い写しの空配列は未設定との区別がつかないため確認不能にする。
+  if (profile.regularHoursKnown === false || (profile.regularHoursKnown !== true && !Object.values(profile.regularHours ?? {}).some(periods => Array.isArray(periods) && periods.length > 0))) return null;
   const week = Object.entries(weekdayNumber).map(([name, weekday]) => ({
     weekday,
     periods: profile.regularHours[name as keyof typeof weekdayNumber]?.map(period => ({

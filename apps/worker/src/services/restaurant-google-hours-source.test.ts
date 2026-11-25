@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { GoogleProfile, Weekday } from './google-business-profile.js';
+import { normalizeProfile, type GoogleProfile, type Weekday } from './google-business-profile.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedRestaurantFixture } from '../test-utils/restaurant-fixture.js';
 import { connectedGoogleProfile, googleOpeningDay, googleOpeningWeek, syncGoogleOpeningWeek } from './restaurant-google-hours-source.js';
@@ -19,6 +19,22 @@ function profile(): GoogleProfile {
 let database: SqliteD1;
 beforeEach(() => { database = createTestD1(); seedRestaurantFixture(database); });
 afterEach(() => { vi.useRealTimers(); database.raw.close(); });
+
+it('Googleの営業時間あり・全休・未設定を区別し、古い空の写しは確認不能とする', async () => {
+  const available = profile();
+  expect(googleOpeningWeek(available)?.[1]?.periods).toHaveLength(1);
+  const closed = await normalizeProfile({ regularHours: { periods: [] } }, location);
+  expect(googleOpeningWeek(closed)).toHaveLength(7);
+  expect(googleOpeningWeek(closed)?.every(day => day.periods.length === 0)).toBe(true);
+  const missing = await normalizeProfile({}, location);
+  expect(googleOpeningWeek(missing)).toBeNull();
+  const emptyObject = await normalizeProfile({ regularHours: {} }, location);
+  expect(googleOpeningWeek(emptyObject)).toBeNull();
+  const malformed = await normalizeProfile({ regularHours: { periods: [{}] } }, location);
+  expect(googleOpeningWeek(malformed)).toBeNull();
+  delete closed.regularHoursKnown;
+  expect(googleOpeningWeek(closed)).toBeNull();
+});
 
 function connection(status = 'connected', selectedLocation = location) {
   database.raw.prepare(`INSERT INTO rt_google_connections

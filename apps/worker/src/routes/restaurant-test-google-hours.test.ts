@@ -50,11 +50,27 @@ it('Google接続後は特別営業時間を指定日の正として返し、旧�
       specialHours: [{ date: '2026-11-10', closed: true, periods: [] }],
     } }), 'fingerprint', '2026-11-10T00:00:00Z', '2026-11-10T00:00:00Z');
   const weekly = (await (await request(path)).json() as any).data;
+  expect(weekly.hoursStatus).toBe('available');
   expect(weekly.hours[2].periods).toEqual([{ opensAt: '10:00', closesAt: '19:00' }]);
   const special = (await (await request(`${path}&date=2026-11-10`)).json() as any).data;
   expect(special.hours[2].periods).toEqual([]);
   expect((await request(path, 'PUT', { storeId: 'store-ginza', hours: oldHours, expectedVersion: 1 })).status).toBe(409);
   expect((await request(`${path}&date=invalid`)).status).toBe(400);
+  database.raw.prepare('UPDATE rt_google_profiles SET profile_json=? WHERE store_id=?').run(JSON.stringify({ profile: {
+    name: 'locations/222', openStatus: 'OPEN', regularHours: Object.fromEntries(Object.keys(regularHours).map(day => [day, []])),
+    regularHoursKnown: true, specialHours: [],
+  } }), 'store-ginza');
+  const closed = (await (await request(path)).json() as any).data;
+  expect(closed.hoursStatus).toBe('closed');
+  expect(closed.hours).toHaveLength(7);
+  for (const [openStatus, expected] of [['CLOSED_TEMPORARILY', 'temporarily_closed'], ['CLOSED_PERMANENTLY', 'permanently_closed']]) {
+    database.raw.prepare('UPDATE rt_google_profiles SET profile_json=? WHERE store_id=?').run(JSON.stringify({ profile: {
+      name: 'locations/222', openStatus, regularHours, specialHours: [],
+    } }), 'store-ginza');
+    expect((await (await request(path)).json() as any).data.hoursStatus).toBe(expected);
+  }
   database.raw.prepare("UPDATE rt_google_connections SET status='expired' WHERE store_id='store-ginza'").run();
-  expect((await (await request(path)).json() as any).data.hours).toBeNull();
+  const unavailable = (await (await request(path)).json() as any).data;
+  expect(unavailable.hours).toBeNull();
+  expect(unavailable.hoursStatus).toBe('unavailable');
 });
