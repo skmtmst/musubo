@@ -312,6 +312,7 @@
 - [電話予約・ウォークイン（V8）の動き](../apps/web/src/v8/restaurant/front-desk/BEHAVIOR.md)
 - [Googleビジネス（V8）の動き](../apps/web/src/v8/restaurant/google/BEHAVIOR.md)
 - [予約枠・在庫の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/inventory/BEHAVIOR.md)
+- [時間帯ごとの在庫表の反映履歴](release-log/unreleased/PR-kenta-stock-rows.md) — 反映履歴・2026-11-26確認。
 - [LINE来店フォロー（V8・融合 B-186）の動き](../apps/web/src/v8/restaurant/line-followup/BEHAVIOR.md)
 - [メニュー管理の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/menu/BEHAVIOR.md)
 - [組織・権限（V8）の動き](../apps/web/src/v8/restaurant/organization/BEHAVIOR.md)

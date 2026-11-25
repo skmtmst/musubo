@@ -246,14 +246,13 @@ html:root .row[data-row-open]:not(.rowInteractive):hover:not([aria-selected='tru
   font-weight: var(--polish-weight-label); line-height: var(--tpl-rs-lh-11);
 }
 :root .frame[data-table-presentation='inventory'] .row { height: var(--tpl-rs-inv-row-h); }
+:root .frame[data-table-presentation='inventory'] .rowComfortable { height: var(--polish-table-row); }
 :root .frame[data-table-presentation='inventory'] .bodyCell {
   padding: 0 var(--tpl-rs-inv-col-gap) 0 0; border: 0; box-shadow: var(--tpl-rs-line-top);
   color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-rs-lh-12); white-space: nowrap;
 }
 :root .frame[data-table-presentation='inventory'] th:first-child,
 :root .frame[data-table-presentation='inventory'] .bodyCell:first-child { padding-left: var(--tpl-rs-inv-side-pad); }
-:root .frame[data-table-presentation='inventory'] th:nth-child(3),
-:root .frame[data-table-presentation='inventory'] .bodyCell:nth-child(3) { padding-right: var(--tpl-rs-inv-col-pad-num); }
 :root .frame[data-table-presentation='inventory'] th:last-child,
 :root .frame[data-table-presentation='inventory'] .bodyCell:last-child { padding-right: var(--tpl-rs-inv-col-pad-end); }
 :root .frame[data-table-presentation='channels'] thead tr { height: var(--tpl-rs-inv-ch-head-h); }
