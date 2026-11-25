@@ -4797,7 +4797,7 @@ CREATE TABLE "instagram_outbound_messages" (
     OR (
       resolved_by_staff_id IS NOT NULL AND length(trim(resolved_by_staff_id)) > 0
       AND resolved_at IS NOT NULL AND length(trim(resolved_at)) > 0
-      AND resolution_kind IN ('reason','meta_conversation_absent')
+      AND resolution_kind IS NOT NULL AND resolution_kind IN ('reason','meta_conversation_absent')
       AND resolution_evidence IS NOT NULL AND length(trim(resolution_evidence)) > 0
     )
   )
