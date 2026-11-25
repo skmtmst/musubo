@@ -293,8 +293,8 @@ export default function KpiCard({
           ) : null}
         </p>
         {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
-        {shownBadge ? (
-          badgeAction ? <button type="button" onClick={badgeAction} data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</button> : <span data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</span>
+        {shownBadge && !badgeAction ? (
+          <span data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</span>
         ) : null}
       </div>
 
@@ -328,6 +328,8 @@ export default function KpiCard({
       {delta ? <span className={styles.delta} data-kpi-delta-slot>{delta}</span> : null}
       {actionPlacement === 'value-row' && actionNode ? <span className={styles.valueActionSlot} data-kpi-action-slot>{actionNode}</span> : null}
       </div>
+
+      {shownBadge && badgeAction ? <div className={styles.badgeActionRow}><button type="button" onClick={badgeAction} aria-label={`${title}：${shownBadge}を開く`} data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</button></div> : null}
 
       {sparkline && sparkline.length > 1 && !loading ? <Sparkline values={sparkline} /> : null}
       {meter && !loading ? <ProgressBar appearance="quota" tone={meter.tone} value={meter.value} label={meter.label} className={styles.meter} /> : null}

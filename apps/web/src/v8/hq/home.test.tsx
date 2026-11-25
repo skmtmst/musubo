@@ -677,4 +677,5 @@ it('要確認5・未確認1のとき接続に問題6アカウントと内訳を�
   const band = [...container.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.includes('接続に問題'))
   expect(band?.textContent).toContain('要確認 5・未確認 1')
   expect(band?.textContent).toMatch(/6\s*件/)
+  expect(band?.querySelector('button[aria-label="接続に問題：要確認 5・未確認 1を開く"]')).toBeTruthy()
 })
