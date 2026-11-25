@@ -862,6 +862,7 @@ export default function RewardsTab() {
       description="たまったマイルと交換できる特典を出します。"
       create={{ label: '最初の使い道を作る', href: '/mileage/rewards/edit' }}
       canCreate={!readonly}
+      lockedReason={balanceSource === 'ec' ? 'マイルは EC で管理しています。' : undefined}
       filtered={rewards.length > 0}
       onClearFilters={resetAll}
       filteredDescription="名前の検索や絞り込みを外すと、すべて出ます"

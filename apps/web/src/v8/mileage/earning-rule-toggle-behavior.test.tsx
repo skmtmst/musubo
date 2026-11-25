@@ -89,3 +89,12 @@ it('停止を先に表示し、失敗すると戻し、成功しても一覧を�
   expect(row.textContent).toContain('止めています')
   expect(calls.earningRulesV6).toHaveBeenCalledTimes(1)
 })
+
+
+it('EC 管理では空の決めごとの作成を理由付きで止める', async () => {
+  calls.earningRulesV6.mockResolvedValue({ success: true, data: overview([]) })
+  render(<MileageShell.Provider value={{ tab: 'earning-rules', readonly: false, narrow: false, counts: {}, setCount: () => {}, balanceSource: 'ec' }}><V8EarningRulesTab /></MileageShell.Provider>)
+  const button = await screen.findByRole('button', { name: /最初の決めごとを作る/ })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(document.body.textContent).toContain('マイルは EC で管理しています。')
+})

@@ -100,3 +100,12 @@ it('使い道の停止を先に表示し、失敗すると戻し、成功して�
   expect(row.textContent).toContain('止めています')
   expect(calls.list).toHaveBeenCalledTimes(1)
 })
+
+
+it('EC 管理では空の使い道の作成を理由付きで止める', async () => {
+  calls.list.mockResolvedValue({ success: true, data: overviewOf([]) })
+  render(<MileageShell.Provider value={{ tab: 'rewards', readonly: false, narrow: false, counts: {}, setCount: () => {}, balanceSource: 'ec' }}><Rewards /></MileageShell.Provider>)
+  const button = await screen.findByRole('button', { name: /最初の使い道を作る/ })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(document.body.textContent).toContain('マイルは EC で管理しています。')
+})
