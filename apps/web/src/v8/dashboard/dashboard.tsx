@@ -14,7 +14,7 @@ import Notice from '@/components/shared/notice'
 import PeriodPicker from '@/components/shared/period-picker'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RetryLabel } from '@/components/shared/retry-label'
-import { DashboardAsideSection,DashboardColumns,DashboardPage,DashboardRow } from '@/components/templates/dashboard-page'
+import { DashboardAsideSection,DashboardColumns,DashboardPage,DashboardRow,DashboardTop } from '@/components/templates/dashboard-page'
 import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
@@ -403,7 +403,6 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       title={usageStyle ? 'ダッシュボード' : greeting(d.staffName)}
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
-        <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} />
         {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */}
         {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : <Button variant="primary" lockedReason={manageLockReason} disabled={!manageLockReason}><Plus size={16} aria-hidden="true" />配信を作る</Button>}
@@ -423,10 +422,11 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
         onReset={d.resetPreferences}
       /> : null}
     >
-      {todayAsOf ? <p className={styles.asOf} title={todayAsOf}>{todayAsOf}</p> : null}
+      <DashboardTop controls={<div className={styles.periodRow}>{todayAsOf ? <p className={styles.asOf} title={todayAsOf}>{todayAsOf}</p> : null}<PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} /></div>}>
       <KpiBand className={styles.todayBand} appearance="cards" data-design="TodayTasks">
         {bandCells.map((entry) => <Fragment key={entry.id}>{entry.node}</Fragment>)}
       </KpiBand>
+      </DashboardTop>
       {openCell?.cell ? (
         <div className={styles.cellDetail} role="region" aria-label="内訳">
           {openCell.cell.detail}

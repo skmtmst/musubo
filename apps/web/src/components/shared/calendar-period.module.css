@@ -1,4 +1,4 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-.viewport { min-inline-size: 0; overflow-x: clip; }
+.viewport { min-inline-size: 0; overflow-x: clip; overflow-clip-margin: var(--space-4); }
 }
