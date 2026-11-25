@@ -137,7 +137,7 @@ interface ReminderRow {
 function accountTarget(row: Pick<ReminderRow, 'lineAccount' | 'lineAccountId'> | null | undefined) {
   if (row?.lineAccount === null) return { id: '', name: '所属なし' }
   if (row?.lineAccount) return { id: row.lineAccount.id, name: row.lineAccount.name?.trim() || '不明' }
-  return { id: row?.lineAccountId ?? '', name: '不明' }
+  return { id: row?.lineAccountId ?? '', name: row?.lineAccountId ? undefined : '不明' }
 }
 
 type StatusKey = 'draft' | 'stopped' | 'active'
@@ -1288,7 +1288,7 @@ export default function RemindersListV8() {
             ) : null}
           </>
         )}
-      ><OperationTargetSummary accounts={[{ id: deleteTarget?.lineAccountId ?? '', name: deleteTarget?.lineAccountId ? undefined : '不明' }]} /></SheetDialog>
+      ><OperationTargetSummary accounts={[accountTarget(deleteTarget)]} /></SheetDialog>
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
       <></>

@@ -198,6 +198,22 @@ it('一件の停止窓は所属不明と環境を示し、切替後の古い確�
   await act(async () => old())
   expect(net.update).not.toHaveBeenCalled()
 })
+it('未所属なら停止と削除のどちらにも所属なしを示す', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: null, lineAccount: null })), total: 2, limit: 20, sort: [] } })
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  const open = async (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name }))
+  }
+  await open('一時停止する')
+  expect(within(await screen.findByRole('dialog')).getByText('所属なし')).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await open('削除する')
+  expect(within(await screen.findByRole('alertdialog')).getByText('所属なし')).toBeTruthy()
+})
+
 it('削除の窓は選択中ではなく記録の所属先を示す', async () => {
   net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: 'account-b' })), total: 2, limit: 20, sort: [] } })
   render(<RemindersList />)
