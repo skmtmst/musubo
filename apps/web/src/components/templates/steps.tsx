@@ -28,6 +28,7 @@ export function Steps({
   steps,
   currentKey,
   connectorSize,
+  unavailableReason,
   layout = 'horizontal',
   summaries,
   summaryLayout = 'default',
@@ -42,6 +43,7 @@ export function Steps({
   /** いまいる段の key（例：URL の `?step=`）。渡さないときは state が current の最初の段。 */
   currentKey?: string
   connectorSize?: 'short'
+  unavailableReason?: string
   /** 窓の左で、回答済み・現在・未回答の質問へ移る列。 */
   layout?: 'horizontal' | 'sidebar' | 'guidance'
   /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
@@ -162,7 +164,7 @@ export function Steps({
                   {name}
                 </button>
               ) : (
-                <span className={styles.step} title={step.label} aria-current={isCurrent ? 'step' : undefined}>
+                <span className={styles.step} title={state === 'todo' && unavailableReason ? unavailableReason : step.label} aria-current={isCurrent ? 'step' : undefined}>
                   {dot}
                   {name}
                 </span>

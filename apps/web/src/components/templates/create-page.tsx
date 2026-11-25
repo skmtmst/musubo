@@ -55,6 +55,7 @@ export interface CreatePageProps extends PageHeadingProps {
   /** 右の列の地。`'plain'` は地の色を敷かない（E-9 p17Qku）。渡さなければ白い板と同じ地。 */
   previewSurface?: 'plain'
   footerActions: ReactNode
+  footerLead?: ReactNode
   /** 浮いた帯が本文の末尾の余白に重なる板。入力段の中身には重ねない。 */
   footerPlacement?: 'floating'
   /** 枠のある下部の帯を描く板だけで使う。StickyBar の既定は変えない。 */
@@ -62,7 +63,7 @@ export interface CreatePageProps extends PageHeadingProps {
   destructive?: ReactNode
   status?: ReactNode
 }
-export function CreatePage({ step = null, readOnly, contentDisabled, contentLabel, dirty, busy, boardId, elementRef, standalone, heightMode, children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, bodyEndActions, previewSurface, footerActions, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
+export function CreatePage({ step = null, readOnly, contentDisabled, contentLabel, dirty, busy, boardId, elementRef, standalone, heightMode, children, preview, previewLabel, previewTitle, previewToggle, previewCompactWhenNarrow, hidePreviewWhenNarrow = true, notice, tabs, noticeSpacing, contentSpacing, bodyEndActions, previewSurface, footerActions, footerLead, footerPlacement, footerOutlined, destructive, status, ...heading }: CreatePageProps) {
   const formActions = splitFormActions(normalizeProgressActionArrows(footerActions))
   const Content = StepContent
   const readOnlyAfterHeading = !!readOnly && contentSpacing === 'notice-after-read-only'
@@ -86,7 +87,7 @@ export function CreatePage({ step = null, readOnly, contentDisabled, contentLabe
     {/* 閲覧帯は頭の中に置く（tagf）。本文先頭にも知らせが続く画面（notice-after-read-only）だけは、余白を後の知らせへ集約するため頭の直下に置く。 */}
     <PageHeading {...heading} readOnlyBand={readOnlyAfterHeading ? heading.readOnlyBand : readOnly || heading.readOnlyBand} actions={<>{heading.actions}{formActions.secondary.length ? <FormSecondaryActions buttons={formActions.secondary} /> : null}</>} />
     {contentSpacing === undefined ? <div className={styles.createFlow} data-template-region="create-flow">{body}</div> : body}
-    {footerActions ? <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={formActions.main} outlined={footerOutlined} destructive={destructive} status={status} /></div> : null}
+    {footerActions ? <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={formActions.main} outlined={footerOutlined} destructive={destructive} status={status} leadAction={footerLead} /></div> : null}
   </PageFrame>
 }
 
