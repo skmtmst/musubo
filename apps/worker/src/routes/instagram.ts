@@ -2,7 +2,7 @@ import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedText } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import type {
@@ -783,8 +783,8 @@ instagram.get('/api/instagram/webhook', async (c) => {
 instagram.post('/api/instagram/webhook', async (c) => {
   if (!c.env.META_APP_SECRET)
     return c.json({ success: false, error: 'unconfigured' }, 503);
-  const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).length > 1048576)
+  const raw = await readBoundedText(c.req.raw, 1048576);
+  if (raw === null)
     return c.json({ success: false, error: 'payload_too_large' }, 413);
   if (
     !(await verifyInstagramSignature(
