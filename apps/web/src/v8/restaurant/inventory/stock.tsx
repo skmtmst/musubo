@@ -162,7 +162,6 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   )
   const tableById = useMemo(() => new Map(tables.map((item) => [item.id, item])), [tables])
   const activeTables = useMemo(() => tables.filter((item) => item.is_active), [tables])
-  const stoppedTables = useMemo(() => tables.filter((item) => !item.is_active), [tables])
   const totalSeats = useMemo(() => activeTables.reduce((sum, item) => sum + item.max_capacity, 0), [activeTables])
   const missingHoursReason = canEdit && !busy && !hoursError && hoursReceipt && hoursReceipt.scope === hoursScope.current
     && hoursReceipt.scope.accountId === selectedAccountId && hoursReceipt.scope.storeId === storeId
