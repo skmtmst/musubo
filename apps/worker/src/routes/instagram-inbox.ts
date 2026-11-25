@@ -58,7 +58,7 @@ type TargetOutboundRow = {
 
 type MetaAbsenceCheck =
   | { ok: true; kind: 'meta_conversation_absent'; evidence: string }
-  | { ok: false; status: 409 | 502; error: string; matchedId?: string };
+  | { ok: false; status: 409 | 502; error: string; matchedId?: string; reasonCode?: 'sender_id_mismatch' };
 
 function safeGraphNextUrl(next: unknown, version: string): URL | null {
   if (typeof next !== 'string' || !next) return null;
@@ -211,7 +211,7 @@ async function verifyAbsentInMetaConversation(
           }
           const fromId = msg.from ? (msg.from as { id: string }).id : undefined;
           if (fromId !== undefined && fromId !== business && fromId !== sender) {
-            return { ok: false, status: 502, error: 'Meta側の送り主の番号の形が違うため照合できません。' };
+            return { ok: false, status: 502, reasonCode: 'sender_id_mismatch', error: 'Meta側の送り主の番号の形が違うため照合できません。' };
           }
           if ((fromId === undefined || fromId === business) && msgTime >= windowStartMs) {
             if (typeof msg.message !== 'string') {
@@ -347,8 +347,8 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
         if (!updated.meta.changes) return c.json({ success: false, error: '会話を読み直してください。' }, 409);
         return c.json({ success: true, data: { outcome: 'sent', message: 'Instagram で届いていたので送信済みにしました。' } });
       }
-      if (verified.error.includes('送り主の番号の形')) {
-        await c.env.DB.prepare(`UPDATE instagram_outbound_messages SET resolution_evidence=COALESCE(resolution_evidence,'') || '[sender_id_mismatch]' ${target}`)
+      if (verified.reasonCode === 'sender_id_mismatch') {
+        await c.env.DB.prepare(`UPDATE instagram_outbound_messages SET resolution_evidence=COALESCE(resolution_evidence,'') || '[sender_id_mismatch]' ${target} AND COALESCE(resolution_evidence,'') NOT LIKE '%[sender_id_mismatch]%'`)
           .bind(id, business, sender, body.key, staleCutoff).run();
       }
       if (!reason) return c.json({ success: false, error: `${verified.error} Instagram で届いていないことを確かめてから、理由を入力してください。` }, verified.status);

@@ -508,8 +508,9 @@ export const INSTAGRAM_PUBLISH_SCOPE = 'instagram_business_content_publish';
 export function instagramCanPublish(scopes: string): boolean {
   return scopes.split(',').includes(INSTAGRAM_PUBLISH_SCOPE);
 }
-export async function subscribeInstagramMessages(config: InstagramConfig, token: string, metaAppId?: string) {
+export async function subscribeInstagramMessages(config: InstagramConfig, token: string, metaAppId?: string): Promise<{ echoSubscribed: boolean }> {
   const path = 'me/subscribed_apps';
+  let fields: string[];
   try {
     const current = await instagramGraph<{ data: { id: string; subscribed_fields: string[] }[]; paging?: { next?: string } }>(
       config, path, token, { fields: 'id,subscribed_fields' });
@@ -517,14 +518,25 @@ export async function subscribeInstagramMessages(config: InstagramConfig, token:
     const own = current.data.find(app => app.id === config.appId || app.id === metaAppId);
     if (own && !Array.isArray(own.subscribed_fields)) throw new Error('invalid_fields');
     if (!own && current.paging?.next) throw new Error('subscription_list_incomplete');
-    const fields = own?.subscribed_fields ?? [];
-    if (fields.includes('messages') && fields.includes('message_echoes')) return;
-    const result = await instagramGraph<{ success: boolean }>(config, path, token, {
-      subscribed_fields: [...new Set([...fields, 'messages', 'message_echoes'])].join(','),
-    }, 'POST');
-    if (result.success !== true) throw new Error('subscription_rejected');
+    fields = own?.subscribed_fields ?? [];
+    if (!fields.includes('messages')) {
+      const result = await instagramGraph<{ success: boolean }>(config, path, token, {
+        subscribed_fields: [...new Set([...fields, 'messages'])].join(','),
+      }, 'POST');
+      if (result.success !== true) throw new Error('subscription_rejected');
+      fields = [...fields, 'messages'];
+    }
   } catch (error) {
     throw new InstagramError('instagram_webhook_subscription_failed', 502, error instanceof InstagramError ? error.detail : undefined);
+  }
+  if (fields.includes('message_echoes')) return { echoSubscribed: true };
+  try {
+    const result = await instagramGraph<{ success: boolean }>(config, path, token, {
+      subscribed_fields: [...new Set([...fields, 'message_echoes'])].join(','),
+    }, 'POST');
+    return { echoSubscribed: result.success === true };
+  } catch {
+    return { echoSubscribed: false };
   }
 }
 

@@ -629,6 +629,9 @@ export default function SnsSettingsPage() {
                 reconnectLabel={INSTAGRAM_RECONNECT_LABEL}
               />
               {addNarrow('instagram')}
+              {(visibleInstagramList?.connections.some((connection) => connection.echoSubscription === 'unavailable') || visibleInstagram?.echoSubscription === 'unavailable') ? (
+                <Notice tone="warn" message="送信の知らせを受け取れていません。つなぎ直すと受け取れることがあります。" />
+              ) : null}
               {igState === 'connected' ? (
                 /* 前からある［接続を確かめる］。閲覧しかできない人にも消さず、理由を添えて置く（F8）。 */
                 <div className={styles.actions}>

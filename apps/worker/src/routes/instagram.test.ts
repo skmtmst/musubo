@@ -1465,7 +1465,7 @@ it('接続がなく照合できない予約は理由を残して未送信確定�
   expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(key)).toEqual({ status: 'not_sent_confirmed' });
 });
 
-it.each(['ok','subscription_failed','personal'])('店舗のOAuthだけでDMの通知を登録する（%s）', async mode => {
+it.each(['ok','subscription_failed','echo_failed','personal'])('店舗のOAuthだけでDMの通知を登録する（%s）', async mode => {
   const subscribed: string[] = [];
   const upstream = vi.mocked(fetch).getMockImplementation()!;
   vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) => {
@@ -1476,13 +1476,15 @@ it.each(['ok','subscription_failed','personal'])('店舗のOAuthだけでDMの�
     if (u.pathname.endsWith('/subscribed_apps')) {
       if (init?.method !== 'POST') return Response.json({data:[{id:config.META_APP_ID,subscribed_fields:['comments']}]});
       subscribed.push(u.searchParams.get('subscribed_fields') ?? '');
-      return Response.json({success: mode === 'ok'});
+      return Response.json({success: mode === 'ok' || (mode === 'echo_failed' && !subscribed.at(-1)?.includes('message_echoes'))});
     }
     return upstream(url, init);
   }));
   const back = await callback({code:'mock_code'});
-  expect(back.searchParams.get('instagram')).toBe(mode === 'ok' ? 'connected' : 'failed');
-  expect(subscribed).toEqual(mode === 'personal' ? [] : ['comments,messages,message_echoes']);
-  expect((await read(await req('/api/instagram/connections'))).data.connections).toHaveLength(mode === 'ok' ? 1 : 0);
-  if (mode === 'ok') expect((await read(await req('/api/instagram/inbox-status'))).data.state).toBe('ready');
+  expect(back.searchParams.get('instagram')).toBe(mode === 'ok' || mode === 'echo_failed' ? 'connected' : 'failed');
+  expect(subscribed).toEqual(mode === 'personal' ? [] : mode === 'subscription_failed' ? ['comments,messages'] : ['comments,messages','comments,messages,message_echoes']);
+  const list = await read(await req('/api/instagram/connections'));
+  expect(list.data.connections).toHaveLength(mode === 'ok' || mode === 'echo_failed' ? 1 : 0);
+  if (mode === 'echo_failed') expect(list.data.connections[0]).toMatchObject({ echoSubscription: 'unavailable' });
+  if (mode === 'ok' || mode === 'echo_failed') expect((await read(await req('/api/instagram/inbox-status'))).data.state).toBe('ready');
 });

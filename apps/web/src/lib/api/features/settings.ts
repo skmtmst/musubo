@@ -11,6 +11,7 @@ export type InstagramConnectionList = {
     id: string
     state: 'connected' | 'expired'
     dmReconnectRequired?: boolean
+    echoSubscription?: 'ready' | 'unavailable' | 'unknown'
     pageId: string
     instagramId: string
     pageName: string

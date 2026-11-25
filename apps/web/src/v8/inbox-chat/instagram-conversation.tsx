@@ -58,6 +58,7 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
   const [confirming, setConfirming] = useState<InstagramResolveOutcome | null>(null)
   const [reason, setReason] = useState('')
   const [closedNotice, setClosedNotice] = useState('')
+  const [closedWarning, setClosedWarning] = useState('')
   const { detail, loadFailed, reload, text, setText, sending, sendError, send, canEdit, canConfirmNotSent, canSend, lockedReason, blockedReason, deadline, now, pending, resolve, resolving, resolveError, resolveNotice, pendingNow, clearResolveError } = thread
   const messages = detail?.messages ?? []
   const lastMessageAt = messages.at(-1)?.createdAt ?? chat.lastMessageAt
@@ -114,10 +115,10 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
       </InboxMessages>
       <InboxComposer>
         {detail?.lateEchoNotice && closedNotice !== `${chat.id}:${detail.lateEchoNotice}` ? <Notice tone="warn" role="alert" message={detail.lateEchoNotice} onClose={() => setClosedNotice(`${chat.id}:${detail.lateEchoNotice ?? ''}`)} /> : null}
-        {detail?.reconciliationWarning ? <Notice tone="warn" role="alert" message={detail.reconciliationWarning} /> : null}
+        {detail?.reconciliationWarning && closedWarning !== `${chat.id}:${detail.reconciliationWarning}` ? <Notice tone="warn" role="alert" message={detail.reconciliationWarning} onClose={() => setClosedWarning(`${chat.id}:${detail.reconciliationWarning ?? ''}`)} /> : null}
         {resolveNotice ? <Notice tone="success" role="status" message={resolveNotice} /> : null}
         {pending ? (
-          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={(pending.canResolveNotSent || !pending.resolveAt ? `「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。` : `送信結果の反映を待っています。未送信の確定まで${formatReplyWindowLeft(Date.parse(pending.resolveAt ?? ""), pendingNow)}です。`) + (detail?.replyState !== 'ready' ? ' Instagram をつなぎ直すと照合できます。' : '')} action={resolveActions} />
+          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={(pending.canResolveNotSent || !pending.resolveAt ? `「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。` : `送信結果の反映を待っています。未送信の確定まで${formatReplyWindowLeft(Date.parse(pending.resolveAt ?? ""), pendingNow)}です。`) + (detail?.replyState !== 'ready' ? ' Instagram をつなぎ直すと照合できます。' : '') + (!canConfirmNotSent ? ' 管理者に確定を頼んでください。' : '')} action={resolveActions} />
         ) : blockedReason ? (
           <Notice tone="warn" role="status" message={blockedReason} action={openSettings} />
         ) : null}

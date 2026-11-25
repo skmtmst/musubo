@@ -643,6 +643,9 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     expect(await result.text()).toContain('送り主の番号の形');
     const detail = await app().request('/api/instagram/conversations/customer?lineAccountId=a1&instagramId=20');
     expect(await detail.text()).toContain('送り主の番号の形');
+    expect((await resolveReply(owner, { key, outcome: 'not_sent' })).status).toBe(502);
+    const evidence = db.raw.prepare('SELECT resolution_evidence FROM instagram_outbound_messages WHERE idempotency_key=?').get(key) as {resolution_evidence:string};
+    expect(evidence.resolution_evidence.match(/\[sender_id_mismatch\]/g)).toHaveLength(1);
   });
 
   it('echoの候補が2件なら更新せず会話に確認を促す', async () => {
@@ -653,7 +656,8 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(first)).toEqual({ status: 'not_sent_confirmed' });
     expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(second)).toEqual({ status: 'unknown' });
     const detail = await app().request('/api/instagram/conversations/customer?lineAccountId=a1&instagramId=20');
-    expect(await detail.text()).toContain('候補が複数');
+    const data = await detail.json() as { data: { reconciliationWarning: string | null } };
+    expect(data.data.reconciliationWarning).toContain('候補が複数');
   });
 
   it.each(['window','sender'])('echoの%sが違えば照合しない', async mode => {
@@ -674,6 +678,28 @@ describe('Instagram DM 未送信確定と再送の制御', () => {
     await seedConnectedDmInbox();
     const key = seedOutbound('unknown', new Date(Date.now() - 360000).toISOString());
     expect((await resolveReply(member, { key, outcome: 'sent' })).status).toBe(403);
+  });
+
+  it('接続の手動確認で既存の店のecho購読を追加し成功を記録する', async () => {
+    await seedConnectedDmInbox();
+    const attempts: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/refresh_access_token')) return Response.json({ access_token: 'new_token', expires_in: 5184000 });
+      if (url.pathname.endsWith('/me/subscribed_apps')) {
+        if (init?.method !== 'POST') return Response.json({ data: [{ id: config.META_APP_ID, subscribed_fields: ['messages'] }] });
+        attempts.push(url.searchParams.get('subscribed_fields') ?? '');
+        return Response.json({ success: true });
+      }
+      return Response.json({ id: '20', username: 'shop' });
+    }));
+    const res = await app(owner).request('/api/instagram/refresh?lineAccountId=a1&connectionId=igc-1', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    });
+    expect(res.status).toBe(200);
+    expect(attempts).toEqual(['messages,message_echoes']);
+    const list = await app(owner).request('/api/instagram/connections?lineAccountId=a1');
+    expect(((await list.json()) as {data: {connections: Array<{echoSubscription:string}>}}).data.connections[0].echoSubscription).toBe('ready');
   });
 
   it('DB制約で未送信確定時の根拠種別や確認情報のNULL・空文字を拒否する', () => {

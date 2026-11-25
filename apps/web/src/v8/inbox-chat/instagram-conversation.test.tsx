@@ -158,7 +158,7 @@ describe('結果の分からない返信', () => {
   })
 
   it('未送信までの残り時間は端末ではなくWorkerの時刻から数える', async () => {
-    mockConversation({ messages: [incoming('m1', 1)], pendingReply: { ...pendingReply, canResolveNotSent: false, serverNow: '2030-01-01T00:00:00.000Z', resolveAt: '2030-01-01T00:04:00.000Z' } })
+    mockConversation({ messages: [incoming('m1', 1)], pendingReply: { ...pendingReply, canResolveNotSent: false, serverNow: '2000-01-01T00:00:00.000Z', resolveAt: '2000-01-01T00:04:00.000Z' } })
     vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
     render(<Harness />)
     expect(await screen.findByText(/未送信の確定まであと4分/)).toBeTruthy()
@@ -185,6 +185,15 @@ describe('結果の分からない返信', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '未送信にする' }))
     expect(await screen.findByText('Instagram で届いていたので送信済みにしました。')).toBeTruthy()
     expect((screen.getByLabelText('メッセージを入力') as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('候補が複数の警告を閉じられる', async () => {
+    mockConversation({ messages: [incoming('m1', 1)], reconciliationWarning: '送信通知の候補が複数あるため、Instagramで確かめてください。' })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    render(<Harness />)
+    expect(await screen.findByText(/送信通知の候補が複数/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
+    expect(screen.queryByText(/送信通知の候補が複数/)).toBeNull()
   })
 
   it('後から送信済みと分かった知らせを閉じられる', async () => {
@@ -268,7 +277,7 @@ describe('結果の分からない返信', () => {
     mockConversation({ messages: [incoming('m1', 1)], pendingReply })
     vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
     render(<Harness role="staff" />)
-    expect(await screen.findByText(/送信結果が分かりません/)).toBeTruthy()
+    expect(await screen.findByText(/管理者に確定を頼んでください/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: '送信済みにする' })).toBeNull()
     expect(screen.queryByRole('button', { name: '未送信にする' })).toBeNull()
   })

@@ -157,6 +157,17 @@ async function startTarget(
     throw new InstagramError('connection_required', 400);
   return await connectionRow(c, id, null);
 }
+const echoSubscriptionKey = (connectionId: string) => `instagram.echo_subscription:${connectionId}`;
+async function saveEchoSubscription(c: Context<Env>, accountId: string, connectionId: string, subscribed: boolean) {
+  await c.env.DB.prepare(`INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)
+    ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`)
+    .bind(crypto.randomUUID(), accountId, echoSubscriptionKey(connectionId), subscribed ? 'ready' : 'unavailable').run();
+}
+async function echoSubscription(c: Context<Env>, accountId: string, connectionId: string) {
+  const saved = await c.env.DB.prepare('SELECT value FROM account_settings WHERE line_account_id=? AND key=?')
+    .bind(accountId, echoSubscriptionKey(connectionId)).first<{ value: string }>();
+  return saved?.value === 'ready' ? 'ready' : saved?.value === 'unavailable' ? 'unavailable' : 'unknown';
+}
 const ready = (c: Context<Env>): InstagramConfig => {
   const cfg = instagramConfig(c.env);
   if (!cfg) throw new InstagramError('unconfigured', 503);
@@ -200,6 +211,7 @@ instagram.get('/api/instagram/connection', async (c) => {
           replyEnabled: !expired(row) && instagramCanMessage(row.scopes) &&
             (c.env.DEPLOY_ENV !== 'staging' || (c.env.INSTAGRAM_STAGING_SEND_ENABLED === 'true' && !qaOutboundStopped(c.env))),
           dmReconnectRequired: !instagramCanMessage(row.scopes ?? ''),
+          echoSubscription: await echoSubscription(c, id, row.id),
           connection: {
             id: row.id,
             pageId: row.page_id,
@@ -227,10 +239,10 @@ instagram.get('/api/instagram/connections', async (c) => {
     return c.json({ success: true, data: { state: 'unconfigured' as const, connections: [] } });
   }
   const rows = await c.env.DB.prepare(
-    'SELECT * FROM instagram_connections WHERE line_account_id=? ORDER BY sort_order, id',
+    "SELECT ic.*, (SELECT value FROM account_settings s WHERE s.line_account_id=ic.line_account_id AND s.key='instagram.echo_subscription:' || ic.id) AS echo_subscription FROM instagram_connections ic WHERE ic.line_account_id=? ORDER BY ic.sort_order, ic.id",
   )
     .bind(id)
-    .all<Connection>();
+    .all<Connection & { echo_subscription: string | null }>();
   return c.json({
     success: true,
     data: {
@@ -240,6 +252,7 @@ instagram.get('/api/instagram/connections', async (c) => {
         // 行ごとに期限を見る。1件が切れていても他の行は使えるので、まとめて「期限切れ」にしない。
         state: expired(row) ? ('expired' as const) : ('connected' as const),
         dmReconnectRequired: !instagramCanMessage(row.scopes),
+        echoSubscription: row.echo_subscription === 'ready' ? 'ready' : row.echo_subscription === 'unavailable' ? 'unavailable' : 'unknown',
         pageId: row.page_id,
         instagramId: row.instagram_id,
         pageName: row.page_name,
@@ -485,7 +498,7 @@ instagram.get(
         .first();
       if (duplicate)
         throw new InstagramError('instagram_account_already_connected', 409);
-      if (instagramCanMessage(grantedScopes)) await subscribeInstagramMessages(cfg, long.token, c.env.META_APP_ID);
+      const subscription = instagramCanMessage(grantedScopes) ? await subscribeInstagramMessages(cfg, long.token, c.env.META_APP_ID) : null;
       const now = new Date().toISOString();
       // 新規接続は末尾に追加し、先頭を使う既存の処理の宛先を変えない。並び順は保存と同じSQLで決める。
       const result = await c.env.DB.prepare(
@@ -514,6 +527,7 @@ instagram.get(
         .run();
       if (!result.meta.changes)
         throw new InstagramError('version_conflict', 409);
+      if (subscription) await saveEchoSubscription(c, id, targetId, subscription.echoSubscribed);
       await c.env.DB.prepare(
         'DELETE FROM instagram_oauth_states WHERE state_hash=?',
       )
@@ -564,6 +578,7 @@ instagram.post(
     const exactId = typeof profile.id === 'string' ? profile.id : '';
     if (!/^\d{1,24}$/.test(exactId))
       throw new InstagramError('instagram_business_account_required', 403);
+    const subscription = instagramCanMessage(r.scopes) ? await subscribeInstagramMessages(cfg, long.token, c.env.META_APP_ID) : null;
     // 合鍵は1本だけなので、2つの列へ同じものを入れ直す。
     const token = await encryptInstagramCredential(
         long.token,
@@ -589,6 +604,7 @@ instagram.post(
       )
       .run();
     if (!saved.meta.changes) throw new InstagramError('version_conflict', 409);
+    if (subscription) await saveEchoSubscription(c, id, r.id, subscription.echoSubscribed);
     return c.json({
       success: true,
       data: {
@@ -637,6 +653,9 @@ instagram.delete(
       c.env.DB.prepare(
         "DELETE FROM instagram_inbox_reads WHERE line_account_id=? AND CASE WHEN json_valid(sender_id) THEN json_extract(sender_id,'$[0]') END=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)",
       ).bind(id, target.instagram_id, target.id, b.expectedVersion),
+      c.env.DB.prepare(
+        'DELETE FROM account_settings WHERE line_account_id=? AND key=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, echoSubscriptionKey(target.id), target.id, b.expectedVersion),
       c.env.DB.prepare(
         'DELETE FROM instagram_connections WHERE id=? AND version=?',
       ).bind(target.id, b.expectedVersion),

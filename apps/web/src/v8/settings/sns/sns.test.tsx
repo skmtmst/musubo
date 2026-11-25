@@ -642,6 +642,13 @@ describe('行の操作は押した行の接続をAPIへ渡す（複数接続・v
     await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 7, 'igc-2'))
   })
 
+  it('送信通知を購読できなかった接続に案内を出す', async () => {
+    fixture.googleConnection.mockResolvedValue(googleData())
+    fixture.igConnection.mockResolvedValue({ success: true, data: { ...status('connected', CONNECTED), echoSubscription: 'unavailable' } })
+    render(<SnsSettingsPage />)
+    expect(await igCard().findByText('送信の知らせを受け取れていません。つなぎ直すと受け取れることがあります。')).toBeTruthy()
+  })
+
   it('Instagram の［接続を確かめる］も行の接続IDを渡す', async () => {
     fixture.igRefresh.mockResolvedValue({ success: true })
     setup('connected', IG_SECOND)
