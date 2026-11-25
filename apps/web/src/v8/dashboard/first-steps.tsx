@@ -70,7 +70,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
         <span className={styles.spacer} />
         {onRetry && summary?.steps.some(step => step.state === 'unknown') ? <Button size="compact" onClick={onRetry}>設定を読み直す</Button> : null}
         {onRecheck ? <Button size="compact" onClick={onRecheck} title="最初の1通の自動の確かめを止めました">もう一度確かめる</Button> : null}
-        {summary && !complete ? <DisclosureToggle open={!folded} controls="first-steps-list" onToggle={onToggle} /> : null}
+        {summary && !complete ? <DisclosureToggle open={!folded} controls="first-steps-list" onToggle={onToggle} subject="はじめにやること" /> : null}
       </div>
       {feedback}
       {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>

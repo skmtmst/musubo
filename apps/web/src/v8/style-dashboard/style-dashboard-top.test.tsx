@@ -53,6 +53,19 @@ it('上の段を軽くするため読み直しは文字の押し口にする', a
   expect(reload.getAttribute('data-variant')).toBe('text')
 })
 
+it('二つのカードは何を畳むかを読み上げで区別でき、それぞれ独立して開閉する', async () => {
+  render(<StyleDashboard style="restaurant" />)
+  const first = await screen.findByRole('button', { name: 'はじめにやることを畳む' })
+  const today = await screen.findByRole('button', { name: '今日の確認を畳む' })
+  expect(first.textContent).toContain('畳む')
+  expect(today.textContent).toContain('畳む')
+  fireEvent.click(first)
+  expect(screen.getByRole('button', { name: 'はじめにやることを開く' }).getAttribute('aria-expanded')).toBe('false')
+  expect(today.getAttribute('aria-expanded')).toBe('true')
+  fireEvent.click(today)
+  expect(screen.getByRole('button', { name: '今日の確認を開く' }).getAttribute('aria-expanded')).toBe('false')
+})
+
 it('探す欄は正の包みで220pxの幅を保つ', async () => {
   render(<StyleDashboard style="restaurant" />)
   const input = await screen.findByPlaceholderText('名前・タグ・メモで探す')

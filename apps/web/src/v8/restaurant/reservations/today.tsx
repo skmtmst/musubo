@@ -175,7 +175,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               {sideFolded && next ? <StatusBadge tone="danger" size="micro" dot={false}>次の予約 1</StatusBadge> : null}
               {sideFolded && careCount > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`注意 ${careCount}`}</StatusBadge> : null}
               {sideFolded && countedBookings.length > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`予約 ${countedBookings.length}`}</StatusBadge> : null}
-              <DisclosureToggle open={!sideFolded} controls={sideId} onToggle={toggleSide} />
+              <DisclosureToggle open={!sideFolded} controls={sideId} onToggle={toggleSide} subject="今日の確認" />
             </div>
             <div id={sideId} hidden={sideFolded}>
               <DisclosureItem title="次の予約" summary={nextSummary} empty={!next} open={sideOpen('next')} onOpenChange={value => setSideOpen('next', value)}>
