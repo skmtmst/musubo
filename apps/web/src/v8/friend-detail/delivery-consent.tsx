@@ -98,21 +98,26 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const errors = useSaveFormErrors()
-  const [events, setEvents] = useState<FriendDeliveryConsentEvent[] | null>(null)
-  const [historyFailed, setHistoryFailed] = useState(false)
+  const [history, setHistory] = useState<{ friendId: string; events: FriendDeliveryConsentEvent[] | null; failed: boolean }>({ friendId, events: null, failed: false })
+  const events = history.friendId === friendId ? history.events : null
+  const historyFailed = history.friendId === friendId && history.failed
   const [reviewRequired, setReviewRequired] = useState(false)
   const commitLock = useRef(false)
+  const historyRequest = useRef(0)
   const loadHistory = useCallback(async () => {
+    if (!scope.current.open || scope.current.friendId !== friendId) return
+    const seq = ++historyRequest.current
+    setHistory({ friendId, events: null, failed: false })
     try {
       const response = await friendDeliveryConsentHistoryApi.list(friendId, { limit: 20 })
       if (!response.success) throw new Error('history_failed')
-      setEvents(Array.isArray(response.data?.items) ? response.data.items : [])
-      setHistoryFailed(false)
+      if (seq !== historyRequest.current || scope.current.friendId !== friendId || !scope.current.open) return
+      setHistory({ friendId, events: Array.isArray(response.data?.items) ? response.data.items : [], failed: false })
     } catch {
-      setHistoryFailed(true)
+      if (seq === historyRequest.current && scope.current.friendId === friendId && scope.current.open) setHistory({ friendId, events: null, failed: true })
     }
   }, [friendId])
-  useEffect(() => { if (open) void loadHistory() }, [open, loadHistory])
+  useEffect(() => { if (open) void loadHistory(); return () => { historyRequest.current++ } }, [open, loadHistory])
 
   const rowOf = (key: string) => rows.find((row) => row.purpose === key)
   const begin = (key: string) => {
@@ -212,7 +217,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
         ) : null}
         <section aria-label="履歴">
           <h3 className={styles.sectionTitle}>履歴</h3>
-          {historyFailed ? <p className={styles.faint}>履歴を読み込めませんでした。</p> : events === null ? <p className={styles.faint}>読み込んでいます</p> : events.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
+          {historyFailed ? <ListState kind="error" title="履歴を読み込めませんでした" onRetry={() => void loadHistory()} /> : events === null ? <ListState kind="loading" title="履歴を読み込んでいます" /> : events.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
             <DataTable>
               <thead><TableHeadRow><Th>いつ</Th><Th>目的</Th><Th>前 → 後</Th><Th>だれ</Th></TableHeadRow></thead>
               <tbody>
