@@ -1397,4 +1397,4 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 - [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
-- [開店準備の進捗取得の高速化](release-log/unreleased/PR-kenta-setup-chip-speed.md) — 開店準備の進み具合の読み込みを並列化して画面表示を速くした履歴。確認 2026-11-25。
+- [開店準備の進捗取得の高速化](release-log/unreleased/238-kenta-setup-chip-speed.md) — 開店準備の進み具合の読み込みを並列化して画面表示を速くした履歴。確認 2026-11-25。
