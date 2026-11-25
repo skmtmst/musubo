@@ -3,7 +3,7 @@ import type { SupportMark } from './support-mark-types.js';
 import type { SupportMarkWithUsage } from './support-mark-impact-revision.js';
 export { supportMarkImpactRevision } from './support-mark-impact-revision.js';
 export type { SupportMark, SupportMarkWithUsage } from './support-mark-impact-revision.js';
-import { parseSupportMarkLocations, type SupportMarkLocation } from '@line-crm/shared';
+import { CHAT_SUPPORT_STATUS, parseSupportMarkLocations, type SupportMarkLocation } from '@line-crm/shared';
 
 import { recordOperation } from './operation-audit.js';
 import { jstNow } from './utils.js';
@@ -58,9 +58,9 @@ export async function ensureDefaultSupportMarks(
   if (visible) return;
 
   const rows = [
-    { suffix: 'untouched', name: '未対応', color: '#F59E0B', default: 1, inbound: 1, order: 0 },
-    { suffix: 'working', name: '対応中', color: '#3B82F6', default: 0, inbound: 0, order: 1 },
-    { suffix: 'done', name: '解決済', color: '#10B981', default: 0, inbound: 0, order: 2 },
+    { suffix: 'untouched', name: CHAT_SUPPORT_STATUS.unread.label, color: CHAT_SUPPORT_STATUS.unread.color, default: 1, inbound: 1, order: 0 },
+    { suffix: 'working', name: CHAT_SUPPORT_STATUS.in_progress.label, color: CHAT_SUPPORT_STATUS.in_progress.color, default: 0, inbound: 0, order: 1 },
+    { suffix: 'done', name: CHAT_SUPPORT_STATUS.resolved.label, color: CHAT_SUPPORT_STATUS.resolved.color, default: 0, inbound: 0, order: 2 },
   ];
   const statements = [];
   for (const row of rows) {

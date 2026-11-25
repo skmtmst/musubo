@@ -1,6 +1,7 @@
 'use client'
 
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SUPPORT_STATUS_LABELS } from '@/components/shared/status-pill'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Checkbox from '@/components/shared/checkbox'
@@ -213,10 +214,10 @@ export default function SavedViewDialog({
                       onChange={(value) => setStatus(value as SavedViewDraft['status'])}
                       options={[
                         { value: 'all', label: 'すべて' },
-                        { value: 'unread', label: '未対応' },
-                        { value: 'in_progress', label: '対応中' },
-                        { value: 'on_hold', label: '保留' },
-                        { value: 'resolved', label: '対応済み' },
+                        { value: 'unread', label: SUPPORT_STATUS_LABELS.unread },
+                        { value: 'in_progress', label: SUPPORT_STATUS_LABELS.in_progress },
+                        { value: 'on_hold', label: SUPPORT_STATUS_LABELS.on_hold },
+                        { value: 'resolved', label: SUPPORT_STATUS_LABELS.resolved },
                       ]}
                       className="h-9 w-40 text-xs font-medium"
                     />

@@ -60,3 +60,14 @@ test('SLA-17 SLA-18: スタッフ・閲覧のみの設定変更と他店の読�
  expect((await gapCall(gapApp(d,[inboxSla],gapOwner,true),'/api/inbox/routing-settings?account_id=a','PUT',body)).status).toBe(200);
  expect((await gapCall(a(),'/api/inbox/routing-settings?account_id=b')).status).toBe(404);
 });
+test('期限順の一覧は担当者ごとの既読位置から未読数を数える',async()=>{
+ await gapCall(a(),'/api/inbox/routing-settings?account_id=a','PUT',body);await upsertChatOnMessage(d.db,'f');await refreshInboxSla(d.db,'a');
+ d.raw.exec(`INSERT INTO messages_log(id,friend_id,direction,message_type,content,line_account_id,created_at) VALUES
+ ('old','f','incoming','text','古い','a','2026-10-16T00:00:00.000Z'),
+ ('new1','f','incoming','text','新着1','a','2026-10-16T00:30:00.000Z'),
+ ('new2','f','incoming','text','新着2','a','2026-10-16T00:40:00.000Z');
+ INSERT INTO inbox_staff_reads(staff_id,channel,conversation_id,last_read_at,updated_at) VALUES('o','line','f','2026-10-16T00:00:00.000Z','2026-10-16T01:00:00.000Z');`);
+ const r=new Hono<Env>();r.get('/api/chats',c=>slaChatList(c));const app=gapApp(d,[r]);
+ const result=await (await gapCall(app,'/api/chats?sort=sla_due&lineAccountId=a')).json() as any;
+ expect(result.data.find((row:any)=>row.friendId==='f')).toMatchObject({isUnread:true,unreadCount:2});
+});

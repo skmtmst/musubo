@@ -65,11 +65,10 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         `SELECT f.id AS friend_id, f.display_name, f.picture_url,
                 CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
                 COALESCE(CASE WHEN c.assignee_staff_id IS NOT NULL THEN 'staff:' || c.assignee_staff_id END, c.operator_id) AS operator_id, CASE WHEN c.assignee_staff_id IS NOT NULL THEN COALESCE((SELECT name FROM staff_members WHERE id=c.assignee_staff_id), '担当者不明') WHEN c.operator_id IS NOT NULL THEN COALESCE((SELECT name FROM operators WHERE id=c.operator_id), '担当者不明') END AS operator_name, c.status, c.revision, c.notes,
-                CASE
-                  WHEN c.last_customer_message_at IS NOT NULL
-                   AND (sr.last_read_at IS NULL OR c.last_customer_message_at > sr.last_read_at)
-                  THEN 1 ELSE 0
-                END AS is_unread_for_staff,
+                (SELECT COUNT(*) FROM messages_log incoming
+                 WHERE incoming.friend_id=f.id AND incoming.direction='incoming'
+                   AND (incoming.delivery_type IS NULL OR incoming.delivery_type!='test')
+                   AND (sr.last_read_at IS NULL OR incoming.created_at > sr.last_read_at)) AS unread_count_for_staff,
                 c.created_at, c.updated_at
            FROM friends f
            INNER JOIN chats c ON c.friend_id = f.id
@@ -98,7 +97,8 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
           lastMessageContent: row.lastIncomingType === 'text' ? row.lastIncomingContent : null,
           lastMessageDirection: 'incoming' as const,
           lastMessageType: row.lastIncomingType,
-          isUnread: Boolean(chat.is_unread_for_staff),
+          isUnread: Number(chat.unread_count_for_staff) > 0,
+          unreadCount: Number(chat.unread_count_for_staff),
           createdAt: chat.created_at,
           updatedAt: chat.updated_at,
         }];
@@ -317,11 +317,10 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         rm.content AS last_message_content,
         rm.direction AS last_message_direction,
         rm.message_type AS last_message_type,
-        CASE
-          WHEN ri.last_incoming_at IS NOT NULL
-           AND (sr.last_read_at IS NULL OR ri.last_incoming_at > sr.last_read_at)
-          THEN 1 ELSE 0
-        END AS is_unread_for_staff,
+        (SELECT COUNT(*) FROM messages_log incoming
+         WHERE incoming.friend_id=f.id AND incoming.direction='incoming'
+           AND (incoming.delivery_type IS NULL OR incoming.delivery_type!='test')
+           AND (sr.last_read_at IS NULL OR incoming.created_at > sr.last_read_at)) AS unread_count_for_staff,
         COALESCE(c.created_at, d.last_message_at) AS created_at,
         COALESCE(c.updated_at, d.last_message_at) AS updated_at
       FROM page d
@@ -335,7 +334,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         ON sr.channel = 'line'
        AND sr.conversation_id = f.id
        AND sr.staff_id = ?
-      ORDER BY ${unreadFirst ? 'is_unread_for_staff DESC, ' : ''}d.last_message_at DESC, d.friend_id DESC
+      ORDER BY ${unreadFirst ? '(unread_count_for_staff > 0) DESC, ' : ''}d.last_message_at DESC, d.friend_id DESC
     `;
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
@@ -369,7 +368,8 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       lastMessageContent: ch.last_message_content || null,
       lastMessageDirection: ch.last_message_direction || null,
       lastMessageType: ch.last_message_type || null,
-      isUnread: Boolean(ch.is_unread_for_staff),
+      isUnread: Number(ch.unread_count_for_staff) > 0,
+      unreadCount: Number(ch.unread_count_for_staff),
       createdAt: ch.created_at,
       updatedAt: ch.updated_at,
     }));

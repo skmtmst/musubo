@@ -1,4 +1,6 @@
 'use client'
+
+import { SUPPORT_STATUS_ORDER, SUPPORT_STATUS_LABELS } from '@/components/shared/status-pill'
 import { type ChatDetail as ApiChatDetail,type ChatListItem } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { jstCalendar,jstDate } from '@/lib/jst-datetime';
@@ -54,11 +56,7 @@ export function inboxSortFromParam(value: string | null | undefined): InboxSort 
 }
 
 export const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: 'すべて' },
-  { key: 'unread', label: '未対応' },
-  { key: 'in_progress', label: '対応中' },
-  { key: 'on_hold', label: '保留' },
-  { key: 'resolved', label: '対応済み' },
+  { key: 'all', label: 'すべて' }, ...SUPPORT_STATUS_ORDER.map(key => ({key,label:SUPPORT_STATUS_LABELS[key]})),
 ]
 
 /*

@@ -128,6 +128,9 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   listFilterKeyRef.current = listFilterKey
 
   const chatListRequestRef = useRef(0)
+  const pendingReads = useRef(new Map<string, object>())
+  useEffect(() => { pendingReads.current.clear() }, [selectedAccountId])
+  const maskPendingReads = useCallback((rows: Chat[]) => rows.map(row => pendingReads.current.has(row.id) ? {...row,isUnread:false,unreadCount:0} : row), [])
 
   const emailListRequestRef = useRef(0)
 
@@ -248,7 +251,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
         setChatListFailed(false)
-        const rows = chatRes.data
+        const rows = maskPendingReads(chatRes.data)
         setChats(rows)
         const last = rows[rows.length - 1]
         nextCursorRef.current = toListCursor(last)
@@ -268,7 +271,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setLoading(false)
       }
     }
-  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
+  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats, maskPendingReads])
 
   // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
   // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
@@ -286,7 +289,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       const chatRes = await withRequestTimeout(api.chats.list(buildListParams(cursor)))
       if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
       if (chatRes.success) {
-        const rows = chatRes.data
+        const rows = maskPendingReads(chatRes.data)
         setChats((prev) => {
           const seen = new Set(prev.map((c) => c.id))
           return [...prev, ...rows.filter((r) => !seen.has(r.id))]
@@ -302,7 +305,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
     }
-  }, [loadingMore, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
+  }, [loadingMore, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats, maskPendingReads])
 
   // Keep refs in sync so setChats updater can read the latest filter without stale closure
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
@@ -318,7 +321,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       if (listPollRequestRef.current !== requestId) return true
       if (listFilterKeyRef.current !== listFilterKey) return true
       if (!res.success) return false
-      const rows = res.data
+      const rows = maskPendingReads(res.data)
       setChats((prev) => {
         const freshIds = new Set(rows.map((row) => row.id))
         const merged = rows.slice()
@@ -337,7 +340,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } catch {
       return false
     }
-  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats])
+  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats, maskPendingReads])
 
   useEffect(() => {
     loadChats()
@@ -351,5 +354,24 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     window.addEventListener(UNANSWERED_REFRESH_EVENT, refresh)
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
   }, [loadChats, loadEmails])
-  return { chats, setChats, emailItems, setEmailItems, emailError, emailLoading, debouncedNameQuery, setDebouncedNameQuery, statusFilterRef, loading, chatListFailed, loadingMore, hasMoreChats, listScrollRef, slaEnabled, overdueTotal, setSlaReload, listFilterKey, chatListCompletedKey, emailListCompletedKey, loadingMoreEmails, hasMoreEmails, loadEmails, loadChats, loadMoreChats, loadChatsQuietly }
+  const latestLoadChats = useRef(loadChats)
+  const latestLoadChatsQuietly = useRef(loadChatsQuietly)
+  const completedKeyRef = useRef(chatListCompletedKey)
+  latestLoadChats.current = loadChats
+  latestLoadChatsQuietly.current = loadChatsQuietly
+  completedKeyRef.current = chatListCompletedKey
+  const beginChatRead = (id: string) => {
+    const token = {}; pendingReads.current.set(id,token)
+    listPollRequestRef.current++
+    setChats(previous => previous.map(row => row.id === id ? {...row,isUnread:false,unreadCount:0} : row))
+    return (success = true) => {
+      if (pendingReads.current.get(id) !== token) return
+      pendingReads.current.delete(id)
+      chatListRequestRef.current++; listPollRequestRef.current++
+      setLoading(false); setLoadingMore(false)
+      if (!success || completedKeyRef.current !== listFilterKeyRef.current) void latestLoadChats.current()
+      else void latestLoadChatsQuietly.current()
+    }
+  }
+  return { beginChatRead, chats, setChats, emailItems, setEmailItems, emailError, emailLoading, debouncedNameQuery, setDebouncedNameQuery, statusFilterRef, loading, chatListFailed, loadingMore, hasMoreChats, listScrollRef, slaEnabled, overdueTotal, setSlaReload, listFilterKey, chatListCompletedKey, emailListCompletedKey, loadingMoreEmails, hasMoreEmails, loadEmails, loadChats, loadMoreChats, loadChatsQuietly }
 }

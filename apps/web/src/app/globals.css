@@ -725,16 +725,16 @@
   /* ③・：対応状況の札（点・薄い地・濃い文字）。 */
   --color-support-unread: #b91c1c;
   --color-support-unread-bg: #fdecec;
-  --color-support-unread-dot: #dc2626;
+  --color-support-unread-dot: var(--polish-status-danger-dot);
   --color-support-progress: #a15c00;
   --color-support-progress-bg: #fdf3e3;
-  --color-support-progress-dot: #d97706;
+  --color-support-progress-dot: var(--polish-status-warning-dot);
   --color-support-resolved: #15803d;
   --color-support-resolved-bg: #e8f5ec;
-  --color-support-resolved-dot: #16a34a;
+  --color-support-resolved-dot: var(--polish-status-success-dot);
   --color-support-hold: #4b5563;
   --color-support-hold-bg: #f1f2f4;
-  --color-support-hold-dot: #6b7280;
+  --color-support-hold-dot: var(--polish-status-neutral-dot);
   /* G-9 共通メッセージ作成 */
   --tpl-msg-composer-fill: 100%;
   --tpl-msg-composer-image-max-h: none;

@@ -236,3 +236,11 @@ test('友だち詳細のリンクは閲覧権限がある場合だけ表示す�
   view.rerender(<CustomerInfoPanel {...props} canViewFriend={false} />)
   expect(screen.queryByRole('link',{name:'友だちの詳細を開く：山田'})).toBeNull()
 })
+
+test('展開しても重複リンクは出さず、プロフィールから詳細へ行ける', () => {
+  render(<CustomerInfoPanel friendId="friend-1" profile={{name:'山田',addedAt:'2026-01-01'}} fields={[]} state="ready" canEdit canViewFriend sections={[]} />)
+  fireEvent.click(screen.getByRole('button',{name:'顧客情報をすべて表示'}))
+  expect(screen.queryByText('情報欄をすべて見る')).toBeNull()
+  expect(screen.getByRole('button',{name:'顧客情報を閉じる'})).toBeTruthy()
+  expect(screen.getByRole('link',{name:'友だちの詳細を開く：山田'}).getAttribute('href')).toBe('/friends/detail?id=friend-1')
+})

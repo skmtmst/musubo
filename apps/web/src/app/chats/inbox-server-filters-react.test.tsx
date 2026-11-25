@@ -106,7 +106,7 @@ async function selectAssignee(value: string) {
   if (!document.querySelector('[aria-label="担当者で絞り込む"]')) await click('絞り込み')
   // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
   const label = value === 'unassigned' ? '未割り当て' : '担当T（0）'
-  await pickEntity('担当者で絞り込む', label, '選ぶ', '担当者を選ぶ')
+  await pickEntity('担当者で絞り込む', label, '選択する', '担当者を選ぶ')
 }
 const listCalls = (channel: Channel) => calls.filter(url => listChannel(url) === channel)
 

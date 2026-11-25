@@ -4,6 +4,7 @@ import { runOptimisticWithUndo } from '@/lib/undoable'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { STATUS_WORD } from './friend-info-status'
+import { asArray } from './friend-detail-shape'
 import { type ChatStatusInfo, type FriendDetail } from './friend-info-types'
 
 type Options = {
@@ -43,7 +44,9 @@ export function useFriendInfoEditing({ setLocalStatus, chatStatus, setLocalOpera
 
   useEffect(() => { setLocalNotes(undefined) }, [chatStatus?.notes, setLocalNotes])
 
-  useEffect(() => { setLocalTags(undefined) }, [friend?.tags, setLocalTags])
+  // 再取得のたびに同じタグが新しい配列で返るため、参照ではなく内容の変更だけを見る。
+  const tagSignature = JSON.stringify(asArray(friend?.tags).map(tag => [tag.id, tag.name, tag.color]).sort((a,b) => String(a[0]).localeCompare(String(b[0]))))
+  useEffect(() => { setLocalTags(undefined) }, [tagSignature, setLocalTags])
 
   const revisionRef = useRef<number | undefined>(revision)
 

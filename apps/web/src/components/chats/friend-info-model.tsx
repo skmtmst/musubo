@@ -1,4 +1,5 @@
 'use client'
+import { SUPPORT_STATUS_LABELS } from '@/components/shared/status-pill'
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { type CustomerMileageState } from '@/components/shared/customer-info-mileage'
 import { type FriendUpcoming } from '@/lib/api'
@@ -59,10 +60,10 @@ export function formatDate(iso: string | null): string {
 }
 
 export const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: string; className: string }> = {
-  unread: { label: '未対応', className: 'bg-status-danger-selected text-danger' },
-  in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
-  on_hold: { label: '保留', className: 'bg-action-soft text-action' },
-  resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
+  unread: { label: SUPPORT_STATUS_LABELS.unread, className: 'bg-status-danger-selected text-danger' },
+  in_progress: { label: SUPPORT_STATUS_LABELS.in_progress, className: 'bg-warning-bg text-warning' },
+  on_hold: { label: SUPPORT_STATUS_LABELS.on_hold, className: 'bg-action-soft text-action' },
+  resolved: { label: SUPPORT_STATUS_LABELS.resolved, className: 'bg-success-bg text-success' },
 }
 
 /*

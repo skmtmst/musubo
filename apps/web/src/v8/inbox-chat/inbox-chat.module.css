@@ -42,8 +42,9 @@
   flex: none;
   width: var(--tpl-inbox-dot);
   height: var(--tpl-inbox-dot);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-mini);
 }
+
 
 /* ── 予約して送る（段2「6.」） ─────────────────── */
 .schBox {

@@ -7,7 +7,7 @@ import { supportInbox } from './support-inbox.js';
 
 const NOW = Date.parse('2026-09-13T12:00:00.000Z');
 type Channel = 'line' | 'email';
-type Item = { id: string; lastMessageAt: string; operatorId?: string; assignedStaffId?: string; isUnread: boolean };
+type Item = { id: string; lastMessageAt: string; operatorId?: string; assignedStaffId?: string; isUnread: boolean; unreadCount?: number };
 let db: SqliteD1;
 beforeEach(() => {
   vi.spyOn(Date, 'now').mockReturnValue(NOW);
@@ -145,3 +145,15 @@ describe.each(['line', 'email'] as const)('N-016 %s の実SQLite・実ルート'
     }
   });
 });
+
+test('LINEの未読数は担当者ごとの受信を数え、既読後の読み直しでも0、新着は残る', async () => {
+ seed('line','counted')
+ db.raw.prepare("INSERT INTO messages_log(id,friend_id,direction,message_type,content,created_at) VALUES ('m2','counted','incoming','text','2','2026-09-13T11:00:00.000Z'),('out','counted','outgoing','text','x','2026-09-13T11:10:00.000Z'),('test','counted','incoming','text','x','2026-09-13T11:20:00.000Z')").run()
+ db.raw.prepare("UPDATE messages_log SET delivery_type='test' WHERE id='test'").run()
+ expect((await rows('line')).find(row=>row.id==='counted')).toMatchObject({isUnread:true,unreadCount:2})
+ expect((await app().request('/api/chats/counted/read',{method:'POST'},{DB:db.db})).status).toBe(200)
+ expect((await rows('line')).find(row=>row.id==='counted')).toMatchObject({isUnread:false,unreadCount:0})
+ expect((await rows('line',{},'reader-b')).find(row=>row.id==='counted')).toMatchObject({isUnread:true,unreadCount:2})
+ db.raw.prepare("INSERT INTO messages_log(id,friend_id,direction,message_type,content,created_at) VALUES ('m3','counted','incoming','text','3','2026-09-13T11:30:00.000Z')").run()
+ expect((await rows('line')).find(row=>row.id==='counted')).toMatchObject({isUnread:true,unreadCount:1})
+})

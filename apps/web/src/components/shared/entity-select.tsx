@@ -72,6 +72,7 @@ type CommonProps = {
   /** 移行前のSelectと同じ呼び出し口。 */
   treatment?: 'box' | 'text' | 'pill'
   menuHeading?: string
+  confirmLabel?: string
 }
 export type EntitySelectProps = CommonProps & ({
   value: string
@@ -99,7 +100,7 @@ export default function EntitySelect(props: EntitySelectProps) {
   const common = {
     compact: props.compact, label, ariaLabel: label, noun, items, candidatesStatus: props.candidatesStatus, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, disabledReason: props.disabledReason, lockedReason: props.lockedReason, readOnly, invalid: Boolean(error) || invalid, id,
-    placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
+    confirmLabel: props.confirmLabel, placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
     describedBy: [props['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, actionHidden: props.actionHidden,
   }

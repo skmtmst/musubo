@@ -1,9 +1,9 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type HTMLAttributes } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type HTMLAttributes } from 'react'
 import { isImeComposing } from './ime'
-import { OVERLAY_MODAL_OPEN_EVENT, useV8Leave } from './overlay-utils'
+import { OVERLAY_MODAL_OPEN_EVENT, OVERLAY_DEPTH_STEP, OVERLAY_MENU_BASE, OverlayDepthContext, useV8Leave } from './overlay-utils'
 import styles from './menu-portal.module.css'
 
 const openPanels: HTMLDivElement[] = []
@@ -387,6 +387,7 @@ export default function MenuPortal({
     }
   }, [open, mounted, focusPanel])
 
+  const overlayDepth = useContext(OverlayDepthContext)
   if ((!open && (!exitDuration || !leaving)) || !mounted || typeof document === 'undefined') return null
   return createPortal(
     <div
@@ -417,7 +418,7 @@ export default function MenuPortal({
         left: geometry?.left ?? 0,
         width: geometry?.width,
         minWidth: geometry?.minWidth,
-        zIndex: 120,
+        zIndex: OVERLAY_MENU_BASE + overlayDepth * OVERLAY_DEPTH_STEP,
         maxWidth: 'calc(100vw - 16px)',
         // 開く方向に使える高さまで。入るなら全部、足りなければ中でスクロール。
         maxHeight: geometry?.maxHeight,
@@ -430,7 +431,7 @@ export default function MenuPortal({
         visibility: geometry ? undefined : 'hidden',
       }}
     >
-      {children}
+      <OverlayDepthContext.Provider value={overlayDepth + 1}>{children}</OverlayDepthContext.Provider>
     </div>,
     document.body,
   )

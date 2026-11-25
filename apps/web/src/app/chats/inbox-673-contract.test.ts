@@ -86,7 +86,7 @@ describe('#673-受け 存在しない・別アカウントは案内の空状態�
   })
 
   it('手選び・メール選びでは古いURL指定と案内を外す', () => {
-    const manual = region(PAGE, 'const handleSelectChat = (chatId: string) => {', 'void api.chats.markRead')
+    const manual = region(PAGE, 'const handleSelectChat = (chatId: string) => {', 'void withRequestTimeout(api.chats.markRead')
     expect(manual).toContain('deepLinkIdRef.current = null')
     expect(manual).toContain("setDeepLinkNotice('')")
   })
@@ -97,7 +97,7 @@ describe('#673-受け 選択中のLINEアカウントへ固定する', () => {
 
   it('遅い照会が新しい選択を上書きしない', () => {
     expect(deepLink).toContain('deepLinkRequestIdRef.current !== requestId')
-    const manual = region(PAGE, 'const handleSelectChat = (chatId: string) => {', 'void api.chats.markRead')
+    const manual = region(PAGE, 'const handleSelectChat = (chatId: string) => {', 'void withRequestTimeout(api.chats.markRead')
     expect(manual).toContain('deepLinkRequestIdRef.current += 1')
   })
 })
