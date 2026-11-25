@@ -148,7 +148,6 @@
 .colTables { width: auto; }
 .colSeats { width: var(--tpl-rs-inv-col-seats); }
 .colFree { width: var(--tpl-rs-inv-col-free); }
-.tablesCell { overflow: hidden; text-overflow: ellipsis; }
 .datePicker { width: var(--tpl-rs-rsv-store-w); flex: none; }
 
 .allocationCardHead,

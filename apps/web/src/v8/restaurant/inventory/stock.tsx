@@ -15,6 +15,7 @@ import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import { PageFrame, PageFooter } from '@/components/templates/page-frame'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 
 import StockListHeading from './stock-list-heading'
 import { DetailColumns } from '@/components/templates/detail-columns'
@@ -515,7 +516,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                         </svg>
                       </Td>
                       <Td className={`${styles.colSeats} ${styles.strong}`} align="right">{`${slot.seats}席`}</Td>
-                      <Td className={styles.colTables}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || emptyValue('unknown')}</span></Td>
+                      <Td className={styles.colTables}><TruncatedText value={joinTableCodes(slot.tables) || emptyValue('unknown')} /></Td>
                       <Td className={`${styles.colFree} ${styles.bold}`} align="right"><span className={lowSlot(slot) ? styles.freeLow : undefined}>{`${slot.free}席`}</span></Td>
                     </Tr>
                   ))}
