@@ -12,12 +12,13 @@ vi.hoisted(() => {
 })
 
 const fixture = vi.hoisted(() => ({
-  snapshot: vi.fn(), inventoryDay: vi.fn(), openingHours: vi.fn(), saveOpeningHours: vi.fn(), saveInventoryAllocation: vi.fn(),
+  snapshot: vi.fn(), inventoryDay: vi.fn(), openingHours: vi.fn(), saveOpeningHours: vi.fn(), saveScopedInventoryAllocation: vi.fn(),
   updateInventory: vi.fn(), generateInventory: vi.fn(), listIntakeAddresses: vi.fn(), issueIntakeAddress: vi.fn(),
 }))
 const fetchApi = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
+vi.mock('@/lib/api/helpers/reservation-board', async importOriginal => { const original = await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>(); return { ...original, reservationBoardApi: { ...original.reservationBoardApi, floors: vi.fn(async () => ({ success: true, data: [] })) } } })
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/inventory', useSearchParams: () => new URLSearchParams(window.location.search) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -38,7 +39,7 @@ const at = (dayOffset: number, hour: number, minute = 0) => {
 
 const slot = (id: string, hour: number, occupied: string[], seats: number, over: Record<string, unknown> = {}) => ({
   id, store_id: 'store-1', starts_at: at(0, hour), slot_minutes: 30, total_capacity: 20, ota_capacity: 8, line_capacity: 6, walk_in_capacity: 6,
-  reserved_count: seats, occupied_seats: seats, occupiedTableIds: occupied, freeSeats: 20 - seats, version: 3, updated_by_name: '見本 30', updated_at: at(0, 14, 2), ...over,
+  reserved_count: seats, occupied_seats: seats, occupiedTableIds: occupied, freeSeats: 20 - seats, version: 3, allocationSource: 'legacy', updated_by_name: '見本 30', updated_at: at(0, 14, 2), ...over,
 })
 const days = [slot('s17', 17, ['pa'], 8), slot('s19', 19, ['pa', 't1', 't2', 't3', 't4'], 18, { ota_capacity: 6, line_capacity: 4, walk_in_capacity: 4 })]
 const hours = Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: weekday === 1 ? [] : [{ opensAt: '17:00', closesAt: '22:00' }] }))
@@ -53,10 +54,10 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = verifiedStaffRole('owner')
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
-  fixture.inventoryDay.mockResolvedValue({ data: days })
+  fixture.inventoryDay.mockResolvedValue({ data: days, allocation: { version: 3, standard: { otaCapacity: 8, lineCapacity: 6, walkInCapacity: 6 }, day: null, hoursStatus: 'open' } })
   fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours, version: 4, updatedBy: 'mem-2', updatedAt: at(0, 14, 2) } })
   fixture.saveOpeningHours.mockResolvedValue({ success: true, data: { version: 5 } })
-  fixture.saveInventoryAllocation.mockResolvedValue({ success: true, data: { updated: 2 } })
+  fixture.saveScopedInventoryAllocation.mockResolvedValue({ success: true, data: { version: 4 } })
   fixture.updateInventory.mockResolvedValue({ success: true })
   fixture.listIntakeAddresses.mockResolvedValue({ data: [{ id: 'ia', storeId: 'store-1', localPart: 'r', address: 'r-1@in.example.jp', status: 'active', createdAt: '', revokedAt: null }] })
   fetchApi.mockImplementation(async (path: string) => (path.includes('/channels')
@@ -76,46 +77,86 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(screen.getByRole('link', { name: '座席・卓管理を開く' }).getAttribute('href')).toContain('/restaurant-test/tables')
   })
 
-  it('配分・在庫の表・いちばん混む時間の卓と「行を押したとき」の箱・開ける時間が出る', async () => {
+  it('配分・在庫の表・いちばん混む時間の卓と個別の編集・開ける時間が出る', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     const board = document.querySelector('[data-design-node="Y8SjT2"]')!
-    expect(board.textContent).toContain('1つの時間帯の総数 20席')
+    expect(board.textContent).toContain('1枠の総数 20席')
     expect(board.textContent).toContain('個室A・T1〜T4')
-    expect(board.textContent).toContain('行を押したとき：19:00 の配分だけ直す')
+    expect(board.textContent).toContain('19:00の配分を変更')
     expect(board.textContent).toContain('休み（定休日）・お客さまの画面に出ません')
   })
 
-  it('変更前の配分と開ける時間は保存できず、変更後は保存できる', async () => {
+  it('在庫の取得失敗では一覧を空扱いせず、読み直しで戻せる', async () => {
+    fixture.inventoryDay.mockRejectedValueOnce(new Error('取得エラー'))
+    render(<InventoryPage />)
+    const error = await screen.findByText('この日の時間帯を読み込めませんでした')
+    expect(screen.queryByText('この日の時間帯がありません')).toBeNull()
+    fireEvent.click(within(error.closest('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByText('19:00 の卓')
+    expect(screen.queryByText('この日の時間帯を読み込めませんでした')).toBeNull()
+  })
+
+  const openStandard = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: '基本配分をまとめて変更' }))
+    return screen.getByRole('dialog', { name: '営業日の基本配分を変更' })
+  }
+
+  it('総席数を超える配分は保存できず、範囲内に直せる', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    const save = screen.getByRole('button', { name: /受付時間と配分を保存/ }) as HTMLButtonElement
+    const form = await openStandard()
+    const input = within(form).getByRole('spinbutton', { name: '予約サイト（グルメサイト）' })
+    const save = within(form).getByRole('button', { name: '基本配分を保存' }) as HTMLButtonElement
+    fireEvent.change(input, { target: { value: '30' } })
     expect(save.disabled).toBe(true)
-    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
+    fireEvent.change(input, { target: { value: '7' } })
     expect(save.disabled).toBe(false)
   })
 
-  it('配分だけを変えた保存では営業時間を再送しない', async () => {
+  it('基本配分の保存は3経路を送って営業時間を再送しない', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
-    fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
-    await waitFor(() => expect(fixture.saveInventoryAllocation).toHaveBeenCalled())
-    expect(fixture.saveInventoryAllocation).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', otaCapacity: 7, slots: [{ id: 's17', expectedVersion: 3 }, { id: 's19', expectedVersion: 3 }] }))
+    const form = await openStandard()
+    fireEvent.change(within(form).getByRole('spinbutton', { name: '予約サイト（グルメサイト）' }), { target: { value: '7' } })
+    fireEvent.click(within(form).getByRole('button', { name: '基本配分を保存' }))
+    await waitFor(() => expect(fixture.saveScopedInventoryAllocation).toHaveBeenCalledWith('account-1', {
+      storeId: 'store-1', scope: 'standard', expectedVersion: 3, allocation: { otaCapacity: 7, lineCapacity: 6, walkInCapacity: 6 },
+    }))
     expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
   })
 
-  it('ほかの担当者が先に保存していたら（409）競合の帯を出し、上の帯は重ねない', async () => {
-    fixture.saveInventoryAllocation.mockRejectedValue(new ApiError(409, 'conflict'))
+  it('先に配分が変わったときは入力を残し、最新の配分を確認してから保存できる', async () => {
+    fixture.saveScopedInventoryAllocation.mockRejectedValueOnce(new ApiError(409, 'conflict', 'version_conflict'))
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.change(screen.getByRole('spinbutton', { name: '予約サイト' }), { target: { value: '7' } })
-    fireEvent.click(screen.getByRole('button', { name: /受付時間と配分を保存/ }))
-    const band = await screen.findByRole('alert')
-    expect(band.textContent).toContain('見本さんが 14:02 に予約枠・在庫を保存しました')
-    expect(screen.getByRole('button', { name: /比べてから保存/ })).not.toBeNull()
-    expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.queryByText('行を押したとき：19:00 の配分だけ直す')).toBeNull()
+    const form = await openStandard()
+    const input = within(form).getByRole('spinbutton', { name: '予約サイト（グルメサイト）' }) as HTMLInputElement
+    const save = within(form).getByRole('button', { name: '基本配分を保存' }) as HTMLButtonElement
+    fireEvent.change(input, { target: { value: '7' } })
+    fireEvent.click(save)
+    await within(form).findByText(/別の変更が保存されました/)
+    expect(input.value).toBe('7')
+    expect(save.disabled).toBe(true)
+    fixture.inventoryDay.mockResolvedValueOnce({ data: days, allocation: { version: 4, standard: { otaCapacity: 8, lineCapacity: 5, walkInCapacity: 6 }, day: null, hoursStatus: 'open' } })
+    fireEvent.click(within(form).getByRole('button', { name: '最新の配分を確認する' }))
+    await within(form).findByText(/最新の配分は.*LINE 5席/)
+    expect(input.value).toBe('7')
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await waitFor(() => expect(fixture.saveScopedInventoryAllocation).toHaveBeenLastCalledWith('account-1', expect.objectContaining({ expectedVersion: 4 })))
+  })
+
+  it('選択日の保存と、従来の枠から共通配分に戻す操作を区別する', async () => {
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    fireEvent.click(screen.getByRole('button', { name: 'この日の配分を変更' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'この日だけ保存' }))
+    await waitFor(() => expect(fixture.saveScopedInventoryAllocation).toHaveBeenLastCalledWith('account-1', expect.objectContaining({ scope: 'day', date: '2026-10-10' })))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(await screen.findByRole('button', { name: '19:00の配分を変更' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '基本配分に戻す' }))
+    await waitFor(() => expect(fixture.saveScopedInventoryAllocation).toHaveBeenLastCalledWith('account-1', expect.objectContaining({ scope: 'slot', startsAt: days[1].starts_at, allocation: null })))
   })
 
   it('残りが少ない時間帯は、媒体を閉じる知らせ（Yyw6i）でメール転送の媒体だけに印を付けられる', async () => {
@@ -163,23 +204,15 @@ describe('Y8SjT2 予約枠・在庫', () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     const reason = value === 'viewer' ? PERMISSION_LOCK_REASON.viewer : PERMISSION_LOCK_REASON.feature
-    for (const [name, savedValue] of [
-      ['予約サイト', '8'], ['LINE 専用', '6'], ['当日（ウォークイン）', '6'],
-      ['19:00の予約サイト', '6'], ['19:00のLINE', '4'], ['19:00の当日', '4'],
-    ]) {
-      const input = screen.getByRole('spinbutton', { name }) as HTMLInputElement
-      expect(input.value).toBe(savedValue)
-      expect(input.disabled).toBe(true)
-      expect(input.readOnly).toBe(true)
-      fireEvent.change(input, { target: { value: '999' } })
-      expect(input.value).toBe(savedValue)
-    }
+    expect(screen.getByText('予約サイト（グルメサイト）')).not.toBeNull()
+    expect(screen.getByText('当日（ウォークイン）')).not.toBeNull()
     const controls = [
       ...screen.getAllByRole('switch'),
-      screen.getByRole('button', { name: /受付時間と配分を保存/ }),
+      screen.getByRole('button', { name: '基本配分をまとめて変更' }),
       screen.getAllByRole('button', { name: '＋ 時間帯を足す' })[0],
       screen.getByRole('button', { name: '火曜日の1つ目の時間帯を外す' }),
-      screen.getByRole('button', { name: 'この時間帯だけ保存' }),
+      screen.getByRole('button', { name: '19:00の配分を変更' }),
+      screen.getByRole('button', { name: 'この日の配分を変更' }),
       screen.getByRole('button', { name: '媒体の受付を閉じる' }),
     ]
     expect(screen.getAllByRole('switch')).toHaveLength(7)
@@ -198,7 +231,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(screen.getByRole('switch', { name: '月曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('false')
     expect(screen.getByRole('switch', { name: '火曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('true')
     expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
-    expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
+    expect(fixture.saveScopedInventoryAllocation).not.toHaveBeenCalled()
     expect(fixture.updateInventory).not.toHaveBeenCalled()
     expect(fixture.generateInventory).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -209,7 +242,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     role.value = verifiedStaffRole(null)
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    const save = screen.getByRole('button', { name: /受付時間と配分を保存/ }) as HTMLButtonElement
+    const save = screen.getByRole('button', { name: '基本配分をまとめて変更' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.hasAttribute('data-permission-locked')).toBe(false)
     for (const control of screen.getAllByRole('switch')) {
@@ -221,7 +254,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(screen.queryByText(/閲覧のみで見ています/)).toBeNull()
     fireEvent.click(save)
     expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
-    expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
+    expect(fixture.saveScopedInventoryAllocation).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '予約経路の連携' }))
     const issue = await screen.findByRole('button', { name: '発行する' }) as HTMLButtonElement
     expect(document.querySelector('[data-read-only-notice]')).toBeNull()
@@ -253,7 +286,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
 it('OP-R04 未保存の配分があるタブの移動は確認し、取り消すと入力を残す',async()=>{
  document.documentElement.dataset.theme='v8'
  render(<InventoryPage/>)
- const input=await screen.findByRole('spinbutton',{name:'予約サイト'})
+ fireEvent.click(await screen.findByRole('button',{name:'基本配分をまとめて変更'}))
+ const input=await screen.findByRole('spinbutton',{name:'予約サイト（グルメサイト）'})
  fireEvent.change(input,{target:{value:'7'}})
  fireEvent.click(screen.getByRole('button',{name:'予約経路の連携'}))
  const dialog=await screen.findByRole('dialog',{name:'保存していない変更があります'})
@@ -261,9 +295,9 @@ it('OP-R04 未保存の配分があるタブの移動は確認し、取り消す
  fireEvent.click(within(dialog).getByRole('button',{name:'編集を続ける'}))
  expect((input as HTMLInputElement).value).toBe('7')
  fireEvent.click(screen.getByRole('button',{name:'予約経路の連携'}))
- fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'保存せずに移る'}))
+ fireEvent.click(within(screen.getByRole('dialog',{name:'保存していない変更があります'})).getByRole('button',{name:'保存せずに移る'}))
  await screen.findByText('Hot Pepper グルメ')
- expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
+ expect(fixture.saveScopedInventoryAllocation).not.toHaveBeenCalled()
  delete document.documentElement.dataset.theme
 })
 
@@ -278,11 +312,10 @@ it('inventory channel read failure does not become no channels',async()=>{
 afterEach(() => { verifiedStaffRole(null) })
 
 describe('予約枠・在庫の切り替え', () => {
-  it('共通タブを外し、画面内の切り替えと座席・卓管理への行き先を保つ', async () => {
+  it('共通タブを外し、画面内の切り替えを保つ', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
-    expect(screen.getByRole('link',{name:'座席・卓管理で変える →'}).getAttribute('href')).toBe('/restaurant-test/tables')
     // 席・枠の配分や予約経路などの切り替えは残す。
     const inner = screen.getByRole('group', { name: '予約枠・在庫の切り替え' })
     expect(within(inner).getAllByRole('button')).toHaveLength(4)

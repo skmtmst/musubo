@@ -24,5 +24,7 @@
   gap: var(--space-8);
   margin: 0;
   min-width: 0;
+  justify-content: flex-start;
 }
+.rows > dd > * { max-width: 100%; min-width: 0; }
 }

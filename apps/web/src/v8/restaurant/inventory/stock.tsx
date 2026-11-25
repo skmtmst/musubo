@@ -4,18 +4,20 @@ import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Armchair, Check, X } from 'lucide-react'
-import type { RestaurantOpeningDay, RestaurantOpeningHours } from '@line-crm/shared'
+import type { RestaurantFloor, RestaurantOpeningDay, RestaurantOpeningHours } from '@line-crm/shared'
+import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
+import { groupTablesByFloor } from './table-groups'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import SeatTile from '@/components/shared/seat-tile'
 import Button from '@/components/shared/button'
-import { RowActions } from '@/components/shared/row-actions'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import { PageFrame, PageFooter } from '@/components/templates/page-frame'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 
 import StockListHeading from './stock-list-heading'
 import { DetailColumns } from '@/components/templates/detail-columns'
@@ -31,32 +33,34 @@ import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ApiError, fetchApi } from '@/lib/api'
-import { restaurantTestApi, type RestaurantInventory, type RestaurantTable } from '@/lib/restaurant-test-api'
+import { restaurantTestApi, type RestaurantInventory, type RestaurantInventoryAllocation, type RestaurantInventoryAllocationState, type RestaurantInventoryAllocationWrite, type RestaurantTable } from '@/lib/restaurant-test-api'
 import { BoundaryBanner, QuietError, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
-import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrder, WEEK_ORDER, WEEKDAY_LABEL } from './format'
+import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, WEEK_ORDER, WEEKDAY_LABEL } from './format'
 import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
-import { Field } from '@/components/shared/form-controls'
+import { AllocationDialog, GuideAllocationCard, StandardAllocationCard, validAllocation } from './allocation-controls'
 import { emptyValue } from '@/components/shared/empty-value'
-import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
-/*
- * ★V8 予約枠・在庫「時間帯ごとの在庫」タブ（板 `Y8SjT2`・競合 ・媒体を閉じる知らせ ）。
- *
- * 案内の帯 → 左：席と枠の配分（卓とつながる）→ 時間帯ごとの在庫の表 → 開ける時間
- * （先頭に「行を押したとき：その時間帯の配分だけ直す」の箱）、右：選んだ時間帯の卓 → 下の帯
- * （受付時間と配分を保存）。ほかの担当者が先に保存していたら（409）競合の帯を出し、
- * 比べてから保存するか、最新を読み込んで続ける。
- * データの口・送る形は今の画面（app/restaurant-test/v8/inventory.tsx）と同じ。動きは BEHAVIOR.md。
- */
-
-
-const allocOf = (row: RestaurantInventory | undefined): Alloc =>
-  row ? { ota: row.ota_capacity, line: row.line_capacity, walkin: row.walk_in_capacity } : { ota: 0, line: 0, walkin: 0 }
-
+const emptyAllocation: Alloc = { ota: 0, line: 0, walkin: 0 }
+const allocationOf = (allocation: RestaurantInventoryAllocation | undefined | null): Alloc => allocation
+  ? { ota: allocation.otaCapacity, line: allocation.lineCapacity, walkin: allocation.walkInCapacity }
+  : emptyAllocation
+const rowAllocation = (row: RestaurantInventory | undefined): Alloc => row
+  ? { ota: row.ota_capacity, line: row.auto_line_original ?? row.line_capacity, walkin: row.walk_in_capacity }
+  : emptyAllocation
+const allocationLabels = { standard: '基本配分', day: 'この日だけ', slot: 'この時間だけ', legacy: '保存済み' }
+type AllocationEditor = {
+  scope: RestaurantInventoryAllocationWrite['scope']
+  allocation: Alloc
+  initial: Alloc
+  time?: string
+  startsAt?: string
+  canRestore: boolean
+  restoreLabel: string
+}
 const emptyWeek = (): Hours => Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [] }))
 
 const periodsText = (day: RestaurantOpeningDay | undefined) =>
@@ -64,22 +68,6 @@ const periodsText = (day: RestaurantOpeningDay | undefined) =>
 
 function storeToday(timezone: string | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone || 'Asia/Tokyo' }).format(new Date())
-}
-
-function NumberField({ id, 'aria-describedby': describedBy, 'data-guide-anchor': guideAnchor, label, value, onChange, canEdit, invalid = false }: { id?: string; 'aria-describedby'?: string; 'data-guide-anchor'?: string; label: string; value: number; onChange: (value: number) => void; canEdit: boolean; invalid?: boolean }) {
-  return (
-    <SaveErrorField names={["value"]}><NumberInput
-      data-guide-anchor={guideAnchor}
-      type="number"
-      min={0}
-      aria-label={label}
-      value={String(value)}
-      readOnly={!canEdit}
-      disabled={!canEdit}
-      invalid={invalid}
-      onChange={(event) => { if (canEdit) onChange(Number(event.target.value)) }}
-    /></SaveErrorField>
-  )
 }
 
 export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notice, tabs }: { ctx: RestaurantV8Context; canEdit: boolean; heading?: ReactNode; notice?: ReactNode; tabs: ReactNode }) {
@@ -94,9 +82,15 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
     () => (store ? data.tables.filter((item) => item.store_id === store.id) : data.tables),
     [data.tables, store],
   )
+  const [floors, setFloors] = useState<RestaurantFloor[]>([])
+  const [floorError, setFloorError] = useState(false)
+  const [floorRetry, setFloorRetry] = useState(0)
+  useEffect(() => { setFloors([]); setFloorError(false) }, [selectedAccountId, storeId])
+  useEffect(() => { let active = true; setFloorError(false); if (selectedAccountId && storeId) void reservationBoardApi.floors(selectedAccountId, storeId).then(result => { if (active) setFloors(result.data) }).catch(() => { if (active) setFloorError(true) }); return () => { active = false } }, [selectedAccountId, storeId, data.tables, floorRetry])
   const [asideExpanded, setAsideExpanded] = useState(false)
   const [date, setDate] = useState(() => storeToday(store?.timezone))
   const [dayRows, setDayRows] = useState<RestaurantInventory[] | null>(null)
+  const [allocationState, setAllocationState] = useState<RestaurantInventoryAllocationState | null>(null)
   const [loadError, setLoadError] = useState('')
   const [refresh, setRefresh] = useState(0)
   const [hours, setHours] = useState<Hours | null>(null)
@@ -119,11 +113,16 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
 
   useEffect(() => {
     let current = true
-    setDayRows(null); setLoadError('')
+    setDayRows(null); setAllocationState(null); setLoadError('')
     if (!selectedAccountId || !storeId) return
     void restaurantTestApi.inventoryDay(selectedAccountId, storeId, date).then((res) => {
-      if (current) setDayRows(Array.isArray(res.data) ? res.data : [])
-    }).catch(() => { if (current) { setDayRows([]); setLoadError('在庫を読み込めませんでした。再読込してください。') } })
+      if (current) {
+        setDayRows(Array.isArray(res.data) ? res.data : [])
+        setAllocationState(res.allocation ?? null)
+      }
+    }).catch(() => {
+      if (current) setLoadError('在庫を読み込めませんでした。再読込してください。')
+    })
     return () => { current = false }
   }, [selectedAccountId, storeId, date, refresh])
 
@@ -173,7 +172,6 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   )
   const tableById = useMemo(() => new Map(tables.map((item) => [item.id, item])), [tables])
   const activeTables = useMemo(() => tables.filter((item) => item.is_active), [tables])
-  const stoppedTables = useMemo(() => tables.filter((item) => !item.is_active), [tables])
   const totalSeats = useMemo(() => activeTables.reduce((sum, item) => sum + item.max_capacity, 0), [activeTables])
   const missingHoursReason = canEdit && !busy && !hoursError && hoursReceipt && hoursReceipt.scope === hoursScope.current
     && hoursReceipt.scope.accountId === selectedAccountId && hoursReceipt.scope.storeId === storeId
@@ -200,7 +198,8 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
     return ids
   }
 
-  const slots: SlotInfo[] = rows.map((row) => {
+  const closedDay = allocationState?.hoursStatus === 'closed'
+  const slots: SlotInfo[] = (closedDay ? [] : rows).map((row) => {
     const start = new Date(row.starts_at).getTime()
     const end = start + row.slot_minutes * 60_000
     const overlapping = Number.isNaN(start) ? [] : reservations.filter((item) => {
@@ -218,164 +217,172 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const selected = slots.find((slot) => slot.row.id === selectedId)
     ?? slots.slice().sort((a, b) => b.ratio - a.ratio)[0] ?? null
 
-  // 上の配分は、利用者が触るまで先頭の時間帯の値を写す（読み込み前に0で固めない）。
-  const [allocVersions, setAllocVersions] = useState<Array<{ id: string; expectedVersion: number }> | null>(null)
-  const [allocOverride, setAllocOverride] = useState<Alloc | null>(null)
-  const alloc: Alloc = allocOverride ?? allocOf(rows[0])
-  const [slotAlloc, setSlotAlloc] = useState<Alloc | null>(null)
-  const [slotVersion, setSlotVersion] = useState<number | undefined>(undefined)
+  const [editor, setEditor] = useState<AllocationEditor | null>(null)
+  const [guideLine, setGuideLine] = useState<string | null>(null)
+  const guideDraftKey = selectedAccountId && storeId ? `musubo:restaurant-reception:${selectedAccountId}:${storeId}` : null
+  const [allocationError, setAllocationError] = useState('')
+  const [allocationConflict, setAllocationConflict] = useState(false)
+  const [checkingAllocation, setCheckingAllocation] = useState(false)
+  const scopedSave = useRef(false)
+  const allocationScope = useRef({ selectedAccountId, storeId, date })
+  useLayoutEffect(() => {
+    allocationScope.current = { selectedAccountId, storeId, date }
+    setEditor(null); setAllocationError(''); setAllocationConflict(false)
+  }, [selectedAccountId, storeId, date])
+  useLayoutEffect(() => {
+    try { setGuideLine(guideDraftKey ? sessionStorage.getItem(guideDraftKey) : null) }
+    catch { setGuideLine(null) }
+  }, [guideDraftKey])
   const [conflict, setConflict] = useState<Conflict | null>(null)
   const [diffOpen, setDiffOpen] = useState(false)
-  // 板 ：残りが少ない時間帯の「媒体を閉じる知らせ」。記録はこの画面だけで持ち、媒体へは書き戻さない。
   const [closeNoteOpen, setCloseNoteOpen] = useState(false)
   const [closedSlots, setClosedSlots] = useState<string[]>([])
   const [closedChannels, setClosedChannels] = useState<string[]>([])
 
-  const currentSlotAlloc: Alloc = slotAlloc ?? allocOf(selected?.row)
-  const allocInvalid = alloc.ota + alloc.line + alloc.walkin > totalSeats
-  const slotInvalid = selected ? currentSlotAlloc.ota + currentSlotAlloc.line + currentSlotAlloc.walkin > selected.row.total_capacity : true
-  const remainder = totalSeats - alloc.ota - alloc.line - alloc.walkin
+  const standard = allocationState?.standard ? allocationOf(allocationState.standard) : null
   const lowSlot = (slot: SlotInfo) => slot.free / Math.max(totalSeats, 1) < 0.2
-  /* 開店準備ガイド⑦の手順1/2（枠14 zvzk4）はLINEの席数を入れ終えた時に次へ進む。 */
   const guide = useSharedGuide()?.guide
   const guidingReception = guide?.phase === 'active' && guide.stepKey === 'scenario'
-  const [advancedAllocation, setAdvancedAllocation] = useState(false)
-  const receptionReady = alloc.line > 0 && !allocInvalid && rows.length > 0
-  useEffect(() => { if (receptionReady) emitGuideSignal('reception.lineSeats') }, [receptionReady])
+  const guideValue = guideLine ?? (standard ? String(standard.line) : '')
+  const guideAllocation = { ...(standard ?? emptyAllocation), line: Number(guideValue) }
+  const hoursUnavailable = allocationState?.hoursStatus === 'unavailable'
+  const showHoursLink = Boolean(missingHoursReason || allocationState?.hoursStatus === 'unconfigured')
+  const canWriteAllocation = Boolean(canEdit && allocationState && !busy && !loadError && !hoursUnavailable && totalSeats > 0)
+  const receptionReady = guidingReception && canWriteAllocation && !showHoursLink
+    && guideAllocation.line > 0 && validAllocation(totalSeats, guideAllocation)
+  useEffect(() => {
+    if (receptionReady && guide?.procedureIndex === 1) emitGuideSignal('reception.lineSeats', selectedAccountId ?? undefined)
+  }, [receptionReady, guide?.procedureIndex, selectedAccountId])
 
-  const updateAlloc = (next: Alloc) => {
-    if (!allocVersions) setAllocVersions(rows.map((r) => ({ id: r.id, expectedVersion: r.version ?? 0 })))
-    setAllocOverride(next)
+  const changeGuideLine = (value: string | null) => {
+    setGuideLine(value)
+    if (!guideDraftKey) return
+    try {
+      if (value === null) sessionStorage.removeItem(guideDraftKey)
+      else sessionStorage.setItem(guideDraftKey, value)
+    } catch { /* この画面では引き続き入力できる。 */ }
   }
-  const updateSlot = (next: Alloc) => {
-    if (slotVersion === undefined) setSlotVersion(selected?.row.version)
-    setSlotAlloc(next)
-  }
-  const resetAll = () => {
-    setAllocOverride(null); setAllocVersions(null); setSlotAlloc(null); setSlotVersion(undefined)
-    setHoursDraft(hours)
-  }
-  const changeDate = (next: string) => {
-    setDate(next); setAllocOverride(null); setAllocVersions(null); setSlotAlloc(null); setSlotVersion(undefined); setSelectedId('')
-  }
-
-  /*
-   * 配分（上の欄・時間帯ごと）と開ける時間は、下の帯の「保存」まで画面にしか無い。
-   * 触ったまま左メニューなどで離れると消えるので、離れる前に確かめる。保存・キャンセルで外れる。
-   */
   const hoursChanged = hours !== null && hoursDraft !== null && JSON.stringify(hoursDraft) !== JSON.stringify(hours)
+  const allocationChanged = editor && (editor.allocation.ota !== editor.initial.ota
+    || editor.allocation.line !== editor.initial.line || editor.allocation.walkin !== editor.initial.walkin)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
-    dirty: canEdit && (allocOverride !== null || slotAlloc !== null || hoursChanged),
+    dirty: canEdit && (guideLine !== null || Boolean(allocationChanged) || hoursChanged),
     busy,
   })
 
-  /* 409 のあと：最新を読み直し、誰がいつ保存したかと、違う所（配分・曜日の開ける時間）を出す。 */
-  const raiseConflict = async (attemptedAlloc: Alloc | null, attemptedHours: Hours | null) => {
-    let latestRows: RestaurantInventory[] = rows
-    let latestHours: Hours | null = hours
-    let hoursBy: string | null = null
-    let hoursAt: string | null = null
-    if (selectedAccountId && storeId) {
-      try { latestRows = (await restaurantTestApi.inventoryDay(selectedAccountId, storeId, date)).data } catch (saveFailure) {
-        saveErrors.capture(saveFailure) /* 今の行のまま */ }
-      try {
-        const res = await restaurantTestApi.openingHours(selectedAccountId, storeId)
-        latestHours = res.data.hours || emptyWeek()
-        hoursBy = res.data.updatedBy
-        hoursAt = res.data.updatedAt
-      } catch (saveFailure) {
-        saveErrors.capture(saveFailure) /* 今の時間のまま */ }
+  const closeEditor = () => { setEditor(null); setAllocationError(''); setAllocationConflict(false) }
+  const resetAll = () => { closeEditor(); changeGuideLine(null); setHoursDraft(hours) }
+  const changeDate = (next: string) => { setDate(next); setSelectedId(''); closeEditor() }
+
+  const openEditor = (scope: AllocationEditor['scope']) => {
+    if (!canWriteAllocation || (scope !== 'standard' && allocationState?.hoursStatus !== 'open')) return
+    const dayOnly = allocationState?.day
+    const source = selected?.row.allocationSource
+    const allocation = scope === 'slot' ? rowAllocation(selected?.row)
+      : allocationOf(scope === 'day' ? dayOnly ?? allocationState?.standard : allocationState?.standard)
+    setEditor({
+      scope,
+      allocation,
+      initial: allocation,
+      time: selected?.time,
+      startsAt: selected?.row.starts_at,
+      canRestore: scope === 'day' ? Boolean(dayOnly) : scope === 'slot' && (source === 'slot' || source === 'legacy'),
+      restoreLabel: scope === 'slot' && dayOnly ? 'この日の配分に戻す' : '基本配分に戻す',
+    })
+    setAllocationError(''); setAllocationConflict(false)
+  }
+
+  const reviewAllocation = async () => {
+    if (!selectedAccountId || !storeId || checkingAllocation) return
+    const scope = allocationScope.current
+    setCheckingAllocation(true)
+    try {
+      const result = await restaurantTestApi.inventoryDay(selectedAccountId, storeId, date)
+      if (scope !== allocationScope.current) return
+      setAllocationState(result.allocation)
+      setDayRows(result.data)
+      const current = editor?.scope === 'slot' ? rowAllocation(result.data.find(row => row.starts_at === editor.startsAt))
+        : allocationOf(editor?.scope === 'day' ? result.allocation.day ?? result.allocation.standard : result.allocation.standard)
+      setAllocationError('最新の配分は、予約サイト ' + current.ota + '席・LINE ' + current.line + '席・当日 ' + current.walkin + '席です。')
+      setAllocationConflict(false)
+    } catch {
+      if (scope === allocationScope.current) setAllocationError('最新の配分を読み込めませんでした。もう一度お試しください。')
+    } finally {
+      setCheckingAllocation(false)
     }
-    const newest = latestRows.slice().sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))[0]
-    const memberName = (id: string | null) => data.memberships.find((member) => member.id === id)?.staff_name ?? null
-    const who = attemptedHours && !attemptedAlloc ? memberName(hoursBy) : newest?.updated_by_name ?? memberName(newest?.updated_by ?? null) ?? memberName(hoursBy)
-    const at = attemptedHours && !attemptedAlloc ? hoursAt : newest?.updated_at ?? hoursAt
-    const changedDays = attemptedHours && latestHours
-      ? WEEK_ORDER.filter((weekday) => periodsText(latestHours?.find((d) => d.weekday === weekday)) !== periodsText(hours?.find((d) => d.weekday === weekday)))
-      : []
-    const latestAlloc = allocOf(latestRows[0])
-    const allocChanged = attemptedAlloc ? JSON.stringify(latestAlloc) !== JSON.stringify(allocOf(rows[0])) : false
-    const scope = [
-      ...(changedDays.length > 0 ? [`${changedDays.map((weekday) => `${WEEKDAY_LABEL[weekday]}曜`).join('・')}の開ける時間`] : []),
-      ...(allocChanged ? ['配分'] : []),
-    ].join('と') || '保存した内容'
-    setConflict({ who: sanName(who), at: formatTime(at, store?.timezone), scope, attemptedAlloc, attemptedHours })
   }
 
-  /* 下の帯の保存：配分（全部の時間帯）→ 開ける時間。どちらかで 409 なら競合の帯。 */
-  const saveAll = (force = false) => {
-    if (!canEdit || busy || !selectedAccountId || !store || allocInvalid) return
-    const attemptedAlloc = rows.length > 0 ? { ...alloc } : null
-    const attemptedHours = hoursChanged ? hoursDraft : null
-    if (!attemptedAlloc && !attemptedHours) return
+  const saveAllocation = (scope: AllocationEditor['scope'], value: Alloc | null, startsAt?: string) => {
+    if (scopedSave.current || !canWriteAllocation || !allocationState || !selectedAccountId || !storeId || allocationConflict
+      || (value && !validAllocation(totalSeats, value))) return
+    scopedSave.current = true
+    const operationScope = allocationScope.current
+    setAllocationError('')
     void mutate(async () => {
       try {
-        if (attemptedAlloc) {
-          const latest = force && selectedAccountId ? (await restaurantTestApi.inventoryDay(selectedAccountId, store.id, date)).data : null
-          const slotsToSave = latest
-            ? latest.map((r) => ({ id: r.id, expectedVersion: r.version ?? 0 }))
-            : allocVersions || rows.map((r) => ({ id: r.id, expectedVersion: r.version ?? 0 }))
-          await restaurantTestApi.saveInventoryAllocation(selectedAccountId, { storeId: store.id, slots: slotsToSave, otaCapacity: attemptedAlloc.ota, lineCapacity: attemptedAlloc.line, walkInCapacity: attemptedAlloc.walkin })
+        await restaurantTestApi.saveScopedInventoryAllocation(selectedAccountId, {
+          storeId,
+          scope,
+          expectedVersion: allocationState.version,
+          ...(scope === 'day' ? { date } : {}),
+          ...(scope === 'slot' ? { startsAt } : {}),
+          allocation: value && { otaCapacity: value.ota, lineCapacity: value.line, walkInCapacity: value.walkin },
+        })
+      } catch (error) {
+        if (operationScope !== allocationScope.current) throw new QuietError('allocation-scope-changed')
+        saveErrors.capture(error)
+        const errorCode = error instanceof ApiError ? error.code : undefined
+        const conflict = errorCode === 'version_conflict'
+        setAllocationConflict(conflict)
+        const messages: Partial<Record<string, string>> = {
+          version_conflict: '別の変更が保存されました。入力内容を保ったまま、最新の配分を確認してください。',
+          hours_not_configured: '開ける時間を設定してから保存してください。入力した配分は残っています。',
+          inventory_closed: 'この日は休業日です。営業時間を確認してから、配分を変更してください。',
+          line_account_not_connected: 'LINEアカウントの接続を確認してください。入力した配分は残っています。',
         }
-        if (attemptedHours) {
-          const version = force ? (await restaurantTestApi.openingHours(selectedAccountId, store.id)).data.version : hoursVersion
-          const res = await restaurantTestApi.saveOpeningHours(selectedAccountId, { storeId: store.id, hours: attemptedHours, expectedVersion: version })
-          setHoursVersion(res.data.version); setHours(attemptedHours)
-        }
-      } catch (err) {
-        saveErrors.capture(err);
-
-        if (err instanceof ApiError && err.status === 409) {
-          await raiseConflict(attemptedAlloc, attemptedHours)
-          /* 知らせは競合の帯が持つ（上の帯は重ねない）。 */
-          throw new QuietError('conflict')
-        }
-        throw err
+        setAllocationError((errorCode && messages[errorCode])
+          || '配分を保存できませんでした。入力内容は残っています。もう一度お試しください。')
+        throw new QuietError('allocation')
       }
-    }, '受付時間と配分を保存しました。予約サイトへは書き戻していません。').then((ok) => {
-      /* 開店準備ガイド⑦の手順2/2（枠14 t8xvM）は保存できた時に次へ進む。 */
-      if (ok) { setConflict(null); setDiffOpen(false); setAllocOverride(null); setAllocVersions(null); setRefresh((n) => n + 1); emitGuideSignal('reception.save') }
-    })
+    }, '配分を保存しました。').then((ok) => {
+      if (!ok || operationScope !== allocationScope.current) return
+      closeEditor()
+      changeGuideLine(null)
+      setRefresh(current => current + 1)
+      if (scope === 'standard') emitGuideSignal('reception.save', selectedAccountId)
+    }).finally(() => { scopedSave.current = false })
   }
 
-  const generateSlots = () => {
-    if (!selectedAccountId || !store || !canEdit || busy || !hoursVersion || allocInvalid) return
-    void mutate(async () => {
-      await restaurantTestApi.generateInventory(selectedAccountId, { storeId: store.id, date, expectedHoursVersion: hoursVersion, otaCapacity: alloc.ota, lineCapacity: guidingReception ? 0 : alloc.line, walkInCapacity: alloc.walkin })
-      if (guidingReception) {
-        const { data: generated } = await restaurantTestApi.inventoryDay(selectedAccountId, store.id, date)
-        if (!generated.length) throw new Error('この日は枠を作れません。営業時間のある日を選んでください。')
-      }
-    }, '30分ごとの枠を作りました。').then((ok) => {
-      if (!ok) return
-      setAllocVersions(null)
-      if (!guidingReception) setAllocOverride(null)
-      setRefresh((n) => n + 1)
-    })
-  }
-
-  const saveSlot = () => {
-    if (!canEdit || busy || !selectedAccountId || !selected || slotInvalid) return
-    const attempt = { ...currentSlotAlloc }
+  const saveHours = (force = false) => {
+    if (!canEdit || busy || !selectedAccountId || !store || !hoursDraft || !hoursChanged) return
+    const attemptedHours = hoursDraft
     void mutate(async () => {
       try {
-        await restaurantTestApi.updateInventory(selectedAccountId, selected.row.id, { otaCapacity: attempt.ota, lineCapacity: attempt.line, walkInCapacity: attempt.walkin, expectedVersion: slotVersion ?? selected.row.version })
-      } catch (err) {
-        saveErrors.capture(err);
-
-        if (err instanceof ApiError && err.status === 409) {
-          await raiseConflict(attempt, null)
+        const version = force ? (await restaurantTestApi.openingHours(selectedAccountId, store.id)).data.version : hoursVersion
+        const result = await restaurantTestApi.saveOpeningHours(selectedAccountId, { storeId: store.id, hours: attemptedHours, expectedVersion: version })
+        setHoursVersion(result.data.version); setHours(attemptedHours)
+      } catch (error) {
+        saveErrors.capture(error)
+        if (error instanceof ApiError && error.status === 409) {
+          const latest = (await restaurantTestApi.openingHours(selectedAccountId, store.id)).data
+          const who = data.memberships.find(member => member.id === latest.updatedBy)?.staff_name ?? null
+          const changes = WEEK_ORDER.filter(weekday => periodsText(latest.hours?.find(day => day.weekday === weekday)) !== periodsText(hours?.find(day => day.weekday === weekday)))
+          setConflict({
+            who: sanName(who), at: formatTime(latest.updatedAt, store.timezone), attemptedHours,
+            scope: changes.length ? changes.map(weekday => WEEKDAY_LABEL[weekday] + '曜').join('・') + 'の開ける時間' : '開ける時間',
+            latestHours: latest.hours,
+          })
           throw new QuietError('conflict')
         }
-        throw err
+        throw error
       }
-    }, `${selected.time} の配分だけ保存しました。予約サイトへは書き戻していません。`).then((ok) => {
-      if (ok) { setSlotAlloc(null); setSlotVersion(undefined); setRefresh((n) => n + 1) }
+    }, '開ける時間を保存しました。').then((ok) => {
+      if (ok) { setConflict(null); setDiffOpen(false); setRefresh(current => current + 1) }
     })
   }
 
   const reloadLatest = () => {
-    setConflict(null); setDiffOpen(false); resetAll(); setRefresh((n) => n + 1)
+    setConflict(null); setDiffOpen(false); resetAll(); setRefresh(current => current + 1)
     void loadHours()
     void ctx.reload()
   }
@@ -383,7 +390,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const occupiedIds = selected ? occupiedOf(selected.row) : new Set<string>()
   const freeTables = activeTables.filter((item) => !occupiedIds.has(item.id))
   const bestTable = freeTables.slice().sort((a, b) => b.max_capacity - a.max_capacity)[0] ?? null
-  const gridTables = tables.slice().sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || tableOrder(a, b))
+  const tableGroups = groupTablesByFloor(tables, floors)
   /* 閉じる先は、メール転送で今も予約が届いている媒体（受付を各媒体の管理画面で閉じるもの）。 */
   const closingChannels = channels.filter((channel) => channel.receiveMethod === 'email_forward' && channel.status === 'receiving')
   const canCloseNote = Boolean(selected && lowSlot(selected) && !closedSlots.includes(selected.row.id))
@@ -394,7 +401,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   }
 
   return (
-    <PageFrame kind="restaurant" standalone heightMode="viewport" boardId="Y8SjT2" hasFooter>
+    <PageFrame kind="restaurant" standalone heightMode="viewport" boardId="Y8SjT2" hasFooter={guidingReception || hoursChanged || Boolean(conflict)}>
       {heading}
       <SaveErrorScope errors={saveErrors}><>
       <div className={styles.stockBody} data-template-region="body">
@@ -414,11 +421,12 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
       ) : null}
       <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={selected ? `${selected.time} の卓` : '空席の状況'} description={'赤＝埋まっている・白＝空き・灰＝停止中'} actions={{primary: ((selected) ? <Button variant="primary" title={`予約台帳で ${selected.time} を見る`} aria-label={`予約台帳を見る（${selected.time}）`} href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}>予約台帳</Button> : null),secondary: ((selected) && (canCloseNote) ? <Button variant="secondary" lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button> : null)}}>
           <DetailSection>
+            {floorError?<Notice tone="warn" action={<Button variant="text" size="inline" onClick={()=>setFloorRetry(value=>value+1)}>もう一度読み込む</Button>}>階・エリアを読み込めませんでした。</Notice>:null}
 
-            {gridTables.length === 0 ? (
+            {tables.length === 0 ? (
               <ListState kind="empty" emptyPreset="readonly" title="卓がありません。座席・卓管理で追加してください。" description="卓を追加すると、ここに空きと利用状況が出ます。" action={<Button href="/restaurant-test/tables">座席・卓管理を開く</Button>} />
-            ) : <ul className={styles.tablesGrid}>
-              {gridTables.map((item) => {
+            ) : tableGroups.map(group => <section key={group.id} className={styles.tableGroup}>{group.name?<h3>{group.name}</h3>:null}<ul className={styles.tablesGrid}>
+              {group.tables.map((item) => {
                 const occupied = occupiedIds.has(item.id)
                 return (
                   <li key={item.id}>
@@ -427,13 +435,13 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                   </li>
                 )
               })}
-            </ul>}
+            </ul></section>)}
             {selected ? (
               <div className={styles.freeInfo}>
                 {bestTable ? (
                   <>
                     <p className={styles.freeTitle}>{`空き：${bestTable.code}（${bestTable.label} ${bestTable.max_capacity}名）`}</p>
-                    <p className={styles.freeSub}>{`${selected.time} に ${bestTable.max_capacity}名までなら受けられます`}</p>
+                    <p className={styles.freeSub}>{`${selected.time} に空いている卓の定員は ${bestTable.max_capacity}名です`}</p>
                   </>
                 ) : <p className={styles.freeTitle}>空きの卓がありません</p>}
               </div>
@@ -442,63 +450,43 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
           </DetailSection>
         </DetailPreview>} asideLayout="detail">
         <div className={styles.mainColumn}>
-          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-alloc-title">
-            <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の有効な卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />
-            <div className={styles.totalLine}>
-              <Armchair size={16} aria-hidden="true" className={styles.totalIcon} />
-              <div className={styles.totalText}>
-                <p className={styles.totalValue}>{`1つの時間帯の総数 ${totalSeats}席`}</p>
-                <p className={styles.totalSub}>{`有効な卓 ${activeTables.length} 卓${stoppedTables.length > 0 ? `（${stoppedTables.map((item) => item.code).join('・')} は停止中のため除く）` : ''}`}</p>
-              </div>
-              <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
-            </div>
-            {noActiveTablesReason ? <DialogNote>{noActiveTablesReason}</DialogNote> : null}
-            <div className={styles.allocGrid}>
-              {(!guidingReception || advancedAllocation) ? (
-                <Field label={<><span className={styles.allocLabel}>予約サイト</span></>}><SaveErrorField names={["ota","alloc.ota"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="予約サイト" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></SaveErrorField></Field>
-              ) : null}
-              <Field label={<><span className={styles.allocLabel}>{guidingReception ? 'LINEで受ける席数（各枠）' : 'LINE 専用'}</span></>}><SaveErrorField names={["line","alloc.line"]}><NumberField data-guide-anchor={!guidingReception || rows.length > 0 ? 'reception.lineSeats' : undefined} canEdit={canEdit} invalid={allocInvalid} label={guidingReception ? 'LINEで受ける席数（各枠）' : 'LINE 専用'} value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></SaveErrorField></Field>
-              {(!guidingReception || advancedAllocation) ? (
-                <Field label={<><span className={styles.allocLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","alloc.walkin"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="当日（ウォークイン）" value={alloc.walkin} onChange={(walkin) => updateAlloc({ ...alloc, walkin })} /></SaveErrorField></Field>
-              ) : null}
-              <div className={styles.allocField}><span className={styles.allocLabel}>{guidingReception ? '電話・店頭の取り置き' : '店頭・電話'}</span>
-                <span className={styles.remainder}>{guidingReception ? `${Math.max(0, remainder)}席` : `${remainder}（残り）`}</span>
-              </div>
-            </div>
-            {guidingReception ? <Button variant="text" size="inline" aria-expanded={advancedAllocation} onClick={() => setAdvancedAllocation(!advancedAllocation)}>予約サイト・当日枠などの詳しい配分</Button> : null}
-            {!guidingReception || advancedAllocation || allocInvalid ? <p className={`${styles.note} ${allocInvalid ? styles.noteInvalid : ''}`}>予約サイト・LINE・当日の合計が総数を超えると保存できません。予約サイトへは書き戻しません（検証中）</p> : null}
-          </Card>
+          {guidingReception ? (
+            <GuideAllocationCard value={guideValue} onChange={changeGuideLine} allocation={guideAllocation} totalSeats={totalSeats} activeTableCount={activeTables.length}
+              valid={receptionReady} disabled={!canWriteAllocation || showHoursLink} error={allocationError}
+              onReload={allocationConflict ? () => void reviewAllocation() : undefined}
+              hoursLink={showHoursLink ? (googleStatus !== null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title') : undefined} />
+          ) : (
+            <StandardAllocationCard allocation={standard} totalSeats={totalSeats} canEdit={canWriteAllocation && !showHoursLink}
+              lockedReason={lockedReason} onEdit={() => openEditor('standard')} />
+          )}
+          {noActiveTablesReason ? <DialogNote>{noActiveTablesReason} {!guidingReception ? <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button> : null}</DialogNote> : null}
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
-            <StockListHeading date={date} busy={busy} onChange={changeDate}>
-              {slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid, 'aria-description': missingHoursReason }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', lockedReason, disabled: !canEdit, onSelect: generateSlots }]} /> : null}
-            </StockListHeading>
-            {missingHoursReason ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href={googleStatus !== null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を設定する</Button></DialogNote> : null}
-            {dayRows === null ? (
+            <StockListHeading date={date} busy={busy} onChange={changeDate} />
+            {missingHoursReason && !guidingReception ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href={googleStatus !== null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を設定する</Button></DialogNote> : null}
+            {!closedDay && rows.some(row => row.allocationSource === 'legacy') ? <Notice tone="info">以前に保存した配分があります。時間帯を選ぶと確認できます。</Notice> : null}
+            {slots.length > 0 && !guidingReception ? <div className={styles.allocationTableActions}>
+              <Button variant="text" lockedReason={lockedReason} disabled={!canWriteAllocation || allocationState?.hoursStatus !== 'open'} onClick={() => openEditor('day')}>この日の配分を変更</Button>
+            </div> : null}
+            {loadError || hoursUnavailable ? (
+              <div className={styles.stateBox}>
+                <ListState kind="error" title="この日の時間帯を読み込めませんでした" onRetry={() => setRefresh(current => current + 1)} />
+              </div>
+            ) : dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
               <div className={styles.stateBox}>
-                <ListState
-                  kind="empty"
-                  title="この日の時間帯がありません"
-                  description="開ける時間から、30分ごとの枠を作れます。今ある枠は残します。"
-                  action={(
-                    <Button
-                      variant="primary"
-                      lockedReason={lockedReason}
-                      disabled={!canEdit || busy || !hoursVersion || allocInvalid}
-                      aria-description={missingHoursReason}
-                      data-guide-anchor={guidingReception ? (guide.procedureIndex === 1 ? 'reception.lineSeats' : 'reception.save') : undefined}
-                      data-guide-action-label="この日の枠を作る"
-                      onClick={generateSlots}
-                    >この日の枠を作る</Button>
-                  )}
-                />
+                <ListState kind="empty" title={closedDay ? 'この日は休業日です' : 'この日の時間帯がありません'}
+                    description={closedDay ? 'この日のLINE予約は受け付けていません。' : undefined}
+                    action={closedDay ? <Button href="/restaurant-test/inventory?tab=closures">休業日・貸切を見る</Button> : undefined} />
               </div>
             ) : (
               <DataTable presentation="inventory">
                 <thead>
                   <TableHeadRow>
                     <Th truncate className={styles.colTime}>時間</Th>
+                    <Th className={styles.colAllocation}>LINE</Th>
+                    <Th className={styles.colAllocation}>予約サイト</Th>
+                    <Th className={styles.colAllocation}>当日</Th>
                     <Th truncate className={styles.colUse}>利用状況</Th>
                     <Th truncate className={styles.colSeats} align="right">席数</Th>
                     <Th truncate className={styles.colTables}>埋まっている卓</Th>
@@ -511,12 +499,18 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                       key={slot.row.id}
                       selected={selected?.row.id === slot.row.id}
                       interactive
-                      onClick={() => { setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}
+                      onClick={() => setSelectedId(slot.row.id)}
                     >
                       <Td>
-                        <Button variant="text" size="compact" fullWidth presentation="row-action" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
+                        <Button variant="text" size="compact" fullWidth presentation="row-action" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id) }}>{slot.time}</Button>
                       </Td>
-                      <Td>
+                      <Td className={styles.colAllocation}>
+                        <strong>{slot.row.line_capacity}席</strong>
+                        <span className={styles.allocationSource}>{slot.row.auto_line_original != null ? '自動停止中' : allocationLabels[slot.row.allocationSource ?? 'legacy']}</span>
+                      </Td>
+                      <Td className={styles.colAllocation}>{slot.row.ota_capacity}席</Td>
+                      <Td className={styles.colAllocation}>{slot.row.walk_in_capacity}席</Td>
+                      <Td className={styles.colUse}>
                         <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
                           <rect className={styles.useTrack} x="0" y="0" width="120" height="8" rx="4" />
                           <rect
@@ -530,36 +524,24 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                         </svg>
                       </Td>
                       <Td className={`${styles.colSeats} ${styles.strong}`} align="right">{`${slot.seats}席`}</Td>
-                      <Td className={styles.tablesCell}><span title={joinTableCodes(slot.tables)}>{joinTableCodes(slot.tables) || emptyValue('unknown')}</span></Td>
+                      <Td className={styles.colTables}><TruncatedText value={joinTableCodes(slot.tables) || emptyValue('unknown')} /></Td>
                       <Td className={`${styles.colFree} ${styles.bold}`} align="right"><span className={lowSlot(slot) ? styles.freeLow : undefined}>{`${slot.free}席`}</span></Td>
                     </Tr>
                   ))}
                 </tbody>
               </DataTable>
             )}
+            {selected && !guidingReception ? <div className={styles.allocationTableActions}>
+              <Button variant="text" lockedReason={lockedReason} disabled={!canWriteAllocation || allocationState?.hoursStatus !== 'open'} onClick={() => openEditor('slot')}>{selected.time}の配分を変更</Button>
+            </div> : null}
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-hours-title">
-            {selected && !conflict ? (
-              <Card layout="vertical" padding="default" gap="tight" surface="inset" aria-label={`${selected.time} の配分だけ直す`}>
-                <h3 className={styles.sectionTitle}>{`行を押したとき：${selected.time} の配分だけ直す`}</h3>
-                <div className={styles.slotGrid}>
-                  <Field label={<><span className={styles.slotLabel}>予約サイト</span></>}><SaveErrorField names={["ota","currentSlotAlloc.ota"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の予約サイト`} value={currentSlotAlloc.ota} onChange={(ota) => updateSlot({ ...currentSlotAlloc, ota })} /></SaveErrorField></Field>
-                  <Field label={<><span className={styles.slotLabel}>LINE 専用</span></>}><SaveErrorField names={["line","currentSlotAlloc.line"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}のLINE`} value={currentSlotAlloc.line} onChange={(line) => updateSlot({ ...currentSlotAlloc, line })} /></SaveErrorField></Field>
-                  <Field label={<><span className={styles.slotLabel}>当日（ウォークイン）</span></>}><SaveErrorField names={["walkin","currentSlotAlloc.walkin"]}><NumberField canEdit={canEdit} invalid={slotInvalid} label={`${selected.time}の当日`} value={currentSlotAlloc.walkin} onChange={(walkin) => updateSlot({ ...currentSlotAlloc, walkin })} /></SaveErrorField></Field>
-                </div>
-                <div className={styles.slotActions}>
-                  <span className={styles.slotBase}>{`全部の時間帯の配分：予約サイト ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
-                  <Button lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (canEdit) updateSlot({ ...alloc }) }}>全体の配分に戻す</Button>
-                  <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || slotInvalid} onClick={saveSlot}>この時間帯だけ保存</Button>
-                </div>
-              </Card>
-            ) : null}
             <CardHeader size="stacked" titleId="rs-hours-title" title="開ける時間" meta={googleStatus !== null ? 'Googleビジネスの営業時間を基準にします。予約枠と席の配分は、この画面で設定します。' : '曜日ごとに予約を受ける時間を決めます（予約設定の受付枠と同じ決め方。違うのは、受けられる数が「人」ではなく「席」で決まること）'} />
             {hoursError ? <Notice tone="danger" className={styles.hoursErrorNoticePlacement} >{hoursError}</Notice> : null}
             {googleStatus !== null ? <>
               <Notice tone={googleStatus === 'connected' ? 'info' : 'warn'}>営業時間の変更は Googleビジネスで行います。接続に問題がある場合は、接続画面で確認してください。</Notice>
-              <Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button>
-              {hours?.map((day) => <p key={day.weekday}>{WEEKDAY_LABEL[day.weekday]}曜日：{periodsText(day)}</p>)}
+              <div className={styles.googleHoursLink}><Button variant="text" href="/restaurant-test/google?tab=hours">Googleビジネスの営業時間を開く →</Button></div>
+              {hours ? <ul className={styles.googleHoursList}>{WEEK_ORDER.map((weekday) => <li key={weekday}>{WEEKDAY_LABEL[weekday]}曜日：{periodsText(hours.find((d) => d.weekday === weekday))}</li>)}</ul> : null}
             </> : hoursDraft ? WEEK_ORDER.map((weekday) => {
               const day = hoursDraft.find((item) => item.weekday === weekday) ?? { weekday, periods: [] }
               const open = day.periods.length > 0
@@ -622,19 +604,33 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
         </div>
       </DetailColumns>
       </div>
-      <PageFooter
-          actions={(
-            <>
-              <Button lockedReason={lockedReason} onClick={resetAll} disabled={!canEdit || busy}>キャンセル</Button>
-              {conflict ? (
-                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
-              ) : (
-                /* 開店準備ガイド⑦の手順2/2（枠14 t8xvM）の光らせる先。 */
-                <Button data-guide-anchor={!guidingReception || rows.length > 0 ? 'reception.save' : undefined} lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (rows.length === 0 && !hoursChanged) || (allocOverride === null && !hoursChanged)} disabledReason={allocOverride === null && !hoursChanged ? "変更していません" : undefined} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />受付時間と配分を保存</Button>
-              )}
-            </>
+      {(guidingReception || hoursChanged || conflict) ? <PageFooter
+        status={guidingReception && allocationError ? '入力内容は残っています。' : undefined}
+        actions={<>
+          <Button lockedReason={lockedReason} onClick={resetAll} disabled={!canEdit || busy}>キャンセル</Button>
+          {conflict ? (
+            <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => setDiffOpen(true)}>比べてから保存</Button>
+          ) : guidingReception && !hoursChanged ? (
+            <Button data-guide-anchor="reception.save" lockedReason={lockedReason} variant="primary" busy={busy} busyLabel="保存しています"
+              data-guide-reception-state={busy ? 'saving' : allocationConflict ? 'conflict' : allocationError ? 'retry' : undefined}
+              data-guide-reception-count={guideAllocation.line}
+              disabled={!receptionReady || allocationConflict || checkingAllocation} onClick={() => saveAllocation('standard', guideAllocation)}>
+              <Check size={16} aria-hidden="true" />配分を保存する
+            </Button>
+          ) : (
+            <Button lockedReason={lockedReason} variant="primary" busy={busy} disabled={!hoursChanged || !canEdit} onClick={() => saveHours()}>
+              <Check size={16} aria-hidden="true" />開ける時間を保存
+            </Button>
           )}
-        />
+        </>}
+      /> : null}
+      {editor ? <AllocationDialog scope={editor.scope} dateLabel={dayLabel(date)} time={editor.time}
+        allocation={editor.allocation} totalSeats={totalSeats} busy={busy || checkingAllocation} error={allocationError}
+        reload={allocationConflict ? () => void reviewAllocation() : undefined}
+        canRestore={editor.canRestore} restoreLabel={editor.restoreLabel}
+        onChange={allocation => setEditor({ ...editor, allocation })}
+        onClose={closeEditor} onSave={() => saveAllocation(editor.scope, editor.allocation, editor.startsAt)}
+        onRestore={() => saveAllocation(editor.scope, null, editor.startsAt)} /> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="配分と開ける時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <RsDialog
         open={closeNoteOpen && Boolean(selected)}
@@ -682,30 +678,23 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
         actions={(
           <>
             <Button onClick={reloadLatest} disabled={busy}>最新を読み込んで続ける</Button>
-            <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => saveAll(true)}>このまま保存する</Button>
+            <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => saveHours(true)}>このまま保存する</Button>
           </>
         )}
       >
-        {conflict ? <ConflictDiff conflict={conflict} latestAlloc={allocOf(rows[0])} latestHours={hours} /> : null}
+        {conflict ? <ConflictDiff conflict={conflict} /> : null}
       </RsDialog>
     </></SaveErrorScope>
     </PageFrame>
   )
 }
 
-function ConflictDiff({ conflict, latestAlloc, latestHours }: { conflict: Conflict; latestAlloc: Alloc; latestHours: Hours | null }) {
+function ConflictDiff({ conflict }: { conflict: Conflict }) {
   const lines: Array<{ label: string; mine: string; latest: string }> = []
-  if (conflict.attemptedAlloc) {
-    lines.push({ label: '予約サイト', mine: String(conflict.attemptedAlloc.ota), latest: String(latestAlloc.ota) })
-    lines.push({ label: 'LINE 専用', mine: String(conflict.attemptedAlloc.line), latest: String(latestAlloc.line) })
-    lines.push({ label: '当日（ウォークイン）', mine: String(conflict.attemptedAlloc.walkin), latest: String(latestAlloc.walkin) })
-  }
-  if (conflict.attemptedHours) {
-    for (const weekday of WEEK_ORDER) {
-      const mine = periodsText(conflict.attemptedHours.find((day) => day.weekday === weekday))
-      const latest = periodsText(latestHours?.find((day) => day.weekday === weekday))
-      if (mine !== latest) lines.push({ label: `${WEEKDAY_LABEL[weekday]}曜の開ける時間`, mine, latest })
-    }
+  for (const weekday of WEEK_ORDER) {
+    const mine = periodsText(conflict.attemptedHours.find(day => day.weekday === weekday))
+    const latest = periodsText(conflict.latestHours?.find(day => day.weekday === weekday))
+    if (mine !== latest) lines.push({ label: WEEKDAY_LABEL[weekday] + '曜の開ける時間', mine, latest })
   }
   return (
     <DataTable className={styles.diffTable}>

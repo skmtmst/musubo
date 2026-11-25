@@ -5,7 +5,7 @@ import { ACCOUNT_STYLES } from '@line-crm/shared'
 import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding/style-experience-player'
 import AccountRegisterV8 from './register'
 import { REGISTRATION_STYLE_KEY as STYLE_KEY } from './use-registration-style'
-import { registrationStorageKey } from './registration-storage'
+import { registrationPresentationKey, registrationStorageKey, rememberRegistrationPresentation } from './registration-storage'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { readStaffIdentity, rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 const REGISTRATION_STYLE_KEY = registrationStorageKey(STYLE_KEY, { id: 'style-owner', tenantId: 'style-tenant' })!
@@ -40,13 +40,12 @@ afterEach(() => { cleanup(); forgetStaffIdentity() })
 it('登録再開中のスタイル選択はページ移動を確認し、編集に戻れば選択を保つ', async () => {
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
-  fireEvent.click(within(dialog).getByRole('button', { name: '面談・相談' }))
   fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
   const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
   fireEvent.click(link)
   expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
-  expect(screen.getByRole('button', { name: '面談・相談（選んでいます）' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '飲食店（選んでいます）' })).toBeTruthy()
   link.remove()
 })
 
@@ -62,7 +61,6 @@ it('読み込んだ保存済みスタイルだけでは未保存の確認を出�
 it('選択窓を閉じても下書きを保ち、ページ移動を確認する', async () => {
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
-  fireEvent.click(within(dialog).getByRole('button', { name: '面談・相談' }))
   fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
   fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
   const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)
@@ -79,7 +77,7 @@ it('登録を再開したアカウントの店名を見本へ渡す', async () =
   expect(net.save).not.toHaveBeenCalled()
 })
 
-it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウントへ保存して登録をやり直さない', async style => {
+it('飲食店を選び、同じアカウントへ保存して登録をやり直さない', async () => {
   sessionStorage.setItem(REGISTRATION_STYLE_KEY, 'created-account')
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
@@ -87,16 +85,27 @@ it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウン�
   expect(dialog.querySelector('[data-window-body]')?.contains(dialog.querySelector('[data-style-switcher]'))).toBe(false)
   const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
   expect(next.disabled).toBe(true)
-  fireEvent.click(within(dialog).getByRole('button', { name: STYLE_EXPERIENCE_SCRIPT.styles[style].label }))
   fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
   await waitFor(() => expect(next.disabled).toBe(false))
   fireEvent.click(next)
   await screen.findByText('LINEアカウントの登録が完了しました')
   expect(screen.queryByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeNull()
   expect(net.starterSet).not.toHaveBeenCalled()
-  expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 0, style, answers: { image: { mode: 'later' } } }, true)
+  expect(net.save).toHaveBeenCalledExactlyOnceWith('created-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } }, true)
   expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBe('created-account')
   expect(screen.getByRole('link', { name: '管理画面へ' }).getAttribute('href')).toBe('/hq')
+})
+
+it.each(ACCOUNT_STYLES.filter(style => style !== 'restaurant'))('%sの未保存の選択から再開しても、そのスタイルは選べない', async style => {
+  rememberRegistrationPresentation(registrationPresentationKey(REGISTRATION_STYLE_KEY, 'created-account'), { choice: style, viewing: style })
+  render(<AccountRegisterV8 />)
+  const dialog = within(await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' }))
+  const unavailable = dialog.getByRole('button', { name: STYLE_EXPERIENCE_SCRIPT.styles[style].label })
+  expect(unavailable).toHaveProperty('disabled', true)
+  fireEvent.click(unavailable)
+  expect(dialog.getByRole('heading', { name: '飲食店でできること' })).toBeTruthy()
+  expect(dialog.getByRole('button', { name: '次へ' })).toHaveProperty('disabled', true)
+  expect(net.save).not.toHaveBeenCalled()
 })
 
 it('保存済みの使い方があれば登録完了を復元し、メニューの設定も保存し直さない', async () => {
@@ -114,14 +123,13 @@ it('保存失敗では完了にせず、同じ選択と作成済みIDで再試�
   net.save.mockRejectedValueOnce(new Error('offline'))
   render(<AccountRegisterV8 />)
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
-  fireEvent.click(within(dialog).getByRole('button', { name: '面談・相談' }))
   fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
   const save = within(dialog).getByRole('button', { name: '次へ' })
   await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(save)
   await screen.findByText('使い方を確認・保存できませんでした')
   expect(screen.queryByText('使い方を保存しました')).toBeNull()
-  expect(within(dialog).getByRole('button', { name: '面談・相談（選んでいます）' })).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: '飲食店（選んでいます）' })).toBeTruthy()
   fireEvent.click(save)
   await screen.findByText('LINEアカウントの登録が完了しました')
   expect(net.save.mock.calls.map(call => call[0])).toEqual(['created-account', 'created-account'])

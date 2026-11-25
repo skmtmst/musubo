@@ -203,6 +203,11 @@ html:root .labelRow > .label {
   white-space: nowrap;
 }
 html:root .labelRow > :not(.label) { flex-shrink: 0; }
+html:root .labelRow[data-label-wrap] > .label {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 :root .field [aria-invalid='true']:is(input, textarea, select) { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
 
 /* 認証の欄は取り込み前の間を保持する。指定なしのinput密度は変えない。 */

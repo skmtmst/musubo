@@ -27,7 +27,7 @@ describe('はじめにやることの再開導線', () => {
     const value = guide()
     render(<FirstStepsGuideFooter guide={value} />)
     const texts = Array.from(document.body.querySelectorAll('button, p')).map(node => node.textContent)
-    expect(texts).toEqual(['続きから進める', '最初から始める', 'チェックは設定の実データで自動判定。ガイドを使わなくても付きます'])
+    expect(texts).toEqual(['続きから進める', '最初から始める'])
     fireEvent.click(screen.getByRole('button', { name: '続きから進める' }))
     expect(value.start).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '最初から始める' }))

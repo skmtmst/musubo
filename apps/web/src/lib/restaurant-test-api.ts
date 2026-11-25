@@ -1,3 +1,5 @@
+import { compareRestaurantTables } from './restaurant-table-order'
+export { compareRestaurantTables } from './restaurant-table-order'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosurePreview, RestaurantClosureSaveResult, RestaurantSeatAvailability } from '@line-crm/shared'
 export type { RestaurantClosure, RestaurantClosureInput, RestaurantClosurePreview, RestaurantClosureSaveResult, RestaurantSeatAvailability } from '@line-crm/shared'
 import type { RestaurantInventoryRules, RestaurantInventoryRulesInput, RestaurantChannelCloseTask } from '@line-crm/shared'
@@ -61,7 +63,23 @@ export type SeatWaitlistEntry = {
 export type RestaurantInventory = {
   id: string; store_id: string; starts_at: string; slot_minutes: 15 | 30; total_capacity: number;
   ota_capacity: number; line_capacity: number; walk_in_capacity: number; same_day_capacity?: number; reserved_count: number; version?: number; updated_by?: string | null; updated_by_name?: string | null; updated_at?: string;
-  guest_count?: number; occupied_seats?: number; occupiedTableIds?: string[]; closedTableIds?: string[]; freeSeats?: number
+  guest_count?: number; occupied_seats?: number; occupiedTableIds?: string[]; closedTableIds?: string[]; freeSeats?: number;
+  allocationSource?: 'standard' | 'day' | 'slot' | 'legacy'; auto_line_original?: number | null
+}
+export type RestaurantInventoryAllocation = { otaCapacity: number; lineCapacity: number; walkInCapacity: number }
+export type RestaurantInventoryAllocationState = {
+  version: number
+  standard: RestaurantInventoryAllocation | null
+  day: RestaurantInventoryAllocation | null
+  hoursStatus: 'open' | 'closed' | 'unconfigured' | 'unavailable'
+}
+export type RestaurantInventoryAllocationWrite = {
+  storeId: string
+  scope: 'standard' | 'day' | 'slot'
+  expectedVersion: number
+  date?: string
+  startsAt?: string
+  allocation: RestaurantInventoryAllocation | null
 }
 export type RestaurantMenuItem = {
   id: string; store_id: string; kind: 'course' | 'a_la_carte'; name: string; price: number;
@@ -131,9 +149,10 @@ export const restaurantTestApi = {
   linkMembershipLogin: (accountId: string, id: string, staffId: string | null) => fetchApi<{ success: true; data: { id: string; staffId: string | null } }>(withAccount(`/api/restaurant-test/memberships/${encodeURIComponent(id)}/login`, accountId), { method: 'PUT', body: JSON.stringify({ staffId }) }),
   openingHours: (accountId: string, storeId: string, date?: string) => fetchApi<{ success: true; data: RestaurantOpeningHours }>(withAccount(`/api/restaurant-test/opening-hours?storeId=${encodeURIComponent(storeId)}${date ? `&date=${encodeURIComponent(date)}` : ''}`, accountId)),
   saveOpeningHours: (accountId: string, body: { storeId: string; hours: NonNullable<RestaurantOpeningHours['hours']>; expectedVersion: number; lateArrivalPolicy?: import('@line-crm/shared').RestaurantLateArrivalPolicy | null }) => fetchApi<{ success: true; data: { version: number } }>(withAccount('/api/restaurant-test/opening-hours', accountId), { method: 'PUT', body: JSON.stringify(body) }),
-  inventoryDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: RestaurantInventory[]; closures: RestaurantClosure[] }>(withAccount(`/api/restaurant-test/inventory/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
+  inventoryDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: RestaurantInventory[]; closures: RestaurantClosure[]; allocation: RestaurantInventoryAllocationState }>(withAccount(`/api/restaurant-test/inventory/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
   generateInventory: (accountId: string, body: RestaurantAllocation & { storeId: string; date: string; expectedHoursVersion: number }) => fetchApi<{ success: true; data: { generated: number; slotCount?: number } }>(withAccount('/api/restaurant-test/inventory/generate', accountId), { method: 'POST', body: JSON.stringify(body) }),
   saveInventoryAllocation: (accountId: string, body: RestaurantAllocation & { storeId: string; slots: Array<{ id: string; expectedVersion: number }> }) => fetchApi<{ success: true; data: { updated: number } }>(withAccount('/api/restaurant-test/inventory/allocation', accountId), { method: 'PUT', body: JSON.stringify(body) }),
+  saveScopedInventoryAllocation: (accountId: string, body: RestaurantInventoryAllocationWrite) => fetchApi<{ success: true; data: { version: number } }>(withAccount('/api/restaurant-test/inventory/allocation', accountId), { method: 'PUT', body: JSON.stringify(body) }),
   holdReservation: (accountId: string, body: RestaurantHoldInput) => fetchApi<{ success: true; data: RestaurantHoldResult }>(withAccount('/api/restaurant-test/reservations/holds', accountId), { method: 'POST', body: JSON.stringify(body) }),
   reservationsDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: { date: string; reservations: RestaurantReservation[]; closures: RestaurantClosure[] } }>(withAccount(`/api/restaurant-test/reservations/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
   customerSearch: (accountId: string, storeId: string, q: string) => fetchApi<{ success: true; data: RestaurantCustomer[] }>(withAccount(`/api/restaurant-test/customers/search?storeId=${encodeURIComponent(storeId)}&q=${encodeURIComponent(q)}`, accountId)),
@@ -160,7 +179,7 @@ export const restaurantTestApi = {
     if (query?.limit) params.set('reservationLimit', String(query.limit));
     if (query?.offset) params.set('reservationOffset', String(query.offset));
     const suffix = params.size ? `&${params.toString()}` : '';
-    return fetchApi<{ success: true; data: RestaurantSnapshot }>(`${withAccount('/api/restaurant-test/snapshot', accountId)}${suffix}`);
+    return fetchApi<{ success: true; data: RestaurantSnapshot }>(`${withAccount('/api/restaurant-test/snapshot', accountId)}${suffix}`).then(result => ({ ...result, data: { ...result.data, tables: [...result.data.tables].sort(compareRestaurantTables) } }));
   },
   createStore: (accountId: string, body: { name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/stores', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateStore: (accountId: string, id: string, body: { name: string; code: string; area: string; capacity: number; status: RestaurantStore['status']; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount(`/api/restaurant-test/stores/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),

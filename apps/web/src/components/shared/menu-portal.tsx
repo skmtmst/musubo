@@ -1,7 +1,7 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type HTMLAttributes } from 'react'
 import { isImeComposing } from './ime'
 import { OVERLAY_MODAL_OPEN_EVENT, useV8Leave } from './overlay-utils'
 import styles from './menu-portal.module.css'
@@ -31,12 +31,17 @@ function topModal(): Element | undefined {
     .sort((a, b) => layer(a) - layer(b)).at(-1)
 }
 
+export function SavedSearchMenuSurface({ children, ...props }: Omit<HTMLAttributes<HTMLDivElement>, 'className'>) {
+  return <div {...props} className={styles.savedSearchSurface}>{children}</div>
+}
+
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
 
 export type MenuPortalProps = {
   /** 絞り込みの窓など、開いた面の最初の操作へ焦点を移して戻す。 */
   focusPanel?: boolean
+  keepOpenOnModal?: boolean
   /** 操作メニューの閉じる時間（提案Fは80ms）。候補欄の既定は変えない。 */
   exitDuration?: number
   /** 開いている間だけ body へ出す。閉じたら何も描かない。 */
@@ -151,6 +156,7 @@ export default function MenuPortal({
   children,
   exitDuration,
   focusPanel = false,
+  keepOpenOnModal = false,
   placement: forcedPlacement,
 }: MenuPortalProps) {
   const leaving = useV8Leave(open, exitDuration)
@@ -172,10 +178,10 @@ export default function MenuPortal({
     if (!open) return
     const modal = topModal()
     if (modal && !belongsToModal(anchorRef.current(), modal)) { closeRef.current(); return }
-    const closeForModal = () => closeRef.current()
+    const closeForModal = () => { if (!keepOpenOnModal) closeRef.current() }
     document.addEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
     return () => document.removeEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
-  }, [open])
+  }, [open, keepOpenOnModal])
   const positionRef = useRef(getPositionRect)
   positionRef.current = getPositionRect
 

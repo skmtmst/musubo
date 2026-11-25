@@ -7,11 +7,12 @@
  *   顔28・名前15/600・その下に補足（LINE・2時間前／メール・件名）
  *   右に 担当：名前 ⌄・☆（LINE だけ）・● 対応状況 ⌄・🔍（LINE だけ）・右の列の出し入れ
  */
-import { useState, type ReactNode } from 'react'
-import { ChevronLeft, PanelRight, Search, Star } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { ChevronLeft, MoreHorizontal, PanelRight, Search, Star } from 'lucide-react'
 import type { OperatorOption } from '@/components/chats/inbox-dropdown'
 import Avatar from '@/components/shared/avatar'
 import IconButton from './icon-button'
+import ActionMenu from './action-menu'
 import { HeadOperatorMenu, HeadStatusMenu, type HeadStatus } from './inbox-head-menus'
 import styles from './inbox-conversation-head.module.css'
 
@@ -43,9 +44,20 @@ export default function ConversationHead({
   /** 頭の右端の前に足すもの（あれば） */
   extra?: ReactNode
 }) {
-  const [nameExpanded, setNameExpanded] = useState(false)
+  const [width, setWidth] = useState(1000)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const headRef = useRef<HTMLDivElement>(null)
+  const moreRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!headRef.current || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    observer.observe(headRef.current)
+    return () => observer.disconnect()
+  }, [])
+  const compact = width < 570
+  const foldAttention = width < 450
   return (
-    <div className={styles.chead} data-inbox-v8="conversation-head">
+    <div ref={headRef} className={styles.chead} data-inbox-v8="conversation-head">
       <div className={styles.cheadWho}>
         {onBack ? (
           <button type="button" className={`${styles.cheadBack} lg:hidden`} aria-label="戻る" onClick={onBack}>
@@ -55,21 +67,13 @@ export default function ConversationHead({
         {/* 顔は共通の Avatar（一覧の行と同じ色・頭文字の決まり）。 */}
         <Avatar name={name} src={pictureUrl} size={28} />
         <div className={styles.cheadText}>
-          <button
-            type="button"
-            className={styles.cheadName}
-            title={name}
-            aria-expanded={nameExpanded}
-            onClick={() => setNameExpanded((now) => !now)}
-          >
-            {name}
-          </button>
+          <span className={styles.cheadName} title={name}>{name}</span>
           <p className={styles.cheadSub} title={subTitle ?? sub}>{sub}</p>
         </div>
       </div>
       <div className={styles.cheadTools}>
-        <HeadOperatorMenu value={operator.value} operators={operator.operators} onChange={operator.onChange} />
-        {attention ? (
+        <HeadOperatorMenu compact={compact} value={operator.value} operators={operator.operators} onChange={operator.onChange} />
+        {attention && !foldAttention ? (
           <IconButton
             variant="plain"
             data-part="attention-star"
@@ -85,6 +89,8 @@ export default function ConversationHead({
         ) : null}
         <HeadStatusMenu value={status.value} onChange={status.onChange} />
         {extra}
+        {search ? <IconButton variant="plain" aria-label="会話の中を探す" title="検索" aria-expanded={search.open} onClick={search.onToggle}><Search aria-hidden="true" /></IconButton> : null}
+        {attention && foldAttention ? <><IconButton ref={moreRef} variant="plain" aria-label="その他の操作" aria-expanded={moreOpen} onClick={() => setMoreOpen(now => !now)}><MoreHorizontal aria-hidden="true" /></IconButton><ActionMenu open={moreOpen} anchorRef={moreRef} ariaLabel="その他の操作" onClose={() => setMoreOpen(false)} items={[{ id: 'attention', label: attention.on ? '注目から外す' : '注目にする', disabled: attention.saving || attention.disabled, lockedReason: attention.lockedReason, onSelect: () => { setMoreOpen(false); attention.onToggle() } }]} /></> : null}
         {panel ? (
           <button
             type="button"
@@ -98,23 +104,7 @@ export default function ConversationHead({
           </button>
         ) : null}
       </div>
-      {/*
-        ★V8：絵（eovoG）の頭は 担当・☆・対応状況・右の列の出し入れの4つ。🔍 を同じ段に置くと
-        担当・対応状況が左へ44ずれるので、頭の下の右端に重ねて浮かせる（⌘F でも開く）。
-        探す帯が開いている間は帯の「探すのをやめる」で閉じるので隠す。
-      */}
-      {search ? (
-        <button
-          type="button"
-          className={`${styles.cheadSquare} ${styles.cheadSearch}`}
-          data-design-node="bvHXu"
-          aria-label="会話の中を探す（⌘F）"
-          aria-expanded={search.open}
-          onClick={search.onToggle}
-        >
-          <Search aria-hidden="true" />
-        </button>
-      ) : null}
+
     </div>
   )
 }

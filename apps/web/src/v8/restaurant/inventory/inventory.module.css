@@ -148,8 +148,84 @@
 .colTables { width: auto; }
 .colSeats { width: var(--tpl-rs-inv-col-seats); }
 .colFree { width: var(--tpl-rs-inv-col-free); }
-.tablesCell { overflow: hidden; text-overflow: ellipsis; }
 .datePicker { width: var(--tpl-rs-rsv-store-w); flex: none; }
+
+.allocationCardHead,
+.allocationSummaryActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-12);
+}
+
+.allocationTotal {
+  flex: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.allocationSummary,
+.allocationFields {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  min-width: 0;
+}
+
+.allocationSummary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.allocationFields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.allocationMetric {
+  padding: var(--space-8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  font-size: var(--text-caption);
+}
+
+.allocationMetric dt { color: var(--color-ink-secondary); }
+.allocationMetric dd {
+  margin: var(--space-4) 0 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.allocationDialogBody {
+  display: grid;
+  gap: var(--space-16);
+}
+
+.allocationTableActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.colAllocation {
+  width: 12%;
+}
+
+.allocationSource {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+@media (max-width: 768px) {
+  .allocationSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .allocationSummaryActions { justify-content: flex-end; }
+  .allocationSummaryActions p { display: none; }
+  .sectionHeadRow { flex-wrap: wrap; }
+  .colUse,
+  .colSeats,
+  .colTables { display: none; }
+  .colAllocation { width: auto; }
+  .allocationSource { white-space: normal; }
+}
 
 .strong {
   font-weight: 600;
@@ -447,3 +523,9 @@
 .manualFields { display: flex; flex-direction: column; gap: var(--tpl-rs-dlg-gap); }
 
 .hoursError, .hoursErrorNoticePlacement { margin: 0; }
+
+/* Googleビジネスにつないでいる時の営業時間。本文の大きさで、月曜から並べる。 */
+.googleHoursLink { display: flex; justify-content: flex-start; }
+.googleHoursList { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; color: var(--color-ink); font-size: var(--text-body); line-height: 1.6; }
+.tableGroup { display:flex; flex-direction:column; gap:var(--space-8); }
+.tableGroup h3 { margin:0; font-size:var(--text-caption); color:var(--color-ink-secondary); }

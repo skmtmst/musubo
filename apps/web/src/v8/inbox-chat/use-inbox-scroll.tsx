@@ -1,18 +1,14 @@
 'use client'
 import { type ChatDetail as ApiChatDetail, type ChatDetailMessage } from '@/lib/api';
-import type { RefObject } from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { TEXTAREA_MAX_HEIGHT_PX } from './inbox-model';
 
 type Options = {
   selectedChatId: string | null
   chatDetail: ApiChatDetail | null
-  textareaRef: RefObject<HTMLTextAreaElement | null>
   pendingMessages?: ChatDetailMessage[]
-  messageContent: string
 }
 
-export function useInboxScroll({ selectedChatId, chatDetail, textareaRef, messageContent, pendingMessages }: Options) {
+export function useInboxScroll({ selectedChatId, chatDetail, pendingMessages }: Options) {
 
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : chatDetail?.messages, [chatDetail?.messages, pendingMessages])
 
@@ -100,12 +96,5 @@ export function useInboxScroll({ selectedChatId, chatDetail, textareaRef, messag
      */
   }, [selectedChatId, chatDetail?.id])
 
-  // Auto-resize textarea as messageContent grows (INBOX-20: 3行〜8行で伸ばす)
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`
-  }, [messageContent, textareaRef])
   return { messagesScrollRef, unseenIncoming, setUnseenIncoming }
 }

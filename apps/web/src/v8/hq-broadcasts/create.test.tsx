@@ -210,7 +210,9 @@ describe('配信イメージの確認', () => {
     expect(within(narrow).getByText('書き直した本文')).toBeTruthy()
     expect(within(narrow).getByRole('checkbox', { name: 'LINEプレビュー確認済み' })).toBeTruthy()
     expect(within(narrow).getByRole('button', { name: /テストを送る/ })).toBeTruthy()
-    expect(within(narrow).getByRole('group', { name: 'プレビューの端末' })).toBeTruthy()
+    expect(within(narrow).queryByRole('group', { name: 'プレビューの端末' })).toBeNull()
+    expect(within(narrow).getByText('PC の LINE では見え方が少し変わります')).toBeTruthy()
+    expect(narrow.querySelector('[data-line-preview-part="device-frame"]')).not.toBeNull()
     expect(within(narrow).queryByRole('button', { name: '配信イメージを見る' })).toBeNull()
     expect(check.checked).toBe(true)
     expect(view.container.textContent).toContain('書き直した本文')
@@ -576,10 +578,12 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
       definition: { schemaVersion: 1, media: [], template: { id: 'mt-1', name: '予約前日のご案内', category: '', messageType: 'text', messageContent: '明日のご予約をお待ちしています', carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' } },
     })
     render(<HqBroadcastCreate />)
-    /* 右の列はどの段でもいつも出す（店の一斉配信と同じ頭とスマホ・PC）。 */
+    /* 右の列はどの段でもいつも出す（店の一斉配信と同じ頭とスマホの見本）。 */
     const aside = screen.getByRole('complementary', { name: 'LINEの見え方' })
     expect(within(aside).getByRole('heading', { name: 'LINE の見え方' })).toBeTruthy()
-    expect(within(aside).getByRole('button', { name: 'PC' })).toBeTruthy()
+    expect(within(aside).queryByRole('button', { name: 'PC' })).toBeNull()
+    expect(within(aside).getByText('PC の LINE では見え方が少し変わります')).toBeTruthy()
+    expect(aside.querySelector('[data-line-preview-part="device-frame"]')).not.toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: /テンプレートを選択/ }))
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'テンプレートを選ぶ' }))

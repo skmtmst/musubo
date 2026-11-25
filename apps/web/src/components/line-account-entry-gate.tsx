@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
 import PagePending from '@/components/templates/page-pending'
@@ -27,7 +27,7 @@ export default function LineAccountEntryGate({ accountId, allowHandover = false,
     return () => { active = false }
   }, [accountId, allowHandover, replace, retry])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (status === 'dashboard' && !allowHandover) return markLineAccountEntryReady(accountId)
   }, [accountId, allowHandover, status])
 

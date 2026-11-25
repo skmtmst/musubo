@@ -60,8 +60,8 @@ export const hqBannersMethods = {
           body: JSON.stringify({}),
         }),
       /** 条件を登録するだけ。画像はまだ作らない。 */
-      createGeneration: (id: string, input: BannerGenerationInput, options?: BannerGenerationCreateOptions) =>
-        fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/generations`, {
+      createGeneration: (id: string, input: BannerGenerationInput, options?: BannerGenerationCreateOptions & { accountId?: string }) =>
+        fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/projects/${encodeURIComponent(id)}/generations${options?.accountId ? `?account_id=${encodeURIComponent(options.accountId)}` : ""}`, {
           method: 'POST',
           headers: options?.idempotencyKey ? { 'Idempotency-Key': options.idempotencyKey } : undefined,
           body: JSON.stringify(input),
@@ -77,8 +77,8 @@ export const hqBannersMethods = {
       get: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}`),
       /** 1回で1枚作る。画面が枚数ぶん繰り返す。切り抜き位置は用途寸法への整形に使う。 */
-      run: (id: string, input?: { gravity?: string }) =>
-        fetchApi<ApiResponse<BannerRunResult>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/run`, {
+      run: (id: string, input?: { gravity?: string }, accountId?: string) =>
+        fetchApi<ApiResponse<BannerRunResult>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/run${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ""}`, {
           method: 'POST',
           body: JSON.stringify(input ?? {}),
         }),

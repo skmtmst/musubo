@@ -8,7 +8,7 @@ import styles from './staff.module.css'
 /** Logged-in member's own second-factor settings, never another member's. */
 export default function SelfSecurity({ fullWidth = false, loginPath = '/login' }: { fullWidth?: boolean; loginPath?: '/login' | '/ops/login' }) {
   const [authenticatorEnabled, setAuthenticatorEnabled] = useState<boolean | null>(null)
-  return <section className={`${styles.asideCard} ${styles.selfSecurityCard}${fullWidth ? ` ${styles.selfSecurityFullWidth}` : ''}`} aria-label="自分の設定">
+  return <section className={`${styles.asideCard} ${styles.selfSecurityCard}${fullWidth ? ` ${styles.selfSecurityFullWidth}` : ''}`} data-design-part="card" aria-label="自分の設定">
     <h2 className={styles.selfSecurityTitle}>二段階認証</h2>
     <SelfPasskeys enabled={authenticatorEnabled} />
     <div className={styles.securityDivider} aria-hidden="true" />

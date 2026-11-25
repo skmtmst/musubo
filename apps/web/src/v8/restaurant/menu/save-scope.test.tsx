@@ -14,6 +14,7 @@ const fixture = vi.hoisted(() => ({ account: 'account-1', snapshot: vi.fn(), sto
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 
+vi.mock('@/components/shared/allergy-field', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account, accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -97,7 +98,8 @@ it.each(['success', 'failure'])('画面を離れた後の保存の%sで一覧へ
 async function fillNewMenu() {
  fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '試しのコース' } })
  fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '4200' } })
- fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+ fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+ fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
 }
 async function choosePublication() {
  fireEvent.click(screen.getByLabelText('保存する状態'))

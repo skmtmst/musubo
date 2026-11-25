@@ -37,6 +37,7 @@ vi.mock('./hq/platform-notices', () => ({ default: () => null }))
 vi.mock('./ops/ops-shell', () => ({ default: ({ children }: { children: React.ReactNode }) => <div data-ops-shell="">{children}</div> }))
 
 import AppShell from './app-shell'
+import { AuthRefreshContext } from './auth-refresh-context'
 
 afterEach(() => { cleanup(); fixture.pathname = '/friends' })
 
@@ -50,6 +51,14 @@ const chain = (page: Element) => {
 }
 
 describe('外枠の門', () => {
+  it('再確認中も左メニューと上の帯を残し、本文だけ待機する', () => {
+    const view = render(<AuthRefreshContext.Provider value={true}><AppShell><p data-page="">本文</p></AppShell></AuthRefreshContext.Provider>)
+    expect(view.container.querySelector('[data-sidebar]')).not.toBeNull()
+    expect(view.container.querySelector('[data-top-bar]')).not.toBeNull()
+    expect(view.container.querySelector('[data-page]')).toBeNull()
+    expect(view.container.querySelector('[data-page-pending="auth"]')).not.toBeNull()
+  })
+
   it.each(['/friends', '/hq'])('%s の本文は統括の境界→閲覧権限→着地点→店舗の選択→機能の停止の順に包まれ、上の帯と左メニューが出る', (pathname) => {
     fixture.pathname = pathname
     const view = render(<AppShell><p data-page="">本文</p></AppShell>)

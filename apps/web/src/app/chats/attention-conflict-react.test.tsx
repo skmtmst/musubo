@@ -188,7 +188,7 @@ describe('注目切替の競合(N-040 #808)', () => {
     await flush()
     expect(host.textContent).toContain('メールを読み込めませんでした。')
     expect(starButton()?.getAttribute('aria-label')).toBe('注目にする')
-    expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull()
+    expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull()
   })
 
 })

@@ -308,20 +308,6 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/v8/restaurant/front-desk/walk-in-dialog.tsx",
-    "fingerprint": "cecb5eb5dccca329",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/v8/restaurant/inventory/stock.tsx",
-    "fingerprint": "8719274e245ed616",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/v8/restaurant/menu/menu.tsx",
     "fingerprint": "fa9523b99a00e426",
     "disposition": "local-parser",

@@ -38,6 +38,14 @@ function Host({ initial = false }: { initial?: boolean }) {
   return <FirstStepsCard summary={summary} folded={folded} onToggle={() => setFolded((current) => !current)} />
 }
 
+it('見出し横の説明を押すとチェックの付き方が分かる', () => {
+  render(<Host />)
+  const help = screen.getByRole('button', { name: 'はじめにやることのチェックについて' })
+  expect(screen.queryByText('チェックは設定の実データで自動判定。ガイドを使わなくても付きます')).toBeNull()
+  fireEvent.click(help)
+  expect(screen.getByRole('note').textContent).toContain('チェックは設定の実データで自動判定。ガイドを使わなくても付きます')
+})
+
 describe('はじめにやることを畳む', () => {
   it('設定画面と同じスタイル別の3〜5段目を表示し、状態を保つ', () => {
     const steps: StepResult[] = ['attributes', 'friendAdd', 'scenario'].map((key, index) => ({

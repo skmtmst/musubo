@@ -86,28 +86,13 @@
 
 /* ピッカー本体（Pencil `d6PU4a`：288 幅・pad12・gap10・r16） */
 .pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 40;
-  display: flex;
   width: 288px;
-  flex-direction: column;
-  gap: 10px;
   padding: 12px;
   background: var(--color-canvas);
   animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
 }
 
-/*
- * 2列に並べた右側で、左そろえのままだと画面の右へはみ出す（横スクロールも
- * 出ないので、はみ出した所は押せない）。入る幅が無いときだけ `color-well.tsx`
- * がこれを足して、コントロールの右端にそろえる。大きさ・中身は `.pop` のまま。
- */
-.popEnd {
-  right: 0;
-  left: auto;
-}
+.popContent { display: flex; flex-direction: column; gap: 10px; }
 
 @keyframes color-well-pop {
   from {
@@ -416,6 +401,7 @@
 :root .well { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -1px; box-shadow: var(--shadow-board); }
 :root .swatch { border-radius: 7px; box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -1px; }
 :root .pop { border: 0; outline: 1px solid var(--color-board-line); outline-offset: -1px; border-radius: var(--polish-radius-dialog); box-shadow: var(--shadow-controls-pop); }
+:root .pop[data-has-more='true'] { box-shadow: var(--menu-portal-more), var(--shadow-controls-pop); }
 :root .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -1px; }
 :root .cell[aria-selected='true'] { outline: 2px solid var(--color-accent-deep); outline-offset: -1px; box-shadow: var(--shadow-controls-selected); }
 :root .dropper svg { width: 16px; height: 16px; }

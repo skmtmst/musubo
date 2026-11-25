@@ -6,6 +6,14 @@ import Dialog from './dialog'
 
 afterEach(cleanup)
 describe('Dialogの画面内への収まり', () => {
+  it('ガイドの窓は指定したときだけ共通の閉じる操作を表示する', () => {
+    const cancel = vi.fn()
+    const view = render(<Dialog open title="案内" designLayout="stacked-guided" onCancel={cancel} />)
+    expect(screen.queryByRole('button', { name: '閉じる' })).toBeNull()
+    view.rerender(<Dialog open title="案内" designLayout="stacked-guided" showCloseButton onCancel={cancel} />)
+    fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+    expect(cancel).toHaveBeenCalledOnce()
+  })
   it('上位置のある窓は既定で残り高さを使い、本文・閉じる・実行の接続を保つ', () => {
     const cancel = vi.fn(), confirm = vi.fn()
     render(<Dialog open title="来店を記録" designTop={140} onCancel={cancel} onConfirm={confirm} confirmLabel="記録する"><input aria-label="お客さま" defaultValue="田中" /></Dialog>)

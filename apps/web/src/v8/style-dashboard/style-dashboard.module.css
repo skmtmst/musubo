@@ -29,6 +29,7 @@
 .sideCard { min-inline-size: 0; }
 .sideHead { display: flex; align-items: center; gap: var(--polish-space-row); min-inline-size: 0; }
 .sideTitle { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; line-height: var(--text-body--line-height); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.todayTitle { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--tpl-sd-today-title-size); font-weight: var(--font-weight-bold); line-height: var(--text-lead--line-height); }
 .sideLink { display: inline-flex; align-items: center; gap: var(--polish-space-row); color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 500; white-space: nowrap; text-decoration: none; }
 .sideRow { display: flex; align-items: baseline; gap: var(--polish-space-row); min-inline-size: 0; }
 .sideLabel { color: var(--color-ink-secondary); font-size: var(--text-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-inline-size: 0; }
@@ -36,6 +37,19 @@
 .sideValue[data-tone='danger'] { color: var(--color-danger); }
 .sideMore { color: var(--color-link); font-size: var(--text-body); font-weight: 600; text-decoration: none; }
 .sideAction { display: flex; }
+/* 今日の確認：開いた項目の中身。項目名・日時は 12 の灰、名前と値は 14 の黒（右の欄の決まり）。 */
+.todayBookings { display: flex; flex-direction: column; gap: var(--polish-space-field); margin: 0; padding: 0; list-style: none; }
+.todayBooking { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'name source' 'when when'; align-items: center; column-gap: var(--polish-space-row); row-gap: var(--space-2); min-inline-size: 0; }
+.todayBookingName { grid-area: name; min-inline-size: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-callout); font-weight: var(--font-weight-ui); line-height: var(--text-lh); white-space: nowrap; text-overflow: ellipsis; }
+.todayBookingSource { grid-area: source; display: inline-flex; min-inline-size: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--font-weight-ui); line-height: var(--text-lh); }
+.todayBookingWhen { grid-area: when; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--font-weight-ui); line-height: var(--text-lh); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.todayValues { display: flex; flex-direction: column; gap: var(--polish-space-row); margin: 0; }
+.todayValue { display: flex; align-items: baseline; gap: var(--polish-space-row); min-inline-size: 0; }
+.todayValueLabel { flex: 1 1 auto; min-inline-size: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--font-weight-ui); line-height: var(--text-lh); white-space: nowrap; text-overflow: ellipsis; }
+.todayValueText { flex: 0 0 auto; margin: 0; color: var(--color-ink); font-size: var(--text-callout); font-weight: var(--font-weight-ui); line-height: var(--text-lh); white-space: nowrap; }
+.todayValueText[data-tone='danger'] { color: var(--color-danger); }
+.todayNote { margin: var(--polish-space-row) 0 0; color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: var(--font-weight-ui); line-height: var(--text-lh); }
+.todayNote:first-child { margin-top: 0; }
 .cardNote { margin: var(--tpl-sd-text-margin); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-caption--line-height); }
 
 /* 一覧（表） */

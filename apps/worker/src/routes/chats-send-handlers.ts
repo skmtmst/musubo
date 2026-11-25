@@ -394,7 +394,7 @@ export const post__api_chats_id_render_preview_2 = async (c: Context<Env, "/api/
       return fail(c, 404, 'CHAT_NOT_FOUND');
     }
 
-    // 送信しないプレビュー。共通情報の厳格解決・台帳記録は行わない（lenient）。
+    // 送信しないプレビュー。共通情報は送信と同じ期限・代替値で解決するが、台帳には記録しない。
     const rendered = await renderChatMessageContent(
       c.env.DB, friend, messageType, content, liffId,
     );
