@@ -1340,7 +1340,7 @@ export default function BroadcastForm({
       </Notice>
     ) : null}
     {editingDraft && currentStep !== 'message' ? (
-      <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
+      <p className={`${styles.draftNotice} border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs`}>
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}

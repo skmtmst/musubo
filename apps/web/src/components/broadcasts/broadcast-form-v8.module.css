@@ -23,6 +23,7 @@
 .header[data-steps-below] > .heading { flex: 1 1 auto; }
 .stepsBelow { order: 3; flex-basis: 100%; min-width: 0; margin-top: var(--space-20); }
 .input { min-width: 0; padding: var(--space-24); display: flex; flex-direction: column; gap: var(--space-16); }
+.draftNotice { margin-inline: var(--space-24); }
 .section { display: flex; flex-direction: column; gap: var(--space-14); min-width: 0; }
 .root h3 { font-size: 13px; font-weight: 600; line-height: 20px; }
 .section > :global(fieldset) { margin: 0; }
