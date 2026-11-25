@@ -7,6 +7,7 @@ import { useAccountStyle } from '@/hooks/use-account-style'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { isLineAccountEntryReady, resolveLineAccountEntry, subscribeLineAccountEntry } from '@/lib/line-account-entry'
+import { isHqShellPath } from '@/lib/menu'
 import { isAccountIndependentRoute } from '@/lib/store-route-guard'
 import { useFirstSteps } from '@/v8/dashboard/public/first-steps-model/index'
 import { GUIDE_ENGINE_EVENT, readGuideEngineState } from './guide-engine'
@@ -18,6 +19,7 @@ import { GuidePublishMenu } from './guide-publish-menu'
 import { guideProcedure } from './guide-script'
 import { GuideSharedProvider, type SharedGuide } from './guide-shared'
 import { useGuideSignal } from './guide-signal'
+import { readRememberedSetupStyle } from './style-setup-progress'
 import { useSetupMutationRefresh } from './use-setup-mutation-refresh'
 
 /*
@@ -89,17 +91,26 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
   accountId: string | null; staffId?: string; role: string | null; armed: boolean; watchFirstMessage: boolean; checkingAccount: boolean; rememberedReady: boolean; children: ReactNode
 }) {
   const account = useOptionalAccount()
-  const style = useAccountStyle(accountId)
   const pathname = usePathname()
-  const entryReady = useSyncExternalStore(subscribeLineAccountEntry, () => isLineAccountEntryReady(accountId), () => false)
-  const accountsScope = pathname === '/accounts' && accountId && staffId && canManageRole(role)
+  const setupEligible = Boolean(
+    accountId &&
+    role !== null &&
+    role !== 'viewer' &&
+    !isHqShellPath(pathname) &&
+    pathname !== '/login' &&
+    pathname !== '/health',
+  )
+  const targetAccountId = setupEligible ? accountId : null
+  const style = useAccountStyle(targetAccountId)
+  const entryReady = useSyncExternalStore(subscribeLineAccountEntry, () => isLineAccountEntryReady(targetAccountId), () => false)
+  const accountsScope = setupEligible && pathname === '/accounts' && accountId && staffId && canManageRole(role)
     ? JSON.stringify([accountId, staffId]) : null
-  const accountsGuideReady = useAccountsGuideEntry(accountId, accountsScope, checkingAccount)
-  const canOpenGuide = accountsGuideReady || (entryReady && !isAccountIndependentRoute(pathname))
-  const independentScope = rememberedReady && pathname !== '/accounts' && isAccountIndependentRoute(pathname) && accountId && staffId
+  const accountsGuideReady = useAccountsGuideEntry(targetAccountId, accountsScope, checkingAccount)
+  const canOpenGuide = setupEligible && (accountsGuideReady || (entryReady && !isAccountIndependentRoute(pathname)))
+  const independentScope = setupEligible && rememberedReady && pathname !== '/accounts' && isAccountIndependentRoute(pathname) && accountId && staffId
     ? JSON.stringify([accountId, staffId]) : null
-  const independentReady = useAccountsGuideEntry(accountId, independentScope, true)
-  const canLoadSetup = entryReady || accountsGuideReady || independentReady
+  const independentReady = useAccountsGuideEntry(targetAccountId, independentScope, true)
+  const canLoadSetup = setupEligible && (entryReady || accountsGuideReady || independentReady)
   const search = useSearchParams()
   const query = search.toString()
   const qrOpen = search.has('qr')
@@ -108,13 +119,14 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
   const watchers = useRef(new Set<symbol>())
   const [sharedWatch, setSharedWatch] = useState(false)
   const setWatch = useCallback((id: symbol, enabled: boolean) => { if (enabled) watchers.current.add(id); else watchers.current.delete(id); setSharedWatch(watchers.current.size > 0) }, [])
-  const canPreloadSetup = Boolean(accountId && role !== null && !pathname.startsWith('/accounts/new') && (pathname !== '/accounts' || checkingAccount))
+  const canPreloadSetup = setupEligible && (pathname !== '/accounts' || checkingAccount)
+  const preloadStyle = style.data?.style ?? readRememberedSetupStyle(targetAccountId) ?? (pathname.startsWith('/restaurant-test/') ? 'restaurant' : null)
   const cacheScope = JSON.stringify([staffId, role])
-  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: canLoadSetup, preload: canPreloadSetup, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch, cacheScope })
+  const first = useFirstSteps(targetAccountId, role, { style: style.data?.style ?? null, preloadStyle, enabled: canLoadSetup, preload: canPreloadSetup, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch, cacheScope })
   const retained = useRef<{ scope: string; summary: typeof first.summary; dismissed: boolean | null; style: typeof style.data extends infer T ? T extends { style: infer S } ? S : null : null }>({ scope: '', summary: null, dismissed: null, style: null })
-  const retainedScope = JSON.stringify([accountId, staffId, role])
-  if (retained.current.scope !== retainedScope || role === null || first.status === 'error' || style.status === 'error') {
-    retained.current = { scope: retainedScope, summary: first.summary, dismissed: first.dismissed ?? null, style: style.data?.style ?? null }
+  const retainedScope = JSON.stringify([targetAccountId, staffId, role])
+  if (!setupEligible || retained.current.scope !== retainedScope || first.status === 'error' || style.status === 'error') {
+    retained.current = { scope: retainedScope, summary: setupEligible ? first.summary : null, dismissed: setupEligible ? (first.dismissed ?? null) : null, style: setupEligible ? (style.data?.style ?? null) : null }
   } else {
     if (first.summary) retained.current.summary = first.summary
     if (first.dismissed !== null && first.dismissed !== undefined) retained.current.dismissed = first.dismissed
@@ -123,7 +135,15 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
   const guide = first.guide
   const summary = canLoadSetup ? first.summary ?? retained.current.summary : null
   const dismissed = canLoadSetup ? first.dismissed ?? retained.current.dismissed : null
-  const shared = useMemo<SharedGuide>(() => ({ guide, summary, dismissed, setup: { accountId, run: first.runState, progress: first.styleProgress, setWatch } }), [guide, summary, dismissed, first.runState, first.styleProgress, accountId, setWatch])
+  const shared = useMemo<SharedGuide>(
+    () => ({
+      guide,
+      summary,
+      dismissed,
+      ...(setupEligible ? { setup: { accountId, run: first.runState, progress: first.styleProgress, setWatch } } : {}),
+    }),
+    [guide, summary, dismissed, setupEligible, first.runState, first.styleProgress, accountId, setWatch],
+  )
 
   const index = summary?.steps.findIndex(step => step.key === guide.stepKey) ?? -1
   const step = index >= 0 ? summary?.steps[index] ?? null : null

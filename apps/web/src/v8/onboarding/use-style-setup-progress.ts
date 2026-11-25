@@ -22,9 +22,10 @@ export function useStyleSetupProgress(
   enabled = true,
   storeId?: string | null,
   cacheScope?: string,
-  preloadOptions?: { preload?: boolean; canPreloadRestaurant?: boolean },
+  preloadOptions?: { preload?: boolean; preloadStyle?: AccountStyle | null; canPreloadRestaurant?: boolean },
 ) {
   const preload = Boolean(preloadOptions?.preload)
+  const preloadStyle = preloadOptions?.preloadStyle ?? null
   const canPreloadRestaurant = Boolean(preloadOptions?.canPreloadRestaurant)
   const scope = JSON.stringify([accountId, style, storeId, cacheScope])
   const activeScope = enabled && accountId && style ? scope : null
@@ -82,7 +83,7 @@ export function useStyleSetupProgress(
       if (enabled && (!accountId || !style)) cached.current = null
       if (preload && accountId && !pendingReload.current && !needsRefresh.current) {
         if (!style) {
-          preloadStyleSetupEvidence(accountId, canPreloadRestaurant)
+          preloadStyleSetupEvidence(accountId, preloadStyle, canPreloadRestaurant)
         } else if (cached.current?.scope !== scope && inFlight.current?.scope !== scope) {
           const promise = loadStyleSetupProgress(accountId, style, storeId)
           const currentFlight = { scope, promise }
@@ -131,7 +132,7 @@ export function useStyleSetupProgress(
       }
     })
     return () => { active = false; generation.current += 1 }
-  }, [accountId, style, enabled, preload, canPreloadRestaurant, activeScope, scope, tick, storeId])
+  }, [accountId, style, enabled, preload, preloadStyle, canPreloadRestaurant, activeScope, scope, tick, storeId])
   useEffect(() => {
     const onStyleOrVisible = (event: Event) => {
       if (event.type === 'visibilitychange' ? document.visibilityState === 'visible' : (event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) refresh()

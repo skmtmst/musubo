@@ -2,13 +2,14 @@ import { styleApi } from '@/lib/api/helpers/styles'
 import { api, bookingApi, eventsApi } from '@/lib/api'
 import { apiReadCacheGeneration } from '@/lib/api/transport/read-cache'
 import { restaurantGoogleApi } from '@/lib/restaurant-google-api'
+import { staffIdentityGeneration } from '@/lib/staff-identity-state'
 import {
   clearPreloadedRestaurantStoreSelection,
   loadRestaurantSetupProgress,
   preloadRestaurantStoreSelection,
   unknownRestaurantSetup,
 } from './restaurant-setup-progress'
-import type { AccountStyle } from '@line-crm/shared'
+import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 
 type Evidence = { complete: boolean | null; reason?: string }
@@ -18,25 +19,38 @@ const both = (...values: Array<boolean | null>): boolean | null => values.includ
 const either = (values: Array<boolean | null>): boolean | null => values.includes(true) ? true : values.includes(null) ? null : false
 const read = async <T,>(load: () => Promise<T>): Promise<T | null> => { try { return await load() } catch { return null } }
 const googleHoursEvidence = (accountId: string, response: Awaited<ReturnType<typeof restaurantGoogleApi.profile>> | null): Evidence => {
-  if (!response) return evidence(null, 'Googleの営業時間を確認できませんでした')
+  if (!response?.store || !response.profile?.regularHours) return evidence(null, 'Googleの営業時間を確認できませんでした')
   if (response.store.lineAccountId !== accountId) return evidence(null, '選択中の店舗の営業時間を確認できませんでした')
-  return evidence(!response.closed && Object.values(response.profile.regularHours).some(periods => periods.length > 0),
+  return evidence(!response.closed && Object.values(response.profile.regularHours).some(periods => Array.isArray(periods) && periods.length > 0),
     'Googleビジネスを接続し、営業時間を設定してください')
 }
 const fetchGoogleHoursEvidence = async (accountId: string): Promise<Evidence> => {
-  const [connection, profile] = await Promise.all([
-    read(() => restaurantGoogleApi.connection(accountId)),
-    read(() => restaurantGoogleApi.profile(accountId)),
-  ])
-  if (!connection || connection.store.lineAccountId !== accountId) return evidence(null, 'Googleの接続状態を確認できませんでした')
+  const connectionPromise = read(() => restaurantGoogleApi.connection(accountId))
+  const profilePromise = read(() => restaurantGoogleApi.profile(accountId))
+  const connection = await connectionPromise
+  if (!connection?.store || !connection.connection || connection.store.lineAccountId !== accountId) {
+    return evidence(null, 'Googleの接続状態を確認できませんでした')
+  }
   if (connection.connection.status !== 'connected' || !connection.connection.locationName) {
     return evidence(false, 'Googleビジネスを接続してください')
   }
-  return googleHoursEvidence(accountId, profile)
+  return googleHoursEvidence(accountId, await profilePromise)
 }
 
 const PRELOAD_TTL_MS = 10_000
-const preloadedGoogleHours = new Map<string, { generation: number; expiresAt: number; promise: Promise<Evidence> }>()
+const preloadToken = () => `${apiReadCacheGeneration()}:${staffIdentityGeneration()}`
+const preloadedGoogleHours = new Map<string, { token: string; expiresAt: number; promise: Promise<Evidence> }>()
+
+export function readRememberedSetupStyle(accountId: string | null | undefined): AccountStyle | null {
+  if (!accountId || typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(`musubo:account-style:${accountId}`)
+    const style = raw ? (JSON.parse(raw) as { style?: AccountStyle } | null)?.style : null
+    return style && ACCOUNT_STYLES.includes(style) ? style : null
+  } catch {
+    return null
+  }
+}
 
 export function clearPreloadedStyleSetupEvidence(accountId?: string | null): void {
   if (!accountId) preloadedGoogleHours.clear()
@@ -44,20 +58,28 @@ export function clearPreloadedStyleSetupEvidence(accountId?: string | null): voi
   clearPreloadedRestaurantStoreSelection(accountId)
 }
 
-export function preloadStyleSetupEvidence(accountId: string, canLoadRestaurant = false): void {
-  const now = Date.now()
-  const generation = apiReadCacheGeneration()
-  const existing = preloadedGoogleHours.get(accountId)
-  if (!existing || existing.generation !== generation || existing.expiresAt <= now) {
-    preloadedGoogleHours.set(accountId, { generation, expiresAt: now + PRELOAD_TTL_MS, promise: fetchGoogleHoursEvidence(accountId) })
+export function preloadStyleSetupEvidence(
+  accountId: string,
+  targetStyle: AccountStyle | null,
+  canLoadRestaurant = false,
+): void {
+  if (!targetStyle) return
+  if (targetStyle === 'restaurant') {
+    if (canLoadRestaurant) preloadRestaurantStoreSelection(accountId)
+    return
   }
-  if (canLoadRestaurant) preloadRestaurantStoreSelection(accountId)
+  const now = Date.now()
+  const token = preloadToken()
+  const existing = preloadedGoogleHours.get(accountId)
+  if (!existing || existing.token !== token || existing.expiresAt <= now) {
+    preloadedGoogleHours.set(accountId, { token, expiresAt: now + PRELOAD_TTL_MS, promise: fetchGoogleHoursEvidence(accountId) })
+  }
 }
 
 const loadGoogleHoursEvidence = (accountId: string): Promise<Evidence> => {
   const preloaded = preloadedGoogleHours.get(accountId)
   if (preloaded) preloadedGoogleHours.delete(accountId)
-  if (preloaded && preloaded.generation === apiReadCacheGeneration() && preloaded.expiresAt > Date.now()) {
+  if (preloaded && preloaded.token === preloadToken() && preloaded.expiresAt > Date.now()) {
     return preloaded.promise
   }
   return fetchGoogleHoursEvidence(accountId)

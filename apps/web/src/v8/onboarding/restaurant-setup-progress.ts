@@ -1,6 +1,7 @@
 import { api } from '@/lib/api'
 import { apiReadCacheGeneration } from '@/lib/api/transport/read-cache'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
+import { staffIdentityGeneration } from '@/lib/staff-identity-state'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 
 const keys = ['attributes', 'friendAdd', 'scenario', 'hours', 'followup', 'richMenu'] as const
@@ -13,7 +14,8 @@ type StoreSelectionLoad = [
   Awaited<ReturnType<typeof restaurantTestApi.storeContext>>,
 ]
 const PRELOAD_TTL_MS = 10_000
-const preloadedStoreSelections = new Map<string, { generation: number; expiresAt: number; promise: Promise<StoreSelectionLoad> }>()
+const preloadToken = () => `${apiReadCacheGeneration()}:${staffIdentityGeneration()}`
+const preloadedStoreSelections = new Map<string, { token: string; expiresAt: number; promise: Promise<StoreSelectionLoad> }>()
 
 export function clearPreloadedRestaurantStoreSelection(accountId?: string | null): void {
   if (!accountId) preloadedStoreSelections.clear()
@@ -22,11 +24,11 @@ export function clearPreloadedRestaurantStoreSelection(accountId?: string | null
 
 export function preloadRestaurantStoreSelection(accountId: string): void {
   const now = Date.now()
-  const generation = apiReadCacheGeneration()
+  const token = preloadToken()
   const existing = preloadedStoreSelections.get(accountId)
-  if (existing && existing.generation === generation && existing.expiresAt > now) return
+  if (existing && existing.token === token && existing.expiresAt > now) return
   const promise = Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)])
-  const entry = { generation, expiresAt: now + PRELOAD_TTL_MS, promise }
+  const entry = { token, expiresAt: now + PRELOAD_TTL_MS, promise }
   preloadedStoreSelections.set(accountId, entry)
   void promise.catch(() => {
     if (preloadedStoreSelections.get(accountId) === entry) preloadedStoreSelections.delete(accountId)
@@ -61,7 +63,7 @@ async function loadRestaurantStoreProgress(accountId: string, selectedStoreId?: 
   if (storeId === undefined) {
     const preloaded = preloadedStoreSelections.get(accountId)
     if (preloaded) preloadedStoreSelections.delete(accountId)
-    const validPreload = preloaded && preloaded.generation === apiReadCacheGeneration() && preloaded.expiresAt > Date.now()
+    const validPreload = preloaded && preloaded.token === preloadToken() && preloaded.expiresAt > Date.now()
       ? preloaded.promise : null
     const [stores, context] = await (validPreload ?? Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)]))
     if (!stores.success || !context.success) return unknownRestaurantSetup('店舗の設定を読み込めませんでした')

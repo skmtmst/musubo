@@ -118,16 +118,20 @@ it('別の店の店舗・会員・予約ページを済みの根拠にしない'
   expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBeNull()
 })
 
-it('予約機能が無い標準業種もGoogle接続とプロフィールを並列で始め、未接続なら営業時間の未設定と判定する', async () => {
+it('Google未接続や接続確認失敗の時はプロフィールの完了を待たずに営業時間を判定する', async () => {
   let resolveConnection!: (value: unknown) => void
   net.googleConnection.mockImplementationOnce(() => new Promise(resolve => { resolveConnection = resolve }))
-  net.googleProfile.mockRejectedValueOnce(new Error('not_connected'))
+  net.googleProfile.mockImplementationOnce(() => new Promise(() => {}))
   const pending = loadStyleSetupProgress('a', 'standard')
   expect(net.googleConnection).toHaveBeenCalledWith('a')
   expect(net.googleProfile).toHaveBeenCalledWith('a')
   resolveConnection({ success: true, store: { lineAccountId: 'a' }, connection: { status: 'disconnected', locationName: null } })
   expect((await pending).steps.hours?.complete).toBe(false)
   expect(net.settings).not.toHaveBeenCalled()
+
+  net.googleConnection.mockRejectedValueOnce(new Error('offline'))
+  net.googleProfile.mockImplementationOnce(() => new Promise(() => {}))
+  expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBeNull()
 })
 
 it('店を切り替えた直後に証拠をクリアし、遅い旧店舗の返事を捨てる', async () => {
@@ -318,17 +322,45 @@ it('ECの進捗確認ではストア接続の応答を待たずにGoogleの接�
   expect(progress.steps.hours?.complete).toBe(true)
 })
 
-it('スタイル確定前に先読みしたGoogle営業時間と飲食店選択を1回だけ使い回す', async () => {
-  preloadStyleSetupEvidence('a', true)
+it('業種に応じた証拠だけを先読みして1回使い回し、未確定時は先読みしない', async () => {
+  preloadStyleSetupEvidence('a', null, true)
+  expect(net.googleConnection).not.toHaveBeenCalled()
+  expect(net.snapshot).not.toHaveBeenCalled()
+
+  preloadStyleSetupEvidence('a', 'standard', true)
   expect(net.googleConnection).toHaveBeenCalledTimes(1)
   expect(net.googleProfile).toHaveBeenCalledTimes(1)
-  expect(net.snapshot).toHaveBeenCalledTimes(1)
-  expect(net.context).toHaveBeenCalledTimes(1)
+  expect(net.snapshot).not.toHaveBeenCalled()
   expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBe(true)
   expect(net.googleConnection).toHaveBeenCalledTimes(1)
   expect(net.googleProfile).toHaveBeenCalledTimes(1)
+
+  preloadStyleSetupEvidence('a', 'restaurant', true)
+  expect(net.snapshot).toHaveBeenCalledTimes(1)
+  expect(net.context).toHaveBeenCalledTimes(1)
+  expect(net.googleConnection).toHaveBeenCalledTimes(1)
   expect((await loadStyleSetupProgress('a', 'restaurant')).steps.attributes?.complete).toBe(true)
   expect(net.snapshot).toHaveBeenCalledTimes(1)
   expect(net.context).toHaveBeenCalledTimes(1)
   expect(net.restaurantProgress).toHaveBeenCalledWith('a', 'store')
+})
+
+it('先読みが入室確認完了より先に解決しても未確認の間は待機状態を保ち、確認完了時に反映する', async () => {
+  const view = renderHook(
+    ({ enabled }) => useStyleSetupProgress('a', 'standard', enabled, null, 'staff-owner', { preload: true, preloadStyle: 'standard' }),
+    { initialProps: { enabled: false } },
+  )
+  await waitFor(() => expect(net.googleConnection).toHaveBeenCalledTimes(1))
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  view.rerender({ enabled: false })
+  expect(view.result.current.status).toBe('idle')
+  expect(view.result.current.progress?.steps.hours?.complete).toBeNull()
+
+  view.rerender({ enabled: true })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.hours?.complete).toBe(true)
+  expect(net.googleConnection).toHaveBeenCalledTimes(1)
 })

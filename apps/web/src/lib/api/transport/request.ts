@@ -92,8 +92,31 @@ export function isSessionLostExempt(code: string | undefined): boolean {
   return code !== undefined && SESSION_LOST_EXEMPT_CODES.has(code)
 }
 
-export function reportServerFailure(path: string, status: number): void {
+const RECENT_SERVER_FAILURE_MS = 60_000
+const recentServerFailures = new Map<string, number>()
+let activeReportScope: string | undefined
+
+export function clearReportedServerFailures(): void {
+  recentServerFailures.clear()
+}
+
+function clearReportedPathFailures(path: string, accountId: string | null = null): void {
+  const suffix = `:${accountId ?? ''}:${canonicalApiPath(path)}`
+  for (const key of recentServerFailures.keys()) {
+    if (key.endsWith(suffix)) recentServerFailures.delete(key)
+  }
+}
+
+export function reportServerFailure(path: string, status: number, accountId: string | null = null): void {
   if (typeof window === 'undefined' || path === '/api/client-errors') return
+  const now = Date.now()
+  for (const [oldKey, reportedAt] of recentServerFailures) {
+    if (now - reportedAt >= RECENT_SERVER_FAILURE_MS) recentServerFailures.delete(oldKey)
+  }
+  const reportKey = `${status}:${accountId ?? ''}:${canonicalApiPath(path)}`
+  const previous = recentServerFailures.get(reportKey)
+  if (previous !== undefined && now - previous < RECENT_SERVER_FAILURE_MS) return
+  recentServerFailures.set(reportKey, now)
   const token = getCsrfToken()
   void (async () => {
     try {
@@ -123,6 +146,10 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   const load = () => requestApi<T>(path, options, context)
   if (typeof window === 'undefined') return load()
   const scope = apiReadScope()
+  if (activeReportScope !== scope.key) {
+    recentServerFailures.clear()
+    activeReportScope = scope.key
+  }
   synchronizeApiReadScope(scope.key)
   // Cookieだけで本人の世代を識別できない間は、別ログインの答えを共有しない。
   if (!scope.identified) return load()
@@ -179,7 +206,8 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
       ...options?.headers,
     },
   })
-  if (res.status >= 500) reportServerFailure(path, res.status)
+  const reportAccountId = context?.accountId ?? resolveApiAccountContext(path, options).accountId
+  if (res.status >= 500) reportServerFailure(path, res.status, reportAccountId)
   if (!res.ok) {
     const raw = await res.text()
     const code = extractApiErrorCode(raw)
@@ -205,6 +233,7 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
     if (context) announceRequestFailure(detail, context, options)
     throw error
   }
+  clearReportedPathFailures(path, reportAccountId)
   if (res.status === 204) {
     if (MUTATING_METHODS.has(method)) {
       clearApiReadCache()

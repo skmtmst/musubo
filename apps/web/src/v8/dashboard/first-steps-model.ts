@@ -77,9 +77,9 @@ export function useFirstMessageArrived(accountId: string | null, steps: Readonly
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }
 }
 
-export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null; enabled?: boolean; preload?: boolean; watchFirstMessage?: boolean; watchWaiting?: boolean; cacheScope?: string } = {}) {
+export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; preloadStyle?: AccountStyle | null; storeId?: string | null; enabled?: boolean; preload?: boolean; watchFirstMessage?: boolean; watchWaiting?: boolean; cacheScope?: string } = {}) {
   const enabled = options.enabled !== false && Boolean(accountId) && role !== null
-  const canPreload = Boolean(options.preload && accountId && role !== null)
+  const canPreload = Boolean(options.preload && accountId && role !== null && role !== 'viewer')
   const [folded, setFolded] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const shared = useSharedGuide()
@@ -96,6 +96,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   const style = options.style === undefined ? 'standard' : options.style
   const ownProgress = useStyleSetupProgress(accountId, style, enabled && !sharedSetup, options.storeId, options.cacheScope, {
     preload: canPreload && !sharedSetup,
+    preloadStyle: options.preloadStyle ?? null,
     canPreloadRestaurant: process.env.NEXT_PUBLIC_RESTAURANT_TEST_ENABLED === 'true' && role !== 'viewer',
   })
   const state = sharedSetup?.run ?? ownRun
@@ -124,11 +125,11 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   }, [accountId])
   return {
     status: !enabled ? 'idle' as const : state.status === 'loading' || progress.status === 'loading' ? 'loading' as const : state.status,
-    summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
+    summary: enabled && shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
     refresh: () => { state.refresh(); (progress.refresh ?? progress.reload)() },
     markStale: () => { state.markStale?.(); progress.markStale?.() },
     invalidate: () => { state.invalidate(); progress.invalidate() },
-    runState: state, styleProgress: progress, steps: displaySteps, progress: progress.progress, dismissed: state.dismissed, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
+    runState: state, styleProgress: progress, steps: displaySteps, progress: progress.progress, dismissed: enabled ? state.dismissed : null, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
     arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss, guide,
   }
 }
