@@ -279,6 +279,7 @@
 - [友だち（V8）の動き（BEHAVIOR.md）](../apps/web/src/v8/friends/BEHAVIOR.md)
 - [統括の対応が要るもの（BEHAVIOR.md）](../apps/web/src/v8/hq-attention/BEHAVIOR.md)
 - [統括のバナー生成の動き（BEHAVIOR.md）](../apps/web/src/v8/hq-banners/BEHAVIOR.md)
+- [バナー生成の一覧反映の履歴](release-log/unreleased/PR-kenta-banner-list.md) — 反映履歴・2026-11-25確認。
 - [統括の一括配信（V8）の動き](../apps/web/src/v8/hq-broadcasts/BEHAVIOR.md)
 - [統括のスタイルの初期セット（BEHAVIOR.md）](../apps/web/src/v8/hq-starter-sets/BEHAVIOR.md)
 - [統括のテンプレートの動き（BEHAVIOR.md）](../apps/web/src/v8/hq-templates/BEHAVIOR.md)

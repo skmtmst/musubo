@@ -193,3 +193,29 @@ it.each(['retry-first', 'late-first'])('時間切れの便を再試行へ回さ�
   expect(await fetchApi('/api/line-accounts')).toEqual(fresh)
   expect(net).toHaveBeenCalledTimes(2)
 })
+
+it.each(['create', 'rename', 'favorite', 'archive', 'duplicate', 'removeImage'] as const)('バナーの%s後は古い通信に相乗りせず一覧と件数を取り直す', async action => {
+  let revision = 0
+  const releaseOld: Array<(response: Response) => void> = []
+  net.mockImplementation(async (_input, init?: RequestInit) => {
+    if (init?.method && init.method !== 'GET') { revision++; return ok({ revision }) }
+    if (revision === 0) return new Promise<Response>(resolve => { releaseOld.push(resolve) })
+    return ok({ revision })
+  })
+  const oldList = api.hqBanners.projects.list()
+  const oldStats = api.hqBanners.stats()
+  switch (action) {
+    case 'create': await api.hqBanners.projects.create({ name: '見本' }); break
+    case 'rename': await api.hqBanners.projects.update('p1', { name: '変更後' }); break
+    case 'favorite': await api.hqBanners.projects.update('p1', { isFavorite: true }); break
+    case 'archive': await api.hqBanners.projects.update('p1', { archived: true }); break
+    case 'duplicate': await api.hqBanners.projects.duplicate('p1'); break
+    case 'removeImage': await api.hqBanners.images.remove('i1'); break
+  }
+  const freshList = api.hqBanners.projects.list()
+  const freshStats = api.hqBanners.stats()
+  releaseOld.forEach(resolve => resolve(ok({ revision: 0 })))
+  await Promise.all([oldList, oldStats])
+  expect((await freshList).data).toEqual({ revision: 1 })
+  expect((await freshStats).data).toEqual({ revision: 1 })
+})
