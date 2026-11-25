@@ -546,9 +546,9 @@
 - [ウォークインの階・エリア切り替え](release-log/unreleased/210-kenta-walkin-floor-tabs.md)
 
 - [開店準備ガイドと予約枠・在庫の改善](release-log/unreleased/230-masato-opening-guide-and-inventory.md) — 反映履歴、確認 2026-11-25。
-- [LINEアカウント登録と開店準備の再開](release-log/unreleased/224-masato-line-onboarding-resume.md) — 反映履歴、確認 2026-11-24。
 - [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
 - [はじめのポップアップの撮影試験の直し](release-log/unreleased/226-kenta-first-run-popup-capture.md) — 反映履歴、確認 2026-11-24。
+- [まとめ列車（Instagram・店舗メール・はじめの設定のスマホ・撮影の試験）](release-log/unreleased/233-kenta-train-bundle.md) — 反映履歴、確認 2026-11-25。
 
 - [店舗ごとの転送メールを受信箱で確認](release-log/unreleased/221-kenta-store-email-inbox.md) — 反映履歴、確認 2026-11-24。
 - [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
