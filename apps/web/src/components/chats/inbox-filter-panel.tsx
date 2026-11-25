@@ -247,5 +247,11 @@ export default function InboxFilterPanel({
       </section>
     </div>
   )
-  return anchorRef ? <MenuPortal open={open} align="start" getAnchor={() => anchorRef.current} onClose={onClose} keepOpenOnModal>{panel}</MenuPortal> : panel
+  return anchorRef ? <MenuPortal open={open} align="start" placement="down" getAnchor={() => anchorRef.current} getPositionRect={() => {
+    const anchor = anchorRef.current?.getBoundingClientRect()
+    if (!anchor) return null
+    const list = anchorRef.current?.closest('[data-inbox-v4="conversation-list"]')?.getBoundingClientRect()
+    const left = Math.max(anchor.left, list?.right ?? anchor.left)
+    return { top: anchor.top, bottom: anchor.bottom, left, right: left, width: 0 }
+  }} onClose={onClose} keepOpenOnModal>{panel}</MenuPortal> : panel
 }
