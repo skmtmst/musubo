@@ -436,6 +436,8 @@ it('複数店舗では選ぶまで機能設定へ移らず、選んだ店舗を�
   getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
   act(() => root.render(<HqBannerProjectV8 />)); await flush()
   expect(buttonNamed('機能設定を開く')?.disabled).toBe(true)
+  expect(buttonNamed('機能設定を開く')?.getAttribute('aria-description')).toBe('店舗を選んでください')
+  expect(buttonNamed('機能設定を開く')?.getAttribute('data-variant')).toBe('secondary')
   act(() => { (document.querySelector('[aria-label="設定する店舗"]') as HTMLButtonElement).click() }); await flush()
   const choice = document.querySelector<HTMLInputElement>('[role=dialog] input[aria-label="大阪店"]')
   expect(choice).toBeTruthy()
@@ -444,4 +446,26 @@ it('複数店舗では選ぶまで機能設定へ移らず、選んだ店舗を�
   act(() => { buttonNamed('機能設定を開く')!.click() }); await flush()
   expect(selectAccount).toHaveBeenCalledWith('a2')
   expect(push).toHaveBeenCalledWith('/settings#ai-features')
+})
+
+
+it('利用可能な店舗が複数あり未選択なら生成できない理由を１行表示する', async () => {
+  localStorage.removeItem('lh_hq_banner_ai_account')
+  listAccounts.mockResolvedValue({ success: true, data: [{ id: 'a1', name: '東京店', isActive: true }, { id: 'a2', name: '大阪店', isActive: true }] })
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: true }] } })
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const button = buttonNamed('生成する（1 枚）')!
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-description')).toBe('AI を使うアカウントを選んでください')
+  expect(host.textContent).toContain('AI を使うアカウントを選んでください')
+})
+
+it('AI設定の確認中・確認失敗でも生成できない理由を示す', async () => {
+  let reject!: (error: Error) => void
+  getAiFeatures.mockReturnValue(new Promise((_resolve, fail) => { reject = fail }))
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const generate = buttonNamed('生成する（1 枚）')!
+  expect(generate.getAttribute('aria-description')).toBe('AI を使うアカウントを確認しています')
+  await act(async () => { reject(new Error('failed')); await Promise.resolve() }); await flush()
+  expect(generate.getAttribute('aria-description')).toBe('AI を使うアカウントを確認できませんでした。ページを再読み込みしてください')
 })
