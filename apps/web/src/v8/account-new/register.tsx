@@ -1,7 +1,7 @@
 'use client'
 
 import type { AccountStyle } from '@line-crm/shared'
-import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding/style-experience-player/script'
+import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
