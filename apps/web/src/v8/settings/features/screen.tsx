@@ -1,4 +1,5 @@
 'use client'
+import BannerAiSetting from './banner-ai-setting'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -446,6 +447,7 @@ export default function FeatureSettingsScreen() {
             {error && !conflicted && !reasonError && <Notice tone="danger" message={error} />}
           </div>
 
+          <BannerAiSetting key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} />
           <div className={styles.toolbar} data-control-row>
             <SearchField aria-label="機能の名前で探す" placeholder="機能の名前で探す" value={query} onChange={setQuery} className={styles.search} />
             <span className={styles.spacer} />

@@ -404,3 +404,16 @@ it('生成条件と名前を同時に変更して移るときは確認を一つ�
   expect(push).toHaveBeenCalledWith('/templates')
   link.remove()
 })
+
+it('AIがオフのとき、管理者に対象の店を切り替える案内と設定への入口を出す', async () => {
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
+  act(() => { root.render(<HqBannerProjectV8 />) }); await flush()
+  expect(host.textContent).toContain('上部で対象のアカウントに切り替えて')
+  expect(host.querySelector('a[href="/settings"]')?.textContent).toContain('機能設定を開く')
+})
+it('閲覧のみの人にはAI設定の操作を出さない', async () => {
+  roleBox.role = 'viewer'
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
+  act(() => { root.render(<HqBannerProjectV8 />) }); await flush()
+  expect(host.querySelector('a[href="/settings"]')).toBeNull()
+})

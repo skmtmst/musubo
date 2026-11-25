@@ -11,6 +11,7 @@ import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dial
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { accountAiFeaturesApi } from '@/lib/api/helpers/gap3'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
@@ -658,6 +659,7 @@ function ProjectInner() {
       {/* ページ内の戻るリンク（プロジェクト一覧 › …）は置かない。戻るは上のパンくずだけ（決まり 2026-10-08）。 */}
       <div className={styles.body}>
         {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} /> : null}
+        {canManage && !readSessionSnapshot()?.impersonation && aiAccountsStatus === 'ready' && aiAccounts.length === 0 ? <Notice tone="danger" action={accounts.some(account => account.isActive && !account.archivedAt) ? <Button href="/settings">機能設定を開く</Button> : undefined}>{accounts.some(account => account.isActive && !account.archivedAt) ? '機能設定を開き、上部で対象のアカウントに切り替えてからバナー生成をオンにしてください。' : '先に利用する LINE アカウントを登録してください。'}</Notice> : null}
         <DetailColumns presentation="card" asideLabel="用途とテキストの設定" toggleLabel="用途とテキストを設定" expanded={panelExpanded} onExpandedChange={setPanelExpanded}
           aside={canManage ? <div ref={panelRef}>
             <GenerationPanel v8Layout accountSelector={<div className="flex flex-col gap-1.5">
