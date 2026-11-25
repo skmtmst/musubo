@@ -481,6 +481,8 @@
 
 ## 反映履歴
 
+- [統括課金の決済通知を修正（採番待ち）](release-log/drafts/masato-stripe-webhook.md) — 反映履歴の下書き。確認 2026-11-25。
+
 - [統括のアカウントの数の帯の未確認をまとめる](release-log/unreleased/181-kenta-hq-kpi-unconfirmed.md)
 
 - [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)

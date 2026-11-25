@@ -172,6 +172,7 @@ export interface StripeInvoice {
   created: number;
   customer: string | null;
   subscription: string | null;
+  parent?: unknown;
   billing_reason?: string | null;
   metadata?: Record<string, string> | null;
   charge: string | { id: string; amount_refunded: number } | null;
@@ -187,6 +188,22 @@ export interface StripeInvoice {
     description: string | null;
     price?: { recurring?: { interval?: string | null } | null } | null;
   }> };
+}
+
+/** Snapshot events can contain an ID or an expanded reference. */
+export function stripeExpandableId(value: unknown): string | null {
+  if (typeof value === 'string') return value || null;
+  if (value && typeof value === 'object' && 'id' in value && typeof value.id === 'string') return value.id || null;
+  return null;
+}
+
+/** The endpoint's snapshot version may differ from the version pinned for API requests. */
+export function stripeInvoiceSubscriptionId(invoice: object): string | null {
+  const parent = 'parent' in invoice
+    ? invoice.parent as { subscription_details?: { subscription?: unknown } } | null | undefined
+    : undefined;
+  const direct = 'subscription' in invoice ? stripeExpandableId(invoice.subscription) : null;
+  return direct ?? stripeExpandableId(parent?.subscription_details?.subscription);
 }
 
 export interface StripeInvoiceListOptions {

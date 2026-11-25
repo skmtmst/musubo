@@ -54,6 +54,8 @@ export function prepareBillingInvoice(db: D1Database, input: BillingInvoiceInput
   const now = input.syncedAt ?? jstNow();
   const createdAt = input.createdAt ?? now;
   const refunded = input.amountRefunded;
+  // A delayed webhook snapshot can be older than the last recorded refund.
+  const refundUpdate = condition ? 'MAX(billing_invoices.amount_refunded, excluded.amount_refunded)' : 'excluded.amount_refunded';
   return db.prepare(
     `INSERT INTO billing_invoices (
        id, tenant_id, stripe_customer_id, subscription_id, status,
@@ -62,13 +64,12 @@ export function prepareBillingInvoice(db: D1Database, input: BillingInvoiceInput
        synced_at, created_at
      ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${condition?.sql ?? '1'}
      ON CONFLICT(id) DO UPDATE SET
-       tenant_id = excluded.tenant_id,
        stripe_customer_id = COALESCE(excluded.stripe_customer_id, billing_invoices.stripe_customer_id),
        subscription_id = COALESCE(excluded.subscription_id, billing_invoices.subscription_id),
        status = COALESCE(excluded.status, billing_invoices.status),
        amount_paid = excluded.amount_paid,
        amount_due = excluded.amount_due,
-       amount_refunded = CASE WHEN ? = 1 THEN excluded.amount_refunded ELSE billing_invoices.amount_refunded END,
+       amount_refunded = CASE WHEN ? = 1 THEN ${refundUpdate} ELSE billing_invoices.amount_refunded END,
        currency = excluded.currency,
        interval = COALESCE(excluded.interval, billing_invoices.interval),
        period_start = COALESCE(excluded.period_start, billing_invoices.period_start),
@@ -77,8 +78,12 @@ export function prepareBillingInvoice(db: D1Database, input: BillingInvoiceInput
        hosted_invoice_url = COALESCE(excluded.hosted_invoice_url, billing_invoices.hosted_invoice_url),
        raw_updated_at = COALESCE(excluded.raw_updated_at, billing_invoices.raw_updated_at),
        synced_at = excluded.synced_at
-     WHERE billing_invoices.status NOT IN ('paid', 'void')
-       OR excluded.status IN ('paid', 'void')`,
+     WHERE billing_invoices.tenant_id = excluded.tenant_id
+       AND (billing_invoices.status IS NULL
+         OR billing_invoices.status NOT IN ('paid', 'void', 'uncollectible')
+         OR excluded.status = 'paid'
+         OR (excluded.status = 'void' AND billing_invoices.status <> 'paid')
+         OR (excluded.status = 'uncollectible' AND billing_invoices.status = 'uncollectible'))`,
   ).bind(
     input.id,
     input.tenantId,

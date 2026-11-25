@@ -1,21 +1,13 @@
 import { prepareBillingInvoice, type MusuboTenantBillingRecord } from '@line-crm/db';
 import { jstDate, musuboChargeDateEpoch } from '@line-crm/shared';
 import { billingInvoiceInput } from './billing-invoices-sync.js';
-import type { StripeInvoice } from './stripe-api.js';
+import { stripeExpandableId, stripeInvoiceSubscriptionId, type StripeInvoice } from './stripe-api.js';
 
 interface MusuboBillingEvent {
   id: string;
   type: string;
   created?: number;
   data: { object: Record<string, unknown> };
-}
-
-function stripeId(value: unknown): string | null {
-  if (typeof value === 'string') return value;
-  if (value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string') {
-    return (value as { id: string }).id;
-  }
-  return null;
 }
 
 /** The signed event must belong to a stored core/options contract, never only to tenant metadata. */
@@ -25,16 +17,16 @@ export async function processMusuboBillingEvent(input: {
   tenantId: string;
   customerId: string;
   billing: MusuboTenantBillingRecord;
-}): Promise<'completed' | 'retry'> {
+}): Promise<'completed' | 'duplicate' | 'retry'> {
   const { db, event, tenantId, customerId, billing } = input;
   const object = event.data.object;
   const metadata = (object.metadata ?? {}) as Record<string, unknown>;
   if (event.type.startsWith('invoice.') && metadata.purpose === 'musubo_addition') {
     const invoice = object as unknown as StripeInvoice;
-    const invoiceId = stripeId(object.id);
+    const invoiceId = stripeExpandableId(object.id);
     const additionId = metadata.addition_id;
     if (!invoiceId || typeof additionId !== 'string' || metadata.tenant_id !== tenantId
-      || stripeId(object.customer) !== customerId || invoice.currency !== 'jpy'
+      || stripeExpandableId(object.customer) !== customerId || invoice.currency !== 'jpy'
       || !Number.isSafeInteger(invoice.amount_due) || !Number.isSafeInteger(invoice.amount_paid)) return 'retry';
     const addition = await db.prepare(`SELECT amount_due_yen,status FROM musubo_pending_additions
       WHERE id=? AND tenant_id=? AND stripe_invoice_id=? AND kind IN ('line','linked_slot')`)
@@ -48,7 +40,7 @@ export async function processMusuboBillingEvent(input: {
         : event.type === 'invoice.payment_failed' ? 'open'
         : event.type === 'invoice.voided' ? 'void' : 'uncollectible';
       statements.push(prepareBillingInvoice(db, billingInvoiceInput({ ...invoice, status,
-        customer: customerId, subscription: null }, { tenantId }), pending));
+        customer: customerId, subscription: null, parent: null }, { tenantId }), pending));
       if (event.type === 'invoice.paid' && invoice.amount_paid >= addition.amount_due_yen) {
         const paidAt = new Date((invoice.status_transitions?.paid_at ?? event.created ?? Date.now() / 1000) * 1000).toISOString();
         statements.push(db.prepare(`UPDATE musubo_pending_additions
@@ -67,21 +59,21 @@ export async function processMusuboBillingEvent(input: {
     statements.push(db.prepare(`UPDATE billing_events SET summary=json_object(
       'state','completed','subjectId',?,'additionId',?,'applied',1)
       WHERE id=? AND summary='pending'`).bind(invoiceId, additionId, event.id));
-    await db.batch(statements);
-    return 'completed';
+    const results = await db.batch(statements);
+    return results.at(-1)?.meta.changes ? 'completed' : 'duplicate';
   }
   const subscriptionId = event.type.startsWith('customer.subscription.')
-    ? stripeId(object.id) : stripeId(object.subscription);
+    ? stripeExpandableId(object.id) : stripeInvoiceSubscriptionId(object);
   if (!subscriptionId) return 'retry';
   const kind = subscriptionId === billing.core_subscription_id ? 'core'
     : subscriptionId === billing.options_subscription_id ? 'options' : null;
   if (!kind) return 'retry';
-  if (stripeId(object.customer) !== customerId) return 'retry';
+  if (stripeExpandableId(object.customer) !== customerId) return 'retry';
   if (event.type.startsWith('customer.subscription.')) {
     const metadata = (object.metadata ?? {}) as Record<string, unknown>;
     if (metadata.tenant_id !== tenantId || metadata.purpose !== `musubo_${kind}`) return 'retry';
   }
-  const subjectId = event.type.startsWith('invoice.') ? stripeId(object.id) : null;
+  const subjectId = event.type.startsWith('invoice.') ? stripeExpandableId(object.id) : null;
   const created = Number.isSafeInteger(event.created) && (event.created ?? 0) > 0 ? event.created! : 0;
   if (event.type === 'invoice.payment_failed' && created === 0) return 'retry';
   const pending = { sql: "EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')", values: [event.id] };
@@ -90,7 +82,7 @@ export async function processMusuboBillingEvent(input: {
     || event.type === 'invoice.voided' || event.type === 'invoice.marked_uncollectible') {
     if (!subjectId) return 'retry';
     const invoice = object as unknown as StripeInvoice;
-    if (!Number.isSafeInteger(invoice.amount_due) || !Number.isSafeInteger(invoice.amount_paid)
+    if (invoice.currency !== 'jpy' || !Number.isSafeInteger(invoice.amount_due) || !Number.isSafeInteger(invoice.amount_paid)
       || (invoice.amount_due ?? 0) < 0 || (invoice.amount_paid ?? 0) < 0) return 'retry';
     const invoiceStatus = event.type === 'invoice.paid' ? 'paid'
       : event.type === 'invoice.payment_failed' ? 'open'
@@ -128,11 +120,17 @@ export async function processMusuboBillingEvent(input: {
       && billing.first_charge_date && created >= musuboChargeDateEpoch(billing.first_charge_date)) {
       statements.push(db.prepare(`UPDATE musubo_tenant_billing SET status='active',updated_at=?
         WHERE tenant_id=? AND core_subscription_id=? AND status IN ('trialing','active','past_due')
+          AND EXISTS (SELECT 1 FROM billing_invoices
+            WHERE id=? AND tenant_id=? AND subscription_id=? AND status='paid')
           AND NOT EXISTS (SELECT 1 FROM billing_invoices
             WHERE tenant_id=? AND subscription_id=? AND status IN ('open','uncollectible')
               AND amount_due>amount_paid)
+          AND NOT EXISTS (SELECT 1 FROM billing_events
+            WHERE tenant_id=? AND type='customer.subscription.deleted'
+              AND CASE WHEN json_valid(summary) THEN json_extract(summary,'$.subscriptionId') END=?)
           AND EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')`)
-        .bind(new Date().toISOString(), tenantId, subscriptionId, tenantId, subscriptionId, event.id));
+        .bind(new Date().toISOString(), tenantId, subscriptionId, subjectId, tenantId, subscriptionId,
+          tenantId, subscriptionId, tenantId, subscriptionId, event.id));
     }
   } else if (kind === 'core' && event.type === 'customer.subscription.deleted') {
     // Stripe can cancel an unpaid contract independently of a requested account closure.
@@ -146,6 +144,6 @@ export async function processMusuboBillingEvent(input: {
   statements.push(db.prepare(`UPDATE billing_events SET summary=json_object(
     'state','completed','created',?,'subscriptionId',?,'subjectId',?,'applied',1)
     WHERE id=? AND summary='pending'`).bind(created, subscriptionId, subjectId, event.id));
-  await db.batch(statements);
-  return 'completed';
+  const results = await db.batch(statements);
+  return results.at(-1)?.meta.changes ? 'completed' : 'duplicate';
 }
