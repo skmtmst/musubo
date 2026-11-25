@@ -35,8 +35,9 @@ export async function expectPermissionLocked(element: Element | null | undefined
 export async function expectLockedFolderMenu(element: Element | null | undefined) {
   expect(element).toBeTruthy()
   await act(async () => { (element as HTMLElement).click() })
-  const items = [...document.querySelectorAll('[role="menuitem"]')].filter(item => /名前を変える|色を変える|並べ替える|消す/.test(item.textContent ?? ''))
-  expect(items.length).toBeGreaterThan(0)
+  const items = [...document.querySelectorAll('[role="menuitem"]')].filter(item => /名前を変更する|色を変更する|並べ替える|消す/.test(item.textContent ?? ''))
+  expect(items.some(item => item.textContent?.includes('名前を変更する'))).toBe(true)
+  expect(items.some(item => item.textContent?.includes('色を変更する'))).toBe(true)
   for (const item of items) await expectPermissionLocked(item)
   expect(document.querySelector('[role="dialog"]')).toBeNull()
   await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
