@@ -122,6 +122,7 @@ export type KpiCardProps = {
   onRetry?: () => void
   retryLabel?: string
   badge?: string
+  badgeAction?: () => void
   /** warning は「見ておくとよい」。止まっている・壊れている（danger）ほど強くない注意に使う。 */
   badgeTone?: 'accent' | 'neutral' | 'warning' | 'danger'
   /** 行き先を数の行の右に置く。省略時・cards型の帯では補足の行（detail）を使う。 */
@@ -181,6 +182,7 @@ export default function KpiCard({
   onRetry,
   retryLabel,
   badge,
+  badgeAction,
   badgeTone = 'accent',
   action,
   actionPlacement = 'detail',
@@ -292,7 +294,7 @@ export default function KpiCard({
         </p>
         {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
         {shownBadge ? (
-          <span data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</span>
+          badgeAction ? <button type="button" onClick={badgeAction} data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</button> : <span data-kpi-badge={shownBadgeTone} className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[shownBadgeTone]].filter(Boolean).join(' ')}>{shownBadge}</span>
         ) : null}
       </div>
 
