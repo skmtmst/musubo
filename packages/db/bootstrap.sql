@@ -4777,17 +4777,30 @@ CREATE TABLE instagram_oauth_states (
  candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
 , connection_id TEXT REFERENCES instagram_connections(id) ON DELETE SET NULL);
 
-CREATE TABLE instagram_outbound_messages (
+CREATE TABLE "instagram_outbound_messages" (
   idempotency_key TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
   instagram_id TEXT NOT NULL,
   sender_id TEXT NOT NULL,
   staff_id TEXT NOT NULL,
   content TEXT NOT NULL,
-  status TEXT NOT NULL CHECK(status IN ('pending','sent','unknown')),
+  status TEXT NOT NULL CHECK(status IN ('pending','sent','unknown','not_sent_confirmed')),
   meta_message_id TEXT,
   created_at TEXT NOT NULL,
-  sent_at TEXT
+  sent_at TEXT,
+  resolved_by_staff_id TEXT,
+  resolved_at TEXT,
+  resolution_kind TEXT CHECK(resolution_kind IS NULL OR resolution_kind IN ('reason','meta_conversation_absent')),
+  resolution_evidence TEXT,
+  CHECK(
+    status <> 'not_sent_confirmed'
+    OR (
+      resolved_by_staff_id IS NOT NULL AND length(trim(resolved_by_staff_id)) > 0
+      AND resolved_at IS NOT NULL AND length(trim(resolved_at)) > 0
+      AND resolution_kind IN ('reason','meta_conversation_absent')
+      AND resolution_evidence IS NOT NULL AND length(trim(resolution_evidence)) > 0
+    )
+  )
 );
 
 CREATE TABLE integration_api_tokens (

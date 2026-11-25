@@ -7,6 +7,7 @@ import { api, type ChatListItem } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { canEditFeature } from '@/lib/staff-capability'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { canAdministerRole } from '@/lib/staff-role'
 
 export type InstagramMessage = { id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }
 export type InstagramReplyState = 'ready' | 'disconnected' | 'permission_required'
@@ -71,6 +72,7 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
   const onChangedRef = useRef(onChanged)
   onChangedRef.current = onChanged
   const canEdit = role !== null && canEditFeature('/chats', role) && !readStaffIdentity()?.readOnly
+  const canConfirmNotSent = canEdit && canAdministerRole(role)
 
   const load = useCallback(async () => {
     if (!threadKey) return
@@ -173,16 +175,26 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
     announce()
   }
 
-  const resolve = async (outcome: InstagramResolveOutcome): Promise<boolean> => {
-    if (!pending || !pending.canResolve || !canEdit || resolving) return false
+  const resolve = async (outcome: InstagramResolveOutcome, reason?: string): Promise<boolean> => {
+    if (!pending || !pending.canResolve || !canEdit || (outcome === 'not_sent' && !canConfirmNotSent) || resolving) return false
     const current = generation.current
     setResolving(true)
     setResolveError('')
     try {
-      await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome)
+      const trimmedReason = reason?.trim()
+      if (trimmedReason) {
+        await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome, trimmedReason)
+      } else {
+        await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome)
+      }
       if (current !== generation.current) return false
-      // 届いていなかった返信は、入力欄が空なら同じ文を戻す（送り直すのは人）。
-      if (outcome === 'not_sent' && !text.trim()) { setTextState(pending.content); key.current = null }
+      // 届いていなかった返信は、入力欄が空なら同じ文を戻し、再送時は必ず新しい送信キーにする。
+      if (outcome === 'not_sent') {
+        if (!text.trim()) setTextState(pending.content)
+        key.current = null
+      } else if (key.current === pending.key) {
+        key.current = null
+      }
       setSendError('')
       await load()
       announce()
@@ -197,7 +209,7 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
 
   return {
     detail, loadFailed, reload: load, text, setText, sending, sendError, send,
-    canEdit, canSend, lockedReason, blockedReason, deadline, now, pending,
+    canEdit, canConfirmNotSent, canSend, lockedReason, blockedReason, deadline, now, pending,
     resolve, resolving, resolveError, clearResolveError: () => setResolveError(''),
   }
 }

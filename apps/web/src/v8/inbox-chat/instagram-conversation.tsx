@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { Field, TextArea } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
 import { InboxComposerActions, InboxComposerBottom, InboxDraftArea, InboxDraftCount, InboxInputBox } from '@/components/shared/inbox-composer'
 import { InboxMessage, InboxMessageDay, InboxThreadLoading } from '@/components/shared/inbox-thread'
@@ -55,7 +56,8 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
   const router = useRouter()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [confirming, setConfirming] = useState<InstagramResolveOutcome | null>(null)
-  const { detail, loadFailed, reload, text, setText, sending, sendError, send, canEdit, canSend, lockedReason, blockedReason, deadline, now, pending, resolve, resolving, resolveError, clearResolveError } = thread
+  const [reason, setReason] = useState('')
+  const { detail, loadFailed, reload, text, setText, sending, sendError, send, canEdit, canConfirmNotSent, canSend, lockedReason, blockedReason, deadline, now, pending, resolve, resolving, resolveError, clearResolveError } = thread
   const messages = detail?.messages ?? []
   const lastMessageAt = messages.at(-1)?.createdAt ?? chat.lastMessageAt
 
@@ -70,8 +72,8 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
     : undefined
   const resolveActions = pending?.canResolve && canEdit
     ? <>
-        <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setConfirming('sent') }}>送信済みにする</Button>
-        <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setConfirming('not_sent') }}>未送信にする</Button>
+        <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('sent') }}>送信済みにする</Button>
+        {canConfirmNotSent ? <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('not_sent') }}>未送信にする</Button> : null}
       </>
     : <Button variant="text" size="inline" onClick={() => void reload()}>読み直す</Button>
 
@@ -149,11 +151,26 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
         onConfirm={() => {
           if (!confirming) return
           // 共通の窓は返した約束を待つ間、押し直しを受けない（記録を2回送らない）。
-          return resolve(confirming).then((done) => { if (done) setConfirming(null) })
+          return resolve(confirming, confirming === 'not_sent' ? reason : undefined).then((done) => {
+            if (done) { setReason(''); setConfirming(null) }
+          })
         }}
-        onCancel={() => { if (!resolving) setConfirming(null) }}
+        onCancel={() => { if (!resolving) { setReason(''); setConfirming(null) } }}
       >
         {pending ? <p className="text-ink-secondary text-sm">{`返信：「${quoteHead(pending.content)}」`}</p> : null}
+        {confirming === 'not_sent' ? (
+          <Field label="確認した理由" optional htmlFor="ig-resolve-reason" note="自動照合できない場合は入力が必要です">
+            <TextArea
+              id="ig-resolve-reason"
+              aria-label="確認した理由"
+              rows={2}
+              maxLength={500}
+              value={reason}
+              disabled={resolving}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </Field>
+        ) : null}
       </ConfirmDialog>
     </InboxConversationPane>
   )

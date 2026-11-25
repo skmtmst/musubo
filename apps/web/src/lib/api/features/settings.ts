@@ -164,8 +164,8 @@ export const settingsMethods = {
       fetchApi<ApiResponse<{ state: InstagramReplyState }>>(`/api/instagram/inbox-status?${instagramParams(accountId)}`),
     conversation: (accountId: string, senderId: string, instagramId?: string) =>
       fetchApi<ApiResponse<InstagramConversationDetail>>(conversationPath(accountId, senderId, instagramId)),
-    resolveReply: (accountId: string, senderId: string, instagramId: string | undefined, key: string, outcome: 'sent' | 'not_sent') =>
-      fetchApi(conversationPath(accountId, senderId, instagramId, '/resolve'), { method: 'POST', body: JSON.stringify({ key, outcome }) }),
+    resolveReply: (accountId: string, senderId: string, instagramId: string | undefined, key: string, outcome: 'sent' | 'not_sent', reason?: string) =>
+      fetchApi(conversationPath(accountId, senderId, instagramId, '/resolve'), { method: 'POST', body: JSON.stringify({ key, outcome, ...(reason?.trim() ? { reason: reason.trim() } : {}) }) }),
     markConversationRead: (accountId: string, senderId: string, instagramId?: string) =>
       fetchApi(conversationPath(accountId, senderId, instagramId, '/read'), { method: 'POST' }),
     sendReply: (accountId: string, messageId: string, text: string, key: string) =>

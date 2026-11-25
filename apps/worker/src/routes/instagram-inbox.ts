@@ -40,6 +40,112 @@ async function businessConnection(c: Context<Env>, lineAccount: string, business
     .bind(lineAccount, business).first<DmConnection>();
 }
 
+type TargetOutboundRow = {
+  idempotency_key: string;
+  content: string;
+  status: string;
+  meta_message_id: string | null;
+  created_at: string;
+};
+
+type MetaAbsenceCheck =
+  | { ok: true; kind: 'meta_conversation_absent'; evidence: string }
+  | { ok: false; status: 409 | 502; error: string };
+
+async function verifyAbsentInMetaConversation(
+  c: Context<Env>,
+  lineAccount: string,
+  business: string,
+  sender: string,
+  targetRow: TargetOutboundRow,
+  resolvedAt: string,
+): Promise<MetaAbsenceCheck> {
+  const cfg = instagramConfig(c.env);
+  const conn = await businessConnection(c, lineAccount, business);
+  if (!cfg || !conn || replyState(c, conn) !== 'ready') {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Meta側の会話を確認できません。Instagramの画面で未送信を確かめた理由を入力してください。',
+    };
+  }
+  const targetCreatedMs = Date.parse(targetRow.created_at);
+  if (!Number.isFinite(targetCreatedMs)) {
+    return { ok: false, status: 502, error: '送信記録の時刻を確認できないため未送信と確定できません。' };
+  }
+  let token: string;
+  try {
+    token = await decryptInstagramCredential(conn.user_token_encrypted, cfg.encryptionKey);
+  } catch {
+    return { ok: false, status: 502, error: 'Instagramの認証情報を確認できないため未送信と確定できません。' };
+  }
+  const url = new URL(`https://graph.instagram.com/${cfg.version}/${encodeURIComponent(business)}/conversations`);
+  url.searchParams.set('platform', 'instagram');
+  url.searchParams.set('user_id', sender);
+  url.searchParams.set('fields', 'messages.limit(25){id,message,created_time,from}');
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, status: 502, error: 'Meta側の会話を取得できないため未送信と確定できません。' };
+  }
+  if ((response.type as string) === 'opaqueredirect' || (response.status >= 300 && response.status < 400) || !response.ok) {
+    return { ok: false, status: 502, error: 'Meta側の会話を取得できないため未送信と確定できません。' };
+  }
+  const payload = await response.json().catch(() => null) as { data?: unknown } | null;
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.data)) {
+    return { ok: false, status: 502, error: 'Meta側の会話応答を確認できないため未送信と確定できません。' };
+  }
+  let checkedMessages = 0;
+  for (const rawThread of payload.data) {
+    if (!rawThread || typeof rawThread !== 'object') {
+      return { ok: false, status: 502, error: 'Meta側の会話応答を確認できないため未送信と確定できません。' };
+    }
+    const messagesBox = (rawThread as { messages?: { data?: unknown; paging?: { next?: unknown } } }).messages;
+    if (!messagesBox || !Array.isArray(messagesBox.data)) {
+      return { ok: false, status: 502, error: 'Meta側の会話本文を取得できないため未送信と確定できません。' };
+    }
+    let oldestTime = Infinity;
+    for (const rawMsg of messagesBox.data) {
+      if (!rawMsg || typeof rawMsg !== 'object') {
+        return { ok: false, status: 502, error: 'Meta側の会話本文を確認できないため未送信と確定できません。' };
+      }
+      const msg = rawMsg as { id?: unknown; message?: unknown; created_time?: unknown; from?: { id?: unknown } };
+      if (targetRow.meta_message_id && msg.id === targetRow.meta_message_id) {
+        return { ok: false, status: 409, error: 'Meta側の会話に同じ返信が見つかりました。送信済みとして記録してください。' };
+      }
+      const msgTime = typeof msg.created_time === 'string' ? Date.parse(msg.created_time) : NaN;
+      if (!Number.isFinite(msgTime)) {
+        return { ok: false, status: 502, error: 'Meta側の送信時刻を確認できないため未送信と確定できません。' };
+      }
+      if (msgTime < oldestTime) oldestTime = msgTime;
+      const fromId = msg.from && typeof msg.from === 'object' ? msg.from.id : undefined;
+      if ((fromId === undefined || fromId === business) && msgTime >= targetCreatedMs - 5000) {
+        if (typeof msg.message !== 'string') {
+          return { ok: false, status: 502, error: 'Meta側の送信内容を確認できないため未送信と確定できません。' };
+        }
+        if (msg.message === targetRow.content) {
+          return { ok: false, status: 409, error: 'Meta側の会話に同じ返信が見つかりました。送信済みとして記録してください。' };
+        }
+      }
+      checkedMessages += 1;
+    }
+    if (messagesBox.paging?.next && (messagesBox.data.length === 0 || oldestTime > targetCreatedMs)) {
+      return { ok: false, status: 502, error: 'Meta側の会話履歴を送信時刻まで確認できないため未送信と確定できません。' };
+    }
+  }
+  return {
+    ok: true,
+    kind: 'meta_conversation_absent',
+    evidence: `meta_conversation_absent:threads=${payload.data.length}:messages=${checkedMessages}:checked_at=${resolvedAt}`,
+  };
+}
+
 export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: Context<Env>) => Promise<string>): void {
   instagram.get('/api/instagram/inbox-status', requirePermission('/chats'), async c => {
     const id = await account(c);
@@ -68,17 +174,49 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
   instagram.post('/api/instagram/conversations/:senderId/resolve', requirePermission('/chats'), inputJsonBoundary(), async c => {
     const id = await account(c), sender = c.req.param('senderId');
     if (c.get('impersonation')) return c.json({ success: false, error: '代理ログイン中は変更できません' }, 403);
-    const business = await businessForConversation(c, id, sender);
-    const body = await c.req.json<{ key?: string; outcome?: string } | null>();
-    if (!body || typeof body.key !== 'string' || !isValidIdempotencyKey(body.key) || !['sent','not_sent'].includes(body.outcome ?? ''))
+    const body = await c.req.json<{ key?: unknown; outcome?: unknown; reason?: unknown } | null>();
+    if (!body || typeof body.key !== 'string' || !isValidIdempotencyKey(body.key)
+      || (body.outcome !== 'sent' && body.outcome !== 'not_sent')
+      || (body.reason !== undefined && typeof body.reason !== 'string'))
       return c.json({ success: false, error: '送信結果を選び直してください。' }, 400);
+    const staff = c.get('staff');
+    if (body.outcome === 'not_sent' && (!staff || staff.readOnly || (staff.role !== 'owner' && staff.role !== 'admin'))) {
+      return c.json({ success: false, error: '未送信として確定できるのはオーナーまたは管理者のみです。' }, 403);
+    }
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length > 500) {
+      return c.json({ success: false, error: '確認理由は500文字以内で入力してください。' }, 400);
+    }
+    const business = await businessForConversation(c, id, sender);
+    const staleCutoff = new Date(Date.now() - staleReservationMs).toISOString();
     const target = `WHERE line_account_id=? AND instagram_id=? AND sender_id=? AND idempotency_key=?
       AND (status='unknown' OR (status='pending' AND created_at<=?))`;
-    const sql = body.outcome === 'sent'
-      ? "UPDATE instagram_outbound_messages SET status='sent',sent_at=created_at"
-      : 'DELETE FROM instagram_outbound_messages';
-    const changed = await c.env.DB.prepare(`${sql} ${target}`).bind(id, business, sender, body.key,
-      new Date(Date.now() - staleReservationMs).toISOString()).run();
+    const targetRow = await c.env.DB.prepare(`SELECT idempotency_key,content,status,meta_message_id,created_at
+      FROM instagram_outbound_messages ${target}`).bind(id, business, sender, body.key, staleCutoff).first<TargetOutboundRow>();
+    if (!targetRow) {
+      return c.json({ success: false, error: 'この返信は送信中、または確認済みです。会話を読み直してください。' }, 409);
+    }
+    const resolvedAt = new Date().toISOString();
+    if (body.outcome === 'sent') {
+      const changed = await c.env.DB.prepare(
+        `UPDATE instagram_outbound_messages SET status='sent',sent_at=COALESCE(sent_at,created_at),resolved_by_staff_id=?,resolved_at=? ${target}`,
+      ).bind(staff.id, resolvedAt, id, business, sender, body.key, staleCutoff).run();
+      if (!changed.meta.changes) return c.json({ success: false, error: 'この返信は送信中、または確認済みです。会話を読み直してください。' }, 409);
+      return c.json({ success: true });
+    }
+    let resolutionKind: 'reason' | 'meta_conversation_absent' = 'reason';
+    let resolutionEvidence = reason;
+    if (!reason) {
+      const verified = await verifyAbsentInMetaConversation(c, id, business, sender, targetRow, resolvedAt);
+      if (!verified.ok) return c.json({ success: false, error: verified.error }, verified.status);
+      resolutionKind = verified.kind;
+      resolutionEvidence = verified.evidence;
+    }
+    const changed = await c.env.DB.prepare(
+      `UPDATE instagram_outbound_messages
+          SET status='not_sent_confirmed',resolved_by_staff_id=?,resolved_at=?,resolution_kind=?,resolution_evidence=?
+        ${target}`,
+    ).bind(staff.id, resolvedAt, resolutionKind, resolutionEvidence, id, business, sender, body.key, staleCutoff).run();
     if (!changed.meta.changes) return c.json({ success: false, error: 'この返信は送信中、または確認済みです。会話を読み直してください。' }, 409);
     return c.json({ success: true });
   });
@@ -110,7 +248,15 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
       if (existing.line_account_id !== id || existing.instagram_id !== message.instagram_id || existing.sender_id !== message.sender_id || existing.content !== body.text)
         return c.json({ success: false, error: '送信キーが別の返信に使われています' }, 409);
       if (existing.status === 'sent') return c.json({ success: true, data: { messageId: existing.meta_message_id, replayed: true } });
+      if (existing.status === 'not_sent_confirmed')
+        return c.json({ success: false, error: '未送信として確定済みの送信キーは再利用できません。新しい送信として送り直してください' }, 409);
       return c.json({ success: false, error: '送信結果を確認してください。重複防止のため再送できません' }, 409);
+    }
+    const unresolved = await c.env.DB.prepare(
+      "SELECT 1 FROM instagram_outbound_messages WHERE instagram_id=? AND sender_id=? AND status IN ('pending','unknown') LIMIT 1",
+    ).bind(message.instagram_id, message.sender_id).first();
+    if (unresolved) {
+      return c.json({ success: false, error: '送信結果の確認待ちです。未送信または送信済みと確定するまで再送できません。' }, 409);
     }
     if (c.env.DEPLOY_ENV === 'staging' && (c.env.INSTAGRAM_STAGING_SEND_ENABLED !== 'true' || qaOutboundStopped(c.env)))
       return c.json({ success: false, error: '検証環境ではInstagramへの送信が無効です' }, 403);

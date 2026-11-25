@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { api, type ChatListItem } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import InstagramConversation from './instagram-conversation'
 import InstagramCustomerInfo from './instagram-customer-info'
 import { INSTAGRAM_REPLY_WINDOW_MS, instagramBlockedReason, instagramReplyDeadline, useInstagramThread } from './use-instagram-thread'
@@ -27,8 +29,8 @@ function mockConversation(detail: Partial<Detail> & { messages: Detail['messages
   return vi.spyOn(api.instagram, 'conversation').mockResolvedValue({ success: true, data: { replyState: 'ready', pendingReply: null, ...detail } as Detail })
 }
 
-beforeEach(() => { nav.push.mockReset() })
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+beforeEach(() => { nav.push.mockReset(); forgetStaffIdentity() })
+afterEach(() => { cleanup(); forgetStaffIdentity(); vi.restoreAllMocks() })
 
 describe('Instagram の会話を開いて返す', () => {
   it('会話と既読は接続先の Instagram を指定し、返信を1回送って入力を空にする', async () => {
@@ -173,16 +175,54 @@ describe('結果の分からない返信', () => {
     expect(conversation.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('未送信と記録したら、理由を添えて送信キーを新しくして再送できる', async () => {
+    const conversation = vi.spyOn(api.instagram, 'conversation')
+      .mockResolvedValueOnce({ success: true, data: { messages: [incoming('m1', 1)], replyState: 'ready', pendingReply: null } })
+      .mockResolvedValueOnce({ success: true, data: { messages: [incoming('m1', 1)], replyState: 'ready', pendingReply } })
+      .mockResolvedValue({ success: true, data: { messages: [incoming('m1', 1)], replyState: 'ready', pendingReply: null } })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    const send = vi.spyOn(api.instagram, 'sendReply')
+      .mockRejectedValueOnce(new Error('送信結果を確認できません。Instagramで確認してください'))
+      .mockResolvedValueOnce({})
+    const resolve = vi.spyOn(api.instagram, 'resolveReply').mockResolvedValue({})
+    render(<Harness />)
+    await screen.findByText('こんにちは')
+    fireEvent.change(screen.getByLabelText('メッセージを入力'), { target: { value: '在庫はあります' } })
+    fireEvent.click(screen.getByRole('button', { name: '送る' }))
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+    const firstKey = send.mock.calls[0][3]
+    fireEvent.click(await screen.findByRole('button', { name: '未送信にする' }))
+    const dialog = await screen.findByRole('dialog', { name: '未送信にしますか？' })
+    fireEvent.change(within(dialog).getByLabelText('確認した理由'), { target: { value: 'Instagramアプリで未着を確認' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '未送信にする' }))
+    await waitFor(() => expect(resolve).toHaveBeenCalledWith('a1', 'customer', 'ig-1', 'k1', 'not_sent', 'Instagramアプリで未着を確認'))
+    await waitFor(() => expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: '送る' }))
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+    expect(send.mock.calls[1][3]).not.toBe(firstKey)
+    expect(conversation).toHaveBeenCalled()
+  })
+
   it('未送信と記録したら、空の入力欄へ同じ文を戻す', async () => {
     const conversation = mockConversation({ messages: [incoming('m1', 1)], pendingReply })
     vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
-    vi.spyOn(api.instagram, 'resolveReply').mockResolvedValue({})
+    const resolve = vi.spyOn(api.instagram, 'resolveReply').mockResolvedValue({})
     render(<Harness />)
     fireEvent.click(await screen.findByRole('button', { name: '未送信にする' }))
     const dialog = await screen.findByRole('dialog', { name: '未送信にしますか？' })
     conversation.mockResolvedValue({ success: true, data: { messages: [incoming('m1', 1)], replyState: 'ready', pendingReply: null } })
     fireEvent.click(within(dialog).getByRole('button', { name: '未送信にする' }))
+    await waitFor(() => expect(resolve).toHaveBeenCalledWith('a1', 'customer', 'ig-1', 'k1', 'not_sent'))
     await waitFor(() => expect((screen.getByLabelText('メッセージを入力') as HTMLTextAreaElement).value).toBe('在庫はあります'))
+  })
+
+  it('担当者は送信済みにはできるが、未送信にはできない', async () => {
+    rememberStaffIdentity({ id: 'staff-1', name: '見本 担当者', role: 'staff', readOnly: false, permissionKeys: ['/chats'] } as StaffMember)
+    mockConversation({ messages: [incoming('m1', 1)], pendingReply })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    render(<Harness role="staff" />)
+    expect(await screen.findByRole('button', { name: '送信済みにする' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '未送信にする' })).toBeNull()
   })
 
   it('閲覧のみの人には記録の操作を出さない', async () => {
