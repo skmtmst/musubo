@@ -129,6 +129,9 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
   it('作る窓は名前が空のあいだ押せず、作ると新しいプロジェクトを開く', async () => {
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
+    const projectCount = () => within(host).getByText('プロジェクト').closest('[data-kpi-presentation]')!.querySelector('[data-kpi-number]')?.textContent
+    expect(projectCount()).toBe('2')
+    expect(host.querySelectorAll('button[aria-label$=" を開く"]')).toHaveLength(2)
     act(() => { buttonNamed('プロジェクトを作る')!.click() })
     await flush()
     const submit = buttonNamed('作って開く') as HTMLButtonElement
@@ -138,14 +141,16 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     fireEvent.change(name, { target: { value: '新しい案件' } })
     await flush()
     expect(submit.disabled).toBe(false)
-    listProjects.mockResolvedValue({ success: true, data: [project('p9', '新しい案件'), project('p1', '秋のキャンペーン')] })
+    listProjects.mockResolvedValue({ success: true, data: [project('p9', '新しい案件'), project('p1', '秋のキャンペーン'), project('p2', '2周年 春の感謝祭', { imageCount: 0, runningCount: 1 })] })
     stats.mockResolvedValue({ success: true, data: { projects: { active: 3, archived: 1 }, deliveredImages: 9, deliveredAccounts: 3 } })
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
     expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
     expect(host.textContent).toContain('新しい案件')
-    expect(within(host).getByText('プロジェクト').closest('[data-kpi-presentation]')?.textContent).toContain('3')
+    expect(projectCount()).toBe('3')
+    expect(host.querySelectorAll('button[aria-label$=" を開く"]')).toHaveLength(3)
+    expect(host.textContent).toContain('2周年 春の感謝祭')
     expect(listProjects).toHaveBeenCalledTimes(2)
     expect(stats).toHaveBeenCalledTimes(2)
   })
