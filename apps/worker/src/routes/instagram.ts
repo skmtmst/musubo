@@ -866,7 +866,11 @@ instagram.post('/api/instagram/webhook', async (c) => {
         const hits = candidates.results.filter(candidate => candidate.meta_message_id === msg.mid ||
           (!candidate.meta_message_id && typeof msg.text === 'string' && normalize(candidate.content) === normalize(msg.text) &&
             echoTime >= Date.parse(candidate.created_at) - 5000 && echoTime <= Date.parse(candidate.created_at) + 5 * 60 * 1000));
-        if (hits.length !== 1) continue;
+        if (hits.length > 1) {
+          for (const candidate of hits) await c.env.DB.prepare("UPDATE instagram_outbound_messages SET resolution_evidence=COALESCE(resolution_evidence,'') || '[echo_ambiguous]' WHERE idempotency_key=? AND status IN ('pending','unknown','not_sent_confirmed') AND COALESCE(resolution_evidence,'') NOT LIKE '%[echo_ambiguous]%'").bind(candidate.idempotency_key).run();
+          continue;
+        }
+        if (!hits.length) continue;
         const hit = hits[0];
         await c.env.DB.prepare(`UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=?,
           resolution_evidence=CASE WHEN status='not_sent_confirmed' THEN COALESCE(resolution_evidence,'') || '\n[echo_after_not_sent]' ELSE resolution_evidence END

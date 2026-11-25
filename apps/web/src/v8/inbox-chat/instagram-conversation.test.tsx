@@ -123,7 +123,7 @@ describe('Instagram の会話を開いて返す', () => {
     expect(await screen.findByText(reason)).toBeTruthy()
     expect(screen.getByText(connection)).toBeTruthy()
     expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: '設定へ' }))
+    fireEvent.click(screen.getByRole('button', { name: '設定を開く' }))
     expect(nav.push).toHaveBeenCalledWith('/settings/sns')
   })
 
@@ -142,7 +142,7 @@ describe('Instagram の会話を開いて返す', () => {
     fireEvent.click(button)
     expect(send).not.toHaveBeenCalled()
     expect(read).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: '設定へ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '設定を開く' })).toBeNull()
   })
 })
 
@@ -155,6 +155,45 @@ describe('結果の分からない返信', () => {
     render(<Harness />)
     expect(await screen.findByText(/未送信の確定まであと4分/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: '未送信にする' })).toBeNull()
+  })
+
+  it('未送信までの残り時間は端末ではなくWorkerの時刻から数える', async () => {
+    mockConversation({ messages: [incoming('m1', 1)], pendingReply: { ...pendingReply, canResolveNotSent: false, serverNow: '2030-01-01T00:00:00.000Z', resolveAt: '2030-01-01T00:04:00.000Z' } })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    render(<Harness />)
+    expect(await screen.findByText(/未送信の確定まであと4分/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '未送信にする' })).toBeNull()
+  })
+
+  it('接続切れでも結果待ちの会話から設定を開ける', async () => {
+    mockConversation({ messages: [incoming('m1', 1)], replyState: 'disconnected', pendingReply })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    render(<Harness />)
+    expect(await screen.findByText(/Instagram をつなぎ直すと照合できます。/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '設定を開く' }))
+    expect(nav.push).toHaveBeenCalledWith('/settings/sns')
+  })
+
+  it('Metaで届いていた返信は成功として表示し、入力欄に戻さない', async () => {
+    const conversation = mockConversation({ messages: [incoming('m1', 1)], pendingReply })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    vi.spyOn(api.instagram, 'resolveReply').mockResolvedValue({ success: true, data: { outcome: 'sent', message: 'Instagram で届いていたので送信済みにしました。' } })
+    render(<Harness />)
+    fireEvent.click(await screen.findByRole('button', { name: '未送信にする' }))
+    const dialog = await screen.findByRole('dialog', { name: '未送信にしますか？' })
+    conversation.mockResolvedValue({ success: true, data: { messages: [incoming('m1', 1)], replyState: 'ready', pendingReply: null } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '未送信にする' }))
+    expect(await screen.findByText('Instagram で届いていたので送信済みにしました。')).toBeTruthy()
+    expect((screen.getByLabelText('メッセージを入力') as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('後から送信済みと分かった知らせを閉じられる', async () => {
+    mockConversation({ messages: [incoming('m1', 1)], lateEchoNotice: '未送信とした返信が実際には届いていました。' })
+    vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
+    render(<Harness />)
+    expect(await screen.findByText('未送信とした返信が実際には届いていました。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
+    expect(screen.queryByText('未送信とした返信が実際には届いていました。')).toBeNull()
   })
 
   it('ある間は送らず、Instagram で確かめるよう知らせる', async () => {
@@ -224,12 +263,13 @@ describe('結果の分からない返信', () => {
     await waitFor(() => expect((screen.getByLabelText('メッセージを入力') as HTMLTextAreaElement).value).toBe('在庫はあります'))
   })
 
-  it('担当者は送信済みにはできるが、未送信にはできない', async () => {
+  it('担当者は送信済みも未送信も確定できない', async () => {
     rememberStaffIdentity({ id: 'staff-1', name: '見本 担当者', role: 'staff', readOnly: false, permissionKeys: ['/chats'] } as StaffMember)
     mockConversation({ messages: [incoming('m1', 1)], pendingReply })
     vi.spyOn(api.instagram, 'markConversationRead').mockResolvedValue({})
     render(<Harness role="staff" />)
-    expect(await screen.findByRole('button', { name: '送信済みにする' })).toBeTruthy()
+    expect(await screen.findByText(/送信結果が分かりません/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '送信済みにする' })).toBeNull()
     expect(screen.queryByRole('button', { name: '未送信にする' })).toBeNull()
   })
 

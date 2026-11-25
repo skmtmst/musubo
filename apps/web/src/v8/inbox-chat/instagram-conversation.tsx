@@ -57,7 +57,8 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [confirming, setConfirming] = useState<InstagramResolveOutcome | null>(null)
   const [reason, setReason] = useState('')
-  const { detail, loadFailed, reload, text, setText, sending, sendError, send, canEdit, canConfirmNotSent, canSend, lockedReason, blockedReason, deadline, now, pending, resolve, resolving, resolveError, clearResolveError } = thread
+  const [closedNotice, setClosedNotice] = useState('')
+  const { detail, loadFailed, reload, text, setText, sending, sendError, send, canEdit, canConfirmNotSent, canSend, lockedReason, blockedReason, deadline, now, pending, resolve, resolving, resolveError, resolveNotice, pendingNow, clearResolveError } = thread
   const messages = detail?.messages ?? []
   const lastMessageAt = messages.at(-1)?.createdAt ?? chat.lastMessageAt
 
@@ -68,14 +69,15 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
   }, [messages.length])
 
   const openSettings = canEdit && detail && detail.replyState !== 'ready'
-    ? <Button variant="text" size="inline" onClick={() => router.push('/settings/sns')}>設定へ</Button>
+    ? <Button variant="text" size="inline" onClick={() => router.push('/settings/sns')}>設定を開く</Button>
     : undefined
-  const resolveActions = pending?.canResolve && canEdit
+  const resolveActions = pending?.canResolve && canConfirmNotSent
     ? <>
         <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('sent') }}>送信済みにする</Button>
+        {openSettings}
         {canConfirmNotSent && pending.canResolveNotSent ? <Button variant="secondary" size="field" onClick={() => { clearResolveError(); setReason(''); setConfirming('not_sent') }}>未送信にする</Button> : null}
       </>
-    : <Button variant="text" size="inline" onClick={() => void reload()}>読み直す</Button>
+    : <>{openSettings}<Button variant="text" size="inline" onClick={() => void reload()}>読み直す</Button></>
 
   return (
     <InboxConversationPane selected data-inbox-channel="instagram">
@@ -111,12 +113,15 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
         </InboxThreadLoading>
       </InboxMessages>
       <InboxComposer>
-        {detail?.lateEchoNotice ? <Notice tone="warn" role="alert" message={detail.lateEchoNotice} /> : null}
+        {detail?.lateEchoNotice && closedNotice !== `${chat.id}:${detail.lateEchoNotice}` ? <Notice tone="warn" role="alert" message={detail.lateEchoNotice} onClose={() => setClosedNotice(`${chat.id}:${detail.lateEchoNotice ?? ''}`)} /> : null}
+        {detail?.reconciliationWarning ? <Notice tone="warn" role="alert" message={detail.reconciliationWarning} /> : null}
+        {resolveNotice ? <Notice tone="success" role="status" message={resolveNotice} /> : null}
         {pending ? (
-          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={pending.canResolveNotSent || !pending.resolveAt ? `「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。` : `送信結果の反映を待っています。未送信の確定まで${formatReplyWindowLeft(Date.parse(pending.resolveAt ?? ""), now)}です。`} action={resolveActions} />
+          <Notice tone="warn" role="status" actionLayout="stack-on-narrow" message={(pending.canResolveNotSent || !pending.resolveAt ? `「${quoteHead(pending.content)}」の送信結果が分かりません。Instagram で送信結果を確認してください。` : `送信結果の反映を待っています。未送信の確定まで${formatReplyWindowLeft(Date.parse(pending.resolveAt ?? ""), pendingNow)}です。`) + (detail?.replyState !== 'ready' ? ' Instagram をつなぎ直すと照合できます。' : '')} action={resolveActions} />
         ) : blockedReason ? (
           <Notice tone="warn" role="status" message={blockedReason} action={openSettings} />
         ) : null}
+        {pending?.warning && !detail?.reconciliationWarning ? <Notice tone="warn" role="alert" message={pending.warning} /> : null}
         {sendError ? <Notice tone="danger" role="alert" message={sendError} /> : null}
         <InboxInputBox>
           <InboxDraftArea
@@ -160,7 +165,7 @@ export default function InstagramConversation({ chat, thread, panel, onBack }: {
       >
         {pending ? <p className="text-ink-secondary text-sm">{`返信：「${quoteHead(pending.content)}」`}</p> : null}
         {confirming === 'not_sent' ? (
-          <Field label="確認した理由" optional htmlFor="ig-resolve-reason" note="Instagram で本当に届いていないか確かめてください。自動照合できない場合は確定できません。">
+          <Field label="確認した理由" optional htmlFor="ig-resolve-reason" note="Instagram で届いていないことを確かめてから入力してください。自動照合できない場合は理由が必要です。">
             <TextArea
               id="ig-resolve-reason"
               aria-label="確認した理由"

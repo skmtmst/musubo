@@ -518,9 +518,9 @@ export async function subscribeInstagramMessages(config: InstagramConfig, token:
     if (own && !Array.isArray(own.subscribed_fields)) throw new Error('invalid_fields');
     if (!own && current.paging?.next) throw new Error('subscription_list_incomplete');
     const fields = own?.subscribed_fields ?? [];
-    if (fields.includes('messages')) return;
+    if (fields.includes('messages') && fields.includes('message_echoes')) return;
     const result = await instagramGraph<{ success: boolean }>(config, path, token, {
-      subscribed_fields: [...fields, 'messages'].join(','),
+      subscribed_fields: [...new Set([...fields, 'messages', 'message_echoes'])].join(','),
     }, 'POST');
     if (result.success !== true) throw new Error('subscription_rejected');
   } catch (error) {

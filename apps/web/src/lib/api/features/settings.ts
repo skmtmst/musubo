@@ -26,7 +26,8 @@ type InstagramReplyState = 'ready' | 'disconnected' | 'permission_required'
 type InstagramConversationDetail = {
   messages: Array<{ id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }>
   lateEchoNotice?: string | null
-  pendingReply?: { key: string; content: string; canResolve: boolean; canResolveNotSent?: boolean; resolveAt?: string } | null
+  reconciliationWarning?: string | null
+  pendingReply?: { key: string; content: string; canResolve: boolean; canResolveNotSent?: boolean; resolveAt?: string; serverNow?: string; warning?: string | null } | null
   replyState: InstagramReplyState
 }
 
@@ -166,7 +167,7 @@ export const settingsMethods = {
     conversation: (accountId: string, senderId: string, instagramId?: string) =>
       fetchApi<ApiResponse<InstagramConversationDetail>>(conversationPath(accountId, senderId, instagramId)),
     resolveReply: (accountId: string, senderId: string, instagramId: string | undefined, key: string, outcome: 'sent' | 'not_sent', reason?: string) =>
-      fetchApi(conversationPath(accountId, senderId, instagramId, '/resolve'), { method: 'POST', body: JSON.stringify({ key, outcome, ...(reason?.trim() ? { reason: reason.trim() } : {}) }) }),
+      fetchApi<ApiResponse<{outcome?: 'sent' | 'not_sent'; message?: string}>>(conversationPath(accountId, senderId, instagramId, '/resolve'), { method: 'POST', body: JSON.stringify({ key, outcome, ...(reason?.trim() ? { reason: reason.trim() } : {}) }) }),
     markConversationRead: (accountId: string, senderId: string, instagramId?: string) =>
       fetchApi(conversationPath(accountId, senderId, instagramId, '/read'), { method: 'POST' }),
     sendReply: (accountId: string, messageId: string, text: string, key: string) =>

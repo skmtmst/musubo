@@ -124,7 +124,7 @@ async function verifyAbsentInMetaConversation(
     return {
       ok: false,
       status: 409,
-      error: 'Meta側の会話を確認できません。Instagramの画面で未送信を確かめた理由を入力してください。',
+      error: 'Instagram をつなぎ直すと照合できます。',
     };
   }
   const targetCreatedMs = Date.parse(targetRow.created_at);
@@ -211,7 +211,7 @@ async function verifyAbsentInMetaConversation(
           }
           const fromId = msg.from ? (msg.from as { id: string }).id : undefined;
           if (fromId !== undefined && fromId !== business && fromId !== sender) {
-            return { ok: false, status: 502, error: 'Meta側の送信者を照合できないため未送信と確定できません。' };
+            return { ok: false, status: 502, error: 'Meta側の送り主の番号の形が違うため照合できません。' };
           }
           if ((fromId === undefined || fromId === business) && msgTime >= windowStartMs) {
             if (typeof msg.message !== 'string') {
@@ -285,10 +285,11 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
         WHERE line_account_id=? AND sender_id=? AND instagram_id=? AND status='sent'
       ORDER BY createdAt DESC,id DESC LIMIT 200`).bind(id, sender, business, id, sender, business).all();
     if (!rows.results.length) throw new InstagramError('not_found', 404);
-    const pending = await c.env.DB.prepare(`SELECT idempotency_key AS key,content,status,created_at
+    const pending = await c.env.DB.prepare(`SELECT idempotency_key AS key,content,status,created_at,resolution_evidence
       FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND sender_id=? AND status IN ('pending','unknown')`)
-      .bind(id, business, sender).first<{ key: string; content: string; status: string; created_at: string }>();
-    const pendingReply = pending ? { key: pending.key, content: pending.content,
+      .bind(id, business, sender).first<{ key: string; content: string; status: string; created_at: string; resolution_evidence: string | null }>();
+    const serverNow = new Date().toISOString();
+    const pendingReply = pending ? { serverNow, warning: pending.resolution_evidence?.includes('[echo_ambiguous]') ? '送信通知の候補が複数あるため、Instagramで確かめてください。' : pending.resolution_evidence?.includes('[sender_id_mismatch]') ? '送り主の番号の形が違うため、Instagramで確かめてください。' : null, key: pending.key, content: pending.content,
       canResolve: pending.status === 'unknown' || Date.parse(pending.created_at) <= Date.now() - staleReservationMs,
       canResolveNotSent: Date.parse(pending.created_at) <= Date.now() - unknownNotSentWaitMs,
       resolveAt: new Date(Date.parse(pending.created_at) + unknownNotSentWaitMs).toISOString() } : null;
@@ -298,7 +299,8 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
     const resent = lateEcho ? await c.env.DB.prepare(`SELECT 1 FROM instagram_outbound_messages
       WHERE line_account_id=? AND instagram_id=? AND sender_id=? AND created_at>=? AND created_at>? AND status IN ('pending','unknown','sent') LIMIT 1`)
       .bind(id, business, sender, lateEcho.resolved_at, lateEcho.created_at).first() : null;
-    return c.json({ success: true, data: { messages: rows.results.reverse(), replyState: state, pendingReply,
+    const ambiguous = await c.env.DB.prepare("SELECT 1 FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND sender_id=? AND status IN ('pending','unknown','not_sent_confirmed') AND resolution_evidence LIKE '%[echo_ambiguous]%' LIMIT 1").bind(id, business, sender).first();
+    return c.json({ success: true, data: { messages: rows.results.reverse(), replyState: state, pendingReply, reconciliationWarning: ambiguous ? '送信通知の候補が複数あるため、Instagramで確かめてください。' : null,
       lateEchoNotice: lateEcho ? (resent ? '未送信とした返信が実際には届いていました。再送済みのため二重送信の可能性があります。' : '未送信とした返信が実際には届いていました。') : null } });
   });
   instagram.post('/api/instagram/conversations/:senderId/resolve', requirePermission('/chats'), inputJsonBoundary(), async c => {
@@ -310,8 +312,8 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
       || (body.reason !== undefined && typeof body.reason !== 'string'))
       return c.json({ success: false, error: '送信結果を選び直してください。' }, 400);
     const staff = c.get('staff');
-    if (body.outcome === 'not_sent' && (!staff || staff.readOnly || (staff.role !== 'owner' && staff.role !== 'admin'))) {
-      return c.json({ success: false, error: '未送信として確定できるのはオーナーまたは管理者のみです。' }, 403);
+    if (!staff || staff.readOnly || (staff.role !== 'owner' && staff.role !== 'admin')) {
+      return c.json({ success: false, error: '送信結果を確定できるのはオーナーまたは管理者のみです。' }, 403);
     }
     const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
     if (reason.length > 500) {
@@ -335,24 +337,34 @@ export function registerInstagramInboxRoutes(instagram: Hono<Env>, account: (c: 
       return c.json({ success: true });
     }
     const verified = await verifyAbsentInMetaConversation(c, id, business, sender, targetRow, resolvedAt);
+    let resolutionKind: 'reason' | 'meta_conversation_absent';
+    let resolutionEvidence: string;
     if (!verified.ok) {
       if (verified.matchedId) {
         const updated = await c.env.DB.prepare(
-          `UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=COALESCE(sent_at,created_at),resolved_by_staff_id=?,resolved_at=? ${target}`,
-        ).bind(verified.matchedId, staff.id, resolvedAt, id, business, sender, body.key, staleCutoff).run();
+          `UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=COALESCE(sent_at,created_at),resolved_by_staff_id=?,resolved_at=?,resolution_kind=NULL,resolution_evidence=? ${target}`,
+        ).bind(verified.matchedId, staff.id, resolvedAt, JSON.stringify({ type: 'meta_message_found', messageId: verified.matchedId, reason }), id, business, sender, body.key, staleCutoff).run();
         if (!updated.meta.changes) return c.json({ success: false, error: '会話を読み直してください。' }, 409);
+        return c.json({ success: true, data: { outcome: 'sent', message: 'Instagram で届いていたので送信済みにしました。' } });
       }
-      return c.json({ success: false, error: verified.error }, verified.status);
+      if (verified.error.includes('送り主の番号の形')) {
+        await c.env.DB.prepare(`UPDATE instagram_outbound_messages SET resolution_evidence=COALESCE(resolution_evidence,'') || '[sender_id_mismatch]' ${target}`)
+          .bind(id, business, sender, body.key, staleCutoff).run();
+      }
+      if (!reason) return c.json({ success: false, error: `${verified.error} Instagram で届いていないことを確かめてから、理由を入力してください。` }, verified.status);
+      resolutionKind = 'reason';
+      resolutionEvidence = JSON.stringify({ reason, failure: verified.error });
+    } else {
+      resolutionKind = verified.kind;
+      resolutionEvidence = reason ? `${verified.evidence}:reason=${JSON.stringify(reason)}` : verified.evidence;
     }
-    const resolutionKind = verified.kind;
-    const resolutionEvidence = verified.evidence;
     const changed = await c.env.DB.prepare(
       `UPDATE instagram_outbound_messages
           SET status='not_sent_confirmed',resolved_by_staff_id=?,resolved_at=?,resolution_kind=?,resolution_evidence=?
         ${target}`,
     ).bind(staff.id, resolvedAt, resolutionKind, resolutionEvidence, id, business, sender, body.key, staleCutoff).run();
     if (!changed.meta.changes) return c.json({ success: false, error: 'この返信は送信中、または確認済みです。会話を読み直してください。' }, 409);
-    return c.json({ success: true });
+    return c.json({ success: true, data: { outcome: 'not_sent' } });
   });
   instagram.post('/api/instagram/conversations/:senderId/read', requirePermission('/chats'), async (c) => {
     const id = await account(c), sender = c.req.param('senderId');

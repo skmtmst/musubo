@@ -11,8 +11,8 @@ import { canAdministerRole } from '@/lib/staff-role'
 
 export type InstagramMessage = { id: string; content: string; createdAt: string; direction: 'incoming' | 'outgoing' }
 export type InstagramReplyState = 'ready' | 'disconnected' | 'permission_required'
-export type InstagramPendingReply = { key: string; content: string; canResolve: boolean; canResolveNotSent?: boolean; resolveAt?: string }
-type Detail = { lateEchoNotice?: string | null; messages: InstagramMessage[]; replyState: InstagramReplyState; pendingReply?: InstagramPendingReply | null }
+export type InstagramPendingReply = { key: string; content: string; canResolve: boolean; canResolveNotSent?: boolean; resolveAt?: string; serverNow?: string; warning?: string | null }
+type Detail = { reconciliationWarning?: string | null; lateEchoNotice?: string | null; messages: InstagramMessage[]; replyState: InstagramReplyState; pendingReply?: InstagramPendingReply | null }
 export type InstagramResolveOutcome = 'sent' | 'not_sent'
 
 /** Instagram の決まり：お客さまの最後のメッセージから24時間だけ返信できる。Worker も同じ物差しで断る。 */
@@ -65,6 +65,8 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
   const [sendError, setSendError] = useState('')
   const [resolving, setResolving] = useState(false)
   const [resolveError, setResolveError] = useState('')
+  const [resolveNotice, setResolveNotice] = useState('')
+  const serverClock = useRef<{ server: number; monotonic: number } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const lock = useRef(false)
   const key = useRef<string | null>(null)
@@ -81,6 +83,8 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
       const result = await api.instagram.conversation(account, senderId, instagramId)
       if (current !== generation.current) return
       if (!result.success || !result.data || !Array.isArray(result.data.messages)) throw new Error('invalid')
+      const server = Date.parse(result.data.pendingReply?.serverNow ?? '')
+      serverClock.current = Number.isFinite(server) ? { server, monotonic: performance.now() } : null
       setDetail(result.data)
       setLoadFailed(false)
       setNow(Date.now())
@@ -106,6 +110,7 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
     setSendError('')
     setResolving(false)
     setResolveError('')
+    setResolveNotice('')
     void load()
   }, [load])
 
@@ -140,8 +145,9 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
 
   const target = detail ? latestIncoming(detail.messages) : null
   const deadline = detail ? instagramReplyDeadline(detail.messages) : null
+  const pendingNow = serverClock.current ? serverClock.current.server + (performance.now() - serverClock.current.monotonic) : now
   const pendingRaw = detail?.pendingReply ?? null
-  const pending = pendingRaw ? { ...pendingRaw, canResolveNotSent: pendingRaw.canResolveNotSent ?? pendingRaw.canResolve, ...(pendingRaw.resolveAt && now >= Date.parse(pendingRaw.resolveAt) ? { canResolve: true, canResolveNotSent: true } : {}) } : null
+  const pending = pendingRaw ? { ...pendingRaw, canResolveNotSent: pendingRaw.canResolveNotSent ?? pendingRaw.canResolve, ...(pendingRaw.resolveAt && pendingNow >= Date.parse(pendingRaw.resolveAt) ? { canResolve: true, canResolveNotSent: true } : {}) } : null
   const blockedReason = detail ? instagramBlockedReason(detail, deadline, now) : ''
   const canSend = canEdit && detail !== null && !pending && !blockedReason && target !== null
   const lockedReason = role === null ? undefined : permissionLockReason(role, canEdit)
@@ -177,20 +183,19 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
   }
 
   const resolve = async (outcome: InstagramResolveOutcome, reason?: string): Promise<boolean> => {
-    if (!pending || !pending.canResolve || (outcome === 'not_sent' && !pending.canResolveNotSent) || !canEdit || (outcome === 'not_sent' && !canConfirmNotSent) || resolving) return false
+    if (!pending || !pending.canResolve || (outcome === 'not_sent' && !pending.canResolveNotSent) || !canEdit || !canConfirmNotSent || resolving) return false
     const current = generation.current
     setResolving(true)
     setResolveError('')
     try {
       const trimmedReason = reason?.trim()
-      if (trimmedReason) {
-        await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome, trimmedReason)
-      } else {
-        await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome)
-      }
+      const result = trimmedReason ? await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome, trimmedReason) : await api.instagram.resolveReply(account, senderId, instagramId, pending.key, outcome)
+      if (result?.success === false) throw new Error(result.error)
+      const foundSent = result?.success && result.data?.outcome === 'sent'
       if (current !== generation.current) return false
+      if (foundSent) setResolveNotice(result.data?.message ?? 'Instagram で届いていたので送信済みにしました。')
       // 届いていなかった返信は、入力欄が空なら同じ文を戻し、再送時は必ず新しい送信キーにする。
-      if (outcome === 'not_sent') {
+      if (outcome === 'not_sent' && !foundSent) {
         if (!text.trim()) setTextState(pending.content)
         key.current = null
       } else if (key.current === pending.key) {
@@ -211,7 +216,7 @@ export function useInstagramThread(chat: ChatListItem | null, role: string | nul
   return {
     detail, loadFailed, reload: load, text, setText, sending, sendError, send,
     canEdit, canConfirmNotSent, canSend, lockedReason, blockedReason, deadline, now, pending,
-    resolve, resolving, resolveError, clearResolveError: () => setResolveError(''),
+    resolve, resolving, resolveError, resolveNotice, pendingNow, clearResolveError: () => setResolveError(''),
   }
 }
 

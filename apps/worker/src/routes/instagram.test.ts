@@ -1454,15 +1454,15 @@ it.each([10, 190])('Metaが返信を明示的に拒否したら予約を解放�
   expect((await read(await req('/api/instagram/inbox-status'))).data.state).toBe(code === 190 ? 'disconnected' : 'ready');
 });
 
-it('接続がなく照合できない予約は古くても未送信確定しない', async () => {
+it('接続がなく照合できない予約は理由を残して未送信確定する', async () => {
   const key = crypto.randomUUID();
   db.raw.prepare(`INSERT INTO instagram_outbound_messages(idempotency_key,line_account_id,instagram_id,sender_id,staff_id,content,status,created_at)
     VALUES(?,'a1','20','sender','staff','reply','pending',?)`).run(key, new Date().toISOString());
   const resolve = () => req('/api/instagram/conversations/sender/resolve?instagramId=20', { key, outcome: 'not_sent', reason: 'Instagram画面で未着を確認' });
   expect((await resolve()).status).toBe(409);
   db.raw.exec("UPDATE instagram_outbound_messages SET created_at='2000-01-01T00:00:00.000Z'");
-  expect((await resolve()).status).toBe(409);
-  expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(key)).toEqual({ status: 'pending' });
+  expect((await resolve()).status).toBe(200);
+  expect(db.raw.prepare('SELECT status FROM instagram_outbound_messages WHERE idempotency_key=?').get(key)).toEqual({ status: 'not_sent_confirmed' });
 });
 
 it.each(['ok','subscription_failed','personal'])('店舗のOAuthだけでDMの通知を登録する（%s）', async mode => {
@@ -1482,7 +1482,7 @@ it.each(['ok','subscription_failed','personal'])('店舗のOAuthだけでDMの�
   }));
   const back = await callback({code:'mock_code'});
   expect(back.searchParams.get('instagram')).toBe(mode === 'ok' ? 'connected' : 'failed');
-  expect(subscribed).toEqual(mode === 'personal' ? [] : ['comments,messages']);
+  expect(subscribed).toEqual(mode === 'personal' ? [] : ['comments,messages,message_echoes']);
   expect((await read(await req('/api/instagram/connections'))).data.connections).toHaveLength(mode === 'ok' ? 1 : 0);
   if (mode === 'ok') expect((await read(await req('/api/instagram/inbox-status'))).data.state).toBe('ready');
 });
