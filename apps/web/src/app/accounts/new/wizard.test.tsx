@@ -125,8 +125,7 @@ async function saveAndFinish() {
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   expect(document.querySelector('[data-step-heading]')?.textContent).toBe('使い方のスタイルを選ぶ')
   await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
-  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
-  const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  const next = within(dialog).getByRole('button', { name: /で次へ$/ }) as HTMLButtonElement
   await waitFor(() => expect(next.disabled).toBe(false))
   fireEvent.click(next)
 }

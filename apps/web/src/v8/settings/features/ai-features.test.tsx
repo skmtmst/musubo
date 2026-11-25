@@ -104,3 +104,27 @@ it('権限エラーは読み直しではなく権限の不足を伝える', asyn
   fireEvent.click(screen.getByRole('button', { name: '同意してオンにする' }))
   expect(await screen.findByText('AI の機能を変更する権限がありません。オーナーまたは管理者に依頼してください。')).toBeTruthy()
 })
+
+it('保存時に返った同意の理由を欄に表示し、再操作で消す', async () => {
+  api.save.mockRejectedValueOnce({ status: 422, fields: { consent: '同意を確認してください' } })
+  render(<AiFeatures accountId="a" canManage />)
+  fireEvent.click(await screen.findByRole('switch', { name: 'バナー生成' }))
+  const checkbox = screen.getByRole('checkbox', { name: '内容に同意します' })
+  fireEvent.click(checkbox)
+  fireEvent.click(screen.getByRole('button', { name: '同意してオンにする' }))
+  expect(await screen.findByText('同意を確認してください')).toBeTruthy()
+  expect(checkbox.getAttribute('aria-invalid')).toBe('true')
+  fireEvent.click(checkbox)
+  await waitFor(() => expect(screen.queryByText('同意を確認してください')).toBeNull())
+})
+
+it('スイッチの欄名で保存に失敗したとき、窓の中で失敗を知らせる', async () => {
+  api.save.mockRejectedValueOnce({ status: 422, fields: { enabled: '設定を確認してください' } })
+  render(<AiFeatures accountId="a" canManage />)
+  fireEvent.click(await screen.findByRole('switch', { name: 'バナー生成' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: '内容に同意します' }))
+  fireEvent.click(screen.getByRole('button', { name: '同意してオンにする' }))
+  const dialog = screen.getByRole('dialog')
+  expect(await within(dialog).findByText('AI の機能を保存できませんでした。設定を読み直してからお試しください。')).toBeTruthy()
+  expect(screen.getByRole('switch', { name: 'Google口コミの返信案' }).getAttribute('aria-invalid')).not.toBe('true')
+})

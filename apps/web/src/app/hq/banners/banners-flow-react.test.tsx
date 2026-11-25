@@ -44,6 +44,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(mocks.query),
 }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: vi.fn() }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useTenantWideAccess: () => true, useStaffRole: () => 'owner' }))
 
@@ -186,7 +187,7 @@ describe('バナー生成のプロジェクトの中', () => {
   it('利用できるアカウントがないと生成できず理由を表示する', async () => {
     mocks.aiSettings.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
     render(<HqBannerProjectV8 />)
-    expect((await screen.findAllByText('AI を使えるアカウントがありません')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/AI を使えるアカウントがありません/)).length).toBeGreaterThan(0)
     const start = screen.getByRole('button', { name: /^生成する（\d+ 枚）$/ }) as HTMLButtonElement
     expect(start.disabled).toBe(true)
     fireEvent.click(start)

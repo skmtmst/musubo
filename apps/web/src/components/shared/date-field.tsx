@@ -275,7 +275,6 @@ export default function DateField({
         type="button"
         className={clearable ? styles.field : `${styles.field} ${choiceStyles.frame}`}
         data-choice-field={!clearable || undefined}
-        data-choice-surface={!clearable ? 'select' : undefined}
         data-choice-invalid={!clearable && invalid || undefined}
         data-choice-disabled={!clearable && disabled || undefined}
         data-input-field
