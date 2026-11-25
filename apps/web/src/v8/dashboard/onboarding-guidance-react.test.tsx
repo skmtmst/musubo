@@ -215,6 +215,23 @@ it('基本が全完了で後回しの設定行が無ければカードを隠す'
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
 })
 
+it('標準は全手順が完了していても設定の取得中と失敗時は案内を残し、復旧後に隠す', async () => {
+  let reject!: (reason: Error) => void
+  net.googleHoursComplete = true
+  net.progress.mockResolvedValue(basic(true))
+  net.style.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  render(<DashboardV8 />)
+  await waitFor(() => expect(net.style).toHaveBeenCalled())
+  expect(await screen.findByRole('region', { name: 'はじめにやること', hidden: true })).toBeTruthy()
+  await act(async () => reject(new Error('offline')))
+  expect(await screen.findByText('使い方の設定を確認できませんでした')).toBeTruthy()
+  expect(guide()).toBeTruthy()
+  net.style.mockResolvedValue(style(false))
+  fireEvent.click(retry('使い方の設定を確認できませんでした'))
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'はじめにやること', hidden: true })).toBeNull())
+  expect(net.style).toHaveBeenCalledTimes(2)
+})
+
 it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み、使い方の変更を許可しない', async role => {
   net.role = role
   render(<DashboardV8 />)
