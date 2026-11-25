@@ -15,8 +15,9 @@ export function accountStyleUpdated(accountId: string) {
 }
 
 type Data = Awaited<ReturnType<typeof styleApi.get>>['data']
+let stylesModule: Promise<typeof import('@/lib/api/helpers/styles')> | null = null
 function load(accountId: string): Promise<Data> {
-  return import('@/lib/api/helpers/styles').then(module => module.styleApi.get(accountId)).then(res => {
+  return (stylesModule ??= import('@/lib/api/helpers/styles')).then(module => module.styleApi.get(accountId)).then(res => {
     if (!res.success || !ACCOUNT_STYLES.includes(res.data?.style)) throw new Error('使い方のスタイルを読み込めませんでした')
     return res.data
   })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import TargetMissing from '@/components/shared/target-missing'
 import PagePending from '@/components/templates/page-pending'
@@ -17,19 +17,24 @@ export default function LineAccountEntryGate({ accountId, allowHandover = false,
   useEffect(() => {
     if (!accountId) return
     let active = true
+    let releaseReady: (() => void) | undefined
     void resolveLineAccountEntry(accountId).then((result) => {
       if (!active) return
       if ('href' in result) {
         if (allowHandover && result.destination === 'handover') setStatus('dashboard')
         else replace(result.href)
-      } else setStatus(result.destination)
+      } else {
+        if (result.destination === 'dashboard' && !allowHandover) {
+          releaseReady = markLineAccountEntryReady(accountId)
+        }
+        setStatus(result.destination)
+      }
     }).catch(() => { if (active) setStatus('error') })
-    return () => { active = false }
+    return () => {
+      active = false
+      releaseReady?.()
+    }
   }, [accountId, allowHandover, replace, retry])
-
-  useLayoutEffect(() => {
-    if (status === 'dashboard' && !allowHandover) return markLineAccountEntryReady(accountId)
-  }, [accountId, allowHandover, status])
 
   if (status === 'dashboard') return <>{children}</>
   if (!accountId || status === 'unavailable') return <TargetMissing kind="not-found" title="登録を再開できませんでした"

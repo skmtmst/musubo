@@ -39,29 +39,29 @@ export function GuideHost({ children }: { children: ReactNode }) {
    * 案内が動いているか。控え（localStorage）を見て決め、
    * 控えが変わった合図でも見直す（ダッシュボードで「開始」を押した直後もここで気づく）。
    */
-  const [remembered, setRemembered] = useState<{
-    accountId: string | null; staffId?: string; armed: boolean; watch: boolean; checkingAccount: boolean
-  } | null>(null)
-
-  useEffect(() => {
-    const read = () => {
-      const { phase, stepKey } = readGuideEngineState(accountId, staffId)
-      setRemembered({ accountId, staffId, armed: phase === 'active' || phase === 'paused',
-        watch: phase === 'active' && stepKey === 'firstMessage', checkingAccount: phase === 'active' && stepKey === 'accounts' })
-    }
-    read()
-    if (typeof window === 'undefined') return
+  const subscribeGuideState = useCallback((onStoreChange: () => void) => {
+    if (typeof window === 'undefined') return () => {}
     const changed = (event: Event) => {
       const detail = (event as CustomEvent<{ accountId?: string }>).detail
-      if (!detail?.accountId || detail.accountId === accountId) read()
+      if (!detail?.accountId || detail.accountId === accountId) onStoreChange()
     }
     window.addEventListener(GUIDE_ENGINE_EVENT, changed)
     return () => window.removeEventListener(GUIDE_ENGINE_EVENT, changed)
-  }, [accountId, staffId])
-
-  const current = remembered?.accountId === accountId && remembered.staffId === staffId ? remembered : null
-  return <GuideSession accountId={accountId} staffId={staffId} role={role} armed={current?.armed ?? false}
-    watchFirstMessage={current?.watch ?? false} checkingAccount={current?.checkingAccount ?? false} rememberedReady={current !== null}>{children}</GuideSession>
+  }, [accountId])
+  const snapshotKey = useSyncExternalStore(
+    subscribeGuideState,
+    () => {
+      const { phase, stepKey } = readGuideEngineState(accountId, staffId)
+      return `${phase}:${stepKey ?? ''}`
+    },
+    () => '',
+  )
+  const [phase = 'idle', stepKey = ''] = snapshotKey ? snapshotKey.split(':') : []
+  const armed = snapshotKey !== '' && (phase === 'active' || phase === 'paused')
+  const watch = snapshotKey !== '' && phase === 'active' && stepKey === 'firstMessage'
+  const checkingAccount = snapshotKey !== '' && phase === 'active' && stepKey === 'accounts'
+  return <GuideSession accountId={accountId} staffId={staffId} role={role} armed={armed}
+    watchFirstMessage={watch} checkingAccount={checkingAccount} rememberedReady={snapshotKey !== ''}>{children}</GuideSession>
 }
 
 function useAccountsGuideEntry(accountId: string | null, scope: string | null, checkingAccount: boolean): boolean {
@@ -108,8 +108,9 @@ function GuideSession({ accountId, staffId, role, armed, watchFirstMessage, chec
   const watchers = useRef(new Set<symbol>())
   const [sharedWatch, setSharedWatch] = useState(false)
   const setWatch = useCallback((id: symbol, enabled: boolean) => { if (enabled) watchers.current.add(id); else watchers.current.delete(id); setSharedWatch(watchers.current.size > 0) }, [])
+  const canPreloadSetup = Boolean(accountId && role !== null && !pathname.startsWith('/accounts/new') && (pathname !== '/accounts' || checkingAccount))
   const cacheScope = JSON.stringify([staffId, role])
-  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: canLoadSetup, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch, cacheScope })
+  const first = useFirstSteps(accountId, role, { style: style.data?.style ?? null, enabled: canLoadSetup, preload: canPreloadSetup, watchWaiting: false, watchFirstMessage: watchFirstMessage || sharedWatch, cacheScope })
   const retained = useRef<{ scope: string; summary: typeof first.summary; dismissed: boolean | null; style: typeof style.data extends infer T ? T extends { style: infer S } ? S : null : null }>({ scope: '', summary: null, dismissed: null, style: null })
   const retainedScope = JSON.stringify([accountId, staffId, role])
   if (retained.current.scope !== retainedScope || role === null || first.status === 'error' || style.status === 'error') {

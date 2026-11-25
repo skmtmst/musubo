@@ -77,8 +77,9 @@ export function useFirstMessageArrived(accountId: string | null, steps: Readonly
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }
 }
 
-export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null; enabled?: boolean; watchFirstMessage?: boolean; watchWaiting?: boolean; cacheScope?: string } = {}) {
+export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null; storeId?: string | null; enabled?: boolean; preload?: boolean; watchFirstMessage?: boolean; watchWaiting?: boolean; cacheScope?: string } = {}) {
   const enabled = options.enabled !== false && Boolean(accountId) && role !== null
+  const canPreload = Boolean(options.preload && accountId && role !== null)
   const [folded, setFolded] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const shared = useSharedGuide()
@@ -91,9 +92,12 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     sharedSetup.setWatch(id, ownWatch)
     return () => sharedSetup.setWatch(id, false)
   }, [sharedSetup?.setWatch, ownWatch])
-  const ownRun = useFirstRun(accountId, enabled && !sharedSetup, ownWatch, options.cacheScope)
+  const ownRun = useFirstRun(accountId, enabled && !sharedSetup, ownWatch, options.cacheScope, canPreload && !sharedSetup)
   const style = options.style === undefined ? 'standard' : options.style
-  const ownProgress = useStyleSetupProgress(accountId, style, enabled && !sharedSetup, options.storeId, options.cacheScope)
+  const ownProgress = useStyleSetupProgress(accountId, style, enabled && !sharedSetup, options.storeId, options.cacheScope, {
+    preload: canPreload && !sharedSetup,
+    canPreloadRestaurant: process.env.NEXT_PUBLIC_RESTAURANT_TEST_ENABLED === 'true' && role !== 'viewer',
+  })
   const state = sharedSetup?.run ?? ownRun
   const progress = sharedSetup?.progress ?? ownProgress
   const displaySteps = stepsForStyle(state.steps, style, progress.progress)
