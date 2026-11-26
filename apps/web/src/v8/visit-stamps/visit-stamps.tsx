@@ -457,11 +457,23 @@ function VisitStampsScreen() {
 
   const photoUrl = usePhotoUrl(selectedAccountId, photo?.photo_url)
 
-  if (loadError && cards === null) {
-    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="error" error={loadError} onRetry={() => void loadCards()} /></PageFrame></SaveErrorScope>
-  }
+  const stampTabs = <div className={tpl.tabs} data-template-region="tabs">
+    <Tabs label="来店スタンプの表示" items={STAMP_TABS.map(item => ({
+      id: `visit-stamp-tab-${item.key}`,
+      controls: `visit-stamp-panel-${item.key}`,
+      label: item.label,
+      current: tab === item.key,
+      count: item.key === 'paper' && paper !== null ? paper.filter(row => row.status === 'pending').length : undefined,
+      countTone: item.key === 'paper' && paper?.some(row => row.status === 'pending') ? 'warning' : undefined,
+      onClick: () => selectTab(item.key),
+    }))} />
+  </div>
   if (cards === null) {
-    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="loading" /></PageFrame></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}>
+      <PageHeading headingSize="regular" title="来店スタンプ" />
+      {stampTabs}
+      <div className={tpl.split} data-template-region="body" role="tabpanel" id={`visit-stamp-panel-${tab}`} aria-labelledby={`visit-stamp-tab-${tab}`}>{loadError ? <ListState kind="error" error={loadError} onRetry={() => void loadCards()} /> : <ListState kind="loading" />}</div>
+    </PageFrame></SaveErrorScope>
   }
 
   const ro = !canManage
@@ -484,17 +496,7 @@ function VisitStampsScreen() {
         actions={stampable&&selectedAccountId&&card?.accountIds.includes(selectedAccountId)?<Button variant="primary" onClick={()=>setQrOpen(true)}><QrCode size={16} aria-hidden="true"/>QR を出す</Button>:undefined}
         help="お店に来たお客さまへ押すスタンプカードです。マイル（オンラインでの動きにたまるもの）とは別に数えます。決まった数がたまると特典を使えます。特典はお客さまの LINE の画面を店員に見せ、店員が暗証番号を打つと使用済みになります。"
       />
-      <div className={tpl.tabs} data-template-region="tabs">
-        <Tabs label="来店スタンプの表示" items={STAMP_TABS.map(item => ({
-          id: `visit-stamp-tab-${item.key}`,
-          controls: `visit-stamp-panel-${item.key}`,
-          label: item.label,
-          current: tab === item.key,
-          count: item.key === 'paper' && paper !== null ? paper.filter(row => row.status === 'pending').length : undefined,
-          countTone: item.key === 'paper' && paper?.some(row => row.status === 'pending') ? 'warning' : undefined,
-          onClick: () => selectTab(item.key),
-        }))} />
-      </div>
+      {stampTabs}
       {role === 'viewer' ? <div className={tpl.notice}><ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div> : null}
       <div className={tpl.split} data-template-region="body" role="tabpanel" id={`visit-stamp-panel-${tab}`} aria-labelledby={`visit-stamp-tab-${tab}`}>
         <div className={styles.body}>
@@ -865,5 +867,5 @@ function HistoryColumns({ canStamp, expanded, onExpandedChange, children }: {
 }
 
 export default function VisitStampsV8() {
-  return <Suspense fallback={<ListState kind="loading" />}><VisitStampsScreen /></Suspense>
+  return <Suspense fallback={<PageFrame kind="visit-stamps"><PageHeading headingSize="regular" title="来店スタンプ" /><div className={tpl.tabs} data-template-region="tabs"><Tabs label="来店スタンプの表示" items={STAMP_TABS.map(item => ({ label: item.label, current: item.key === 'settings', onClick: () => { const url = new URL(window.location.href); url.searchParams.set('tab', item.key); window.location.assign(url.toString()) } }))} /></div><div className={tpl.split}><ListState kind="loading" /></div></PageFrame>}><VisitStampsScreen /></Suspense>
 }

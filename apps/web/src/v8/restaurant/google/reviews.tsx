@@ -15,7 +15,7 @@ import { ApiError } from '@/lib/api'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
-import { DataTable, TableHeadRow, Th, Td, Tr, ActionCell } from '@/components/shared/table'
+import { GridTable, GridHeadRow, GridRow, GridCell, type GridTableDesign } from '@/components/shared/grid-table'
 import { TextArea } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
@@ -67,6 +67,15 @@ const RATING_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'すべて' },
   ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` })),
 ]
+
+const REVIEW_TABLE_DESIGN: GridTableDesign = {
+  columns: 'var(--tpl-rt-col-150) minmax(0, 1fr) var(--tpl-rt-col-130) var(--tpl-rt-col-130) var(--tpl-rt-col-130)',
+  gap: 'var(--tpl-rt-col-gap)',
+  rowPadding: 'var(--space-12) var(--tpl-list-inset)',
+  headPadding: '0 var(--tpl-list-inset)',
+  rowHeight: 'auto',
+  fontSize: 'var(--text-caption)',
+}
 
 export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: string; data: GoogleConnectionData; go: GoogleNav; onSynced: () => void }) {
   const { allowed: canEdit, lockedReason } = useGooglePermission()
@@ -175,36 +184,39 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </div>
       ) : null}
       {list && list.total > 0 ? (
-        /* 絵 ：口コミの表は角丸の枠のカードに入る。 */
-        <Card overflow="hidden"><DataTable density="reviews" columnSizing="controls" data-design="google-reviews"><thead>
-          <TableHeadRow data-table-layout="columns">
-            <Th>投稿者・評価</Th>
-            <Th grow>口コミ</Th>
-            <Th>受信</Th>
-            <Th>状態</Th>
-            <Th><span className="sr-only">操作</span></Th>
-          </TableHeadRow></thead><tbody>
-          {list.reviews.map((review) => {
-            const badge = replyBadge(review)
-            const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
-            return (
-              <Tr key={review.id} data-row-id={review.id} data-table-layout="columns">
-                <Td>
-                  <span className={styles.reviewer}>{review.reviewerDisplayName ?? '匿名'}</span>
-                  <Stars rating={review.starRating} />
-                </Td>
-                <Td grow>
-                  <span className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span>
-                </Td>
-                <Td>{formatShortStamp(reviewReceivedAt(review))}</Td>
-                <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
-                <ActionCell>
-                  <Button disabled={actionable && !review.replyDraft && !canEdit} lockedReason={actionable && !review.replyDraft ? lockedReason : undefined} onClick={() => { if (canEdit || !actionable || review.replyDraft) go({ tab: 'reviews', view: 'draft', id: review.id }) }}>{actionable && !review.replyDraft ? '下書きを作る' : '返信を見る'}</Button>
-                </ActionCell>
-              </Tr>
-            )
-          })}
-        </tbody></DataTable></Card>
+        /* 絵 ：口コミの表は角丸の枠のカードに入る。列幅を固定して投稿者名・年付き日時で列がずれないようにする。 */
+        <Card overflow="hidden">
+          <GridTable label="口コミ一覧" framed={false} design={REVIEW_TABLE_DESIGN} data-design="google-reviews">
+            <GridHeadRow>
+              <GridCell role="columnheader">投稿者・評価</GridCell>
+              <GridCell role="columnheader">口コミ</GridCell>
+              <GridCell role="columnheader" align="right">受信</GridCell>
+              <GridCell role="columnheader">状態</GridCell>
+              <GridCell role="columnheader">操作</GridCell>
+            </GridHeadRow>
+            {list.reviews.map((review) => {
+              const badge = replyBadge(review)
+              const reviewerName = review.reviewerDisplayName ?? '匿名'
+              const actionable = review.replyStatus === 'unreplied' || review.replyStatus === 'draft' || review.replyStatus === 'pending_confirm'
+              return (
+                <GridRow key={review.id} data-row-id={review.id}>
+                  <GridCell stack>
+                    <span className={styles.reviewer} title={reviewerName}>{reviewerName}</span>
+                    <Stars rating={review.starRating} />
+                  </GridCell>
+                  <GridCell>
+                    <span className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span>
+                  </GridCell>
+                  <GridCell align="right" className={styles.reviewDate}>{formatShortStamp(reviewReceivedAt(review))}</GridCell>
+                  <GridCell><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></GridCell>
+                  <GridCell data-list-action-cell="">
+                    <Button disabled={actionable && !review.replyDraft && !canEdit} lockedReason={actionable && !review.replyDraft ? lockedReason : undefined} onClick={() => { if (canEdit || !actionable || review.replyDraft) go({ tab: 'reviews', view: 'draft', id: review.id }) }}>{actionable && !review.replyDraft ? '下書きを作る' : '返信を見る'}</Button>
+                  </GridCell>
+                </GridRow>
+              )
+            })}
+          </GridTable>
+        </Card>
       ) : null}
       {list && pageCount > 1 ? (
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${polishFormatNumber(list.total)} 件・新着と未返信は別に管理`} />
