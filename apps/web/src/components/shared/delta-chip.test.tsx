@@ -34,7 +34,13 @@ it('数の向きと良し悪しを分け、符号は二重にしない', () => {
   ] as const) {
     const { container } = render(<DeltaChip tone="up" direction={direction}>{value}</DeltaChip>)
     expect(container.querySelector('span > span')?.textContent).toBe(expected)
-    expect(container.querySelector('svg')).toBeNull()
+    const arrow = container.querySelector('svg[data-delta-direction]')
+    if (['—', '比較未取得'].includes(String(value))) expect(arrow).toBeNull()
+    else {
+      const signed = String(value).startsWith('−') || String(value).startsWith('-') ? 'down' : String(value).startsWith('+') || String(value).startsWith('＋') ? 'up' : direction
+      expect(arrow?.getAttribute('data-delta-direction')).toBe(signed)
+      expect(arrow?.getAttribute('aria-hidden')).toBe('true')
+    }
     expect(container.querySelector('[data-delta-word]')?.textContent ?? null).toBe(['—', '比較未取得'].includes(String(value)) ? null : '改善')
     cleanup()
   }
@@ -42,8 +48,8 @@ it('数の向きと良し悪しを分け、符号は二重にしない', () => {
 
 it('子の数値と読み上げを保ち、悪化は赤側の言葉で示す', () => {
   const { container } = render(<DeltaChip tone="down" direction="up"><span aria-hidden="true">+0.3pt</span><span className="sr-only">前より0.3ポイント多い</span></DeltaChip>)
-  expect(container.querySelector('[aria-hidden="true"]')?.textContent).toBe('+0.3pt')
+  expect(container.querySelector('span[aria-hidden="true"]')?.textContent).toBe('+0.3pt')
   expect(container.querySelector('.sr-only')?.textContent).toBe('前より0.3ポイント多い')
   expect(container.querySelector('[data-delta-word]')?.textContent).toBe('悪化')
-  expect(container.querySelector('svg')).toBeNull()
+  expect(container.querySelector('[data-delta-direction="up"]')).not.toBeNull()
 })
