@@ -1422,3 +1422,4 @@
 - [オートメーションの公開確認と通知](release-log/unreleased/PR-kenta-later-codex21.md) — 条件を確認できないときの公開と通知の表示を直した反映履歴。確認 2026-11-27。
 
 - [運用者通知とテンプレートの表示修正](release-log/unreleased/PR-kenta-later-codex22.md) — 反映履歴。確認 2026-11-27。
+- [配信分析と受信設定の表示修正](release-log/unreleased/PR-kenta-later-codex23.md) — 反映履歴。確認 2026-11-27。
