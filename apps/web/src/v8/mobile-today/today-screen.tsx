@@ -84,7 +84,7 @@ function TodayBody() {
   if (style.status === 'error' || style.stale) return <ListState kind="error" title="表示の設定を読み込めませんでした" onRetry={style.reload} />
   if (features.status === 'error') return <ListState kind="error" title="利用できる機能を読み込めませんでした" description="画面を開き直してください。" />
   if (style.status !== 'ready' || features.status !== 'ready') return <ListState kind="loading" title="表示の設定を読み込んでいます" />
-  if (!featureEnabled) return <ListState kind="empty" title="予約の表示は準備中です" description="利用できる機能を確認してください。" />
+  if (!featureEnabled) return <ListState kind="empty" title="このアカウントでは予約機能を利用できません" description="利用できる機能を確認してください。" />
   const current = result?.accountId === selectedAccountId ? result : null
   if (!current) return <ListState kind="loading" title="今日の予約を読み込んでいます" />
   if ('noStore' in current) return <ListState kind="empty" title="このアカウントの店舗はまだありません" description="店舗の設定を確認してください。" />

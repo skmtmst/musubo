@@ -82,10 +82,10 @@ it('一般予約の上限に達したときは全件数に見せず予約台帳�
  expect(screen.queryByText('200 件')).toBeNull()
 })
 
-it('予約機能が無いアカウントは取得せず準備中と案内する', () => {
+it('予約機能が無いアカウントは取得せず利用できないと案内する', () => {
  fixture.enabled = false
  render(<MobileTodayScreen />)
- expect(screen.getByText('予約の表示は準備中です')).toBeTruthy()
+ expect(screen.getByText('このアカウントでは予約機能を利用できません')).toBeTruthy()
  expect(fixture.getToday).not.toHaveBeenCalled()
  expect(fixture.reservationsDay).not.toHaveBeenCalled()
 })

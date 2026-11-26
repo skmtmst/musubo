@@ -165,7 +165,7 @@ it('未選択の複数店舗で選んだ店を表示店舗にすると、知ら�
   fireEvent.click(await screen.findByRole('button', { name: '店舗', exact: true }))
   const dialog = await screen.findByRole('dialog')
   fireEvent.click(within(dialog).getByRole('radio', { name: 'もう一つの店', exact: true }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する', exact: true }))
   fireEvent.click(await screen.findByRole('button', { name: 'この店舗を表示店舗にする' }))
   await waitFor(() => expect(net.contextId).toBe('second'))
   view.unmount()
