@@ -1397,4 +1397,4 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 - [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
-- [予約メールの取り込みの停止・再開](release-log/unreleased/PR-kenta-mail-import.md) — 店舗と媒体ごとに予約メールの取り込みを止める・再開する反映履歴。確認 2026-11-26。
+- [予約メールの取り込みの停止・再開](release-log/unreleased/242-kenta-mail-import.md) — 店舗と媒体ごとに予約メールの取り込みを止める・再開する反映履歴。確認 2026-11-26。
