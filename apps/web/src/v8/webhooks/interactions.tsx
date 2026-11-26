@@ -82,6 +82,7 @@ function bodyLines(item: WebhookInteraction): { main: string; sub: string } {
 /* 返事の札。言葉は口の返事、色は記録の状態（処理中・送り直し済みを成功の緑にしない）。 */
 function replyLabel(item: WebhookInteraction): { text: string; tone: StatusBadgeTone } {
   const { tone } = interactionState(item)
+  if (!['failed', 'succeeded', 'pending', 'retried'].includes(item.status)) return { text: '状態不明', tone }
   if (item.status === 'failed') return { text: item.responseLabel, tone }
   if (item.direction === 'incoming') return { text: '受け取った', tone }
   return { text: item.responseLabel, tone }
@@ -93,6 +94,7 @@ function seconds(ms: number | null): string {
 
 /* その記録をここからやり直せるかを業務の言葉で説明する（管理画面 と同じ定義）。 */
 function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
+  if (!['failed', 'succeeded', 'pending', 'retried'].includes(item.status)) return '状態を確認できません。最新の記録を確認してください。'
   if (item.eventType === 'incoming_webhook.test') return '受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため、送り直す対象ではありません。'
   if (item.status === 'succeeded') return '届いた記録なので、送り直す必要はありません。'
   if (item.status === 'pending') return 'いま処理の途中です。終わってから結果を確かめてください。'
@@ -114,7 +116,8 @@ function interactionState(item: WebhookInteraction): { label: string; tone: Stat
   if (item.status === 'failed') return { label: '失敗', tone: 'danger' }
   if (item.status === 'succeeded') return { label: '成功', tone: 'success' }
   if (item.status === 'retried') return { label: '送り直し済み', tone: 'neutral' }
-  return { label: '処理中', tone: 'warning' }
+  if (item.status === 'pending') return { label: '処理中', tone: 'warning' }
+  return { label: '状態不明', tone: 'neutral' }
 }
 
 function canRetryNow(item: WebhookInteraction, allowed: boolean): boolean {
