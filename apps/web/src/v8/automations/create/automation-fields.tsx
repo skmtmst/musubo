@@ -18,6 +18,7 @@ import { Zap } from 'lucide-react'
 import WaitFields from '@/components/automations/wait-fields'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { ActionDraft } from './action-draft'
+import { UNKNOWN_CONDITION_REASON } from './draft-conditions'
 import styles from './create.module.css'
 import { b244Requirements, newActionDraft } from './draft-model'
 import { EDITABLE_ACTIONS, EVENTS, REPRESENTATIVE_TRIGGER_EVENTS, TRIGGER_SHORT_NOTES } from './draft-options'
@@ -32,7 +33,7 @@ export function AutomationFields({
   setEventQuery, triggerEventGroups, matchedEvents, eventType,
   setEventType, representativeIcon, setShowAllEvents, usesKeyword,
   keyword, setKeyword, triggerConfig, setTriggerConfig,
-  tags, selectedAccountId, triggerConfigSummary, conditionUnreadable,
+  tags, selectedAccountId, triggerConfigSummary, conditionUnreadable, unknownCondition,
   setConditionUnreadable, conditionSummaries, setConditionOpen, actions,
   setActions, canEdit, editingActionKey, actionRowDetail,
   scenarios, commonActions, updateAction, tagsLoading,
@@ -62,6 +63,7 @@ export function AutomationFields({
   selectedAccountId: string | null
   triggerConfigSummary: string
   conditionUnreadable: boolean
+  unknownCondition: boolean
   setConditionUnreadable: Dispatch<SetStateAction<boolean>>
   conditionSummaries: string[]
   setConditionOpen: Dispatch<SetStateAction<boolean>>
@@ -185,6 +187,7 @@ export function AutomationFields({
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>だれに動かしますか</h2>
         </div>
+        {unknownCondition ? <Notice tone="warn">{UNKNOWN_CONDITION_REASON}</Notice> : null}
         {conditionUnreadable ? (
           <Notice tone="danger" heading={<> 保存されていた条件は読めませんでした </>} action={<> <div>
               <Button id="v8-repair-condition" aria-describedby={inputError?.target === 'v8-repair-condition' ? 'v8-repair-condition-error' : undefined} onClick={() => { setConditionUnreadable(false); setInputError(null) }}>以前の条件を外して付け直す</Button>

@@ -1419,3 +1419,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [オートメーションの条件表示](release-log/unreleased/PR-kenta-later-codex20.md) — 見慣れない条件を含むときの表示を直した反映履歴。確認 2026-11-27。
+- [オートメーションの公開確認と通知](release-log/unreleased/PR-kenta-later-codex21.md) — 条件を確認できないときの公開と通知の表示を直した反映履歴。確認 2026-11-27。
