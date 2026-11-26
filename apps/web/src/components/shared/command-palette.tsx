@@ -1,9 +1,11 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MENU_SECTIONS } from '@/lib/menu'
+import { isHqShellPath } from '@/lib/menu'
+import { useOptionalAccount } from '@/contexts/account-context'
+import { resolveLineAccountEntry } from '@/lib/line-account-entry'
 import { useV8Leave } from './overlay-utils'
 import styles from './command-palette.module.css'
 import { isImeComposing } from './ime'
@@ -13,6 +15,7 @@ export type PaletteItem = {
   href: string
   label: string
   section?: string
+  accountId?: string
 }
 
 const TEMPLATE_SEARCH_TYPES = [
@@ -27,6 +30,12 @@ function collectVisibleItems(): PaletteItem[] {
   const seen = new Set<string>()
   const items: PaletteItem[] = []
   anchors.forEach((anchor) => {
+    let ancestor: Element | null = anchor
+    while (ancestor) {
+      if (ancestor.matches('[hidden], [aria-hidden="true"], [inert]') && !ancestor.matches('[data-group-open="false"]')) return
+      ancestor = ancestor.parentElement
+    }
+    if (anchor.getAttribute('aria-disabled') === 'true') return
     const href = anchor.getAttribute('href')
     if (!href || seen.has(href)) return
     seen.add(href)
@@ -34,12 +43,6 @@ function collectVisibleItems(): PaletteItem[] {
     items.push({ href, label })
   })
   return items
-}
-
-function menuFallback(): PaletteItem[] {
-  return MENU_SECTIONS.flatMap((section) =>
-    section.items.map((item) => ({ href: item.href, label: item.label, section: section.title })),
-  )
 }
 
 /**
@@ -50,6 +53,10 @@ function menuFallback(): PaletteItem[] {
  */
 export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   const router = useRouter()
+  const pathname = usePathname() ?? ''
+  const hqShell = isHqShellPath(pathname)
+  const account = useOptionalAccount()
+  const accountEntryRequest = useRef(0)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
@@ -62,12 +69,14 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   const backdropRef = useRef<HTMLDivElement>(null)
   const openRef = useRef(open)
   openRef.current = open
+  useEffect(() => () => { accountEntryRequest.current += 1 }, [pathname])
   /* 閉じるときも窓と同じく薄く消す（動きの点検 13 番）。 */
   const leaving = useV8Leave(open)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey && !event.shiftKey && !isImeComposing(event)) {
+      if (!event.defaultPrevented && !event.repeat && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey && !event.shiftKey && !isImeComposing(event)) {
+        if (!openRef.current && [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(dialog => !dialog.closest('[hidden], [aria-hidden="true"], [inert]'))) return
         event.preventDefault()
         if (!openRef.current) {
           const active = document.activeElement
@@ -96,8 +105,12 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
     }
   }, [open ])
 
-  const base = items ?? (menuItems.length > 0 ? menuItems : menuFallback())
-  const canSearchTemplates = (items ?? menuItems).some((item) => item.href.split('?')[0] === '/templates')
+  const visibleItems = items ?? menuItems
+  const base = useMemo(() => [...visibleItems, ...(account?.accounts ?? []).filter(item => (hqShell || item.id !== account?.selectedAccountId) && !item.archivedAt).map(item => ({ href: '', accountId: item.id, label: item.displayName || item.name, section: 'アカウント切替' }))], [visibleItems, account?.accounts, account?.selectedAccountId, hqShell])
+  const hasRoute = (route: string) => visibleItems.some((item) => item.href.split('?')[0] === route)
+  const canSearchTemplates = hasRoute('/templates')
+  const canSearchFriends = hasRoute('/friends')
+  const canSearchChats = hasRoute('/chats')
   const trimmed = query.trim()
   const hits = useMemo(() => {
     const lower = trimmed.toLowerCase()
@@ -112,9 +125,10 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
     () =>
       trimmed === ''
         ? hits
-        : [...hits, { href: `/friends?q=${encodeURIComponent(trimmed)}`, label: `友だちを探す「${trimmed}」` },
+        : [...hits, ...(canSearchFriends ? [{ href: `/friends?q=${encodeURIComponent(trimmed)}`, label: `友だちを探す「${trimmed}」` }] : []),
+          ...(canSearchChats ? [{ href: `/chats?q=${encodeURIComponent(trimmed)}`, label: `トークの相手を探す「${trimmed}」` }] : []),
           ...(canSearchTemplates ? TEMPLATE_SEARCH_TYPES.map(([tab, label]) => ({ href: `/templates?q=${encodeURIComponent(trimmed)}&tab=${tab}`, label: `${label}のテンプレートを探す「${trimmed}」` })) : [])],
-    [hits, trimmed, canSearchTemplates],
+    [hits, trimmed, canSearchFriends, canSearchChats, canSearchTemplates],
   )
 
   useEffect(() => {
@@ -123,15 +137,43 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
 
   if ((!open && !leaving) || typeof document === 'undefined') return null
 
-  const go = (href: string) => {
+  const go = (row: PaletteItem) => {
     setOpen(false)
+    if (row.accountId && account) {
+      const id = row.accountId
+      requestUnsavedAction(async () => {
+        const request = ++accountEntryRequest.current
+        if (hqShell) {
+          try {
+            const entry = await resolveLineAccountEntry(id)
+            if (request !== accountEntryRequest.current) return
+            if ('href' in entry || entry.destination === 'unavailable') { router.push('href' in entry ? entry.href : `/accounts/new?resume=${encodeURIComponent(id)}`); return }
+          } catch { if (request === accountEntryRequest.current) router.push(`/accounts/new/handover?accountId=${encodeURIComponent(id)}`); return }
+          account.setSelectedAccountId(id)
+          router.push('/')
+        } else {
+          account.setSelectedAccountId(id)
+          if (pathname === '/' && account.selectedAccountId !== id) {
+            const params = new URLSearchParams(window.location.search)
+            const keys = ['setup', 'setupReturn', 'qr', 'guide']
+            if (keys.some(key => params.has(key))) {
+              keys.forEach(key => params.delete(key))
+              router.replace(params.size ? `/?${params}` : '/')
+            }
+          }
+        }
+      })
+      return
+    }
+    const href = row.href
     // 書きかけの画面があれば、左メニューのリンクと同じ「保存せずに移りますか」を通す。
     // 直接 router.push すると未保存の入力が確認なしで消える（監査 WEB-008）。
     requestUnsavedAction(() => {
       // 同じ一覧では router.push だけだと一覧の URL 購読に検索語が届かない。
-      if (window.location.pathname === '/templates' && href.startsWith('/templates?q=')) {
+      if ((window.location.pathname === '/templates' && href.startsWith('/templates?q=')) || (window.location.pathname === '/chats' && href.startsWith('/chats?q='))) {
         window.history.pushState(null, '', href)
         window.dispatchEvent(new PopStateEvent('popstate'))
+        if (window.location.pathname === '/chats') window.dispatchEvent(new CustomEvent('musubo:command-palette-chat-search', { detail: new URLSearchParams(window.location.search).get('q') ?? '' }))
       } else router.push(href)
     })
   }
@@ -146,6 +188,8 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (leaving) return
+          // 開いた窓の単独キーは受信箱など背景のショートカットに渡さない。
+          if (!event.metaKey && !event.ctrlKey && !event.altKey) event.stopPropagation()
           // 変換中の Enter（確定）で行き先へ飛ばない・上下で行を動かさない。
           if (isImeComposing(event)) return
           if (event.key === 'Escape') setOpen(false)
@@ -156,7 +200,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
             event.preventDefault()
             setActive((prev) => (rows.length === 0 ? 0 : (prev - 1 + rows.length) % rows.length))
           } else if (event.key === 'Enter' && rows[active]) {
-            go(rows[active].href)
+            go(rows[active])
           }
         }}
       >
@@ -175,14 +219,14 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
         />
         <ul ref={listRef} className={styles.list} role="listbox" aria-label="探した結果">
           {rows.map((row, index) => (
-            <li key={`${row.href}-${row.label}`}>
+            <li key={`${row.accountId ?? row.href}-${row.label}`}>
               <button
                 type="button"
                 role="option"
                 aria-selected={index === active}
                 className={`${styles.row} ${index === active ? styles.rowActive : ''}`}
                 onMouseEnter={() => setActive(index)}
-                onClick={() => go(row.href)}
+                onClick={() => go(row)}
               >
                 <span className={styles.rowLabel}>{row.label}</span>
                 {row.section ? <span className={styles.rowSection}>{row.section}</span> : null}
