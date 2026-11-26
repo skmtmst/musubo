@@ -58,7 +58,8 @@ function tenantState(row: OpsTenantRow): { label: string; tone: StatusBadgeTone 
   if (row.plan_status === 'past_due') return { label: '決済失敗', tone: 'danger' }
   if (row.plan_status === 'active') return { label: '契約中', tone: 'success' }
   if (row.plan_status === 'exempt') return { label: '課金対象外', tone: 'neutral' }
-  return { label: '請求解約', tone: 'neutral' }
+  if (row.plan_status === 'canceled') return { label: '請求解約', tone: 'neutral' }
+  return { label: '確認が必要', tone: 'neutral' }
 }
 
 /** 10/4 の形。 */
@@ -168,7 +169,7 @@ export default function OpsTenantsV8() {
               return <Tr data-table-layout="columns" key={row.id} href={tenantDetailHref(row.id)}>
                 <NameCell grow name={<RowNameLink href={tenantDetailHref(row.id)} title={row.name}><TruncatedText value={String(row.name ?? '')} /></RowNameLink>} />
                 <Td>{row.plan_status === 'trialing' && !row.plan_key ? 'トライアル' : planLabel(row.plan_key)}</Td>
-                <Td title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${PLAN_STATUS_LABEL[row.plan_status] ?? row.plan_status}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></Td>
+                <Td title={`利用 ${row.status === 'suspended' ? '利用停止' : row.status === 'archived' ? '解約済み' : '利用中'}・請求 ${(Object.prototype.hasOwnProperty.call(PLAN_STATUS_LABEL, row.plan_status) ? PLAN_STATUS_LABEL[row.plan_status] : row.plan_status)}`}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></Td>
                 <Td align="right" data-list-number collapseAt="narrow">{row.account_count}</Td>
                 <Td align="right" data-list-number collapseAt="narrow">{row.staff_count}</Td>
                 <Td><span className={styles.billing}>
