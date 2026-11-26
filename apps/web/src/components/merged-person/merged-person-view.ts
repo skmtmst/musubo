@@ -22,6 +22,10 @@ import { formatDateTime, formatDay } from '@/lib/format'
 /** 取得元が無い値。取得できた 0 とは別。 */
 export const NOT_AVAILABLE = '—'
 
+function knownText(table: object, key: string, fallback: string): string {
+  return Object.prototype.hasOwnProperty.call(table, key) ? (table as Record<string, string>)[key] : fallback
+}
+
 /**
  * 統合ユーザーのidを、一覧の行から取り出す。
  *
@@ -51,7 +55,7 @@ const STATUS: Record<MergedPersonStatus, string> = {
 }
 
 export function statusText(status: MergedPersonStatus): string {
-  return STATUS[status]
+  return knownText(STATUS, status, '状態を確認できません')
 }
 
 const SOURCE: Record<MergedPersonProfileSource, string> = {
@@ -64,7 +68,7 @@ const SOURCE: Record<MergedPersonProfileSource, string> = {
 
 /** 採用元。「どこから採ったか」が読めないと、値を疑ったとき確かめられない。 */
 export function sourceText(sourceType: MergedPersonProfileSource): string {
-  return SOURCE[sourceType]
+  return knownText(SOURCE, sourceType, '取得元を確認できません')
 }
 
 const UPDATE_MODE: Record<MergedPersonProfileUpdateMode, string> = {
@@ -73,7 +77,7 @@ const UPDATE_MODE: Record<MergedPersonProfileUpdateMode, string> = {
 }
 
 export function updateModeText(mode: MergedPersonProfileUpdateMode): string {
-  return UPDATE_MODE[mode]
+  return knownText(UPDATE_MODE, mode, '更新方法を確認できません')
 }
 
 const PURPOSE: Record<MergedPersonDeliveryPurpose, string> = {
@@ -85,7 +89,7 @@ const PURPOSE: Record<MergedPersonDeliveryPurpose, string> = {
 }
 
 export function purposeText(purpose: MergedPersonDeliveryPurpose): string {
-  return PURPOSE[purpose]
+  return knownText(PURPOSE, purpose, '用途を確認できません')
 }
 
 const EVENT: Record<MergedPersonEventType, string> = {
@@ -98,7 +102,7 @@ const EVENT: Record<MergedPersonEventType, string> = {
 }
 
 export function eventText(eventType: MergedPersonEventType): string {
-  return EVENT[eventType]
+  return knownText(EVENT, eventType, '履歴の種類を確認できません')
 }
 
 /**
