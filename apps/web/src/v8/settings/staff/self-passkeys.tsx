@@ -4,6 +4,7 @@ import { startRegistration } from '@simplewebauthn/browser'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiResponse } from '@line-crm/shared'
 import { fetchApi, describeSaveFailure } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -21,7 +22,9 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [loaded, setLoaded] = useState(false)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const loaded = loadState === 'ready'
+  const loadSeq = useRef(0)
   const [keyToRemove, setKeyToRemove] = useState<(Passkey & { displayIndex: number }) | null>(null)
   const deleteTicket = useRef<object | null>(null)
   const renderedDeleteTicket = deleteTicket.current
@@ -33,14 +36,25 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
   useEffect(() => { setKeyToRemove(null) }, [identityId])
   const stepUp = useStepUpGate()
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
+    setLoadState('loading')
+    setError('')
     try {
       const res = await fetchApi<ApiResponse<Passkey[]>>('/api/auth/passkeys/self', { cache: 'no-store' })
+      if (seq !== loadSeq.current) return
       if (!res.success || !Array.isArray(res.data)) throw new Error(res.success ? 'パスキー一覧を読み込めませんでした' : res.error)
       setKeys(res.data)
-    } catch (caught) { setError(describeSaveFailure(caught)) }
-    finally { setLoaded(true) }
+      setLoadState('ready')
+    } catch (caught) {
+      if (seq !== loadSeq.current) return
+      setLoadState('error')
+      setError(describeApiFailure(caught, 'パスキー一覧の読み込み'))
+    }
   }, [])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { loadSeq.current += 1 }
+  }, [load])
 
   const register = async () => {
     if (busy) return
@@ -87,9 +101,9 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
 
   return <>
     <section className={styles.passkeyBlock} aria-label="パスキー">
-      {error ? <Notice tone="danger" message={error} /> : null}
+      {error ? <Notice tone="danger" message={error} action={loadState === 'error' ? <Button size="compact" onClick={() => void load()}>もう一度読み込む</Button> : undefined} /> : null}
       {message ? <Notice tone="info" message={message} /> : null}
-      <p className={styles.securityState}>パスキー　{loaded ? keys.length ? `登録済み ${keys.length}件` : '未登録' : '確認中'}</p>
+      <p className={styles.securityState}>パスキー　{loaded ? keys.length ? `登録済み ${keys.length}件` : '未登録' : loadState === 'error' ? '確認できませんでした' : '確認中'}</p>
       {loaded && keys.length ? <div className={styles.passkeyList}>{keys.map((key, index) => <div key={key.id} className={styles.passkeyItem}>
         <div><strong>パスキー {index + 1}</strong><span>{registeredDate.format(new Date(key.createdAt))} 登録</span></div>
         <Button variant="text" textTone="danger" size="compact" disabled={busy} onClick={() => { deleteTicket.current = {}; setKeyToRemove({ ...key, displayIndex: index + 1 }) }}>削除</Button>
