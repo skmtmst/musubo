@@ -10,6 +10,7 @@ import type { Tag } from '@line-crm/shared'
 import { api, type BroadcastApprovalCandidate } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -92,6 +93,8 @@ export default function QuickSendV8({
   const [candidates, setCandidates] = useState<BroadcastApprovalCandidate[]>([])
   const [approverId, setApproverId] = useState('')
   const [approvalConfig, setApprovalConfig] = useState<{threshold: number; singleOperator: boolean} | null>(null)
+  const [configLoadFailed, setConfigLoadFailed] = useState(false)
+  const [configRetry, setConfigRetry] = useState(0)
   const [countInput, setCountInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +110,7 @@ export default function QuickSendV8({
     let cancelled = false
     if (!open) return
     setApprovalConfig(null)
+    setConfigLoadFailed(false)
     setCountInput('')
     setTags([])
     setCandidates([])
@@ -129,9 +133,28 @@ export default function QuickSendV8({
     void api.broadcasts.approval.candidates(accountId).then((res) => {
       if (!cancelled && res.success) setCandidates(res.data)
     }).catch(() => undefined)
-    void api.broadcasts.approval.config(accountId).then((res) => { if (cancelled) return; if (res.success) setApprovalConfig(res.data); else setError('承認の設定を読み込めませんでした。開き直してください。') }).catch(() => { if (!cancelled) setError('承認の設定を読み込めませんでした。開き直してください。') })
     return () => { cancelled = true }
   }, [open, accountId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!open || !accountId) return
+    setConfigLoadFailed(false)
+    void api.broadcasts.approval.config(accountId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setApprovalConfig(res.data)
+          setConfigLoadFailed(false)
+        } else {
+          setConfigLoadFailed(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setConfigLoadFailed(true)
+      })
+    return () => { cancelled = true }
+  }, [open, accountId, configRetry])
 
   // 本文・相手が変わったら人数を見積もる（少し待ってから1回だけ）。
   useEffect(() => {
@@ -209,7 +232,7 @@ export default function QuickSendV8({
       : target === 'tag' && !tagId ? '送る相手のタグを選んでください。'
         : when === 'scheduled' && !scheduledAt ? '送る日時を選んでください。'
           : needsApproval && !approverId ? '承認を頼む相手を選んでください。'
-            : approvalConfig === null ? error ? '配信の承認設定を確認できません。もう一度開き直してください。' : '配信の承認設定を確認しています。'
+            : approvalConfig === null ? (error || configLoadFailed) ? '配信の承認設定を確認できません。もう一度読み込んでください。' : '配信の承認設定を確認しています。'
               : estimate === null ? error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
                 : needsCountConfirmation && !countMatched ? '確認した対象人数を入力してください。'
                   : busy ? '送っています。完了までお待ちください。' : undefined
@@ -354,7 +377,7 @@ export default function QuickSendV8({
 
         </DialogActions>)}
     >
-      <div className={styles.body}><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
+      <div className={styles.body}><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />{configLoadFailed ? <Notice tone="danger" action={<Button size="compact" onClick={() => setConfigRetry((count) => count + 1)}>もう一度読み込む</Button>}>承認の設定を読み込めませんでした。開き直してください。</Notice> : null}{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
