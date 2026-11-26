@@ -21,12 +21,12 @@ export type HealthTabKey = 'logs' | 'concern' | 'items'
 export type HealthFilters = { q: string; change: NenHealthChangeFilter; last: NenHealthLastFilter; sort: NenHealthSort }
 export const EMPTY_FILTERS: HealthFilters = { q: '', change: '', last: '', sort: 'concern' }
 
-export const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' }
-export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' }
+export const SKIN_LABELS: Record<string, string> = Object.assign(Object.create(null), { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' })
+export const TEAR_LABELS: Record<string, string> = Object.assign(Object.create(null), { normal: '問題なし', mild: '少し気になる', concern: '気になる' })
 
 export function countText(counts: Record<string, number>, labels: Record<string, string>): string {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
-  return entries.length ? entries.map(([key, n]) => `${labels[key] ?? key} ${n}回`).join('・') : emptyValue('unknown')
+  return entries.length ? entries.map(([key, n]) => `${Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : key} ${n}回`).join('・') : emptyValue('unknown')
 }
 
 /** 「2026-09-30」→「9/30」。 */
@@ -50,13 +50,13 @@ export function changeBadges(row: NenHealthRow): Array<{ key: string; label: str
       ? { key: 'ok', label: 'いつもどおり', detail: '気になる変化はありません', tone: 'ok' }
       : { key: 'none', label: '記録なし', detail: '30日の記録がありません', tone: 'off' }]
   }
-  const short: Record<string, string> = {
+  const short: Record<string, string> = Object.assign(Object.create(null), {
     weight_drop: '体重が減った',
     weight_gain: '体重が増えた',
     stool_abnormal: '便の異常が続く',
     appetite_poor: '食いつき不良が続く',
     silent: '記録なし',
-  }
+  })
   return row.changes.map((change) => ({
     key: change.key,
     label: short[change.key] ?? change.label,
