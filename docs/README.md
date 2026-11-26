@@ -1409,12 +1409,9 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-- [リッチメニューとお知らせの読み直し](release-log/unreleased/PR-kenta-later-bottom3.md) — 対象人数・タップ数と役割の取得を直した履歴。確認 2026-11-26。
 
-- [かんたん配信とウェビナーの読み直し](release-log/unreleased/PR-kenta-later-bottom4.md) — 人数と動画情報の取得失敗からの復帰。確認 2026-11-26。
 
-- [カルーセルと質問のフォルダの読み直し](release-log/unreleased/PR-kenta-later-bottom5.md) — フォルダの取得失敗からの復帰。確認 2026-11-26。
 
-- [タグの同名確認とイベントの予約枠の読み直し](release-log/unreleased/PR-kenta-later-bottom6.md) — 取得失敗時の表示と再試行の履歴。確認 2026-11-26。
 
-- [担当スタッフの設定と統括の友だち数の読み直し](release-log/unreleased/PR-kenta-later-bottom7.md) — 取得失敗時の表示と再試行の履歴。確認 2026-11-26。
+
+- [画面の読み直しと表示の列車5](release-log/unreleased/PR-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
