@@ -1410,3 +1410,4 @@
 - [LINEフォローのテンプレート選択とバナー取り込み窓の再読み込み](release-log/unreleased/253-kenta-later-gemini3-1127.md) — 反映履歴、確認 2026-11-27。
 - [LINEアカウント登録のプロバイダーID案内と吹き出し編集の折り返し修正](release-log/unreleased/254-kenta-later-ui.md) — 反映履歴、確認 2026-11-27。
 - [緊急コントロール送信経路と友だち配信受け取り履歴の再読み込み](release-log/unreleased/255-kenta-later-gemini4-1127.md) — 反映履歴、確認 2026-11-27。
+- [スマホ幅のリマインダ名と共通アクションの未対応の種類の表示を直した反映履歴](release-log/unreleased/257-kenta-later-codex2.md) — 反映履歴、確認 2026-11-27。
