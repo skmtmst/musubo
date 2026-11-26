@@ -1406,8 +1406,6 @@
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 
-- [来店スタンプと友だち移行の履歴表示](release-log/unreleased/PR-kenta-later-codex24.md) — 反映履歴。確認 2026-11-27。
-- [友だち追加時の配信一覧と送り先編集の読み込み状態・再読み込み表示](release-log/unreleased/PR-kenta-later-gemini21-1127.md) — 反映履歴、確認 2026-11-27。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
@@ -1421,16 +1419,5 @@
 - [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
-- [オートメーションの条件表示](release-log/unreleased/PR-kenta-later-codex20.md) — 見慣れない条件を含むときの表示を直した反映履歴。確認 2026-11-27。
-- [オートメーションの公開確認と通知](release-log/unreleased/PR-kenta-later-codex21.md) — 条件を確認できないときの公開と通知の表示を直した反映履歴。確認 2026-11-27。
 
-- [運用者通知とテンプレートの表示修正](release-log/unreleased/PR-kenta-later-codex22.md) — 反映履歴。確認 2026-11-27。
-- [配信分析と受信設定の表示修正](release-log/unreleased/PR-kenta-later-codex23.md) — 反映履歴。確認 2026-11-27。
-- [初回案内とリッチメニューの参照表示](release-log/unreleased/PR-kenta-later-codex25.md) — 反映履歴。確認 2026-11-27。
-- [UID移行と申込一覧の状態表示](release-log/unreleased/PR-kenta-later-codex26.md) — 反映履歴。確認 2026-11-27。
-- [通知記録とシナリオのアクション件数](release-log/unreleased/PR-kenta-later-codex27.md) — 反映履歴。確認 2026-11-27。
-- [友だち追加の実行結果と統括一括配信一覧の読み込み失敗表示と再読み込み](release-log/unreleased/PR-kenta-later-gemini18-1127.md) — 反映履歴、確認 2026-11-27。
-- [運営メンバー管理と統合ユーザー一覧の読み込み失敗時の表示と再読み込み](release-log/unreleased/PR-kenta-later-gemini19-1127.md) — 反映履歴、確認 2026-11-27。
-- [サイトスクリプトと自動応答作成の読み込み失敗時の表示と再読み込み](release-log/unreleased/PR-kenta-later-gemini20-1127.md) — 反映履歴、確認 2026-11-27。
-- [EC連携の自動LINE送った件数再取得とウェビナー分析の読み込み・失敗表示](release-log/unreleased/PR-kenta-later-gemini22-1127.md) — 反映履歴、確認 2026-11-27。
-- [保存した検索の失敗表示・条件名再取得と自動応答実行結果の読み込み・失敗表示](release-log/unreleased/PR-kenta-later-gemini23-1127.md) — 反映履歴、確認 2026-11-27。
+- [夜の画面の直し（列車6）](release-log/unreleased/PR-kenta-train-night6-1127.md) — 反映履歴、確認 2026-11-27。
