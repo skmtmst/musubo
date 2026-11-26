@@ -83,13 +83,13 @@ export function describeConditionRule(
         ? '選んだフォームに回答した人'
         : 'いずれかのフォームに回答した人'
     case 'reaction_state': {
-      const labels: Record<string, string> = {
+      const labels: Record<string, string> = Object.assign(Object.create(null), {
         reply_or_postback: '返信・応答のある人',
         reply: '返信のある人',
         postback: 'ボタン応答のみの人',
         none: '返信・応答の無い人',
-      }
-      return labels[String(rule.value)] ?? '反応状態で絞る人'
+      })
+      return labels[String(rule.value)] ?? '反応状態を確認できない人'
     }
     case 'score_range': {
       const min = typeof v?.min === 'number' ? v.min : null

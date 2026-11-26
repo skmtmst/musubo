@@ -19,3 +19,8 @@ it.each(['constructor', '__proto__', 'future'])('未知のシナリオ状態 %s 
   render(<NewAutomationV8 />)
   expect((await screen.findAllByText(/購読状態が不明/)).length).toBeGreaterThan(0)
 })
+it.each(['toString', 'constructor', '__proto__', 'future'])('未知の反応状態 %s を画面に表示する', async value => {
+  fixture.condition = { operator:'AND',rules:[{type:'reaction_state',value}],groups:[] }
+  render(<NewAutomationV8 />)
+  expect((await screen.findAllByText(/反応状態を確認できない人/)).length).toBeGreaterThan(0)
+})
