@@ -31,6 +31,10 @@ const LIFF_SOURCE = readFileSync(
   join(REPO_ROOT, 'apps/liff/src/components/date-time-picker.tsx'),
   'utf8',
 )
+const LIFF_DATE_PARTS_SOURCE = readFileSync(
+  join(REPO_ROOT, 'apps/liff/src/components/booking-date-parts.tsx'),
+  'utf8',
+)
 const LIFF_USER_MESSAGE_SOURCE = readFileSync(
   join(REPO_ROOT, 'apps/liff/src/lib/user-message.ts'),
   'utf8',
@@ -72,7 +76,10 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
     expect(LIFF_SOURCE).not.toContain('空き枠を取得中…')
     expect(LIFF_SOURCE).not.toContain('text-red-600')
     // ★V8: 「週で見る」は5日の並び（空き・満・休み）、時刻は選んだ日の3列。
-    expect(LIFF_SOURCE).toContain('週で見る')
+    expect(LIFF_SOURCE).toContain('<BookingDateViews')
+    expect(LIFF_SOURCE).toContain('<BookingDayChoice')
+    expect(LIFF_DATE_PARTS_SOURCE).toContain('週で見る')
+    expect(LIFF_DATE_PARTS_SOURCE).toContain('カレンダー')
     expect(LIFF_SOURCE).toContain('grid-cols-5')
     expect(LIFF_SOURCE).toContain('grid-cols-3')
     expect(LIFF_SOURCE).toContain('満席')
@@ -81,7 +88,7 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
     // カレンダーは月の表（7列・●空きあり／灰色は満席・休みの印の見方）。
     expect(LIFF_SOURCE).toContain('grid-cols-7')
     expect(LIFF_SOURCE).toContain('お休み')
-    expect(LIFF_SOURCE).toContain('radiogroup')
+    expect(LIFF_DATE_PARTS_SOURCE).toContain('radiogroup')
   })
 
   it('管理画面側に実LIFFと違う見せ方が残っていない', () => {
