@@ -81,12 +81,15 @@ function normalizedSubmission(item: Submission): Submission {
     return { ...item, data: {} }
   }
 }
+function answerOf(data: Record<string, unknown>, key: string): unknown {
+  return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : undefined
+}
 function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>, blocks: InputBlock[]) {
   const header = ['回答ID', '答えた人', '答えた日時', ...fieldKeys.map((key) => labels[key] ?? key)]
   const lines = [header.map(csvCell).join(',')]
   for (const row of rows) {
     const data = row.data as Record<string, unknown>
-    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => valueText(data[key], blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
+    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => valueText(answerOf(data, key), blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
   }
   const url = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
@@ -278,7 +281,7 @@ function Responses() {
   const summaries = useMemo(() => fieldKeys.map((key) => {
     const counts = new Map<string, number>()
     for (const item of items) {
-      const value = valueText((item.data as Record<string, unknown>)[key], blockByKey(key))
+      const value = valueText(answerOf(item.data as Record<string, unknown>, key), blockByKey(key))
       if (value === '—') continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
@@ -405,7 +408,7 @@ function Responses() {
     rate != null ? `全回答の答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
-    && items.some((item) => String((item.data as Record<string, unknown>)[key] ?? '').trim() !== ''))
+    && items.some((item) => String(answerOf(item.data as Record<string, unknown>, key) ?? '').trim() !== ''))
 
   const responseSelection = view === 'rows' ? selected : null
   const rail = (
@@ -430,11 +433,11 @@ function Responses() {
               <dd>{shortWhen(selected.createdAt)}</dd>
             </div>
             {fieldKeys.map((key) => {
-              const value = valueText((selected.data as Record<string, unknown>)[key], blockByKey(key))
+              const value = valueText(answerOf(selected.data as Record<string, unknown>, key), blockByKey(key))
               return (
                 <div key={key}>
                   <dt title={labels[key] ?? key}>{labels[key] ?? key}</dt>
-                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={(selected.data as Record<string, unknown>)[key]} block={blockByKey(key)} />}</dd>
+                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={answerOf(selected.data as Record<string, unknown>, key)} block={blockByKey(key)} />}</dd>
                 </div>
               )
             })}
@@ -532,13 +535,13 @@ function Responses() {
                 )
               })}
               {longKey ? (() => {
-                const recents = items.filter((item) => String((item.data as Record<string, unknown>)[longKey] ?? '').trim() !== '')
+                const recents = items.filter((item) => String(answerOf(item.data as Record<string, unknown>, longKey) ?? '').trim() !== '')
                 return (
                   <Card variant="form" padding="roomy" aria-label={labels[longKey] ?? longKey}>
                     <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`} />
                     <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) 0' }}><tbody>
                       {recents.slice(0, 2).map((item) => {
-                        const text = String((item.data as Record<string, unknown>)[longKey])
+                        const text = String(answerOf(item.data as Record<string, unknown>, longKey))
                         return (
                           <Tr key={item.id} interactive={false} data-table-layout="columns">
                             <Td grow><TruncatedText value={`「${text}」`} /></Td>
@@ -575,7 +578,7 @@ function Responses() {
                 <tbody>
                   {items.map((item) => {
                     const incomplete = incompleteOf(item)
-                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey], blockByKey(firstKey)) : emptyValue('unknown')
+                    const first = firstKey ? valueText(answerOf(item.data as Record<string, unknown>, firstKey), blockByKey(firstKey)) : emptyValue('unknown')
                     const isSelected = selected?.id === item.id
                     return (
                       <Tr
