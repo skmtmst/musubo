@@ -82,7 +82,7 @@ export function pastTense(label: string): string {
 export function actionTitle(action: ActionRun, configured: unknown[] | undefined): string {
   const index = Number(action.stableId.split(':').pop())
   const config = Number.isInteger(index) ? configured?.[index] : undefined
-  const fallback = ACTION_LABELS[action.type] ?? '処理'
+  const fallback = Object.prototype.hasOwnProperty.call(ACTION_LABELS, action.type) ? ACTION_LABELS[action.type] : '処理'
   if (!config || typeof config !== 'object') return fallback
   const { type, label } = config as { type?: unknown; label?: unknown }
   if (typeof label !== 'string' || !label || typeof type !== 'string' || CONFIGURED_KIND[type] !== action.type) return fallback
@@ -277,7 +277,7 @@ function FriendAddRunDetailInner() {
     : '経路が分からない'
   const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? emptyValue('unknown')}版）` : '使用ルールは未取得'
   const messageType = detail.rule?.definition?.messageType
-  const messageLabel = messageType ? MESSAGE_TYPE_LABEL[messageType] ?? '案内' : '案内'
+  const messageLabel = messageType && Object.prototype.hasOwnProperty.call(MESSAGE_TYPE_LABEL, messageType) ? MESSAGE_TYPE_LABEL[messageType] : '案内'
   const deliveryUnknown = detail.errorCode === DELIVERY_UNKNOWN_CODE
   /* 案内を送らなかった記録（再追加で案内なし・送れなかった）は「案内を送った」を出さない。 */
   const messageSent = detail.status !== 'suppressed' && !deliveryUnknown && !(detail.status === 'failed' && failedActions.length === 0)
@@ -289,7 +289,7 @@ function FriendAddRunDetailInner() {
     ? `${firstFailed + (messageSent ? 2 : 1)}つ目の処理を完了できませんでした`
     : routingAction(detail.status, detail.errorCode)
   const bandNote = failedActions.length > 0
-    ? `${messageSent ? '案内は届いています。' : ''}${ACTION_STOPPED_AT[actionRuns[firstFailed]?.type ?? ''] ?? '処理のところ'}で止まりました。`
+    ? `${messageSent ? '案内は届いています。' : ''}${Object.prototype.hasOwnProperty.call(ACTION_STOPPED_AT, actionRuns[firstFailed]?.type ?? '') ? ACTION_STOPPED_AT[actionRuns[firstFailed].type] : '処理のところ'}で止まりました。`
     : deliveryUnknown
       ? '届いたか分かりません。二重に届かないよう、自動では送り直しません。トークで確かめてください。'
       : '案内を送れませんでした。理由を確かめて、もう一度実行できます。'
