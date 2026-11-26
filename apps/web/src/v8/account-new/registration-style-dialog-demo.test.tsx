@@ -49,3 +49,11 @@ it('表示を切り替えると選択表示も同期し、表示中を保存す�
   fireEvent.click(screen.getByRole('button', { name: /で次へ$/ }))
   expect(save).toHaveBeenCalledExactlyOnceWith('salon')
 })
+
+it('保存失敗後も表示中のスタイルで再試行する', () => {
+  const save = vi.fn()
+  render(<RegistrationStyleDialog open choice="" busy={false} ready error="保存できませんでした" onChoose={vi.fn()} onSave={save} onClose={vi.fn()} />)
+  fireEvent.click(within(screen.getByRole('group', { name: '見るスタイル' })).getByRole('button', { name: 'サロン' }))
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度保存する' }))
+  expect(save).toHaveBeenCalledExactlyOnceWith('salon')
+})

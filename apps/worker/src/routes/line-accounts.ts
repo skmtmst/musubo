@@ -906,10 +906,10 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = parsed.value.importFriends && followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
+    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id, musuboInsight!);
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
     savingStyle = false;
-    if (musuboGate === 'first') await startFirstMusuboLine(c, account.id, musuboInsight!);
     const additionState = musuboGate === 'reserved_addition'
       ? await startReservedMusuboLine(c, account.id, musuboInsight!) : null;
     try { if (parsed.value.importFriends && (!additionState || additionState === 'active')) scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }

@@ -14,7 +14,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Check, CircleAlert, CircleDashed, Copy, Plug,
 } from 'lucide-react'
-import { api, type LineAccountConnectData } from '@/lib/api'
+import { api, ApiError, type LineAccountConnectData } from '@/lib/api'
+import { ACCOUNT_STYLES } from '@line-crm/shared'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageContent, PageFooter, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { StepContent } from '@/components/templates/steps'
@@ -43,7 +45,7 @@ import RegistrationStyleDialog from './registration-style-dialog'
 import RegistrationUnsavedGuard from './registration-unsaved-guard'
 import Step5Completion from './step5-completion'
 import RegistrationSession from './registration-session'
-import { PENDING_REGISTRATION_RECEIPT, REGISTRATION_STYLE_KEY, registrationImportChoiceKey, registrationPresentationKey, registrationStorageKey, readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
+import { PENDING_REGISTRATION_RECEIPT, REGISTRATION_STYLE_KEY, registrationImportChoiceKey, registrationPresentationKey, registrationStorageKey, readRegistrationPresentation, rememberRegistrationPresentation, readPendingStyleRetry, savePendingStyleRetry } from './registration-storage'
 import { useRegistrationImport } from './use-registration-import'
 import { useRegistrationReceipt } from './use-registration-receipt'
 import { useRegistrationStyle } from './use-registration-style'
@@ -112,6 +114,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
   const [precheck, setPrecheck] = useState<PrecheckAnswers>({})
   const [precheckAt, setPrecheckAt] = useState<PrecheckAt>('q1')
   const [resumedId, setResumedId] = useState(initialAccountId)
+  const [pendingStyleRetry, setPendingStyleRetry] = useState(() => readPendingStyleRetry(resumeKey, initialAccountId))
   const [currentStep, setCurrentStep] = useState<StepNumber>(initialAccountId ? 3 : 1)
   const [sub, setSub] = useState(initialAccountId ? 2 : 1)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -318,8 +321,8 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
   useEffect(() => {
     if (!verifiedReceipt || !createdId) return
     try { if (resumeKey) sessionStorage.setItem(resumeKey, receiptStatus === 'confirmed' ? createdId : PENDING_REGISTRATION_RECEIPT + createdId) } catch { /* 登録は続けられる。 */ }
-    if (receiptStatus === 'confirmed' && currentStep === 3) { setCurrentStep(4); setSub(1) }
-  }, [createdId, currentStep, receiptStatus, resumeKey, verifiedReceipt])
+    if (receiptStatus === 'confirmed' && currentStep === 3 && !pendingStyleRetry) { setCurrentStep(4); setSub(1) }
+  }, [createdId, currentStep, receiptStatus, resumeKey, verifiedReceipt, pendingStyleRetry])
 
   useEffect(() => {
     if (currentStep === 4 && registrationStyle.selected) {
@@ -446,6 +449,34 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     } catch { /* 登録は続けられる。 */ }
   }
 
+  const retryStyleInitialization = async () => {
+    if (!pendingStyleRetry || busyLock.current) return
+    busyLock.current = true
+    setBusyAction('save')
+    setError('')
+    const finish = () => {
+      savePendingStyleRetry(resumeKey, null)
+      setPendingStyleRetry(null)
+    }
+    try {
+      await styleApi.retryRegistrationInitialization(pendingStyleRetry.accountId, pendingStyleRetry.style)
+      finish()
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        try {
+          const current = await styleApi.get(pendingStyleRetry.accountId, true)
+          if (current.success && current.data.version > 0 && (pendingStyleRetry.style === null
+            ? current.data.shouldPromptStyleSelection === true
+            : current.data.styleSelected && current.data.style === pendingStyleRetry.style)) {
+            finish()
+            return
+          }
+        } catch { /* 確認できない時は成功と決めつけず、案内を残す。 */ }
+      }
+      setError(describeActionFailure(caught, '初期設定の保存'))
+    } finally { busyLock.current = false; setBusyAction(null) }
+  }
+
   const goToBilling = (id?: string) => {
     connectionRequest.current.active = false
     if (id) rememberCreatedAccount(id)
@@ -543,6 +574,19 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
       setSub(2)
     } catch (caught) {
       if (!connectionRequest.current.active) return
+      if (caught instanceof ApiError && caught.code === 'style_save_failed' && caught.data && typeof caught.data === 'object') {
+        const data = caught.data as { accountId?: unknown; style?: unknown }
+        if (typeof data.accountId === 'string' && data.accountId && (data.style === null || ACCOUNT_STYLES.includes(data.style as AccountStyle))) {
+          const pending = { accountId: data.accountId, style: data.style as AccountStyle | null }
+          savePendingStyleRetry(resumeKey, pending)
+          setPendingStyleRetry(pending)
+          rememberCreatedAccount(data.accountId)
+          setResumedId(data.accountId)
+          setForm(current => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+          setCurrentStep(3); setSub(2)
+          return
+        }
+      }
       const fieldFailure = connectionRequestIsCurrent(revision) && saveErrors.capture(caught)
       // 料金を確認したLINEの追加接続で本人確認を求められたときだけ再試行する。
       if (!stepUpToken && isStepUpRequired(caught)) {
@@ -695,7 +739,11 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
       />
       <form id="account-registration" className={styles.body} data-template-region="body" onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <StepContent elementRef={stepPanelRef} step={currentStep * 10 + sub}>
-          {recoveredAccountId ? (
+          {pendingStyleRetry ? (
+            <Notice tone="warn" role="alert" heading="初期設定を保存できませんでした" action={<Button onClick={() => void retryStyleInitialization()} disabled={Boolean(busyAction)}>もう一度保存する</Button>}>
+              {error || 'アカウントは登録されています。選んだスタイルを保ったまま、初期設定を保存し直します。'}
+            </Notice>
+          ) : recoveredAccountId ? (
             <Notice
               tone="warn"
               message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}

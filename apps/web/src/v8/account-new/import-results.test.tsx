@@ -119,3 +119,11 @@ it('引き継ぎを選ばなかった場合は、オフの案内や次の操作�
   expect(screen.getByText('確認用アカウント')).toBeTruthy()
   expect(document.body.textContent).not.toMatch(/LINEで確認した\s*0|0人の友だちを引き継ぎました/)
 })
+
+it.each([[59, '59秒'], [60, '1分'], [3599, '59分'], [3600, '1時間'], [86399, '23時間'], [86400, '1日'], [4362240, '50日']] as const)(
+  '更新から%d秒の経過時間を読みやすく表示する', (seconds, elapsed) => {
+    render(<Step5Completion {...props(state({ phase: 'importing_ids' }))} idleSeconds={seconds} />)
+    expect(screen.getByText(`最終更新：${elapsed}前`)).toBeTruthy()
+    if (seconds >= 60) expect(screen.getByText(`${elapsed}${seconds < 3600 || seconds >= 86400 ? '間' : ''}、引き継ぎの状態が更新されていません`)).toBeTruthy()
+  },
+)

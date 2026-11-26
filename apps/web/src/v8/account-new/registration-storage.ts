@@ -3,6 +3,20 @@ import { ACCOUNT_STYLES, type AccountStyle, type StaffMember } from '@line-crm/s
 export const PENDING_REGISTRATION_RECEIPT = 'receipt:'
 export const REGISTRATION_STYLE_KEY = 'musubo-registration-style'
 
+export function readPendingStyleRetry(resumeKey: string | null, accountId: string): { accountId: string; style: AccountStyle | null } | null {
+  try {
+    const raw = resumeKey && sessionStorage.getItem(`${resumeKey}:style-retry`)
+    if (!raw) return null
+    const saved = JSON.parse(raw) as { accountId?: unknown; style?: unknown }
+    if (saved.accountId !== accountId || (saved.style !== null && !ACCOUNT_STYLES.includes(saved.style as AccountStyle))) return null
+    return { accountId, style: saved.style as AccountStyle | null }
+  } catch { return null }
+}
+
+export function savePendingStyleRetry(resumeKey: string | null, value: { accountId: string; style: AccountStyle | null } | null): void {
+  try { if (resumeKey) { if (value) sessionStorage.setItem(`${resumeKey}:style-retry`, JSON.stringify(value)); else sessionStorage.removeItem(`${resumeKey}:style-retry`) } } catch { /* 保存できない時も画面を閉じるまでは再試行できる。 */ }
+}
+
 /** 本人APIで確認できた利用者・統括の保存値だけを読む。共通キーは移行しない。 */
 export function registrationStorageKey(base: string, identity: Pick<StaffMember, 'id' | 'tenantId'> | null): string | null {
   if (!identity?.id || !identity.tenantId) return null

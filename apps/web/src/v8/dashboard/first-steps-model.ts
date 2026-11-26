@@ -65,18 +65,21 @@ export function waitingForFirstMessage(steps: ReadonlyArray<StepResult>): boolea
 }
 
 /**
- * 最初の1通が、この画面で見ている間に「まだ」から「済み」に変わったか。
+ * 6段すべてが、この画面で見ている間に「まだ」から「済み」に変わったか。
  * 開いた時にもう済みだった人・別のアカウントへ移った直後は数えない（後から来た人には出さない）。
  */
 export function useFirstMessageArrived(accountId: string | null, steps: ReadonlyArray<StepResult>, ready: boolean) {
-  const seen = useRef<{ accountId: string | null; state: StepResult['state'] | null }>({ accountId: null, state: null })
+  const seen = useRef<{ accountId: string | null; state: boolean | null }>({ accountId: null, state: null })
   const [arrived, setArrived] = useState(false)
   useEffect(() => {
     if (!ready) return
-    const state = steps.find((step) => step.key === 'firstMessage')?.state ?? null
+    const keys = ['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage']
+    // 保存済みの初期セットは一覧から取り除かれる（dropSettledFeatureSet）。
+    const values = keys.map(key => steps.find(step => step.key === key)?.state ?? (key === 'featureSet' && steps.length > 0 ? 'done' : undefined))
+    const state = values.some(value => !value || value === 'unknown') ? null : values.every(value => value === 'done')
     const before = seen.current
     seen.current = { accountId, state }
-    if (before.accountId === accountId && before.state === 'todo' && state === 'done') setArrived(true)
+    if (before.accountId === accountId && before.state === false && state === true) setArrived(true)
   }, [accountId, steps, ready])
   useEffect(() => { setArrived(false) }, [accountId])
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }

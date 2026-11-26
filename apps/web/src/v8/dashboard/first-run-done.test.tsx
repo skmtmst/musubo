@@ -51,6 +51,14 @@ describe('最初の1通が届いた時の窓', () => {
     expect(result.current.arrived).toBe(false)
   })
 
+  it('最初の1通だけでは開かず、残りの段もすべて済んだ時に開く', () => {
+    const { result, rerender } = renderHook(({ list }) => useFirstMessageArrived('a', list, true), { initialProps: { list: steps({ firstMessage: 'todo', scenario: 'todo' }) } })
+    rerender({ list: steps({ scenario: 'todo' }) })
+    expect(result.current.arrived).toBe(false)
+    rerender({ list: steps({}) })
+    expect(result.current.arrived).toBe(true)
+  })
+
   it('友だち追加の時の配信が済んで最初の1通がまだの時だけ「待っている」', () => {
     expect(waitingForFirstMessage(steps({ firstMessage: 'todo' }))).toBe(true)
     expect(waitingForFirstMessage(steps({ friendAdd: 'todo', firstMessage: 'todo' }))).toBe(false)

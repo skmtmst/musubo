@@ -1,4 +1,5 @@
 import { savedStyleMenuPreview } from '../services/style-menu-preview.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { styleEcSummary } from './style-ec-summary.js';
 import { styleMenuButtons } from '../services/style-menu-buttons.js';
@@ -31,6 +32,7 @@ import {
   questionsForStyle,
   readCards,
   saveProfile,
+  initializeAccountStyle,
   starter,
   styleWarnings,
 } from '../services/style-setup.js';
@@ -104,6 +106,17 @@ styles.get(base, async (c) => {
 styles.put(base, async (c) => {
   edit(c);
   const id = await accountForStyle(c);
+  const body = await json(c);
+  if (body.retryRegistrationInitialization === true) {
+    if (c.req.query('registration') !== '1' || body.expectedVersion !== 0)
+      throw new StyleError('invalid_request', 400);
+    const row = await c.env.DB.prepare('SELECT tenant_id FROM line_accounts WHERE id=?').bind(id).first<{ tenant_id: string | null }>();
+    if (!row) throw new StyleError('not_found', 404);
+    return c.json({ success: true, data: await initializeAccountStyle(
+      c.env.DB, id, row.tenant_id ?? DEFAULT_TENANT_ID, c.get('staff').id,
+      body.style === undefined || body.style === null ? undefined : checkStyle(body.style), starterCatalogRuntime(c),
+    ) });
+  }
   return c.json({
     success: true,
     data: await saveProfile(
@@ -111,7 +124,7 @@ styles.put(base, async (c) => {
       id,
       c.get('staff').tenantId ?? null,
       c.get('staff').id,
-      await json(c),
+      body,
       {
         images: c.env.IMAGES,
         catalogRuntime: starterCatalogRuntime(c),
