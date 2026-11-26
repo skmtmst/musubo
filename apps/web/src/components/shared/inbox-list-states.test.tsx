@@ -13,6 +13,11 @@ describe('受信箱の空と失敗はほかの一覧と同じ形', () => {
     const filtered = renderToStaticMarkup(<InboxListEmpty filtered onClear={() => {}} />)
     expect(filtered).toContain('data-inbox-list-state="filtered-empty"')
     expect(filtered).toContain('絞り込みを外す')
+    const overdue = renderToStaticMarkup(<InboxListEmpty filtered onClear={() => {}} description="店舗で設定した対応期限の対象になる会話はありません。" />)
+    expect(overdue).toContain('店舗で設定した対応期限の対象になる会話はありません。')
+    expect(overdue).toContain('絞り込みを外す')
+    expect(renderToStaticMarkup(<InboxListEmpty filtered={false} channel="instagram" onClear={() => {}} />)).toContain('Instagram の DM が届くとここに出ます。')
+    expect(renderToStaticMarkup(<InboxListEmpty filtered={false} channel="email" onClear={() => {}} />)).toContain('メールが届くとここに出ます。')
   })
 
   it('会話とメールが両方失敗しても、知らせと「もう一度読み込む」は1つ', () => {
@@ -27,5 +32,6 @@ describe('受信箱の空と失敗はほかの一覧と同じ形', () => {
     expect(inboxFailureText(['email'], ['line', 'email'])).toBe('メールを読み込めませんでした。読み込めていないため件数は分かりません。LINE の会話は読めています。')
     expect(inboxFailureText(['line', 'email'], ['line', 'email'])).toBe('LINE の会話とメールを読み込めませんでした。読み込めていないため件数は分かりません。')
     expect(inboxFailureText(['line'], ['line'])).toBe('LINE の会話を読み込めませんでした。読み込めていないため件数は分かりません。')
+    expect(inboxFailureText(['instagram'], ['instagram'])).toBe('Instagram の会話を読み込めませんでした。読み込めていないため件数は分かりません。')
   })
 })

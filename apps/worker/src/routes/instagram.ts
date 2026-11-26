@@ -2,7 +2,7 @@ import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputError, inputJsonBoundary, readBoundedText } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import type {
@@ -17,6 +17,8 @@ import {
   denyReadOnly,
 } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { qaOutboundStopped } from '../services/staging-qa-safety.js';
+import { registerInstagramInboxRoutes } from './instagram-inbox.js';
 import {
   InstagramError,
   instagramConfig,
@@ -26,6 +28,8 @@ import {
   instagramLongToken,
   instagramRefreshToken,
   instagramCanPublish,
+  instagramCanMessage,
+  subscribeInstagramMessages,
   instagramUrlCode,
   instagramUrlDetail,
   instagramUrlScopes,
@@ -153,6 +157,17 @@ async function startTarget(
     throw new InstagramError('connection_required', 400);
   return await connectionRow(c, id, null);
 }
+const echoSubscriptionKey = (connectionId: string) => `instagram.echo_subscription:${connectionId}`;
+async function saveEchoSubscription(c: Context<Env>, accountId: string, connectionId: string, subscribed: boolean) {
+  await c.env.DB.prepare(`INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)
+    ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at`)
+    .bind(crypto.randomUUID(), accountId, echoSubscriptionKey(connectionId), subscribed ? 'ready' : 'unavailable').run();
+}
+async function echoSubscription(c: Context<Env>, accountId: string, connectionId: string) {
+  const saved = await c.env.DB.prepare('SELECT value FROM account_settings WHERE line_account_id=? AND key=?')
+    .bind(accountId, echoSubscriptionKey(connectionId)).first<{ value: string }>();
+  return saved?.value === 'ready' ? 'ready' : saved?.value === 'unavailable' ? 'unavailable' : 'unknown';
+}
 const ready = (c: Context<Env>): InstagramConfig => {
   const cfg = instagramConfig(c.env);
   if (!cfg) throw new InstagramError('unconfigured', 503);
@@ -162,6 +177,8 @@ instagram.use(
   '/api/instagram/*',
   async (c, next) => {
     if (c.req.path === '/api/instagram/webhook') return next();
+    if (c.req.path === '/api/instagram/inbox-status' || c.req.path.startsWith('/api/instagram/conversations/') || /^\/api\/instagram\/messages\/[^/]+\/reply$/.test(c.req.path))
+      return requirePermission('/chats')(c, next);
     return requirePermission('/webhooks')(c, next);
   },
   async (c, next) => {
@@ -191,7 +208,10 @@ instagram.get('/api/instagram/connection', async (c) => {
     data: row
       ? {
           state: expired(row) ? 'expired' : 'connected',
-          replyEnabled: false,
+          replyEnabled: !expired(row) && instagramCanMessage(row.scopes) &&
+            (c.env.DEPLOY_ENV !== 'staging' || (c.env.INSTAGRAM_STAGING_SEND_ENABLED === 'true' && !qaOutboundStopped(c.env))),
+          dmReconnectRequired: !instagramCanMessage(row.scopes ?? ''),
+          echoSubscription: await echoSubscription(c, id, row.id),
           connection: {
             id: row.id,
             pageId: row.page_id,
@@ -219,10 +239,10 @@ instagram.get('/api/instagram/connections', async (c) => {
     return c.json({ success: true, data: { state: 'unconfigured' as const, connections: [] } });
   }
   const rows = await c.env.DB.prepare(
-    'SELECT * FROM instagram_connections WHERE line_account_id=? ORDER BY sort_order, id',
+    "SELECT ic.*, (SELECT value FROM account_settings s WHERE s.line_account_id=ic.line_account_id AND s.key='instagram.echo_subscription:' || ic.id) AS echo_subscription FROM instagram_connections ic WHERE ic.line_account_id=? ORDER BY ic.sort_order, ic.id",
   )
     .bind(id)
-    .all<Connection>();
+    .all<Connection & { echo_subscription: string | null }>();
   return c.json({
     success: true,
     data: {
@@ -231,6 +251,8 @@ instagram.get('/api/instagram/connections', async (c) => {
         id: row.id,
         // 行ごとに期限を見る。1件が切れていても他の行は使えるので、まとめて「期限切れ」にしない。
         state: expired(row) ? ('expired' as const) : ('connected' as const),
+        dmReconnectRequired: !instagramCanMessage(row.scopes),
+        echoSubscription: row.echo_subscription === 'ready' ? 'ready' : row.echo_subscription === 'unavailable' ? 'unavailable' : 'unknown',
         pageId: row.page_id,
         instagramId: row.instagram_id,
         pageName: row.page_name,
@@ -418,17 +440,19 @@ instagram.get(
       if (!short.scopes.includes(INSTAGRAM_PUBLISH_SCOPE))
         throw new InstagramError('instagram_publish_not_granted', 403);
       const long = await instagramLongToken(cfg, short.token);
-      const profile = await instagramGraph<InstagramProfile>(
+      const profile = await instagramGraph<InstagramProfile & { account_type?: string }>(
         cfg,
         'me',
         long.token,
         {
           fields:
-            'id,username,name,biography,profile_picture_url,followers_count,media_count',
+            'id,account_type,username,name,biography,profile_picture_url,followers_count,media_count',
         },
       );
       // /me の文字列IDを優先する。認可応答の user_id は大きな JSON 数値で
       // 返る場合があり、JavaScript で丸められると投稿先が存在しないIDになる。
+      if (profile.account_type && !['BUSINESS','MEDIA_CREATOR','CREATOR'].includes(profile.account_type.toUpperCase()))
+        throw new InstagramError('instagram_business_account_required', 403);
       const profileId = typeof profile.id === 'string' ? profile.id : '';
       const instagramId = /^\d{1,24}$/.test(profileId) ? profileId : short.userId;
       if (!/^\d{1,24}$/.test(instagramId))
@@ -474,6 +498,7 @@ instagram.get(
         .first();
       if (duplicate)
         throw new InstagramError('instagram_account_already_connected', 409);
+      const subscription = instagramCanMessage(grantedScopes) ? await subscribeInstagramMessages(cfg, long.token, c.env.META_APP_ID) : null;
       const now = new Date().toISOString();
       // 新規接続は末尾に追加し、先頭を使う既存の処理の宛先を変えない。並び順は保存と同じSQLで決める。
       const result = await c.env.DB.prepare(
@@ -502,6 +527,7 @@ instagram.get(
         .run();
       if (!result.meta.changes)
         throw new InstagramError('version_conflict', 409);
+      if (subscription) await saveEchoSubscription(c, id, targetId, subscription.echoSubscribed);
       await c.env.DB.prepare(
         'DELETE FROM instagram_oauth_states WHERE state_hash=?',
       )
@@ -552,6 +578,7 @@ instagram.post(
     const exactId = typeof profile.id === 'string' ? profile.id : '';
     if (!/^\d{1,24}$/.test(exactId))
       throw new InstagramError('instagram_business_account_required', 403);
+    const subscription = instagramCanMessage(r.scopes) ? await subscribeInstagramMessages(cfg, long.token, c.env.META_APP_ID) : null;
     // 合鍵は1本だけなので、2つの列へ同じものを入れ直す。
     const token = await encryptInstagramCredential(
         long.token,
@@ -577,6 +604,7 @@ instagram.post(
       )
       .run();
     if (!saved.meta.changes) throw new InstagramError('version_conflict', 409);
+    if (subscription) await saveEchoSubscription(c, id, r.id, subscription.echoSubscribed);
     return c.json({
       success: true,
       data: {
@@ -620,10 +648,19 @@ instagram.delete(
         'DELETE FROM instagram_oauth_states WHERE line_account_id=? AND (connection_id=? OR (connection_id IS NULL AND NOT EXISTS(SELECT 1 FROM instagram_connections WHERE line_account_id=? AND id<>?))) AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
       ).bind(id, target.id, id, target.id, target.id, b.expectedVersion),
       c.env.DB.prepare(
+        'DELETE FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, target.instagram_id, target.id, b.expectedVersion),
+      c.env.DB.prepare(
+        "DELETE FROM instagram_inbox_reads WHERE line_account_id=? AND CASE WHEN json_valid(sender_id) THEN json_extract(sender_id,'$[0]') END=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)",
+      ).bind(id, target.instagram_id, target.id, b.expectedVersion),
+      c.env.DB.prepare(
+        'DELETE FROM account_settings WHERE line_account_id=? AND key=? AND EXISTS(SELECT 1 FROM instagram_connections WHERE id=? AND version=?)',
+      ).bind(id, echoSubscriptionKey(target.id), target.id, b.expectedVersion),
+      c.env.DB.prepare(
         'DELETE FROM instagram_connections WHERE id=? AND version=?',
       ).bind(target.id, b.expectedVersion),
     ]);
-    if (!r[2]!.meta.changes) throw new InstagramError('version_conflict', 409);
+    if (!r[r.length - 1]!.meta.changes) throw new InstagramError('version_conflict', 409);
     return c.json({ success: true, data: { disconnected: true } });
   },
 );
@@ -748,13 +785,7 @@ instagram.get('/api/instagram/messages', async (c) => {
       total: total!.n, items: responseItems, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 });
-instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {
-  await account(c);
-  return c.json(
-    { success: false, error: 'meta_review_required', enabled: false },
-    403,
-  );
-});
+registerInstagramInboxRoutes(instagram, account);
 instagram.get('/api/instagram/webhook', async (c) => {
   const token = c.env.META_WEBHOOK_VERIFY_TOKEN,
     challenge = c.req.query('hub.challenge');
@@ -771,8 +802,8 @@ instagram.get('/api/instagram/webhook', async (c) => {
 instagram.post('/api/instagram/webhook', async (c) => {
   if (!c.env.META_APP_SECRET)
     return c.json({ success: false, error: 'unconfigured' }, 503);
-  const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).length > 1048576)
+  const raw = await readBoundedText(c.req.raw, 1048576);
+  if (raw === null)
     return c.json({ success: false, error: 'payload_too_large' }, 413);
   if (
     !(await verifyInstagramSignature(
@@ -837,6 +868,35 @@ instagram.post('/api/instagram/webhook', async (c) => {
       continue;
     for (const row of rows) for (const event of entry.messaging ?? []) {
       const msg = event?.message;
+      if (msg?.is_echo) {
+        if (typeof msg.mid !== 'string' || !msg.mid || msg.mid.length > 512 ||
+            event.sender?.id !== row.instagram_id || typeof event.recipient?.id !== 'string' ||
+            !Number.isSafeInteger(event.timestamp) || event.timestamp! <= 0 || event.timestamp! > 8640000000000000) continue;
+        const alreadyRecorded = await c.env.DB.prepare("SELECT 1 FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND meta_message_id=? AND status='sent' LIMIT 1")
+          .bind(row.line_account_id, row.instagram_id, msg.mid).first();
+        if (alreadyRecorded) continue;
+        const echoTime = event.timestamp!;
+        const candidates = await c.env.DB.prepare(`SELECT idempotency_key,content,status,meta_message_id,created_at
+          FROM instagram_outbound_messages WHERE line_account_id=? AND instagram_id=? AND sender_id=?
+          AND status IN ('pending','unknown','not_sent_confirmed')`)
+          .bind(row.line_account_id, row.instagram_id, event.recipient.id)
+          .all<{ idempotency_key: string; content: string; status: string; meta_message_id: string | null; created_at: string }>();
+        const normalize = (value: string) => value.replace(/\r\n?/g, '\n').trim();
+        const hits = candidates.results.filter(candidate => candidate.meta_message_id === msg.mid ||
+          (!candidate.meta_message_id && typeof msg.text === 'string' && normalize(candidate.content) === normalize(msg.text) &&
+            echoTime >= Date.parse(candidate.created_at) - 5000 && echoTime <= Date.parse(candidate.created_at) + 5 * 60 * 1000));
+        if (hits.length > 1) {
+          for (const candidate of hits) await c.env.DB.prepare("UPDATE instagram_outbound_messages SET resolution_evidence=COALESCE(resolution_evidence,'') || '[echo_ambiguous]' WHERE idempotency_key=? AND status IN ('pending','unknown','not_sent_confirmed') AND COALESCE(resolution_evidence,'') NOT LIKE '%[echo_ambiguous]%'").bind(candidate.idempotency_key).run();
+          continue;
+        }
+        if (!hits.length) continue;
+        const hit = hits[0];
+        await c.env.DB.prepare(`UPDATE instagram_outbound_messages SET status='sent',meta_message_id=?,sent_at=?,
+          resolution_evidence=CASE WHEN status='not_sent_confirmed' THEN COALESCE(resolution_evidence,'') || '\n[echo_after_not_sent]' ELSE resolution_evidence END
+          WHERE idempotency_key=? AND status IN ('pending','unknown','not_sent_confirmed')`)
+          .bind(msg.mid, new Date(echoTime).toISOString(), hit.idempotency_key).run();
+        continue;
+      }
       if (
         typeof msg?.mid !== 'string' ||
         msg.mid.length > 512 ||

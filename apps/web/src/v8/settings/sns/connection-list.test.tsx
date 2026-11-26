@@ -42,11 +42,11 @@ function googleSlots(): SnsServiceSlots {
   return {
     service: 'googleBusiness',
     connections: [
-      conn('googleBusiness', 'gc-1', '然カフェ 本店', {
+      conn('googleBusiness', 'gc-1', '見本 本店', {
         primary: true,
         meta: ['owner@example.com', '最後に取り込んだ日時 11/16 9:00'],
       }),
-      conn('googleBusiness', 'gc-2', '然カフェ 駅前店', {
+      conn('googleBusiness', 'gc-2', '見本 駅前店', {
         meta: ['owner@example.com', '最後に取り込んだ日時 11/16 8:30'],
       }),
     ],
@@ -58,8 +58,8 @@ function instagramSlots(): SnsServiceSlots {
   return {
     service: 'instagram',
     connections: [
-      conn('instagram', 'ig-1', '@nen_cafe', { meta: ['ビジネスアカウント', '接続した日 10/7'] }),
-      conn('instagram', 'ig-2', '@nen_cafe_ekimae', {
+      conn('instagram', 'ig-1', '@sample_shop', { meta: ['ビジネスアカウント', '接続した日 10/7'] }),
+      conn('instagram', 'ig-2', '@sample_shop_ekimae', {
         state: 'expired',
         meta: ['ビジネスアカウント', '接続した日 10/8'],
       }),
@@ -83,8 +83,8 @@ describe('複数の接続を一覧に出す（受入条件1）', () => {
     expect(list).toHaveLength(2)
     expect(list.map((row) => row.dataset.connectionId)).toEqual(['gc-1', 'gc-2'])
 
-    expect(within(list[0]!).getByText('然カフェ 本店')).toBeTruthy()
-    expect(within(list[1]!).getByText('然カフェ 駅前店')).toBeTruthy()
+    expect(within(list[0]!).getByText('見本 本店')).toBeTruthy()
+    expect(within(list[1]!).getByText('見本 駅前店')).toBeTruthy()
     // 状態の札は行ごとに出す。
     expect(within(list[0]!).getByText('接続済み')).toBeTruthy()
     expect(within(list[1]!).getByText('接続済み')).toBeTruthy()
@@ -135,7 +135,7 @@ describe('行の操作（受入条件4）', () => {
     const slots = googleSlots()
     render(<SnsConnectionList slots={slots} canManage onDisconnect={onDisconnect} />)
 
-    openMenu('然カフェ 駅前店')
+    openMenu('見本 駅前店')
     fireEvent.click(screen.getAllByRole('menuitem', { name: '解除する' })[0]!)
 
     expect(onDisconnect).toHaveBeenCalledTimes(1)
@@ -155,7 +155,7 @@ describe('行の操作（受入条件4）', () => {
     expect(onReconnect.mock.calls[0]![0]).toBe(slots.connections[1])
 
     // 同じ操作を「⋯」にも重ねて置かない（ほかに入れる操作が無ければ「⋯」も出さない）。
-    expect(within(expired).queryByRole('button', { name: '@nen_cafe_ekimaeの操作' })).toBeNull()
+    expect(within(expired).queryByRole('button', { name: '@sample_shop_ekimaeの操作' })).toBeNull()
   })
 
   it('ふつうに繋がっている行の「つなぎ直す」は「⋯」の中に置く', () => {
@@ -166,7 +166,7 @@ describe('行の操作（受入条件4）', () => {
     const healthy = rows()[0]!
     expect(within(healthy).queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
 
-    openMenu('@nen_cafe')
+    openMenu('@sample_shop')
     fireEvent.click(screen.getAllByRole('menuitem', { name: 'つなぎ直す' })[0]!)
     expect(onReconnect.mock.calls[0]![0]).toBe(slots.connections[0])
   })
@@ -196,7 +196,7 @@ describe('行の操作（受入条件4）', () => {
     const slots = googleSlots()
     render(
       <SnsConnectionList
-        slots={{ ...slots, connections: [conn('googleBusiness', 'gc-9', '然カフェ 本店')] }}
+        slots={{ ...slots, connections: [conn('googleBusiness', 'gc-9', '見本 本店')] }}
         canManage
         onReconnect={vi.fn()}
         onSetPrimary={vi.fn()}
@@ -204,7 +204,7 @@ describe('行の操作（受入条件4）', () => {
     )
 
     expect(screen.queryByRole('button', { name: '主連携にする' })).toBeNull()
-    openMenu('然カフェ 本店')
+    openMenu('見本 本店')
     expect(screen.queryAllByRole('menuitem', { name: /主連携にする/ })).toHaveLength(0)
   })
 
@@ -224,7 +224,7 @@ describe('行の操作（受入条件4）', () => {
     const busyRow = rows()[1]!
     expect((within(busyRow).getByRole('button', { name: '主連携にする' }) as HTMLButtonElement).disabled).toBe(true)
 
-    openMenu('然カフェ 駅前店')
+    openMenu('見本 駅前店')
     const busyItems = screen.getAllByRole('menuitem')
     expect(busyItems.length).toBeGreaterThan(0)
     for (const item of busyItems) {
@@ -233,7 +233,7 @@ describe('行の操作（受入条件4）', () => {
     fireEvent.keyDown(document.body, { key: 'Escape' })
 
     // もう一方の行は動かせる。
-    openMenu('然カフェ 本店')
+    openMenu('見本 本店')
     expect(
       screen.getAllByRole('menuitem', { name: '解除する' }).some((item) => !(item as HTMLButtonElement).disabled),
     ).toBe(true)
@@ -253,7 +253,7 @@ describe('閲覧しかできない人（F8）', () => {
       />,
     )
 
-    const menu = screen.getByRole('button', { name: '然カフェ 駅前店の操作' })
+    const menu = screen.getByRole('button', { name: '見本 駅前店の操作' })
     expect(menu.getAttribute('aria-disabled')).toBe('true')
     expect(screen.getAllByText(LOCKED_REASON).length).toBeGreaterThan(0)
 

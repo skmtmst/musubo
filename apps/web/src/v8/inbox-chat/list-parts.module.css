@@ -130,6 +130,17 @@
   line-height: var(--tpl-inbox-badge-lh);
 }
 
+/*
+  Instagram の札：公式の2色のグラデーションに白い字（LINE は緑、メールは灰）。
+  2色は公式のグラデーションのうち、白い字が 4.5:1 以上で読める紫→ピンク。この札だけで使うので全体の変数にしない。
+*/
+:global(:root) .channelBadgeInstagram {
+  --tpl-instagram-from: #962fbf;
+  --tpl-instagram-to: #d62976;
+  background: linear-gradient(90deg, var(--tpl-instagram-from), var(--tpl-instagram-to));
+  color: var(--color-on-accent);
+}
+
 :global(:root) .rowAssignee {
   font-size: var(--text-micro);
   line-height: var(--tpl-inbox-badge-lh);

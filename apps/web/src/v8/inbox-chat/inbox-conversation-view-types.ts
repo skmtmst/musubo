@@ -6,16 +6,19 @@ import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { type AttachSlot } from '@/v8/inbox-chat/attachments';
 import { useChatSearch } from '@/v8/inbox-search/public/use-chat-search/index'
 import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { EmailRef } from './email-sources';
 import type { EmailInboxItem, OldestAttentionTarget, PendingAttachment } from './inbox-model';
 import { Chat } from './inbox-model';
 export type Props = {
+  /** 店舗のメールを読む LINE アカウント。つながっていない時は null（店舗の会話は開かない）。 */
+  storeEmailAccountId?: string | null
   operators: { id: string; name: string }[]
   selectedChatId: string | null
-  selectedThreadId: string | null
-  setSelectedThreadId: Dispatch<SetStateAction<string | null>>
+  /** 開いているメール。経路（共通／店舗）と会話IDの組。 */
+  selectedEmail: EmailRef | null
+  setSelectedEmail: (ref: EmailRef | null) => void
   showFriendInfo: boolean
   setShowFriendInfo: (next: boolean | ((current: boolean) => boolean)) => void
-  loadEmails: (offset?: number, append?: boolean) => Promise<void>
   deepLinkNotice: string
   clearDeepLink: () => void
   detailLoading: boolean

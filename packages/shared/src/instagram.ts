@@ -1,6 +1,8 @@
 export interface InstagramConnectionStatus {
   state: 'unconfigured' | 'disconnected' | 'connected' | 'expired';
-  replyEnabled: false;
+  replyEnabled: boolean;
+  dmReconnectRequired?: boolean;
+  echoSubscription?: 'ready' | 'unavailable' | 'unknown';
   connection?: {
     /** 接続そのものの id。画面が操作先を指定するときに使う（表示はしない）。 */
     id?: string;

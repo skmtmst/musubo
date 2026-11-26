@@ -126,3 +126,23 @@
 
 /* F6 JvuLH の「戻る」「解除する」の文字（絵では 13/600）は、窓の外枠に出る
    data-design-node で絞るので sns-board.css へ置く（この束の決まりでは書けない）。 */
+
+/* Instagram をつなぐ前の案内（確かめること3つ）。沈んだ地の箱に縦に並べる。 */
+.checkList {
+  composes: rows;
+  list-style: none;
+}
+
+.checkItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-sns-slot-box-gap);
+  min-width: 0;
+}
+
+.checkTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-e1-sns-slot-value-lh);
+}

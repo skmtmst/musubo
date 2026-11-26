@@ -1,3 +1,4 @@
+import { documentedInboxRoutes } from './openapi-inbox-baseline.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -144,6 +145,7 @@ const ALLOWLIST_MAX = 769;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   ...ONBOARDING_BASELINE,
+  ...documentedInboxRoutes,
   'GET /api/hq/onboarding/pricing',
   'GET /api/hq/onboarding/quotes/latest',
   'GET /api/hq/onboarding/quotes/{id}',
@@ -584,10 +586,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/hq/broadcasts/{id}/activity',
   'GET /api/hq/broadcasts/{id}/export.csv',
 
-  'POST /api/chats/{id}/send',
-  'POST /api/chats/{id}/attachments/upload',
-  'POST /api/chats/{id}/attachments/upload-sessions',
-  'POST /api/chats/{id}/attachments/upload-sessions/{sessionId}/complete',
   'GET /api/line-account-folders',
   'POST /api/line-account-folders',
   'PATCH /api/line-account-folders/{id}',
@@ -610,8 +608,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/scenario-drafts/{key}',
   'PUT /api/scenario-drafts/{key}',
   'DELETE /api/scenario-drafts/{key}',
-  'GET /api/chats/{friendId}/messages/search',
-  'GET /api/chats/{friendId}/messages',
   'GET /api/liff/restaurant/link/{token}',
   'GET /api/liff/restaurant/availability',
   'POST /api/liff/restaurant/holds',
@@ -622,6 +618,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/auto-replies/unmatched-settings',
   'PUT /api/auto-replies/unmatched-settings',
   'GET /api/instagram/connection',
+  'GET /api/instagram/inbox-status',
+  'GET /api/instagram/conversations/{senderId}',
+  'POST /api/instagram/conversations/{senderId}/read',
+  'POST /api/instagram/conversations/{senderId}/resolve',
   'GET /api/instagram/connections',
   'DELETE /api/instagram/connection',
   'POST /api/instagram/oauth/start',
@@ -709,7 +709,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'DELETE /api/booking/admin/resources/{id}',
   'DELETE /api/booking/admin/waitlist/{id}',
   'DELETE /api/broadcasts/{id}',
-  'DELETE /api/chats/{id}/scheduled/{scheduleId}',
   'DELETE /api/conversions/points/{id}',
   'DELETE /api/friends/{id}/tags/{tagId}',
   'DELETE /api/file-scans/{id}',
@@ -763,9 +762,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/broadcasts/{id}/activity',
   'GET /api/broadcasts/{id}/approval',
   'GET /api/broadcasts/{id}/recipients',
-  'GET /api/chats/outbound-failures',
-  'GET /api/chats/quick-counts',
-  'GET /api/chats/{id}/scheduled',
   'GET /api/common-actions/resources',
   'GET /api/common-vars/exports',
   'GET /api/common-vars/exports/{id}',
@@ -912,7 +908,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/hq/banners/images/{id}',
   'PATCH /api/booking/admin/bookings/{id}',
   'PATCH /api/booking/admin/resources/{id}',
-  'PATCH /api/chats/{id}/scheduled/{scheduleId}',
   'PATCH /api/friend-add-rules/reorder',
   'PUT /api/friend-add-rules/order',
   'POST /api/friend-add-rules/{id}/test-send',
@@ -995,9 +990,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/broadcasts/{id}/send',
   'POST /api/broadcasts/{id}/stop',
   'POST /api/broadcasts/dedup-preview',
-  'POST /api/chats/{id}/render-preview',
-  'POST /api/chats/{id}/send-combined',
-  'POST /api/chats/{id}/schedule',
   'POST /api/common-actions/{id}/archive',
   'POST /api/common-actions/{id}/unarchive',
   'POST /api/common-vars/exports',

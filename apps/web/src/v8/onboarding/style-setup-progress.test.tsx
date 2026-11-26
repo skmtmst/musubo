@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ACCOUNT_STYLES } from '@line-crm/shared'
-import { loadStyleSetupProgress } from './style-setup-progress'
+import { clearPreloadedStyleSetupEvidence, loadStyleSetupProgress, preloadStyleSetupEvidence } from './style-setup-progress'
 import { useStyleSetupProgress } from './use-style-setup-progress'
 const net = vi.hoisted(() => ({ menus: vi.fn(), staff: vi.fn(), settings: vi.fn(), account: vi.fn(), events: vi.fn(), members: vi.fn(), snapshot: vi.fn(), context: vi.fn(), restaurantProgress: vi.fn(), hours: vi.fn(), connector: vi.fn(), googleProfile: vi.fn(), googleConnection: vi.fn(), richMenus: vi.fn() }))
 vi.mock('@/lib/api', () => ({
@@ -15,6 +15,7 @@ vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { profile: 
 vi.mock('@/hooks/use-account-style', () => ({ ACCOUNT_STYLE_UPDATED: 'account-style-updated' }))
 
 beforeEach(() => {
+  clearPreloadedStyleSetupEvidence()
   vi.resetAllMocks()
   net.menus.mockResolvedValue({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [{ id: 'staff' }] }] })
   net.staff.mockResolvedValue({ staff: [{ id: 'staff', is_active: 1 }] })
@@ -117,10 +118,15 @@ it('別の店の店舗・会員・予約ページを済みの根拠にしない'
   expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBeNull()
 })
 
-it('予約機能が無い標準業種もGoogle接続だけで営業時間の未設定を判定する', async () => {
-  net.googleConnection.mockResolvedValue({ success: true, store: { lineAccountId: 'a' }, connection: { status: 'disconnected', locationName: null } })
-  expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBe(false)
-  expect(net.googleProfile).not.toHaveBeenCalled()
+it('予約機能が無い標準業種もGoogle接続とプロフィールを並列で始め、未接続なら営業時間の未設定と判定する', async () => {
+  let resolveConnection!: (value: unknown) => void
+  net.googleConnection.mockImplementationOnce(() => new Promise(resolve => { resolveConnection = resolve }))
+  net.googleProfile.mockRejectedValueOnce(new Error('not_connected'))
+  const pending = loadStyleSetupProgress('a', 'standard')
+  expect(net.googleConnection).toHaveBeenCalledWith('a')
+  expect(net.googleProfile).toHaveBeenCalledWith('a')
+  resolveConnection({ success: true, store: { lineAccountId: 'a' }, connection: { status: 'disconnected', locationName: null } })
+  expect((await pending).steps.hours?.complete).toBe(false)
   expect(net.settings).not.toHaveBeenCalled()
 })
 
@@ -310,4 +316,19 @@ it('ECの進捗確認ではストア接続の応答を待たずにGoogleの接�
   const progress = await pending
   expect(progress.steps.attributes?.complete).toBe(true)
   expect(progress.steps.hours?.complete).toBe(true)
+})
+
+it('スタイル確定前に先読みしたGoogle営業時間と飲食店選択を1回だけ使い回す', async () => {
+  preloadStyleSetupEvidence('a', true)
+  expect(net.googleConnection).toHaveBeenCalledTimes(1)
+  expect(net.googleProfile).toHaveBeenCalledTimes(1)
+  expect(net.snapshot).toHaveBeenCalledTimes(1)
+  expect(net.context).toHaveBeenCalledTimes(1)
+  expect((await loadStyleSetupProgress('a', 'standard')).steps.hours?.complete).toBe(true)
+  expect(net.googleConnection).toHaveBeenCalledTimes(1)
+  expect(net.googleProfile).toHaveBeenCalledTimes(1)
+  expect((await loadStyleSetupProgress('a', 'restaurant')).steps.attributes?.complete).toBe(true)
+  expect(net.snapshot).toHaveBeenCalledTimes(1)
+  expect(net.context).toHaveBeenCalledTimes(1)
+  expect(net.restaurantProgress).toHaveBeenCalledWith('a', 'store')
 })

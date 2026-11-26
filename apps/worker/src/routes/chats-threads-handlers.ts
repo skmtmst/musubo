@@ -11,8 +11,15 @@ import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveOrCreateChat } from './chats-definition.js';
 import type { Context } from 'hono';
+import { instagramInboxList } from '../services/instagram-inbox-list.js';
+
+// オフセットのない旧データは日本時間として扱う。
+const inboxTimeSql = (column: string) => `julianday(CASE WHEN substr(${column},-1) IN ('Z','z') OR substr(${column},-6,1) IN ('+','-') OR substr(${column},-5,1) IN ('+','-') THEN ${column} ELSE ${column}||'+09:00' END)`;
 
 export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
+  const channel = c.req.query('channel') ?? 'all';
+  if (!['all', 'line', 'instagram'].includes(channel)) return c.json({ success: false, error: 'invalid_channel' }, 400);
+  if (channel === 'instagram' && (c.req.query('sort') === 'sla_due' || c.req.query('slaState') || ['true', '1'].includes(c.req.query('unansweredOnly') ?? '') || c.req.query('status') || c.req.query('operatorId'))) return c.json({ success: false, error: 'incompatible_filters' }, 400);
   if(c.req.query('sort')==='sla_due'||['overdue','soon'].includes(c.req.query('slaState')??'')) return slaChatList(c);
   try {
     const staff = c.get('staff');
@@ -34,6 +41,10 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
     if (lineAccountId && !visibleScope.allowedAccountIds.includes(lineAccountId)) {
       return c.json({ success: false, error: '受信箱が見つかりません' }, 404);
+    }
+    if (channel === 'instagram' && quickFilter === 'overdue') {
+      const limit = listLimit(c.req.query('limit'), 200);
+      return c.json(buildCursorListResponse({ success: true, data: [], items: [], paging: { limit }, sort: [] }));
     }
     const unansweredOnly =
       c.req.query('unansweredOnly') === 'true' || c.req.query('unansweredOnly') === '1';
@@ -107,6 +118,34 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       return c.json(buildCursorListResponse({ success: true, data, items: responseItems, paging: { limit }, sort: [] }));
     }
 
+    // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
+    // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
+    const limit = listLimit(c.req.query('limit'), 200);
+    // カーソルページング: (未読, last_message_at, friend_id) の複合カーソルより後の行を返す。
+    // 一覧は「未読が先 → 最新の受信・送信が新しい順」。offset 方式は「取得の合間に
+    // 新着で行が押し下げられた分が欠落する」構造問題があるため採用しない。
+    // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
+    // sort=latest のカーソルは (last_message_at, friend_id) だけで、beforeUnread は見ない。
+    const rawBeforeAt = c.req.query('beforeAt') || undefined;
+    const parsedBeforeAt = rawBeforeAt && new Date(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(rawBeforeAt) ? rawBeforeAt : `${rawBeforeAt.replace(' ', 'T')}+09:00`);
+    const beforeAt = parsedBeforeAt && Number.isFinite(parsedBeforeAt.getTime()) ? parsedBeforeAt.toISOString() : rawBeforeAt;
+    const beforeId = c.req.query('beforeId') || undefined;
+    const beforeUnreadRaw = c.req.query('beforeUnread');
+    const beforeUnread = !unreadFirst ? null : beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
+      ? 1
+      : beforeUnreadRaw === '0' || beforeUnreadRaw === 'false' ? 0 : null;
+    const useCursor = Boolean(beforeAt && beforeId);
+
+    const includeInstagram = channel !== 'line' && !status && !operatorId && quickFilter !== 'overdue';
+    const instagramItems = includeInstagram ? await instagramInboxList(c.env.DB, {
+      accounts: lineAccountId ? [lineAccountId] : visibleScope.allowedAccountIds,
+      staffId: staff.id, query, unreadOnly, beforeAt, beforeId, beforeUnread, unreadFirst, limit, replyOnly: quickFilter === 'reply',
+    }) : [];
+    if (channel === 'instagram') {
+      return c.json(buildCursorListResponse({ success: true, data: instagramItems, items: instagramItems, paging: { limit }, sort: [] }));
+    }
+
     // 送受信履歴と chats の和集合で、初回メッセージ前のチャットも一覧へ含める。履歴の最大値と MATERIALIZED CTE を使い、ページの友だちを先に確定してからプレビューを求める。大きな応答を防ぐため、テキストだけ先頭200文字へ制限し、アカウント指定時はその友だちへ絞る。並びは未読・最終日時・友だち ID の降順で安定させる。
     for(const account of visibleScope.allowedAccountIds) await refreshInboxSla(c.env.DB,account);
     const accountFilterBindings: string[] = [];
@@ -127,23 +166,6 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         ? `friend_id IN (SELECT id FROM friends WHERE ${accountClauses.join(' OR ')})`
         : '0=1';
     }
-
-    // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
-    // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
-    const limit = listLimit(c.req.query('limit'), 200);
-    // カーソルページング: (未読, last_message_at, friend_id) の複合カーソルより後の行を返す。
-    // 一覧は「未読が先 → 最新の受信・送信が新しい順」。offset 方式は「取得の合間に
-    // 新着で行が押し下げられた分が欠落する」構造問題があるため採用しない。
-    // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
-    // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
-    // sort=latest のカーソルは (last_message_at, friend_id) だけで、beforeUnread は見ない。
-    const beforeAt = c.req.query('beforeAt') || undefined;
-    const beforeId = c.req.query('beforeId') || undefined;
-    const beforeUnreadRaw = c.req.query('beforeUnread');
-    const beforeUnread = !unreadFirst ? null : beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
-      ? 1
-      : beforeUnreadRaw === '0' || beforeUnreadRaw === 'false' ? 0 : null;
-    const useCursor = Boolean(beforeAt && beforeId);
 
     const conditions: string[] = [];
     const conditionBindings: unknown[] = [];
@@ -224,7 +246,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     const sql = `
       WITH last_any AS MATERIALIZED (
         SELECT friend_id,
-          MAX(COALESCE(line_event_at, created_at)) AS last_message_at,
+          MAX(strftime('%Y-%m-%dT%H:%M:%fZ', ${inboxTimeSql('COALESCE(line_event_at, created_at)')})) AS last_message_at,
           MAX(CASE WHEN direction = 'incoming' THEN created_at END) AS last_incoming_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
@@ -235,7 +257,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         SELECT friend_id, MAX(last_message_at) AS last_message_at FROM (
           SELECT friend_id, last_message_at FROM last_any
           UNION ALL
-          SELECT friend_id, last_message_at FROM chats WHERE ${accountFilterSql}
+          SELECT friend_id, strftime('%Y-%m-%dT%H:%M:%fZ', ${inboxTimeSql('last_message_at')}) AS last_message_at FROM chats WHERE ${accountFilterSql}
         ) GROUP BY friend_id
       ),
       page AS MATERIALIZED (
@@ -313,7 +335,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         COALESCE(c.status, 'resolved') AS status,
         COALESCE(c.revision, 0) AS revision,
         c.notes,
-        COALESCE(rm.preview_at, d.last_message_at) AS last_message_at,
+        d.last_message_at AS last_message_at,
         rm.content AS last_message_content,
         rm.direction AS last_message_direction,
         rm.message_type AS last_message_type,
@@ -374,7 +396,12 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       updatedAt: ch.updated_at,
     }));
 
-    const responseItems = await enrichSlaChats(c.env.DB,data);
+    const lineItems = await enrichSlaChats(c.env.DB,data);
+    const responseItems = [...lineItems.map(item => ({ ...item, channel: 'line' as const })), ...instagramItems]
+      .sort((a, b) => (unreadFirst ? Number(b.isUnread) - Number(a.isUnread) : 0)
+        || (String(a.lastMessageAt) < String(b.lastMessageAt) ? 1 : String(a.lastMessageAt) > String(b.lastMessageAt) ? -1 : 0)
+        || (String(a.id) < String(b.id) ? 1 : String(a.id) > String(b.id) ? -1 : 0))
+      .slice(0, limit);
     return c.json(buildCursorListResponse({ success: true, data: responseItems, items: responseItems, paging: { limit }, sort: [] }));
   } catch (err) {
     throw err;

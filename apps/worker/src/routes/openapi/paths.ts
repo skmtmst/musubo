@@ -52,6 +52,7 @@ import { friendsPaths } from './friends-paths.js';
 import { tagsPaths } from './tags-paths.js';
 import { friendAttributesPaths } from './friend-attributes-paths.js';
 import { mediaScanningPaths } from './media-scanning-paths.js';
+import { accountEmailPaths } from './account-email-paths.js';
 import { chatsPaths } from './chats-paths.js';
 import { actionsRemindersPaths } from './actions-reminders-paths.js';
 import { autoRepliesPaths } from './auto-replies-paths.js';
@@ -141,6 +142,7 @@ export const paths = {
   ...friendAttributesPaths,
   ...mediaScanningPaths,
   ...chatsPaths,
+  ...accountEmailPaths,
   ...actionsRemindersPaths,
   ...autoRepliesPaths,
   ...mileageScoresPaths,

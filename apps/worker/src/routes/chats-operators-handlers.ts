@@ -1,3 +1,4 @@
+import { storeEmailFilter, emailStatuses, accountEmailMode } from '../services/account-email-filter.js';
 import { assigneeFilter } from '../services/chat-assignees.js';
 import { listChatAssignees } from '../services/chat-assignees.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -11,6 +12,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { listOutboundSendFailures } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { Context } from 'hono';
+import { instagramInboxCounts } from '../services/instagram-inbox-list.js';
 
 export const get__api_operators_1 = async (c: Context<Env, "/api/operators">) => {
   try {
@@ -92,7 +94,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
     const assignee = c.req.query('assignee') ?? operatorId;
     const unreadOnly = c.req.query('unreadOnly') === '1' || c.req.query('unreadOnly') === 'true';
     const channel = c.req.query('channel') || 'all';
-    if (channel !== 'all' && channel !== 'line' && channel !== 'email') {
+    if (channel !== 'all' && channel !== 'line' && channel !== 'email' && channel !== 'instagram') {
       return c.json({ success: false as const, error: 'invalid_channel' }, 400);
     }
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
@@ -110,7 +112,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
     let line = { all: 0, reply: 0, overdue: 0 };
     let email = { all: 0, reply: 0, overdue: 0 };
 
-    if (channel !== 'email') {
+    if (channel !== 'email' && channel !== 'instagram') {
       // ── LINE 側。一覧クエリと同じ候補集合（messages_log ∪ chats）を
       // 同じ条件で数える。preview 用の集約は不要なので CTE 2本だけ。 ──
     const accountFilterBindings: string[] = [];
@@ -216,13 +218,16 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       };
     }
 
-    /*
-     * ── メール側。一覧（/api/support/inbox?channel=email）と同じ
-     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。
-     * メールは LINE アカウントに所属しないため、選択中のアカウントが
-     * あっても数える（一覧と同じ）。 ──
-     */
-    if (channel !== 'line' && scope.canSeeUnassigned) {
+    const mode = channel === 'line' || channel === 'instagram' ? 'none' : await accountEmailMode(c.env.DB,lineAccountId,scope.canSeeUnassigned);
+    if ((mode === 'store' || mode === 'both') && lineAccountId) {
+      const filter = storeEmailFilter({statuses:emailStatuses(status || 'all'),
+        matchUnassigned:!assignee || assignee==='unassigned',query,unreadOnly});
+      const counts = await c.env.DB.prepare(`SELECT count(*) AS total,count(CASE WHEN t.status='unread' THEN 1 END) AS reply,
+        count(CASE WHEN t.status='unread' AND julianday(t.last_message_at)<=julianday(?) THEN 1 END) AS overdue ${filter.sql}`)
+        .bind(overdueThreshold,staff.id,lineAccountId,...filter.binds).first<{total:number; reply:number; overdue:number}>();
+      email = {all:counts?.total ?? 0,reply:counts?.reply ?? 0,overdue:counts?.overdue ?? 0};
+    }
+    if (mode === 'legacy' || mode === 'both') {
       const statusSql = !status || status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -272,20 +277,25 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       ).bind(overdueThreshold, staff.id, ...bindings)
         .first<{ all_count: number | null; reply_count: number | null; overdue_count: number | null }>();
       email = {
-        all: emailCounts?.all_count ?? 0,
-        reply: emailCounts?.reply_count ?? 0,
-        overdue: emailCounts?.overdue_count ?? 0,
+        all: email.all + (emailCounts?.all_count ?? 0),
+        reply: email.reply + (emailCounts?.reply_count ?? 0),
+        overdue: email.overdue + (emailCounts?.overdue_count ?? 0),
       };
     }
 
+    const includeInstagram = (channel === 'instagram' || channel === 'all' || c.req.query('socialChannel') === 'all') && channel !== 'email' && !status && !assignee;
+    const instagram = includeInstagram ? await instagramInboxCounts(c.env.DB, {
+      accounts: lineAccountId ? [lineAccountId] : scope.allowedAccountIds, staffId: staff.id, query, unreadOnly,
+    }) : { all: 0, reply: 0, overdue: 0 };
     return c.json({
       success: true as const,
       data: {
-        all: line.all + email.all,
-        reply: line.reply + email.reply,
+        all: line.all + email.all + instagram.all,
+        reply: line.reply + email.reply + instagram.reply,
         overdue: line.overdue + email.overdue,
         line,
         email,
+        instagram,
       },
     });
   } catch (err) {

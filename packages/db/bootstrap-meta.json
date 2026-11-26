@@ -678,13 +678,16 @@
     "763_folder_membership_revisions.sql",
     "764_broadcast_ab_live.sql",
     "765_ec_auto_line_cap.sql",
+    "768_instagram_inbox.sql",
     "769_musubo_contracted_linked_slots.sql",
     "770_onboarding_guide_progress.sql",
     "772_sns_multi_connections.sql",
     "773_sns_multi_connections_drop_compat.sql",
     "786_restaurant_course_gallery.sql",
     "789_limit_legacy_folder_update_triggers.sql",
-    "797_scope_friend_line_user_ids.sql"
+    "796_account_email_inbox.sql",
+    "797_scope_friend_line_user_ids.sql",
+    "798_instagram_outbound_not_sent_confirmed.sql"
   ],
-  "migrationCount": 685
+  "migrationCount": 688
 }

@@ -3,20 +3,24 @@ import type { Dispatch, SetStateAction } from 'react';
 import { api } from '@/lib/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { EMAIL_SOURCE_URL_KEY, emailSourceFromParam, type EmailRef } from './email-sources';
 import { DEEP_LINK_NOTICE, buildInboxUrl, isSafeFriendIdForInbox } from './inbox-model';
 type Options = {
   params: ReturnType<typeof useSearchParams>
   setSelectedChatId: Dispatch<SetStateAction<string | null>>
-  setSelectedThreadId: Dispatch<SetStateAction<string | null>>
+  setSelectedEmail: (ref: EmailRef | null) => void
   accountsLoading: boolean
-  emailInboxEnabled: boolean
+  /** 共通のメールを出すアカウントか（未選択は従来どおり出す）。 */
+  sharedEmailEnabled: boolean
+  /** 店舗のメール（転送用アドレス）がつながっているか。 */
+  storeEmailEnabled: boolean
   selectedAccountId: string | null
   router: ReturnType<typeof useRouter>
   channel: "all" | "email" | "line"
   savedViewParam: string
 }
 
-export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadId, accountsLoading, emailInboxEnabled, selectedAccountId, router, channel, savedViewParam }: Options) {
+export function useInboxDeepLink({ params, setSelectedChatId, setSelectedEmail, accountsLoading, sharedEmailEnabled, storeEmailEnabled, selectedAccountId, router, channel, savedViewParam }: Options) {
 
   /**
    * URLで指定された会話が開けなかったときの案内。
@@ -36,7 +40,8 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
   const deepLinkRequestIdRef = useRef(0)
 
   // Deep-link from other pages. LINE is ?friend=<friendId> (?friendId= is
-  // the old form kept for shared URLs), email is ?thread=<threadId>.
+  // the old form kept for shared URLs), email is ?thread=<threadId>
+  // (共通。店舗のメールは &source=store を付け、店舗の口だけで開く).
   // Selecting one side always clears the other so the center panel has
   // exactly one conversation to show. Re-runs on URL change so back/forward
   // and shared URLs keep the target; reload works because the target lives
@@ -51,14 +56,18 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
   // から送ってしまう。だからここで選択中アカウントへ固定する(#673)。
   useEffect(() => {
     const threadId = (params.get('thread') ?? '').trim()
+    const emailSource = emailSourceFromParam(params.get(EMAIL_SOURCE_URL_KEY))
     const rawFriend = (params.get('friend') ?? params.get('friendId') ?? '').trim()
     if (threadId) {
       if (accountsLoading) return
       deepLinkRequestIdRef.current += 1
       deepLinkIdRef.current = null
-      setDeepLinkNotice(emailInboxEnabled ? '' : 'このアカウントではメールを接続していません。')
+      const connected = emailSource === 'store' ? storeEmailEnabled : sharedEmailEnabled
+      setDeepLinkNotice(connected ? '' : emailSource === 'store'
+        ? 'このアカウントでは店舗のメールを接続していません。'
+        : 'このアカウントではメールを接続していません。')
       setSelectedChatId(null)
-      setSelectedThreadId(emailInboxEnabled ? threadId : null)
+      setSelectedEmail(connected ? { source: emailSource, threadId } : null)
       return
     }
     // URLに対象が無いときは何もしない。手で選んだ会話を消さない。
@@ -68,7 +77,7 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
     if (!isSafeFriendIdForInbox(rawFriend)) {
       // 不正なIDは口へ渡さず、別人も開かない。案内だけ出す。
       deepLinkIdRef.current = rawFriend
-      setSelectedThreadId(null)
+      setSelectedEmail(null)
       setSelectedChatId(null)
       setDeepLinkNotice(DEEP_LINK_NOTICE.malformed)
       return
@@ -79,7 +88,7 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
     if (accountsLoading) return
 
     deepLinkIdRef.current = rawFriend
-    setSelectedThreadId(null)
+    setSelectedEmail(null)
     // 照合できるまでは会話を選ばない。ここで選ぶと `api.chats.get` が
     // 走り、別アカウントの会話が表示されてしまう。
     setSelectedChatId(null)
@@ -116,7 +125,7 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
       setSelectedChatId(rawFriend)
     })()
     return () => { cancelled = true }
-  }, [params, selectedAccountId, accountsLoading, emailInboxEnabled, setSelectedThreadId, setSelectedChatId])
+  }, [params, selectedAccountId, accountsLoading, sharedEmailEnabled, storeEmailEnabled, setSelectedEmail, setSelectedChatId])
 
   // 案内付きの空状態から一覧へ戻る。URLの指定も外す。
   // 外さないと再読込で同じ指定が復活する(#673)。

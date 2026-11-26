@@ -51,6 +51,24 @@ export const INSTAGRAM_CONNECTION_STATUS = {
   unconfigured: { label: '未設定', tone: 'neutral' },
 } as const satisfies Record<string, { label: string; tone: StatusTone }>
 
+/**
+ * 店舗のメール（転送用アドレス）の接続状態。設定と受信箱で同じ言葉を使う。
+ * 設定中は進んでいる途中（橙）、受信確認待ちは確かめ待ち（黄）、解除のあとは止め（灰）。
+ */
+export const ACCOUNT_EMAIL_CONNECTION_STATUS = {
+  disconnected: GOOGLE_CONNECTION_STATUS.disconnected,
+  setup: { label: '設定中', tone: 'warning' },
+  pending: { label: '受信確認待ち', tone: 'caution' },
+  connected: GOOGLE_CONNECTION_STATUS.connected,
+  revoked: { label: '接続切れ', tone: 'neutral' },
+} as const satisfies Record<string, { label: string; tone: StatusTone | 'caution' }>
+
+/**
+ * 店舗のメール（転送用アドレス）への返信の案内。送信の手段と差出人を確かめるまで受信専用。
+ * 受信箱の返信欄の吹き出しと、設定のメールの枠で同じ言葉を使う。
+ */
+export const ACCOUNT_EMAIL_RECEIVE_ONLY_NOTE = '転送メールは受信専用です。返信は共通メールか LINE から'
+
 /** Google ビジネスの投稿の状態（API の値 → 札の言葉と色）。画面では言葉を作らず、この表だけを読む。 */
 export const GOOGLE_POST_STATUS: Record<string, { label: string; tone: StatusTone }> = {
   draft: { label: '下書き', tone: 'neutral' },

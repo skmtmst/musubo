@@ -56,7 +56,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
       items=items.filter(item=>(item.folder_id ?? null)===folderId);
     }
-    const { tagsByAccount, foldersByAccount, statsByAccount, emailInboxAccountIds } = await readLineAccountListMetadata(
+    const { tagsByAccount, foldersByAccount, statsByAccount, emailCapabilities } = await readLineAccountListMetadata(
       db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map((item) => item.id),
     );
     const serializeWithStats = (item: DbLineAccount) => {
@@ -67,7 +67,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
         : undefined;
       return {
         ...serializeLineAccount(item),
-        emailInboxEnabled: emailInboxAccountIds.has(item.id),
+        ...emailCapabilities(item.id),
         tags: tagsByAccount[item.id] ?? [],
         folderId: foldersByAccount[item.id]?.id ?? null,
         folder: foldersByAccount[item.id] ?? null,

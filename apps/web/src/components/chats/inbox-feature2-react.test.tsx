@@ -50,11 +50,10 @@ describe('LAY-01/LAY-02 顧客情報のドロワー', () => {
       lineContent={<p>選んだ相手の情報</p>}
       showFriendInfo
       selectedChatId="chat-a"
-      selectedThreadId={null}
+      selectedEmail={null}
       wideInfoPanel={wide}
       setShowFriendInfo={setShowFriendInfo}
       customerPanelRef={createRef<HTMLElement>()}
-      emailItems={[]}
     />)
     return setShowFriendInfo
   }

@@ -52,7 +52,7 @@ type Revalidation =
  * 15 分たったら止めて `watchExpired` を立てる（［もう一度確かめる］で `rewatch`）。
  * 後ろで読み直す時は今の表示を消さない（読み込み中に戻さない）。
  */
-export function useFirstRun(accountId: string | null, enabled = true, watch = false, cacheScope?: string) {
+export function useFirstRun(accountId: string | null, enabled = true, watch = false, cacheScope?: string, preload = false) {
   const scope = JSON.stringify([accountId, cacheScope])
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [revalidation, setRevalidation] = useState<Revalidation | null>(null)
@@ -62,18 +62,21 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   const generation = useRef(0)
   const pendingReload = useRef(false)
   const cached = useRef<Snapshot | null>(null)
+  const inFlight = useRef<{ scope: string; promise: Promise<FirstRunLoad> } | null>(null)
   const needsRefresh = useRef(false)
   const wasDisabled = useRef(!enabled)
   const markStale = useCallback(() => {
     needsRefresh.current = true
+    inFlight.current = null
     if (!enabled) return
     generation.current += 1
     setRevalidation({ accountId, scope, status: 'loading', error: null })
   }, [accountId, enabled, scope])
-  const invalidate = useCallback(() => { generation.current += 1; cached.current = null; setRevalidation(null); setSnapshot(null) }, [])
+  const invalidate = useCallback(() => { generation.current += 1; inFlight.current = null; cached.current = null; setRevalidation(null); setSnapshot(null) }, [])
   const reload = useCallback(() => { pendingReload.current = true; invalidate(); setTick((n) => n + 1) }, [invalidate])
   const refresh = useCallback(() => {
     needsRefresh.current = true
+    inFlight.current = null
     if (!enabled || pendingReload.current) return
     const at = ++generation.current
     void loadFirstRun(accountId).then((loaded) => {
@@ -92,27 +95,52 @@ export function useFirstRun(accountId: string | null, enabled = true, watch = fa
   }, [accountId, enabled, scope])
   useEffect(() => {
     const at = ++generation.current
-    if (!enabled) { wasDisabled.current = true; return }
+    if (!enabled) {
+      wasDisabled.current = true
+      if (preload && accountId && !pendingReload.current && !needsRefresh.current
+        && cached.current?.scope !== scope && inFlight.current?.scope !== scope) {
+        const promise = loadFirstRun(accountId)
+        const currentFlight = { scope, promise }
+        inFlight.current = currentFlight
+        void promise.then(
+          loaded => {
+            if (inFlight.current === currentFlight) {
+              inFlight.current = null
+              cached.current = { accountId, scope, ...loaded, status: 'ready', error: null }
+            }
+          },
+          () => {
+            if (inFlight.current === currentFlight) inFlight.current = null
+          },
+        )
+      }
+      return
+    }
     wasDisabled.current = false
     if (!pendingReload.current && !needsRefresh.current && cached.current?.scope === scope && cached.current.status === 'ready') {
       setSnapshot(cached.current)
       return () => { generation.current += 1 }
     }
+    const flight = !pendingReload.current && !needsRefresh.current && inFlight.current?.scope === scope ? inFlight.current : null
     pendingReload.current = false
     setRevalidation(null)
     setSnapshot(null)
     cached.current = null
-    void loadFirstRun(accountId).then((loaded) => {
+    const promise = flight ? flight.promise : loadFirstRun(accountId)
+    if (!flight) inFlight.current = null
+    void promise.then((loaded) => {
+      if (inFlight.current === flight) inFlight.current = null
       if (generation.current === at) {
         needsRefresh.current = false
         cached.current = { accountId, scope, ...loaded, status: 'ready', error: null }
         setSnapshot(cached.current)
       }
     }).catch((error: unknown) => {
+      if (inFlight.current === flight) inFlight.current = null
       if (generation.current === at) setSnapshot({ accountId, scope, status: 'error', error })
     })
     return () => { generation.current += 1 }
-  }, [accountId, enabled, tick, scope])
+  }, [accountId, enabled, preload, tick, scope])
   useEffect(() => {
     const featureSaved = (event: Event) => {
       const detail = (event as CustomEvent<FeatureSettingsUpdate>).detail

@@ -22,6 +22,7 @@ beforeEach(() => {
   db = createTestD1();
   db.raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
     VALUES ('account-a', 'channel-a', '本店', 'token', 'secret')`).run();
+  db.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('fixture-legacy','account-a','inbox_email_legacy_enabled','true')");
 });
 afterEach(() => { db.raw.close(); vi.restoreAllMocks(); });
 

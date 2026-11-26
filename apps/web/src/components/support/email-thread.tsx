@@ -4,7 +4,8 @@ import { scrollMotion } from '@/components/shared/overlay-utils'
 import EntitySelect from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { ApiError, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi, type AccountEmailAttachment } from '@/lib/api'
+import { lockUnless } from '@/components/shared/permission-lock'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { InboxInputBox } from '@/components/shared/inbox-composer'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -36,6 +37,7 @@ type EmailMessage = {
   body_text: string
   sent_by_staff_name: string | null
   created_at: string
+  attachments?: AccountEmailAttachment[]
 }
 
 type EmailDetail = {
@@ -111,6 +113,11 @@ function EmailThreadHeader({ children }: { children: React.ReactNode }) {
 
 export default function EmailThread({
   threadId,
+  storeAccountId = null,
+  sourceLabel,
+  replyLockedReason,
+  draftStore,
+  readOnly = false,
   onBack,
   onChanged,
   customerInfoOpen = false,
@@ -118,6 +125,22 @@ export default function EmailThread({
   onCloseCustomerInfo,
 }: {
   threadId: string
+  /** 店舗のメールの LINE アカウント。渡すと会話・対応状況・添付を店舗の口で読み書きする。共通は null。 */
+  storeAccountId?: string | null
+  /** 届いた経路の呼び名（共通／店舗）。会話の頭の補足に出す。 */
+  sourceLabel?: string
+  /**
+   * 返信を送れない理由。渡すと返信欄と［メールで返信］を隠さず灰色にし、乗せた時・焦点を当てた時に
+   * 吹き出しで出す（店舗のメールは送信の手段と差出人を確かめるまで受信専用）。
+   */
+  replyLockedReason?: string
+  /**
+   * 会話ごとの下書きの預かり先。渡すと、この部品を作り直しても（店舗の会話や LINE を見てから戻っても）
+   * 下書きが残る。渡さなければ部品の中だけで預かる。
+   */
+  draftStore?: Map<string, string>
+  /** 閲覧のみ。担当・対応状況・返信・メモは隠さず灰色＋理由にする。 */
+  readOnly?: boolean
   /** スマホでメール一覧へ戻る。LINEのトークと同じ位置に出す。 */
   onBack: () => void
   /** 状態や返信で一覧の中身が変わったときに知らせる。 */
@@ -135,7 +158,7 @@ export default function EmailThread({
     入力しても、Aの成功応答がBの文面を消さない。A→B→Aの往復でも
     それぞれの下書きが戻る。消すのは「送った会話の、送った版」だけ。
   */
-  const draftsRef = useRef(new Map<string, string>())
+  const draftsRef = useRef(draftStore ?? new Map<string, string>())
   const writeDraft = useCallback((thread: string, value: string) => {
     if (value) draftsRef.current.set(thread, value)
     else draftsRef.current.delete(thread)
@@ -172,6 +195,8 @@ export default function EmailThread({
   }, [])
 
   useEffect(() => {
+    // 店舗のメールは担当を持たない。閲覧のみの人にも今の担当の名前を出すため、共通では読む。
+    if (storeAccountId) return
     let cancelled = false
     void fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
       '/api/operators?channel=email',
@@ -184,7 +209,7 @@ export default function EmailThread({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [storeAccountId])
 
   // 世代で古い応答を捨てる。threadIdが変わった後の遅い応答が
   // 新しい会話を上書きしない(順序逆転防止、#630)。
@@ -243,9 +268,9 @@ export default function EmailThread({
       const after = current && current.thread.id === myThread ? (current.newestCursor ?? null) : null
       const query = after ? `?after=${encodeURIComponent(after)}` : ''
       try {
-        const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
-          `/api/support/email/threads/${encodeURIComponent(threadId)}${query}`,
-        )
+        const res = storeAccountId
+          ? await api.accountEmail.thread(storeAccountId, threadId, { after })
+          : await fetchApi<{ success: boolean; data: EmailDetail }>(`/api/support/email/threads/${encodeURIComponent(threadId)}${query}`)
         if (isStale()) return true
         if (res.success) {
           const data = res.data
@@ -276,7 +301,7 @@ export default function EmailThread({
         return false
       }
     },
-    [threadId],
+    [threadId, storeAccountId],
   )
 
   // 相手からの返信が届いたら出したい。未解決の間だけ5秒起点の1本で
@@ -358,9 +383,12 @@ export default function EmailThread({
   const updateStatus = async (status: ThreadStatus) => {
     // 操作を始めたスレッドを固定する。応答を待つ間に別スレッドへ
     // 切り替わっても、その画面へ結果・失敗を書き込まない(A02-01/04)。
+    if (readOnly || !detail) return
     const myThread = threadId
     try {
-      const res = await fetchApi<{ success: boolean; error?: string }>(
+      const res = storeAccountId
+        ? await api.accountEmail.updateStatus(storeAccountId, myThread, status, detail.thread.revision)
+        : await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(myThread)}/status`,
         { method: 'PATCH', body: JSON.stringify({ status, revision: detail?.thread.revision }) },
       )
@@ -379,6 +407,7 @@ export default function EmailThread({
 
   /** 担当を付け替える（LINE のトークと同じ）。 */
   const updateAssignee = async (staffId: string | null) => {
+    if (readOnly || storeAccountId) return
     const myThread = threadId
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
@@ -398,8 +427,14 @@ export default function EmailThread({
     }
   }
 
+  /** 閲覧のみの人の理由。担当・対応状況・メモ・返信を灰色にする。 */
+  const viewerLock = readOnly ? lockUnless(false, 'viewer') : undefined
+  /** 返信欄の理由。店舗のメールは役割に関わらず受信専用の理由を出す。 */
+  const replyLock = replyLockedReason ?? viewerLock
+
   const sendReply = async () => {
-    if (!reply.trim() || sending) return
+    // 店舗のメールは共通の返信の口へ送らない（受信専用）。
+    if (storeAccountId || replyLock || !reply.trim() || sending) return
     /*
       F06+A02-01/04: 送信を始めたスレッドと送った版を固定する。
       応答を待つ間に別の会話へ切り替わっても、その画面の入力欄を
@@ -457,9 +492,9 @@ export default function EmailThread({
     const heightBefore = scroller?.scrollHeight ?? 0
     setOlderLoading(true)
     try {
-      const res = await fetchApi<{ success: boolean; data: EmailDetail }>(
-        `/api/support/email/threads/${encodeURIComponent(myThread)}?before=${encodeURIComponent(cursor)}`,
-      )
+      const res = storeAccountId
+        ? await api.accountEmail.thread(storeAccountId, myThread, { before: cursor })
+        : await fetchApi<{ success: boolean; data: EmailDetail }>(`/api/support/email/threads/${encodeURIComponent(myThread)}?before=${encodeURIComponent(cursor)}`)
       if (latestThreadRef.current !== myThread || !res.success) return
       const data = res.data
       setDetail((prev) => {
@@ -513,7 +548,8 @@ export default function EmailThread({
    */
   const memoSaveGenRef = useRef(0)
   const saveMemo = async () => {
-    if (!detail || memoSaving) return
+    // 店舗のメールにはメモの口が無い。閲覧のみの人も保存しない。
+    if (!detail || memoSaving || storeAccountId || readOnly) return
     const myThread = threadId
     const myRevision = detail.thread.revision
     const mySeq = ++memoSaveGenRef.current
@@ -594,15 +630,16 @@ export default function EmailThread({
          */
         <ConversationHead
           name={detail.thread.customer_name || detail.thread.customer_email}
-          sub={`メール・${detail.thread.subject}`}
-          subTitle={`${detail.thread.customer_email}・メール・${detail.thread.subject}`}
+          sub={`${sourceLabel ?? ''}メール・${detail.thread.subject}`}
+          subTitle={`${detail.thread.customer_email}・${sourceLabel ?? ''}メール・${detail.thread.subject}`}
           onBack={onBack}
-          operator={{
+          operator={storeAccountId ? undefined : {
             value: detail.thread.assigned_staff_id ? `staff:${detail.thread.assigned_staff_id}` : 'unassigned',
             operators,
             onChange: (next) => { void updateAssignee(next === 'unassigned' ? null : next) },
+            lockedReason: viewerLock,
           }}
-          status={{ value: detail.thread.status, onChange: (next) => void updateStatus(next) }}
+          status={{ value: detail.thread.status, onChange: (next) => void updateStatus(next), lockedReason: viewerLock }}
           panel={onOpenCustomerInfo ? {
             open: customerInfoOpen,
             onToggle: () => (customerInfoOpen ? onCloseCustomerInfo?.() : onOpenCustomerInfo()),
@@ -633,6 +670,12 @@ export default function EmailThread({
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
+              {storeAccountId && message.attachments?.map(file => (
+                <Button key={file.id} title={file.filename} variant="text" size="inline" onClick={() => {
+                  void api.accountEmail.downloadAttachment(storeAccountId, file.id, file.filename)
+                    .catch(() => setError('添付をダウンロードできませんでした。'))
+                }}>{file.filename}</Button>
+              ))}
               <p className="mt-2 text-right text-nano text-ink-faint">
                 {dateTime(message.created_at)}
                 {message.direction === 'outgoing' ? '・送信済み' : ''}
@@ -656,21 +699,24 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
+      <div data-inbox-v4="composer" data-reply-locked={replyLock ? '' : undefined} data-reply-unavailable={replyLockedReason ? '' : undefined} className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
         {/*
           上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた。
           U010: 横に収まらなければ次の行へ折り返す。1行に固定したままだと
           390px で右の操作が画面外へ切れ、短い文言が縦に割れて読めない。
+          店舗のメールは受信専用なので、返信のための道具は出さず、返信欄だけを押せない形で置く。
+          閲覧のみの人には隠さず灰色＋理由で置く。
         */}
+        {replyLockedReason ? null : (
         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" onClick={() => setShowTemplatePicker(true)}>
+            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" lockedReason={viewerLock} onClick={() => setShowTemplatePicker(true)}>
               ▧ テンプレートを選択
             </Button>
-            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" onClick={() => setShowComposerOptions(v => !v)}>
+            <Button variant="secondary" className="shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 text-xs text-action h-auto" type="button" lockedReason={viewerLock} onClick={() => setShowComposerOptions(v => !v)}>
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
             </Button>
-            <Button variant="secondary" className="shrink-0 items-center whitespace-nowrap px-3 py-2 text-xs text-ink-secondary h-auto" type="button" onClick={openMemoEditor} aria-expanded={showMemoEditor}>
+            <Button variant="secondary" className="shrink-0 items-center whitespace-nowrap px-3 py-2 text-xs text-ink-secondary h-auto" type="button" lockedReason={viewerLock} onClick={openMemoEditor} aria-expanded={showMemoEditor}>
               内部メモ
             </Button>
           </div>
@@ -678,8 +724,9 @@ export default function EmailThread({
             {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
           </span>
         </div>
+        )}
 
-        {showComposerOptions && (
+        {showComposerOptions && !replyLock && (
           <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
             <span className="text-ink-secondary">送信キー</span>
             <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
@@ -740,7 +787,9 @@ export default function EmailThread({
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
         <InboxInputBox>
           <SharedTextArea
-            value={reply}
+            // 送れない会話（店舗のメール）は値を出さず、欄の中の理由を常に見せる。預かった下書きは消さない。
+            value={replyLockedReason ? '' : reply}
+            lockedReason={replyLock}
             onChange={(e) => setReplyDraft(e.target.value)}
             onCompositionStart={() => { isComposingRef.current = true }}
             onCompositionEnd={() => { isComposingRef.current = false }}
@@ -765,7 +814,8 @@ export default function EmailThread({
                 void sendReply()
               }
             }}
-            placeholder="メールの返信を入力"
+            // 店舗のメールは欄の中に送れない理由をそのまま出す（吹き出しにも同じ文）。
+            placeholder={replyLockedReason ?? 'メールの返信を入力'}
             aria-label="メールの返信を入力"
             rows={3}
             className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
@@ -775,11 +825,14 @@ export default function EmailThread({
             文字が複数行に割れる。行を折り返せるようにし、ボタンは
             縮まず1行で保つ。差出人は長いときだけ省略する。
           */}
-          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            <span className="text-ink-faint min-w-0 truncate text-xs" title="差出人 contact-shed@nen-petfood.com">
-              差出人 contact-shed@nen-petfood.com
-            </span>
-            <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中…" widthReserve="idle">
+          <div className={`mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 ${storeAccountId ? 'justify-end' : 'justify-between'}`}>
+            {/* 店舗のメールは差出人がまだ決まっていないので、共通の差出人は出さない。 */}
+            {storeAccountId ? null : (
+              <span className="text-ink-faint min-w-0 truncate text-xs" title="差出人 contact-shed@nen-petfood.com">
+                差出人 contact-shed@nen-petfood.com
+              </span>
+            )}
+            <Button variant="primary" className="shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto" onClick={() => sendReply()} disabled={!reply.trim() || sending} lockedReason={replyLock} busy={sending} busyLabel="送信中…" widthReserve="idle">
               {'メールで返信'}
             </Button>
           </div>

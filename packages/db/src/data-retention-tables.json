@@ -38,6 +38,60 @@
   "_556_folders_backup_webinars": {
     "category": "global"
   },
+  "account_email_attachment_parts": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "attachment_id",
+      "parent": "account_email_attachments",
+      "parentColumn": "id"
+    }
+  },
+  "account_email_attachments": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "message_id",
+      "parent": "account_email_messages",
+      "parentColumn": "id"
+    }
+  },
+  "account_email_connections": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "account_email_messages": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "thread_id",
+      "parent": "account_email_threads",
+      "parentColumn": "id"
+    }
+  },
+  "account_email_reads": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "thread_id",
+      "parent": "account_email_threads",
+      "parentColumn": "id"
+    }
+  },
+  "account_email_threads": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "connection_id",
+      "parent": "account_email_connections",
+      "parentColumn": "id"
+    }
+  },
   "account_handover_decisions": {
     "category": "purge",
     "scope": {
@@ -4159,6 +4213,20 @@
     }
   },
   "instagram_connections": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "instagram_inbox_reads": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "instagram_outbound_messages": {
     "category": "purge",
     "scope": {
       "by": "lineAccount",

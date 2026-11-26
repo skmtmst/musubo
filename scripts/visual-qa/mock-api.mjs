@@ -3047,6 +3047,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/intake-addresses') {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   }
+  // メールの接続画面は本物と同じ未接続の状態を読む。更新は通常どおり許可しない。
+  if (method === 'GET' && /^\/api\/account-email\/[^/]+\/connection$/.test(pathname)) {
+    return { success: true, data: { status: 'disconnected', connectionId: null, address: null, mailbox: null, forwardingConfirmation: null, canReply: false, issue: null, checkedAt: null } }
+  }
   // SNS 連携（y3GGTs）の Google・Instagram の接続と接続一覧は sns-multi-mode.mjs にまとめた。
   if (method === 'GET' && SNS_CONNECTION_PATHS.has(pathname)) return snsConnectionBody(pathname)
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {

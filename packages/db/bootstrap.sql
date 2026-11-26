@@ -103,6 +103,64 @@ CREATE TABLE account_ai_features (
  PRIMARY KEY(account_id,feature)
 );
 
+CREATE TABLE account_email_attachment_parts (
+  attachment_id TEXT NOT NULL REFERENCES account_email_attachments(id) ON DELETE CASCADE,
+  part INTEGER NOT NULL,
+  content BLOB NOT NULL,
+  PRIMARY KEY(attachment_id,part)
+);
+
+CREATE TABLE account_email_attachments (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL REFERENCES account_email_messages(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size INTEGER NOT NULL
+);
+
+CREATE TABLE account_email_connections (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  address TEXT NOT NULL UNIQUE,
+  mailbox TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('setup','pending','connected','revoked')),
+  challenge_hash TEXT,
+  challenge_sent INTEGER,
+  forwarding_confirmation TEXT,
+  checked_at TEXT,
+  automated_at INTEGER,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE account_email_messages (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT NOT NULL REFERENCES account_email_threads(id) ON DELETE CASCADE,
+  dedup_key TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(thread_id,dedup_key)
+);
+
+CREATE TABLE account_email_reads (
+  thread_id TEXT NOT NULL REFERENCES account_email_threads(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL,
+  last_message_id TEXT NOT NULL,
+  PRIMARY KEY(thread_id,staff_id)
+);
+
+CREATE TABLE account_email_threads (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL REFERENCES account_email_connections(id) ON DELETE CASCADE,
+  customer_email TEXT NOT NULL,
+  customer_name TEXT,
+  status TEXT NOT NULL DEFAULT 'unread' CHECK(status IN ('unread','in_progress','on_hold','resolved')),
+  revision INTEGER NOT NULL DEFAULT 0,
+  subject TEXT NOT NULL,
+  last_message_at TEXT NOT NULL,
+  UNIQUE(connection_id,customer_email)
+);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,
@@ -4756,6 +4814,14 @@ CREATE TABLE "instagram_connections" (
   sort_order INTEGER NOT NULL DEFAULT 0 CHECK (sort_order >= 0)
 );
 
+CREATE TABLE instagram_inbox_reads (
+  staff_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  sender_id TEXT NOT NULL,
+  last_read_at TEXT NOT NULL,
+  PRIMARY KEY (staff_id, line_account_id, sender_id)
+);
+
 CREATE TABLE "instagram_messages" (
  id TEXT NOT NULL, line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
  instagram_id TEXT NOT NULL, sender_id TEXT NOT NULL, recipient_id TEXT NOT NULL,
@@ -4768,6 +4834,32 @@ CREATE TABLE instagram_oauth_states (
  staff_id TEXT NOT NULL, phase TEXT NOT NULL CHECK(phase IN ('started','exchanging','selecting','connecting')),
  candidates_encrypted TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
 , connection_id TEXT REFERENCES instagram_connections(id) ON DELETE SET NULL);
+
+CREATE TABLE "instagram_outbound_messages" (
+  idempotency_key TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  instagram_id TEXT NOT NULL,
+  sender_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','sent','unknown','not_sent_confirmed')),
+  meta_message_id TEXT,
+  created_at TEXT NOT NULL,
+  sent_at TEXT,
+  resolved_by_staff_id TEXT,
+  resolved_at TEXT,
+  resolution_kind TEXT CHECK(resolution_kind IS NULL OR resolution_kind IN ('reason','meta_conversation_absent')),
+  resolution_evidence TEXT,
+  CHECK(
+    status <> 'not_sent_confirmed'
+    OR (
+      resolved_by_staff_id IS NOT NULL AND length(trim(resolved_by_staff_id)) > 0
+      AND resolved_at IS NOT NULL AND length(trim(resolved_at)) > 0
+      AND resolution_kind IS NOT NULL AND resolution_kind IN ('reason','meta_conversation_absent')
+      AND resolution_evidence IS NOT NULL AND length(trim(resolution_evidence)) > 0
+    )
+  )
+);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -9829,6 +9921,16 @@ CREATE TABLE workflow_steps (
       OR (status <> 'running' AND lease_owner IS NULL AND lease_expires_at IS NULL))
 );
 
+CREATE UNIQUE INDEX account_email_active ON account_email_connections(account_id) WHERE status <> 'revoked';
+
+CREATE INDEX account_email_files ON account_email_attachments(message_id);
+
+CREATE INDEX account_email_history ON account_email_connections(account_id, created_at DESC);
+
+CREATE INDEX account_email_latest ON account_email_threads(connection_id,last_message_at DESC,id);
+
+CREATE INDEX account_email_timeline ON account_email_messages(thread_id,created_at,id);
+
 CREATE INDEX ai_answer_logs_account ON ai_answer_logs(account_id,created_at,id);
 
 CREATE INDEX booking_entitlement_notices_due ON booking_entitlement_notices(status,scheduled_at);
@@ -11007,8 +11109,14 @@ CREATE INDEX idx_instagram_messages_account_time_754 ON instagram_messages(line_
 CREATE INDEX idx_instagram_messages_connection_772
   ON instagram_messages(connection_id, received_at, id);
 
+CREATE INDEX idx_instagram_messages_conversation_768
+  ON instagram_messages(line_account_id, sender_id, received_at DESC, id DESC);
+
 CREATE INDEX idx_instagram_oauth_states_connection_772
   ON instagram_oauth_states(connection_id);
+
+CREATE UNIQUE INDEX idx_instagram_outbound_pending_768
+  ON instagram_outbound_messages(instagram_id, sender_id) WHERE status IN ('pending','unknown');
 
 CREATE INDEX idx_integration_api_tokens_account
   ON integration_api_tokens (line_account_id, revoked_at);
@@ -12317,6 +12425,29 @@ BEGIN SELECT RAISE(ABORT,'ab_test_requires_test_transport'); END;
 
 CREATE TRIGGER ab_stop_broadcast AFTER UPDATE OF stopped_at ON broadcasts WHEN NEW.stopped_at IS NOT NULL
 BEGIN UPDATE broadcast_ab_tests SET status='stopped',version=version+1 WHERE broadcast_id=NEW.id AND status NOT IN('finished','expired','stopped'); END;
+
+CREATE TRIGGER account_email_connection_status AFTER UPDATE OF status ON account_email_connections WHEN OLD.status IS NOT NEW.status BEGIN
+  INSERT INTO account_settings(id,line_account_id,key,value)
+    SELECT lower(hex(randomblob(16))),NEW.account_id,'inbox_email_forwarding_connected','true'
+    WHERE NEW.status='connected'
+    ON CONFLICT(line_account_id,key) DO UPDATE SET value='true'; DELETE FROM account_settings WHERE line_account_id=NEW.account_id AND key='inbox_email_forwarding_connected'
+    AND NEW.status='revoked' AND NOT EXISTS (SELECT 1 FROM account_email_connections WHERE account_id=NEW.account_id AND status='connected'); END;
+
+CREATE TRIGGER account_email_received AFTER INSERT ON account_email_messages BEGIN
+  UPDATE account_email_threads SET status='unread', revision=revision+1, last_message_at = MAX(last_message_at, NEW.created_at),
+    subject = CASE WHEN NEW.created_at >= last_message_at THEN NEW.subject ELSE subject END
+  WHERE id = NEW.thread_id; END;
+
+CREATE TRIGGER account_email_retire_notices AFTER UPDATE OF status ON account_email_connections
+WHEN NEW.status='revoked' AND OLD.status<>'revoked' BEGIN
+  DELETE FROM notifications WHERE line_account_id=NEW.account_id AND event_type='account_email_received'
+    AND id IN (SELECT m.id FROM account_email_messages m JOIN account_email_threads t ON t.id=m.thread_id
+               WHERE t.connection_id=NEW.id); END;
+
+CREATE TRIGGER account_email_tenant_change AFTER UPDATE OF tenant_id ON line_accounts
+WHEN OLD.tenant_id IS NOT NEW.tenant_id BEGIN
+  UPDATE account_email_connections SET status='revoked',challenge_hash=NULL,forwarding_confirmation=NULL
+    WHERE account_id=OLD.id AND status <> 'revoked'; END;
 
 CREATE TRIGGER affiliate_offers_folder_insert BEFORE INSERT ON affiliate_offers WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE id=NEW.folder_id AND kind='affiliate_offer' AND account_id=NEW.line_account_id) BEGIN SELECT RAISE(ABORT,'folder_assignment_invalid'); END;
 

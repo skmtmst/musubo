@@ -53,6 +53,8 @@ const GUARDED = [
   'v8/hq/company-contact.tsx',
   'v8/ai-reply/qa-list.tsx',
   'v8/settings/pools/pools.tsx',
+  // メールをつなぐ窓で打ちかけのお店のメールアドレスは、窓を開いたまま画面を離れる前に確認する。
+  'v8/settings/sns/email-card.tsx',
   // 友だち詳細の情報欄。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
   'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',

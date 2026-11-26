@@ -81,10 +81,8 @@ function MobileTalkInbox() {
     listFilterKey, chatListCompletedKey, loadChats, loadMoreChats, loadChatsQuietly,
   } = useInboxLists({
     CHAT_PAGE_SIZE: LIST_BATCH,
-    EMAIL_PAGE_SIZE: 1,
     nameQuery,
     selectedAccountId,
-    emailInboxEnabled: false,
     statusFilter: 'all',
     assigneeFilter: 'all',
     unreadOnly: filter === 'unread',
@@ -137,6 +135,8 @@ function MobileTalkInbox() {
 
 /** 読み直さない側（一覧の画面の会話・会話の画面の一覧）に渡す。 */
 const nothingToRefresh = async () => true
+/** 電話のトークは LINE だけ。URL のメールの指定は開かない。 */
+const ignoreEmailSelection = () => {}
 
 function MobileTalkThread() {
   const router = useRouter()
@@ -147,7 +147,6 @@ function MobileTalkThread() {
   const canReply = !shell.readOnly && role !== null && canEditFeature(TALK_PERMISSION, role)
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const [, setSelectedThreadId] = useState<string | null>(null)
   const [chats, setChats] = useState<ChatListItem[]>([])
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
@@ -175,7 +174,7 @@ function MobileTalkThread() {
 
   /* 会話の指定は PC と同じ照合を通す（いま選んでいるアカウントの相手でなければ開かない）。 */
   const { deepLinkNotice, setDeepLinkNotice, deepLinkIdRef } = useInboxDeepLink({
-    params, setSelectedChatId, setSelectedThreadId, accountsLoading, emailInboxEnabled: false, selectedAccountId, router, channel: 'line', savedViewParam: '',
+    params, setSelectedChatId, setSelectedEmail: ignoreEmailSelection, accountsLoading, sharedEmailEnabled: false, storeEmailEnabled: false, selectedAccountId, router, channel: 'line', savedViewParam: '',
   })
 
   const draft = useInboxDraft({ selectedAccountId, selectedChatId })

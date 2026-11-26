@@ -62,7 +62,7 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
 /** 左のメニュー（lib/menu）に無く、設定の中のメニューにだけ出す項目。 */
 const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-customer-look', href: '/settings/customer-look', label: 'お客さまのデザイン', icon: '', note: '予約・回答フォームなど、お客さまに見える画面のデザイン', required: true },
-  { id: 'settings-sns', href: '/settings/sns', label: 'SNS 連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
+  { id: 'settings-sns', href: '/settings/sns', label: 'メール・SNS連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
   { id: 'settings-booking-media', href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: '', note: '店ごとの予約サイト・グルメ媒体の URL と、他のサイトの枠を閉じる知らせ', required: true },
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
 ]

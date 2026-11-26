@@ -556,6 +556,7 @@
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
 :global(:root) .listBody .toolbar[data-collapsed-only] { padding-inline: 0; margin-inline: var(--tpl-list-inset); }
+:global(:root) .listBody .main[data-content-surface='board'] > .toolbar { padding-inline: 0; margin-inline: var(--tpl-list-inset); }
 /* 画面が道具の段を本文の直下に置いたとき（中身と一緒に読み込む一覧）も、型の道具の段と同じ余白にする。本文は表のために左右 0。 */
 :global(:root) .listBody .content > :global([data-shared-part='list-toolbar']) { box-sizing: border-box; padding: var(--tpl-toolbar-pad-block) var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }

@@ -49,6 +49,10 @@ export type SnsConnectionListProps = {
   onDisconnect?: (connection: SnsConnectionView) => void
   /** 行の中の移動先（Google の「営業時間へ」）。無い行は出さない。 */
   rowLink?: (connection: SnsConnectionView) => { href: string; label: string } | null
+  /** 行の対処の1行（Instagram の期限切れ・DM の許可なし）。無い行は出さない。 */
+  rowRemedy?: (connection: SnsConnectionView) => { tone: 'danger' | 'warn'; text: string } | null
+  /** つなぎ直しの言葉。既定は「つなぎ直す」。Instagram は「もう一度つなぐ」。 */
+  reconnectLabel?: string
 }
 
 export default function SnsConnectionList({
@@ -60,6 +64,8 @@ export default function SnsConnectionList({
   onSetPrimary,
   onDisconnect,
   rowLink,
+  rowRemedy,
+  reconnectLabel = 'つなぎ直す',
 }: SnsConnectionListProps) {
   if (!slots.connections.length) return null
   const multiple = slots.connections.length > 1
@@ -69,11 +75,12 @@ export default function SnsConnectionList({
       {slots.connections.map((connection) => {
         const status = connectionStatusLabel(connection.state)
         const link = rowLink?.(connection) ?? null
+        const remedy = rowRemedy?.(connection) ?? null
         const busy = busyId === connection.id
         const items: ActionMenuItem[] = []
 
-        /* 絵（F1）は異常な行にだけ［つなぎ直す］を行の中に出す。 */
-        const quickReconnect = Boolean(onReconnect) && NEEDS_RECONNECT.includes(connection.state)
+        /* 絵（F1）は異常な行にだけ［つなぎ直す］を行の中に出す。対処の1行がある行（DM の許可なしなど）も同じ。 */
+        const quickReconnect = Boolean(onReconnect) && (NEEDS_RECONNECT.includes(connection.state) || remedy !== null)
         /* 主連携は選べる相手が2件以上あるときだけ入れ替えられる（要件 §4-3）。 */
         const quickPrimary = Boolean(onSetPrimary) && multiple && !connection.primary
 
@@ -81,7 +88,7 @@ export default function SnsConnectionList({
           items.push({
             id: 'reconnect',
             group: 'manage',
-            label: 'つなぎ直す',
+            label: reconnectLabel,
             disabled: busy,
             onSelect: () => onReconnect(connection),
           })
@@ -123,6 +130,7 @@ export default function SnsConnectionList({
               </div>
             ) : null}
             {connection.meta.length ? <p className={styles.meta}>{connection.meta.join('・')}</p> : null}
+            {remedy ? <p className={styles.remedy} data-tone={remedy.tone}>{remedy.text}</p> : null}
             {quickPrimary || quickReconnect ? (
               <div className={styles.connOps}>
                 {quickPrimary ? (
@@ -146,7 +154,7 @@ export default function SnsConnectionList({
                     disabled={!canManage || busy}
                     onClick={() => onReconnect?.(connection)}
                   >
-                    つなぎ直す
+                    {reconnectLabel}
                   </Button>
                 ) : null}
               </div>

@@ -98,7 +98,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
                 } else if (step.href?.startsWith('/?guide=')) {
                   return
                 }
-                guide?.startAt?.(step.key)
+                if (!step.href?.startsWith('/?guide=')) guide?.startAt?.(step.key)
               }}>{actionLabel}</TextLink>
             )}
           </SetupStepRow>

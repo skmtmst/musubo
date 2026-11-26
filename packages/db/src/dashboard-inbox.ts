@@ -143,6 +143,12 @@ export async function getInboxStatusCounts(
     };
   }
 
+  const storeScope = accountScopeSql(scope,'c.account_id');
+  const storeRows = await db.prepare(`SELECT t.status,count(*) AS n FROM account_email_threads t
+    JOIN account_email_connections c ON c.id=t.connection_id WHERE c.status='connected' AND ${storeScope.sql}
+    GROUP BY t.status`).bind(...storeScope.binds).all<{status:'unread'|'in_progress'|'on_hold'|'resolved';n:number}>();
+  const statusKeys = {unread:'unanswered',in_progress:'inProgress',on_hold:'onHold',resolved:'resolved'} as const;
+  for (const row of storeRows.results) email[statusKeys[row.status]] += row.n;
   return {
     unanswered: line.unanswered + email.unanswered,
     inProgress: line.inProgress + email.inProgress,
@@ -201,6 +207,11 @@ export async function inboxState(db: D1Database, scope: AccountStatsScope): Prom
       .first<{ oldest: string | null }>();
     oldestAt.push(mailOldest?.oldest ?? null);
   }
+  const storeScope = accountScopeSql(scope,'c.account_id');
+  const storeOldest = await db.prepare(`SELECT MIN(t.last_message_at) AS oldest FROM account_email_threads t
+    JOIN account_email_connections c ON c.id=t.connection_id WHERE c.status='connected' AND t.status='unread' AND ${storeScope.sql}`)
+    .bind(...storeScope.binds).first<{oldest:string|null}>();
+  oldestAt.push(storeOldest?.oldest ?? null);
   let oldestMinutes: number | null = null;
   for (const at of oldestAt) {
     if (!at) continue;

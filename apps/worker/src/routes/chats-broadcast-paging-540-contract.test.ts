@@ -113,6 +113,41 @@ describe('#540 機能2: 受信箱一覧の上限とページ送り', () => {
     } as Env['Bindings']);
     expect(response.status).toBe(404);
   });
+
+  it('Instagram を一覧に混ぜ、媒体とカーソルで絞れる', async () => {
+    testDb.raw.prepare(`INSERT INTO instagram_messages
+      (id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+      VALUES ('ig-message','account-1','ig-business','customer','ig-business','DM','2026-09-02T12:00:00.000Z','2026-09-02T12:00:00.000Z')`).run();
+    const first = await chatsApp(testDb.db).request('/api/chats?limit=2&sort=latest');
+    const body = await first.json() as { data: Array<{ id: string; channel: string; lastMessageAt: string; lastMessageContent: string }> };
+    expect(body.data.map((row) => row.channel)).toEqual(['line', 'instagram']);
+    expect(body.data[1].lastMessageContent).toBe('DM');
+    const cursor = body.data[1];
+    const next = await chatsApp(testDb.db).request(`/api/chats?limit=2&sort=latest&beforeAt=${encodeURIComponent(cursor.lastMessageAt)}&beforeId=${encodeURIComponent(cursor.id)}`);
+    const nextBody = await next.json() as { data: Array<{ id: string }> };
+    expect(nextBody.data.map((row) => row.id)).toEqual(['friend-b', 'friend-a']);
+    const only = await chatsApp(testDb.db).request('/api/chats?channel=instagram');
+    const onlyBody = await only.json() as { data: Array<{ channel: string }> };
+    expect(onlyBody.data.map((row) => row.channel)).toEqual(['instagram']);
+    const lineOnly = await chatsApp(testDb.db).request('/api/chats?channel=line');
+    expect(((await lineOnly.json()) as { data: Array<{ channel: string }> }).data.map(row => row.channel)).toEqual(['line', 'line', 'line']);
+    testDb.raw.prepare(`INSERT INTO instagram_inbox_reads(staff_id,line_account_id,sender_id,last_read_at)
+      VALUES('owner-1','account-1',json_array('ig-business','customer'),'2026-09-02T12:00:00.000Z')`).run();
+    const unread = await chatsApp(testDb.db).request('/api/chats?channel=instagram&unreadOnly=1');
+    expect(((await unread.json()) as { data: unknown[] }).data).toHaveLength(0);
+  });
+  it('日本時間と UTC を同じ時刻基準で並べ、ページをまたぐ', async () => {
+    testDb.raw.prepare("UPDATE messages_log SET created_at='2026-09-02T21:00:00.000+09:00' WHERE id='m-b'").run();
+    testDb.raw.prepare(`INSERT INTO instagram_messages
+      (id,line_account_id,instagram_id,sender_id,recipient_id,content,received_at,created_at)
+      VALUES ('ig-utc','account-1','ig-business','customer','ig-business','DM','2026-09-02T12:30:00.000Z','2026-09-02T12:30:00.000Z')`).run();
+    const first = await chatsApp(testDb.db).request('/api/chats?limit=2&sort=latest');
+    const body = await first.json() as { data: Array<{ id: string; channel: string; lastMessageAt: string }> };
+    expect(body.data.map((row) => row.channel)).toEqual(['line', 'instagram']);
+    const cursor = body.data[1];
+    const second = await chatsApp(testDb.db).request(`/api/chats?limit=2&sort=latest&beforeAt=${encodeURIComponent(cursor.lastMessageAt)}&beforeId=${encodeURIComponent(cursor.id)}`);
+    expect(((await second.json()) as { data: Array<{ id: string }> }).data.map(row => row.id)).toEqual(['friend-b', 'friend-a']);
+  });
 });
 
 describe('#540 機能2: 会話詳細は直近から100件ずつ', () => {

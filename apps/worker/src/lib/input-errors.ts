@@ -91,8 +91,15 @@ export async function readBoundedText(request: Pick<Request, 'headers' | 'body'>
 
 /** 巨大なアップロードをすべてメモリへ置かないよう、許可したバイト数だけを読む。 */
 export async function readBoundedBytes(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<Uint8Array | null> {
-  const declared = Number(request.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > maxBytes) return null;
+  const contentLength = request.headers.get('content-length');
+  if (contentLength !== null) {
+    for (const part of contentLength.split(',')) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const declared = Number(trimmed);
+      if (Number.isFinite(declared) && declared > maxBytes) return null;
+    }
+  }
   const reader = request.body?.getReader();
   if (!reader) return new Uint8Array();
   const chunks: Uint8Array[] = [];

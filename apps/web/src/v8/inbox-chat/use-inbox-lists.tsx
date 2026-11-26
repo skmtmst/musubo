@@ -1,41 +1,31 @@
 'use client'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
-import { api,fetchApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { inboxRoutingApi } from '@/lib/api/helpers/gap1';
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
 import { withRequestTimeout } from '@/lib/request-timeout';
 import { clampSearchQuery } from '@/lib/search-query';
 import type { Dispatch,SetStateAction } from 'react';
 import { useCallback,useEffect,useRef,useState } from 'react';
-import { Chat,EmailInboxItem,InboxSort,ListCursor,StatusFilter,toListCursor } from './inbox-model';
-import { buildSupportEmailInboxQuery } from './support-email-query';
+import { Chat,InboxSort,ListCursor,StatusFilter,toListCursor } from './inbox-model';
 
+/** LINE の会話の一覧。メールの一覧（共通・店舗）は use-inbox-emails が経路ごとに読む。 */
 type Options = {
   CHAT_PAGE_SIZE: number
-  EMAIL_PAGE_SIZE: number
   nameQuery: string
   selectedAccountId: string | null
-  emailInboxEnabled: boolean
   statusFilter: StatusFilter
   assigneeFilter: string
   unreadOnly: boolean
   quickFilter: "all" | "reply" | "overdue"
+  socialChannel?: 'all' | 'line' | 'instagram'
   /** 並び。期限を使う店は期限が近い順で並べるので、口へは送らない。 */
   sort?: InboxSort
   setError: Dispatch<SetStateAction<string>>
 }
 
-export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, emailInboxEnabled, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
+export function useInboxLists({ CHAT_PAGE_SIZE, nameQuery, selectedAccountId, statusFilter, assigneeFilter, unreadOnly, quickFilter, socialChannel = 'all', sort = 'unread_first', setError }: Options) {
 
-  /*
-   * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
-   * 以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
-   * 成功したら消す。ふだんは何も出ない。
-   */
-  const [emailError, setEmailError] = useState('')
-
-  // 初回・条件変更時の取得中。追加読み込みとは分け、0件表示を先走らせない。
-  const [emailLoading, setEmailLoading] = useState(true)
 
   const [debouncedNameQuery, setDebouncedNameQuery] = useState('')
 
@@ -92,11 +82,12 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   const buildListParams = useCallback((cursor: ListCursor | null) => {
     const params: {
-      status?: string; accountId?: string; q?: string;
+      channel?: 'all' | 'line' | 'instagram'; status?: string; accountId?: string; q?: string;
       operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
       sort?: 'latest';
       limit?: number; beforeUnread?: 0 | 1; beforeAt?: string; beforeId?: string;
     } = {}
+    params.channel = socialChannel
     const latest = sort === 'latest' && !slaEnabled
     if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
@@ -105,7 +96,10 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     if (unreadOnly) params.unreadOnly = true
     if (quickFilter !== 'all') params.quickFilter = quickFilter
     /* 返事の期限を使う店：「期限超過」は旧い「1時間以上待ち」の絞りを使わない。期限の絞り・並びは読んだ行の slaState・slaDueAt で行う。 */
-    if (slaEnabled && quickFilter === 'overdue') delete params.quickFilter
+    if (slaEnabled && quickFilter === 'overdue' && socialChannel !== 'instagram') {
+      delete params.quickFilter
+      params.channel = 'line'
+    }
     // 新しい順は既定の並びと違うときだけ送る（既定の呼び方は変えない）。続きの位置に未読は使わない。
     if (latest) params.sort = 'latest'
     params.limit = CHAT_PAGE_SIZE
@@ -115,23 +109,18 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE])
+  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE, socialChannel])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, socialChannel])
 
   const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
-  const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])
 
   const listFilterKeyRef = useRef(listFilterKey)
 
   listFilterKeyRef.current = listFilterKey
 
   const chatListRequestRef = useRef(0)
-
-  const emailListRequestRef = useRef(0)
-
-  const emailMoreLockRef = useRef(false)
 
   // 描画中の条件と、各一覧が最後まで取得できた条件を結び付ける。
   // useEffect が loading を立てる前の1描画でも、旧条件の0件を新条件の0件と誤認しない。
@@ -144,94 +133,6 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     void inboxRoutingApi.listByDeadline(selectedAccountId, { overdue: true, limit: 1 }).then((res) => { if (live) setOverdueTotal(res.total) }, () => { if (live) setOverdueTotal(null) })
     return () => { live = false }
   }, [slaEnabled, selectedAccountId, chatListCompletedKey])
-
-  const [emailListCompletedKey, setEmailListCompletedKey] = useState<string | null>(null)
-
-  // メール一覧の1ページ件数。上限200切りっぱなしだった offset なし取得を、
-  // LINE側と同じく「さらに読み込む」で遡れるようにする。
-
-  const [loadingMoreEmails, setLoadingMoreEmails] = useState(false)
-
-  const [hasMoreEmails, setHasMoreEmails] = useState(false)
-
-  /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
-  const loadEmails = useCallback(async (offset = 0, append = false) => {
-    if (!emailInboxEnabled) {
-      emailListRequestRef.current += 1
-      setEmailItems([])
-      setEmailError('')
-      setHasMoreEmails(false)
-      setLoadingMoreEmails(false)
-      setEmailLoading(false)
-      setEmailListCompletedKey(listFilterKey)
-      return
-    }
-    const requestId = append ? emailListRequestRef.current : ++emailListRequestRef.current
-    if (append) {
-      if (emailMoreLockRef.current) return
-      emailMoreLockRef.current = true
-      setLoadingMoreEmails(true)
-    } else {
-      setHasMoreEmails(false)
-      emailMoreLockRef.current = false
-      setLoadingMoreEmails(false)
-      setEmailLoading(true)
-      setEmailError('')
-    }
-    try {
-      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
-      const res = await withRequestTimeout(fetchApi<{
-        success: boolean
-        data: { items: EmailInboxItem[]; summary?: { total: number } }
-      }>(
-        `/api/support/inbox?${buildSupportEmailInboxQuery({
-          status: statusFilter,
-          query: debouncedNameQuery,
-          limit: EMAIL_PAGE_SIZE,
-          offset,
-          assignee: assigneeFilter,
-          unreadOnly,
-          quickFilter: quickFilter === 'all' ? undefined : quickFilter,
-        })}`,
-      ))
-      if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
-      if (res.success && res.data && Array.isArray(res.data.items)) {
-        setEmailError('')
-        if (append) {
-          const rows = res.data.items
-          setEmailItems((prev) => {
-            const seen = new Set(prev.map((e) => e.id))
-            return [...prev, ...rows.filter((r) => !seen.has(r.id))]
-          })
-          setHasMoreEmails(offset + rows.length < (res.data.summary?.total ?? offset + rows.length))
-        } else {
-          setEmailItems(res.data.items)
-          setHasMoreEmails(res.data.items.length >= EMAIL_PAGE_SIZE
-            && res.data.items.length < (res.data.summary?.total ?? res.data.items.length + 1))
-        }
-      } else {
-        // 口が success:false を返したときも、0件と区別できるよう失敗を出す。
-        setEmailError('メールの読み込みに失敗しました。時間をおいて、もう一度お試しください。')
-      }
-    } catch {
-      if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
-      // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
-      setEmailError('メールの読み込みに失敗しました。時間をおいて、もう一度お試しください。')
-    } finally {
-      if (append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
-        emailMoreLockRef.current = false
-        setLoadingMoreEmails(false)
-      }
-      if (!append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
-        setEmailListCompletedKey(listFilterKey)
-        setEmailLoading(false)
-      }
-    }
-  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE, emailInboxEnabled, setEmailItems])
-
-  useEffect(() => {
-    void loadEmails()
-  }, [loadEmails])
 
   const loadChats = useCallback(async () => {
     const requestId = ++chatListRequestRef.current
@@ -346,10 +247,9 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   useEffect(() => {
     const refresh = () => {
       void loadChats()
-      void loadEmails()
     }
     window.addEventListener(UNANSWERED_REFRESH_EVENT, refresh)
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
-  }, [loadChats, loadEmails])
-  return { chats, setChats, emailItems, setEmailItems, emailError, emailLoading, debouncedNameQuery, setDebouncedNameQuery, statusFilterRef, loading, chatListFailed, loadingMore, hasMoreChats, listScrollRef, slaEnabled, overdueTotal, setSlaReload, listFilterKey, chatListCompletedKey, emailListCompletedKey, loadingMoreEmails, hasMoreEmails, loadEmails, loadChats, loadMoreChats, loadChatsQuietly }
+  }, [loadChats])
+  return { chats, setChats, debouncedNameQuery, setDebouncedNameQuery, statusFilterRef, loading, chatListFailed, loadingMore, hasMoreChats, listScrollRef, slaEnabled, overdueTotal, setSlaReload, listFilterKey, chatListCompletedKey, loadChats, loadMoreChats, loadChatsQuietly }
 }

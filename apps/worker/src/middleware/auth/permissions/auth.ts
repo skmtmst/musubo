@@ -5,7 +5,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/auth/two-factor/policy', 'auth.mfa.policy'],
   ...DELIVERY_API_PERMISSIONS,
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
-  ['/api/support', '/chats'], ['/api/operators', '/chats'],
+  ['/api/account-email', '/chats'], ['/api/support', '/chats'], ['/api/operators', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/support-mark-rules', '/tags'],
   ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
@@ -59,6 +59,9 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
 
 /** URL 互換性で /api/friends 配下にある別機能を先に解決し、friends 権限だけでチャットや属性へアクセスできないようにする。 */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/instagram\/inbox-status$/, '/chats'],
+  [/^\/api\/instagram\/conversations\/[^/]+(?:\/(?:read|resolve))?$/, '/chats'],
+  [/^\/api\/instagram\/messages\/[^/]+\/reply$/, '/chats'],
   [/^\/api\/restaurant-test\/followups\/[^/]+\/(?:engines|rows|reservation-form)(?:\/|$)/, '/restaurant-test/line-followup'],
   [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
   // 予約の細かい権限。広い '/api/booking' → '/booking/bookings' より先に評価する。

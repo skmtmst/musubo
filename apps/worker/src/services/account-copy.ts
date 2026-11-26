@@ -67,7 +67,7 @@ export async function copyLineAccountSettings(
   if (items.includes('accountSettings')) {
     for (const row of await rows(db, 'SELECT * FROM account_settings WHERE line_account_id = ?', sourceAccountId)) {
       // 店舗固有の初期目録を、然のテンプレートから引き継がない。
-      if (row.key === 'inbox_email_legacy_enabled' || row.key === SPECIALIZED_CATALOG_SETTING_KEY) continue;
+      if (row.key === 'inbox_email_legacy_enabled' || row.key === 'inbox_email_forwarding_connected' || row.key === SPECIALIZED_CATALOG_SETTING_KEY) continue;
       statements.push(insertStatement(db, 'account_settings', {
         ...row,
         id: crypto.randomUUID(),

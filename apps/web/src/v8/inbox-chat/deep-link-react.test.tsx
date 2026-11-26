@@ -8,7 +8,7 @@ import { useInboxDeepLink } from './use-inbox-deep-link'
 vi.mock('@/lib/api', () => ({ api: { friends: { get: vi.fn() } } }))
 
 const selectChat = vi.fn()
-const selectThread = vi.fn()
+const selectEmail = vi.fn()
 const router = { replace: vi.fn(), push: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }
 type Options = Parameters<typeof useInboxDeepLink>[0]
 let container: HTMLDivElement
@@ -28,8 +28,8 @@ beforeEach(() => {
   root = createRoot(container)
   options = {
     params: new URLSearchParams('friend=friend-a') as Options['params'],
-    selectedAccountId: 'account-a', accountsLoading: false, emailInboxEnabled: true,
-    setSelectedChatId: selectChat, setSelectedThreadId: selectThread,
+    selectedAccountId: 'account-a', accountsLoading: false, sharedEmailEnabled: true, storeEmailEnabled: false,
+    setSelectedChatId: selectChat, setSelectedEmail: selectEmail,
     router, channel: 'all', savedViewParam: '',
   }
 })
@@ -37,10 +37,26 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 describe('URLから開く会話の再照合', () => {
   it('新規アカウントでは共有URLのメール会話も開かない', async () => {
-    options = { ...options, params: new URLSearchParams('thread=old-mail') as Options['params'], emailInboxEnabled: false }
+    options = { ...options, params: new URLSearchParams('thread=old-mail') as Options['params'], sharedEmailEnabled: false }
     await render()
-    expect(selectThread).toHaveBeenLastCalledWith(null)
+    expect(selectEmail).toHaveBeenLastCalledWith(null)
     expect(container.textContent).toContain('メールを接続していません')
+  })
+  it('印の無い thread は共通のメール、source=store は店舗のメールとして開く', async () => {
+    options = { ...options, params: new URLSearchParams('thread=mail-a') as Options['params'] }
+    await render()
+    expect(selectEmail).toHaveBeenLastCalledWith({ source: 'shared', threadId: 'mail-a' })
+    options = { ...options, params: new URLSearchParams('thread=mail-a&source=store') as Options['params'], storeEmailEnabled: true }
+    await render()
+    expect(selectEmail).toHaveBeenLastCalledWith({ source: 'store', threadId: 'mail-a' })
+    expect(selectChat).toHaveBeenLastCalledWith(null)
+  })
+  it('店舗のメールがつながっていないアカウントでは、店舗の指定を共通のメールとして開かない', async () => {
+    options = { ...options, params: new URLSearchParams('thread=mail-a&source=store') as Options['params'], sharedEmailEnabled: true, storeEmailEnabled: false }
+    await render()
+    expect(selectEmail).toHaveBeenLastCalledWith(null)
+    expect(selectEmail).not.toHaveBeenCalledWith({ source: 'shared', threadId: 'mail-a' })
+    expect(container.textContent).toContain('店舗のメールを接続していません')
   })
   it('URLを変更すると新しい相手を照合し、戻る操作でも開き直す', async () => {
     await render()

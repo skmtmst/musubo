@@ -241,7 +241,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
   function googleData(connection: Record<string, unknown>): GoogleConnectionData {
     return {
       success: true,
-      store: { id: 'store-1', name: '然カフェ 本店', lineAccountId: 'acc-1' },
+      store: { id: 'store-1', name: '見本 本店', lineAccountId: 'acc-1' },
       connection: connection as GoogleConnectionData['connection'],
       candidates: [],
       summary: {
@@ -262,7 +262,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
       googleData({
         id: 'gc-1',
         status: 'connected',
-        locationTitle: '然カフェ 本店',
+        locationTitle: '見本 本店',
         googleAccountEmail: 'owner@example.com',
         lastSyncedAt: '2026-11-01T00:00:00.000Z',
         confirmationRevision: 4,
@@ -276,7 +276,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     expect(row).toMatchObject({
       id: 'gc-1',
       service: 'googleBusiness',
-      name: '然カフェ 本店',
+      name: '見本 本店',
       state: 'connected',
       primary: true,
       version: 4,
@@ -288,7 +288,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
 
   it('Google は接続の id が無いとき操作先を空にする（店舗名で代用しない）', () => {
     const row = googleSlots(
-      googleData({ status: 'connected', locationName: 'locations/1', locationTitle: '然カフェ 本店' }),
+      googleData({ status: 'connected', locationName: 'locations/1', locationTitle: '見本 本店' }),
       fmt,
     ).connections[0]!
 
@@ -316,7 +316,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
   it('Google の選ぶ段・認可切れはそれぞれの状態の行になる', () => {
     const pending = googleSlots(googleData({ status: 'pending_location' }), fmt).connections[0]!
     // 店舗名が無いときは店の名前で代わりに出す。
-    expect(pending).toMatchObject({ state: 'pending', name: '然カフェ 本店', version: null })
+    expect(pending).toMatchObject({ state: 'pending', name: '見本 本店', version: null })
 
     expect(googleSlots(googleData({ status: 'expired' }), fmt).connections[0]!.state).toBe('expired')
     expect(googleSlots(googleData({ status: 'reauth_required' }), fmt).connections[0]!.state).toBe('expired')
@@ -335,8 +335,8 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     id: 'igc-1',
     pageId: 'page-1',
     instagramId: 'ig-1',
-    pageName: '然カフェ',
-    username: 'nen_cafe',
+    pageName: '見本 カフェ',
+    username: 'sample_shop',
     expiresAt: '2026-12-31T00:00:00.000Z',
     dataAccessExpiresAt: null,
     version: 3,
@@ -351,7 +351,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     expect(row).toMatchObject({
       id: 'ig-1',
       service: 'instagram',
-      name: '@nen_cafe',
+      name: '@sample_shop',
       state: 'connected',
       primary: false,
       version: 3,
@@ -371,7 +371,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
 
   it('Instagram はユーザー名が無いときページ名を出す', () => {
     const slots = instagramSlots(igStatus('connected', { ...IG_CONNECTION, username: null }), fmt)
-    expect(slots.connections[0]!.name).toBe('然カフェ')
+    expect(slots.connections[0]!.name).toBe('見本 カフェ')
   })
 
   it('Instagram の認可切れも行として出す', () => {
@@ -396,7 +396,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
         id: 'gc-1',
         status: 'connected',
         locationName: 'locations/1',
-        locationTitle: '然 渋谷店',
+        locationTitle: '見本 A店',
         googleAccountEmail: 'shop@example.com',
         lastSyncedAt: '2026-10-02T08:00:00.000Z',
         confirmationRevision: 4,
@@ -405,7 +405,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
         id: 'gc-2',
         status: 'connected',
         locationName: 'locations/2',
-        locationTitle: '然 恵比寿店',
+        locationTitle: '見本 B店',
         googleAccountEmail: 'shop@example.com',
         lastSyncedAt: '2026-10-01T21:00:00.000Z',
         confirmationRevision: 2,
@@ -417,8 +417,8 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
 
       expect(slots.connections).toHaveLength(2)
       expect(slots.connections.map((row) => [row.name, row.primary, row.connectionId, row.version])).toEqual([
-        ['然 渋谷店', true, 'gc-1', 4],
-        ['然 恵比寿店', false, 'gc-2', 2],
+        ['見本 A店', true, 'gc-1', 4],
+        ['見本 B店', false, 'gc-2', 2],
       ])
       expect(slotCountText(slots, 2)).toBe('連携 2個（契約枠 2個）')
     })
@@ -444,7 +444,7 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     })
 
     it('Google は一覧を読めていないとき1件ぶんの返事から1行だけ作る', () => {
-      const data = googleData({ id: 'gc-1', status: 'connected', locationTitle: '然 渋谷店' })
+      const data = googleData({ id: 'gc-1', status: 'connected', locationTitle: '見本 A店' })
       for (const list of [null, undefined, []] as const) {
         const slots = googleSlots(data, fmt, list)
         expect(slots.connections.map((row) => row.connectionId)).toEqual(['gc-1'])
