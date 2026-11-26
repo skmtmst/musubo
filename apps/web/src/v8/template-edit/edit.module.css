@@ -215,7 +215,6 @@
 .composerFooter > :first-child { flex: 1; min-width: max-content; }
 .composerFooter::after { content: ''; flex: 1; }
 
-.composerSaveToggle label { white-space: nowrap; }
 .composerTitleAccessories { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); }
 
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
