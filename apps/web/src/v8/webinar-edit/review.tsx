@@ -44,6 +44,8 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   const [notifyConfirm, setNotifyConfirm] = useState(false)
   const testRecipients = useTestRecipients(webinar.id, notifyConfirm)
   const [notifyCount, setNotifyCount] = useState<{ on: number; missedOff: boolean } | null>(null)
+  const [notifyState, setNotifyState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [notifyAttempt, setNotifyAttempt] = useState(0)
   const requestId = useRef(0)
   const lock = useRef(false)
   const version = useRef(editor.version)
@@ -67,12 +69,14 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
   useEffect(() => {
     let active = true
     setNotifyCount(null)
+    setNotifyState('loading')
     void webinarApi.notifications(webinar.id).then((response) => {
       const settings = response.data.settings
-      if (active && settings) setNotifyCount({ on: FLAGS.filter((flag) => settings[flag]).length, missedOff: !settings.missedEnabled })
-    }).catch(() => { if (active) setNotifyCount(null) })
+      if (!settings) throw new Error('notifications_unavailable')
+      if (active) { setNotifyCount({ on: FLAGS.filter((flag) => settings[flag]).length, missedOff: !settings.missedEnabled }); setNotifyState('ready') }
+    }).catch(() => { if (active) { setNotifyCount(null); setNotifyState('error') } })
     return () => { active = false }
-  }, [webinar.id])
+  }, [webinar.id, notifyAttempt])
 
   const checks = validation?.checks ?? []
   const failed = checks.filter((check) => check.status === 'failed')
@@ -147,7 +151,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
     ['開催形式', editor.deliveryKind === 'scheduled' ? '日時指定・開催回あり' : editor.deliveryKind === 'external' ? '外部の動画' : 'オンデマンド・いつでも視聴'],
     ['公開期間', publicationStateLabel(webinar.publicationState, webinar.publicationStartsAt, webinar.publicationEndsAt) ?? '—（公開期間は未設定）'],
     ['案内ボタン', ctx.ctaCount > 0 ? `${formatNumber(ctx.ctaCount)}件` : emptyValue('unconfigured')],
-    ['通知', notifyCount === null ? emptyValue('unknown') : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
+    ['通知', notifyCount === null ? (notifyState === 'error' ? '通知設定を確認できません' : '読み込み中…') : `${notifyCount.on} つ${notifyCount.missedOff ? '（見逃し案内は止めている）' : ''}`],
     ['視聴後の動き', reviewActionSummaryText(validation)],
   ]
   const chrome = chromeFor(readOnly ? null : (
@@ -209,7 +213,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
           {summary.map(([label, value]) => (
             <div key={label} className={styles.summaryRow}>
               <dt className={styles.summaryLabel}>{label}</dt>
-              <dd className={`${styles.summaryValue} ${form.ellipsis}`} title={value}>{value}</dd>
+              <dd className={`${styles.summaryValue} ${label === '通知' && notifyState === 'error' ? '' : form.ellipsis}`} title={value}>{value}{label === '通知' && notifyState === 'error' ? <Button type="button" variant="secondary" onClick={() => setNotifyAttempt(attempt => attempt + 1)}>通知設定を読み直す</Button> : null}</dd>
             </div>
           ))}
         </dl>
