@@ -108,6 +108,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
+  const [bookingMenusRead, setBookingMenusRead] = useState<{ accountId: string; status: 'loading' | 'ready' | 'error'; items: NonNullable<FormRefs['bookingMenus']> } | null>(null)
+  const [bookingMenusAttempt, setBookingMenusAttempt] = useState(0)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -314,18 +316,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
           bookingMenus: [],
           bookingMenuStaff: {},
         })
-        // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせない。読めなくても欄は置ける。
-        if (selectedAccountId) {
-          bookingApi
-            .listMenus(selectedAccountId)
-            .then((menuRes) => {
-              const bookingMenus = (menuRes.menus ?? [])
-                .filter((m) => m.is_active === 1)
-                .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes }))
-              setRefs((prev) => ({ ...prev, bookingMenus }))
-            })
-            .catch(() => {})
-        }
         if (draftToken && !id) {
           const initial: Snapshot = { name: '', description: '', isActive: false, onSubmitTagId: '', ogTitle: '', ogDescription: '', ogImageUrl: '', layout }
           savedSnapshot.current = JSON.stringify(initial)
@@ -351,6 +341,23 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     // loadForm は params を読むが、読み込み直すのは id・アカウント・再試行のときだけ。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadKey, selectedAccountId, saveErrors])
+
+  // 予約メニューだけを読み直し、編集中のフォームを読み直さない。
+  useEffect(() => {
+    if (hostRef.current || !selectedAccountId) return
+    let cancelled = false
+    const accountId = selectedAccountId
+    setBookingMenusRead({ accountId, status: 'loading', items: [] })
+    void bookingApi.listMenus(accountId).then((result) => {
+      if (cancelled) return
+      if (!Array.isArray(result.menus)) throw new Error('booking_menus_unavailable')
+      setBookingMenusRead({ accountId, status: 'ready', items: result.menus.filter((menu) => menu.is_active === 1).map((menu) => ({ id: menu.id, name: menu.name, durationMinutes: menu.duration_minutes })) })
+    }).catch(() => { if (!cancelled) setBookingMenusRead({ accountId, status: 'error', items: [] }) })
+    return () => { cancelled = true }
+  }, [selectedAccountId, bookingMenusAttempt])
+
+  const currentBookingMenus = bookingMenusRead?.accountId === selectedAccountId ? bookingMenusRead : null
+  const visibleRefs = host ? refs : { ...refs, bookingMenus: currentBookingMenus?.items ?? [] }
 
   useEffect(() => {
     if (bookingStaffAccount.current !== selectedAccountId) {
@@ -893,7 +900,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /* 「答え終わったあと」のタブでは、質問の画面ではなくお礼の画面を映す。 */
   const phone = (
-    <FormPhone formName={name} accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} fixedNext={editTab !== 'after'} focusBlockId={editTab === 'after' ? null : selectedBlockId} thanks={editTab === 'after' ? { text: layout.options.thanksText ?? '', url: layout.options.thanksUrl ?? null } : undefined} />
+    <FormPhone formName={name} accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={visibleRefs.bookingMenus ?? []} fixedNext={editTab !== 'after'} focusBlockId={editTab === 'after' ? null : selectedBlockId} thanks={editTab === 'after' ? { text: layout.options.thanksText ?? '', url: layout.options.thanksUrl ?? null } : undefined} />
   )
 
   const preview = (
@@ -1012,6 +1019,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <div className={styles.root} data-fe-root>
         {host?.notice}
         {referencesError?<ListState kind="error" title="候補を読み込めませんでした" onRetry={()=>{setReferencesError(false);setError('');setReloadKey(value=>value+1)}}/>:null}
+        {!host && currentBookingMenus?.status === 'error' ? <ListState kind="error" title="予約メニューを読み込めませんでした" onRetry={() => setBookingMenusAttempt(value => value + 1)} /> : null}
         {Object.keys(bookingStaffErrors).length > 0 ? <ListState kind="error" title="予約の担当を読み込めませんでした" onRetry={()=>setBookingStaffErrors({})}/>:null}
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
@@ -1024,7 +1032,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             layout={layout}
             page={page}
             blocks={blocks}
-            refs={refs}
+            refs={visibleRefs}
             bookingStaffErrors={bookingStaffErrors}
             onRetryBookingStaff={(menuId) => setBookingStaffErrors((prev) => { const next = { ...prev }; delete next[menuId]; return next })}
             selectedBlockId={selectedBlockId}
@@ -1051,7 +1059,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onChangeReferences={host ? () => {} : (next) => setLayout((prev) => ({ ...prev, references: next }))}
           />
         ) : editTab === 'after' ? (
-          <AfterTab readOnly={!canEdit} options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
+          <AfterTab readOnly={!canEdit} options={layout.options} refs={visibleRefs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />
         ) : (
           <AppearanceTab
             readOnly={!canEdit}
