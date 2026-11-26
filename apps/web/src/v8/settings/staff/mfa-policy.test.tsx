@@ -2,20 +2,22 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import MfaPolicy from './mfa-policy'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), gate: vi.fn() }))
 vi.mock('@/lib/api', async original => ({ ...await original<typeof import('@/lib/api')>(), fetchApi: mocks.fetch }))
 vi.mock('@/components/step-up-prompt', () => ({ useStepUpGate: () => ({ gate: mocks.gate, prompt: null }) }))
-beforeEach(() => { mocks.fetch.mockReset(); mocks.gate.mockReset() }); afterEach(cleanup)
+beforeEach(() => { mocks.fetch.mockReset(); mocks.gate.mockReset() }); afterEach(() => { cleanup(); clearToastsForTest() })
 it('Off requires the common confirmation flow and sends its one-use grant', async () => {
   mocks.fetch.mockResolvedValueOnce({ success: true, data: { required: true, canEdit: true } })
     .mockResolvedValueOnce({ success: true, data: { required: false, relogin: false } })
   mocks.gate.mockResolvedValue('fixture-grant')
-  render(<MfaPolicy />)
+  render(<><MfaPolicy /><ToastHost /></>)
   fireEvent.click(await screen.findByRole('switch', { name: 'ログインで二段階認証を必須にする' }))
   await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(2))
   expect(mocks.gate).toHaveBeenCalledWith('auth.mfa.policy', '二段階認証の必須をオフにする')
   expect(mocks.fetch.mock.calls[1][1]).toMatchObject({ method: 'PUT', headers: { 'X-Step-Up-Token': 'fixture-grant' }, body: '{"required":false}' })
   await screen.findByText('パスワードやLINEだけで入れます。自分で登録した人には、確かめが出ます。')
+  expect(await screen.findByText('二段階認証の必須を解除しました。')).toBeTruthy()
 })
 it('cancelling confirmation retains On and sends no update', async () => {
   mocks.fetch.mockResolvedValueOnce({ success: true, data: { required: true, canEdit: true } }); mocks.gate.mockResolvedValue(null)
