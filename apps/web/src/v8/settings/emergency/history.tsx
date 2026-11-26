@@ -122,13 +122,16 @@ export default function UpdateHistoryV8({ hqOrigin = false }: { hqOrigin?: boole
   const runningVersion = useRunningVersion()
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [retryToken, setRetryToken] = useState(0)
   const [page, setPage] = useState(1)
   const [query, setQuery] = useState('')
   const [fullReleases, setFullReleases] = useState<NonNullable<ReleaseSummary['releases']> | null>(null)
   const [searchError, setSearchError] = useState(false)
+  const [searchRetryToken, setSearchRetryToken] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setState('loading')
     api.operations.history(HISTORY_FETCH_LIMIT)
       .then((response) => {
         if (cancelled) return
@@ -136,7 +139,7 @@ export default function UpdateHistoryV8({ hqOrigin = false }: { hqOrigin?: boole
       })
       .catch(() => { if (!cancelled) setState('error') })
     return () => { cancelled = true }
-  }, [])
+  }, [retryToken])
 
   const summary = releaseLog as ReleaseSummary
   const releases = useMemo(() => (summary.releases ?? []).filter((item) => item.released), [summary])
@@ -160,7 +163,7 @@ export default function UpdateHistoryV8({ hqOrigin = false }: { hqOrigin?: boole
       if (!cancelled) setFullReleases(loaded.default.releases)
     }).catch(() => { if (!cancelled) setSearchError(true) })
     return () => { cancelled = true }
-  }, [query, fullReleases])
+  }, [query, fullReleases, searchRetryToken])
   const searchableSummary = useMemo(() => fullReleases === null ? summary : {
     ...summary, releases: fullReleases,
   }, [summary, fullReleases])
@@ -176,12 +179,12 @@ export default function UpdateHistoryV8({ hqOrigin = false }: { hqOrigin?: boole
     <div className={styles.board}>
       <KpiBand aria-label="更新の集計">
         <KpiCard title="いまの版" icon={<GitBranch size={16} />} value={null} valueText={current ? `${current}` : '—'} unit="" detail={currentAt ? `${formatDate(currentAt, { style: 'list' })} に更新` : runningVersion.statusText} />
-        <KpiCard title="この30日の更新" icon={<RefreshCw size={16} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
+        <KpiCard title="この30日の更新" icon={<RefreshCw size={16} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : state === 'error' ? '読み込めませんでした' : '読み込み中'} />
         <KpiCard title="失敗した更新" icon={<CircleX size={16} aria-hidden="true" />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
       </KpiBand>
 
       {state === 'error' ? (
-        <ListState kind="error" title="更新の記録を読み込めませんでした" description="版の一覧は出しています。配備の結果は読み直すと出ます。" />
+        <ListState kind="error" title="更新の記録を読み込めませんでした" description="版の一覧は出しています。配備の結果は読み直すと出ます。" onRetry={() => setRetryToken((count) => count + 1)} />
       ) : null}
 
       <SearchField aria-label="変更内容を探す" placeholder="変更内容を探す" value={query}
@@ -189,7 +192,7 @@ export default function UpdateHistoryV8({ hqOrigin = false }: { hqOrigin?: boole
       <p className={styles.footText}>これから入る変更と、前の版のまとめを含む公開済みの本文を検索します。</p>
 
       {query.trim() && fullReleases === null ? searchError
-        ? <ListState kind="error" title="変更の本文を読み込めませんでした" description="画面にある要約だけを検索しています。検索語を入れ直すと再試行します。" />
+        ? <ListState kind="error" title="変更の本文を読み込めませんでした" description="画面にある要約だけを検索しています。検索語を入れ直すと再試行します。" onRetry={() => setSearchRetryToken((count) => count + 1)} />
         : <ListState kind="loading" title="変更の本文を読み込んでいます" /> : null}
       {cards.length === 0 ? (
         query.trim() && fullReleases === null && !searchError ? null : <ListState kind="empty" title={query.trim() ? "一致する変更はありません" : "更新の記録はまだありません"} />
