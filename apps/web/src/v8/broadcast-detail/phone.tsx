@@ -44,7 +44,7 @@ export default function BroadcastPhone({
     return (
       <LinePreview title={null} accountName={previewName} caption={chip}>
         <LinePreviewMessage accountName={previewName} avatar={initial} time={time} bare><LinePreviewCarousel columns={carousel} /></LinePreviewMessage>
-        <LinePreviewButtons buttons={broadcast.messageOptions?.buttons ?? []} />
+        <LinePreviewButtons buttons={broadcast.messageOptions?.buttons ?? []} time={time} />
       </LinePreview>
     )
   }
@@ -64,7 +64,7 @@ export default function BroadcastPhone({
         messageContent={broadcast.messageContent}
         buttons={broadcast.messageOptions?.buttons}
       />}
-      {photo ? <LinePreviewButtons buttons={broadcast.messageOptions?.buttons ?? []} /> : null}
+      {photo ? <LinePreviewButtons buttons={broadcast.messageOptions?.buttons ?? []} time={time} /> : null}
     </LinePreview>
   )
 }

@@ -19,6 +19,6 @@ it('テキストとボタンを送る場合も送信元と時刻を表示する'
   const html = renderToStaticMarkup(<BroadcastPhone accountName="お店" time="10:00" broadcast={{ messageType: 'text', messageContent: 'こんにちは', messageOptions: { buttons } }} />)
   expect(html).toContain('こんにちは')
   expect(html).toContain('お店')
-  expect(html).toContain('10:00')
+  expect(html.match(/10:00/g)).toHaveLength(2)
   expect(html).toContain('予約する')
 })

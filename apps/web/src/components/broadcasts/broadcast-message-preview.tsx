@@ -79,7 +79,7 @@ export default function BroadcastMessagePreview({
           </LinePreviewMessage>
         </div>
       ))}
-      <LinePreviewButtons buttons={buttons ?? []} />
+      <LinePreviewButtons buttons={buttons ?? []} time={time} />
     </div>
   )
 }

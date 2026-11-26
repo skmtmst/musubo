@@ -245,7 +245,7 @@ export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWid
 }
 
 /** 別の Flex として送る追加ボタンを、同じ送信データから表示する。 */
-export function LinePreviewButtons({ buttons }: { buttons: Array<{ label: string; value: string; type?: string }> }) {
+export function LinePreviewButtons({ buttons, time }: { buttons: Array<{ label: string; value: string; type?: string }>; time?: string }) {
   if (!buttons.length) return null
-  return <div style={{ paddingLeft: 40 }}><LinePreviewFlex maxWidth={210} content={JSON.stringify(broadcastButtonsFlex(buttons))} /></div>
+  return <div style={{ paddingLeft: 40, display: 'flex', alignItems: 'flex-end', gap: 'var(--space-4)' }}><LinePreviewFlex maxWidth={210} content={JSON.stringify(broadcastButtonsFlex(buttons))} />{time ? <span className={styles.messageTime}>{time}</span> : null}</div>
 }
