@@ -13,7 +13,7 @@ vi.mock('@/lib/api', async original => { const actual = await original<typeof im
 import AutomationTemplates from './templates'
 beforeEach(() => { verifiedStaffRole('owner'); fixture.account = 'a'; fixture.push.mockReset(); fixture.create.mockReset(); fixture.templates.mockResolvedValue({ success: true, data: [{ key: 'sample', name: '見本', description: '', triggerLabel: '友だちになったとき', actionLabel: '返信する' }] }); fixture.list.mockResolvedValue({ success: true, data: [] }) })
 afterEach(() => { cleanup(); clearToastsForTest() })
-async function open() { const view = render(<><AutomationTemplates /><ToastHost /></>); await screen.findByText('見本'); return view }
+async function open() { const view = render(<><AutomationTemplates /><ToastHost /></>); await screen.findByRole('button', { name: 'この見本で下書きを作る' }); return view }
 it('見本から下書きを作ると完了を知らせて進む', async () => {
  fixture.create.mockResolvedValueOnce({ success: true, data: { id: 'draft' } }); await open()
  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'この見本で下書きを作る' })) })
