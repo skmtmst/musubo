@@ -1,0 +1,4 @@
+.row { display: flex; flex-direction: column; gap: var(--polish-space-row); min-width: 0; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-row); font-variant-numeric: var(--font-numeric); }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--phone-body-text); }
+.detail { overflow-wrap: anywhere; color: var(--color-ink-secondary); font-size: var(--phone-support-text); line-height: var(--phone-support-lh); }

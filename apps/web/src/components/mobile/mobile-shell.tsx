@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { ClipboardCheck, MessageCircle } from 'lucide-react'
+import { CalendarDays, ClipboardCheck, Ellipsis, MessageCircle } from 'lucide-react'
 import AuthGuard from '@/components/auth-guard'
 import SessionLostNotice from '@/components/session-lost-notice'
 import ImpersonationNotice from '@/components/ops/impersonation-notice'
@@ -26,8 +26,10 @@ import { requestUnsavedAction } from '@/lib/unsaved-action'
  */
 
 const TAB_ICONS: Record<MobileTabId, ReactNode> = {
+  today: <CalendarDays aria-hidden="true" />,
   talk: <MessageCircle aria-hidden="true" />,
   todo: <ClipboardCheck aria-hidden="true" />,
+  more: <Ellipsis aria-hidden="true" />,
 }
 
 export type MobileShellParts = {
@@ -125,7 +127,7 @@ function MobileShellState({ children }: { children: ReactNode }) {
     requestUnsavedAction(() => {
       setSelectedAccountId(accountId)
       setMenuOpen(false)
-      router.replace((current ?? MOBILE_TABS[0]).href)
+      router.replace((current ?? visible[0] ?? MOBILE_TABS.find(tab => tab.id === 'more')!).href)
     })
   }
   const accountLabel = selected ? (selected.displayName || selected.name) : loading ? '読み込み中…' : '店を選ぶ'

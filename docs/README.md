@@ -9,6 +9,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [電話の画面のタブの反映履歴](release-log/unreleased/PR-kenta-mobile-tabs.md) — 今日ともっとを追加。確認 2026-11-26。
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
@@ -297,6 +298,8 @@
 - [マイル（V8）の動き](../apps/web/src/v8/mileage/BEHAVIOR.md)
 - [たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）](../apps/web/src/v8/mileage/earning-rule-new/BEHAVIOR.md)
 - [電話の画面の対応（BEHAVIOR.md）](../apps/web/src/v8/mobile-todo/BEHAVIOR.md)
+- [電話の画面の今日（BEHAVIOR.md）](../apps/web/src/v8/mobile-today/BEHAVIOR.md)
+- [電話の画面のもっと（BEHAVIOR.md）](../apps/web/src/v8/mobile-more/BEHAVIOR.md)
 - [NEN配信の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-campaigns/BEHAVIOR.md)
 - [健康日記（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-health/BEHAVIOR.md)
 - [会員（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-members/BEHAVIOR.md)
