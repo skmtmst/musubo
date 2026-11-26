@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MENU_SECTIONS } from '@/lib/menu'
 import { useV8Leave } from './overlay-utils'
@@ -40,7 +40,7 @@ function menuFallback(): PaletteItem[] {
 /**
  * ② どこからでも探す窓（V8「サクサク感」F）。
  * ⌘K（Ctrl+K）で開く。機能は左メニューに出ているものだけ、
- * 友だちは今ある友だち一覧の `?q=` の受け口へ送る。
+ * 友だちとメッセージのテンプレートは、それぞれの一覧の `?q=` の受け口へ送る。
  * 帯（top-bar）に探す欄は置かない（外枠の決まり）。
  */
 export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
@@ -50,6 +50,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   const [active, setActive] = useState(0)
   const [menuItems, setMenuItems] = useState<PaletteItem[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const hintId = useId()
   /* 閉じたら、開く前にいた場所へフォーカスを戻す（動きの点検 2 番）。 */
   const returnFocusRef = useRef<HTMLElement | null>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
@@ -90,6 +91,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   }, [open ])
 
   const base = items ?? (menuItems.length > 0 ? menuItems : menuFallback())
+  const canSearchTemplates = (items ?? menuItems).some((item) => item.href.split('?')[0] === '/templates')
   const trimmed = query.trim()
   const hits = useMemo(() => {
     const lower = trimmed.toLowerCase()
@@ -104,8 +106,9 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
     () =>
       trimmed === ''
         ? hits
-        : [...hits, { href: `/friends?q=${encodeURIComponent(trimmed)}`, label: `友だちを探す「${trimmed}」` }],
-    [hits, trimmed],
+        : [...hits, { href: `/friends?q=${encodeURIComponent(trimmed)}`, label: `友だちを探す「${trimmed}」` },
+          ...(canSearchTemplates ? [{ href: `/templates?q=${encodeURIComponent(trimmed)}`, label: `メッセージのテンプレートを探す「${trimmed}」` }] : [])],
+    [hits, trimmed, canSearchTemplates],
   )
 
   if ((!open && !leaving) || typeof document === 'undefined') return null
@@ -114,7 +117,13 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
     setOpen(false)
     // 書きかけの画面があれば、左メニューのリンクと同じ「保存せずに移りますか」を通す。
     // 直接 router.push すると未保存の入力が確認なしで消える（監査 WEB-008）。
-    requestUnsavedAction(() => router.push(href))
+    requestUnsavedAction(() => {
+      // 同じ一覧では router.push だけだと一覧の URL 購読に検索語が届かない。
+      if (window.location.pathname === '/templates' && href.startsWith('/templates?q=')) {
+        window.history.pushState(null, '', href)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      } else router.push(href)
+    })
   }
 
   return createPortal(
@@ -141,10 +150,12 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
           }
         }}
       >
+        {canSearchTemplates ? <span id={hintId} className="sr-only">メッセージのテンプレートも検索できます。</span> : null}
         <input
           ref={inputRef}
+          aria-describedby={canSearchTemplates ? hintId : undefined}
           aria-label="機能と友だちを探す"
-          placeholder="機能・友だちの名前で探す"
+          placeholder={canSearchTemplates ? '機能・友だち・メッセージのテンプレートを探す' : '機能・友だちの名前で探す'}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)

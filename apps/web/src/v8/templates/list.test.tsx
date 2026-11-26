@@ -457,6 +457,28 @@ it('C-10: 保存された複数通だけを絞り込み、複数通の下書き�
 })
 
 
+it('URL の検索語を一覧へ引き継ぎ、一致するテンプレートだけを出す', async () => {
+  window.history.replaceState(null, '', '/templates?q=%E4%BA%88%E7%B4%84')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  await renderList()
+  expect(screen.getByText('予約前日のご案内')).toBeTruthy()
+  expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
+})
+
+it('一覧を開いたまま URL の検索語が変わると、検索欄と行を更新する', async () => {
+  window.history.replaceState(null, '', '/templates?q=%E4%BA%88%E7%B4%84')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  await renderList()
+  expect(screen.getByText('予約前日のご案内')).toBeTruthy()
+  await act(async () => {
+    window.history.pushState(null, '', '/templates?q=%E6%96%B0%E5%95%86%E5%93%81')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  expect((screen.getByRole('searchbox', { name: 'テンプレートを検索' }) as HTMLInputElement).value).toBe('新商品')
+  expect(screen.queryByText('予約前日のご案内')).toBeNull()
+  expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
+})
+
 it('E-20: 質問タブのURLから開き、タブ切替もURLに残す', async () => {
   window.history.replaceState(null, '', '/templates?tab=question')
   window.dispatchEvent(new PopStateEvent('popstate'))
