@@ -163,14 +163,14 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
   <ListPageCards columns={4} narrowColumns={2} inset="parent">
    <Card as="article" padding="default" gap="tight" layout="vertical" aria-label="予約の回答フォーム">
     <div className={styles.head}><h2>予約の回答フォーム</h2></div>
-    <div className={styles.timing}><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy} lockedReason={lockedReason} onClick={openFormEditor}>変える</Button></div>
+    <div className={styles.timing}><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent" disabled={!canManage||busy} lockedReason={lockedReason} onClick={openFormEditor}>変更する</Button></div>
     <div className={styles.sample}>
      <ReservationFormSample definition={form} storeName={storeName} compact/>
     </div>
    </Card>
    {rows.map(row=><Card as="article" key={row.trigger} padding="default" gap="tight" layout="vertical" aria-label={FOLLOWUP_NAMES[row.trigger]}>
     <div className={styles.head}><h2>{FOLLOWUP_NAMES[row.trigger]}</h2><span className={styles.switch} data-guide-anchor={row === guideRow && !row.enabled ? 'followup.start' : undefined}><Toggle label={`${FOLLOWUP_NAMES[row.trigger]}を使う`} checked={row.enabled} disabled={!canManage||busy||!row.enabled&&!row.editable} lockedReason={lockedReason} onChange={enabled=>{if(!enabled)update({...row,enabled:false});else if(row.editable)openEditor({...row,enabled:true})}}/></span></div>
-    <div className={styles.timing}><p title={followupTimingLabel(row.trigger,row.timing)}>{followupTimingLabel(row.trigger,row.timing)}</p><Button data-guide-anchor={row === guideRow && row.enabled ? 'followup.start' : undefined} data-guide-followup-existing={row === guideRow && row.enabled || undefined} variant="text" size="inline" textTone="accent" disabled={!canManage||busy||!row.editable} lockedReason={lockedReason} disabledReason={!row.editable?'詳細画面で変更できます':undefined} onClick={()=>openEditor(row)}>変える</Button></div>
+    <div className={styles.timing}><p title={followupTimingLabel(row.trigger,row.timing)}>{followupTimingLabel(row.trigger,row.timing)}</p><Button data-guide-anchor={row === guideRow && row.enabled ? 'followup.start' : undefined} data-guide-followup-existing={row === guideRow && row.enabled || undefined} variant="text" size="inline" textTone="accent" disabled={!canManage||busy||!row.editable} lockedReason={lockedReason} disabledReason={!row.editable?'詳細画面で変更できます':undefined} onClick={()=>openEditor(row)}>変更する</Button></div>
     <StatusBadge help={row.enabled&&!row.sending?row.reason??undefined:undefined} tone={row.enabled&&row.sending?'success':'neutral'}>{rowContentKey(row)!==rowContentKey(savedRows.find(saved=>saved.trigger===row.trigger)!)?'未保存':!row.enabled?'止めています':row.sending?'送っています':!row.editable?'中身を確認してください':'準備済み・送信停止中'}</StatusBadge>
     <div className={styles.sample} data-muted={!row.enabled||undefined}>
      {row.bubbles.length ? <FollowupMessageSample trigger={row.trigger} bubbles={row.bubbles} storeName={storeName} compact/> : <p className={styles.support}>詳細で中身を確認してから試してください。</p>}
