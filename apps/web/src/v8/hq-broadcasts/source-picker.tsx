@@ -26,7 +26,7 @@ function dateLabel(value?: string | null) {
 
 export function templatePickerItem(item: HqTemplateListItem): SourcePickerItem {
   const category = item.kind ?? 'message'
-  return { id: item.id, name: item.name, category, categoryLabel: KINDS.find((kind) => kind.id === category)?.label ?? 'メッセージ', folderId: item.folder_id, updatedLabel: dateLabel(item.updated_at), tone: category === 'carousel' ? 'info' : category === 'coupon' ? 'success' : category === 'question' ? 'danger' : 'neutral' }
+  return { id: item.id, name: item.name, category, categoryLabel: KINDS.find((kind) => kind.id === category)?.label ?? '種類不明', folderId: item.folder_id, updatedLabel: dateLabel(item.updated_at), tone: category === 'carousel' ? 'info' : category === 'coupon' ? 'success' : category === 'question' ? 'danger' : 'neutral' }
 }
 
 export function broadcastPickerItem(item: HqBroadcastRun): SourcePickerItem {
