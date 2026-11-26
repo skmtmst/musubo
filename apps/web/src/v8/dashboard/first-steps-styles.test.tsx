@@ -31,11 +31,11 @@ it('Googleの営業時間が設定済みでも営業時間を開ける', () => {
   /* 済みの段はガイドが無いので、確かめ直すための「開く」だけ残す。 */
   expect(screen.getByRole('link', { name: '営業時間を設定する（開く）' }).getAttribute('href')).toBe('/restaurant-test/google?tab=hours')
 })
-it('全て済めば同じ頭の1行だけにし、未確認の段があれば済みにしない', () => {
+it('全て済めばカードを隠し、未確認の段があれば済みにしない', () => {
   const summary = summarizeFirstSteps(base().map(step => ({ ...step, state: 'done' as const })))
   const view = render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} />)
   expect(screen.queryByRole('list')).toBeNull()
-  expect(screen.getByText('5 / 5 済み')).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
   view.rerender(<FirstStepsCard summary={summarizeFirstSteps(base(), 'restaurant')} folded={false} onToggle={() => {}} />)
   expect(screen.getByRole('list')).toBeTruthy()
   expect(screen.queryByText('8 / 8 済み')).toBeNull()

@@ -5,9 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 
 const state = vi.hoisted(() => ({ account: 'a', role: 'admin', search: '', replace: vi.fn(), push: vi.fn(), get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), schedule: vi.fn(), warnings: vi.fn(), items: vi.fn() }))
-const firstRun = vi.hoisted(() => ({ status: 'ready' as 'ready' | 'loading', steps: [] as unknown[], watch: vi.fn(), notices: undefined as {message:string;href:string}[]|undefined }))
+const firstRun = vi.hoisted(() => ({ status: 'ready' as 'ready' | 'loading', steps: [] as unknown[], watch: vi.fn(), notices: undefined as {message:string;href:string}[]|undefined, progressSteps: {} as Record<string, {complete: boolean | null}> }))
 vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: (_account: string, _enabled: boolean, watch: boolean) => { firstRun.watch(watch); return { status: firstRun.status, steps: firstRun.steps, firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() } } }))
-vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: {}, notices: firstRun.notices }, reload: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: firstRun.progressSteps, notices: firstRun.notices }, reload: vi.fn() }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, selectedAccount: { channelId: state.account, basicId: '@same-store', displayName: '同じ店' } }) }))
@@ -35,6 +35,7 @@ beforeEach(() => {
   state.role = 'admin'
   state.search = ''
   firstRun.notices = undefined
+  firstRun.progressSteps = {}
   firstRun.status = 'ready'
   firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'todo', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
   state.account = 'a'
@@ -107,6 +108,15 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの専用画�
   const band = view.container.querySelector('[data-style-dashboard]')!
   expect(card.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
+it('飲食の案内、期間の操作、数の帯はこの順に並ぶ', async () => {
+  const view = render(<StyleDashboard style="restaurant" />)
+  const card = (await screen.findByRole('heading', { name: 'はじめにやること' })).closest('section')!
+  const controls = screen.getByLabelText('期間')
+  const band = view.container.querySelector('[data-style-dashboard]')!
+  expect(card.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(controls.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
 it('専用画面の閲覧のみでもカードを隠さず、設定の操作を灰色で残す', async () => {
   state.role = 'viewer'
   render(<StyleDashboard style="restaurant" />)
@@ -218,4 +228,15 @@ it.each(['admin','staff','viewer'])('飲食のホームでも復旧案内を出�
     expect(reasonId).toBeTruthy()
     expect(document.getElementById(reasonId!)?.textContent).toBe(role==='viewer'?'閲覧のみのため変更できません。オーナーか管理者に頼んでください。':'この操作はオーナーか管理者だけができます。')
   }
+})
+
+it('飲食の手順が全部済むとカードを隠し、未確認があれば出す', async () => {
+  firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'done', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
+  firstRun.progressSteps = Object.fromEntries(['attributes', 'friendAdd', 'scenario', 'hours', 'followup', 'richMenu'].map(key => [key, { complete: true }]))
+  const view = render(<StyleDashboard style="restaurant" />)
+  await screen.findByText('未配席 1・枠閉じ 2')
+  expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
+  firstRun.progressSteps = { ...firstRun.progressSteps, hours: { complete: null } }
+  view.rerender(<StyleDashboard style="restaurant" />)
+  expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
 })
