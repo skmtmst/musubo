@@ -2,6 +2,7 @@
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 - [二段階認証と前月比の画面改善](release-log/unreleased/PR-kenta-later-codex4.md)（説明・2026-11-27確認）
+- [運営画面と広告設定の表示改善](release-log/unreleased/PR-kenta-later-codex5.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
