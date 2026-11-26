@@ -208,7 +208,6 @@ export default function HqBroadcastCreate() {
   const [approvalRequestOpen, setApprovalRequestOpen] = useState(false)
   const [confirmCount, setConfirmCount] = useState('')
   const [previewConfirmed, setPreviewConfirmed] = useState(false)
-  const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
 
   const [when, setWhen] = useState<'now' | 'later'>('later')
   const [date, setDate] = useState(() => jstDateOffset(1))
@@ -813,21 +812,18 @@ export default function HqBroadcastCreate() {
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
-  const messagePreview = <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
+  const messagePreview = <div className={formStyles.phonePreview}>
               <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
                   {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
                 </div>
               </LinePreview>
+              <p className={formStyles.previewCaption}>PC の LINE では見え方が少し変わります</p>
             </div>
 
   const previewContent = (inDialog = false) => <>            <div className={formStyles.previewHead}>
               <h3>LINE の見え方</h3>
-              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
-              </div>
             </div>
             {messagePreview}
             <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>

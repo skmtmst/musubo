@@ -41,7 +41,7 @@ describe('飲食の初期設定（承認済み Pen v09）', () => {
     expect(result.map(step => step.ordinal)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9'])
     const step = result[2]
     expect(step.title).toBe('リッチメニューを選ぶ')
-    expect(step.action).toEqual({ label: 'リッチメニューを選ぶ', href: '/getting-started/rich-menu' })
+    expect(step.action).toEqual({ label: 'リッチメニューを選ぶ', href: '/?guide=richMenu' })
     expect(step.condition).toContain('下書き')
   })
 

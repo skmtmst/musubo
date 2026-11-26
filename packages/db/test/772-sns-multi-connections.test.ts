@@ -9,11 +9,11 @@ const migration = readFileSync(
 );
 // 772 は「足すだけ」。旧Workerの ON CONFLICT が当たる互換索引（末尾 `_compat_772`）を
 // 残してあるので、2件目の接続が入るようになるのは 773 を当てた後。
-// 773 は新しいWorkerを配り終えてから当てるぶんなので、まだ `migrations/` に入れず
-// `migrations-pending/` で順番待ちしている（理由は同ディレクトリの README.md）。
-// ここでは順番待ちの置き場から読んで、当てた後の形も合わせて確かめる。
+// 773 は新しいWorkerを配り終えてから当てるぶんで、同じ `migrations/` に置いてある
+// （置き場を移した条件は `migrations-pending/README.md`）。
+// ここでは 773 も読んで、当てた後の形も合わせて確かめる。
 const dropCompat = readFileSync(
-  join(import.meta.dirname, '..', 'migrations-pending', '773_sns_multi_connections_drop_compat.sql'),
+  join(import.meta.dirname, '..', 'migrations', '773_sns_multi_connections_drop_compat.sql'),
   'utf8',
 );
 

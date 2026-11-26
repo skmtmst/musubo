@@ -47,13 +47,14 @@ describe('サイドバーの共通ロゴ・設定・版', () => {
     // 非表示のモバイル複製ではなく、常設のサイドバーを検証する。
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
     const logo = desktop.getByRole('img', { name: 'musubo' }) as HTMLImageElement
-    expect(logo.getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect(logo.getAttribute('src')).toBe('/brand/musubo-color-140-1x.png')
+    expect(logo.getAttribute('srcset')).toBe('/brand/musubo-color-140-1x.png 1x, /brand/musubo-color-140-2x.png 2x, /brand/musubo-color-140-3x.png 3x')
     expect(logo.closest('[data-design-node="J33xq/V2WbXF"]')).toBeTruthy()
     expect(desktop.queryByText('Shed Products株式会社')).toBeNull()
     expect(desktop.queryByTitle('LINEアカウント')).toBeNull()
     const drawer = within(view.container.querySelector('#mobile-menu') as HTMLElement)
     expect(drawer.getAllByRole('img', { name: 'musubo' })).toHaveLength(1)
-    expect((drawer.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect((drawer.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color-140-1x.png')
     expect(desktop.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     expect(desktop.queryByRole('link', { name: otherLabel })).toBeNull()
     // 閉じた状態は版と環境の1行。詳細は共通の浮く面で開いて確かめる。
@@ -80,12 +81,12 @@ describe('サイドバーの共通ロゴ・設定・版', () => {
   it('利用停止中のメニューでも同じ公式ロゴを出す', () => {
     const view = render(createElement(SuspendedSidebar))
     const desktop = within(view.container.querySelector('aside') as HTMLElement)
-    expect((desktop.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect((desktop.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color-140-1x.png')
     expect(desktop.queryByText('musubo 統括コンソール')).toBeNull()
   })
 
   it('運営メニューでも同じ公式ロゴを出す', () => {
     const view = render(createElement(OpsBrand, { compact: true }))
-    expect((within(view.container).getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect((within(view.container).getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color-140-1x.png')
   })
 })

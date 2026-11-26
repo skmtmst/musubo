@@ -363,7 +363,7 @@ export const post__api_nen_members_photos_id_notification_retry_5 = async (c: Co
   // pending（一括の通知準備で落ちた対象など、まだ一度も送れていないもの）を
   // 外すと、画面に失敗と出ているのに再送だけ 409 で断る食い違いが起きる。
   const row = await c.env.DB.prepare(
-    `SELECT ps.id, ps.friend_id, f.line_user_id, f.line_account_id, f.is_following,
+    `SELECT ps.id, ps.friend_id, f.line_platform_user_id AS line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted,
             e.id decision_id, e.to_status, e.reason_code, e.reason_note, e.resubmit_invite,
             s.customer_id
@@ -433,7 +433,7 @@ export const post__api_nen_members_tags_resync_6 = async (c: Context<Env, "/api/
 export const get__api_nen_members_friends_friendId_7 = async (c: Context<Env, "/api/nen-members/friends/:friendId">) => {
   const friendId = c.req.param('friendId');
   const friend = await c.env.DB.prepare(
-    `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.is_following,
+    `SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name, f.picture_url, f.is_following,
             f.created_at, f.updated_at, f.line_account_id, la.name AS line_account_name
        FROM friends f
        LEFT JOIN line_accounts la ON la.id = f.line_account_id
@@ -479,7 +479,7 @@ export const get__api_nen_members_friends_friendId_7 = async (c: Context<Env, "/
 
 export const get__api_nen_members_ranks_8 = async (c: Context<Env, "/api/nen-members/ranks">) => {
   const { scope, where } = await adminAccountScope(c);
-  const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id WHERE 1 = 1 ${where} ORDER BY s.purchase_amount DESC LIMIT 300`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>();
+  const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_platform_user_id AS line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id WHERE 1 = 1 ${where} ORDER BY s.purchase_amount DESC LIMIT 300`).bind(...(scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [])).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 };
 

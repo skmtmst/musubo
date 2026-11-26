@@ -12,9 +12,3 @@
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-18);
 }
-
-.guideBasics {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-16);
-}

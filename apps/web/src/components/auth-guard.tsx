@@ -1,5 +1,5 @@
 'use client'
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
@@ -14,6 +14,7 @@ import { prefetchLineAccounts } from '@/lib/line-accounts-cache'
 import TenantSuspended from './tenant-suspended'
 import AuthPendingShell from './auth-pending-shell'
 import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
+import { AuthRefreshContext } from './auth-refresh-context'
 
 /*
  * PERF-07: 画面遷移のたびの /api/auth/session を短いあいだ再利用する。
@@ -65,6 +66,9 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
   const router = useRouter()
   const pathname = usePathname()
   const [checked, setChecked] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const checkedRef = useRef(checked)
+  checkedRef.current = checked
   const [tenantStatus, setTenantStatus] = useState<TenantStatus>('active')
   const [onboardingPath, setOnboardingPath] = useState<string | null>(null)
 
@@ -102,6 +106,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
       && Date.now() - lastSessionCheck.at < SESSION_REUSE_MS
       && (!lastSessionCheck.onboardingPath || isOnboardingContinuationPath(pathname, lastSessionCheck.onboardingPath))
     ) {
+      setRefreshing(false)
       setTenantStatus(lastSessionCheck.tenantStatus)
       setOnboardingPath(lastSessionCheck.onboardingPath)
       setChecked(true)
@@ -116,7 +121,13 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     // 変わっていても、最新の利用開始状態を取得するまで通常メニューを描画しない。
     const verified = readAuthCheck(fingerprint)
     if (verified?.snapshot) rememberSessionSnapshot(verified.snapshot)
-    setChecked(false)
+    // 同じ認証を期限で再確認する間は、確認済みの外枠を保ち、本文だけ待機する。
+    // 初回・別ログイン・失効後は外枠も表示しない。
+    const keepShell = checkedRef.current && lastSessionCheck?.tenantStatus === 'active'
+      && lastSessionCheck.fingerprint === fingerprint
+      && (!lastSessionCheck.onboardingPath || isOnboardingContinuationPath(pathname, lastSessionCheck.onboardingPath))
+    setRefreshing(Boolean(keepShell))
+    if (!keepShell) setChecked(false)
 
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
@@ -185,6 +196,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus, onboardingPath: nextOnboardingPath }
         // 読み直しても中身を先に出せるよう、このタブに印を残す（停止中は残さない）。
         rememberAuthCheck(confirmedFingerprint, nextTenantStatus, snapshot, nextOnboardingPath)
+        setRefreshing(false)
         if (nextOnboardingPath && !isOnboardingContinuationPath(pathname, nextOnboardingPath)) {
           setChecked(false)
           router.replace(nextOnboardingPath)
@@ -196,6 +208,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
           recheckAfterStale()
           return
         }
+        setRefreshing(false)
+        setChecked(false)
         lastSessionCheck = null
         forgetSessionSnapshot()
         forgetAuthCheck()
@@ -225,5 +239,5 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     return <TenantAccessProvider status={tenantStatus}>{suspendedSupport}</TenantAccessProvider>
   }
 
-  return <TenantAccessProvider status={tenantStatus}><OnboardingAccessContext.Provider value={onboardingPath}>{children}</OnboardingAccessContext.Provider></TenantAccessProvider>
+  return <TenantAccessProvider status={tenantStatus}><OnboardingAccessContext.Provider value={onboardingPath}><AuthRefreshContext.Provider value={refreshing}>{children}</AuthRefreshContext.Provider></OnboardingAccessContext.Provider></TenantAccessProvider>
 }

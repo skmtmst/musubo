@@ -9,9 +9,9 @@
  * ありません」が出て、再読み込みの手段も無かった。
  *
  * ここは本物の AccountProvider を react-dom で動かし、通信
- * （api.lineAccounts.list）の成否だけを差し替えて、
+ * （アカウント一覧と選択したアカウントの確認）の成否を差し替えて、
  *   1. 失敗時に error が立ち、ガードが「読み込めませんでした＋再読み込み」を出す
- *   2. 再読み込みの成功で一覧が更新され、画面へ戻れる
+ *   2. 再読み込みの成功で一覧が更新され、アカウントの確認が済んでから画面へ戻れる
  *   3. 成功済みの一覧は再取得の失敗で消えない
  *   4. '/' の着地点ゲートが失敗をエラー表示にし、統括へ飛ばさない
  * ことを確認する。
@@ -25,7 +25,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const api = vi.hoisted(() => ({ listAccounts: vi.fn(), profilePictures: vi.fn() }))
+const api = vi.hoisted(() => ({ listAccounts: vi.fn(), profilePictures: vi.fn(), accountEntry: vi.fn() }))
 
 const fixture = vi.hoisted(() => ({ pathname: '/friends' }))
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
@@ -70,7 +70,7 @@ const ACCOUNT: AccountWithStats = {
 
 /** 文脈の中身を DOM に出すだけの観測点。 */
 function Probe() {
-  const { accounts, selectedAccountId, error, loading, refreshing, refreshAccounts } = useAccount()
+  const { accounts, selectedAccountId, error, loading, refreshing, refreshAccounts, clearSelectedAccountId } = useAccount()
   return (
     <div>
       <span data-probe="loading">{String(loading)}</span>
@@ -79,6 +79,7 @@ function Probe() {
       <span data-probe="count">{accounts.length}</span>
       <span data-probe="picture">{accounts[0]?.pictureUrl ?? ''}</span>
       <span data-probe="selected">{selectedAccountId ?? ''}</span>
+      <button type="button" data-probe="clear" onClick={clearSelectedAccountId}>clear</button>
       <button type="button" data-probe="refresh" onClick={() => { void refreshAccounts() }}>
         refresh
       </button>
@@ -110,17 +111,20 @@ let storage: MemoryStorage
 beforeEach(() => {
   vi.clearAllMocks()
   api.profilePictures.mockResolvedValue({ success: true, data: [] })
+  api.accountEntry.mockResolvedValue({ success: true, data: { destination: 'dashboard', canResume: false } })
   clearLineAccountsCache()
   storage = new MemoryStorage()
   storage.setItem('lh_csrf', 'fixture-session')
   vi.stubGlobal('localStorage', storage)
   vi.stubGlobal('fetch', vi.fn(async (input: string) => {
-    const path = new URL(input).pathname
+    const { pathname: path, searchParams } = new URL(input)
     const response = path === '/api/staff/me'
       ? { success: true, data: { id: 'staff-a', role: 'owner' } }
       : path === '/api/line-accounts/profile-pictures'
         ? await api.profilePictures()
-        : await api.listAccounts()
+        : path === `/api/line-accounts/${ACCOUNT.id}/follower-import` && searchParams.get('entry') === '1'
+          ? await api.accountEntry()
+          : await api.listAccounts()
     return new Response(JSON.stringify(response))
   }))
   fixture.pathname = '/friends'
@@ -134,6 +138,44 @@ afterEach(() => {
   host.remove()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+})
+
+describe('1店の自動選択', () => {
+  it('店の画面で1店を選び、設定へ移っても保持する', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('selected').textContent).toBe(ACCOUNT.id))
+    fixture.pathname = '/staff'
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    expect(probe('selected').textContent).toBe(ACCOUNT.id)
+    expect(storage.getItem('lh_selected_account')).toBe(ACCOUNT.id)
+  })
+  it('統括へ戻る解除を維持し、店に戻ると1店を選ぶ', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('selected').textContent).toBe(ACCOUNT.id))
+    await act(async () => { probe('clear').click() })
+    expect(probe('selected').textContent).toBe('')
+    fixture.pathname = '/hq'
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    expect(probe('selected').textContent).toBe('')
+    fixture.pathname = '/friends'
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('selected').textContent).toBe(ACCOUNT.id))
+  })
+  it('複数あるときは勝手に選ばない', async () => {
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT, { ...ACCOUNT, id: 'account-2' }] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('loading').textContent).toBe('false'))
+    expect(probe('selected').textContent).toBe('')
+  })
+  it('統括の画面では1店でも自動選択しない', async () => {
+    fixture.pathname = '/hq'
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => expect(probe('loading').textContent).toBe('false'))
+    expect(probe('selected').textContent).toBe('')
+  })
 })
 
 describe('アカウント一覧の取得失敗（Issue #978）', () => {
@@ -153,7 +195,7 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     clock.mockRestore()
   })
 
-  it('アーカイブ済みは切り替え一覧から除き、保存された選択も解除する', async () => {
+  it('アーカイブ済みを除き、残る1店を選択する', async () => {
     const archived = { ...ACCOUNT, id: 'old-shed', name: 'THE SHED（旧登録）', archivedAt: '2026-10-28T00:00:00Z' }
     const active = { ...ACCOUNT, id: 'current-shed', name: 'THE SHED', archivedAt: null }
     storage.setItem('lh_selected_account', archived.id)
@@ -162,8 +204,8 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
     await eventually(() => { expect(probe('loading').textContent).toBe('false') })
     expect(probe('count').textContent).toBe('1')
-    expect(probe('selected').textContent).toBe('')
-    expect(storage.getItem('lh_selected_account')).toBeNull()
+    await eventually(() => expect(probe('selected').textContent).toBe(active.id))
+    expect(storage.getItem('lh_selected_account')).toBe(active.id)
 
     storage.setItem('lh_selected_account', active.id)
     await act(async () => { probe('refresh').click() })
@@ -230,9 +272,14 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
       expect(probe('error').textContent).not.toBe('')
     })
 
-    // 保存済みの選択があれば復元されて、そのまま画面へ入れる。
+    // 保存済みの選択を復元しても、対象アカウントの確認が済むまでは画面を開かない。
     storage.setItem('lh_selected_account', ACCOUNT.id)
     api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    let confirmEntry: () => void = () => {}
+    api.accountEntry.mockImplementationOnce(async () => {
+      await new Promise<void>(resolve => { confirmEntry = resolve })
+      return { success: true, data: { destination: 'dashboard', canResume: false } }
+    })
 
     const retry = byExactText('button', 'もう一度読み込む')
     expect(retry).toBeTruthy()
@@ -241,8 +288,12 @@ describe('アカウント一覧の取得失敗（Issue #978）', () => {
     await eventually(() => {
       expect(probe('error').textContent).toBe('')
       expect(probe('count').textContent).toBe('1')
-      expect(host.querySelector('[data-probe="children"]')).toBeTruthy()
+      expect(probe('selected').textContent).toBe(ACCOUNT.id)
+      expect(api.accountEntry).toHaveBeenCalledOnce()
     })
+    expect(host.querySelector('[data-probe="children"]')).toBeNull()
+    await act(async () => { confirmEntry() })
+    expect(host.querySelector('[data-probe="children"]')).toBeTruthy()
   })
 
   it('一度取れた一覧は、再取得の失敗で消えない', async () => {

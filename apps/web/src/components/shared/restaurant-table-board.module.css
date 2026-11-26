@@ -191,3 +191,6 @@
 :global(body):has(.detailList) :global([data-design-part='action-menu'] [role='menuitem']) { height: 36px; }
 
 }
+
+.listHeading { display:flex; align-items:center; justify-content:space-between; gap:var(--space-8); flex-wrap:wrap; }
+.listHeading h2 { margin:0; font-size:var(--text-body); }

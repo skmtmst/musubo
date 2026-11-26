@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { app } from '../index.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
 import { ALLOWLIST } from './openapi-coverage-allowlist.js';
+import { ONBOARDING_BASELINE } from './openapi-coverage-onboarding-baseline.js';
 
 /**
  * OpenAPI（GET /openapi.json）と実装の同期ゲート。
@@ -142,18 +143,7 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
-  'GET /api/getting-started/guide',
-  'PUT /api/getting-started/guide',
-  'GET /api/hq/billing/musubo/last-line-end',
-  'POST /api/hq/billing/musubo/last-line-end',
-  'GET /api/hq/billing/musubo/line-addition',
-  'GET /api/hq/billing/musubo/line-removal/{lineId}',
-  'GET /api/hq/billing/musubo/resumption',
-  'GET /api/hq/billing/musubo/resumption/complete',
-  'POST /api/hq/billing/musubo/line-addition',
-  'POST /api/hq/billing/musubo/line-removal/{lineId}',
-  'POST /api/hq/billing/musubo/resumption/accept',
-  'POST /api/hq/billing/musubo/resumption/connect',
+  ...ONBOARDING_BASELINE,
   'GET /api/hq/onboarding/pricing',
   'GET /api/hq/onboarding/quotes/latest',
   'GET /api/hq/onboarding/quotes/{id}',
@@ -167,6 +157,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/ops/applications/{applicationId}/quotes/{id}/resolve-send',
   'POST /api/ops/applications/{applicationId}/quotes/{id}/send',
   'POST /api/ops/pricing-conditions',
+  'GET /api/settings/sns/connections',
+  'PUT /api/settings/sns/google-primary',
   'PUT /api/ops/applications/{applicationId}/quotes/{id}',
   'PUT /api/ops/pricing-conditions/{id}',
   "GET /api/hq/broadcasts/test-recipients",
@@ -833,6 +825,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/integrations/google-sheets/runs',
   'GET /api/integrations/tiktok-pnl/status',
   'GET /api/line-accounts',
+  'GET /api/line-accounts/registration-resume',
   'GET /api/line-accounts/{id}',
   'GET /api/line-accounts/{id}/registration-receipt',
   'GET /api/line-accounts/{id}/handovers',

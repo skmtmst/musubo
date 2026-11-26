@@ -42,7 +42,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     accounts: [{ id: 'acc-1', name: 'テスト店' }],
-    selectedAccount: { id: 'acc-1', name: 'テスト店' },
+    selectedAccount: { id: 'acc-1', name: 'テスト店', liffId: 'liff-test' },
     selectedAccountId: 'acc-1',
     loading: false,
   }),
@@ -121,6 +121,7 @@ beforeEach(() => {
    */
   updateEvent.mockImplementation(async (_accountId: string, _id: string, payload: Partial<EventDetail>, version: number) => ({
     ...serverRow(version + 1),
+    is_published: payload.is_published ?? 0,
     questions_json: payload.questions ? JSON.stringify(payload.questions) : null,
   }))
 })
@@ -174,6 +175,35 @@ describe('R82 続けて保存しても質問が消えない', () => {
     await click(saveButton())
     expect(updateEvent).toHaveBeenCalledTimes(2)
     expect(updateEvent.mock.calls[1][2].questions).toEqual([QUESTION])
+  })
+
+  it('概要の保存後も同じタブに残り、予約枠へ自動で移らない', async () => {
+    await renderForm()
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent?.includes('保存して次へ'))).toBe(false)
+    await click(saveButton())
+    expect(updateEvent).toHaveBeenCalledTimes(1)
+    expect(questionInput()).not.toBeNull()
+    expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toContain('概要')
+  })
+
+  it('予約 URL は公開設定に置き、公開を保存してから表示・コピーする', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    await renderForm()
+    expect(document.querySelector('input[aria-label="予約 URL"]')).toBeNull()
+    const tab = [...document.querySelectorAll('[role="tab"]')].find((item) => item.textContent?.includes('公開設定'))!
+    await click(tab)
+    expect(document.body.textContent).toContain('公開して保存すると、ここに URL が出ます')
+    await click(document.querySelector('input[name="event-publish-state"][value="published"]')!)
+    expect(document.body.textContent).toContain('公開して保存すると、ここに URL が出ます')
+    const save = [...document.querySelectorAll('button')].find((button) => button.textContent === '公開設定を保存する')!
+    await click(save)
+    const url = document.querySelector<HTMLInputElement>('input[aria-label="予約 URL"]')!
+    expect(url.value).toContain('liffId=liff-test')
+    expect(url.value).toContain('id=ev-1')
+    await click(document.querySelector('button[aria-label="予約 URL をコピー"]')!)
+    expect(writeText).toHaveBeenCalledWith(url.value)
+    vi.unstubAllGlobals()
   })
 
   it('横断公開を選ぶと編集中のアカウントを含めて保存し、単一へ戻すと対象の配列を送らない', async () => {

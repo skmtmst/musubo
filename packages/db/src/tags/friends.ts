@@ -1,5 +1,6 @@
 import { tagReadPredicate, type TagReadScope } from '../tag-lists.js';
 import type { Friend } from '../friends/types/index.js';
+import { normalizeFriendLineUserId, type StoredFriend } from '../friend-account-identity.js';
 import { type Tag } from './types.js';
 
 
@@ -83,6 +84,6 @@ export async function getFriendsByTag(
        ORDER BY f.created_at DESC`,
     )
     .bind(...(predicate?.binds ?? []), ...bindings)
-    .all<Friend>();
-  return result.results;
+    .all<StoredFriend>();
+  return result.results.map(normalizeFriendLineUserId);
 }

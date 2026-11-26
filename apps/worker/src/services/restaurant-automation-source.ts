@@ -30,7 +30,7 @@ export async function readRestaurantAutomationSource(db: D1Database, input: {
       w.starts_at,w.ends_at,w.guest_count,w.status,NULL departed_at,0 customer_version,w.line_uid,
       s.timezone,s.name store_name,NULL course_name
       FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id
-      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=w.line_uid
+      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=w.line_uid
       WHERE w.id=? AND w.store_id=? AND s.line_account_id=? AND f.id=? ${strict?"AND s.status='active'":''}
       AND f.is_following=1 AND f.is_hidden=0 AND w.status='invited'
       AND w.notification_retry_key=? AND julianday(w.hold_expires_at)>julianday(?)
@@ -39,7 +39,7 @@ export async function readRestaurantAutomationSource(db: D1Database, input: {
     if (!context) return {restaurant:true,allowed:false};
     return {restaurant:true,allowed:true,context,waitlistId,guard:{
       sql:`${eventSql} AND EXISTS(SELECT 1 FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id
-        JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=w.line_uid
+        JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=w.line_uid
         WHERE w.id=? AND w.store_id=? AND s.line_account_id=? AND f.id=? ${strict?"AND s.status='active'":''}
         AND f.is_following=1 AND f.is_hidden=0 AND w.status='invited' AND w.notification_retry_key=?
         AND julianday(w.hold_expires_at)>julianday(?) ${strict?'AND w.hold_expires_at=? AND w.starts_at=? AND w.ends_at=? AND w.guest_count=?':''})`,
@@ -62,7 +62,7 @@ export async function readRestaurantAutomationSource(db: D1Database, input: {
       AND correction.event_type=? AND correction.reservation_version>?)`:'';
     const phase=event.event_type==='restaurant.departed'?' AND r.departed_at IS NOT NULL':event.event_type==='restaurant.departure_undone'?' AND r.departed_at IS NULL':'';
     const sql=`${eventSql} AND EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
-      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
       WHERE r.id=? AND r.store_id=? AND s.line_account_id=? AND f.id=? AND f.is_following=1 AND f.is_hidden=0
       AND ${state}${phase}${undoSql})`;
     const binds=[...eventBinds,context.reservation_id,context.store_id,input.lineAccountId,input.friendId,...(undo?[undo,event.reservation_version]:[])];
@@ -71,7 +71,7 @@ export async function readRestaurantAutomationSource(db: D1Database, input: {
   }
   return {restaurant:true,allowed:true,context,guard:{
     sql:`${eventSql} AND EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id
-      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+      JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
       WHERE r.id=? AND r.store_id=? AND r.customer_version=? AND r.status=? AND r.departed_at IS ?
         AND r.starts_at=? AND r.ends_at=? AND r.guest_count=? AND s.line_account_id=? AND f.id=?
         AND s.status='active' AND f.is_following=1 AND f.is_hidden=0)`,

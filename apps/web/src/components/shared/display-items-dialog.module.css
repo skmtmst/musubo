@@ -30,3 +30,5 @@
 .body[data-presentation='columns'] .options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .body[data-presentation='columns'] .options .row { padding: var(--tpl-dic-gap-tight) 0; }
 }
+
+.row[data-child] { padding-left: var(--space-24); }

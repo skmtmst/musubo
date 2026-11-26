@@ -10,6 +10,7 @@ import { validateTemplateMessage } from '../services/template-message-validation
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { validRestaurantFloor, readRestaurantFloor, firstTablePlacement, tablePlacementFits } from '../services/restaurant-floor.js';
 import { inputError } from '../lib/input-errors.js';
+import { readScopedInventoryDay, saveScopedInventoryAllocation } from './restaurant-test-inventory-allocation.js';
 import { auditLog } from '../lib/audit-log.js';
 import { publicClosure, closuresForRange, closureAffectsTable, openSeatTables } from '../services/restaurant-closures.js';
 import type { RestaurantTableLayoutInput, RestaurantFloorWrite } from '@line-crm/shared';
@@ -22,6 +23,7 @@ import { dbFor } from '../services/db-router.js';
 
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
 import { connectedGoogleProfile, googleOpeningDay, googleOpeningWeek } from '../services/restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from '../services/google-connection-primary.js';
 import { applyDueRestaurantMenuPrices, expireRestaurantHolds, validateRestaurantHold, validRestaurantDate, restaurantCivilTime } from '../services/restaurant-booking.js';
 import { hasOrganizationSelector, requiredAccount, organizationFor, storeBelongsTo, acquireLock, adjustInventoryReservedCount, releaseLock } from './restaurant-test-definition.js';
 import type { Context } from 'hono';
@@ -263,7 +265,12 @@ export const put__api_restaurant_test_inventory_allocation_6 = async (c: Context
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({success:false,error:'組織が見つかりません'},404);
-  const body = await c.req.json<{storeId:string;slots:Array<{id:string;expectedVersion:number}>;otaCapacity:number;lineCapacity:number;walkInCapacity:number;sameDayCapacity?:number}>().catch(()=>null);
+  const body = await c.req.json<{storeId:string;slots:Array<{id:string;expectedVersion:number}>;otaCapacity:number;lineCapacity:number;walkInCapacity:number;sameDayCapacity?:number;scope?:unknown}>().catch(()=>null);
+  if (body?.scope !== undefined) {
+    if (typeof body.storeId !== 'string' || !await storeBelongsTo(c, organization.id, body.storeId))
+      return inputError(c, { success: false, error: '店舗を確認してください' }, 400, ['storeId']);
+    return saveScopedInventoryAllocation(c, dbFor(c.env, body.storeId), body.storeId, body);
+  }
   if (!body || !Array.isArray(body.slots) || body.slots.length<1 || body.slots.length>200 || new Set(body.slots.map(s=>s?.id)).size!==body.slots.length
     || body.slots.some(s=>!s || typeof s.id!=='string' || !Number.isSafeInteger(s.expectedVersion) || s.expectedVersion<1)
     || !await storeBelongsTo(c,organization.id,body.storeId)) return inputError(c, {success:false,error:'店舗・枠・版を確認してください'}, 400, ["slots","storeId"]);
@@ -323,16 +330,17 @@ export const get__api_restaurant_test_opening_hours_8 = async (c: Context<Env, "
   if (date !== undefined && !validRestaurantDate(date)) return inputError(c, { success: false, error: '日付を確認してください' }, 400, ['date']);
   const row = await dbFor(c.env, storeId).prepare('SELECT hours_json, version, updated_by, updated_at, late_cancel_after_minutes, late_arrival_message FROM rt_opening_hours_settings WHERE store_id = ?')
     .bind(storeId).first<{ hours_json: string; version: number; updated_by: string; updated_at: string; late_cancel_after_minutes: number | null; late_arrival_message: string | null }>();
-  const connection = await dbFor(c.env, storeId).prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-    .bind(storeId).first<{ status: import('@line-crm/shared').RestaurantOpeningHours['googleStatus'] }>();
-  const profile = connection ? await connectedGoogleProfile(dbFor(c.env, storeId), storeId) : null;
+  // 画面へ返す googleStatus と、営業時間の元になる写しが**同じ1件**を指すようにする。
+  // store_id だけで接続を引くと、接続が2件あるとき「接続Aの状態 × 接続Bの営業時間」を返し得る。
+  const connection = await primaryGoogleConnection(dbFor(c.env, storeId), storeId);
+  const profile = connection ? await connectedGoogleProfile(dbFor(c.env, storeId), storeId, connection.id) : null;
   const week = connection ? row && profile && googleOpeningWeek(profile) : row ? JSON.parse(row.hours_json) as import('@line-crm/shared').RestaurantOpeningDay[] : null;
   const day = date && profile ? googleOpeningDay(profile, date) : null;
   const weekday = date ? new Date(`${date}T12:00:00Z`).getUTCDay() : null;
   const hours = week && (date && profile ? day !== null : true)
     ? weekday === null || !profile ? week : week.map(item => item.weekday === weekday ? { weekday, periods: day! } : item)
     : null;
-  return c.json({ success: true, data: { storeId, hours, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, googleStatus: connection?.status ?? null, lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
+  return c.json({ success: true, data: { storeId, hours, version: row?.version ?? 0, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null, googleStatus: (connection?.status ?? null) as import('@line-crm/shared').RestaurantOpeningHours['googleStatus'], lateArrivalPolicy: row?.late_cancel_after_minutes != null && row.late_arrival_message ? {cancelAfterMinutes:row.late_cancel_after_minutes,message:row.late_arrival_message} : null } });
 };
 
 export const put__api_restaurant_test_opening_hours_9 = async (c: Context<Env, "/api/restaurant-test/opening-hours">) => {
@@ -342,8 +350,8 @@ export const put__api_restaurant_test_opening_hours_9 = async (c: Context<Env, "
   const body: { storeId?: string; hours?: unknown; expectedVersion?: number; lateArrivalPolicy?: import('@line-crm/shared').RestaurantLateArrivalPolicy | null } = (await c.req.json().catch(() => null)) || {};
   const storeId = typeof body.storeId === 'string' ? body.storeId : body.storeId === undefined ? organization.scopedStoreId : null;
   if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
-  const googleConnection = await dbFor(c.env, storeId).prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-    .bind(storeId).first<{ status: string }>();
+  // 接続が1件でもあれば手入力の保存を断る口。判定の対象を主連携1件に固定しておく。
+  const googleConnection = await primaryGoogleConnection(dbFor(c.env, storeId), storeId);
   if (googleConnection)
     return c.json({ success: false, error: '営業時間はGoogleビジネスで変更してください', code: 'google_hours_source' }, 409);
   const hours = validateRestaurantOpeningHours(body.hours);
@@ -681,7 +689,7 @@ export const get__api_restaurant_test_customers_search_26 = async (c: Context<En
       AND (INSTR(customer_name, ?) > 0 OR INSTR(${customerPhoneSql}, ?) > 0)
       AND (customer_phone IS NOT NULL OR line_uid IS NOT NULL)
     GROUP BY COALESCE(line_uid, customer_phone) UNION
-    SELECT COALESCE(f.display_name, 'LINEの友だち') AS name, NULL AS phone, f.line_user_id AS lineUid
+    SELECT COALESCE(f.display_name, 'LINEの友だち') AS name, NULL AS phone, f.line_platform_user_id AS lineUid
     FROM friends f JOIN rt_stores s ON s.line_account_id = f.line_account_id
     WHERE s.id = ? AND f.is_following = 1 AND INSTR(COALESCE(f.display_name, ''), ?) > 0 LIMIT 20`)
     .bind(storeId, q, normalizePhone(q) || q, storeId, q).all<{ name: string; phone: string | null; lineUid: string | null }>();
@@ -697,20 +705,5 @@ export const get__api_restaurant_test_inventory_day_27 = async (c: Context<Env, 
   if (!validRestaurantDate(date) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と日付を確認してください' }, 400);
   const db = dbFor(c.env, storeId);
   await expireRestaurantHolds(db, undefined, storeId);
-  const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id = ?').bind(storeId).first<{ timezone: string }>();
-  const rows = await db.prepare(`SELECT v.*, sm.name AS updated_by_name FROM rt_inventory_occupancy v
-    LEFT JOIN staff_members sm ON sm.id=v.updated_by
-    WHERE v.store_id=? AND datetime(v.starts_at)>=datetime(?) AND datetime(v.starts_at)<datetime(?) ORDER BY v.starts_at`)
-    .bind(storeId, restaurantCivilTime(date, 0, store!.timezone), restaurantCivilTime(date, 1440, store!.timezone)).all<Record<string, unknown>>();
-  const closures = await closuresForRange(db, storeId, restaurantCivilTime(date, 0, store!.timezone), restaurantCivilTime(date, 1440, store!.timezone));
-  const tables=(await db.prepare('SELECT id,max_capacity FROM rt_tables WHERE store_id=? AND is_active=1').bind(storeId).all<{id:string;max_capacity:number}>()).results;
-  return c.json({ success: true, closures: closures.map(publicClosure), data: rows.results.map(r => {
-    const occupiedTableIds=JSON.parse(String(r.occupied_table_ids_json)) as string[];
-    const from=Date.parse(String(r.starts_at)),to=from+Number(r.slot_minutes)*60_000;
-    const closed=closures.filter(c=>(JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).some(p=>Date.parse(p.startsAt)<to&&Date.parse(p.endsAt)>from));
-    const closedTables=tables.filter(t=>closed.some(c=>closureAffectsTable(c,t.id)));
-    const blockedSeats=closedTables.filter(t=>!occupiedTableIds.includes(t.id)).reduce((n,t)=>n+t.max_capacity,0);
-    return {...r,reserved_count:r.guest_count,occupiedTableIds,closedTableIds:closedTables.map(t=>t.id),
-      freeSeats:Math.max(0,Number(r.total_capacity)-Number(r.occupied_seats)-Number(r.unassigned_guests)-blockedSeats)};
-  }) });
+  return c.json(await readScopedInventoryDay(db, storeId, date));
 };

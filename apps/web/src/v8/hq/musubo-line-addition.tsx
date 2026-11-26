@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { api } from '@/lib/api'
-import type { MusuboLineAdditionState } from '@/lib/api/features/musubo-line-addition'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { api, ApiError } from '@/lib/api'
+import type { MusuboLineAdditionPending, MusuboLineAdditionState, MusuboLineAdditionTarget } from '@/lib/api/features/musubo-line-addition'
 import PageHeader from '@/components/shared/page-header'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
@@ -11,121 +11,170 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import MusuboPaymentRecovery, { type MusuboPaymentRecoveryView } from './musubo-payment-recovery'
+import MusuboPaymentRecovery, { RegistrationPaymentRecovery } from './musubo-payment-recovery'
 import styles from './musubo-line-addition.module.css'
 
-const yen = (value: number) => `¥${new Intl.NumberFormat('ja-JP').format(value)}`
+const billingPath = '/hq/billing/line-addition'
+const yen = (value: number) => '¥' + new Intl.NumberFormat('ja-JP').format(value)
 const dateTime = (value: string) => new Intl.DateTimeFormat('ja-JP', {
   timeZone: 'Asia/Tokyo', year: 'numeric', month: 'long', day: 'numeric',
   hour: '2-digit', minute: '2-digit',
 }).format(new Date(value))
 
-export default function MusuboLineAdditionPage() {
+function additionHref(additionId: string) {
+  return billingPath + '?' + new URLSearchParams({ additionId })
+}
+
+function matchesTarget(addition: MusuboLineAdditionPending | undefined, target: MusuboLineAdditionTarget) {
+  return 'accountId' in target ? addition?.lineAccountId === target.accountId : addition?.id === target.additionId
+}
+
+function AdditionEntry() {
+  const params = useSearchParams()
+  const accountId = params.get('accountId')
+  const additionId = params.get('additionId')
+  const ambiguous = params.getAll('accountId').length > 1 || params.getAll('additionId').length > 1
+  const target = useMemo<MusuboLineAdditionTarget | undefined>(() => {
+    if (accountId && additionId === null) return { accountId }
+    if (additionId && accountId === null) return { additionId }
+    return undefined
+  }, [accountId, additionId])
+  if (ambiguous || (!target && (accountId !== null || additionId !== null))) return <RegistrationPaymentRecovery state="unavailable" />
+  const key = accountId ? 'account:' + accountId : additionId ? 'addition:' + additionId : ''
+  return <MusuboLineAdditionPage key={key} target={target} />
+}
+
+export default function AdditionPage() {
+  return <Suspense fallback={<ListState kind="loading" title="登録の状態を確認しています" />}><AdditionEntry /></Suspense>
+}
+
+function MusuboLineAdditionPage({ target }: { target?: MusuboLineAdditionTarget }) {
   const router = useRouter()
   const [state, setState] = useState<MusuboLineAdditionState | null>(null)
-  const stateRef = useRef<MusuboLineAdditionState | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'failed' | 'unavailable'>('loading')
+  const [retryCount, setRetryCount] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const [activatedSummary, setActivatedSummary] = useState<{ ordinal: number; amountYen: number; nextMonthlyYen: number | null } | null>(null)
-  const justActivated = activatedSummary !== null
-  const recovering = justActivated || state?.expired === true || Boolean(state?.pending && !state.pending.canConnect)
+  const busyLock = useRef(false)
+  const linkedId = state?.pending?.lineAccountId ? state.pending.id : null
+  const recovering = Boolean(target || linkedId || state?.expired)
   usePageTitle(recovering ? 'お支払い' : 'LINE追加')
   usePageCrumbs(recovering
-    ? [{ label: 'アカウント', href: '/accounts' }, { label: 'LINE追加', href: '/hq/billing/line-addition' }]
+    ? [{ label: 'アカウント', href: '/accounts' }, { label: 'LINE追加', href: billingPath }]
     : [{ label: 'アカウント', href: '/accounts' }])
-  const load = useCallback(async () => {
-    const result = await api.musuboLineAddition.get()
-    if (!result.success) throw new Error(result.error)
-    const previous = stateRef.current
-    if (previous?.pending && !result.data.pending && result.data.activeLineCount > previous.activeLineCount) {
-      setActivatedSummary({ ordinal: previous.price.addedLineOrdinal, amountYen: previous.pending.amountDueYen,
-        nextMonthlyYen: previous.recurringAfter.coreInterval === 'month'
-          ? previous.recurringAfter.coreYen + previous.recurringAfter.optionsYen : null })
-    }
-    stateRef.current = result.data
-    setState(result.data)
-  }, [])
+
   useEffect(() => {
     let disposed = false
-    void load().catch(() => { if (!disposed) setError('追加料金を読み込めませんでした。もう一度お試しください。') })
-      .finally(() => { if (!disposed) setLoading(false) })
+    void api.musuboLineAddition.get(target).then(result => {
+      if (!result.success) throw new Error(result.error)
+      if (disposed) return
+      if (target && !matchesTarget(result.data.addition, target)) {
+        setLoadState('unavailable')
+        return
+      }
+      setState(result.data)
+      setLoadState('ready')
+    }).catch(caught => {
+      if (disposed) return
+      const unavailable = target && caught instanceof ApiError && [400, 403, 404].includes(caught.status)
+      setLoadState(unavailable ? 'unavailable' : 'failed')
+    })
     return () => { disposed = true }
-  }, [load])
+  }, [target, retryCount])
+
+  useEffect(() => {
+    if (!target && linkedId) router.replace(additionHref(linkedId))
+  }, [linkedId, router, target])
+
+  const retryLoad = useCallback(() => {
+    setLoadState('loading')
+    setRetryCount(count => count + 1)
+  }, [])
 
   const acceptAddition = async (token?: string) => {
-    if (!state || busy) return
-    setBusy(true); setError('')
+    if (!state || busyLock.current) return
+    busyLock.current = true
+    setBusy(true)
+    setError('')
     try {
       const amountDueYen = state.pending?.amountDueYen ?? state.price.dueNowYen
-      const result = await api.musuboLineAddition.accept({
-        amountDueYen, activeLineCount: state.activeLineCount,
-      }, token)
+      const result = await api.musuboLineAddition.accept({ amountDueYen, activeLineCount: state.activeLineCount }, token)
       if (!result.success) throw new Error(result.error)
-      if (result.data.status === 'activated') {
-        setActivatedSummary({ ordinal: state.price.addedLineOrdinal, amountYen: result.data.amountDueYen,
-          nextMonthlyYen: state.recurringAfter.coreInterval === 'month'
-            ? state.recurringAfter.coreYen + state.recurringAfter.optionsYen : null })
-        await load()
+      if (result.data.lineAccountId) {
+        router.push(additionHref(result.data.id))
       } else if (result.data.canConnect) {
         router.push('/accounts/new')
       } else {
-        await load()
+        retryLoad()
       }
     } catch (caught) {
       if (!token && isStepUpRequired(caught)) {
         setStepUp({ purpose: 'line_account.connect', action: 'LINEの追加料金を確定する', retry: acceptAddition })
       } else setError('決済状況を確認できませんでした。内容を読み直して再度お試しください。')
-    } finally { setBusy(false) }
+    } finally {
+      busyLock.current = false
+      setBusy(false)
+    }
   }
 
-  if (loading) return <ListState kind="loading" title="LINE追加料金を確認しています" />
-  if (!state) return <ListState kind="error" title="LINE追加料金を表示できませんでした" />
+  if (loadState === 'loading') return <ListState kind="loading" title={target ? '登録の状態を確認しています' : 'LINE追加料金を確認しています'} />
+  if (loadState === 'unavailable') return <RegistrationPaymentRecovery state="unavailable" />
+  if (loadState === 'failed' || !state) return <ListState kind="error" title="LINE追加料金を表示できませんでした" onRetry={retryLoad} />
+
+  const addition = state.addition ?? state.pending
+  if (target || linkedId) {
+    if (!addition?.lineAccountId || state.expired || addition.status === 'expired' || addition.status === 'cancelled') {
+      return <RegistrationPaymentRecovery state="unavailable" />
+    }
+    if (addition.status === 'activated') {
+      const registrationHref = '/accounts/new?' + new URLSearchParams({ resume: addition.lineAccountId })
+      return <RegistrationPaymentRecovery state="activated" registrationHref={registrationHref} />
+    }
+    const refresh = async () => {
+      const result = await api.musuboLineAddition.reconcile({ additionId: addition.id }).catch((caught: unknown) => {
+        if (caught instanceof ApiError && [400, 403, 404].includes(caught.status)) {
+          setLoadState('unavailable')
+          return null
+        }
+        throw caught
+      })
+      if (!result) return
+      if (!result.success) throw new Error(result.error)
+      if (result.data.id !== addition.id || result.data.lineAccountId !== addition.lineAccountId) {
+        setLoadState('unavailable')
+        return
+      }
+      const updated = result.data
+      setState({ ...state, addition: updated })
+    }
+    return <RegistrationPaymentRecovery state={addition.status === 'paid' ? 'processing' : 'failed'}
+      onRefresh={refresh} paymentUrl={addition.paymentUrl} />
+  }
+
   const pending = state.pending
-  const expired = state.expired === true
-  const ordinal = activatedSummary?.ordinal ?? state.price.addedLineOrdinal
-  const failed = pending && !pending.canConnect && pending.status === 'awaiting_payment' && !expired
-  const checking = pending?.activationPending
-  if (recovering) {
-    const recoveryView: MusuboPaymentRecoveryView = {
-      kind: 'addition', state: justActivated ? 'activated' : expired ? 'expired' : checking ? 'processing' : 'failed',
-      amountYen: activatedSummary?.amountYen ?? pending?.amountDueYen ?? state.price.dueNowYen,
+  const ordinal = state.price.addedLineOrdinal
+  const confirm = stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />
+  if (state.expired) {
+    return <><MusuboPaymentRecovery view={{
+      kind: 'addition', state: 'expired', amountYen: state.price.dueNowYen,
       addedLineOrdinal: ordinal, activeLineCount: state.activeLineCount,
       holdUntil: pending?.expiresAt ?? new Date().toISOString(),
-      nextMonthlyYen: activatedSummary?.nextMonthlyYen ?? (state.recurringAfter.coreInterval === 'month'
-        ? state.recurringAfter.coreYen + state.recurringAfter.optionsYen : null),
-    }
-    return <><MusuboPaymentRecovery view={recoveryView}
-      onPrimary={async () => {
-        if (justActivated) router.push('/accounts')
-        else if (checking) await load()
-        else await acceptAddition()
-      }}
-      onSecondary={() => router.push(justActivated ? '/hq/billing' : '/accounts')}
-      secondaryLabel={justActivated ? '請求を確認する' : 'アカウント一覧へ'} />
+    }}
+      onPrimary={async () => { await acceptAddition() }}
+      onSecondary={() => router.push('/accounts')} secondaryLabel="アカウント一覧へ" />
       {error && <Notice tone="danger" message={error} />}
-      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
+      {confirm}
     </>
   }
+  if (pending && !pending.canConnect) return <RegistrationPaymentRecovery state="unavailable" />
+
   return <div className={styles.page}>
-    <PageHeader breadcrumb={[]} title={justActivated ? `${ordinal}個目のLINEを追加しました`
-      : failed ? 'LINE追加のお支払いが未完了です'
-        : checking ? '追加分のお支払いを確認しています'
-          : expired ? '追加料金の確認期限が過ぎました'
-            : `${ordinal}個目のLINEを追加しますか`} />
+    <PageHeader breadcrumb={[]} title={ordinal + '個目のLINEを追加しますか'} />
     {error && <Notice tone="danger" message={error} />}
-    {justActivated ? <Notice tone="success" heading="追加したLINEを利用できます"
-      message="追加分の決済とLINEの有効化が完了しました。" />
-      : failed ? <Notice tone="warn" heading="追加分のお支払いが完了していません"
-        message="接続情報は保存済みです。決済成功後に追加したLINEを有効化します。既存のLINEはそのまま使えます。" />
-        : checking ? <Notice tone="info" heading="決済結果を確認しています"
-          message="追加したLINEは有効化待ちです。既存のLINEはそのまま使えます。" />
-          : expired ? <Notice tone="warn" heading="追加分の保留期限が過ぎました"
-            message="最新の料金を確認してから、もう一度追加してください。" /> : null}
     <div className={styles.columns}>
       <Card as="section" layout="vertical" padding="roomy" gap="normal">
-        <h2>{failed ? '追加分のお支払い' : '追加料金のご確認'}</h2>
+        <h2>追加料金のご確認</h2>
         <div className={styles.priceRows}>
           <div><span>追加するLINE</span><strong>{ordinal}個目</strong></div>
           <div><span>LINE基本料金の増分</span><strong>{yen(state.price.coreIncrementYen)}／{state.price.coreIncrementInterval === 'year' ? '年' : '月'}</strong></div>
@@ -139,10 +188,10 @@ export default function MusuboLineAdditionPage() {
         <p className={styles.explanation}>{state.price.dueNowYen === 0
           ? '無料体験中のため、本日の請求はありません。LINEの接続が完了すると追加分を有効化します。'
           : 'LINEの接続情報を確認した後、追加分の決済が成功すると有効化します。決済が完了しなければ既存のLINEはそのまま使えます。'}</p>
-        {pending && !justActivated && <p className={styles.explanation}>保留期限：{dateTime(pending.expiresAt)}</p>}
+        {pending && <p className={styles.explanation}>保留期限：{dateTime(pending.expiresAt)}</p>}
       </Card>
       <Card as="section" layout="vertical" padding="roomy" gap="normal">
-        <h2>{failed ? '追加を完了するには' : 'この後の流れ'}</h2>
+        <h2>この後の流れ</h2>
         <ol className={styles.flow}>
           <li>料金を確認してLINEアカウントを接続</li>
           <li>有料利用中は追加分のお支払いを確認</li>
@@ -150,17 +199,11 @@ export default function MusuboLineAdditionPage() {
         </ol>
         <p className={styles.explanation}>カード情報はStripeで扱い、musuboには保存しません。</p>
         <div className={styles.actions}>
-          {justActivated ? <Button href="/accounts">アカウント一覧へ</Button>
-            : pending?.canConnect && !expired ? <Button href="/accounts/new">LINE接続へ</Button>
-              : failed ? <>
-                {pending?.paymentUrl && <Button variant="secondary" external href={pending.paymentUrl}>Stripeでお支払いを確認</Button>}
-                <Button type="button" busy={busy} onClick={() => void acceptAddition()}>カードを確認して再試行</Button>
-              </> : checking ? <Button type="button" busy={busy} onClick={() => void load()}>決済状況を再確認</Button>
-                : expired ? <Button type="button" busy={busy} onClick={() => void acceptAddition()}>最新の料金でLINE接続へ</Button>
-                  : <Button type="button" busy={busy} onClick={() => void acceptAddition()}>確認してLINE接続へ</Button>}
+          {pending?.canConnect ? <Button href="/accounts/new">LINE接続へ</Button>
+            : <Button type="button" busy={busy} onClick={() => void acceptAddition()}>確認してLINE接続へ</Button>}
         </div>
       </Card>
     </div>
-    {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
+    {confirm}
   </div>
 }

@@ -681,8 +681,10 @@
     "769_musubo_contracted_linked_slots.sql",
     "770_onboarding_guide_progress.sql",
     "772_sns_multi_connections.sql",
+    "773_sns_multi_connections_drop_compat.sql",
     "786_restaurant_course_gallery.sql",
-    "789_limit_legacy_folder_update_triggers.sql"
+    "789_limit_legacy_folder_update_triggers.sql",
+    "797_scope_friend_line_user_ids.sql"
   ],
-  "migrationCount": 683
+  "migrationCount": 685
 }

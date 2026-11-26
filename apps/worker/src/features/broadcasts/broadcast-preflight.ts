@@ -99,7 +99,7 @@ export async function previewAudience(
   }
 
   const result = await db.prepare(
-    `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.user_id,
+    `SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name, f.picture_url, f.user_id,
             ${DELIVERY_CONSENT_ALLOWED_SQL} AS consent_allowed,
             f.is_following, COALESCE(f.is_hidden, 0) AS is_hidden,
             COALESCE((SELECT GROUP_CONCAT(t.name, '・')

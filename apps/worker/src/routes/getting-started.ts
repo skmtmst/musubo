@@ -1,6 +1,6 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import {
   getOnboardingGuideProgress,
   hasFirstDeliveredMessage,
@@ -9,6 +9,7 @@ import {
   acknowledgeOnboardingWelcome,
 } from '@line-crm/db';
 import type { OnboardingGuidePhase, OnboardingGuideProgressRow } from '@line-crm/db';
+import { hasStaffAccess } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -16,6 +17,9 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { starterApplication } from '../services/style-starter-ensure.js';
 import { firstRunTimes } from '../services/getting-started-first-run.js';
 import { scenarioIdsStartedBy } from '../services/first-run-funnel.js';
+import {
+  hasReceivedFirstMessageTest, issueFirstMessageIdentity, readFirstMessageTest, sendFirstMessageTest,
+} from '../services/getting-started-first-message.js';
 
 /**
  * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳。
@@ -47,9 +51,7 @@ const STEP_PERMISSIONS: Record<keyof typeof STEP_HREFS, string[]> = {
 };
 
 function canAdvance(staff: AuthenticatedStaff | undefined, key: keyof typeof STEP_HREFS) {
-  if (!staff) return false;
-  if (staff.role === 'owner' || staff.role === 'admin') return true;
-  return STEP_PERMISSIONS[key].some((permission) => staff.permissionKeys?.includes(permission));
+  return STEP_PERMISSIONS[key].some((permission) => hasStaffAccess(staff, permission));
 }
 
 function withAccess(
@@ -161,7 +163,10 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       scenarioFromFriendAdd = hit !== null;
     }
 
-    const firstMessage = accountId ? await hasFirstDeliveredMessage(c.env.DB, accountId) : false;
+    const firstMessage = accountId && staff?.id && c.req.query('version') === 'v8'
+      && rows.some(row => row.id === accountId && row.style === 'restaurant')
+      ? await restaurantFirstMessageDone(c.env.DB, { accountId, staffId: staff.id })
+      : accountId ? await hasFirstDeliveredMessage(c.env.DB, accountId) : false;
 
     const hasPublishedRule = ruleRows.results.length > 0;
     const hasFallbackRule = ruleRows.results.some((row) => row.is_unknown_route_fallback === 1);
@@ -326,6 +331,40 @@ gettingStarted.put('/api/getting-started/guide', requireRole('owner', 'admin', '
     procedureIndex: procedureIndex as number,
   });
   return c.json({ success: true, data: guidePayload(row) });
+});
+
+async function restaurantFirstMessageDone(db: D1Database, scope: { staffId: string; accountId: string }): Promise<boolean> {
+  if (await hasReceivedFirstMessageTest(db, scope)) return true;
+  const guide = await getOnboardingGuideProgress(db, scope.staffId, scope.accountId);
+  // 以前の手順で完了した人の進捗は維持する。
+  return guide?.phase === 'done' && await hasFirstDeliveredMessage(db, scope.accountId);
+}
+
+const firstMessageRole = requireRole('owner', 'admin', 'staff');
+const firstMessagePermission: MiddlewareHandler<Env> = async (c, next) => {
+  if (!canAdvance(c.get('staff'), 'firstMessage')) {
+    return c.json({ success: false, error: 'この操作を実行する権限がありません' }, 403);
+  }
+  return next();
+};
+gettingStarted.get('/api/getting-started/first-message', firstMessageRole, firstMessagePermission, async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+  return c.json({ success: true, data: await readFirstMessageTest(c.env.DB, scope) });
+});
+
+gettingStarted.post('/api/getting-started/first-message/identity', firstMessageRole, firstMessagePermission, async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+  const verificationUrl = await issueFirstMessageIdentity(c.env.DB, scope);
+  return c.json({ success: true, data: { verificationUrl } });
+});
+
+gettingStarted.post('/api/getting-started/first-message/send', firstMessageRole, firstMessagePermission, async (c) => {
+  const scope = await requireGuideScope(c);
+  if ('response' in scope) return scope.response;
+  const data = await sendFirstMessageTest(c.env.DB, scope, { credentialKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY });
+  return c.json({ success: true, data });
 });
 
 export { gettingStarted };

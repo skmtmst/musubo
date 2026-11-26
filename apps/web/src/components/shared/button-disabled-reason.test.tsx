@@ -103,15 +103,15 @@ it('権限不足ではキーやタップの副処理も実行せず、aria-disab
   expect(activate).toHaveBeenCalledOnce()
 })
 
-it('削除の確認は赤い文字だけ、保管や停止の確認は普通の副操作にする', () => {
+it('危険な操作の確認は赤い塗りのボタンにする', () => {
   const confirm = vi.fn()
   const { rerender } = render(<Dialog open tone="destructive" title="削除しますか？" confirmLabel="削除する" confirmIcon={<svg />} onCancel={() => {}} onConfirm={confirm} />)
   const remove = screen.getByRole('button', { name: '削除する' })
-  expect(remove.getAttribute('data-variant')).toBe('text')
-  expect(remove.className).toContain('textDanger')
+  expect(remove.getAttribute('data-variant')).toBe('danger')
+  expect(remove.className).toContain('danger')
   expect(remove.querySelector('svg')).toBeNull()
   fireEvent.click(remove)
   expect(confirm).toHaveBeenCalledOnce()
   rerender(<Dialog open tone="destructive" title="保管しますか？" confirmLabel="保管する" onCancel={() => {}} onConfirm={confirm} />)
-  expect(screen.getByRole('button', { name: '保管する' }).getAttribute('data-variant')).toBe('secondary')
+  expect(screen.getByRole('button', { name: '保管する' }).getAttribute('data-variant')).toBe('danger')
 })

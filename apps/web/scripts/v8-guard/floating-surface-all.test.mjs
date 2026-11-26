@@ -78,7 +78,6 @@ const css = [await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.
 /** 面自身に塗りが無ければ、最初に塗りを持つ子を面と見る（走査と同じ決め方）。 */
 const MEASURE = (sel) => {
   const root = sel === ':tip' ? document.querySelector('[role="tooltip"]')
-    : sel === ':color' ? document.querySelector('[aria-label^="色を選ぶ"]')?.parentElement?.querySelector(':scope > div')
     : document.querySelector(sel)
   if (!root) return null
   const css = (el) => getComputedStyle(el)
@@ -95,7 +94,6 @@ const MEASURE = (sel) => {
 /** MEASURE と同じ面を選ぶ（故障対照の壊し用。測りが透けを見れば選びが合っている証拠になる）。 */
 const PICK = (sel) => {
   const root = sel === ':tip' ? document.querySelector('[role="tooltip"]')
-    : sel === ':color' ? document.querySelector('[aria-label^="色を選ぶ"]')?.parentElement?.querySelector(':scope > div')
     : document.querySelector(sel)
   if (!root) return null
   const css = (el) => getComputedStyle(el)
@@ -118,7 +116,7 @@ test('全部の開く面は不透明な地と影で読み取れる（F2）', asy
         ['複数を開く', '[data-menu-portal]', null],
         ['連想を開く', '[data-menu-portal]', null],
         ['暦を開く', '[data-menu-portal]', '検査日'],
-        ['色を開く', ':color', '色を選ぶ'],
+        ['色を開く', '[data-menu-portal]', '色を選ぶ'],
         ['箱色を開く', '[data-menu-portal]', 'フォルダの色'],
         ['命令を開く', '[role="dialog"]', ':palette'],
         ['絞りを開く', '[data-menu-portal]', null],
@@ -130,7 +128,7 @@ test('全部の開く面は不透明な地と影で読み取れる（F2）', asy
         if (extra === ':palette') await page.keyboard.press('Meta+k')
         else if (extra) await page.getByRole('button', { name: extra }).first().click()
 
-        const surface = page.locator(selector === ':color' ? '[aria-label^="色を選ぶ"]' : selector === ':tip' ? '[role="tooltip"]' : selector)
+        const surface = page.locator(selector === ':tip' ? '[role="tooltip"]' : selector)
         await surface.first().waitFor()
         if (await page.locator('[data-menu-portal]').count()) await page.locator('[data-menu-portal][data-ready="true"]').first().waitFor()
         // 開いた直後の一瞬（子の装着前）を避け、落ち着いた地を測る。透けたままなら落ちる。
@@ -151,7 +149,7 @@ test('全部の開く面は不透明な地と影で読み取れる（F2）', asy
         if (process.env.MUSE_SHOTS) { mkdirSync(process.env.MUSE_SHOTS, { recursive: true }); await page.screenshot({ path: `${process.env.MUSE_SHOTS}/floating-all-${width}-${name}.png` }) }
         // 故障対照：同じ取っ手を壊して戻す（選び直さないので選び違いがない）。
         // 走査の対象面は、走査が赤になることまで見る。
-        const scanned = selector !== '[role="dialog"]' && selector !== ':color'
+        const scanned = selector !== '[role="dialog"]'
         const handle = await page.evaluateHandle(PICK, selector)
         assert.ok(await handle.evaluate((el) => el !== null), `${name}: 故障対照の面が見つかる`)
         const turned = await handle.evaluate((el) => {

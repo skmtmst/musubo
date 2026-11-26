@@ -190,7 +190,7 @@ export async function loadPhotoReviewRecipient(
   input: { photoId: string; lineAccountId: string },
 ): Promise<ReviewPhotoRow | null> {
   return db.prepare(
-    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
+    `SELECT ps.*, s.customer_id, f.line_platform_user_id AS line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted
        FROM nen_photo_submissions ps
        JOIN friends f ON f.id = ps.friend_id

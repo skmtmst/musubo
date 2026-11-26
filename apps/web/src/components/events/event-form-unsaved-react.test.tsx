@@ -133,12 +133,6 @@ function nameInput(): HTMLInputElement {
   return input as HTMLInputElement
 }
 
-function listLink(): HTMLAnchorElement {
-  const link = [...host.querySelectorAll('a')].find((a) => a.textContent === 'イベント一覧')
-  if (!link) throw new Error('list link not found')
-  return link as HTMLAnchorElement
-}
-
 async function click(target: Element) {
   await act(async () => {
     target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
@@ -157,7 +151,12 @@ describe('イベント編集の書きかけがある間の離脱確認', () => {
       fireEvent.change(nameInput(), { target: { value: '体験レッスン改' } })
     })
 
-    await click(listLink())
+    const breadcrumb = document.createElement('a')
+    breadcrumb.href = '/events'
+    breadcrumb.textContent = 'イベント予約'
+    document.body.appendChild(breadcrumb)
+    await click(breadcrumb)
+    breadcrumb.remove()
     // 確認の窓は document.body 直下のポータルに出る。
     expect(document.body.textContent).toContain('保存していない変更があります')
     expect(routerPush).not.toHaveBeenCalled()

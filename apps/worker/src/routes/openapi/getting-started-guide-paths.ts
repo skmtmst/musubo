@@ -38,7 +38,56 @@ const guideProgressResponse = {
   },
 };
 
+const firstMessageState = {
+  type: 'object',
+  required: ['status', 'accountName', 'friendUrl', 'retryAt', 'verificationPending'],
+  properties: {
+    status: { type: 'string', enum: [
+      'ready', 'identity_required', 'friend_required', 'sending_stopped',
+      'sending', 'sent', 'received', 'busy', 'connection', 'unknown', 'failed',
+    ] },
+    accountName: { type: 'string', nullable: true },
+    friendUrl: { type: 'string', nullable: true },
+    retryAt: { type: 'integer', nullable: true, description: '再試行可能になる時刻（Unix epoch ミリ秒）' },
+    verificationPending: { type: 'boolean' },
+  },
+};
+
+function firstMessageTransition(summary: string, description: string, data: object) {
+  return {
+    tags: ['Getting started'],
+    summary,
+    description,
+    parameters: [accountId],
+    responses: {
+      '200': {
+        description: '最初のテスト送信の状態',
+        content: { 'application/json': { schema: {
+          type: 'object', required: ['success', 'data'],
+          properties: { success: { type: 'boolean', enum: [true] }, data },
+        } } },
+      },
+      '400': { description: 'account_id がない' },
+      '401': { description: '未認証' },
+      '403': { description: '権限なし' },
+      '404': { description: '見える範囲にないアカウント' },
+    },
+  };
+}
+
 export const gettingStartedGuidePaths = {
+  '/api/getting-started/first-message': {
+    get: firstMessageTransition('最初のテスト送信の状態を取得', '利用者自身と対象のLINEアカウントに対応する状態を返す。', firstMessageState),
+  },
+  '/api/getting-started/first-message/identity': {
+    post: firstMessageTransition('本人確認リンクを発行', '対象のお店のLINEトークで本人を確認するための一時リンクを返す。', {
+      type: 'object', required: ['verificationUrl'],
+      properties: { verificationUrl: { type: 'string', nullable: true } },
+    }),
+  },
+  '/api/getting-started/first-message/send': {
+    post: firstMessageTransition('最初のテストメッセージを送信', '対象のお店のLINEから本人確認済みの宛先に送信する。受領済み・送信済み・確認中のメッセージは再送しない。', firstMessageState),
+  },
   '/api/getting-started/guide': {
     get: {
       tags: ['Getting started'],

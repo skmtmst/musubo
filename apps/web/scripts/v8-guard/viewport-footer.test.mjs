@@ -18,6 +18,8 @@ test('保存帯付きの在庫は本文だけが送り、旧高さの故障を�
         })
         const response = await page.goto(new URL('/restaurant-test/inventory', baseUrl).href)
         assert.ok(response?.ok(), 'built inventory must exist')
+        await page.getByRole('switch', { name: '月曜日に予約を受ける', exact: true }).click()
+        await page.getByRole('button', { name: '開ける時間を保存', exact: true }).waitFor()
         const frame = page.locator('main#main-content > [data-design-shell] > [data-page-template="restaurant"][data-standalone][data-has-footer][data-frame-height="viewport"]')
         await frame.locator('button[data-part="row-name"]').first().waitFor()
         await page.evaluate(() => document.fonts.ready)

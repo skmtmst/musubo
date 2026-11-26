@@ -68,7 +68,7 @@ export async function getConversionPointForIngest(
   db: D1Database,
   id: string,
 ): Promise<IngestPointRow | null> {
-  return db.prepare(`SELECT id, status, ingest_secret_encrypted, ingest_disabled_at
+  return db.prepare(`SELECT id, status, line_account_id, tenant_id, ingest_secret_encrypted, ingest_disabled_at
     FROM conversion_points WHERE id = ?`).bind(id).first<IngestPointRow>();
 }
 

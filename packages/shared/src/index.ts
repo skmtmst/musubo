@@ -4,6 +4,7 @@ export * from './api-errors.js';
 export * from './client-logger.js';
 export * from "./sticker";
 export * from "./interpolation";
+export * from "./template-sample-variable-labels";
 export * from "./japanese-holidays";
 export * from "./response-window";
 export * from "./reminder-timing";
@@ -103,6 +104,7 @@ export * from './musubo-condition.js';
 export * from './musubo-individual-quote.js';
 export * from './musubo-linked-addition.js';
 export * from './musubo-linked-removal.js';
+export * from './sns-connection-ports.js';
 export type { BookingAssignmentMethod, BookingAssignmentPeriod, BookingAssignmentPriority, BookingAssignmentResource, BookingAssignmentWrite, BookingAssignmentSettings, RestaurantTableAssignmentSettings, RestaurantTableAssignmentWrite } from './booking-assignment.js';
 
 export * from './booking-entitlements.js';
@@ -137,7 +139,7 @@ export { zonedWallTime } from './zoned-time.js';
 export { parseAutomationWait, nextDayWaitAt, automationWaitLabel } from './automation-wait.js';
 export type { AutomationWait } from './automation-wait.js';
 
-export type { RestaurantSetupProgress } from './restaurant-setup-progress.js';
+export type { RestaurantBookingExposure, RestaurantSetupProgress } from './restaurant-setup-progress.js';
 export * from './initial-rich-menu.js';
 export { initialMenuImageDataUri, initialMenuPng } from './initial-rich-menu-images.js';
 export { RESTAURANT_GUIDE_MENUS, RESTAURANT_GUIDE_MENU_IDS, restaurantGuideMenu, type RestaurantGuideMenu } from './restaurant-guide-menu.js';

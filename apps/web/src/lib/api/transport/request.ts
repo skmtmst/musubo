@@ -1,9 +1,10 @@
 import { responseApiError } from './errors'
+import { announceApiMutation } from './mutation-events'
 import type { FeatureDisabledEventDetail, FetchApiOptions, ApiAccountEventDetail } from '../types/transport'
 import { getFeatureDisabledContext } from '../../feature-disabled-context'
 import { FEATURE_DISABLED_EVENT, getCsrfToken, API_URL, MUTATING_METHODS, apiReadScope } from './session'
 import { adminSessionHeaders } from '../../admin-session'
-import { fetchWithNetworkMessage, extractApiErrorCode, extractApiErrorData } from './errors'
+import { fetchWithNetworkMessage, extractApiErrorCode, extractApiErrorData, extractUnresolvedVariableData } from './errors'
 import { SESSION_LOST_EVENT } from '../../session-events'
 import { canonicalApiPath, clearApiReadCache, shareApiRead, synchronizeApiReadScope } from './read-cache'
 
@@ -194,20 +195,28 @@ async function requestApi<T>(path: string, options: FetchApiOptions | undefined,
     if (res.status === 401 && typeof window !== 'undefined' && !isSessionLostExempt(code)) {
       clearApiReadCache()
     }
-    const error = responseApiError(res, raw, code, res.status === 409 || res.status === 429 || res.status === 502 || res.status === 503 && code === 'invalid_saved_form'
-        ? extractApiErrorData(raw)
-        : undefined)
+    const data = res.status === 400 && code === 'UNRESOLVED_TEMPLATE_VARIABLES'
+      ? extractUnresolvedVariableData(raw)
+      : res.status === 409 || res.status === 429 || res.status === 502 || res.status === 503 && code === 'invalid_saved_form'
+        ? extractApiErrorData(raw) : undefined
+    const error = responseApiError(res, raw, code, data)
     const detail = { status: res.status, code, feature: extractFeatureDisabledDetail(raw) }
     responseEvents.set(error, detail)
     if (context) announceRequestFailure(detail, context, options)
     throw error
   }
   if (res.status === 204) {
-    if (MUTATING_METHODS.has(method)) clearApiReadCache()
+    if (MUTATING_METHODS.has(method)) {
+      clearApiReadCache()
+      announceApiMutation(path, context?.accountId ?? null, context?.accountIds)
+    }
     return undefined as T
   }
   const body = await res.json() as T
   // 更新の影響は別資源の表示にも及ぶため、成功後は保守的に全読取を失効させる。
-  if (MUTATING_METHODS.has(method) && !(body && typeof body === 'object' && 'success' in body && body.success === false)) clearApiReadCache()
+  if (MUTATING_METHODS.has(method) && !(body && typeof body === 'object' && 'success' in body && body.success === false)) {
+    clearApiReadCache()
+    announceApiMutation(path, context?.accountId ?? null, context?.accountIds)
+  }
   return body
 }

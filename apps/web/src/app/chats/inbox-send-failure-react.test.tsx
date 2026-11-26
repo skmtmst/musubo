@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import ChatsPage from './page'
+import { setTextControlValue } from '@/test-utils/text-control'
 
 const fixture = vi.hoisted(() => ({
   params: new URLSearchParams('friend=friend-a'),
@@ -131,13 +132,10 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
   })
 
   async function typeAndSend(text: string) {
-    const textarea = host.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    // 返信欄は差し込みを札で見せる欄。textarea と同じく value と input で書ける。
+    const textarea = host.querySelector<HTMLElement>('[aria-label="メッセージを入力"]')!
     expect(textarea).not.toBeNull()
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
-      setter.call(textarea, text)
-      textarea.dispatchEvent(new Event('input', { bubbles: true }))
-    })
+    await act(async () => { setTextControlValue(textarea, text) })
     const button = Array.from(host.querySelectorAll('button'))
       .find((b) => b.textContent?.trim() === '送信する')!
     await act(async () => { button.click() })
@@ -145,7 +143,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
 
   it('画面の手動返信は受信箱の口へ1回送り、Proxyへ送らない', async () => {
     await act(async () => root.render(<ChatsPage />))
-    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    await eventually(() => expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
     requests = []
     await typeAndSend('こんにちは')
     expect(requests.filter(request => request.method === 'POST' && request.path.includes('/send')).map(request => request.path)).toEqual(['/api/chats/friend-a/send'])
@@ -160,7 +158,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
     }, 429)
     await act(async () => root.render(<ChatsPage />))
     await eventually(() =>
-      expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+      expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
 
     await typeAndSend('制限に当たる文')
 
@@ -168,7 +166,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
       expect(host.textContent).toContain('送信制限')
       expect(host.textContent).toContain('分後')
     })
-    const textarea = host.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    const textarea = host.querySelector('[aria-label="メッセージを入力"]') as HTMLElement & { value: string }
     expect(textarea.value).toBe('制限に当たる文')
     expect(textarea.closest('[data-inbox-v4="composer"]')?.textContent).toContain('送信制限')
   })
@@ -176,7 +174,7 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
   it('失敗した同じ本文の再送には同じ鍵を使い、成功した後の送信は新しい鍵にする', async () => {
     sendResponse = () => json({ success: false, code: 'LINE_RATE_LIMITED' }, 429)
     await act(async () => root.render(<ChatsPage />))
-    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    await eventually(() => expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
     await typeAndSend('再送する文')
     expect(sendKeys).toHaveLength(1)
     expect(sendKeys[0]).toBeTruthy()
@@ -197,18 +195,39 @@ describe('N-028/N-029 受信箱送信の失敗理由', () => {
     }, 503)
     await act(async () => root.render(<ChatsPage />))
     await eventually(() =>
-      expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+      expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
 
     await typeAndSend('届いたか不明な文')
 
     await eventually(() => expect(host.textContent).toContain('自動再送'))
   })
 
+  it('差し込みが入らず送信口が止めたときは送らず、記号を出さずに直し方を出し、入力を残す', async () => {
+    sendResponse = () => json({
+      success: false,
+      error: '差し込みを解決できません: {{var.guest_count}}',
+      code: 'UNRESOLVED_TEMPLATE_VARIABLES',
+      data: { variables: ['var.guest_count'] },
+    }, 400)
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
+    await typeAndSend('{{var.guest_count}}名でお待ちしています')
+    await eventually(() => expect(host.textContent).toContain('入らないため、送りませんでした'))
+    const composer = host.querySelector('[data-inbox-v4="composer"]')!
+    // 口が返した差し込みの名前を、返信欄と同じ札の名前（人数）で言う。名前の無い一般の文にしない。
+    const failure = composer.querySelector('[role="alert"]')!
+    expect(failure.textContent).toContain('「人数」が入らないため、送りませんでした。その部分を書き換えるか消してから、送り直してください。')
+    expect(failure.textContent).not.toContain('差し込みの値が入らないため')
+    expect(composer.textContent).not.toContain('{{')
+    expect(composer.querySelector('[data-token="{{var.guest_count}}"]')?.textContent).toBe('人数')
+    expect((host.querySelector('[aria-label="メッセージを入力"]') as HTMLElement & { value: string }).value).toBe('{{var.guest_count}}名でお待ちしています')
+  })
+
   it('リビジョン競合の409は従来どおり読み直しを促す', async () => {
     sendResponse = () => json({ success: false, error: 'revision conflict' }, 409)
     await act(async () => root.render(<ChatsPage />))
     await eventually(() =>
-      expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+      expect(host.querySelector('[aria-label="メッセージを入力"]')).not.toBeNull())
 
     await typeAndSend('競合する文')
 

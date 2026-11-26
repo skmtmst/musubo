@@ -20,6 +20,7 @@ const fixture = vi.hoisted(() => ({
   onboarding: false,
   theme: 'v8' as 'v8' | 'v7',
   push: vi.fn(),
+  replace: vi.fn(),
   setSelectedAccountId: vi.fn(),
   tenantsMe: vi.fn(),
   selectedAccountId: null as string | null,
@@ -29,7 +30,7 @@ const fixture = vi.hoisted(() => ({
   refreshAccounts: vi.fn(),
   accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
   notificationList: vi.fn(),
-  followerImportState: vi.fn(),
+  accountEntry: vi.fn(),
   restoreApi: undefined as (() => void) | undefined,
 }))
 
@@ -44,7 +45,7 @@ Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: t
 Object.defineProperty(window, 'localStorage', { configurable: true, value: testLocalStorage })
 
 vi.mock('next/navigation', () => {
-  const router = { push: fixture.push, replace: vi.fn() }
+  const router = { push: fixture.push, replace: fixture.replace }
   return { usePathname: () => fixture.pathname, useRouter: () => router }
 })
 vi.mock('@/components/auth-guard', () => ({ useOnboardingAccess: () => fixture.onboarding }))
@@ -79,13 +80,15 @@ describe('★V8 統括の上の帯', () => {
   beforeEach(() => {
     const list = vi.spyOn(api.notifications.center, 'list').mockImplementation(fixture.notificationList)
     const tenants = vi.spyOn(api.tenants, 'me').mockImplementation(fixture.tenantsMe)
-    const importState = vi.spyOn(api.lineAccounts, 'followerImportState').mockImplementation(fixture.followerImportState)
+    const importState = vi.spyOn(api.lineAccounts, 'accountEntry').mockImplementation(fixture.accountEntry)
     fixture.restoreApi = () => { list.mockRestore(); tenants.mockRestore(); importState.mockRestore() }
     forgetStaffIdentity()
     fixture.pathname = '/hq'
     fixture.onboarding = false
     fixture.theme = 'v8'
     fixture.push.mockReset()
+    fixture.replace.mockReset()
+    window.history.replaceState(null, '', '/')
     fixture.setSelectedAccountId.mockReset()
     fixture.tenantsMe.mockReset()
     fixture.tenantsMe.mockResolvedValue({ success: true, data: { name: '然 -NEN- 本部' } })
@@ -97,8 +100,8 @@ describe('★V8 統括の上の帯', () => {
     fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
     fixture.notificationList.mockReset()
     fixture.notificationList.mockResolvedValue({ success: true, data: { items: [], counts: { all: 0, error: 0, update: 0, unread: 0 }, unreadCount: 0 } })
-    fixture.followerImportState.mockReset()
-    fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
+    fixture.accountEntry.mockReset()
+    fixture.accountEntry.mockResolvedValue({ success: true, data: { destination: 'dashboard', canResume: false } })
     document.documentElement.dataset.theme = fixture.theme
     window.localStorage.setItem('lh_staff_name', 'Demo Person')
     window.localStorage.setItem('lh_staff_role', 'owner')
@@ -307,13 +310,33 @@ describe('★V8 統括の上の帯', () => {
   })
 
   it('札から引き継ぎ中の店を選んでも店舗へ入れない', async () => {
-    fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'hydrating_profiles' } })
+    fixture.accountEntry.mockResolvedValue({ success: true, data: { destination: 'handover', canResume: false } })
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
     fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
     fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
     await waitFor(() => expect(fixture.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=account-1'))
     expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()
+  })
+
+  it('統括の札からも本人の同じ登録へ戻る', async () => {
+    fixture.accountEntry.mockResolvedValue({ success: true, data: { destination: 'registration', canResume: true } })
+    const view = render(<AppTopBar />)
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
+    await waitFor(() => expect(fixture.push).toHaveBeenCalledWith('/accounts/new?resume=account-1'))
+    expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()
+  })
+
+  it('ホームでアカウントを変えたら前のアカウントの設定指定だけを外す', async () => {
+    fixture.pathname = '/'
+    fixture.selectedAccountId = 'previous-account'
+    window.history.replaceState(null, '', '/?setup=0&setupReturn=accounts&qr=base&range=week')
+    const view = render(<AppTopBar />)
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
+    expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1')
+    expect(fixture.replace).toHaveBeenCalledExactlyOnceWith('/?range=week')
   })
 
   it('店の画面は今までどおり（「LINEアカウント」・役割はオーナー・ホームは /・選んでも移らない）', async () => {
@@ -397,9 +420,18 @@ describe('アカウント未選択の共通の呼び名', () => {
     const view = render(<TopBar title="友だち" accounts={[]} selectedAccountId="" onAccountChange={vi.fn()} roleLabel={roleLabel} userName="確認担当" onLogout={vi.fn()} v8Chrome showIdentity={false} />)
     const label = view.container.querySelector('[data-part="account-name"]')!
     expect(label.textContent).toBe('未選択')
-    expect(label.getAttribute('title')).toBe('LINE公式アカウントを選んでください')
+    expect(label.closest('[data-unselected]')).toBeTruthy()
+    expect(label.getAttribute('title')).toBe('LINE公式アカウントを選ぶと、ほかの機能が出ます')
     expect(view.container.textContent).not.toContain('店舗を選択')
     expect(view.getByRole('button', { name: 'アカウントを切り替える' })).toBeTruthy()
+  })
+
+  it('選択済みと統括では未選択の印を出さない', () => {
+    const props = { title: '友だち', accounts: [{ id: 'one', label: '店' }], onAccountChange: vi.fn(), roleLabel: 'オーナー', userName: '担当', onLogout: vi.fn(), v8Chrome: true }
+    const view = render(<TopBar {...props} selectedAccountId="one" />)
+    expect(view.container.querySelector('[data-unselected]')).toBeNull()
+    view.rerender(<TopBar {...props} selectedAccountId="" hq={{ name: '統括' }} />)
+    expect(view.container.querySelector('[data-unselected]')).toBeNull()
   })
 
   it('利用開始中はホームとサイドバー切替を表示せず、現在地だけを残す', () => {

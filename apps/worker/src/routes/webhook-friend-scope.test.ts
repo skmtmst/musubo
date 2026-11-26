@@ -185,6 +185,27 @@ describe('POST /webhook — Issue #961 別アカウント所有の friend 行へ
     expect(markLineWebhookEventSucceeded).toHaveBeenCalled();
   });
 
+  test('テキスト受信: 未割当を別アカウントが先に引き当て、旧制約で新規登録できないときは他店に履歴を作らない', async () => {
+    vi.mocked(getFriendByLineUserIdForAccount)
+      .mockResolvedValueOnce({ id: 'friend-unassigned', line_account_id: null } as never)
+      .mockResolvedValueOnce(null);
+    vi.mocked(upsertFriend).mockRejectedValue(SCOPE_CONFLICT);
+
+    const response = await postWebhook([{
+      type: 'message',
+      webhookEventId: 'webhook-scope-adoption-race',
+      timestamp: 1787530800000,
+      source: { type: 'user', userId: 'U-shared' },
+      message: { id: 'msg-race', type: 'text', text: '接続テスト' },
+    }]);
+
+    expect(response.status).toBe(200);
+    expect(stubDb.prepare).toHaveBeenCalledWith(expect.stringContaining('WHERE id = ? AND line_account_id IS NULL'));
+    expect(getFriendByLineUserIdForAccount).toHaveBeenCalledTimes(2);
+    expect(upsertFriend).toHaveBeenCalledExactlyOnceWith(stubDb, expect.objectContaining({ lineUserId: 'U-shared', lineAccountId: 'account-a' }));
+    expect(recordIncomingLineMessage).not.toHaveBeenCalled();
+  });
+
   test('フォロー受信: 別アカウント所有の行しか無い場合、friend_add 台帳・通知を作らない', async () => {
     lineClientMocks.getProfile.mockResolvedValue({ displayName: '別アカの人' });
     vi.mocked(upsertFriend).mockRejectedValue(SCOPE_CONFLICT);

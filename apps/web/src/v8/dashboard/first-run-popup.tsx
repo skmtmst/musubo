@@ -5,7 +5,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type TouchEve
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import SheetDialog from '@/components/shared/sheet-dialog'
-import { publishSetupChip, useSetupChipReopen } from '@/v8/onboarding/public/setup-chip/index'
 import { nextFirstStepKey, type FirstStepsSummary } from './first-steps'
 import styles from './first-run-popup.module.css'
 
@@ -15,7 +14,7 @@ import styles from './first-run-popup.module.css'
   枠 02 (C5i3rw) ＝ PC、枠 02b (nt3Po) ＝ スマホ（画面下部固定のボトムシート）。
 
   9項目の済み／未済は実データ計測の summary をそのまま出す。ここで済みにしない。
-  閉じたあとは上の帯の「開店準備 N/9」から開き直す（枠 02 の足の注記どおり）。
+  閉じたあとは、上の帯の札からはじめの設定へ移る。
 */
 
 export function firstRunPopupDismissedKey(accountId: string): string {
@@ -35,7 +34,7 @@ function writeDismissed(accountId: string): void {
   try {
     window.localStorage.setItem(firstRunPopupDismissedKey(accountId), '1')
   } catch {
-    /* 保存できない端末でも画面は使える。開き直しは帯の札から。 */
+    /* 保存できない端末でも画面は使える。 */
   }
 }
 
@@ -46,7 +45,7 @@ export type FirstRunPopupControl = {
 
 /**
  * 出すかどうかの判断と、帯の札への値出し。
- * 初回だけ自動で開き、閉じたあとは札から開き直す。
+ * 初回だけ自動で開く。
  */
 export function useFirstRunPopup(options: {
   accountId: string | null
@@ -62,23 +61,9 @@ export function useFirstRunPopup(options: {
   const [dismissed, setDismissed] = useState(true)
   useEffect(() => { setDismissed(readDismissed(accountId)) }, [accountId])
 
-  const [reopened, setReopened] = useState(false)
-  useEffect(() => { setReopened(false) }, [accountId])
-
-  /* 帯の札は、出す値がある間だけ置く。 */
-  useEffect(() => {
-    if (!eligible || !accountId || !summary) { publishSetupChip(null); return }
-    publishSetupChip({ accountId, done: summary.done, total: summary.total })
-  }, [eligible, accountId, summary])
-  useEffect(() => () => { publishSetupChip(null) }, [])
-
-  const reopen = useCallback(() => { setReopened(true) }, [])
-  useSetupChipReopen(reopen)
-
-  const open = eligible && guidePhase !== 'active' && guidePhase !== 'paused' && (reopened || !dismissed)
+  const open = eligible && guidePhase !== 'active' && guidePhase !== 'paused' && !dismissed
 
   const close = useCallback(() => {
-    setReopened(false)
     setDismissed(true)
     if (accountId) writeDismissed(accountId)
   }, [accountId])

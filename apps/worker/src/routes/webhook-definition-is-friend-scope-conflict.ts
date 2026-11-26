@@ -7,6 +7,7 @@ import { createStickerMessageContent } from '@line-crm/shared';
 import { upsertFriend, updateFriendFollowStatus, getFriendByLineUserIdForAccount, upsertChatOnMessage, jstNow, toJstString, recordIncomingLineMessage, recordLineMessageUnsend } from '@line-crm/db';
 import type { Friend } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
+import { isFirstMessageTestEvent } from '../services/getting-started-first-message.js';
 
 export // 署名確認前の巨大本文による負荷を防ぐため、1MiBに制限する。大量イベントをまとめても余裕を保ち、Worker の128MBメモリを圧迫しない。
 const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024;
@@ -29,49 +30,47 @@ export async function ensureFriendFromWebhookUser(
   lineAccountId: string | null,
   followOccurredAt?:string,
 ): Promise<Friend | null> {
-  let friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
+  const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
+  if (friend?.line_account_id === lineAccountId) return friend;
 
-  if (!friend) {
-    let profile: Awaited<ReturnType<LineClient['getProfile']>> | null = null;
-    try {
-      profile = await lineClient.getProfile(userId);
-    } catch (err) {
-      // 署名済み受信は利用者の接触を証明するため、プロフィール取得が一時的に失敗しても LINE userId で友だちを作り、後から情報を補う。
-      logWebhookStepFailure('unknown_user_profile', err, lineAccountId);
-    }
-
-    try {
-      friend = await upsertFriend(db, {
-        lineUserId: userId,
-        lineAccountId,
-        displayName: profile?.displayName ?? null,
-        pictureUrl: profile?.pictureUrl ?? null,
-        statusMessage: profile?.statusMessage ?? null,
-        followOccurredAt,
-      });
-    } catch (err) {
-      if (!isFriendScopeConflict(err)) throw err;
-      // 同一 line_user_id が別アカウント所有。C-2b まではこのアカウント用の
-      // friend 行を作れないので、相手の行に触れずイベントを諦める。
-      logger.warn("line_webhook_friend_scope_conflict");
-      return null;
-    }
-    logger.log("line_webhook_friend_registered");
-  }
-
-  if (lineAccountId && friend.line_account_id !== lineAccountId) {
-    // lookup は同一アカウントか未割当 (NULL) の行しか返さないので、ここで
-    // line_account_id が違うのは未割当行だけ。それを受信アカウントへ引き当てる。
-    // 別アカウントの行を「移動」する経路は Issue  で廃止した。
-    const now = jstNow();
-    await db
-      .prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
-      .bind(lineAccountId, now, friend.id)
+  if (friend) {
+    // 読み取った未割当行がまだ未割当で、対象アカウントに行がないときだけ引き当てる。
+    if (!lineAccountId || friend.line_account_id !== null) return null;
+    await db.prepare(`UPDATE friends SET line_account_id = ?, updated_at = ?
+      WHERE id = ? AND line_account_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM friends WHERE line_account_id = ? AND line_platform_user_id = ?)`)
+      .bind(lineAccountId, jstNow(), friend.id, lineAccountId, userId)
       .run();
-    friend = { ...friend, line_account_id: lineAccountId, updated_at: now };
+    const scopedFriend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
+    if (scopedFriend?.line_account_id === lineAccountId) return scopedFriend;
+    // 別アカウントが先に引き当てた場合は、受信アカウント用の行を作る。
   }
 
-  return friend;
+  let profile: Awaited<ReturnType<LineClient['getProfile']>> | null = null;
+  try {
+    profile = await lineClient.getProfile(userId);
+  } catch (err) {
+    // 署名済み受信は利用者の接触を証明するため、プロフィール取得に失敗してもLINE userIdで友だちを作る。
+    logWebhookStepFailure('unknown_user_profile', err, lineAccountId);
+  }
+
+  try {
+    const registered = await upsertFriend(db, {
+      lineUserId: userId,
+      lineAccountId,
+      displayName: profile?.displayName ?? null,
+      pictureUrl: profile?.pictureUrl ?? null,
+      statusMessage: profile?.statusMessage ?? null,
+      followOccurredAt,
+    });
+    if (registered.line_account_id !== lineAccountId) return null;
+    logger.log("line_webhook_friend_registered");
+    return registered;
+  } catch (err) {
+    if (!isFriendScopeConflict(err)) throw err;
+    logger.warn("line_webhook_friend_scope_conflict");
+    return null;
+  }
 }
 
 export /** 停止中の統括も受信データは保持するが、外部の副作用は起こさない。新しい返信経路で送信が復活しないよう、handleEvent と分離して守る。 */
@@ -83,6 +82,7 @@ async function handleStoppedTenantEvent(
   lineMessageAccountKey: string,
   legacyLineMessageAccountKey?: string,
 ): Promise<void> {
+  if (isFirstMessageTestEvent(event)) return;
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,

@@ -39,7 +39,7 @@ export default function AuthCard({
   variant?: 'totp'
   titleId?: string
   authLayout?: 'admin' | 'ops'
-  /** ログインの何段目か（「2 / 2」）。カードの頭の右に出す。 */
+  /** ログイン用のカード配置を選ぶ。 */
   step?: { current: number; total: number }
   /** 中身が広いカード（二段階認証の設定）。 */
   wide?: boolean
@@ -51,7 +51,7 @@ export default function AuthCard({
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
     <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-auth-width={wide ? 'wide' : undefined} data-design-node={cardNode}>
-    <AuthCardHead step={step} />
+    <AuthCardHead />
     {/* 題 20/600 と説明 1 行を 1 組の見出しとして渡す。 */}
     <PageHeading
       title={title}
@@ -95,7 +95,7 @@ export default function AuthCard({
   if (step) return (
     <main data-design-node={node} className={authStyles.page} data-auth-layout="admin" data-auth-foot="">
       <section data-design-node={cardNode} className={authStyles.card} aria-label={title} data-auth-layout="admin">
-        <AuthCardHead step={step} />
+        <AuthCardHead />
         <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" subtitle={description} subtitleSize="body" />
         {children}
       </section>
@@ -121,11 +121,10 @@ export default function AuthCard({
   )
 }
 
-/** 認証のカードでは店舗名を出さず、公式ロゴと手順だけを表示する。 */
-function AuthCardHead({ step }: { step?: { current: number; total: number } }) {
+/** 認証のカードには公式ロゴを表示する。 */
+function AuthCardHead() {
   return <div className={authStyles.head} data-auth-head="">
     <MusuboLogo />
-    {step ? <span className={authStyles.headStep}><span className="sr-only">ログインの手順 </span>{step.current} / {step.total}</span> : null}
   </div>
 }
 

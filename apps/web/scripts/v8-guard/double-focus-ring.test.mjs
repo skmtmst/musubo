@@ -18,6 +18,8 @@ import Combobox from './src/components/shared/combobox';
 import SearchField from './src/components/shared/search-field';
 import CheckCard from './src/components/shared/check-card';
 import RadioCard from './src/components/shared/radio-card';
+import staffHeading from './src/v8/booking-staff/layout.module.css';
+import salesHeading from './src/app/booking/sales/sales-v8.module.css';
 import Checkbox from './src/components/shared/checkbox';
 import Button from './src/components/shared/button';
 import Select from './src/components/shared/select';
@@ -54,6 +56,10 @@ function Fixture(){return <main>
 <Case id="pill-ok" color="blue"><Select aria-label="対応状況" treatment="pill" value="a" options={[{value:"a",label:"対応中",tone:"neutral"}]} onChange={()=>{}} /></Case>
 <Case id="radio-card-ok" color="blue"><RadioCard name="radio-ok" value="x" checked={false} title="前日" onChange={()=>{}} /></Case>
 <Case id="radio-card-bad" color="red"><RadioCard name="radio-bad" value="x" checked={false} title="当日" onChange={()=>{}} invalid /></Case>
+<div data-measure="short"><RadioCard name="measure-short" value="x" checked={false} title="短い" height="short" onChange={()=>{}} /></div>
+<div data-measure="icon"><RadioCard name="measure-icon" value="x" checked={false} title="印あり" icon={<span>印</span>} onChange={()=>{}} /></div>
+<div data-measure="plain"><RadioCard name="measure-plain" value="x" checked={false} title="印なし" onChange={()=>{}} /></div>
+<h1 data-heading="staff" className={staffHeading.title}>予約スタッフ</h1><h1 data-heading="sales" className={salesHeading.title}>予約からの売上</h1>
 </main>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`},
  bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',tsconfig: webRoot+'/tsconfig.json',define:{'process.env.NODE_ENV':'"production"'},banner:{js:'var process=typeof process!=="undefined"?process:{env:{NODE_ENV:"production",NEXT_PUBLIC_API_URL:"http://127.0.0.1:8788"}};'},
@@ -161,5 +167,36 @@ for (const width of [1152, 1440]) test(`箱で囲んだ入力は焦点の輪1本
       assert.equal(r.activeWidth, '2px', `${r.id}: ボタン自身の輪は共通の太さ`)
     }
     assert.equal(bad.length, 0, `二重輪あり:\n${bad.join('\n')}`)
+  } finally { await browser.close() }
+})
+
+for (const width of [1152, 1440]) test(`選ぶカードと予約の題の表示を保つ ${width}`, async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width, height: 900 } })
+    await page.setContent(`<html><style>${css}</style><div id="root"></div></html>`)
+    await page.addScriptTag({ content: compiled.outputFiles[0].text })
+    await page.locator('[data-measure="short"] label').waitFor()
+    const observed = await page.evaluate(() => {
+      const style = selector => getComputedStyle(document.querySelector(selector))
+      const short = style('[data-measure="short"] label')
+      const icon = style('[data-measure="icon"] label')
+      const plain = style('[data-measure="plain"] label')
+      const staff = document.querySelector('[data-heading="staff"]')
+      const sales = document.querySelector('[data-heading="sales"]')
+      const before = [getComputedStyle(staff).fontSize, getComputedStyle(sales).fontSize]
+      document.documentElement.style.setProperty('--tpl-title-size', '41px')
+      const shared = [getComputedStyle(staff).fontSize, getComputedStyle(sales).fontSize]
+      document.documentElement.style.setProperty('--tpl-bks-sales-title-size', '37px')
+      return { short: short.minHeight, padding: short.paddingBottom, icon: icon.minHeight, plain: plain.minHeight, before, shared, after: [getComputedStyle(staff).fontSize, getComputedStyle(sales).fontSize] }
+    })
+    assert.equal(observed.short, '90px')
+    assert.equal(observed.padding, '6px')
+    assert.equal(observed.icon, '98px')
+    assert.equal(observed.plain, '0px')
+    assert.equal(observed.before[0], observed.before[1])
+    assert.deepEqual(observed.shared, ['41px', '41px'])
+    assert.equal(observed.after[0], '41px')
+    assert.equal(observed.after[1], '37px')
   } finally { await browser.close() }
 })

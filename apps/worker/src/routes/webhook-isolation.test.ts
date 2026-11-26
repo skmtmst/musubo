@@ -2,6 +2,9 @@ import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { recordIncomingLineMessage, recordLineMessageUnsend, listLineAccountsWithTenantStatus } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import type { LineClient } from '@line-crm/line-sdk';
+import { ensureFriendFromWebhookUser } from './webhook-definition-is-friend-scope-conflict.js';
 import { webhook } from './webhook.js';
 import { isPublicApiBoundary } from '../middleware/public-api-boundary.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -105,6 +108,31 @@ describe('real signatures + real database: customer isolation', () => {
     expect(item.raw.prepare("SELECT line_account_id,is_following FROM friends WHERE id='friend-a'").get())
       .toEqual({ line_account_id: 'a', is_following: 1 });
   });
+  test('a racing account creates its own friend when the legacy row was claimed first', async () => {
+    item.raw.prepare("UPDATE line_accounts SET tenant_id = ? WHERE id IN ('a','b')").run(DEFAULT_TENANT_ID);
+    insertFriend(item.raw, 'legacy-friend', { line_account_id: null, line_user_id: 'U-shared', display_name: 'Legacy profile' });
+    const prepare = item.db.prepare.bind(item.db);
+    const race = vi.spyOn(item.db, 'prepare').mockImplementation(sql => {
+      if (sql.startsWith('UPDATE friends SET line_account_id = ?')) {
+        item.raw.prepare("UPDATE friends SET line_account_id = 'a' WHERE id = 'legacy-friend' AND line_account_id IS NULL").run();
+      }
+      return prepare(sql);
+    });
+    const getProfile = vi.fn().mockResolvedValue({ displayName: 'Profile from account B' });
+    const friend = await ensureFriendFromWebhookUser(item.db, { getProfile } as unknown as LineClient, 'U-shared', 'b')
+      .finally(() => race.mockRestore());
+
+    expect(getProfile).toHaveBeenCalledExactlyOnceWith('U-shared');
+    expect(friend).toMatchObject({ line_account_id: 'b', line_user_id: 'U-shared', display_name: 'Profile from account B' });
+    expect(friend?.id).not.toBe('legacy-friend');
+    expect(item.raw.prepare(
+      'SELECT id, line_account_id, display_name FROM friends WHERE line_platform_user_id = ? ORDER BY line_account_id',
+    ).all('U-shared')).toEqual([
+      { id: 'legacy-friend', line_account_id: 'a', display_name: 'Legacy profile' },
+      { id: friend?.id, line_account_id: 'b', display_name: 'Profile from account B' },
+    ]);
+  });
+
   test('scoped lookup reads only the specified channel and preserves tenant suspension', async () => {
     const rows = await listLineAccountsWithTenantStatus(item.db, undefined, '1002');
     expect(rows).toHaveLength(1); expect(rows[0]).toMatchObject({ id: 'b', tenant_status: 'suspended' });

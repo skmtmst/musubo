@@ -179,13 +179,13 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
     Math.min(Date.now() + result.holdMinutes * 60000, Date.parse(startsAt)),
   ).toISOString();
   if(old){
-    const [,refreshed]=await capacity.commit([db.prepare(`UPDATE rt_reservations SET confirmation_revision=confirmation_revision+1, starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`).bind(startsAt,slot.endsAt,tableId,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null,assignedTable.id,store.id)]);
+    const [,,refreshed]=await capacity.commit([result.allocationGuard,db.prepare(`UPDATE rt_reservations SET confirmation_revision=confirmation_revision+1, starts_at=?,ends_at=?,table_id=?,hold_expires_at=?,customer_version=customer_version+1,updated_at=datetime('now') WHERE id=? AND customer_version=? AND status='pending' AND julianday(hold_expires_at)<=julianday('now') AND EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`).bind(startsAt,slot.endsAt,tableId,expires,old.id,old.customer_version,store.id,result.hoursVersion,body.courseId||null,body.courseId||null,store.id,course?.durationMinutes??null,assignedTable.id,store.id)]);
     if(!refreshed.meta.changes)return liffBookingJson(c, {success:false,error:'version_conflict'},409);
     const row=await db.prepare('SELECT *,NULL seat_type FROM rt_reservations WHERE id=?').bind(old.id).first<CustomerReservationRow>();
     return liffBookingJson(c, {success:true,data:customerBooking(row!)});
   }
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
-  await capacity.commit([db
+  await capacity.commit([result.allocationGuard,db
     .prepare(
       `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?)) AND EXISTS(SELECT 1 FROM rt_tables WHERE id=? AND store_id=? AND is_active=1)`,
     )
@@ -305,6 +305,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             settings.cancelDeadlineMinutesBefore * 60000
       )
         return liffBookingJson(c, { success: false, error: 'self_deadline_passed' }, 403);
+      let allocationGuard: D1PreparedStatement | null = null;
       let starts = row.starts_at,
         ends = row.ends_at,
         table = row.table_id,
@@ -341,6 +342,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
           return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
         ends = slot.endsAt;
         hoursVersion = available.hoursVersion;
+        allocationGuard = available.allocationGuard;
       }
       const capacity = action === 'cancel' ? null : await restaurantSeatCapacity(db, store.id, starts, ends, row.id);
       if (capacity) {
@@ -352,6 +354,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         const available=await customerAvailability(db,store,tzDateStr(store.timezone,new Date(starts)),count,row.id,courseId);
         if(!available?.data.slots.some(s=>s.startsAt===starts && s.available && s.endsAt===ends))return liffBookingJson(c, {success:false,error:'slot_conflict'},409);
         hoursVersion=available.hoursVersion;
+        allocationGuard=available.allocationGuard;
       }
       const next = {
         ...row,
@@ -371,6 +374,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       };
       const results = await (capacity?.commit ?? db.batch.bind(db))([
         ...(formSnapshot?[formSnapshot.guard]:[]),
+        ...(allocationGuard?[allocationGuard]:[]),
         db
           .prepare(
             `UPDATE rt_reservations SET confirmation_revision = confirmation_revision + 1, status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,customer_name=?,allergy_note=?,course_id=?,dining_snapshot_json=json_set(CASE WHEN course_id IS NOT ? THEN json_set(COALESCE(dining_snapshot_json,'{}'),'$.courseId',?,'$.courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=? AND store_id=?),'[]'))) ELSE COALESCE(dining_snapshot_json,'{}') END,'$.allergy',?),customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now')) AND (?='cancel' OR ? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
@@ -416,7 +420,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         if(formSnapshot&&!await formSnapshot.isCurrent())throw new Error('RESTAURANT_FORM_CHANGED');
         throw error;
       });
-      if (!results[(form?1:0)+(capacity?1:0)]!.meta.changes)
+      if (!results[(form?1:0)+(capacity?1:0)+(allocationGuard?1:0)]!.meta.changes)
         return liffBookingJson(c, { success: false, error: 'version_conflict' }, 409);
       await finish(c, store);
       const saved=await db.prepare('SELECT *,NULL seat_type,(SELECT name FROM rt_menu_items WHERE id=rt_reservations.course_id) course_name FROM rt_reservations WHERE id=?').bind(next.id).first<CustomerReservationRow>();
@@ -429,7 +433,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/confirmations/:requestId/re
  const self=await identity(c);if(self instanceof Response)return self;
  const b=await c.req.json<{expectedVersion?:number;response?:RestaurantConfirmationResponse}>().catch(()=>null);
  if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['going','change_requested','cancel'].includes(b.response??''))return liffBookingInputError(c,{success:false,error:'invalid_confirmation_response'},400,['expectedVersion','response']);
- const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
+ const db=dbFor(c.env);const f=await db.prepare('SELECT id FROM friends WHERE line_account_id=? AND line_platform_user_id=? AND is_following=1').bind(self.accountId,self.uid).first<{id:string}>();
  if(!f)return liffBookingJson(c, {success:false,error:'not_found'},404);
  const result=await respondToRestaurantConfirmation(db,{requestId:c.req.param('requestId'),friendId:f.id,accountId:self.accountId,expectedVersion:b.expectedVersion!,response:b.response!});
  if(!result.ok)return liffBookingJson(c, {success:false,error:result.error},result.status);
@@ -483,7 +487,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/form-booking',inputJsonBoun
  const saved=await db.prepare(`SELECT s.id,s.data,v.layout,v.fields FROM form_submit_claims q
  JOIN form_submissions s ON s.id=q.submission_id JOIN friends f ON f.id=s.friend_id
  JOIN form_versions v ON v.id=s.form_version_id AND v.form_id=s.form_id
- WHERE q.form_id=s.form_id AND q.status='completed' AND q.form_id=? AND q.idempotency_key=? AND q.line_account_id=? AND q.friend_id=f.id AND f.line_user_id=? AND f.line_account_id=? AND s.is_test=0`)
+ WHERE q.form_id=s.form_id AND q.status='completed' AND q.form_id=? AND q.idempotency_key=? AND q.line_account_id=? AND q.friend_id=f.id AND f.line_platform_user_id=? AND f.line_account_id=? AND s.is_test=0`)
  .bind(b.formId,b.submissionKey,self.accountId,self.uid,self.accountId).first<{id:string;data:string;layout:string;fields:string}>();
  if(!saved)return liffBookingJson(c, {success:false,error:'saved_answer_required'},404);
  const block=collectInputs(parseLayout(saved.layout,saved.fields)).find(x=>x.id===b.blockId&&x.type==='booking');

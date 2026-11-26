@@ -12,7 +12,8 @@ import { getMoreHoursTypes, todayIn, type GoogleProfile } from '../services/goog
 import { tracedFetch } from '@line-crm/shared/server';
 import { hoursWorkspaceEvent } from '../services/google-hours-history.js';
 import { GoogleBusinessError } from '../services/google-business.js';
-import { accessTokenFor, fail, requireConnectedStore, storeFor, type StoreContext } from './restaurant-google.js';
+import { accessTokenFor, connectionFor, fail, requestedConnectionId, requireConnectedStore, storeFor, type StoreContext } from './restaurant-google.js';
+import { PROFILE_FOR_CONNECTION_SQL } from '../services/google-connection-primary.js';
 
 type StoredWorkspace = { workspace: HoursWorkspace; history: HoursWorkspaceEvent[] };
 const keyFor = (store: StoreContext) => `google.hours.${store.id}`;
@@ -48,7 +49,14 @@ restaurantGoogleHoursWorkspace.get('/api/restaurant-test/google/hours/workspace'
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await dbFor(c.env, store.id).prepare('SELECT timezone FROM rt_stores WHERE id = ?').bind(store.id).first<{ timezone: string | null }>();
   const today = todayIn(row?.timezone || 'Asia/Tokyo');
-  const cached = await dbFor(c.env, store.id).prepare('SELECT profile_json FROM rt_google_profiles WHERE store_id = ?').bind(store.id).first<{ profile_json: string }>();
+  // 写しは「どの接続の写しか」まで決めて読む。store_id だけで読むと、同じ店舗に接続が2件あるとき
+  // 画面に出すサービス種別が別の接続の写しから混ざる。接続が無い店舗は接続に紐づかない写し
+  // （connection_id IS NULL、店舗につき1行）を読むので、今までと同じ結果になる。
+  const workspaceConnection = await connectionFor(c, store.id, requestedConnectionId(c));
+  const cached = await dbFor(c.env, store.id)
+    .prepare(`SELECT profile_json ${PROFILE_FOR_CONNECTION_SQL}`)
+    .bind(store.id, workspaceConnection?.id ?? null)
+    .first<{ profile_json: string }>();
   const profile = cached ? (JSON.parse(cached.profile_json) as { profile?: GoogleProfile }).profile : undefined;
   let serviceTypes = profile?.moreHoursTypes ?? [];
   if (!serviceTypes.length && profile?.categoryNames?.length) {

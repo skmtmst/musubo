@@ -1,57 +1,5 @@
 /* 会話の中を探す帯（V8.pen 枠 ・帯 f64Ok）。値は globals.css の --tpl-inbox-search-*。 */
-.band {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-inbox-search-gap);
-  padding: var(--tpl-inbox-search-pad);
-  background: var(--color-surface-pearl);
-  box-shadow: var(--tpl-inbox-search-line-bottom);
-}
-
-.field {
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-  align-items: center;
-  gap: var(--tpl-inbox-search-field-gap);
-  height: var(--tpl-inbox-search-field-h);
-  padding: var(--tpl-inbox-search-field-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  outline: var(--tpl-inbox-search-field-line);
-  outline-offset: var(--tpl-inbox-search-field-line-offset);
-}
-
-.fieldIcon {
-  flex: none;
-  width: var(--tpl-inbox-search-icon);
-  height: var(--tpl-inbox-search-icon);
-  color: var(--color-ink-secondary);
-}
-
-.input {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--tpl-inbox-search-text);
-  line-height: var(--tpl-inbox-search-text-lh);
-}
-
-.input:focus {
-  outline: none;
-}
-
-.input::placeholder {
-  color: var(--color-placeholder);
-}
-
-/* 消す×はこちらの「探すのをやめる」と重なるので出さない。 */
-.input::-webkit-search-cancel-button {
-  display: none;
-}
+.field { flex: 1 1 auto; min-width: 0; }
 
 .count {
   flex: none;
@@ -63,15 +11,4 @@
 
 .count:empty {
   display: none;
-}
-
-.button {
-  width: var(--tpl-inbox-search-btn);
-  height: var(--tpl-inbox-search-btn);
-  flex-basis: var(--tpl-inbox-search-btn);
-}
-
-.button > svg {
-  width: var(--tpl-inbox-search-btn-icon);
-  height: var(--tpl-inbox-search-btn-icon);
 }

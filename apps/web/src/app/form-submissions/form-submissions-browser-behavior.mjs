@@ -248,6 +248,12 @@ async function openHarness(browser, {
       return json({ success: true, data: { id: 'staff-1', name: `${role}利用者`, role, permissionKeys: [], permissionViewKeys: ['/form-submissions'] } })
     }
     if (path === '/api/line-accounts') return json({ success: true, data: ACCOUNTS })
+    const entryAccount = /^\/api\/line-accounts\/([^/]+)\/follower-import$/.exec(path)
+    if (request.method() === 'GET' && entryAccount && url.searchParams.get('entry') === '1') {
+      return ACCOUNTS.some(account => account.id === decodeURIComponent(entryAccount[1]))
+        ? json({ success: true, data: { destination: 'dashboard', canResume: false } })
+        : json({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND' }, 404)
+    }
     if (path === '/api/dashboard/style') return json({ success: true, data: { style: 'standard', styleSelected: true } })
     if (path === '/api/tags') return json({ success: true, data: tags })
     // 左メニューは表示設定を読む。形が違うと画面全体が落ちるので、既定の形で返す。

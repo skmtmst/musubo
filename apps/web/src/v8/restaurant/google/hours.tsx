@@ -17,6 +17,7 @@ import { HoursCalendarPage } from './hours-calendar-page'
 import { restaurantGoogleApi, type GoogleDayHours } from '@/lib/restaurant-google-api'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useSharedGuide } from '@/v8/onboarding/public/guide-shared/index'
+import { guideDraftKey, readGuideDraft, writeGuideDraft } from '@/lib/scoped-guide-draft'
 import { emitGuideSignal } from '@/v8/onboarding/public/guide-overlay/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -30,14 +31,23 @@ import styles from './hours.module.css'
 
 const NO_BOOKABLE_HOURS = '予約枠を作れる営業日がありません。Googleの営業時間を確認してください。'
 
+type HoursPosition = {
+ panel: HoursPanel | null; calendar: boolean; month: string; date: string; review: boolean; version: number;
+ initialMode?: string | null; initialDate?: string | null;
+}
+
 export default function HoursPage({ accountId, tabs, initialMode, initialDate, shared = false }: {accountId:string;tabs:ReactNode;initialMode?:string|null;initialDate?:string|null;shared?:boolean}) {
- const m=useHoursWorkspace(accountId)
+ const {allowed,lockedReason,known}=useGooglePermission('manager', true, shared ? '/settings/sns' : '/restaurant-test/google')
+ const m=useHoursWorkspace(accountId,!shared&&allowed)
  const { guide } = useSharedGuide() ?? {}
  const confirmingImportedHours = !shared && guide?.phase === 'active' && guide.stepKey === 'hours' && guide.procedureIndex === 2
- const {allowed,lockedReason,known}=useGooglePermission('manager', true, shared ? '/settings/sns' : '/restaurant-test/google')
  const [panel,setPanel]=useState<HoursPanel|null>(()=>initialMode?initialMode==='weekly'?{kind:'weekly'}:initialMode==='text'?{kind:'text'}:{kind:'dates',dates:initialDate?[initialDate]:[]}:null)
  const [expanded,setExpanded]=useState(false),[history,setHistory]=useState(false),[calendar,setCalendar]=useState(false),[month,setMonth]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[actionError,setActionError]=useState(''),[sent,setSent]=useState<'google'|'local'|null>(null)
  const [calendarDate,setCalendarDate]=useState('')
+ const positionKey=!shared&&allowed&&m.data?guideDraftKey(`hours-position:${m.data.profile.name}`,accountId,m.data.store.id):null
+ const editorKey=!shared&&allowed&&m.data?guideDraftKey(`hours-editor:${m.data.profile.name}`,accountId,m.data.store.id):null
+ const [loadedPosition,setLoadedPosition]=useState<string|null>(null)
+ const [checkingReview,setCheckingReview]=useState(false)
  const [sendFailed,setSendFailed]=useState(false)
  const failureRef=useRef<HTMLDivElement>(null)
  useEffect(()=>{if(!sendFailed)return;const frame=requestAnimationFrame(()=>failureRef.current?.scrollIntoView?.({block:'nearest'}));return()=>cancelAnimationFrame(frame)},[sendFailed])
@@ -45,12 +55,33 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
  const operation=useRef(false)
  const mounted = useRef(false)
  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+ useEffect(()=>{
+  if(!positionKey||!m.config||m.loading||loadedPosition===positionKey)return
+  const saved=readGuideDraft<HoursPosition>(positionKey)
+  setLoadedPosition(positionKey)
+  if(!saved||initialMode&&(saved.initialMode!==initialMode||saved.initialDate!==initialDate))return
+  setPanel(saved.panel??null)
+  setCalendar(saved.calendar===true)
+  setMonth(/^\d{4}-\d{2}$/.test(saved.month)?saved.month:'')
+  setCalendarDate(/^\d{4}-\d{2}-\d{2}$/.test(saved.date)?saved.date:'')
+  if(saved.review&&saved.version===m.config.version&&m.saved){
+   setCheckingReview(true)
+   void m.restoreReview().then(restored=>{if(mounted.current)setConfirm(restored)},()=>{
+    if(mounted.current)setActionError('変更内容を確認できませんでした。入力内容は残っています。')
+   }).finally(()=>{if(mounted.current)setCheckingReview(false)})
+  }
+ },[positionKey,loadedPosition,m.config,m.loading,m.saved,m.restoreReview,initialMode,initialDate])
+ useEffect(()=>{
+  if(!positionKey||loadedPosition!==positionKey||m.loading||checkingReview||!m.config)return
+  writeGuideDraft(positionKey,{panel,calendar,month,date:calendarDate,review:confirm,version:m.config.version,initialMode,initialDate} satisfies HoursPosition)
+ },[positionKey,loadedPosition,m.loading,m.config,checkingReview,panel,calendar,month,calendarDate,confirm,initialMode,initialDate])
+ const clearEditor=()=>{writeGuideDraft(editorKey,null);writeGuideDraft(editorKey?`${editorKey}:dates`:null,null)}
  const {leaveTarget,confirmLeave,cancelLeave}=useUnsavedGuard({dirty:Boolean(m.config)&&(!m.saved||editorUnsaved),busy:busy||m.saving})
- const review=async()=>{if(!allowed||operation.current)return;operation.current=true;setBusy(true);setActionError('');setSendFailed(false);try{await m.review();setPanel(null);setConfirm(true);setSent(null)}catch(e){setActionError(errorMessage(e,'変更内容を確認できませんでした。入力内容は残っています。'))}finally{setBusy(false);operation.current=false}}
+ const review=async()=>{if(!allowed||operation.current)return;operation.current=true;setBusy(true);setActionError('');setSendFailed(false);try{await m.review();clearEditor();setPanel(null);setConfirm(true);setSent(null)}catch(e){setActionError(errorMessage(e,'変更内容を確認できませんでした。入力内容は残っています。'))}finally{setBusy(false);operation.current=false}}
  const send=async()=>{if(!allowed||operation.current||!m.data)return;operation.current=true;setBusy(true);setActionError('');try{for(const change of m.changes){if(['applied','accepted'].includes(change.status))continue;await restaurantGoogleApi.sendChange(accountId,change.id)}const google=m.changes.length>0;await m.complete(google);setConfirm(false);setSent(google?'google':'local');/* 開店準備ガイド⑤の手順2/2（枠14 kYvXk）は確定できた時に進む。 */emitGuideSignal('hours.confirm')}catch(e){setSendFailed(true);setConfirm(false);setCalendar(false);setActionError(errorMessage(e,'Googleに送信できませんでした。入力した内容は残っています。'));const refreshed=await Promise.all(m.changes.map(c=>restaurantGoogleApi.change(accountId,c.id).catch(()=>null)));m.setChanges(m.changes.map((c,i)=>refreshed[i]?.change??c))}finally{setBusy(false);operation.current=false}}
- const close=()=>{void m.flush().then(()=>setPanel(null)).catch(()=>undefined)}
- const open=(value:HoursPanel)=>{setSent(null);setSendFailed(false);setActionError('');setPanel(value)}
- if(m.loading)return <PageFrame kind="list"><ListState kind="loading" title="営業時間を読み込んでいます"/></PageFrame>
+ const close=()=>{void m.flush().then(()=>{clearEditor();setPanel(null)}).catch(()=>undefined)}
+ const open=(value:HoursPanel)=>{clearEditor();setSent(null);setSendFailed(false);setActionError('');setPanel(value)}
+ if(m.loading||checkingReview||positionKey&&loadedPosition!==positionKey&&!m.error)return <PageFrame kind="list"><ListState kind="loading" title="営業時間を読み込んでいます"/></PageFrame>
  if(m.error||!m.data||!m.config)return <PageFrame kind="list"><ListState kind="error" title="営業時間を表示できませんでした" description={m.error} onRetry={()=>void m.load()}/></PageFrame>
  const {data,config,workspace}=m,today=data.today.date,weekly=workspace.draft.weekly??data.profile.regularHours
  const groups=upcomingHolidayGroups(config.holidays,today)
@@ -86,20 +117,9 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
     return (hours.hours?.find(day => day.weekday === new Date(`${date}T12:00:00Z`).getUTCDay())?.periods.length ?? 0) > 0
    })
    if (!nextOpen) { setActionError(NO_BOOKABLE_HOURS); return }
-   const openToday = day(today)
-   const initialDays = !openToday.closed && openToday.periods.length ? [today, nextOpen] : [nextOpen]
-   let slotCount = 0
-   for (const date of initialDays) {
-    if (!mounted.current) return
-    const { data: result } = await restaurantTestApi.generateInventory(accountId, {
-     storeId: data.store.id, date, expectedHoursVersion: hours.version, otaCapacity: 0, lineCapacity: 0, walkInCapacity: 0,
-    })
-    slotCount += result.slotCount ?? result.generated
-   }
-   if (!slotCount) { setActionError(NO_BOOKABLE_HOURS); return }
    if (mounted.current) emitGuideSignal('hours.confirm', accountId)
   } catch (cause) {
-   setActionError(errorMessage(cause, '予約枠を作れませんでした。もう一度お試しください。'))
+   setActionError(errorMessage(cause, '営業時間を確認できませんでした。もう一度お試しください。'))
   } finally {
    operation.current = false
    setBusy(false)
@@ -161,7 +181,7 @@ export default function HoursPage({ accountId, tabs, initialMode, initialDate, s
    {sendFailed?<Notice ref={failureRef} tone="danger" statusWord={false} heading={<span className={styles.noticeTitle}>Googleに送信できませんでした</span>} action={<Button presentation="hours" variant="primary" size="field" disabled={disabled} lockedReason={lockedReason} busy={busy} onClick={()=>void review()}>確認して再送する</Button>}>入力内容は保存されています。接続を確認して、もう一度お試しください。</Notice>:sent?<Notice tone="success" statusWord={false} heading={<span className={styles.noticeTitle}>{sent==='google'?'Googleに営業時間の変更を送信しました':'営業時間の設定を保存しました'}</span>}>{sent==='google'?'Googleマップの表示が更新されるまで時間がかかる場合があります。':''}</Notice>:changed?<div className={styles.updateBar}><Info size={18}/><div><strong className={styles.updateTitle}>Googleの営業時間を更新</strong><p className={styles.muted}>変更内容を確認してから、Googleに反映できます。</p></div><Button presentation="hours" variant="primary" size="field" disabled={disabled||!m.saved} lockedReason={lockedReason} busy={busy} widthReserve="idle" onClick={()=>void review()}>変更内容を確認</Button></div>:null}
   </div>}
   </HoursWorkspaceFrame>
-  {panel?<HoursEditPanel key={JSON.stringify(panel)} panel={panel} onUnsavedChange={setEditorUnsaved} data={data} workspace={workspace} holidays={config.holidays} serviceTypes={config.serviceTypes??[]} onDraft={m.update} onReview={()=>void review()} onClose={close} onEditDates={dates=>setPanel({kind:'dates',dates})} saving={m.saving||busy} saved={m.saved} disabled={disabled} lockedReason={lockedReason}/>:null}
+  {panel?<HoursEditPanel key={JSON.stringify(panel)} panel={panel} onUnsavedChange={setEditorUnsaved} data={data} workspace={workspace} holidays={config.holidays} serviceTypes={config.serviceTypes??[]} onDraft={m.update} onReview={()=>void review()} onClose={close} onEditDates={dates=>{clearEditor();setPanel({kind:'dates',dates})}} saving={m.saving||busy} saved={m.saved} disabled={disabled} lockedReason={lockedReason} draftKey={editorKey} draftVersion={config.version}/>:null}
   <Drawer open={history} title="営業時間の変更履歴" width="hours" headerIcon={false} heightMode="viewport" onClose={()=>setHistory(false)} footer={<Button presentation="hours" size="field" onClick={()=>setHistory(false)}>閉じる</Button>}><div className={styles.stackLarge}>{config.history.length?config.history.map((event,i)=><div className={styles.historyRow} key={`${event.at}-${i}`}><div className={styles.splitRow}><p className={styles.muted}>{hoursHistoryStamp(event.at,data.timeZone)}</p>{event.googleState?<span className={styles.muted}>{event.googleState==='sent'?'Googleへ送信済み':'Googleへ送信する前'}</span>:null}</div><strong className={styles.historyTitle}>{event.summary}</strong>{event.description?<p className={styles.bodyText}>{event.description}</p>:null}<span className={styles.muted}>{event.staffName}</span></div>):<ListState kind="empty" title="営業時間の変更履歴はありません"/>}</div></Drawer>
   <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間" onConfirm={confirmLeave} onCancel={cancelLeave}/>
  </>

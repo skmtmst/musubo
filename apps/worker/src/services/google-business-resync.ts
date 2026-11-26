@@ -202,7 +202,9 @@ export async function processGoogleBusinessHourlyResync(
           VALUES(?,?,?,?,?,?,?) ON CONFLICT(COALESCE(connection_id, 'store:' || store_id)) DO UPDATE SET connection_id=excluded.connection_id,location_name=excluded.location_name,
           profile_json=excluded.profile_json,fingerprint=excluded.fingerprint,fetched_at=excluded.fetched_at,updated_at=excluded.updated_at`)
           .bind(connection.store_id, connection.id, connection.location_name, JSON.stringify({ profile, extras }), profile.fingerprint, input.now, input.now).run();
-        await syncGoogleOpeningWeek(db, connection.store_id, connection.location_name!, profile);
+        // 今取り込んだ接続を渡す。予約の週設定は店舗に1行なので、主連携でない接続の
+        // 営業時間で上書きしない（syncGoogleOpeningWeek 側で主連携と照合する）。
+        await syncGoogleOpeningWeek(db, connection.store_id, connection.location_name!, profile, connection.id);
       }
       if (dueReviews && syncRestaurantContent) {
         const result = await listAllReviews(options, connection.location_name!);

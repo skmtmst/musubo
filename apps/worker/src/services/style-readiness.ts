@@ -10,6 +10,7 @@ import {
 } from './style-setup-core.js';
 import { profile, profileAnswers } from './style-profile.js';
 import { connectedGoogleProfile, googleOpeningWeek } from './restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 import { accountOpeningHours, openingWeek } from './account-opening-hours.js';
 export async function featureReadiness(
   db: D1Database,
@@ -33,9 +34,9 @@ export async function featureReadiness(
         .bind(account).all<{ id: string; hours_json: string | null }>()).results;
       configured = false;
       for (const store of stores) {
-        const connection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-          .bind(store.id).first<{ status: string }>();
-        const googleProfile = connection ? await connectedGoogleProfile(db, store.id) : null;
+        // 接続の有無の判定と写しの読み取りで**同じ1件**を見る（773で互換索引が外れ接続が2件入り得る）。
+        const connection = await primaryGoogleConnection(db, store.id);
+        const googleProfile = connection ? await connectedGoogleProfile(db, store.id, connection.id) : null;
         const week: unknown = connection ? googleProfile && googleOpeningWeek(googleProfile)
           : store.hours_json ? JSON.parse(store.hours_json) : null;
         if (Array.isArray(week) && week.some(day => day && Array.isArray(day.periods) && day.periods.length > 0)) {

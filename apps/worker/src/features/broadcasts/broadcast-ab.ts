@@ -15,7 +15,7 @@ export async function abAudience(db:D1Database,id:string){
  if(b.target_type==='segment'&&!b.segment_conditions)throw new GapError('AB_SEGMENT_REQUIRED');
  const seg=b.target_type==='segment'?buildSegmentWhere(JSON.parse(b.segment_conditions!)):null;
  const condition=seg?`AND (${seg.sql})`:'AND EXISTS(SELECT 1 FROM friend_tags ft WHERE ft.friend_id=f.id AND ft.tag_id=?)';
- const rows=(await db.prepare(`SELECT f.id FROM friends f WHERE f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND COALESCE(f.line_user_id,'')!='' AND ${DELIVERY_CONSENT_ALLOWED_SQL} ${condition} ORDER BY f.id`).bind(b.line_account_id,...(seg?seg.bindings:[b.target_tag_id])).all<{id:string}>()).results;
+ const rows=(await db.prepare(`SELECT f.id FROM friends f WHERE f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND COALESCE(f.line_platform_user_id,'')!='' AND ${DELIVERY_CONSENT_ALLOWED_SQL} ${condition} ORDER BY f.id`).bind(b.line_account_id,...(seg?seg.bindings:[b.target_tag_id])).all<{id:string}>()).results;
  return {account:b.line_account_id,ids:rows.map(x=>x.id)};
 }
 export function splitAb(ids:string[],ratio:number,random=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296){

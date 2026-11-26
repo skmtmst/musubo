@@ -12,33 +12,26 @@ vi.mock('@/components/shared/dialog', async original => {
 })
 afterEach(() => { cleanup(); previewWindow.hidden = false })
 
-it('共通の切り替えでスマホとPCの見本を選び、閉じると呼び出したボタンへ焦点を戻す', () => {
+it('スマホの見本とPCでの差の注記を出し、閉じると焦点を戻す', () => {
   type Props = ComponentProps<typeof BroadcastPreviewRail>
   const toggle = createRef<HTMLButtonElement>()
   function Preview() {
-    const [device, setDevice] = useState<'phone' | 'pc'>('phone')
     const [open, setOpen] = useState(true)
     return <><button ref={toggle}>見本を開く</button><BroadcastPreviewRail
       ab={{ hasB: false } as Props['ab']} afterActionVersionId="" audienceDisplayCount={null}
       bubbles={[]} confirmAudienceLabel="未設定" currentStep="message" excludeTagId="" messageButtons={[]}
       openTestDialog={vi.fn(async () => {})} previewCloseRef={createRef<HTMLButtonElement>()} reviewKey="initial" previewConfirmed={false}
-      previewDevice={device} previewOpen={open} previewToggleRef={toggle} publishedActions={[]}
+      previewOpen={open} previewToggleRef={toggle} publishedActions={[]}
       saving={false} scheduledLabel={null} selectedAccount={null} sendWhenLabel={null}
-      setPreviewConfirmed={vi.fn()} setPreviewDevice={setDevice} setPreviewOpen={setOpen}
+      setPreviewConfirmed={vi.fn()} setPreviewOpen={setOpen}
       tags={[]} testBlockReason="本文を入れてください" /></>
   }
   const { container } = render(<Preview />)
-  const devices = screen.getByRole('group', { name: 'プレビューの端末' })
-  const phone = within(devices).getByRole('button', { name: 'スマホ' })
-  const pc = within(devices).getByRole('button', { name: 'PC' })
-  expect(phone.getAttribute('aria-pressed')).toBe('true')
+  expect(screen.queryByRole('group', { name: 'プレビューの端末' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'PC' })).toBeNull()
   expect(container.querySelector(`.${styles.phonePreview}`)).not.toBeNull()
-  fireEvent.click(pc)
-  expect(pc.getAttribute('aria-pressed')).toBe('true')
-  expect(phone.getAttribute('aria-pressed')).toBe('false')
-  expect(container.querySelector(`.${styles.pcPreview}`)).not.toBeNull()
-  fireEvent.keyDown(pc, { key: 'ArrowLeft' })
-  expect(phone.getAttribute('aria-pressed')).toBe('true')
+  expect(container.querySelector('[data-line-preview-part="device-frame"]')).not.toBeNull()
+  expect(screen.getByText('PC の LINE では見え方が少し変わります')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
   expect(container.querySelector('aside')?.hasAttribute('data-open')).toBe(false)
   expect(document.activeElement).toBe(toggle.current)
@@ -51,9 +44,9 @@ it('手順 1〜2 は空のスマホではなく、届く人数と内訳（対象
     ab: { hasB: false } as Props['ab'], afterActionVersionId: '', audienceDisplayCount: 1028, bubbles: [],
     confirmAudienceLabel: 'シナリオ購読中', excludeTagId: 'tag-1', messageButtons: [], openTestDialog: vi.fn(async () => {}),
     preflight: { audienceCount: 1028, hiddenExcluded: 0, warnings: [], audience: { matched: 1045, sendable: 1028, evaluatedAt: '2026-10-26T00:00:00Z', representatives: [] }, exclusions: { blocked: 17, hidden: 0, missingDestination: 0, duplicate: 0, paused: null, total: 17 } },
-    preflightStatus: 'ready' as const, previewCloseRef: createRef<HTMLButtonElement>(), reviewKey: 'initial', previewConfirmed: false, previewDevice: 'phone' as const,
+    preflightStatus: 'ready' as const, previewCloseRef: createRef<HTMLButtonElement>(), reviewKey: 'initial', previewConfirmed: false,
     previewOpen: true, previewToggleRef: createRef<HTMLButtonElement>(), publishedActions: [], saving: false, scheduledLabel: null,
-    selectedAccount: null, sendWhenLabel: null, setPreviewConfirmed: vi.fn(), setPreviewDevice: vi.fn(), setPreviewOpen: vi.fn(),
+    selectedAccount: null, sendWhenLabel: null, setPreviewConfirmed: vi.fn(), setPreviewOpen: vi.fn(),
     tags: [{ id: 'tag-1', name: '休眠' }] as Props['tags'], testBlockReason: '',
   }
   for (const step of ['basic', 'audience'] as const) {
@@ -86,8 +79,8 @@ function ReviewPreview({ hasB = false }: { hasB?: boolean }) {
     ab={{ hasB, tab, setTab, b: [{ id: 'b', type: 'text', content: { text: 'B案の本文' } }] } as Props['ab']}
     afterActionVersionId="" audienceDisplayCount={null} bubbles={[{ id: 'a', type: 'text', content: { text } }]} confirmAudienceLabel="全員" currentStep="message" excludeTagId="" messageButtons={[]}
     openTestDialog={async () => { throw Error('送信しない') }} preflight={null} preflightStatus="idle" previewCloseRef={createRef<HTMLButtonElement>()} reviewKey={JSON.stringify([text, hasB])} previewConfirmed={confirmed}
-    previewDevice="phone" previewOpen={open} previewToggleRef={createRef<HTMLButtonElement>()} publishedActions={[]} saving={false} scheduledLabel={null} selectedAccount={null} sendWhenLabel={null}
-    setPreviewConfirmed={setConfirmed} setPreviewDevice={() => {}} setPreviewOpen={setOpen} tags={[]} testBlockReason="" /></>
+    previewOpen={open} previewToggleRef={createRef<HTMLButtonElement>()} publishedActions={[]} saving={false} scheduledLabel={null} selectedAccount={null} sendWhenLabel={null}
+    setPreviewConfirmed={setConfirmed} setPreviewOpen={setOpen} tags={[]} testBlockReason="" /></>
 }
 
 it('見本の窓が出ない場合はボタンを押しても確認済みにしない', () => {
@@ -138,10 +131,10 @@ it('今すぐの見本には時刻を出さず、予約の見本には予約時�
     confirmAudienceLabel: '全員', currentStep: 'confirm' as const, excludeTagId: '', messageButtons: [],
     openTestDialog: vi.fn(async () => {}), preflight: null, preflightStatus: 'idle' as const,
     previewCloseRef: createRef<HTMLButtonElement>(), reviewKey: 'initial', previewConfirmed: false,
-    previewDevice: 'phone' as const, previewOpen: true, previewToggleRef: createRef<HTMLButtonElement>(),
+    previewOpen: true, previewToggleRef: createRef<HTMLButtonElement>(),
     publishedActions: [], saving: false, scheduledLabel: null, selectedAccount: null,
     sendWhenLabel: '今すぐ（確認してから送信）', setPreviewConfirmed: vi.fn(),
-    setPreviewDevice: vi.fn(), setPreviewOpen: vi.fn(), tags: [], testBlockReason: '',
+    setPreviewOpen: vi.fn(), tags: [], testBlockReason: '',
   }
   const view = render(<BroadcastPreviewRail {...props} />)
   expect(view.queryByText('10:00')).toBeNull()

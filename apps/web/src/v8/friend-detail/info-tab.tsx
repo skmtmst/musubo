@@ -38,8 +38,9 @@ export const ALL_GROUP = 'all'
 export const DINING_GROUP = '__dining__'
 export const UNFILED_GROUP = '__unfiled__'
 
-function FieldInput({ field, value, onChange, disabled, computed = false, id }: {
+function FieldInput({ field, value, onChange, disabled, computed = false, id, accountId }: {
   field: FriendField
+  accountId: string | null
   value: string
   onChange: (v: string) => void
   disabled: boolean
@@ -49,7 +50,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
 }) {
   // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
   const readOnly = disabled || !!field.ecIsMaster
-  if (field.fixedKey === 'allergy') return <AllergyField showEmptyValue={readOnly} value={value} options={field.options ?? undefined} readOnly={readOnly} onChange={onChange} />
+  if (field.fixedKey === 'allergy') return <AllergyField accountId={accountId} showEmptyValue={readOnly} value={value} options={field.options ?? undefined} readOnly={readOnly} onChange={onChange} />
   if (field.type === 'textarea') {
     return <SaveErrorField names={["value"]}><TextArea id={id} rows={3} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
   }
@@ -214,6 +215,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
                     {fixed?.label ? <span className={styles.fieldSource} title={fixed.source ?? undefined}>{fixed.label}</span> : null}
                   </label>
                   <FieldInput
+                    accountId={data.friend?.lineAccountId ?? null}
                     id={id}
                     field={field}
                     value={fixed?.derived ? fixed.value ?? '' : values[field.id] ?? ''}

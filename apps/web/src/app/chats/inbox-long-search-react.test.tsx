@@ -60,8 +60,13 @@ function base(url: URL) {
 }
 const list = () => host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
 const searchInput = () => host.querySelector<HTMLInputElement>('input[aria-label="名前・メールアドレス・内容で検索"]')!
-const quickTabCounts = () => [...host.querySelectorAll<HTMLElement>('[aria-label="受信箱のクイック絞り込み"] button [data-segment-count]')]
-  .map((span) => span.textContent?.trim())
+async function quickTabCounts() {
+  await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="絞り込み"]')!.click() })
+  await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')!.click() })
+  const counts = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map(option => option.textContent?.match(/\((\d+)\)/)?.[1]).filter(Boolean)
+  await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="絞り込みを閉じる"]')!.click() })
+  return counts
+}
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
 }
@@ -143,7 +148,7 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
   await act(async () => root.render(<ChatsPage />))
   await settle()
   // 最初は取れた件数が出ている（0や—ではない）
-  await eventually(() => expect(quickTabCounts()).toEqual(['3', '2', '1']))
+  expect(await quickTabCounts()).toEqual(['3', '2', '1'])
 
   fail = true
   await typeQuery(LONG_QUERY)
@@ -154,7 +159,7 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
   })
   expect(list().querySelector('[data-inbox-list-state="loading"]')).toBeNull()
   // タブ件数は失敗を0件と読ませない。★管理画面（2026-09-24）では「—」も出さず、件数そのものを出さない。
-  expect(quickTabCounts()).toEqual([])
+  expect(await quickTabCounts()).toEqual([])
 
   // 再読み込みで同じ条件（長い検索語のまま）を取り直せる。
   fail = false
@@ -168,9 +173,14 @@ test('長い検索語で一覧口が落ちても、失敗行＋再読み込み�
 
   // 件数は失敗のまま0にせず「—」。条件を動かすと同じ口で数え直して戻る。
   await typeQuery('')
-  await eventually(() => {
-    expect(quickTabCounts()).toEqual(['3', '2', '1'])
-  })
+  let restored: string[] = []
+  const started = Date.now()
+  while (Date.now() - started < 1500) {
+    restored = (await quickTabCounts()) as string[]
+    if (restored.join(',') === '3,2,1') break
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  }
+  expect(restored).toEqual(['3', '2', '1'])
 })
 
 test('過去本文だけで一致したサーバーの検索結果を消さない（WEB282）', async () => {

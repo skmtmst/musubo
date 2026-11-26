@@ -126,7 +126,10 @@ async function openEc(page, waitFor = 'domcontentloaded') {
       csrfToken: 'test-csrf',
     },
   }))
-  await page.route('**/api/line-accounts/*/follower-import', (route) => route.fulfill({ json: { success: true, data: { phase: 'complete' } } }))
+  await page.route(/\/api\/line-accounts\/[^/]+\/follower-import(?:\?|$)/, (route) => {
+    const entry = new URL(route.request().url()).searchParams.get('entry') === '1'
+    return route.fulfill({ json: { success: true, data: entry ? { destination: 'dashboard', canResume: false } : { phase: 'complete' } } })
+  })
   await page.route('**/api/line-accounts', (route) => route.fulfill({
     json: {
       success: true,

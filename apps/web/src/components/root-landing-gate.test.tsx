@@ -3,6 +3,9 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { PagePendingLayout } from './templates/page-pending'
+import type { StaffMember } from '@line-crm/shared'
+import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
+import { REGISTRATION_STYLE_KEY, registrationStorageKey } from '@/v8/account-new/registration-storage'
 const state = vi.hoisted(() => ({ accounts: [] as Array<{ id: string }>, selectedAccountId: null as string | null, loading: false, error: 'offline' as string | null, refreshing: false, refreshAccounts: vi.fn(), setSelectedAccountId: vi.fn(), replace: vi.fn() }))
 const pricing = vi.hoisted(() => ({ get: vi.fn() }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => ({ replace: state.replace }) }))
@@ -12,7 +15,8 @@ import RootLandingGate from './root-landing-gate'
 afterEach(() => {
   cleanup()
   state.accounts = []; state.selectedAccountId = null; state.loading = false; state.error = 'offline'
-  state.replace.mockReset(); pricing.get.mockReset()
+  state.replace.mockReset(); state.setSelectedAccountId.mockReset(); pricing.get.mockReset()
+  forgetStaffIdentity(); sessionStorage.clear()
 })
 
 it('表示先の失敗・再試行中もホームの題を保ち、取得後に本文を始める', () => {
@@ -54,4 +58,17 @@ it('旧契約や料金状態の読取失敗でも通常の統括一覧へ戻れ�
   pricing.get.mockResolvedValue({ success: false, error: 'not found' })
   render(<RootLandingGate><p>ホームの中身</p></RootLandingGate>)
   await waitFor(() => expect(state.replace).toHaveBeenCalledWith('/hq'))
+})
+
+
+it('再ログイン後は表示できる本人の途中登録だけを選択して入口確認に渡す', async () => {
+  const staff = { id: 'owner-1', tenantId: 'org-1', role: 'owner', accountScope: 'all' } as StaffMember
+  rememberStaffIdentity(staff)
+  sessionStorage.setItem(registrationStorageKey(REGISTRATION_STYLE_KEY, staff)!, 'receipt:registration-account')
+  state.accounts = [{ id: 'other-account' }, { id: 'registration-account' }]
+  state.error = null
+  render(<RootLandingGate><p>ホームの中身</p></RootLandingGate>)
+  await waitFor(() => expect(state.setSelectedAccountId).toHaveBeenCalledWith('registration-account'))
+  expect(state.replace).not.toHaveBeenCalled()
+  expect(screen.queryByText('ホームの中身')).toBeNull()
 })

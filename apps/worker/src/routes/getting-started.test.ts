@@ -3,9 +3,11 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 const db = {
+  activeTenantLineAccountSql: () => '1',
   hasSavedFeatureConfiguration: vi.fn(async () => false),
   resolveLineCredential: vi.fn(async () => 'token'),
   hasFirstDeliveredMessage: vi.fn(async () => true),
+  getOnboardingGuideProgress: vi.fn(async () => null),
   firstDeliveredMessageAt: vi.fn(async () => null),
   toJstString: (date: Date) => date.toISOString(),
 };
@@ -95,15 +97,25 @@ function database(): D1Database {
 
 const { gettingStarted } = await import('./getting-started.js');
 
-function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = []) {
+function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: string[] = [], hqRole?: 'operator', readOnly = false) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', name: '担当', role, readOnly: false, permissionKeys });
+    c.set('staff', { id: 'staff-1', name: '担当', role, readOnly, permissionKeys, hqRole });
     return next();
   });
   app.route('/', gettingStarted);
   return app;
 }
+
+it('最初の1通はガイドと同じ操作権限と対象アカウントを確認する', async () => {
+  const request = (app: Hono<Env>, accountId: string, action = '', method = 'GET') =>
+    app.request(`/api/getting-started/first-message${action}?account_id=${accountId}`, { method }, { DB: database() });
+  const editor = makeApp('staff', ['/chats']);
+  expect((await request(editor, 'account-1')).status).toBe(200);
+  expect((await request(editor, 'other', '/send', 'POST')).status).toBe(404);
+  expect((await request(makeApp('staff'), 'account-1', '/identity', 'POST')).status).toBe(403);
+  expect((await request(makeApp('staff', ['/chats'], undefined, true), 'account-1', '/send', 'POST')).status).toBe(403);
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -251,6 +263,16 @@ describe('GET /api/getting-started', () => {
     expect(body.data.steps.find((step) => step.key === 'attributes')).toMatchObject({
       state: 'forbidden', href: null,
     });
+  });
+
+  it('統括の業務担当には店舗設定につながる未完了段を返す', async () => {
+    state.tags = 0;
+    const response = await makeApp('staff', [], 'operator').fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { steps: Array<{ key: string; state: string; href: string | null }> } };
+    expect(body.data.steps.find(step => step.key === 'attributes')).toMatchObject({ state: 'todo', href: '/tags?tab=tags' });
   });
 
   it('担当外アカウントは存在を隠して404にする', async () => {

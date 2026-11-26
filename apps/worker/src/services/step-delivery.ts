@@ -25,6 +25,7 @@ import {
   recoverStuckDeliveries,
   pauseFriendScenarioDelivery,
   getFriendById,
+  normalizeFriendLineUserId,
   jstNow,
   computeNextDeliveryAt,
   scenarioStepExists,
@@ -186,7 +187,7 @@ export async function resolveScenarioDeliveryFriend(
       )
       .bind(enrolledFriend.user_id, scenarioAccountId)
       .first<Friend>();
-    if (linked) return linked.is_following ? linked : null;
+    if (linked) return linked.is_following ? normalizeFriendLineUserId(linked) : null;
   }
 
   return enrolledFriend.line_account_id === null ? enrolledFriend : null;

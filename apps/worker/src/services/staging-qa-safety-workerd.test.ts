@@ -33,7 +33,7 @@ test('実workerdでも外部へのHTTPを止め、登録済みの試験LINEだ�
     const db = await mf.getD1Database('DB', 'qa');
     await db.prepare('CREATE TABLE platform_settings(key TEXT PRIMARY KEY,value TEXT)').run();
     await db.prepare('CREATE TABLE line_accounts(id TEXT,tenant_id TEXT,channel_access_token TEXT,is_active INTEGER)').run();
-    await db.prepare('CREATE TABLE friends(id TEXT,line_user_id TEXT,line_account_id TEXT,is_following INTEGER)').run();
+    await db.prepare('CREATE TABLE friends(id TEXT,line_user_id TEXT,line_account_id TEXT,is_following INTEGER,line_platform_user_id TEXT AS (line_user_id) VIRTUAL)').run();
     const id = '11111111-1111-4111-8111-111111111111';
     await db.prepare('INSERT INTO platform_settings VALUES (?,?)').bind(`staging-qa:run:${id}`, JSON.stringify({ id, tenantId: 'qa-tenant', accountId: 'qa-account', status: 'active', friendIds: ['qa-friend'] })).run();
     await db.prepare('INSERT INTO line_accounts VALUES (?,?,?,1)').bind('qa-account', 'qa-tenant', `qa-mock:${id}:22222222-2222-4222-8222-222222222222`).run();

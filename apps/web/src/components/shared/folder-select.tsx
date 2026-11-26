@@ -46,6 +46,8 @@ export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'lab
   folders: ReadonlyArray<FolderSelectFolder>
   value: string
   onChange: (value: string) => void
+  /** 絞り込みの「すべて」に戻す行。所属の選択では渡さない。 */
+  allOption?: { value: string; label: string }
   /**
    * 「未分類」（フォルダに入れない）の行。既定は value '' の「未分類」。
    * null で出さない。label を変えたいとき（「（選ばない）」など）は渡す。
@@ -141,6 +143,7 @@ export default function FolderSelect({
   folders,
   value,
   onChange,
+  allOption,
   unfiled = { value: '', label: '未分類' },
   onCreate,
   colors = true,
@@ -175,6 +178,7 @@ export default function FolderSelect({
     return [...folders, ...created.filter((folder) => !known.has(folder.value))]
   }, [folders, created])
   const options = [
+    ...(allOption ? [{ ...allOption, leading: undefined }] : []),
     ...(unfiled ? [{ value: unfiled.value, label: unfiled.label, leading: <FolderDot /> }] : []),
     ...all.map((folder) => ({ value: folder.value, label: folder.label, leading: <FolderDot folder={{ name: folder.label, color: folder.color }} /> })),
   ]

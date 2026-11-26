@@ -56,7 +56,7 @@ export async function testRestaurantFollowupEngine(db:D1Database,input:{storeId:
    const current=await resolveReminderTestRecipient(db,accountId,{staffId:input.staffId});
    if(current.state!=='ready'||current.recipient?.id!==friend.id||current.recipientKind!==recipient.recipientKind)throw new NotificationDeliveryBlocked('REMINDER_TEST_RECIPIENT_NOT_AVAILABLE');
    const ready=await db.prepare(`SELECT 1 FROM friends f JOIN line_accounts la ON la.id=f.line_account_id
-    WHERE f.id=? AND f.line_account_id=? AND f.line_user_id=? AND f.is_following=1 AND f.is_hidden=0 AND la.is_active=1 AND la.archived_at IS NULL
+    WHERE f.id=? AND f.line_account_id=? AND f.line_platform_user_id=? AND f.is_following=1 AND f.is_hidden=0 AND la.is_active=1 AND la.archived_at IS NULL
     AND ${activeTenantLineAccountSql('la.id')} AND (${snapshot.publicationGuard!.sql})
     AND EXISTS(SELECT 1 FROM rt_store_followup_targets WHERE store_id=? AND trigger=? AND version=? AND enabled=1)`)
     .bind(friend.id,accountId,friend.line_user_id,...snapshot.publicationGuard!.binds,input.storeId,input.trigger,input.expectedTargetVersion).first();

@@ -64,6 +64,7 @@ export function Field({
   optional,
   optionalAppearance,
   labelHidden = false,
+  labelWrap,
   labelSize = 'standard',
   note,
   error,
@@ -98,6 +99,7 @@ export function Field({
   optionalAppearance?: 'parentheses'
   /** 探す欄など自身に読み上げ名がある欄では、視覚上のラベル行を省く。 */
   labelHidden?: boolean
+  labelWrap?: boolean
   labelSize?: 'standard' | 'compact' | 'section'
   note?: ReactNode
   error?: ReactNode
@@ -217,7 +219,7 @@ export function Field({
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
-      {label && !labelHidden ? <div className={styles.labelRow}>
+      {label && !labelHidden ? <div className={styles.labelRow} data-label-wrap={labelWrap || undefined}>
         <label htmlFor={controlId} className={styles.label} title={fieldNoteText(note) || undefined}>
           {shownLabel}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には

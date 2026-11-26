@@ -91,7 +91,11 @@ function raceOnPairPrecheck(db: D1Database, raw: SqliteD1['raw'], moveSql: strin
       ...statement,
       bind: (...args: unknown[]) => {
         const bound = (statement as unknown as { bind: (...a: unknown[]) => D1PreparedStatement }).bind(...args);
-        if (!armed || !/FROM friends/i.test(sql) || !/WHERE id IN/i.test(sql)) return bound;
+        const readsPair = /FROM friends/i.test(sql) && (
+          /WHERE id IN/i.test(sql)
+          || /OR \(id = \? AND line_account_id = \? AND line_platform_user_id = \?\)/i.test(sql)
+        );
+        if (!armed || !readsPair) return bound;
         return {
           ...bound,
           all: (async () => {
@@ -395,7 +399,7 @@ function createItem(testDb: SqliteD1) {
 
 function countUid(testDb: SqliteD1, accountId: string, lineUserId: string): number {
   return (testDb.raw.prepare(
-    'SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND line_user_id = ?',
+    'SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ? AND line_platform_user_id = ?',
   ).get(accountId, lineUserId) as { count: number }).count;
 }
 
@@ -420,7 +424,7 @@ function raceOnFriendInsert(db: D1Database, raw: SqliteD1['raw']): D1Database {
               id, line_user_id, line_account_id, display_name, created_at, updated_at
             ) VALUES ('f-rival', 'UNEW-9', 'acc-to', '先着',
               '2026-08-30T09:00:00.000Z', '2026-08-30T09:00:00.000Z')`).run();
-            throw new Error('UNIQUE constraint failed: friends.line_user_id');
+            return bound.run();
           }) as D1PreparedStatement['run'],
         };
       },
@@ -439,7 +443,7 @@ describe('F-3 移行先UIDの新規作成と名前引継ぎ', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, data: { status: 'completed' } });
     const made = testDb.raw.prepare(
-      'SELECT * FROM friends WHERE line_account_id = ? AND line_user_id = ?',
+      'SELECT * FROM friends WHERE line_account_id = ? AND line_platform_user_id = ?',
     ).get('acc-to', 'UNEW-9') as {
       id: string; user_id: string | null; display_name: string | null;
       real_name: string | null; system_display_name: string | null;
@@ -471,22 +475,23 @@ describe('F-3 移行先UIDの新規作成と名前引継ぎ', () => {
     expect(friendUserId(testDb, 'f-old')).toBe(friendUserId(testDb, 'f-made'));
   });
 
-  it('対象外アカウントのUIDは越境させず失敗にし何も書かない', async () => {
+  it('他のアカウントに同じUIDがあっても、移行先に独立した行を作る', async () => {
     const testDb = createTestD1();
     seedCreateRun(testDb, { withElsewhere: true });
-    const before = (testDb.raw.prepare('SELECT COUNT(*) AS count FROM friends').get() as { count: number }).count;
+    const otherBefore = testDb.raw.prepare("SELECT * FROM friends WHERE id = 'f-other'").get();
     const response = await appFor(testDb.db, executor).fetch(
       post('/api/friends/migrations/run-9/execute'), envFor(testDb.db),
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ success: true, data: { status: 'failed' } });
+    expect(await response.json()).toMatchObject({ success: true, data: { status: 'completed' } });
     const item = createItem(testDb);
-    expect(item.result).toBe('failed');
-    expect(item.error_message).toContain('別のLINEアカウント');
-    expect(item.new_friend_id).toBeNull();
-    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(0);
-    expect((testDb.raw.prepare('SELECT COUNT(*) AS count FROM friends').get() as { count: number }).count).toBe(before);
-    expect(friendUserId(testDb, 'f-old')).toBeNull();
+    expect(item.result).toBe('applied');
+    expect(item.new_friend_id).toBeTruthy();
+    expect(item.new_friend_id).not.toBe('f-other');
+    expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
+    expect(countUid(testDb, 'acc-other', 'UNEW-9')).toBe(1);
+    expect(testDb.raw.prepare("SELECT * FROM friends WHERE id = 'f-other'").get()).toEqual(otherBefore);
+    expect(friendUserId(testDb, 'f-old')).toBe(friendUserId(testDb, item.new_friend_id!));
   });
 
   it('並行作成の競合は作り直さず一人に収束させる', async () => {
@@ -716,7 +721,7 @@ describe('F-3 障害時の副作用0（監査メモ対応）', () => {
     seedCreateRun(testDb);
     const racyDb = raceOnPairPrecheck(
       testDb.db, testDb.raw,
-      `UPDATE friends SET user_id = 'user-u2' WHERE line_account_id = 'acc-to' AND line_user_id = 'UNEW-9'`,
+      `UPDATE friends SET user_id = 'user-u2' WHERE line_account_id = 'acc-to' AND line_platform_user_id = 'UNEW-9'`,
     );
     const response = await appFor(racyDb, executor).fetch(
       post('/api/friends/migrations/run-9/execute'), envFor(racyDb),
@@ -726,7 +731,7 @@ describe('F-3 障害時の副作用0（監査メモ対応）', () => {
     // 別処理の結び付きは残し、項目の参照だけ外す（食い違わせない）。
     expect(countUid(testDb, 'acc-to', 'UNEW-9')).toBe(1);
     const kept = testDb.raw.prepare(
-      'SELECT user_id FROM friends WHERE line_account_id = ? AND line_user_id = ?',
+      'SELECT user_id FROM friends WHERE line_account_id = ? AND line_platform_user_id = ?',
     ).get('acc-to', 'UNEW-9') as { user_id: string | null };
     expect(kept.user_id).toBe('user-u2');
     expect(friendUserId(testDb, 'f-old')).toBeNull();

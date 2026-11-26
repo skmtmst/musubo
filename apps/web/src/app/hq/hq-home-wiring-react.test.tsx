@@ -18,7 +18,7 @@ vi.hoisted(() => {
 })
 
 const mocks = vi.hoisted(() => ({
-  attention: vi.fn(), list: vi.fn(), fetchApi: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), folders: vi.fn(), importState: vi.fn(),
+  attention: vi.fn(), list: vi.fn(), fetchApi: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), folders: vi.fn(), accountEntry: vi.fn(),
   role: 'owner', editProps: null as null | Record<string, unknown>,
 }))
 
@@ -57,7 +57,7 @@ vi.mock('@/lib/api', async (original) => {
     fetchApi: mocks.fetchApi,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, followerImportState: mocks.importState },
+      lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, accountEntry: mocks.accountEntry },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: mocks.folders },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '統括' } })) },
     },
@@ -83,7 +83,7 @@ beforeEach(() => {
   mocks.folders.mockResolvedValue({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })
   mocks.refresh.mockResolvedValue(undefined)
   mocks.fetchApi.mockResolvedValue({ success: true, data: {} })
-  mocks.importState.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
+  mocks.accountEntry.mockReset().mockResolvedValue({ success: true, data: { destination: 'dashboard', canResume: false } })
 })
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/') })
 
@@ -263,10 +263,11 @@ describe('統括のアカウント：設定と編集', () => {
 
 describe('統括のアカウント：入る', () => {
   it('入ると選んだアカウントを覚え、識別子を住所に付けずに店のホームへ移る', async () => {
+    mocks.list.mockResolvedValue({ success: true, data: [account('a1', '銀座店'), account('a2', '梅田店')] })
     render(<HqHomeV8 />)
-    await screen.findAllByText('銀座店')
-    fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
-    await waitFor(() => expect(mocks.select).toHaveBeenCalledWith('a1'))
+    fireEvent.click(await screen.findByRole('button', { name: '梅田店 へ入る' }))
+    await waitFor(() => expect(mocks.select).toHaveBeenCalledWith('a2'))
+    expect(mocks.accountEntry).toHaveBeenCalledExactlyOnceWith('a2')
     expect(mocks.push).toHaveBeenCalledTimes(1)
     expect(mocks.push.mock.calls[0][0]).toBe('/')
   })
@@ -290,20 +291,22 @@ describe('統括のアカウント：入る', () => {
   })
 
   it('引き継ぎ中は店舗を選択せず登録時と同じ進捗画面へ戻す', async () => {
-    mocks.importState.mockResolvedValue({ success: true, data: { phase: 'importing_ids' } })
+    mocks.accountEntry.mockResolvedValue({ success: true, data: { destination: 'handover', canResume: true } })
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=a1'))
+    expect(mocks.accountEntry).toHaveBeenCalledExactlyOnceWith('a1')
     expect(mocks.select).not.toHaveBeenCalled()
   })
 
-  it('引き継ぎ状態を読めないときも店舗へ入れない', async () => {
-    mocks.importState.mockRejectedValue(new Error('network error'))
+  it('登録状態を読めないときも店舗へ入れない', async () => {
+    mocks.accountEntry.mockRejectedValue(new Error('network error'))
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=a1'))
+    expect(mocks.accountEntry).toHaveBeenCalledExactlyOnceWith('a1')
     expect(mocks.select).not.toHaveBeenCalled()
   })
 })
@@ -391,7 +394,9 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     await screen.findAllByText('銀座店')
     expect(kpis()).toHaveLength(4)
     await waitFor(() => expect(values()).toEqual(['2', '—', '0', '2']))
-    expect(kpis()[3].textContent).toContain('ほかに未確認 1 件')
+    expect(kpis()[3].textContent).toContain('要確認・未確認 1')
+    // 未確認は右上の札にまとめ、2行目（note）を出さない＝ほかの箱と同じ高さ。
+    expect(kpis()[3].querySelector('[role="note"]')?.textContent ?? '').toBe('')
     expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(1)
     expect(document.querySelectorAll('[data-kpi-detail] [role="note"]')).toHaveLength(4)
     const card = [...document.querySelectorAll('article')].find(node => node.textContent?.includes('二号店'))!
@@ -405,7 +410,7 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
 
 describe('統括の接続問題：分かっている数と未確認を分ける', () => {
   it.each([
-    { statuses: ['warn', 'unknown'], value: '3', detail: 'ほかに未確認 1 件', tab: 2, warning: true },
+    { statuses: ['warn', 'unknown'], value: '3', detail: '要確認・未確認 1', tab: 2, warning: true },
     { statuses: ['ok', 'unknown'], value: '—', detail: '未確認 1 件', tab: 1, warning: false },
     { statuses: ['warn', 'ok'], value: '3', detail: '', tab: 1, warning: true },
     { statuses: ['ok', 'ok'], value: '0', detail: '', tab: 0, warning: false },
@@ -431,7 +436,7 @@ describe('統括の接続問題：分かっている数と未確認を分ける'
     await screen.findAllByText('取得済み')
     const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
     await waitFor(() => expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('4'))
-    expect(card.textContent).toContain('ほかに未確認 1 件')
+    expect(card.textContent).toContain('要確認・未確認 1')
   })
 
   it('停止とアーカイブを要確認の対象へ加えず、未取得の接続は未確認へ数える', async () => {

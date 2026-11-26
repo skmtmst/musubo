@@ -25,7 +25,7 @@ vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
   accountFeatureAvailability: mocks.accountFeatureAvailability,
 }));
 
-import { featureEnforcementMiddleware } from './feature-enforcement.js';
+import { featureEnforcementMiddleware, routeClassification } from './feature-enforcement.js';
 
 function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   const app = new Hono<Env>();
@@ -43,11 +43,13 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.post('/api/broadcasts', handler);
   app.get('/api/settings/features', handler);
   app.get('/api/instagram/connection', handler);
+  app.get('/api/instagram/connections', handler);
   app.post('/api/instagram/oauth/start', handler);
   app.post('/api/instagram/refresh', handler);
   app.delete('/api/instagram/connection', handler);
   app.get('/api/instagram/messages', handler);
   app.get('/api/restaurant-test/google/connection', handler);
+  app.get('/api/restaurant-test/google/connections', handler);
   app.post('/api/restaurant-test/google/connect/start', handler);
   app.get('/api/restaurant-test/google/profile', handler);
   app.get('/api/restaurant-test/google/hours/workspace', handler);
@@ -85,10 +87,12 @@ describe('featureEnforcementMiddleware', () => {
 
   test.each([
     ['GET', '/api/instagram/connection'],
+    ['GET', '/api/instagram/connections'],
     ['POST', '/api/instagram/oauth/start'],
     ['POST', '/api/instagram/refresh'],
     ['DELETE', '/api/instagram/connection'],
     ['GET', '/api/restaurant-test/google/connection'],
+    ['GET', '/api/restaurant-test/google/connections'],
     ['POST', '/api/restaurant-test/google/connect/start'],
     ['GET', '/api/restaurant-test/google/profile'],
     ['GET', '/api/restaurant-test/google/hours/workspace'],
@@ -99,6 +103,28 @@ describe('featureEnforcementMiddleware', () => {
     expect(response.status).toBe(200);
     expect(handler).toHaveBeenCalledOnce();
     expect(mocks.accountFeatureAvailability).not.toHaveBeenCalled();
+  });
+
+  test('SNS接続一覧の設定扱いはGETの完全一致だけに限定する', () => {
+    expect(routeClassification('/api/instagram/connections', 'GET')).toMatchObject({ kind: 'core' });
+    expect(routeClassification('/api/restaurant-test/google/connections', 'GET')).toMatchObject({ kind: 'core' });
+    for (const [path, method] of [
+      ['/api/instagram/connections', 'POST'],
+      ['/api/instagram/connections', 'DELETE'],
+      ['/api/instagram/connections/extra', 'GET'],
+      ['/api/instagram/messages', 'GET'],
+      ['/api/instagram/sync', 'POST'],
+    ] as const) {
+      expect(routeClassification(path, method)).toEqual({ kind: 'feature', featureId: 'external_integrations' });
+    }
+    for (const [path, method] of [
+      ['/api/restaurant-test/google/connections', 'POST'],
+      ['/api/restaurant-test/google/connections', 'DELETE'],
+      ['/api/restaurant-test/google/connections/extra', 'GET'],
+      ['/api/restaurant-test/google/reviews', 'GET'],
+    ] as const) {
+      expect(routeClassification(path, method)).toEqual({ kind: 'feature', featureId: 'restaurant_test' });
+    }
   });
 
   test.each([

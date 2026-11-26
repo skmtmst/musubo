@@ -12,7 +12,6 @@ const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), check: vi.fn() 
 vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.check } } }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
-vi.mock('./resume-style', () => ({ default: () => null }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
@@ -44,9 +43,16 @@ function savedChoice(value: boolean, explicit = false) {
   return key
 }
 
+function returnToPrecheck() {
+  for (const name of ['LINEログインへ戻る', 'Webhook の設定へ戻る', 'プロバイダーIDへ戻る', 'Messaging API へ戻る', '事前確認へ戻る', '戻る', '戻る', '戻る']) {
+    fireEvent.click(screen.getByRole('button', { name, exact: true }))
+  }
+}
+
 async function confirmation(answer: boolean, restored?: boolean, explicit = false) {
   if (restored !== undefined) savedChoice(restored, explicit)
   render(<AccountRegisterV8 />)
+  if (screen.queryByRole('button', { name: 'LINEログインへ戻る' })) returnToPrecheck()
   fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
   fireEvent.click(screen.getByRole('radio', { name: answer ? 'はい、引き継ぎます' : 'いいえ、引き継ぎません' }))
   if (answer) {
@@ -112,7 +118,6 @@ it.each([false, true])('最終確認の選択 %s を、接続確認と登録の�
   const checkbox = await confirmation(!finalChoice)
   // 最後の確認では、事前の回答を本人が上書きできる。
   if (checkbox.checked !== finalChoice) fireEvent.click(checkbox)
-  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect(calls.check).toHaveBeenCalledTimes(1))
   expect.soft(calls.check).toHaveBeenCalledWith(expect.objectContaining({ importFriends: finalChoice }))
@@ -125,10 +130,10 @@ it.each([false, true])('最終確認の選択 %s を、接続確認と登録の�
 it.each([false, true])('再訪時は最終選択 %s を保ち、新しくQ2に答えた時だけ変える', async saved => {
   const key = savedChoice(saved)
   render(<AccountRegisterV8 />)
-  expect((screen.getByRole('radio', { name: 'はい、あります' }) as HTMLInputElement).checked).toBe(false)
   const stored = () => JSON.parse(localStorage.getItem(key)!)
-  await waitFor(() => expect(stored().step).toBe(1))
+  await waitFor(() => expect(stored().step).toBe(3))
   expect(stored().importFriends).toBe(saved)
+  returnToPrecheck()
   fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
   expect(stored().importFriends).toBe(saved)
   fireEvent.click(screen.getByRole('radio', { name: saved ? 'いいえ、引き継ぎません' : 'はい、引き継ぎます' }))

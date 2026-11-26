@@ -251,6 +251,7 @@ export default function StoreComparisonList() {
       <ListPage
         skeleton
         boardId="W4fI7A"
+        layout="store-comparison"
         title="比較・分析"
         help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の印で知らせます。数は毎朝、前の日の分まで更新します。数の横の印は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。期間の途中から集計した店は、集計できた日の分だけで数を出し、件数の横に「12 日分」のように日数を出します（日数が違うので差の印は出しません）。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
         toolbar={toolbar}

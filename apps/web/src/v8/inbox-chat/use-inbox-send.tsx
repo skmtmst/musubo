@@ -9,6 +9,10 @@ import { useState, type Dispatch, type RefObject, type SetStateAction } from 're
 import type { PendingAttachment } from './inbox-model';
 import { MESSAGE_MAX_LENGTH, StatusFilter, draftKeyOf } from './inbox-model';
 import { describeSendFailure } from './send-failure';
+import { withoutRawInserts } from './chat-inserts';
+import type { InsertTokenNames } from '@/components/shared/insert-tokens';
+
+const NO_TOKEN_NAMES: InsertTokenNames = {}
 import { appendSentMessages, buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic';
 
 type Options = {
@@ -43,9 +47,11 @@ type Options = {
   setPendingPack: Dispatch<SetStateAction<{ texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null>>
   isComposingRef: RefObject<boolean>
   sendMode: "enter" | "shift-enter"
+  /** 失敗文の差し込みの名前（返信欄・送るとこうなりますと同じ名前で言う）。 */
+  tokenNames?: InsertTokenNames
 }
 
-export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAttachment, messageContent, pendingImage, selectedAccountId, setSending, chatDetail, quotedMessage, senderId, sendKeysRef, dropSentDraft, selectedChatIdRef, detailAccountRef, pendingImageRef, setPendingImage, setPendingImageMeta, setMessageContent, setChatDetail, setChats, statusFilterRef, attachDraftsRef, putAttachment, correctingId, setCorrectingId, setQuotedMessage, setPendingPack, isComposingRef, sendMode }: Options) {
+export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAttachment, messageContent, pendingImage, selectedAccountId, setSending, chatDetail, quotedMessage, senderId, sendKeysRef, dropSentDraft, selectedChatIdRef, detailAccountRef, pendingImageRef, setPendingImage, setPendingImageMeta, setMessageContent, setChatDetail, setChats, statusFilterRef, attachDraftsRef, putAttachment, correctingId, setCorrectingId, setQuotedMessage, setPendingPack, isComposingRef, sendMode, tokenNames = NO_TOKEN_NAMES }: Options) {
 
   const [sendFailure, setSendFailure] = useState<{ owner: string; message: string } | null>(null)
   const owner = draftKeyOf(selectedAccountId, selectedChatId ?? '')
@@ -309,7 +315,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       // 別の会話・アカウントへ切り替えたあとの古い失敗は、
       // 新しい画面へ出さない(A02-04)。
       if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-        setSendError(describeSendFailure(sendError))
+        setSendError(describeSendFailure(sendError, new Date(), tokenNames))
       }
     } finally {
       setSending(false)
@@ -341,7 +347,8 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       ))
       if (!sendResult.success) {
         if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-          setSendError(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
+          // 口の文に差し込みの記号が混ざっても、札の名前で見せる。
+          setSendError(sendResult.error ? withoutRawInserts(sendResult.error, tokenNames) : '送信できませんでした。時間をおいて、もう一度お試しください。')
         }
         return false
       }
@@ -380,7 +387,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
         return true
       }
       if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-        setSendError(describeSendFailure(sendError))
+        setSendError(describeSendFailure(sendError, new Date(), tokenNames))
       }
       return false
     } finally {

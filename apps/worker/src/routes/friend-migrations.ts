@@ -13,7 +13,9 @@ import {
   countUidMigrationItemDecisions,
   countUidMigrationItems,
   createUidMigrationRun,
+  encodeScopedFriendLineUserId,
   getUidMigrationRun,
+  isFriendLineUserIdConflict,
   listUidMigrationItems,
   listUidMigrationRuns,
   protectCsvCell,
@@ -31,6 +33,7 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 
 export const friendMigrations = new Hono<Env>();
 const MAX_MAPPING_ROWS = 5_000;
+const LEGACY_OTHER_ACCOUNT_UID_CONFLICT = '別のLINEアカウントに同じUIDがあります';
 const EXPORT_COLUMNS = ['basic', 'friend_fields', 'tags_fields', 'support'] as const;
 type ExportColumn = (typeof EXPORT_COLUMNS)[number];
 type ImportCandidate = {
@@ -355,8 +358,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
         /*
           判断 create は対応表の移行先UIDで友だちを新しく作り、名前は
           移行元の友だちから引き継ぐ。同じUIDが対象アカウントにあれば新規
-          の重複は作らず採用し、並行作成・再送は一人に収束させる。対象外の
-          アカウントにあるUIDは越境させず、書込みなしで失敗に記録する。
+          の重複は作らず採用し、並行作成・再送は一人に収束させる。
         */
         let createdFriendId: string | null = null;
         /*
@@ -391,7 +393,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
             continue;
           }
           const selectTarget = () => c.env.DB.prepare(`SELECT id, user_id FROM friends
-            WHERE line_account_id = ? AND line_user_id = ? LIMIT 1`)
+            WHERE line_account_id = ? AND line_platform_user_id = ? LIMIT 1`)
             .bind(run.to_account_id, item.new_uid)
             .first<{ id: string; user_id: string | null }>();
           /*
@@ -410,12 +412,6 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           };
           let target = await selectTarget();
           if (!target) {
-            const elsewhere = await c.env.DB.prepare(`SELECT id FROM friends
-              WHERE line_user_id = ? LIMIT 1`).bind(item.new_uid).first<{ id: string }>();
-            if (elsewhere) {
-              await failItem(item.id, '別のLINEアカウントに同じUIDがあります');
-              continue;
-            }
             const freshId = crypto.randomUUID();
             let inserted = false;
             try {
@@ -423,7 +419,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
                 id, line_user_id, line_account_id, display_name, real_name, system_display_name,
                 is_following, metadata, created_at, updated_at
               ) VALUES (?, ?, ?, ?, ?, ?, 0, '{}', ?, ?)`).bind(
-                freshId, item.new_uid, run.to_account_id,
+                freshId, encodeScopedFriendLineUserId(freshId, item.new_uid, run.to_account_id), run.to_account_id,
                 source.display_name, source.real_name, source.system_display_name, now, now,
               ).run();
               inserted = true;
@@ -460,7 +456,9 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           continue;
         }
         const pair = await c.env.DB.prepare(`SELECT id, user_id, display_name FROM friends
-          WHERE id IN (?, ?)`).bind(item.old_friend_id, item.new_friend_id)
+          WHERE (id = ? AND line_account_id = ? AND line_platform_user_id = ?)
+            OR (id = ? AND line_account_id = ? AND line_platform_user_id = ?)`)
+          .bind(item.old_friend_id, run.from_account_id, item.old_uid, item.new_friend_id, run.to_account_id, item.new_uid)
           .all<{ id: string; user_id: string | null; display_name: string | null }>();
         const oldFriend = pair.results.find((friend) => friend.id === item.old_friend_id);
         const newFriend = pair.results.find((friend) => friend.id === item.new_friend_id);
@@ -490,11 +488,12 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
           `UPDATE friends
               SET user_id = CASE id WHEN ? THEN ? WHEN ? THEN ? END, updated_at = ?
             WHERE id IN (?, ?)
-              AND ((id = ? AND user_id IS ?) OR (id = ? AND user_id IS ?))`,
+              AND ((id = ? AND line_account_id = ? AND user_id IS ?)
+                OR (id = ? AND line_account_id = ? AND user_id IS ?))`,
         ).bind(
           oldFriend.id, userId, newFriend.id, userId, now,
           oldFriend.id, newFriend.id,
-          oldFriend.id, oldFriend.user_id, newFriend.id, newFriend.user_id,
+          oldFriend.id, run.from_account_id, oldFriend.user_id, newFriend.id, run.to_account_id, newFriend.user_id,
         );
         const recordWrites: D1PreparedStatement[] = [pairWrite];
         if (!oldFriend.user_id && !newFriend.user_id) {
@@ -841,7 +840,7 @@ friendMigrations.get('/api/friends/exports/:id/download', requireRole('owner', '
         controller.enqueue(encoder.encode('\uFEFF' + ['LINEユーザーID', 'LINE表示名', '本名', 'システム表示名', '登録日', ...fields.map((field) => field.field_key)].map(protectCsvCell).join(',') + '\r\n'));
         started = true;
       }
-      const page = await c.env.DB.prepare(`SELECT id, line_user_id, display_name, real_name, system_display_name, created_at
+      const page = await c.env.DB.prepare(`SELECT id, line_platform_user_id AS line_user_id, display_name, real_name, system_display_name, created_at
         FROM friends WHERE line_account_id = ? ORDER BY created_at DESC, id ASC LIMIT 500 OFFSET ?`)
         .bind(job.line_account_id, offset).all<ExportRow>();
       if (page.results.length === 0) {
@@ -887,7 +886,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inp
     const accountId = body.accountId?.trim();
     const filename = body.sourceFilename?.trim();
     const checksum = body.sourceChecksum?.trim();
-    const rows = body.rows ?? [];
+    let rows = body.rows ?? [];
     if (!accountId || !filename || !checksum || rows.length === 0 || rows.length > MAX_MAPPING_ROWS) {
       return inputError(c, { success: false, error: `対象・ファイル情報と1〜${MAX_MAPPING_ROWS}行のデータが必要です` }, 400, ["accountId","sourceFilename","sourceChecksum","rows"]);
     }
@@ -895,10 +894,16 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inp
       return c.json({ success: false, error: 'Not found' }, 404);
     }
     const previous = await c.env.DB.prepare(
-      'SELECT id, status, result_json FROM friend_import_jobs WHERE line_account_id = ? AND source_checksum = ?',
-    ).bind(accountId, checksum).first<{ id: string; status: string; result_json: string }>();
+      'SELECT id, status, rows_json, result_json FROM friend_import_jobs WHERE line_account_id = ? AND source_checksum = ?',
+    ).bind(accountId, checksum).first<{ id: string; status: string; rows_json: string; result_json: string }>();
     if (previous) {
-      return c.json({ success: true, data: { id: previous.id, status: previous.status, result: JSON.parse(previous.result_json), duplicate: true } });
+      const result = JSON.parse(previous.result_json) as { rows?: Array<{ kind?: string; reason?: string }> };
+      if (previous.status !== 'previewed' || !result.rows?.some((row) =>
+        row.kind === 'conflict' && row.reason === LEGACY_OTHER_ACCOUNT_UID_CONFLICT)) {
+        return c.json({ success: true, data: { id: previous.id, status: previous.status, result, duplicate: true } });
+      }
+      // 以前の規則で止まった確認だけ、同じファイルの再確認に応じて作り直す。
+      rows = JSON.parse(previous.rows_json) as typeof rows;
     }
     const fields = rows.some((row) => row.friendFields !== undefined)
       ? await getFriendFieldsForScope(c.env.DB, { tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID, lineAccountId: accountId }) : [];
@@ -927,21 +932,10 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inp
         results.push({ lineUid, kind: 'error', reason: checkedFields.error, values });
         continue;
       }
-      /*
-        **同じUIDの有無は2本で見る。** 1本(`LIMIT 1`)だと拾った行が
-        たまたま同アカウントの場合に他アカウントの重複を見逃す。
-        先に対象アカウントを見て、無ければ他アカウントを探す。
-      */
       const sameAccount = await c.env.DB.prepare(`SELECT id, display_name, real_name, system_display_name
-        FROM friends WHERE line_account_id = ? AND line_user_id = ? LIMIT 1`).bind(accountId, lineUid).first<ImportCandidate>();
+        FROM friends WHERE line_account_id = ? AND line_platform_user_id = ? LIMIT 1`).bind(accountId, lineUid).first<ImportCandidate>();
       if (!sameAccount) {
-        const otherAccount = await c.env.DB.prepare(`SELECT id FROM friends
-          WHERE line_user_id = ? AND line_account_id != ? LIMIT 1`).bind(lineUid, accountId).first<{ id: string }>();
-        if (otherAccount) {
-          results.push({ lineUid, kind: 'conflict', reason: '別のLINEアカウントに同じUIDがあります', values });
-        } else {
-          results.push({ lineUid, kind: 'add', reason: null, values });
-        }
+        results.push({ lineUid, kind: 'add', reason: null, values });
         continue;
       }
       if (
@@ -956,20 +950,32 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inp
       }
     }
     const count = (kind: typeof results[number]['kind']) => results.filter((row) => row.kind === kind).length;
-    const id = crypto.randomUUID();
+    const id = previous?.id ?? crypto.randomUUID();
     const now = new Date().toISOString();
     const staff = c.get('staff');
     const summary = { add: count('add'), update: count('update'), unchanged: count('unchanged'), conflict: count('conflict'), error: count('error') };
+    const result = { summary, rows: results };
+    if (previous) {
+      const refreshed = await c.env.DB.prepare(`UPDATE friend_import_jobs
+        SET result_json=?, total_count=?, add_count=?, update_count=?, unchanged_count=?, conflict_count=?, error_count=?
+        WHERE id=? AND line_account_id=? AND status='previewed' AND result_json=?`)
+        .bind(JSON.stringify(result), results.length, summary.add, summary.update, summary.unchanged,
+          summary.conflict, summary.error, id, accountId, previous.result_json).run();
+      if (refreshed.meta.changes !== 1) {
+        return c.json({ success: false, error: '取り込み状況が変わりました。もう一度確認してください' }, 409);
+      }
+      return c.json({ success: true, data: { id, status: 'previewed', result, duplicate: false } });
+    }
     await c.env.DB.prepare(`INSERT INTO friend_import_jobs (
       id, line_account_id, source_filename, source_checksum, rows_json, result_json,
       status, total_count, add_count, update_count, unchanged_count, conflict_count,
       error_count, created_by, created_by_name, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, 'previewed', ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
-      id, accountId, filename, checksum, JSON.stringify(rows), JSON.stringify({ summary, rows: results }),
+      id, accountId, filename, checksum, JSON.stringify(rows), JSON.stringify(result),
       results.length, summary.add, summary.update, summary.unchanged, summary.conflict, summary.error,
       staff.id, staff.name, now,
     ).run();
-    return c.json({ success: true, data: { id, status: 'previewed', result: { summary, rows: results }, duplicate: false } }, 201);
+    return c.json({ success: true, data: { id, status: 'previewed', result, duplicate: false } }, 201);
   } catch (error) {
     throw error;
   }
@@ -1011,18 +1017,19 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       if (checked.error) return inputError(c, { success: false, error: `${row.lineUid}: ${checked.error}` }, 422, []);
       if (row.kind === 'add') {
         applied += 1;
+        const id = crypto.randomUUID();
         statements.push(c.env.DB.prepare(`INSERT INTO friends (
           id, line_user_id, line_account_id, display_name, real_name, system_display_name,
           is_following, metadata, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, 0, '{}', ?, ?)`).bind(
-          crypto.randomUUID(), row.lineUid, job.line_account_id, row.values.displayName,
+          id, encodeScopedFriendLineUserId(id, row.lineUid, job.line_account_id), job.line_account_id, row.values.displayName,
           row.values.realName, row.values.systemDisplayName, now, now,
         ));
       } else if (row.kind === 'update') {
         applied += 1;
         statements.push(c.env.DB.prepare(`UPDATE friends
           SET display_name = ?, real_name = ?, system_display_name = ?, updated_at = ?
-          WHERE line_account_id = ? AND line_user_id = ?`).bind(
+          WHERE line_account_id = ? AND line_platform_user_id = ?`).bind(
           row.values.displayName, row.values.realName, row.values.systemDisplayName,
           now, job.line_account_id, row.lineUid,
         ));
@@ -1030,17 +1037,22 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       if (row.kind === 'add' || row.kind === 'update') {
         for (const [key, value] of Object.entries(checked.values)) {
           const field = fields.find((item) => item.field_key === key)!;
-          const friendSelect = 'SELECT id FROM friends WHERE line_account_id = ? AND line_user_id = ?';
+          const friendSelect = 'SELECT id FROM friends WHERE line_account_id = ? AND line_platform_user_id = ?';
           statements.push(value === null
             ? c.env.DB.prepare(`DELETE FROM friend_field_values WHERE field_id = ? AND friend_id IN (${friendSelect})`).bind(field.id, job.line_account_id, row.lineUid)
             : c.env.DB.prepare(`INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
-                SELECT id, ?, ?, ?, ? FROM friends WHERE line_account_id = ? AND line_user_id = ?
+                SELECT id, ?, ?, ?, ? FROM friends WHERE line_account_id = ? AND line_platform_user_id = ?
                 ON CONFLICT(friend_id, field_id) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at`)
               .bind(field.id, value, c.get('staff').id, now, job.line_account_id, row.lineUid));
         }
       }
     }
-    if (statements.length > 0) await c.env.DB.batch(statements);
+    try {
+      if (statements.length > 0) await c.env.DB.batch(statements);
+    } catch (error) {
+      if (!isFriendLineUserIdConflict(error)) throw error;
+      return c.json({ success: false, error: 'このLINEアカウントの友だちが追加されました。もう一度内容を確認してください' }, 409);
+    }
     await c.env.DB.prepare(`UPDATE friend_import_jobs SET status = 'completed', executed_at = ? WHERE id = ? AND status = 'previewed'`)
       .bind(now, job.id).run();
     return c.json({ success: true, data: { id: job.id, status: 'completed', applied, duplicate: false } });

@@ -125,9 +125,10 @@ async function saveAndFinish() {
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   expect(document.querySelector('[data-step-heading]')?.textContent).toBe('使い方のスタイルを選ぶ')
   await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
-  const skip = within(dialog).getByRole('button', { name: 'あとで設定する' })
-  await waitFor(() => expect((skip as HTMLButtonElement).disabled).toBe(false))
-  fireEvent.click(skip)
+  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
+  const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  await waitFor(() => expect(next.disabled).toBe(false))
+  fireEvent.click(next)
 }
 
 describe('LINEアカウント作成ウィザード', () => {
@@ -160,6 +161,25 @@ describe('LINEアカウント作成ウィザード', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Messaging API へ戻る', exact: true }))
     expect(expectHeadingFocus()).toBe(screen.getByRole('heading', { name: 'Messaging API の情報を入れる' }))
     expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+  })
+
+  it.each(['一覧', '下の帯'])('%s から前の接続ステップに戻っても入力を保つ', (method) => {
+    render(<NewLineAccountPage />)
+    passPrecheck()
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    expect(screen.queryByRole('button', { name: /プロバイダーID.*LINE Developersからコピー/ })).toBeNull()
+    nextStep()
+    expect(screen.queryByRole('button', { name: /Webhookの設定.*URLを貼り付けて/ })).toBeNull()
+    const back = method === '一覧'
+      ? screen.getByRole('button', { name: /Messaging APIの2項目.*公式アカウントで取得/ })
+      : screen.getByRole('button', { name: 'Messaging API へ戻る', exact: true })
+    back.focus()
+    expect(document.activeElement).toBe(back)
+    fireEvent.click(back)
+    expect(screen.getByRole('heading', { name: 'Messaging API の情報を入れる' })).toBeTruthy()
+    expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+    expect((document.getElementById('v8-channel-secret') as HTMLInputElement).value).toBe('synthetic-secret')
   })
 
   it('①の質問に答えてから②の4つの小さな段へ順に進む', () => {
@@ -314,7 +334,6 @@ describe('LINEアカウント作成ウィザード', () => {
       },
     })
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     expect(await screen.findByText('Webhook URL の登録で止まりました', {}, { timeout: 5000 })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
@@ -326,7 +345,6 @@ describe('LINEアカウント作成ウィザード', () => {
     let finishNotice!: (response: { success: boolean; data: { available: boolean } }) => void
     notices.lineRegistration.mockReturnValueOnce(new Promise((resolve) => { finishNotice = resolve }))
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     await saveAndFinish()
     const completeHeading = await screen.findByRole('heading', { name: 'LINEアカウントの登録が完了しました' })
@@ -353,7 +371,6 @@ describe('LINEアカウント作成ウィザード', () => {
       linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     } })
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     await saveAndFinish()
     await screen.findByText('LINEアカウントの登録が完了しました')
@@ -383,7 +400,6 @@ describe('LINEアカウント作成ウィザード', () => {
     } })
     enterCheckStep()
     fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     await saveAndFinish()
     await screen.findByText('友だちを確認しています', { selector: 'h2' })
@@ -417,7 +433,6 @@ describe('LINEアカウント作成ウィザード', () => {
       .mockImplementation(() => new Promise(() => {}))
     enterCheckStep()
     fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     await saveAndFinish()
     await screen.findByText('4人のうち1人を引き継ぎました。残り3人を処理中です。')
@@ -442,7 +457,6 @@ describe('LINEアカウント作成ウィザード', () => {
       }, busy: false, profilesFetched: 3 } })
     enterCheckStep()
     fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     await saveAndFinish()
     await screen.findByText('進み具合を確認できません', { selector: 'h2' })

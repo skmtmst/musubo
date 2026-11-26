@@ -21,26 +21,6 @@ export interface SqliteD1 {
   raw: Database.Database
 }
 
-/**
- * 互換索引の無い形（773 適用後）にする。
- *
- * 772 は旧Workerの `ON CONFLICT(store_id)` / `ON CONFLICT(line_account_id)` が
- * 当たる先を残すため、同じ形の互換UNIQUE索引を5本作る。`bootstrap.sql` は
- * `packages/db/migrations/` を流した形なので、いまはその5本が入っており、
- * **2件目の接続は入らない**（互換期間の仕様どおり）。
- *
- * 複数接続そのものを確かめる試験は、順番待ちの
- * `packages/db/migrations-pending/773_sns_multi_connections_drop_compat.sql`
- * を当てて互換期間の後の形にしてから使う。773 を `packages/db/migrations/` へ
- * 移したら bootstrap.sql に入るので、この関数と呼び出しはまとめて消す
- * （手順は `packages/db/migrations-pending/README.md`）。
- */
-export function dropCompatIndexes772(raw: Database.Database): void {
-  raw.exec(
-    readFileSync(join(DB_PKG_ROOT, 'migrations-pending/773_sns_multi_connections_drop_compat.sql'), 'utf8'),
-  )
-}
-
 function isSelect(sql: string): boolean {
   return /^\s*(SELECT|WITH|PRAGMA)/i.test(sql) || /\bRETURNING\b/i.test(sql)
 }

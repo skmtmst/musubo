@@ -50,7 +50,7 @@ import { ANALYTICS_DAYS,COMPARE } from './dashboard-options'
 import { jstToday,shiftDate } from './date-range'
 import { LessonRoster } from './lesson-roster'
 import type { IndustryStyle,StyleAlertAction,StyleKpi,StyleRow } from './model'
-import { SideCard } from './parts'
+import { TodayCheck } from './today-check'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { ClosureDialog,ViewDrawer } from './settings-panels'
 import { StaffBoard } from './staff-board'
@@ -114,7 +114,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
   /* 初回ポップアップ（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
-    accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: start.guide.phase,
+    accountId: accountId || null, canManage: canManageRole(role), summary: start.summary, guidePhase: wizard.dialog || start.guide.loading ? 'loading' : start.guide.phase,
   })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
@@ -168,7 +168,10 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <SegmentedControl aria-label="表示" appearance="track" size="small" fit="content" value={view} onChange={(v: DashboardView) => setParam({ view: v === cfg.defaultView ? null : v })} options={cfg.views} />
   ) : null
 
-  const side = (today?.side ?? []).map((card) => <SideCard key={card.id} card={card} canWrite={canWrite} onAction={(card) => (card.id === 'pay' ? openPayment() : ['care', 'waitlist', 'rebook'].includes(card.id) ? preparing.open(card.title) : router.push('/broadcasts'))}>{card.id === 'pay' && testMode ? <TestModeNote /> : null}</SideCard>)
+  /* 右の列は「今日の確認」1枚。項目ごとに開け閉めし、開き方は本人・アカウント・スタイルごとに覚える。書く操作は書ける人だけ（今までの右の列と同じ）。 */
+  const sideCards = today?.side ?? []
+  const side = sideCards.length ? <TodayCheck cards={sideCards} accountId={accountId || null} style={style} canWrite={canWrite} extra={{ pay: testMode ? <TestModeNote /> : null }}
+    onAction={(card) => (card.id === 'pay' ? openPayment() : ['care', 'waitlist', 'rebook'].includes(card.id) ? preparing.open(card.title) : router.push('/broadcasts'))} /> : null
 
   const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
   let body: ReactNode
@@ -178,8 +181,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     body = <StyleAnalyticsView data={analytics} error={analyticsFailed} onTab={(t) => setParam({ sub: t })} onRetry={() => void loadAnalytics()} onRowOpen={() => router.push(cfg.links.bookings)} />
   } else if (style === 'consult' && tab === 'bookings') {
     // 結果待ち（OJ4Vu）：実施した面談のうち、結果をまだ付けていない物。押すと結果を付ける窓。
+    // 右の列は1枚目と同じ開閉（狭い板ではタブの段の［今日の確認を見る］で開く）。
     body = (
-      <DetailColumns variant="style-dashboard" asideLabel="今日の動き" expanded={false} onExpandedChange={() => {}} showToggle={false} aside={side.length ? side : null}>
+      <DetailColumns variant="style-dashboard" asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen} showToggle={false} aside={side}>
           <TodayList style={style} rows={resultRows} note={`${formatNumber(resultRows.length)}件中 1〜${formatNumber(resultRows.length)}件・結果を付けると、分析の成約率に入ります`} canWrite={canWrite} busyId={busy} menuFor={menuFor}
             onVisit={(r) => void markVisit(r)} onUndo={() => {}} onResult={(r) => setResultRow(r)}
             empty={<ListState kind="empty" title="結果待ちの面談はありません" description="実施した面談に結果を付けると、ここから消えます。" />} />
@@ -192,7 +196,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     const emptyBookings = hasEmptyBookingAction ? <EmptyBookings style={style} day={date === jstToday() ? '今日' : 'この日'} today={today} canWrite={canWrite} role={role} onBook={() => addNew()} onCreateClass={() => router.push('/events/new')} /> : null
     const filteredEmpty = <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setSearch('')}>検索を外す</Button>} />
     let main: ReactNode
-    let aside: ReactNode = side.length ? side : null
+    let aside: ReactNode = side
     if (view === 'calendar') {
       if (range === 'month' && today.month) {
         main = <MonthCalendar month={today.month} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'month', s))} onDay={(d) => setDate(d)} />
@@ -227,15 +231,18 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     )
   }
   /* 追加決まり1: 右の列の開閉はタブの段の右端へ。タブの下に1つだけの段を作らない。 */
-  const asideLabel = asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'
+  const monthDayList = tab === 'main' && view === 'calendar' && range === 'month' && !!today?.month && !shownRoster
+  const asideLabel = asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : monthDayList ? '選んだ日の予約を見る' : '今日の確認を見る'
   const mainAside = tab === 'main' && !!today && (shownRoster ? true : view === 'calendar'
-    ? (range === 'month' && !!today.month) || (!today.week && side.length > 0)
-    : side.length > 0)
+    ? (range === 'month' && !!today.month) || (!today.week && sideCards.length > 0)
+    : sideCards.length > 0)
+  const resultAside = style === 'consult' && tab === 'bookings' && !!today && sideCards.length > 0
+  const asideToggle = mainAside || resultAside
   /* タブの段の右端の操作。狭い幅ではタブの下へ折り返す（タブに重ねない）。 */
-  const tabRowActions = viewSwitch || mainAside ? (
+  const tabRowActions = viewSwitch || asideToggle ? (
     <div className={styles.tabRowActions}>
       {viewSwitch}
-      {mainAside ? <span className={styles.tabAsideToggle}><Button size="compact" aria-expanded={asideOpen} onClick={() => setAsideOpen(!asideOpen)}>{asideLabel}</Button></span> : null}
+      {asideToggle ? <span className={styles.tabAsideToggle}><Button size="compact" aria-expanded={asideOpen} onClick={() => setAsideOpen(!asideOpen)}>{asideLabel}</Button></span> : null}
     </div>
   ) : null
 
@@ -251,7 +258,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
-        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide}
+        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide} firstMessageInline={style === 'restaurant'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           feedback={<>{start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
             {setup.error && canManageRole(role) ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}</>} /> : null}

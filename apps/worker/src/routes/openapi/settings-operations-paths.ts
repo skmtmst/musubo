@@ -1,5 +1,34 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const settingsOperationsPaths = {
+  '/api/settings/sns/connections': {
+    get: {
+      tags: ['Settings'], summary: '店舗のSNS契約枠・請求段・接続件数・Google主連携を読む',
+      parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+      responses: {
+        '200': { description: '契約枠、サーバー確認済み請求段、接続件数、主連携と版' },
+        '403': { description: 'owner/admin以外、またはLINEアカウントの権限なし' },
+        '404': { description: '契約枠が未登録' },
+      },
+    },
+  },
+  '/api/settings/sns/google-primary': {
+    put: {
+      tags: ['Settings'], summary: 'Googleビジネスの主連携を版付きで切り替える',
+      requestBody: { required: true, content: { 'application/json': { schema: {
+        type: 'object', required: ['lineAccountId', 'connectionId', 'expectedVersion'],
+        properties: {
+          lineAccountId: { type: 'string' }, connectionId: { type: 'string' },
+          expectedVersion: { type: 'integer', minimum: 0 },
+        },
+      } } } },
+      responses: {
+        '200': { description: '保存した接続IDと次の版' },
+        '403': { description: 'owner/admin以外、閲覧のみ、またはLINEアカウントの権限なし' },
+        '404': { description: '対象のGoogle接続が無い' },
+        '409': { description: 'ほかの変更と版が競合' },
+      },
+    },
+  },
   // ── Settings ─────────────────────────────────────────────────────────────
   '/api/settings/company': {
     get: {

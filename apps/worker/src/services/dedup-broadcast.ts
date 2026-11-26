@@ -73,7 +73,7 @@ export async function computeDedupBroadcastPreview(
     WITH selected AS (
       SELECT
         f.id            AS friend_id,
-        f.line_user_id,
+        f.line_platform_user_id AS line_user_id,
         f.display_name,
         f.line_account_id,
         f.created_at,

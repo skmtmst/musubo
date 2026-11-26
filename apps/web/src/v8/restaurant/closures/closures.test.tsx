@@ -26,7 +26,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRo
 import { ApiError } from '@/lib/api'
 import InventoryPage from '../inventory/inventory'
 import { snapshotOf } from '../booking-kit/test-data'
-import { inputError, monthWeeks, overlapMessage, overlapping, statusLine, tasksFor, todayIn } from './format'
+import { dayTitle, inputError, monthWeeks, overlapMessage, overlapping, statusLine, tasksFor, todayIn } from './format'
 
 const today = todayIn('Asia/Tokyo')
 const month = today.slice(0, 7)
@@ -104,6 +104,23 @@ describe('UVnvR 休業日・貸切', () => {
     expect(within(band).getByRole('link', { name: 'ホットペッパーの管理画面を開く' }).getAttribute('href')).toBe('https://cms.example.jp/')
     fireEvent.click(within(band).getByRole('button', { name: 'ホットペッパーの枠を閉じた' }))
     await waitFor(() => expect(fixture.completeChannelCloseTask).toHaveBeenCalledWith('account-1', 'k1'))
+  })
+
+  it('過去の日付は押せず、今日以降を押すと選んだ日の窓が開く', async () => {
+    fixture.closures.mockResolvedValue({ data: [] })
+    render(<InventoryPage />)
+    await screen.findByRole('button', { name: /臨時休業・貸切を足す/ })
+    const grid = screen.getByRole('grid')
+    const previous = within(grid).getByRole('gridcell', { name: dayTitle(day(9)) })
+    expect(previous.tagName).toBe('SPAN')
+    expect(previous.className).toContain('cellPast')
+    fireEvent.click(previous)
+    expect(screen.queryByRole('dialog', { name: '臨時休業・貸切を足す' })).toBeNull()
+    const target = within(grid).getByRole('gridcell', { name: `${dayTitle(day(13))}を閉じる` })
+    expect(target.tagName).toBe('BUTTON')
+    fireEvent.click(target)
+    const dialog = await screen.findByRole('dialog', { name: '臨時休業・貸切を足す' })
+    expect(within(dialog).getByRole('button', { name: 'はじめの日' }).textContent).toContain('13日')
   })
 
   it('右上のボタンで足す窓を開き、preview の重なる予約と「LINE で連絡する」（受信箱のその友だち）を出して保存する', async () => {

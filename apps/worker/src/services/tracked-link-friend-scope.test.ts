@@ -11,7 +11,7 @@ beforeEach(() => {
   raw = new Database(':memory:');
   // 複合一意制約への移行後も、同じLINE利用者の所属一致を未割当より優先する。
   raw.exec(`CREATE TABLE line_accounts(id TEXT PRIMARY KEY,tenant_id TEXT);
-    CREATE TABLE friends(id TEXT PRIMARY KEY,line_user_id TEXT,line_account_id TEXT,display_name TEXT);
+    CREATE TABLE friends(id TEXT PRIMARY KEY,line_user_id TEXT,line_account_id TEXT,display_name TEXT,line_platform_user_id TEXT AS (line_user_id) VIRTUAL);
     CREATE TABLE tracked_links(id TEXT PRIMARY KEY,line_account_id TEXT,scenario_id TEXT);
     CREATE TABLE scenarios(id TEXT PRIMARY KEY,line_account_id TEXT);
     CREATE TABLE link_clicks(id TEXT,tracked_link_id TEXT,friend_id TEXT,clicked_at TEXT);

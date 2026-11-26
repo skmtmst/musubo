@@ -12,7 +12,7 @@ import { expireRestaurantHolds, applyDueRestaurantMenuPrices } from '../services
 import { issueSession } from '../services/admin-session.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
-import { getPlatformAdminByStaffId, recordPlatformAudit, startImpersonation } from '@line-crm/db';
+import { encodeScopedFriendLineUserId, getPlatformAdminByStaffId, recordPlatformAudit, startImpersonation } from '@line-crm/db';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 
 export const stagingQa = new Hono<Env>();
@@ -167,7 +167,9 @@ stagingQa.post(`${BASE}/runs/:id/friends`, async (c) => {
     run.friendIds.push(...friends.map(friend => friend.id));
     await db.batch([
       ...friends.map((friend, index) => db.prepare(`INSERT INTO friends(id,line_user_id,line_account_id,display_name,metadata)
-        VALUES (?,?,?,?,'{"stagingQa":true}')`).bind(friend.id, friend.lineUserId, run.accountId, `QA friend ${run.friendIds.length - friends.length + index + 1}`)),
+        VALUES (?,?,?,?,'{"stagingQa":true}')`).bind(friend.id,
+        encodeScopedFriendLineUserId(friend.id, friend.lineUserId, run.accountId),
+        run.accountId, `QA friend ${run.friendIds.length - friends.length + index + 1}`)),
       db.prepare('UPDATE platform_settings SET value=? WHERE key=?').bind(JSON.stringify(run), runKey(id)),
     ]);
     return c.json({ success: true, data: { runId: id, accountId: run.accountId, friends } }, 201);

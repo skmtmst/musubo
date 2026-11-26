@@ -88,6 +88,8 @@ export type EntityPickerWindowProps = {
   scrollBody?: boolean
   footer: ReactNode
   band?: ReactNode
+  /** 選んだものへの注意（共通の Notice）。赤い失敗の文（error）とは分け、一覧と操作の間に置く。 */
+  notice?: ReactNode
   /** 頭の×の左の操作（S2Vgi の「＋タグを作る」）。 */
   headerAction?: ReactNode
   /** 指定した窓だけ、一覧と並ぶ読み取り用の見本を出す。 */

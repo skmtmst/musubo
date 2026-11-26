@@ -4,6 +4,9 @@ import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { openSeatTables, closuresForRange, closureAffectsTable } from '../../services/restaurant-closures.js';
+import { restaurantSeatCapacity } from '../../services/restaurant-seat-capacity.js';
+import { planRestaurantSeats } from '../../services/restaurant-seat-plan.js';
+import { waitlistLineCapacityAvailable } from '../../services/restaurant-inventory-schedule.js';
 import { explainBookingSlot, getAccountTimeZone, tzDateStr, tzHHMM } from '../../services/availability.js';
 import { finishExpiredWaitlists, promoteBookingWaitlist } from '../../features/booking/booking-waitlist/index.js';
 import { insertSeatWaitlistEntry } from '../restaurant-test.js';
@@ -149,16 +152,32 @@ booking.post('/api/liff/booking/seat-waitlist/:id/accept',inputJsonBoundary(), a
  if(entry.status!=='invited'||Date.parse(entry.hold_expires_at)<=Date.now())return liffBookingJson(c, {error:'offer_expired'},409);
  const checked=validateInboundReservation({externalId:`waitlist:${id}`,customerName:entry.customer_name,lineUid:caller.lineUserId,guestCount:entry.guest_count,startsAt:entry.starts_at,endsAt:entry.ends_at,status:'confirmed'});
  if(!checked.ok)return liffBookingInputError(c, {error:checked.error}, 400, []);
- const table=await c.env.DB.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(entry.table_id,entry.store_id,entry.guest_count,entry.guest_count).first();
+ const table=await c.env.DB.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1').bind(entry.table_id,entry.store_id).first();
  if(!table)return liffBookingJson(c, {error:'slot_conflict'},409);
  const closed=await closuresForRange(c.env.DB,entry.store_id,entry.starts_at,entry.ends_at);
  if(closed.some(r=>closureAffectsTable(r,entry.table_id)))return liffBookingJson(c, {error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);
+ const capacity = await restaurantSeatCapacity(c.env.DB, entry.store_id, entry.starts_at, entry.ends_at);
+ const slot = { startsAt: entry.starts_at, endsAt: entry.ends_at, guestCount: entry.guest_count, tableId: entry.table_id };
+ const availableState = { ...capacity.state, waiting: capacity.state.waiting.filter(offer => offer.id !== id) };
+ if (!planRestaurantSeats(availableState, slot)
+  || !await waitlistLineCapacityAvailable(c.env.DB, entry.store_id, slot, capacity.state, id)) {
+  return liffBookingJson(c, { error: 'slot_conflict' }, 409);
+ }
  const reservationId=crypto.randomUUID();
- try { await c.env.DB.batch([
+ try { await capacity.commit([
  c.env.DB.prepare(`INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,?,'line',?,?,?,?,?,?,?,'confirmed',?)`).bind(reservationId,entry.store_id,`waitlist:${id}`,entry.customer_name,caller.lineUserId,entry.guest_count,entry.starts_at,entry.ends_at,entry.table_id,id),
  c.env.DB.prepare(`UPDATE rt_inventory_slots SET reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND julianday(r.starts_at)<julianday(rt_inventory_slots.starts_at,'+'||rt_inventory_slots.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(rt_inventory_slots.starts_at)),0) WHERE store_id=?`).bind(entry.store_id),
  ]);
- }catch(error){if(String(error).includes('closure_conflict'))return liffBookingJson(c, {error:'closure_conflict',reason:'臨時休業・貸切のため受付できません'},409);throw error;}
+ } catch (error) {
+  if (String(error).includes('closure_conflict')) return liffBookingJson(c, { error: 'closure_conflict', reason: '臨時休業・貸切のため受付できません' }, 409);
+  if (/RESTAURANT_CAPACITY_CHANGED|restaurant_table_conflict|customer_line_capacity/.test(String(error))) {
+   const converted = await c.env.DB.prepare('SELECT id,status FROM rt_reservations WHERE store_id=? AND waitlist_entry_id=? AND line_uid=?')
+    .bind(entry.store_id, id, caller.lineUserId).first<{id:string;status:string}>();
+   if (converted) return liffBookingJson(c, {reservation_id:converted.id,status:converted.status});
+   return liffBookingJson(c, { error: 'slot_conflict' }, 409);
+  }
+  throw error;
+ }
  return liffBookingJson(c, {reservation_id:reservationId,status:'confirmed'},201);
 });
 

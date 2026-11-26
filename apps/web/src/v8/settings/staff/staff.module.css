@@ -198,12 +198,7 @@
   line-height: var(--tpl-sa-staff-sub-lh);
 }
 
-.cardWarn {
-  margin: 0;
-  min-width: 0;
-  color: var(--color-status-warn-deep);
-  font-size: var(--text-micro);
-}
+
 
 .cardTools {
   display: flex;
@@ -623,3 +618,6 @@ html:root .table.table :global([data-shared-part='list-row']) {
   height: var(--tpl-sa-staff-role-chip-h);
   justify-content: center;
 }
+
+.personNameLine { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.personNameLine > button { min-width: 0; }

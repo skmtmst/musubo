@@ -9,6 +9,9 @@ import styles from './inbox-chat.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { scheduledMessageInputReason } from '@/lib/scheduled-message-input'
+import { InsertText } from '@/components/shared/insert-text-field'
+import { insertDisplayText, type InsertTokenNames } from '@/components/shared/insert-tokens'
+import { CHAT_INSERT_TOKENS } from './chat-inserts'
 
 
 /*
@@ -52,6 +55,7 @@ export default function ScheduleSendDialog({
   onReschedule,
   onCancelRow,
   now,
+  tokenNames = {},
 }: {
   open: boolean
   accountId: string | null
@@ -75,10 +79,15 @@ export default function ScheduleSendDialog({
   onCancelRow: (id: string) => void
   /** 試験で「いま」を固定する */
   now?: Date
+  /** 差し込みの札の名前（返信欄と同じ札で読む。送る値は {{…}} のまま）。 */
+  tokenNames?: InsertTokenNames
 }) {
   const presets = schedulePresets(now)
   const firstLine = content.trim().split('\n')[0] ?? ''
-  const summary = [firstLine ? `「${firstLine}」` : '', hasImage ? '画像 1枚' : '', attachmentLabel ?? ''].filter(Boolean).join(' ＋ ')
+  /* 差し込みは札で見せ、title も札の名前で読む（生の {{…}} を出さない）。 */
+  const inserts = { names: tokenNames, extra: CHAT_INSERT_TOKENS, markUnknown: true }
+  const others = [hasImage ? '画像 1枚' : '', attachmentLabel ?? ''].filter(Boolean).join(' ＋ ')
+  const summary = firstLine || others ? <>{firstLine ? <>「<InsertText value={firstLine} tokenNames={tokenNames} extraTokens={CHAT_INSERT_TOKENS} markUnknown />」</> : null}{firstLine && others ? ' ＋ ' : ''}{others}</> : null
   const night = value ? isNightJst(value) : false
   const disabledReason = scheduledMessageInputReason(content, hasImage || Boolean(attachmentLabel), value)
 
@@ -101,7 +110,7 @@ export default function ScheduleSendDialog({
         <p className={styles.schBoxLabel}>送るもの</p>
         <p className={styles.schBoxValue}>
           <FileText aria-hidden="true" className={styles.schBoxIcon} />
-          <span className={styles.schBoxText} title={content}>{summary || '書く欄に文を入れてください'}</span>
+          <span className={styles.schBoxText} title={insertDisplayText(content, inserts)}>{summary ?? '書く欄に文を入れてください'}</span>
         </p>
       </div>
       <div className={styles.schGroup}>
@@ -136,7 +145,7 @@ export default function ScheduleSendDialog({
             {rows.map((row) => (
               <li key={row.id} data-inbox-v6="scheduled-row" className={styles.schRow}>
                 <span className={styles.schRowAt}>{row.label}</span>
-                <span className={styles.schRowText} title={row.content}>{row.content}</span>
+                <span className={styles.schRowText} title={insertDisplayText(row.content, inserts)}><InsertText value={row.content} tokenNames={tokenNames} extraTokens={CHAT_INSERT_TOKENS} markUnknown /></span>
                 <DateTimeField
                   aria-label="予約時刻を変更（日本時間）"
                   defaultValue={row.defaultValue}

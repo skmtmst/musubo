@@ -4,18 +4,17 @@ import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { prepareRegistrationWelcome } from '@/lib/registration-welcome'
-import type { LineAccount } from '@line-crm/shared'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, ArrowRight, Check, CircleAlert, CircleDashed, Copy, Plug,
 } from 'lucide-react'
-import { api, type FollowerImportState, type LineAccountConnectData, type LineRegistrationReceipt } from '@/lib/api'
+import { api, type LineAccountConnectData } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { PageContent, PageFooter, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { StepContent } from '@/components/templates/steps'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import { Steps } from '@/components/templates/steps'
@@ -29,13 +28,12 @@ import TextLink from '@/components/shared/text-link'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, channelLengthWarning, checkActionLabel, checkErrorText,
-  checkStage, handoverProgress, isDuplicateChannelError, latestFollowerImportState,
+  checkStage, isDuplicateChannelError, isDuplicateChannelResponse,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
-import { PROVIDER_MEMBERSHIP_GUIDANCE } from './check-rows'
 import Step1Precheck from './step1-precheck'
 import Step2Connect, { type Step2Field } from './step2-connect'
 import Step4Template from './step4-template'
@@ -43,8 +41,10 @@ import RegistrationStyleDialog from './registration-style-dialog'
 import RegistrationUnsavedGuard from './registration-unsaved-guard'
 import Step5Completion from './step5-completion'
 import RegistrationSession from './registration-session'
-import { PENDING_REGISTRATION_RECEIPT, registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
-import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
+import { PENDING_REGISTRATION_RECEIPT, REGISTRATION_STYLE_KEY, registrationImportChoiceKey, registrationPresentationKey, registrationStorageKey, readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
+import { useRegistrationImport } from './use-registration-import'
+import { useRegistrationReceipt } from './use-registration-receipt'
+import { useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -67,8 +67,6 @@ const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string;
   { number: 5, label: '完了', node: 'Plmq1', lead: 'いまの友だちを引き継いでいます。終わると完了です。' },
 ]
 
-const PROVIDER_CONFIRMATION_LABEL = 'LINE Developersで同じプロバイダーにあることを確かめた'
-const PROVIDER_CONFIRMATION_REASON = '接続の確認と登録の前に、このチェックで確認してください。'
 
 type BusyAction = 'check' | 'save' | null
 interface FormState {
@@ -82,6 +80,7 @@ const emptyForm: FormState = {
 
 export default function AccountRegisterV8() {
   const role = useStaffRole()
+  const explicitId = useSearchParams().get('resume')
   const identity = readStaffIdentity()
   const draftKey = registrationStorageKey(DRAFT_KEY, identity)
   const resumeKey = registrationStorageKey(REGISTRATION_STYLE_KEY, identity)
@@ -94,18 +93,15 @@ export default function AccountRegisterV8() {
     <PageContent layout="stats">{role === null ? <ListState kind="loading" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。</ReadOnlyNotice>}</PageContent>
     <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
   </PageFrame>
-  return <RegistrationSession key={draftKey ?? 'unverified'} resumeKey={resumeKey}>
-    {(pendingAccountId, onReceiptConfirmed) => <AccountRegistrationForm
-      draftKey={draftKey} resumeKey={resumeKey} pendingAccountId={pendingAccountId} onReceiptConfirmed={onReceiptConfirmed}
-    />}
+  return <RegistrationSession key={`${draftKey ?? 'unverified'}:${explicitId ?? ''}`} resumeKey={resumeKey} explicitId={explicitId}>
+    {accountId => <AccountRegistrationForm draftKey={draftKey} resumeKey={resumeKey} initialAccountId={accountId} />}
   </RegistrationSession>
 }
 
-function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onReceiptConfirmed }: {
+function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
   draftKey: string | null
   resumeKey: string | null
-  pendingAccountId: string
-  onReceiptConfirmed: (accountId: string) => void
+  initialAccountId: string
 }) {
   const router = useRouter()
   const saveErrors = useSaveFormErrors()
@@ -113,17 +109,15 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
   // ①事前確認（v07 p6zMkA）。答えと、いま出している面。
   const [precheck, setPrecheck] = useState<PrecheckAnswers>({})
   const [precheckAt, setPrecheckAt] = useState<PrecheckAt>('q1')
-  const [currentStep, setCurrentStep] = useState<StepNumber>(pendingAccountId ? 3 : 1)
-  const [sub, setSub] = useState(pendingAccountId ? 2 : 1)
+  const [resumedId, setResumedId] = useState(initialAccountId)
+  const [currentStep, setCurrentStep] = useState<StepNumber>(initialAccountId ? 3 : 1)
+  const [sub, setSub] = useState(initialAccountId ? 2 : 1)
   const [form, setForm] = useState<FormState>(emptyForm)
   const [importFriendsExplicit, setImportFriendsExplicit] = useState(false)
   const importFriendsExplicitRef = useRef(false)
   const [acks, setAcks] = useState<Record<string, boolean>>({})
-  const [providerConfirmed, setProviderConfirmed] = useState(false)
-  const [providerRevision, setProviderRevision] = useState(0)
-  const providerGuard = useRef({ active: true, confirmed: false, revision: 0 })
+  const connectionRequest = useRef({ active: true, revision: 0 })
   const [connection, setConnection] = useState<LineAccountConnectData | null>(null)
-  const [importState, setImportState] = useState<FollowerImportState | null>(null)
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [touchedFields, setTouchedFields] = useState<Partial<Record<Step2Field, boolean>>>({})
@@ -135,50 +129,23 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
   const [checkRunning, setCheckRunning] = useState(false)
   const [checkAttempted, setCheckAttempted] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
-  const [receiptStatus, setReceiptStatus] = useState<Exclude<LineRegistrationReceipt['status'], 'confirmed'> | 'unavailable'>('waiting')
-  const [resumedAccount, setResumedAccount] = useState<Pick<LineAccount, 'name' | 'displayName' | 'basicId'>>()
-  const [idleSeconds, setIdleSeconds] = useState(0)
-  const [importRequestError, setImportRequestError] = useState(false)
-  const [importRefreshing, setImportRefreshing] = useState(false)
+  const [checkedInactiveId, setCheckedInactiveId] = useState('')
   const [draftRestored, setDraftRestored] = useState(false)
   const [draftReady, setDraftReady] = useState(false)
   const [noticeDialog, setNoticeDialog] = useState<'idle' | 'open' | 'done'>('idle')
   const [styleDialogOpen, setStyleDialogOpen] = useState(true)
   const busyLock = useRef(false)
-  const importProgressRef = useRef('')
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const guard = providerGuard.current
-    guard.active = true
-    return () => { guard.active = false; guard.confirmed = false }
+    const request = connectionRequest.current
+    request.active = true
+    return () => { request.active = false }
   }, [])
 
-  const providerConfirmationIsCurrent = () => {
-    const guard = providerGuard.current
-    return guard.active && guard.confirmed && guard.revision === providerRevision
-  }
-  const requireProviderConfirmation = () => {
-    if (providerConfirmationIsCurrent()) return true
-    if (providerGuard.current.active) setError(PROVIDER_CONFIRMATION_REASON)
-    return false
-  }
-  const changeProviderConfirmation = (next: boolean) => {
-    const guard = providerGuard.current
-    if (!guard.active || (next && guard.revision !== providerRevision)) return
-    if (!next) {
-      guard.revision += 1
-      setProviderRevision(guard.revision)
-      setConnection(null)
-      setCheckCursor(0)
-      setCheckRunning(false)
-      setCheckAttempted(false)
-      setStepUp(null)
-    }
-    guard.confirmed = next
-    setProviderConfirmed(next)
-    setError('')
-  }
+  const connectionRequestIsCurrent = (revision: number) =>
+    connectionRequest.current.active && connectionRequest.current.revision === revision
+  const connectionRevision = connectionRequest.current.revision
 
   const checkRows = toV06CheckRows(connection, { running: checkRunning, cursor: checkCursor })
   const rowsOk = allV06RowsOk(checkRows)
@@ -200,26 +167,42 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     const nextAt = precheckNext(key, answers)
     if (nextAt) setPrecheckAt(nextAt)
   }
-  const createdId = connection?.id ?? pendingAccountId
-  // Webhook URLは②Step3で表示する。Callback URLは入力させない。
-  const registrationStyle = useRegistrationStyle(createdId, currentStep === 4)
+  const createdId = connection?.id ?? resumedId
+  const presentationKey = registrationPresentationKey(resumeKey, createdId)
+  const { status: receiptStatus, account: resumedAccount, verified: verifiedReceipt } = useRegistrationReceipt(createdId, currentStep === 3 && sub === 2)
+  const registrationStyle = useRegistrationStyle(createdId, currentStep >= 4, presentationKey)
+  const completionAccount = connection ?? (resumedAccount ? {
+    displayName: resumedAccount.displayName ?? resumedAccount.name,
+    basicId: resumedAccount.basicId ?? null,
+    followerImport: { capability: 'unknown' as const, phase: 'not_started' as const },
+    remainingActions: [],
+  } : null)
+  const [savedImportChoice, setSavedImportChoice] = useState<boolean>()
+  const { importState, importRunning, importFriends, importAttention, importRequestError, importRefreshing, idleSeconds, handover, refreshImport } =
+    useRegistrationImport(createdId, currentStep === 5, connection?.followerImport.phase, resumedId ? savedImportChoice : form.importFriends, Boolean(resumedId))
   const templateKey = registrationStyle.choice
-  const finishStyle = async (action: 'save' | 'skip') => {
-    const succeeded = await registrationStyle[action]()
+  const showStyleDialog = (open: boolean) => {
+    setStyleDialogOpen(open)
+    rememberRegistrationPresentation(presentationKey, { styleOpen: open })
+  }
+  const finishStyle = async () => {
+    const succeeded = await registrationStyle.save()
     if (succeeded) { setStyleDialogOpen(false); setCurrentStep(5); setSub(1) }
   }
-  const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
-  const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
-  const importAttention = (importRunning || importState?.phase === 'completed') && (Boolean(importState?.lastError) || importRequestError || (importRunning && idleSeconds >= 60))
   const basicId = connection?.basicId ?? resumedAccount?.basicId ?? ''
   const accountDisplayName = connection?.displayName ?? resumedAccount?.displayName ?? resumedAccount?.name ?? form.name
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
 
-  const headingReady = currentStep !== 5 || Boolean(connection)
+  const verifyingResume = Boolean(resumedId) && receiptStatus === 'loading'
+  const checkingPayment = receiptStatus === 'inactive' && checkedInactiveId !== createdId
+  const checkingStyle = Boolean(resumedId) && currentStep === 4 && !registrationStyle.error
+    && (registrationStyle.version === null || registrationStyle.selected)
+  const waitingForRegistration = verifyingResume || checkingPayment || !draftReady || checkingStyle
+  const headingReady = currentStep !== 5 || Boolean(completionAccount)
   useEffect(() => {
-    if (headingReady) stepPanelRef.current?.querySelector<HTMLElement>('[data-step-heading]')?.focus()
-  }, [currentStep, sub, precheckAt, headingReady])
+    if (headingReady && !waitingForRegistration) stepPanelRef.current?.querySelector<HTMLElement>('[data-step-heading]')?.focus()
+  }, [currentStep, sub, precheckAt, headingReady, waitingForRegistration])
   useEffect(() => {
     if (!Object.keys(fieldErrors).length) return
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
@@ -227,32 +210,48 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     invalid?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
   }, [fieldErrors, currentStep, sub])
 
-  // 本人の入力だけを戻す。表示位置は必ず①の最初から（秘密値は入れ直す）。
+  // 本人の手順と入力を復元する。秘密値と接続確認の結果は保存しない。
   useEffect(() => {
     const draft = (() => { try { return draftKey ? readDraft(window.localStorage, draftKey) : null } catch (saveFailure) {
       saveErrors.capture(saveFailure)
       return null } })()
     setDraftReady(true)
-    if (!draft) return
+    if (!draft || initialAccountId) return
+    setPrecheck(draft.precheck)
+    setPrecheckAt(draft.precheckAt)
+    setAcks(draft.acks ?? {})
+    setCurrentStep(draft.step <= 2 ? draft.step : 3)
+    setSub(draft.step === 2 ? draft.sub : 1)
+    if (draft.step === 1) setDraftRestored(true)
+    if (draft.step === 3 && /^\d+$/.test(draft.channelId)) {
+      const revision = connectionRequest.current.revision
+      void Promise.resolve().then(() => api.lineAccounts.registrationResume(draft.channelId)).then(response => {
+        if (response.success && connectionRequestIsCurrent(revision)) { setCurrentStep(3); setResumedId(response.data.accountId); setSub(2) }
+      }).catch(() => { /* 接続確認の画面から入力を続けられる。 */ })
+    }
     importFriendsExplicitRef.current = draft.importFriendsExplicit === true
     setImportFriendsExplicit(importFriendsExplicitRef.current)
     setForm((current) => ({
       ...current, name: draft.name, channelId: draft.channelId, providerId: draft.providerId, loginChannelId: draft.loginChannelId, lineId: draft.lineId,
       tagIds: draft.tagIds, parentId: draft.parentId, staffIds: draft.staffIds, liffId: draft.liffId, importFriends: draft.importFriends,
     }))
-    setDraftRestored(true)
-  }, [draftKey, saveErrors])
+  }, [draftKey, initialAccountId, saveErrors])
 
   // 変わるたびに端末の下書きを残す（秘密値は除く）。登録が終わったら消す。
   useEffect(() => {
     if (!draftReady || !draftKey) return
     if (createdId) {
-      try { window.localStorage.removeItem(draftKey) } catch (saveFailure) {
+      try {
+        const saved = readDraft(window.localStorage, draftKey)
+        if (connection?.id || (resumedAccount?.channelId && saved?.channelId === resumedAccount.channelId)) {
+          window.localStorage.removeItem(draftKey)
+        }
+      } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* 消せなくても登録は続ける。 */ }
       return
     }
     const draft: DraftState = {
-      step: currentStep, sub, connectionStepsVersion: 4, accountMethod, precheck, precheckAt,
+      step: currentStep, sub, connectionStepsVersion: 4, accountMethod, precheck, precheckAt, acks,
       name: form.name, channelId: form.channelId, providerId: form.providerId, loginChannelId: form.loginChannelId,
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
@@ -260,7 +259,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     }
     try { window.localStorage.setItem(draftKey, JSON.stringify(draft)) } catch (saveFailure) {
       saveErrors.capture(saveFailure) /* 書けなくても入力は続ける。 */ }
-  }, [draftReady, draftKey, createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, importFriendsExplicit, saveErrors])
+  }, [draftReady, draftKey, createdId, resumedAccount?.channelId, connection?.id, currentStep, sub, accountMethod, precheck, precheckAt, acks, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, importFriendsExplicit, saveErrors])
 
   /* ③-1：応答が返ったあと、5行を1行ずつ送る。止まった行（error）が出たらそこで終わる。 */
   useEffect(() => {
@@ -272,15 +271,17 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     return () => clearTimeout(timer)
   }, [checkRunning, connection, checkCursor])
 
-  // 再読み込み後のQRに必要な表示名とベーシックIDは保存済みアカウントから読む。
   useEffect(() => {
-    if (!pendingAccountId) return
-    let active = true
-    void api.lineAccounts.get(encodeURIComponent(pendingAccountId)).then(response => {
-      if (active && response.success) setResumedAccount(response.data)
-    }).catch(() => { /* 受信確認はアカウント詳細の読み込みと独立して続ける。 */ })
-    return () => { active = false }
-  }, [pendingAccountId])
+    if (!createdId) return
+    const choiceKey = registrationImportChoiceKey(resumeKey, createdId)
+    try {
+      const choice = choiceKey ? localStorage.getItem(choiceKey) : null
+      setSavedImportChoice(choice === null ? undefined : choice === 'true')
+    } catch { setSavedImportChoice(undefined) }
+    const presentation = readRegistrationPresentation(presentationKey)
+    setStyleDialogOpen(presentation.styleOpen !== false)
+    setNoticeDialog(presentation.noticeDone ? 'done' : 'idle')
+  }, [createdId, resumeKey, presentationKey])
 
   // ③-2：自分のスマホで読む友だち追加のQR。作れなくてもURLは出す。
   useEffect(() => {
@@ -296,114 +297,39 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     return () => { cancelled = true }
   }, [currentStep, sub, addFriendUrl, saveErrors])
 
-  // ③-2：人数ではなく、このアカウントに登録後届いた署名付きWebhookの記録を確認する。
   useEffect(() => {
-    if (currentStep !== 3 || sub !== 2 || !createdId) return
+    if (receiptStatus !== 'inactive' || !createdId) return
     let active = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const poll = async () => {
-      try {
-        const response = await api.lineAccounts.registrationReceipt(createdId)
-        if (!active) return
-        if (response.success) {
-          if (response.data.status === 'confirmed') {
-            try { if (resumeKey) sessionStorage.setItem(resumeKey, createdId) } catch (failure) { saveErrors.capture(failure) }
-            if (pendingAccountId) onReceiptConfirmed(createdId)
-            else {
-              setStyleDialogOpen(true)
-              setCurrentStep(4)
-              setSub(1)
-            }
-            return
-          }
-          setReceiptStatus(response.data.status)
-        } else setReceiptStatus('unavailable')
-      } catch {
-        if (active) setReceiptStatus('unavailable')
-      }
-      if (active) timer = setTimeout(() => void poll(), 5000)
-    }
-    void poll()
-    return () => { active = false; if (timer) clearTimeout(timer) }
-  }, [currentStep, sub, createdId, onReceiptConfirmed, pendingAccountId, resumeKey, saveErrors])
+    void api.musuboLineAddition.get({ accountId: createdId }).then(response => {
+      const addition = response.success ? response.data.addition : null
+      if (active && addition?.lineAccountId === createdId && (addition.status === 'awaiting_payment' || addition.status === 'paid')) {
+        router.replace(`/hq/billing/line-addition?${new URLSearchParams({ accountId: createdId })}`)
+      } else if (active) setCheckedInactiveId(createdId)
+    }).catch(() => { if (active) setCheckedInactiveId(createdId) })
+    return () => { active = false }
+  }, [receiptStatus, createdId, router])
 
-  /* ⑤：画面を開いている間は1回ぶんが終わるたびに次を呼ぶ。
-   * 本番では cron も拾うが、検証環境は cron を無効にしている。 */
   useEffect(() => {
-    if (!createdId || !importRunning || !form.importFriends) return
-    let active = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const advance = async () => {
-      try {
-        const response = await api.lineAccounts.stepFollowerImport(createdId)
-        if (!active) return
-        if (!response.success) {
-          setImportRequestError(true)
-          timer = setTimeout(() => void advance(), 5000)
-          return
-        }
-        setImportRequestError(false)
-        setImportState((current) => latestFollowerImportState(current, response.data.state))
-        if (['importing_ids', 'hydrating_profiles'].includes(response.data.state.phase)) {
-          /* 進めた直後は待たない（0.5秒は、何も進まない応答が続いたときの空回り止め）。 */
-          timer = setTimeout(() => void advance(), response.data.busy ? 3000 : 500)
-        }
-      } catch (saveFailure) {
-        saveErrors.capture(saveFailure)
-        if (active) {
-          setImportRequestError(true)
-          timer = setTimeout(() => void advance(), 5000)
-        }
-      }
-    }
-    void advance()
-    return () => { active = false; if (timer) clearTimeout(timer) }
-  }, [createdId, importRunning, form.importFriends, saveErrors])
+    if (!verifiedReceipt || !createdId) return
+    try { if (resumeKey) sessionStorage.setItem(resumeKey, receiptStatus === 'confirmed' ? createdId : PENDING_REGISTRATION_RECEIPT + createdId) } catch { /* 登録は続けられる。 */ }
+    if (receiptStatus === 'confirmed' && currentStep === 3) { setCurrentStep(4); setSub(1) }
+  }, [createdId, currentStep, receiptStatus, resumeKey, verifiedReceipt])
 
-  // ⑤：バックグラウンドで進む状態も読む。POST が一時的に失敗しても表示を止めない。
   useEffect(() => {
-    if (currentStep !== 5 || !createdId || !form.importFriends) return
-    let active = true
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const poll = async () => {
-      try {
-        const response = await api.lineAccounts.followerImportState(createdId)
-        if (active && response.success) {
-          setImportState((current) => latestFollowerImportState(current, response.data))
-          setImportRequestError(false)
-        } else if (active) setImportRequestError(true)
-      } catch {
-        if (active) setImportRequestError(true)
-      }
-      if (active) timer = setTimeout(() => void poll(), 5000)
+    if (currentStep === 4 && registrationStyle.selected) {
+      setStyleDialogOpen(false)
+      setCurrentStep(5)
     }
-    void poll()
-    return () => { active = false; if (timer) clearTimeout(timer) }
-  }, [currentStep, createdId, form.importFriends])
-
-  // ⑤：件数・段階が動いたら待ち時間を戻す。時間は目安をでっち上げず更新確認に使う。
-  const importProgressKey = importState
-    ? `${importState.phase}:${importState.received}:${importState.imported}:${importState.alreadyPresent}:${importState.profilesProcessed}:${importState.profilesUpdated}`
-    : ''
-  useEffect(() => {
-    if (!importProgressKey || importProgressRef.current === importProgressKey) return
-    importProgressRef.current = importProgressKey
-    setIdleSeconds(0)
-  }, [importProgressKey])
-  useEffect(() => {
-    if (currentStep !== 5 || !importRunning) return
-    const timer = setInterval(() => setIdleSeconds((current) => current + 1), 1000)
-    return () => clearInterval(timer)
-  }, [currentStep, importRunning])
+  }, [currentStep, registrationStyle.selected])
 
   // 登録完了（引き継ぎも終わった）直後に契約者専用LINEの案内を一度だけ出す。
   useEffect(() => {
-    if (currentStep === 5 && connection && !importRunning && noticeDialog === 'idle') setNoticeDialog('open')
-  }, [currentStep, connection, importRunning, noticeDialog])
+    if (currentStep === 5 && headingReady && !importRunning && noticeDialog === 'idle'
+      && (!resumedId || savedImportChoice === false || importState !== null)) setNoticeDialog('open')
+  }, [currentStep, headingReady, importRunning, noticeDialog, resumedId, savedImportChoice, importState])
 
   const update = (key: keyof FormState, value: string | string[] | boolean) => {
     if (key === 'importFriends') { importFriendsExplicitRef.current = true; setImportFriendsExplicit(true) }
-    if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') changeProviderConfirmation(false)
     setForm((current) => ({ ...current, [key]: value } as FormState))
     setFieldErrors((current) => {
       const next = { ...current }
@@ -421,7 +347,9 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
       return next
     })
     if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') setReviewedLengthStep(null)
-    if (key === 'channelId' || key === 'channelSecret' || key === 'loginChannelId' || key === 'loginChannelSecret') {
+    if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') {
+      connectionRequest.current.revision += 1
+      setStepUp(null)
       setConnection(null)
       setCheckCursor(0)
       setCheckRunning(false)
@@ -485,9 +413,44 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     }
   }
 
+  const resumeExisting = async (channelId: string, revision: number) => {
+    const result = await api.lineAccounts.registrationResume(channelId.trim()).catch(() => null)
+    if (!result?.success || !connectionRequestIsCurrent(revision)) return false
+    setConnection(null)
+    setResumedId(result.data.accountId)
+    setForm(current => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+    setCurrentStep(3)
+    setSub(2)
+    return true
+  }
+
+  const recoverDuplicate = async (revision: number) => {
+    if (await resumeExisting(form.channelId, revision)) return
+    const recovered = await findRegisteredAccountId(form.channelId)
+    if (!connectionRequestIsCurrent(revision)) return
+    if (recovered) setRecoveredAccountId(recovered)
+    setError('このチャネルIDは登録済みです。登録済みのアカウントを開いて確認してください。')
+  }
+
+  const rememberCreatedAccount = (id: string) => {
+    const choiceKey = registrationImportChoiceKey(resumeKey, id)
+    try {
+      if (choiceKey) localStorage.setItem(choiceKey, String(form.importFriends))
+      if (resumeKey && id) sessionStorage.setItem(resumeKey, PENDING_REGISTRATION_RECEIPT + id)
+    } catch { /* 登録は続けられる。 */ }
+  }
+
+  const goToBilling = (id?: string) => {
+    connectionRequest.current.active = false
+    if (id) rememberCreatedAccount(id)
+    setForm(current => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+    router.push(id ? `/hq/billing/line-addition?${new URLSearchParams({ accountId: id })}` : '/hq/billing/line-addition')
+  }
+
   // ③-1「接続を確かめる」：4項目でLINEへ問い合わせ、5行を1行ずつ送る。
   const runCheck = async () => {
-    if (!requireProviderConfirmation()) return
+    const revision = connectionRevision
+    if (!connectionRequestIsCurrent(revision)) return
     const nextErrors = channelErrors(form)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
@@ -506,27 +469,28 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     setError('')
     try {
       const response = await api.lineAccounts.connectCheck(input())
-      if (!providerConfirmationIsCurrent()) return
+      if (!connectionRequestIsCurrent(revision)) return
       if (!response.success) {
         setCheckRunning(false)
-        setError(response.error)
+        if (isDuplicateChannelError(response.error)) await recoverDuplicate(revision)
+        else setError(response.error)
         return
       }
       if (response.data.additionState === 'pending_payment'
         || response.data.additionState === 'pending_reconciliation') {
-        providerGuard.current.active = false
-        providerGuard.current.confirmed = false
-        setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
-        router.push('/hq/billing/line-addition')
+        goToBilling(response.data.id)
         return
       }
       setConnection(response.data)
-      setReceiptStatus('waiting')
       if (response.data.basicId) setForm((current) => ({ ...current, lineId: response.data.basicId ?? current.lineId }))
       // 止まった行は③の一覧が赤で示し、下の帯が「どこを直すか」を言う。同じ文を重ねない。
     } catch (saveFailure) {
-      if (!providerConfirmationIsCurrent()) return
+      if (!connectionRequestIsCurrent(revision)) return
       setCheckRunning(false)
+      if (isDuplicateChannelResponse(saveFailure)) {
+        await recoverDuplicate(revision)
+        return
+      }
       const fieldFailure = saveErrors.capture(saveFailure)
       /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
          403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。
@@ -539,7 +503,8 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
   }
 
   const save = async (stepUpToken?: string) => {
-    if (!requireProviderConfirmation()) return
+    const revision = connectionRevision
+    if (!connectionRequestIsCurrent(revision)) return
     if (!rowsOk || busyLock.current) {
       setError('5つの確認がすべて通ってから登録してください。')
       return
@@ -550,53 +515,47 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     setRecoveredAccountId('')
     try {
       const response = await api.lineAccounts.connect(input(), stepUpToken)
+      if (!connectionRequest.current.active) return
       if (!response.success) {
-        // R523: 重複は登録済みの詳細へ案内する。
-        if (isDuplicateChannelError(response.error)) {
-          const recovered = await findRegisteredAccountId(form.channelId)
-          if (recovered) {
-            setRecoveredAccountId(recovered)
-            setError('このチャネルIDは登録済みです。登録済みのアカウントを開いて確認してください。')
-            return
-          }
-        }
-        setError(response.error)
+        if ('code' in response && response.code === 'MUSUBO_ADDITION_PENDING_RECONCILIATION') {
+          goToBilling(response.data.accountId)
+        } else if (isDuplicateChannelError(response.error)) await recoverDuplicate(revision)
+        else if (connectionRequestIsCurrent(revision)) setError(response.error)
         return
       }
       if (response.data.additionState === 'pending_payment' || response.data.additionState === 'pending_reconciliation') {
-        providerGuard.current.active = false
-        providerGuard.current.confirmed = false
-        setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
-        router.push('/hq/billing/line-addition')
+        goToBilling(response.data.id)
         return
       }
-      providerGuard.current.active = false
-      providerGuard.current.confirmed = false
+      connectionRequest.current.active = false
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
-      const choiceKey = registrationImportChoiceKey(resumeKey, response.data.id ?? '')
-      try { if (choiceKey) localStorage.setItem(choiceKey, String(form.importFriends)) } catch (failure) { saveErrors.capture(failure) }
-      try {
-        if (response.data.id && resumeKey) sessionStorage.setItem(resumeKey, PENDING_REGISTRATION_RECEIPT + response.data.id)
-      } catch (failure) { saveErrors.capture(failure) }
+      if (response.data.id) rememberCreatedAccount(response.data.id)
       // v07：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
       setSub(2)
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught)
+      if (!connectionRequest.current.active) return
+      const fieldFailure = connectionRequestIsCurrent(revision) && saveErrors.capture(caught)
       // 料金を確認したLINEの追加接続で本人確認を求められたときだけ再試行する。
       if (!stepUpToken && isStepUpRequired(caught)) {
-        if (providerConfirmationIsCurrent()) setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
+        if (connectionRequestIsCurrent(revision)) setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
         return
       }
-      // R523: 応答が無い失敗は「未保存」と断定しない。
+      if (isDuplicateChannelResponse(caught)) {
+        await recoverDuplicate(revision)
+        return
+      }
+      // 応答のない保存も、本人の途中登録を照合して続ける。
+      if (await resumeExisting(form.channelId, revision)) return
       const recovered = await findRegisteredAccountId(form.channelId)
+      if (!connectionRequest.current.active) return
       if (recovered) {
         setRecoveredAccountId(recovered)
         if (!fieldFailure) setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。')
         return
       }
-      if (!fieldFailure) setError('登録できませんでした。時間をおいて、もう一度お試しください。')
+      if (!fieldFailure && connectionRequestIsCurrent(revision)) setError('登録できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -641,7 +600,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
       return
     }
     if (currentStep === 3 && sub === 1 && rowsOk) void save()
-    // ④の保存とスキップはポップアップ内の操作から行う。
+    // ④の保存はポップアップ内の操作から行う。
   }
 
   const moveBack = () => {
@@ -665,32 +624,6 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     moveNext()
   }
 
-  const handover = handoverProgress({
-    phase: importState?.phase ?? connection?.followerImport.phase ?? 'not_started',
-    received: importState?.received ?? 0,
-    imported: importState?.imported ?? 0,
-    alreadyPresent: importState?.alreadyPresent ?? 0,
-    reactivated: importState?.reactivated ?? 0,
-    claimedUnassigned: importState?.claimedUnassigned ?? 0,
-    conflicts: importState?.conflicts ?? 0,
-    invalid: importState?.invalid ?? 0,
-    profilesUpdated: importState?.profilesUpdated ?? 0,
-  })
-  const refreshImport = async () => {
-    if (!createdId || importRefreshing) return
-    setImportRefreshing(true)
-    try {
-      const response = await api.lineAccounts.followerImportState(createdId)
-      if (response.success) {
-        setImportState((current) => latestFollowerImportState(current, response.data))
-        setImportRequestError(false)
-      } else setImportRequestError(true)
-    } catch {
-      setImportRequestError(true)
-    } finally {
-      setImportRefreshing(false)
-    }
-  }
   const busy = Boolean(busyAction) || registrationStyle.busy
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
@@ -703,15 +636,34 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
     || Boolean(missingConnectionReason)
     || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
-    || (currentStep === 3 && sub === 1 && (!rowsOk || !providerConfirmed))
+    || (currentStep === 3 && sub === 1 && !rowsOk)
   // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
     : currentStep !== 2 ? '戻る'
     : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : sub === 3 ? 'プロバイダーIDへ戻る' : 'Webhook の設定へ戻る'
   const nextLabel = currentStep === 3 && sub === 1 ? '登録する' : currentStep === 2 ? '次のステップへ' : '次へ'
 
+  if (waitingForRegistration) {
+    return <PageFrame kind="wizard" boardId={shownStep.node}>
+      <PageHeading title="LINEアカウントを登録" />
+      <PageContent layout="stats"><ListState kind="loading" title="登録の状態を確認しています" /></PageContent>
+    </PageFrame>
+  }
+  if (receiptStatus === 'closed' || receiptStatus === 'inactive') {
+    return <PageFrame kind="wizard" boardId={shownStep.node}>
+      <PageHeading title="LINEアカウントを登録" />
+      <PageContent layout="stats"><ListState kind="error" title="登録を再開できませんでした"
+        description="アカウントの状態が変わったため、LINEアカウントの一覧で確認してください。" /></PageContent>
+      <StickyBar actions={<Button href="/accounts" onClick={() => {
+        try {
+          if (resumeKey && [createdId, `receipt:${createdId}`].includes(sessionStorage.getItem(resumeKey) ?? '')) sessionStorage.removeItem(resumeKey)
+        } catch { /* 一覧に進める。 */ }
+      }}>アカウント一覧へ</Button>} />
+    </PageFrame>
+  }
+
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node} hasFooter>
       <PageHeading
         title="LINEアカウントを登録"
         help={shownStep.lead}
@@ -720,6 +672,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
           <Steps
             label="登録の進捗"
             summaryLayout="aligned"
+            hideSummaryChangeKeys={['1']}
             summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
             /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
@@ -734,7 +687,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
           />
         )}
       />
-      <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
+      <form id="account-registration" className={styles.body} data-template-region="body" onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <StepContent elementRef={stepPanelRef} step={currentStep * 10 + sub}>
           {recoveredAccountId ? (
             <Notice
@@ -771,6 +724,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
               touchedFields={touchedFields}
               acks={acks}
               onUpdate={update}
+              onBackTo={(step) => { setError(''); setSub(step) }}
               onTouchField={(key) => setTouchedFields((current) => ({ ...current, [key]: true }))}
               onValidateField={validateChannelField}
               onToggleAck={toggleAck}
@@ -788,7 +742,6 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>接続確認</h2>
-                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p><Checkbox required checked={providerConfirmed} onCheckedChange={changeProviderConfirmation}>{PROVIDER_CONFIRMATION_LABEL}</Checkbox></Notice>
                 <ul className={styles.checkList}>
                   {checkRows.map((row) => (
                     <li key={row.key} className={styles.checkRow} data-phase={row.phase}>
@@ -827,7 +780,6 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>友だち追加できるか確かめます</h2>
-                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
                     {qrDataUrl ? (
@@ -870,49 +822,54 @@ function AccountRegistrationForm({ draftKey, resumeKey, pendingAccountId, onRece
           {currentStep === 4 && (
             <>
               {registrationStyle.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={registrationStyle.error} onRetry={registrationStyle.reload} /> : null}
-              <Step4Template templateKey={templateKey} onOpen={() => setStyleDialogOpen(true)} />
+              <Step4Template templateKey={templateKey} onOpen={() => showStyleDialog(true)} />
               <RegistrationStyleDialog
-                accountName={form.name.trim() || connection?.displayName?.trim()}
-                open={styleDialogOpen}
+                accountName={accountDisplayName.trim()}
+                presentationKey={presentationKey}
+                open={styleDialogOpen && registrationStyle.version !== null}
                 choice={templateKey}
                 busy={registrationStyle.busy}
                 ready={registrationStyle.version !== null}
                 error={registrationStyle.error}
-                onChoose={(key) => { registrationStyle.setChoice(key); setError('') }}
-                onSave={() => void finishStyle('save')}
-                onSkip={() => void finishStyle('skip')}
-                onClose={() => setStyleDialogOpen(false)}
+                onChoose={(key) => { registrationStyle.setChoice(key); rememberRegistrationPresentation(presentationKey, { choice: key }); setError('') }}
+                onSave={finishStyle}
+                onClose={() => showStyleDialog(false)}
               />
             </>
           )}
 
-          {currentStep === 5 && connection && (
-            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
-          )}
+          {currentStep === 5 && (completionAccount
+            ? <Step5Completion connection={completionAccount} accountName={accountDisplayName} createdId={createdId} importRunning={importRunning} importFriends={importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
+            : <ListState kind="loading" title="登録の状態を確認しています" />)}
 
 
         </StepContent>
-        {!(currentStep === 3 && sub === 2) && <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
+      </form>
+        {!(currentStep === 3 && sub === 2) && <PageFooter shadowInset actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
             <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'} onClick={event => {
               if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+              try { if (resumeKey) sessionStorage.removeItem(resumeKey) } catch { /* 画面は移動できる。 */ }
               if (!importRunning && noticeDialog === 'done') prepareRegistrationWelcome()
             }}><ArrowLeft size={16} aria-hidden="true" />管理画面へ</Button>
           </> : currentStep === 4 ? <>
-            <Button type="button" onClick={() => setStyleDialogOpen(true)} disabled={busy}>スタイルを選ぶ</Button>
-            <Button type="button" onClick={() => void finishStyle('skip')} disabled={busy || registrationStyle.version === null} busy={registrationStyle.busy} busyLabel="保存しています…">あとで設定する</Button>
+            <Button type="button" onClick={() => showStyleDialog(true)} disabled={busy}>スタイルを選ぶ</Button>
           </> : currentStep === 3 && sub === 1 && !rowsOk ? <>
             <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
-            <Button type="button" variant="primary" disabled={busy || checkRunning || !providerConfirmed} disabledReason={!providerConfirmed ? PROVIDER_CONFIRMATION_REASON : undefined} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
+            <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
           </> : <>
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} disabledReason={currentStep === 3 && sub === 1 && !providerConfirmed ? PROVIDER_CONFIRMATION_REASON : missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
+            {currentStep === 2 && <Button href="/hq">途中保存して閉じる</Button>}
+            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" form="account-registration" variant="primary" disabled={busy || nextBlocked} disabledReason={missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
+
           </>} />}
-      </form>
-      <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
-      {currentStep === 4 ? <RegistrationUnsavedGuard dirty={registrationStyle.dirty} busy={registrationStyle.busy} onDiscard={registrationStyle.discard} /> : null}
+      <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => {
+        setNoticeDialog('done')
+        rememberRegistrationPresentation(presentationKey, { noticeDone: true })
+      }} />
+      {currentStep === 4 ? <RegistrationUnsavedGuard dirty={registrationStyle.dirty} busy={registrationStyle.busy} onDiscard={() => { registrationStyle.discard(); rememberRegistrationPresentation(presentationKey, { choice: '' }) }} /> : null}
       {!createdId && currentStep < 4 && (form.channelSecret || form.loginChannelSecret || busyAction || checkRunning) ? <RegistrationUnsavedGuard dirty={Boolean(form.channelSecret || form.loginChannelSecret)} busy={Boolean(busyAction) || checkRunning} onDiscard={() => setForm(current => ({ ...current, channelSecret: '', loginChannelSecret: '' }))} /> : null}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </PageFrame></SaveErrorScope>

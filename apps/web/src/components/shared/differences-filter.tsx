@@ -14,7 +14,7 @@ export default function DifferencesFilter({ checked, onChange }: { checked: bool
   return <div className="flex items-center gap-2">
     <label className="flex items-center gap-2">
       <Toggle label="違う項目だけ" checked={checked} onChange={onChange} />
-      <span>違う項目だけ</span>
+      <span className="text-caption">違う項目だけ</span>
     </label>
     <HelpTip label="違う項目だけの説明">オフにすると一致した項目も確認できます。未取得・マスク済みの値は省略しません。表示を切り替えても選んだ値と保存対象は変わりません。</HelpTip>
   </div>

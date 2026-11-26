@@ -21,7 +21,7 @@ describe('型の見出し（379板の絵）', () => {
     expect(vars, '変数の一覧がありません').toBeTruthy()
     for (const [name, value] of [
       ['--tpl-head-pad-top', '16px'], ['--tpl-head-pad-side', 'var(--polish-space-section)'], ['--tpl-head-pad-bottom', '8px'],
-      ['--tpl-title-size', 'var(--polish-text-page)'], ['--tpl-title-weight', '600'], ['--tpl-title-lh', '40px'],
+      ['--tpl-title-size', 'var(--polish-text-page-title)'], ['--tpl-title-weight', '600'], ['--tpl-title-lh', '40px'],
       ['--tpl-head-gap', 'var(--polish-space-row)'], ['--tpl-desc-size', 'var(--polish-text-body)'], ['--tpl-desc-lh', '19px'],
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],

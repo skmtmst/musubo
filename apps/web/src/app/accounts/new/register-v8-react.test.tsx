@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import RegisterV8 from '@/v8/account-new/register'
 import { allV8RowsPassed, toV8CheckRows } from '@/v8/account-new/logic'
-import type { LineAccountConnectData } from '@/lib/api'
+import type { FollowerImportState, LineAccountConnectData } from '@/lib/api'
 import { deferred } from '@/test-utils/race'
 
 const calls = vi.hoisted(() => ({
-  connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(), registrationReceipt: vi.fn(),
+  connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(), registrationReceipt: vi.fn(), accountGet: vi.fn(),
   followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
   styleGet: vi.fn(), styleSave: vi.fn(), starterSet: vi.fn(),
@@ -20,6 +20,7 @@ vi.mock('@/lib/api', () => ({
       connect: calls.connect,
       list: calls.list,
       registrationReceipt: calls.registrationReceipt,
+      get: calls.accountGet,
       followerImportState: calls.followerImportState,
       stepFollowerImport: calls.stepFollowerImport,
       followerInsight: calls.followerInsight,
@@ -76,6 +77,7 @@ beforeEach(() => {
   calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account' } })
   calls.list.mockResolvedValue({ success: true, data: [] })
   calls.registrationReceipt.mockResolvedValue(confirmedReceipt)
+  calls.accountGet.mockResolvedValue({ success: true, data: { id: 'new-account', name: baseData.displayName, basicId: baseData.basicId } })
   calls.staffList.mockResolvedValue({ success: true, data: [] })
   calls.tagList.mockResolvedValue({ success: true, data: [] })
   calls.followerInsight.mockResolvedValue({ success: true, data: { followers: null } })
@@ -172,18 +174,21 @@ describe('V8 登録ウィザードの gated 進行', () => {
     calls.registrationReceipt.mockReturnValueOnce(confirmation.promise)
     enterCheckStep()
     expect(shownNode()).toBe('Lwxyh')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
     expect(shownNode()).toBe('Lwxyh')
+    expect(calls.accountGet).not.toHaveBeenCalled()
+    expect(calls.styleGet).not.toHaveBeenCalled()
     await act(async () => confirmation.resolve(confirmedReceipt))
     await waitFor(() => expect(shownNode()).toBe('X0pGdw'))
     expect(calls.registrationReceipt).toHaveBeenCalledExactlyOnceWith('new-account')
     await chooseStyle('飲食店')
     await waitFor(() => expect(shownNode()).toBe('Plmq1'))
     expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
-    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } })
+    expect(calls.accountGet).toHaveBeenCalledExactlyOnceWith('new-account')
+    expect(calls.styleGet).toHaveBeenCalledExactlyOnceWith('new-account', true)
+    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } }, true)
     expect(calls.starterSet).not.toHaveBeenCalled()
   })
 
@@ -193,7 +198,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
       .querySelector('[aria-current="step"]')?.textContent
     enterCheckStep()
     expect(current()).toContain('接続確認')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -201,19 +205,21 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
   })
 
-  it('④のポップアップを閉じても、登録画面の「あとで設定する」で保留を保存して⑤へ進める', async () => {
+  it('④のポップアップを閉じても、スタイルを選ぶまでは⑤へ進まない', async () => {
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
     fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull())
-    const skip = screen.getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement
-    await waitFor(() => expect(skip.disabled).toBe(false))
-    fireEvent.click(skip)
+    expect(screen.queryByRole('button', { name: 'あとで設定する' })).toBeNull()
+    expect(screen.queryByText('LINEアカウントの登録が完了しました')).toBeNull()
+    expect(calls.styleSave).not.toHaveBeenCalled()
+    const stickyBar = document.querySelector<HTMLElement>('[data-shared-part="sticky-bar"]')!
+    fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選ぶ' }))
+    await chooseStyle('飲食店')
     expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
-    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, styleMode: 'later' })
+    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } }, true)
     expect(sessionStorage.getItem('musubo-registration-style')).toBeNull()
   })
 
@@ -228,7 +234,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
     nextStep()
     nextStep()
     nextStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -238,7 +243,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
   it('友だち人数があっても今回の受信が未確認なら自動で進まない', async () => {
     calls.registrationReceipt.mockResolvedValue(waitingReceipt)
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -255,7 +259,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
       .mockResolvedValueOnce({ success: true, data: { status: 'error', receivedAt: null } })
       .mockRejectedValueOnce(new Error('temporary connection error'))
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     try {
@@ -394,7 +397,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
     enterCheckStep()
     expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
     expect(calls.connect).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     expect(document.querySelectorAll('[data-phase="ok"]').length).toBe(5)
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
@@ -403,19 +405,33 @@ describe('V8 登録ウィザードの gated 進行', () => {
   })
 
   it('登録後は画面から取り込みの続きを進め、完了を画面へ反映する', async () => {
-    calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account', followerImport: { capability: 'available', phase: 'importing_ids' } } })
-    /* 読むだけ（followerImportState）では次の自動処理まで進まないので、画面は step を呼ぶ。 */
-    calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: { capability: 'available', phase: 'completed', received: 10, imported: 10 }, busy: false, profilesFetched: 10 } })
+    const inProgress: FollowerImportState = {
+      version: 1, capability: 'available', phase: 'importing_ids',
+      eligibilityCheckedAt: null, startedAt: '2026-10-20T10:00:00+09:00', completedAt: null, updatedAt: '2026-10-20T10:00:01+09:00',
+      received: 0, imported: 0, reactivated: 0, claimedUnassigned: 0, alreadyPresent: 0, conflicts: 0, invalid: 0,
+      profilesProcessed: 0, profilesUpdated: 0, profileErrors: 0, lastError: null,
+    }
+    const completed: FollowerImportState = {
+      ...inProgress, phase: 'completed', completedAt: '2026-10-20T10:00:03+09:00', updatedAt: '2026-10-20T10:00:03+09:00',
+      received: 10, imported: 10, profilesProcessed: 10, profilesUpdated: 10,
+    }
+    const earlierState = deferred<{ success: true; data: FollowerImportState }>()
+    calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account', followerImport: { capability: inProgress.capability, phase: inProgress.phase } } })
+    calls.followerImportState.mockReturnValueOnce(earlierState.promise)
+    calls.stepFollowerImport.mockResolvedValue({ success: true, data: { state: completed, busy: false, profilesFetched: 10 } })
     enterCheckStep()
     fireEvent.click(screen.getByRole('checkbox', { name: 'いまの友だちの引き継ぎ' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    expect(calls.stepFollowerImport).not.toHaveBeenCalled()
     await chooseStyle('飲食店')
-    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
-    expect(calls.followerImportState).not.toHaveBeenCalled()
+    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledExactlyOnceWith('new-account'))
+    expect(calls.followerImportState).toHaveBeenCalledExactlyOnceWith('new-account')
     // 取り込み完了後は引き継ぎ結果の板を出し、汎用の完了文は出さない。
     await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
+    await act(async () => earlierState.resolve({ success: true, data: inProgress }))
+    expect(screen.getByRole('heading', { name: '友だちの引き継ぎが完了しました' })).toBeTruthy()
     expect(screen.queryByText('LINEアカウントの登録が完了しました')).toBeNull()
     expect(screen.getByText('10人の友だちを引き継ぎました')).toBeTruthy()
   })
@@ -435,7 +451,6 @@ describe('V8 登録ウィザードの gated 進行', () => {
       },
     })
     enterCheckStep()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
     fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
     // 行の文字は止まった時点で出るが、案内は5行の演出が終わってから出る。
     expect(await screen.findByText('「Webhookの利用」をONにしてください', {}, { timeout: 5000 })).toBeTruthy()

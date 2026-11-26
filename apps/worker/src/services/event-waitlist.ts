@@ -457,7 +457,7 @@ export async function getMyEventWaitlist(
       JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
       JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
       JOIN event_slots s ON s.id = w.slot_id AND s.deleted_at IS NULL
-     WHERE w.line_account_id = ? AND f.line_user_id = ? AND (? IS NULL OR w.id = ?)
+     WHERE w.line_account_id = ? AND f.line_platform_user_id = ? AND (? IS NULL OR w.id = ?)
      ORDER BY slot_starts_at ASC, w.created_at ASC, w.id ASC
   `).bind(params.lineAccountId, params.callerLineUserId, params.waitlistId ?? null, params.waitlistId ?? null)
     .all<Omit<EventWaitlistMine, 'source' | 'customer_note' | 'venue_url' | 'cancel_deadline_hours_before'>>();
@@ -474,7 +474,7 @@ export async function cancelMyEventWaitlist(
   const row = await db.prepare(`
     SELECT w.status, w.version FROM event_waitlist w
       JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
-     WHERE w.id = ? AND w.line_account_id = ? AND f.line_user_id = ?
+     WHERE w.id = ? AND w.line_account_id = ? AND f.line_platform_user_id = ?
   `).bind(params.waitlistId, params.lineAccountId, params.callerLineUserId)
     .first<{ status: string; version: number }>();
   if (!row) return 'not_found';
@@ -489,7 +489,7 @@ export async function cancelMyEventWaitlist(
     db.prepare(`UPDATE event_waitlist SET status = 'cancelled', version = version + 1, updated_at = ?
       WHERE id = ? AND line_account_id = ? AND version = ? AND status IN ('waiting', 'offered')
         AND EXISTS (SELECT 1 FROM friends f WHERE f.id = event_waitlist.friend_id
-          AND f.line_account_id = event_waitlist.line_account_id AND f.line_user_id = ?)`)
+          AND f.line_account_id = event_waitlist.line_account_id AND f.line_platform_user_id = ?)`)
       .bind(now, params.waitlistId, params.lineAccountId, row.version, params.callerLineUserId),
     db.prepare(`INSERT OR IGNORE INTO event_waitlist_promotion_jobs
       (id, line_account_id, event_id, slot_id, source_key, status, attempts, available_at, created_at, updated_at)
@@ -524,7 +524,7 @@ export async function getEventWaitlistOffer(
       JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
       JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
       JOIN event_slots s ON s.id = w.slot_id AND s.deleted_at IS NULL
-     WHERE w.offer_token_hash = ? AND f.line_user_id = ?
+     WHERE w.offer_token_hash = ? AND f.line_platform_user_id = ?
      LIMIT 1
   `).bind(await sha256(params.token), params.callerLineUserId)
     .first<Omit<EventWaitlistOfferDetail, 'remainingSeconds' | 'canAccept'>>();
@@ -570,7 +570,7 @@ export async function acceptEventWaitlistOffer(
   const nowIso = now.toISOString();
   const offer = await db
     .prepare(
-      `SELECT w.id, w.line_account_id, w.friend_id, f.line_user_id,
+      `SELECT w.id, w.line_account_id, w.friend_id, f.line_platform_user_id AS line_user_id,
               w.event_id, w.slot_id, w.status, w.offer_expires_at,
               CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
               CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS starts_at,
@@ -583,7 +583,7 @@ export async function acceptEventWaitlistOffer(
          JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
          JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
          JOIN event_slots s ON s.id = w.slot_id AND s.deleted_at IS NULL
-        WHERE w.offer_token_hash = ? AND f.line_user_id = ?
+        WHERE w.offer_token_hash = ? AND f.line_platform_user_id = ?
         LIMIT 1`,
     )
     .bind(tokenHash, params.callerLineUserId)
@@ -679,7 +679,7 @@ export async function acceptEventWaitlistOffer(
          JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
          JOIN event_slots slot ON slot.id = w.slot_id AND slot.deleted_at IS NULL
         WHERE w.id = ? AND w.status = 'accepted' AND w.offer_token_hash = ?
-          AND f.line_user_id = ?
+          AND f.line_platform_user_id = ?
           AND NOT EXISTS (
             SELECT 1 FROM event_bookings same_slot
              WHERE same_slot.event_id = w.event_id AND same_slot.slot_id = w.slot_id
@@ -1277,7 +1277,7 @@ export function createEventWaitlistOfferSender(
   return async (offer) => {
     const row = await db
       .prepare(
-        `SELECT la.channel_access_token, la.channel_access_token_encrypted, f.line_user_id
+        `SELECT la.channel_access_token, la.channel_access_token_encrypted, f.line_platform_user_id AS line_user_id
            FROM line_accounts la
            JOIN friends f ON f.id = ? AND f.line_account_id = la.id
           WHERE la.id = ?`,

@@ -69,6 +69,21 @@ export type TargetMissingProps = {
   accountName?: string
 }
 
+/** ダイアログの本文に再取得の操作を置くときに使う。 */
+export function InlineLoadFailure({ title, description, onRetry, retrying, 'data-design-node': designNode }: {
+  title: string
+  description: string
+  onRetry: () => void
+  retrying?: boolean
+  'data-design-node'?: string
+}) {
+  return <div className={styles.inlineError} role="alert" data-design-node={designNode}>
+    <strong>{title}</strong>
+    <p>{description}</p>
+    <Button busy={retrying} busyLabel="読み込んでいます" onClick={onRetry}>もう一度読み込む</Button>
+  </div>
+}
+
 export default function TargetMissing({
   kind,
   permissionScope = 'store',

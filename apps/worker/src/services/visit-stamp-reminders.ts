@@ -20,7 +20,7 @@ export function stampReminderText(name:string,expiry:string):string {
 /** 共通の通知台帳を使う。財布と期限で一意、期限が伸びたら別の通知になる。 */
 export async function processVisitStampReminders(db:D1Database,options:{now:Date;proxyBaseUrl:string;proxyDispatch?:HarnessProxyDispatch}) {
   const now=options.now.toISOString();let sent=0,failed=0;
-  const rows=(await db.prepare(`SELECT w.card_id,w.friend_id,w.expires_at,c.settings_json,c.name,f.line_account_id,f.line_user_id,
+  const rows=(await db.prepare(`SELECT w.card_id,w.friend_id,w.expires_at,c.settings_json,c.name,f.line_account_id,f.line_platform_user_id AS line_user_id,
     a.channel_access_token,a.channel_access_token_encrypted FROM visit_stamp_wallets w
     JOIN visit_stamp_cards c ON c.id=w.card_id JOIN friends f ON f.id=w.friend_id JOIN line_accounts a ON a.id=f.line_account_id
     JOIN visit_stamp_card_accounts ca ON ca.card_id=w.card_id AND ca.line_account_id=a.id
@@ -66,7 +66,7 @@ export async function processVisitStampReminders(db:D1Database,options:{now:Date
         ||await isOperationCapabilityStopped(db,row.line_account_id,'reminder_dispatch'))continue;
       const live=await db.prepare(`SELECT 1 FROM visit_stamp_wallets w JOIN visit_stamp_cards c ON c.id=w.card_id
         JOIN friends f ON f.id=w.friend_id WHERE w.card_id=? AND w.friend_id=? AND w.expires_at=? AND c.active=1
-        AND c.settings_json=? AND f.is_following=1 AND f.line_account_id=? AND f.line_user_id=? AND ${activeTenantLineAccountSql('f.line_account_id')}`)
+        AND c.settings_json=? AND f.is_following=1 AND f.line_account_id=? AND f.line_platform_user_id=? AND ${activeTenantLineAccountSql('f.line_account_id')}`)
         .bind(row.card_id,row.friend_id,row.expires_at,row.settings_json,row.line_account_id,row.line_user_id).first();
       if(!live)continue;
       const accepted=await pushViaHarnessProxy(options.proxyBaseUrl,token,row.line_user_id,[{type:'text',text:stampReminderText(row.name,row.expires_at)}],delivery.id,options.proxyDispatch,'reminder_dispatch');

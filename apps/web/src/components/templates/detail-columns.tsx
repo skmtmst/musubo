@@ -8,7 +8,7 @@ import detailStyles from '@/components/shared/detail-content.module.css'
 /** 詳細の本文と補助欄。狭い板では補助欄を畳み、操作は開いて使う。 */
 export function DetailColumns({ children, aside, asideLabel, expanded, onExpandedChange, presentation, variant, toggleLabel, showToggle = true, asideLayout }: {
   asideLayout?: 'detail'
-  variant?: 'restaurant-inventory' | 'restaurant-tables' | 'restaurant-ledger' | 'analysis-history' | 'style-dashboard' | 'style-roster'
+  variant?: 'restaurant-inventory' | 'restaurant-tables' | 'restaurant-ledger' | 'analysis-history' | 'style-dashboard' | 'style-roster' | 'followup-editor'
   children: ReactNode
   aside: ReactNode
   asideLabel: string

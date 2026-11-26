@@ -13,7 +13,10 @@ import {
 } from './restaurant-booking.js';
 import { tzDateStr } from './availability.js';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line/index.js';
+import { inventoryAllocationKey, parseAllocationDocument } from './restaurant-inventory-allocation.js';
+import { inventoryLineCapacityCheck, scheduledInventoryWindows } from './restaurant-inventory-schedule.js';
 export type CustomerReservationRow = {
   id: string;
   store_id: string;
@@ -65,6 +68,7 @@ export async function customerAvailability(
   data: RestaurantCustomerAvailability;
   hoursVersion: number;
   holdMinutes: number;
+  allocationGuard: D1PreparedStatement;
 } | null> {
   if (
     !validRestaurantDate(date) ||
@@ -96,9 +100,9 @@ export async function customerAvailability(
     weekday: number;
     periods: Array<{ opensAt: string; closesAt: string }>;
   }>;
-  const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-    .bind(store.id).first<{ status: string }>();
-  const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id) : null;
+  // 接続の有無の判定と写しの読み取りで**同じ1件**を見る（773で互換索引が外れ接続が2件入り得る）。
+  const googleConnection = await primaryGoogleConnection(db, store.id);
+  const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id, googleConnection.id) : null;
   if (googleConnection && !googleProfile) return null;
   const minute = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   const slots: RestaurantCustomerAvailability['slots'] = [];
@@ -107,6 +111,13 @@ export async function customerAvailability(
   const from = restaurantCivilTime(date,0,store.timezone), to = restaurantCivilTime(date,1440,store.timezone);
   const closures = await closuresForRange(db,store.id,from,to);
   const capacity = await restaurantSeatCapacity(db, store.id, from, new Date(Date.parse(to) + duration * 60000).toISOString(), excludeId);
+  const allocation = parseAllocationDocument(capacity.state.inventoryAllocation ?? null);
+  const periodsFor = (day: string) => googleProfile ? googleOpeningDay(googleProfile, day) : parsed.find(period => period.weekday === new Date(day).getUTCDay())?.periods;
+  const windows = allocation.version ? scheduledInventoryWindows(date, store.timezone, periodsFor, [-1,0,1]) : [];
+  const checkLineCapacity = inventoryLineCapacityCheck(allocation, windows, capacity.state);
+  const allocationGuard = allocation.version ? capacity.guard : db.prepare(`SELECT json(CASE WHEN EXISTS (
+    SELECT 1 FROM account_settings WHERE line_account_id=? AND key=?
+  ) THEN 'RESTAURANT_CAPACITY_CHANGED' ELSE '{}' END)`).bind(store.line_account_id, inventoryAllocationKey + store.id);
   const reasonFor = (startsAt:string,endsAt:string): import('@line-crm/shared').RestaurantUnavailableReason => {
     const overlapping = closures.filter(c => (JSON.parse(c.periods_json) as Array<{startsAt:string;endsAt:string}>).some(p => Date.parse(p.startsAt)<Date.parse(endsAt) && Date.parse(p.endsAt)>Date.parse(startsAt)));
     if (overlapping.some(c=>JSON.parse(c.table_ids_json).length===0)
@@ -120,8 +131,7 @@ export async function customerAvailability(
     const civilDate = new Date(Date.parse(date) + dayOffset * 86400000)
       .toISOString()
       .slice(0, 10);
-    const dayPeriods = googleProfile ? googleOpeningDay(googleProfile, civilDate)
-      : parsed.find((d) => d.weekday === new Date(civilDate).getUTCDay())?.periods;
+    const dayPeriods = periodsFor(civilDate);
     if (dayPeriods === null) return null;
     for (const period of dayPeriods ?? []) {
       const start = minute(period.opensAt),
@@ -167,16 +177,7 @@ export async function customerAvailability(
             (t) => !(t.tableIds??[t.id]).some(id=>occupied.some((r)=>r.table_id===id)),
           );
         }
-        const inventories = (
-          await db
-            .prepare(
-              `SELECT i.line_capacity,(SELECT COALESCE(SUM(r.guest_count),0) FROM rt_reservations r WHERE r.store_id=i.store_id AND r.source='line' AND r.id<>? AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(i.starts_at,'+'||i.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(i.starts_at)) used FROM rt_inventory_slots i WHERE i.store_id=? AND julianday(i.starts_at)<julianday(?) AND julianday(i.starts_at,'+'||i.slot_minutes||' minutes')>julianday(?)`,
-            )
-            .bind(excludeId ?? '', store.id, endsAt, startsAt)
-            .all<{ line_capacity: number; used: number }>()
-        ).results;
-        if (inventories.some((i) => i.line_capacity - i.used < count))
-          tables = [];
+        if (tables.length && !checkLineCapacity(startsAt, endsAt, count)) tables = [];
         if (tables.length && !capacity.select({ startsAt, endsAt, guestCount: count })) tables = [];
         slots.push({
           startsAt,
@@ -203,6 +204,7 @@ export async function customerAvailability(
     },
     hoursVersion: hours.version,
     holdMinutes: settings.holdMinutes,
+    allocationGuard,
   };
 }
 export async function processRestaurantCustomerNotices(

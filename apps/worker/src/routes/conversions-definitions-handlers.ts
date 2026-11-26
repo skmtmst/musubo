@@ -11,7 +11,7 @@ import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { maskedPayloadShape } from '../services/incoming-webhook-actions.js';
 import { sha256Hex } from '../middleware/auth.js';
 import type { ConversionDefinitionUsageKind } from '@line-crm/db';
-import { conversionRange, definitionFilters, conversionDefinitionScope, conversionContractError, readDefinitionInput, plainObject, positiveVersion, readReason, MAX_INGEST_BODY_BYTES, INGEST_SIGNATURE_HEADER, INGEST_EVENT_ID_HEADER } from './conversions-definition.js';
+import { conversionRange, definitionFilters, conversionDefinitionScope, conversionContractError, findConversionIngestFriends, readDefinitionInput, plainObject, positiveVersion, readReason, MAX_INGEST_BODY_BYTES, INGEST_SIGNATURE_HEADER, INGEST_EVENT_ID_HEADER } from './conversions-definition.js';
 import type { Context } from 'hono';
 
 export const get__api_conversions_definitions_1 = async (c: Context<Env, "/api/conversions/definitions">) => {
@@ -504,13 +504,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
 
     const friendId = typeof payload.friendId === 'string' ? payload.friendId.trim() : '';
     const lineUserId = typeof payload.lineUserId === 'string' ? payload.lineUserId.trim() : '';
-    let resolvedFriendId = friendId;
-    if (!resolvedFriendId && lineUserId) {
-      const friend = await c.env.DB.prepare('SELECT id FROM friends WHERE line_user_id = ?')
-        .bind(lineUserId).first<{ id: string }>();
-      resolvedFriendId = friend?.id ?? '';
-    }
-    if (!resolvedFriendId) {
+    if (!friendId && !lineUserId) {
       await log({
         result: 'rejected', reason: 'friend_missing', isTest,
         sourceEventId: sourceEventId.trim().slice(0, 200),
@@ -518,6 +512,15 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
       });
       return inputError(c, { success: false, error: 'friendId or lineUserId is required' }, 400, ["friendId"]);
     }
+    const friends = await findConversionIngestFriends(c.env.DB, point, friendId ? { friendId } : { lineUserId });
+    if (friends.length !== 1) {
+      await log({
+        result: 'rejected', reason: friends.length > 1 ? 'friend_ambiguous' : 'friend_not_found', isTest,
+        sourceEventId: sourceEventId.trim().slice(0, 200), payloadShape, signatureSha256: signatureHash,
+      });
+      return fail(c, 422, 'FRIEND_NOT_FOUND_OR_OUT_OF_SCOPE', {}, []);
+    }
+    const resolvedFriendId = friends[0]!.id;
     const value = payload.value === null || payload.value === undefined
       ? null : Number(payload.value);
 

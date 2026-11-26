@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   get: vi.fn(),
+  selected: 'account-1' as string | null,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -37,7 +38,7 @@ vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.selected, loading: false }) }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '会社', iconUrl: null }) }))
 vi.mock('@/components/layout/sidebar-identity', () => ({ default: () => <div>identity</div> }))
 vi.mock('@/components/hq/account-menu', () => ({ default: () => <div>hq</div>, SidebarAccountMenu: ({ hq }: { hq: boolean }) => <div data-testid="sidebar-account">{hq ? 'me-hq' : 'me-store'}</div> }))
@@ -104,6 +105,7 @@ function isCollapsed() {
 describe('V8-1085-KEYBOARD-01: ⌘\\ は1回だけ畳む', () => {
   beforeEach(() => {
     clearFeatureVisibilityCache()
+    fixture.selected = 'account-1'
     fixture.visibility.mockReset()
     fixture.get.mockReset()
     fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
@@ -144,6 +146,12 @@ describe('V8-1085-KEYBOARD-01: ⌘\\ は1回だけ畳む', () => {
     keydown(window, { key: '\\', ctrlKey: true })
     expect(collapsedValue()).toBe('1')
     expect(isCollapsed()).toBe(true)
+  })
+
+  it('未選択の案内を左メニューに表示しない', () => {
+    fixture.selected = null
+    renderShell()
+    expect(document.body.textContent).not.toContain('LINE公式アカウントを選ぶと、ほかの機能が出ます')
   })
 
   it('畳むボタン1回で1回だけ畳む', async () => {

@@ -56,15 +56,26 @@ describe('describeSendFailure: N-028/N-029 失敗理由の言い換え', () => {
     expect(describeSendFailure(error, NOW)).toContain('受け付けませんでした')
   })
 
-  // N-026: 差し込みの未解決はLINEの拒否ではなく本文側の問題。変数名まで伝える。
-  it('差し込み未解決の400は変数名と修正方法を伝える', () => {
+  // 差し込みの未解決はLINEの拒否ではなく本文側の問題。直す差し込みを札の名前で伝え、生の記号は出さない。
+  it('差し込み未解決の400は差し込みの名前と修正方法を伝える', () => {
     const error = new ApiError(400, '', 'UNRESOLVED_TEMPLATE_VARIABLES', {
-      variables: ['pet_name'],
+      variables: ['pet_name', 'var.guest_count', 'var.closure_datetime'],
     })
     const text = describeSendFailure(error, NOW)
-    expect(text).toContain('差し込み')
-    expect(text).toContain('{{pet_name}}')
+    expect(text).toBe('「不明な差し込み」「人数」「休業の日時」が入らないため、送りませんでした。その部分を書き換えるか消してから、送り直してください。')
+    expect(text).not.toContain('{{')
     expect(text).not.toContain('LINE')
+  })
+
+  it('差し込み未解決の400は、受信箱が読んだ共通情報の名前で言う', () => {
+    const error = new ApiError(400, '', 'UNRESOLVED_TEMPLATE_VARIABLES', { variables: ['var.closure_datetime'] })
+    expect(describeSendFailure(error, NOW, { vars: { closure_datetime: '臨時休業の日時' }, varsComplete: true }))
+      .toBe('「臨時休業の日時」が入らないため、送りませんでした。その部分を書き換えるか消してから、送り直してください。')
+  })
+
+  it('差し込みの名前が分からない未解決の400も、記号を出さずに直し方を伝える', () => {
+    const text = describeSendFailure(new ApiError(400, '差し込みを解決できません: {{var.x}}', 'UNRESOLVED_TEMPLATE_VARIABLES'), NOW)
+    expect(text).toBe('差し込みの値が入らないため、送りませんでした。その部分を書き換えるか消してから、送り直してください。')
   })
 
   it('502は一時障害として待機時間つきで伝える', () => {

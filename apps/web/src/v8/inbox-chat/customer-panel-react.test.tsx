@@ -25,11 +25,12 @@ const render = async (wide: boolean, open = true) => {
 }
 beforeEach(() => {
   onChange.mockClear()
+  vi.spyOn(window, 'matchMedia').mockImplementation(query => ({ matches: false, media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList)
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
 })
-afterEach(async () => { await act(async () => root.unmount()); container.remove() })
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks() })
 
 describe('顧客欄の列と重なりの切替', () => {
   it('狭い幅は名前付きの窓で開き、閉じる操作と参照が届く', async () => {
@@ -43,6 +44,14 @@ describe('顧客欄の列と重なりの切替', () => {
     await render(false, false)
     expect(document.querySelector('[role="dialog"][aria-label="顧客情報"]')).toBeNull()
     expect(panelRef.current).toBeNull()
+  })
+
+  it('デスクトップの重なりでは会話側も操作できる', async () => {
+    vi.mocked(window.matchMedia).mockImplementation(query => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList)
+    await render(false)
+    const panel = document.querySelector('[role="region"][aria-label="顧客情報"]')!
+    expect(panel.textContent).toContain('選んだ相手の情報')
+    expect(panel.hasAttribute('aria-modal')).toBe(false)
   })
 
   it('広い幅へ移すと通常の列へ戻り、二重の欄や窓を残さない', async () => {

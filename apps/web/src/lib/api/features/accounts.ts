@@ -1,6 +1,6 @@
 import { fetchApi } from '../transport/request'
 import type { ApiResponse, LineAccount, TrafficPool, PoolAccount } from '@line-crm/shared'
-import type { LineAccountTag, LineAccountConnectData, FollowerImportState, LineRegistrationReceipt } from '../types/accounts'
+import type { LineAccountTag, LineAccountConnectData, LineAccountConnectPending, FollowerImportState, LineRegistrationReceipt } from '../types/accounts'
 import type { FetchApiOptions } from '../types/transport'
 
 export const accountsMethods = {
@@ -55,6 +55,10 @@ export const accountsMethods = {
         `/api/line-accounts/${encodeURIComponent(id)}/connection-checks`,
         { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ expectedRevision }) },
       ),
+    registrationResume: (channelId: string) =>
+      fetchApi<ApiResponse<{ accountId: string }>>(
+        `/api/line-accounts/registration-resume?${new URLSearchParams({ channel_id: channelId })}`, { cache: 'no-store' },
+      ),
     registrationReceipt: (id: string) =>
       fetchApi<ApiResponse<LineRegistrationReceipt>>(`/api/line-accounts/${encodeURIComponent(id)}/registration-receipt`, { cache: 'no-store' }),
     create: (data: {
@@ -84,7 +88,7 @@ export const accountsMethods = {
     connectCheck: (data: import('@line-crm/shared').LineAccountConnectInput) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
       method: 'POST', body: JSON.stringify(data),
     }),
-    connect: (data: import('@line-crm/shared').LineAccountConnectInput, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+    connect: (data: import('@line-crm/shared').LineAccountConnectInput, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData> | LineAccountConnectPending>('/api/line-accounts/connect', {
       method: 'POST',
       headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       body: JSON.stringify(data),
@@ -201,6 +205,11 @@ export const accountsMethods = {
     }),
     followerImportState: (id: string) =>
       fetchApi<ApiResponse<FollowerImportState>>(`/api/line-accounts/${id}/follower-import`),
+    accountEntry: (id: string) =>
+      fetchApi<ApiResponse<{
+        destination: 'registration' | 'billing' | 'dashboard' | 'handover' | 'unavailable';
+        canResume: boolean;
+      }>>(`/api/line-accounts/${encodeURIComponent(id)}/follower-import?entry=1`, { accountId: id, cache: 'no-store' }),
     detectFollowerImport: (id: string) =>
       fetchApi<ApiResponse<FollowerImportState>>(
         `/api/line-accounts/${id}/follower-import/detect`,

@@ -93,7 +93,7 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
               ))}
             </ul>
           )}
-          <TextLink inline href="/tags?tab=marks">対応マークの設定を開く</TextLink>
+          <TextLink inline tone="menu" href="/tags?tab=marks">対応マークの設定を開く</TextLink>
           {canManage && accountId ? <button type="button" className={styles.popLink} onClick={() => { setOpen(false); setRoutingOpen(true) }}>割り当てと返事の期限</button> : null}
         </section>
       </MenuPortal>

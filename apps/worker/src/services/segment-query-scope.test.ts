@@ -54,6 +54,25 @@ it('適用できないSQLの形は、無制限の問い合わせを返さず拒�
   expect(() => scopeSegmentQuery({ sql: 'SELECT id FROM friends AS f', bindings: [] }, { allowedAccountIds: ['own'], canSeeUnassigned: false })).toThrow();
 });
 
+it('旧配信のSQLでも公開用LINE IDを返し、別アカウントの同じIDを含めない', async () => {
+  fixture.raw.pragma('query_only = OFF');
+  fixture.raw.prepare('UPDATE friends SET line_user_id = ? WHERE id = ?').run('musubo-scope:own-friend:U-shared', 'own-friend');
+  fixture.raw.prepare('UPDATE friends SET line_user_id = ? WHERE id = ?').run('U-shared', 'other-friend');
+  fixture.raw.pragma('query_only = ON');
+
+  const where = 'WHERE f.display_name LIKE ? OR f.id = ?';
+  const query = await scopeStoredBroadcastSegmentQuery(fixture.db, {
+    sql: `SELECT f.id, f.line_user_id, f.display_name FROM friends f ${where}`,
+    bindings: ['own%', 'other-friend'],
+  }, 'own');
+  const scoped = restrictSegmentInput(query, 'f.is_following = ?', [1]);
+
+  expect(scoped.sql.endsWith(where)).toBe(true);
+  expect(scoped.bindings).toEqual([1, 'own', 'own%', 'other-friend']);
+  const { results } = await fixture.db.prepare(scoped.sql).bind(...scoped.bindings).all();
+  expect(results).toEqual([{ id: 'own-friend', line_user_id: 'U-shared', display_name: 'own-friend' }]);
+});
+
 it('重ねた入力制限も条件のORから外れず、束縛の順序を保つ', async () => {
   const scoped = scopeSegmentQuery(buildPublicSegmentQuery(all), { allowedAccountIds: ['own', 'other'], canSeeUnassigned: true });
   expect(await ids(restrictSegmentInput(scoped, 'f.display_name = ?', ['own-friend']))).toEqual(['own-friend']);

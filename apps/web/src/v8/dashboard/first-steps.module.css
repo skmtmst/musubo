@@ -21,12 +21,6 @@
  * 名前の数字でつまずくため、var() で差し替えるだけにする。
  */
 .card {
-  /*
-   * 注記の色は正本（xK5CF / PdmLK）が共通の「control の添え字」と同じ濃い灰なので、
-   * 共通トークンをそのまま指す。docs/v8-design-rules.md §6.47 の
-   * 「文字と地の明暗差は 4.5:1 以上」を満たすのはこの濃さ。
-   */
-  --color-step-note-ink: var(--color-ink-secondary);
   /* 操作の字は正本どおり 600（w6DXYN / rntpz / SR0lf）。 */
   --tpl-button-weight: 600;
   --step-action-weight: var(--tpl-button-weight);
@@ -54,12 +48,6 @@
   --step-action-w: 180px;
   --step-action-text: 14px;
   --step-action-text-lh: 20px;
-  /* 注記の字は正本（xK5CF / PdmLK）どおり PC・SP とも添え字の大きさ。
-     行の高さと寄せは正本の実測どおり PC（xK5CF）が 1.46・右寄せ、
-     SP（PdmLK）が 1.5・左寄せ。共通の 19px トークンは 12px の注記には合わないので使わない。 */
-  --step-note-size: var(--polish-text-support);
-  --step-note-lh: 1.46;
-  --step-note-align: right;
 }
 
 /*
@@ -108,36 +96,17 @@
 
 /*
  * 再開の導線。9項目の一覧の下に「続きから進める」「最初から始める」を並べ、
- * その右（SPでは下）に注記を置く（正本 pTC77 / q9XBK と同じ順）。狭い幅では縦に折り返す。
+ * 狭い幅では縦に折り返す。
  */
 .guideFooter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--step-footer-gap);
   min-width: 0;
 }
 
-/*
- * 注記。正本（xK5CF）は2操作のすぐ右で残り幅いっぱい、SP（PdmLK）は下に折り返す。
- */
-.note {
-  margin: 0;
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--color-step-note-ink);
-  font-size: var(--step-note-size);
-  /*
-    正本の注記は太さ指定なしだが、12px は
-    docs/v8-design-rules.md §6.5 の 2「14px 以下の UI 文字は 500」
-    （§6.14 でも同じ値を §6.5 から取ると明記）に従って 500 にする。
-    文字の大きさ・色・位置は正本のまま。
-  */
-  font-weight: 500;
-  line-height: var(--step-note-lh);
-  /* 正本（xK5CF）は2操作の右で残り幅いっぱいを取り、文字は右端に寄せる。SP（PdmLK）は左寄せ。 */
-  text-align: var(--step-note-align);
-}
 
 /*
  * 下段の2操作は正本の寸法（主・副ともに 180×36・文字 14/600）。
@@ -158,7 +127,7 @@ html:root .guideFooter button[class][class][class] {
 
 /*
  * SP390（FJ6Xd / rvGC6）: 進みの線を出さず「畳む」までカードの中に収め、2操作は縦積みの全幅。
- * 題は PC と同じ 15/22、注記は 12/1.5、頭の間は正本 CIUpZ の 10、下段の間は q9XBK の 10。
+ * 題は PC と同じ大きさにし、頭と下段の間隔をそろえる。
  * 段の高さは正本 mmQ8z の 52。段幅は受容済みの差（正本310→実装270）があるため、
  * 頭が270pxに収まるか毎回実測する。
  */
@@ -171,9 +140,6 @@ html:root .guideFooter button[class][class][class] {
   .card {
     --step-head-gap: 10px;
     --step-footer-gap: 10px;
-    /* 注記の大きさはカード既定と同じ。行の高さは正本（PdmLK）の 1.5、寄せは正本どおり左。 */
-    --step-note-lh: 1.5;
-    --step-note-align: left;
     --tpl-list-row-multi-h: 52px;
   }
   /*

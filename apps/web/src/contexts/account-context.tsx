@@ -1,7 +1,9 @@
 'use client'
 
 import { ListNavigationAccount, ListReturnAccountGuard } from '@/components/shared/list-navigation'
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { usePathname } from 'next/navigation'
+import { isHqShellPath } from '@/lib/menu'
 import type { ReactNode } from 'react'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { loadLineAccounts } from '@/lib/line-accounts-cache'
@@ -84,6 +86,8 @@ interface AccountContextValue {
 const AccountContext = createContext<AccountContextValue | null>(null)
 
 export function AccountProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const clearedAtPath = useRef<string | null>(null)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,6 +97,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const setSelectedAccountId = useCallback((id: string) => {
     requestUnsavedAction(() => {
       clearApiReadCache()
+      clearedAtPath.current = null
       setSelectedAccountIdState(id)
       try {
         localStorage.setItem(STORAGE_KEY, id)
@@ -105,6 +110,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const clearSelectedAccountId = useCallback(() => {
     requestUnsavedAction(() => {
       clearApiReadCache()
+      clearedAtPath.current = pathname ?? ''
       setSelectedAccountIdState(null)
       try {
         localStorage.removeItem(STORAGE_KEY)
@@ -112,7 +118,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         // localStorage unavailable
       }
     })
-  }, [])
+  }, [pathname])
 
   const loadAccounts = useCallback(async (reload: boolean) => {
     setRefreshing(true)
@@ -175,6 +181,17 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadAccounts(false)
   }, [loadAccounts])
+
+  // 統括へ戻る直前の解除を再選択で打ち消さない。店の画面へ移ったら再び判定する。
+  useEffect(() => {
+    if (clearedAtPath.current !== null) {
+      if (clearedAtPath.current === (pathname ?? '')) return
+      clearedAtPath.current = null
+    }
+    if (!loading && !error && !isHqShellPath(pathname) && !selectedAccountId && accounts.length === 1) {
+      setSelectedAccountId(accounts[0].id)
+    }
+  }, [pathname, loading, error, accounts, selectedAccountId, setSelectedAccountId])
 
   useEffect(() => {
     if (loading || error || accounts.length === 0) return

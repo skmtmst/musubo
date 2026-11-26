@@ -9,7 +9,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ConversationHead from './conversation-head'
-import { HeadStatusMenu } from '@/components/shared/inbox-head-menus'
+import { HeadOperatorMenu, HeadStatusMenu } from '@/components/shared/inbox-head-menus'
 
 beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.unstubAllGlobals() })
@@ -76,13 +76,13 @@ describe('会話の頭のメニュー', () => {
     mount()
     expect(screen.getByText('メール・発送について')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '注目にする' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '会話の中を探す（⌘F）' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '会話の中を探す' })).toBeNull()
     cleanup()
     const onToggle = vi.fn()
     mount({ attention: { on: false, saving: false, onToggle }, search: { open: false, onToggle: () => undefined } })
     fireEvent.click(screen.getByRole('button', { name: '注目にする' }))
     expect(onToggle).toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: '会話の中を探す（⌘F）' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '会話の中を探す' })).toBeTruthy()
   })
 
   test('閲覧のみの注目は焦点と理由を残し、押しても変えない', () => {
@@ -102,6 +102,33 @@ test('長い名前と担当は省略しても全文を確認できる', () => {
   const longName = '山田 とても長いお客さまのお名前'
   const longOperator = '鈴木 とても長い担当者のお名前'
   mount({ name: longName, operator: { value: 'long', operators: [{ id: 'long', name: longOperator }], onChange: vi.fn() } })
-  expect(screen.getByRole('button', { name: longName }).getAttribute('title')).toBe(longName)
+  expect(screen.getByTitle(longName).getAttribute('title')).toBe(longName)
   expect(screen.getByRole('button', { name: '担当者を変える' }).parentElement?.querySelector('[data-choice-value]')?.getAttribute('title')).toContain(longOperator)
+})
+
+ test('狭い会話の担当は頭文字でも同じ候補を選べる', () => {
+  const onChange = vi.fn()
+  render(<HeadOperatorMenu compact value="op-k" operators={operators} onChange={onChange} />)
+  expect(screen.getAllByTitle('担当：Kenta').find(el => el.hasAttribute('data-compact-operator'))?.getAttribute('data-initial')).toBe('K')
+  fireEvent.click(screen.getByRole('button', {name:'担当者を変える'}))
+  fireEvent.click(screen.getByRole('radio', {name:'Masato'}))
+  fireEvent.click(screen.getByRole('button', {name:'選ぶ'}))
+  expect(onChange).toHaveBeenCalledWith('op-m')
+})
+
+test('狭い会話では注目をメニューから変更でき、検索と状態は残る', () => {
+  vi.stubGlobal('ResizeObserver', class {
+    callback: ResizeObserverCallback
+    constructor(callback: ResizeObserverCallback) { this.callback = callback }
+    observe() { this.callback([{ contentRect: { width: 400 } } as ResizeObserverEntry], this as unknown as ResizeObserver) }
+    disconnect() {}
+  })
+  const onToggle = vi.fn()
+  mount({ attention: { on: false, saving: false, onToggle }, search: {open: false, onToggle: vi.fn()} })
+  expect(screen.queryByRole('button', {name:'注目にする'})).toBeNull()
+  expect(screen.getByRole('button', {name:'会話の中を探す'})).toBeTruthy()
+  expect(screen.getByRole('button', {name:'対応状況を変える'})).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', {name:'その他の操作'}))
+  fireEvent.click(screen.getByRole('menuitem', {name:'注目にする'}))
+  expect(onToggle).toHaveBeenCalledOnce()
 })

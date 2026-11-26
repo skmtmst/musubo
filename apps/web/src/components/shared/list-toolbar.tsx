@@ -228,10 +228,11 @@ export default function ListToolbar({
 }
 
 /** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
-export function ListToolbarFrame({ children, layout = 'band', singleRow = false, ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked'; /** 狭い板でも道具を 1 行に並べる（検索は縮み、折り返さない）。既定は狭い板で 2 段。 */ singleRow?: boolean }) {
+export function ListToolbarFrame({ children, layout = 'band', singleRow = false, conversation = false, ...props }: HTMLAttributes<HTMLDivElement> & { conversation?: boolean; layout?: 'band' | 'stacked'; /** 狭い板でも道具を 1 行に並べる（検索は縮み、折り返さない）。既定は狭い板で 2 段。 */ singleRow?: boolean }) {
   const ref = useToolbarFit()
   const { leading, persistent } = useContext(LeadingContext)
   const ownsLeading = !containsToolbarLayout(children)
+  if (conversation) return <div {...props} ref={ref} className={styles.conversation} data-shared-part="list-toolbar" data-list-toolbar>{children}</div>
   return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'} data-toolbar-single-row={singleRow || undefined}>
     {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {ownsLeading ? <span className={styles.rowBreak} aria-hidden="true" /> : null}{children}
@@ -275,8 +276,8 @@ function toolbarRole(node: ReactNode): 'search' | 'filter' | 'sort' | 'count' | 
   return roles.find(role => role !== 'filter') ?? 'filter'
 }
 
-export function ListToolbarSearchSlot({ children, width, search }: { children?: ReactNode; width?: number; search?: ListToolbarSearch }) {
-  return <div className={styles.searchSlot} data-toolbar-search style={width ? ({ '--list-search-width': `${width}px` } as React.CSSProperties) : undefined}>{search ? <SearchField value={search.value} onChange={search.onChange} onClear={() => search.onChange('')} placeholder={search.placeholder} aria-label={search.label ?? search.placeholder} maxLength={search.maxLength} loading={search.loading} updateMode={search.updateMode} /> : children}</div>
+export function ListToolbarSearchSlot({ children, width, search, flexible = false }: { children?: ReactNode; width?: number; search?: ListToolbarSearch; flexible?: boolean }) {
+  return <div className={styles.searchSlot} data-toolbar-search data-flexible={flexible || undefined} style={width ? ({ '--list-search-width': `${width}px` } as React.CSSProperties) : undefined}>{search ? <SearchField value={search.value} onChange={search.onChange} onClear={() => search.onChange('')} placeholder={search.placeholder} aria-label={search.label ?? search.placeholder} maxLength={search.maxLength} loading={search.loading} updateMode={search.updateMode} /> : children}</div>
 }
 
 export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanElement>) {

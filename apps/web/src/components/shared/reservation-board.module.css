@@ -65,3 +65,8 @@
 .board[data-kind='seats'] .timeline { padding-inline-end: var(--space-24); }
 .board[data-kind='seats'] .timeHead > span { min-width: 0; }
 .board[data-kind='seats'] .nowTrack { inset-inline-end: var(--space-24); }
+
+.noticeWithLegend{display:flex;align-items:center;gap:var(--space-8)}
+.noticeWithLegend>:first-child{flex:1;min-width:0}
+
+.toolbarEnd{display:flex;align-items:center;gap:var(--space-6);margin-inline-start:auto;min-width:0}

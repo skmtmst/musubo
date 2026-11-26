@@ -173,6 +173,11 @@
   box-shadow: var(--tpl-e10-line-left);
 }
 
+.cellPast {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .cellButton {
   cursor: pointer;
 }

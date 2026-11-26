@@ -62,9 +62,7 @@
 .previewHead { display: flex; align-items: center; gap: var(--space-8); width: 100%; }
 .previewHead h3 { flex: 1; white-space: nowrap; }
 .phonePreview { width: 100%; }
-.phonePreview :global(section > p:first-child), .pcPreview :global(section > p:first-child) { display: none; }
-.pcPreview { width: 100%; }
-.pcPreview :global(section > div) { width: 100%; height: 440px; border-radius: var(--radius-panel); }
+.phonePreview :global(section > p:first-child) { display: none; }
 /* 手順 1〜2 の右の欄：届く人数と内訳。箱は共通のカード、中の字だけここで決める。 */
 .reachCard { width: 100%; }
 .reachRows { font-size: var(--text-micro); font-weight: var(--font-weight-ui); }

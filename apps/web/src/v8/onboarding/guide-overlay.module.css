@@ -12,7 +12,7 @@
   */
   --tpl-guideov-inline-line: 1px;
   --tpl-guideov-brand: #00833f;
-  --tpl-guideov-dim: #0f172a73; --tpl-guideov-ring-border: 3px solid var(--tpl-guideov-brand); --tpl-guideov-radius: 14px; --tpl-guideov-ring-shadow: 0 0 18px #00833f66;
+  --tpl-guideov-ring-border: 3px solid var(--tpl-guideov-brand); --tpl-guideov-radius: 14px; --tpl-guideov-ring-shadow: 0 0 18px #00833f66;
   --tpl-guideov-balloon-w: 340px; --tpl-guideov-balloon-pad: 16px 18px; --tpl-guideov-balloon-shadow: 0 10px 28px #10182840; --tpl-guideov-balloon-offset: 8px; --tpl-guideov-balloon-bottom: 96px; --tpl-guideov-balloon-radius-sp: 14px 14px 0 0;
   --tpl-guideov-gap-4: 4px; --tpl-guideov-gap-8: 8px; --tpl-guideov-gap-10: 10px; --tpl-guideov-pill-pad: 3px 8px; --tpl-guideov-pill-bg: #e9f7ee; --tpl-guideov-text-12: 12px; --tpl-guideov-title: 14.5px; --tpl-guideov-body: 12.5px; --tpl-guideov-body-max-h: 6em;
   --tpl-guideov-line-18: 18px;
@@ -39,7 +39,7 @@
 /* 暗幕 4枚。Pen 04-1 z8qKxY/AmAKC/Lt7PG/v8doAa と同じ色。 */
 .dim {
   position: fixed;
-  background: var(--tpl-guideov-dim);
+  background: var(--color-guide-scrim);
   pointer-events: none;
 }
 
@@ -50,6 +50,11 @@
   border-radius: var(--tpl-guideov-radius);
   box-shadow: var(--tpl-guideov-ring-shadow);
   pointer-events: none;
+}
+
+.tableRing {
+  border-width: var(--space-2);
+  box-shadow: none;
 }
 
 /* 吹き出し。Pen 04-1 mkzrI。 */
@@ -284,12 +289,27 @@ html:root .barHeader button[class][class][class] { height: auto; }
   border-radius: var(--polish-radius-card);
 }
 
+@media (max-width: 480px) {
+  [data-guide-followup-editor] .stack {
+    margin-inline: var(--space-8);
+  }
+}
+
 .root[data-guide-table-editor] .balloon {
-  width: var(--tpl-guideov-complete-balloon-w);
+  width: var(--guide-table-balloon-width);
 }
 
 .root[data-guide-table-editor] .bar {
   inset-block-end: var(--space-12);
+}
+
+[data-guide-table-compact] .stack {
+  margin-inline: var(--space-14);
+}
+
+[data-guide-course-compact] .balloon {
+  margin-inline: var(--space-16);
+  border-radius: var(--tpl-guideov-radius);
 }
 
 .root[data-guide-course-basics] {

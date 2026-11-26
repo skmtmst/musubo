@@ -43,6 +43,8 @@ const searchCalls = vi.hoisted(() => ({ count: 0 }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace }),
+  // AccountProvider が今いる画面を読む（統括へ戻った直後の選択解除を保つため）。
+  usePathname: () => '/auto-replies/edit',
   // 安定したURLSearchParams transport adapter (id=synthetic-rule固定・呼出回数で実body再実行を裏付け)。
   useSearchParams: () => {
     searchCalls.count += 1

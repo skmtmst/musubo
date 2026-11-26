@@ -129,7 +129,7 @@ export async function sendEventBookingNotification(
   const { db, accountId, operationId } = params.delivery;
   await deliverBookingLine(db, { accountId, operationId, snapshot, retryKey: params.retryKey,
     deadlineAt: params.delivery.deadlineAt,
-    authorize: async saved => !!await db.prepare(`SELECT 1 ok FROM friends f WHERE f.line_account_id=? AND f.line_user_id=?
+    authorize: async saved => !!await db.prepare(`SELECT 1 ok FROM friends f WHERE f.line_account_id=? AND f.line_platform_user_id=?
       AND f.is_following=1 AND ${activeTenantLineAccountSql('f.line_account_id')}`).bind(accountId, saved.to).first()
       && !await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')
       && await featureJobCanRun(db, { accountId, featureId: 'events', job: 'event notification' })

@@ -4,6 +4,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import RegisterV8 from './register'
 import { DRAFT_KEY } from './logic'
 
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
 const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), connectCheck: vi.fn(), stepFollowerImport: vi.fn(), getStyle: vi.fn(), saveStyle: vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.getStyle, save: calls.saveStyle } }))
 vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.connectCheck, stepFollowerImport: calls.stepFollowerImport } } }))

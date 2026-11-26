@@ -645,3 +645,6 @@
 @media(min-width:1024px){
  :global(body:has([data-google-hours-page])) .root[data-v8-chrome='shell']{height:56px;min-height:56px;}
 }
+
+/* 未選択は選択欄で知らせ、フォーカスの輪は優先する。 */
+:root .accountPill[data-unselected]:not(:focus-within) { outline: 1px solid var(--color-warning); outline-offset: -.5px; }

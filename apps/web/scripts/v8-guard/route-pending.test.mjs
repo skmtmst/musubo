@@ -13,7 +13,11 @@ import { styleDashboardMock } from '../../../../scripts/visual-qa/style-dashboar
 const source = ts.transpileModule(readFileSync(new URL('../../src/lib/route-pending.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
 const { ROUTE_PENDING_LAYOUTS } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'))
 const paths = process.env.ROUTE_PENDING_PATHS?.split(',')
-const recipes = Object.entries(ROUTE_PENDING_LAYOUTS).filter(([path]) => path !== '/booking/staff/shifts' && (!paths || paths.includes(path))).map(([path, value]) => ({ path, ...value }))
+const handoverPath = '/accounts/new/handover'
+const handoverAccountId = 'visual-qa-account-new'
+const recipes = Object.entries(ROUTE_PENDING_LAYOUTS)
+  .filter(([path]) => path !== '/booking/staff/shifts' && (!paths || paths.includes(path)))
+  .map(([path, value]) => ({ path: path === handoverPath ? `${path}?accountId=${handoverAccountId}` : path, ...value }))
 if (!paths) recipes.push(
   { path: '/password/reset?token=guard', title: '新しいパスワードを設定', publicAuth: true },
   { path: '/register/complete?token=guard', title: '本登録', finalTitle: '利用開始の設定', publicAuth: true },
@@ -69,6 +73,11 @@ for (const width of [1152, 1440]) test(`route pending and fixed headings ${width
         row.finalHeadings = actual
         assert.equal(new URL(page.url()).pathname, recipe.destination ?? new URL(recipe.path, base).pathname)
         const frames = await page.evaluate(() => window.routePendingFrames)
+        if (new URL(recipe.path, base).pathname === handoverPath) {
+          assert.equal(new URL(page.url()).searchParams.get('accountId'), handoverAccountId)
+          assert.ok(frames.some(frame => frame.stage === 'handover'), '引き継ぎの権限を確認する間も観察した')
+          assert.equal(await page.getByRole('navigation', { name: '登録の進捗' }).locator('[aria-current="step"]').innerText(), '5\n完了')
+        }
         if (!recipe.publicAuth) {
           const authFrames = frames.filter(frame => frame.stage === 'auth')
           assert.ok(authFrames.length > 0, '認証前の待機を観察した')

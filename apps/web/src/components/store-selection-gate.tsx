@@ -1,50 +1,29 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import PagePending from '@/components/templates/page-pending'
 import { useAccount } from '@/contexts/account-context'
 import { storeSelectionHref } from '@/lib/hq-navigation'
 import { decideStoreRoute, isAccountIndependentRoute } from '@/lib/store-route-guard'
-import { api } from '@/lib/api'
+import LineAccountEntryGate from './line-account-entry-gate'
 
 export default function StoreSelectionGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const router = useRouter()
   const { loading, selectedAccountId, accounts, error, refreshing, refreshAccounts } = useAccount()
   const decision = decideStoreRoute(pathname, loading, selectedAccountId)
-  const needsHandoverCheck = decision === 'show' && !isAccountIndependentRoute(pathname)
   // 「店舗を選ぶ」から戻る先（元の通知編集など）を持ち越す。
   // クエリは window からしか取れないのでマウント後に組み立てる（NEXT-07）。
   const [selectHref, setSelectHref] = useState('/hq')
-  const [handoverGate, setHandoverGate] = useState<{ id: string; status: 'ready' | 'pending' | 'error' } | null>(null)
-  const [handoverRetry, setHandoverRetry] = useState(0)
   useEffect(() => {
     setSelectHref(storeSelectionHref(`${window.location.pathname}${window.location.search}`))
   }, [pathname])
 
-  useEffect(() => {
-    if (!needsHandoverCheck || !selectedAccountId) return
-    let active = true
-    void api.lineAccounts.followerImportState(selectedAccountId).then((response) => {
-      if (!active) return
-      if (!response.success) throw new Error(response.error)
-      const status = response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles' ? 'pending' : 'ready'
-      setHandoverGate({ id: selectedAccountId, status })
-      if (status === 'pending') router.replace(`/accounts/new/handover?accountId=${encodeURIComponent(selectedAccountId)}`)
-    }).catch(() => {
-      if (active) setHandoverGate({ id: selectedAccountId, status: 'error' })
-    })
-    return () => { active = false }
-  }, [needsHandoverCheck, selectedAccountId, handoverRetry, router])
-
   if (decision === 'show') {
-    if (!needsHandoverCheck) return <>{children}</>
-    if (handoverGate?.id === selectedAccountId && handoverGate.status === 'ready') return <>{children}</>
-    if (handoverGate?.id === selectedAccountId && handoverGate.status === 'error') return <PagePending stage="handover" failed errorTitle="友だちの引き継ぎ状態を確認できません" onRetry={() => setHandoverRetry((value) => value + 1)} />
-    return <PagePending stage="handover" />
+    if (!selectedAccountId || isAccountIndependentRoute(pathname)) return <>{children}</>
+    return <LineAccountEntryGate key={selectedAccountId} accountId={selectedAccountId}>{children}</LineAccountEntryGate>
   }
 
   if (decision === 'wait') {

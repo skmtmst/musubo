@@ -11,11 +11,12 @@ vi.hoisted(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
 })
 
-const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
+const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), storeContext: vi.fn(), createMenu: vi.fn(), updateMenu: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
+vi.mock('@/components/shared/allergy-field', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -44,6 +45,7 @@ beforeEach(() => {
   role.value = verifiedStaffRole('owner')
   nav.params = new URLSearchParams()
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
+  fixture.storeContext.mockResolvedValue({ data: { selectedStore: null } })
   fixture.createMenu.mockResolvedValue({ success: true })
   fixture.updateMenu.mockResolvedValue({ success: true })
   fetchApi.mockResolvedValue({ success: true })
@@ -351,12 +353,13 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuEditPage />)
     fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '冬のコース' } })
     fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '7000' } })
-    fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+    fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+    fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
     fireEvent.click(screen.getByRole('button', { name: /保存して追加する/ }))
     await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', name: '冬のコース', price: 7000 })))
   })
 
-  it.each(['draft', 'active'] as const)('コースを%sで保存するとき公開だけでガイドを進める', async status => {
+  it.each(['draft', 'active'] as const)('コースを%sで保存した後に登録の確認を促す', async status => {
     const advance = vi.fn()
     function MenuWithGuide() {
       useGuideSignal('menu.save', true, advance)
@@ -366,7 +369,8 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuWithGuide />)
     fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '春のコース' } })
     fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '8800' } })
-    fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
+    fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+    fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
     if (status === 'active') {
       fireEvent.click(screen.getByRole('button', { name: '保存する状態', exact: true }))
       fireEvent.click(within(screen.getByRole('option', { name: '公開', exact: true })).getByRole('button'))
@@ -378,7 +382,7 @@ describe('mauOC コースの編集ページ', () => {
     }
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
     expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ status }))
-    expect(advance).toHaveBeenCalledTimes(status === 'active' ? 1 : 0)
+    expect(advance).toHaveBeenCalledOnce()
   })
 
   it('保存に失敗したら入力を残して知らせ、一覧へ戻らない', async () => {
@@ -560,27 +564,36 @@ it('変更予定の価格と日時を一覧に表示する', async () => {
 it('所要時間を編集して保存できる', async () => {
   nav.params = new URLSearchParams('id=m1')
   render(<MenuEditPage />)
-  const duration = await screen.findByRole('spinbutton', { name: '所要時間' }) as HTMLInputElement
+  const duration = await screen.findByRole('button', { name: '所要時間' }) as HTMLButtonElement
   expect(duration.disabled).toBe(false)
-  fireEvent.change(duration, { target: { value: '90' } })
+  fireEvent.click(duration)
+  fireEvent.click(within(screen.getByRole('option', { name: '1時間30分（90分）' })).getByRole('button'))
   fireEvent.click(screen.getByRole('button', { name: '保存する' }))
   await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
 })
 
-it('開店準備では所要時間を30分刻みで選び、選択した分数を保存する', async () => {
+it('開店準備で通常の入力欄を使い、必須3項目で下書きを保存する', async () => {
+  const data = snapshotOf()
+  const firstStore = data.stores[0]
+  data.stores = [firstStore, { ...firstStore, id: 'store-2', line_account_id: 'account-1' }]
+  fixture.snapshot.mockResolvedValue({ data })
+  fixture.storeContext.mockResolvedValue({ data: { selectedStore: { id: 'store-2' } } })
   render(<GuideSharedProvider value={{ summary: null, guide: {
-    phase: 'active', stepKey: 'friendAdd', procedureIndex: 2, anchor: null, pausedAnchor: null,
+    phase: 'active', stepKey: 'friendAdd', procedureIndex: 6, anchor: null, pausedAnchor: null,
     start: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
   } }}><MenuEditPage /></GuideSharedProvider>)
-  fireEvent.click(await screen.findByRole('button', { name: '所要時間' }))
-  expect(screen.getByRole('option', { name: '30分', exact: true })).toBeTruthy()
-  expect(screen.getByRole('option', { name: '6時間（360分）' })).toBeTruthy()
-  expect(screen.getAllByRole('option')).toHaveLength(13)
-  fireEvent.click(within(screen.getByRole('option', { name: '2時間30分（150分）' })).getByRole('button'))
+  const duration = await screen.findByRole('button', { name: '所要時間' })
+  expect(screen.getByRole('button', { name: '保存する状態' }).textContent).toContain('下書き')
   fireEvent.change(screen.getByRole('textbox', { name: 'メニュー名' }), { target: { value: '季節の会席コース' } })
   fireEvent.change(screen.getByRole('spinbutton', { name: '価格（税込）' }), { target: { value: '8800' } })
-  fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+  const save = screen.getByRole('button', { name: '保存して追加する' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  fireEvent.click(duration)
+  fireEvent.click(within(screen.getByRole('option', { name: '2時間30分（150分）' })).getByRole('button'))
+  fireEvent.click(save)
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({
-    kind: 'course', name: '季節の会席コース', price: 8800, durationMinutes: 150,
+    storeId: 'store-2', kind: 'course', name: '季節の会席コース', price: 8800, durationMinutes: 150, status: 'draft',
   })))
+  expect(screen.queryByText('このメニューを公開しますか？')).toBeNull()
+  expect(nav.push).not.toHaveBeenCalled()
 })

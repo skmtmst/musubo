@@ -1,7 +1,7 @@
 'use client'
 
 import { loadStaffIdentity, useTenantAdministratorAccess } from '@/lib/staff-role'
-import { PageFrame } from '@/components/templates/page-frame'
+import { ListPage } from '@/components/templates'
 import { UserPlus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
@@ -13,7 +13,7 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
 import { api, ApiError } from '@/lib/api'
 import StatusBadge from '@/components/shared/status-badge'
 import { canResendInvite, lastLoginShort, memberStatus, sortMembersByRole } from '@/lib/hq-members'
-import HqSettingsNavV8 from './settings-nav'
+import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -60,6 +60,7 @@ export default function HqMembersV8() {
 
 function MembersInner() {
   const saveErrors = useSaveFormErrors()
+  const settingsNav = useHqSettingsFolderNav('members')
   // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
@@ -212,9 +213,8 @@ function MembersInner() {
   const ready = status === 'ready' && !restricted
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId="r4ARpV">
+    <SaveErrorScope errors={saveErrors}><ListPage boardId="r4ARpV" title="メンバー" help="統括に入るメンバーの招待や権限を管理します。" contentSurface="board" folders={<HqSettingsNavV8 active="members" />} folderWidth={200} folderNav={settingsNav}>
       <div className={styles.layout}>
-        <aside className={styles.settingsNav}><HqSettingsNavV8 active="members" /></aside>
         <div className={styles.main}>
         {ready && !canManage ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice></div> : null}
         {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
@@ -235,6 +235,7 @@ function MembersInner() {
               <SegmentedControl aria-label="利用状態で絞り込む" fit="content" value={filter} onChange={value => { setFilter(value); setPage(1) }} options={[{ value: 'active', label: '有効', count: activeCount }, { value: 'suspended', label: '止めた', count: suspendedCount }, { value: 'all', label: 'すべて' }]} />
               <Button variant="primary" disabled={!canManage} onClick={openInvite}><UserPlus aria-hidden="true" className={styles.buttonIcon} />招待する</Button>
             </ListToolbarRow></ListToolbarFrame>
+            {missingMfa > 0 ? <Notice tone="warn" message={`二段階認証が未設定の人が ${missingMfa}人 います。高い権限の人から設定してください。`} /> : null}
             <section className={styles.listCard}>
               <h2 className={styles.listTitle}>メンバー</h2><p className={styles.listCount}>{members.length}人</p>
             <GridTable label="権限者の一覧" columnSizing="content" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-hq-col-role) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
@@ -248,8 +249,8 @@ function MembersInner() {
                 const isSelf = member.id === me?.id
                 return (
                   <GridRow key={member.id}>
-                    <GridNameCell folder={false} name={<span className={styles.identity}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
-                    <GridCell><StatusBadge tone={member.role === 'viewer' ? 'neutral' : member.role === 'staff' ? 'info' : 'success'}>{ROLE_WORDS[member.role] ?? member.role}</StatusBadge></GridCell>
+                    <GridNameCell folder={false} name={<span className={styles.identity}><span className={styles.identityLine}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong></span><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
+                    <GridCell stack><StatusBadge tone={member.role === 'viewer' ? 'neutral' : member.role === 'staff' ? 'info' : 'success'}>{ROLE_WORDS[member.role] ?? member.role}</StatusBadge>{memberStatus(member) === 'active' && member.twoFactorEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</GridCell>
                     <GridCell><span className={styles.shortText}>{lastLoginShort(lastLogins[member.id])}</span></GridCell>
                     <GridCell align="right">
                       {canManage ? <RowActions subjectName={member.name} edit={{ label: '権限を変更する', onClick: () => openChange(member) }} menuItems={canResendInvite(member) ? [{ id: 'resend', label: '招待を再送する', disabled: resendingId === member.id, disabledReason: resendingId === member.id ? '招待を送信しています' : undefined, onSelect: () => { void resend(member) } }] : []} /> : null}
@@ -258,7 +259,6 @@ function MembersInner() {
                 )
               })}
             </GridTable></section>
-            {missingMfa > 0 ? <p className={styles.warning}>二段階認証が未設定の人が {missingMfa}人 います。高い権限の人から設定してください。</p> : null}
             <div className={styles.listFoot}><span>メンバー {filteredRows.length}人中 {visibleRows.length}人を表示</span><Pagination page={Math.min(page, pageCount)} pageCount={pageCount} onPageChange={setPage} /></div>
 
           </>
@@ -308,6 +308,6 @@ function MembersInner() {
           onClose={() => setStepUp(null)}
         />
       ) : null}
-    </PageFrame></SaveErrorScope>
+    </ListPage></SaveErrorScope>
   )
 }

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import {
@@ -19,12 +20,15 @@ import {
  * - 未割当 (NULL) の行だけは、受信したアカウントへ明示的に引き当てる
  */
 
-function asD1(sqlite: Database.Database): D1Database {
+type BeforeWrite = (sql: string, sqlite: Database.Database) => void;
+
+function asD1(sqlite: Database.Database, beforeWrite?: BeforeWrite): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
     async first<T>() {
       return (sqlite.prepare(sql).get(...params) as T) ?? null;
     },
     async run() {
+      beforeWrite?.(sql, sqlite);
       return { success: true, meta: sqlite.prepare(sql).run(...params) };
     },
   });
@@ -56,7 +60,7 @@ const FRIENDS_COLUMNS = `
 
 const databases: Database.Database[] = [];
 
-function makeDb(opts: { globalUniqueLineUserId: boolean }) {
+function makeDb(opts: { globalUniqueLineUserId: boolean; beforeWrite?: BeforeWrite }) {
   const sqlite = new Database(':memory:');
   databases.push(sqlite);
   const lineUserIdColumn = opts.globalUniqueLineUserId
@@ -65,7 +69,7 @@ function makeDb(opts: { globalUniqueLineUserId: boolean }) {
   sqlite.exec(`CREATE TABLE line_accounts(id TEXT PRIMARY KEY, tenant_id TEXT);
     INSERT INTO line_accounts(id,tenant_id) VALUES ('account-a',NULL),('account-b',NULL),('account-c',NULL);
     CREATE TABLE friends (${lineUserIdColumn}, ${FRIENDS_COLUMNS});`);
-  return { sqlite, db: asD1(sqlite) };
+  return { sqlite, db: asD1(sqlite, opts.beforeWrite) };
 }
 
 function insertFriend(
@@ -141,6 +145,23 @@ describe('現行スキーマ (line_user_id グローバルUNIQUE) でのスコ�
     expect(friendRow(sqlite, 'friend-b').is_following).toBe(1);
   });
 
+  test('古いフォローイベントは未割当の所有権とフォロー状態を変えない', async () => {
+    const { sqlite, db } = makeDb({ globalUniqueLineUserId: true });
+    insertFriend(sqlite, { id: 'friend-u', lineUserId: 'U-free', accountId: null });
+    sqlite.prepare(`UPDATE friends SET is_following = 0, last_unfollowed_at = ?
+      WHERE id = 'friend-u'`).run('2026-08-25T00:00:00.000+09:00');
+
+    const friend = await upsertFriend(db, {
+      lineUserId: 'U-free',
+      lineAccountId: 'account-a',
+      followOccurredAt: '2026-08-24T00:00:00.000+09:00',
+      displayName: '以前の名前',
+    });
+
+    expect(friend).toMatchObject({ id: 'friend-u', line_account_id: null, is_following: 0, display_name: 'friend-u' });
+    expect(friendRow(sqlite, 'friend-u')).toMatchObject({ line_account_id: null, is_following: 0 });
+  });
+
   test('未割当の行は upsertFriend が受信アカウントへ引き当てる', async () => {
     const { sqlite, db } = makeDb({ globalUniqueLineUserId: true });
     insertFriend(sqlite, { id: 'friend-u', lineUserId: 'U-free', accountId: null });
@@ -159,6 +180,58 @@ describe('現行スキーマ (line_user_id グローバルUNIQUE) でのスコ�
   });
 });
 
+function assignToAccountBBeforeUpdate(sql: string, sqlite: Database.Database) {
+  if (sql.startsWith('UPDATE friends')) {
+    sqlite.prepare("UPDATE friends SET line_account_id = 'account-b' WHERE id = 'friend-u' AND line_account_id IS NULL").run();
+  }
+}
+
+describe('未割当の行を別アカウントが先に引き当てた場合', () => {
+  test('別々の店舗が同時に追加しても、移行済みDBではどちらも保存される', async () => {
+    const sqlite = new Database(':memory:');
+    databases.push(sqlite);
+    sqlite.exec(readFileSync(new URL('../bootstrap.sql', import.meta.url), 'utf8'));
+    sqlite.exec(`INSERT INTO line_accounts(id, name, channel_id, channel_secret, channel_access_token)
+      VALUES ('account-a', 'A', '1001', 'fixture', 'fixture'), ('account-b', 'B', '1002', 'fixture', 'fixture')`);
+    insertFriend(sqlite, { id: 'legacy', lineUserId: 'U-shared', accountId: null });
+    const db = asD1(sqlite);
+
+    const [a, b] = await Promise.all([
+      upsertFriend(db, { lineUserId: 'U-shared', lineAccountId: 'account-a', displayName: 'Aでの表示名' }),
+      upsertFriend(db, { lineUserId: 'U-shared', lineAccountId: 'account-b', displayName: 'Bでの表示名' }),
+    ]);
+
+    expect(a).toMatchObject({ line_user_id: 'U-shared', line_account_id: 'account-a', display_name: 'Aでの表示名' });
+    expect(b).toMatchObject({ line_user_id: 'U-shared', line_account_id: 'account-b', display_name: 'Bでの表示名' });
+    expect(a.id).not.toBe(b.id);
+    expect([a.id, b.id]).toContain('legacy');
+  });
+
+  test('upsertFriend は引き当て先のプロフィールを変更せず、行を返さない', async () => {
+    const { sqlite, db } = makeDb({ globalUniqueLineUserId: true, beforeWrite: assignToAccountBBeforeUpdate });
+    insertFriend(sqlite, { id: 'friend-u', lineUserId: 'U-free', accountId: null });
+
+    await expect(upsertFriend(db, {
+      lineUserId: 'U-free',
+      lineAccountId: 'account-a',
+      displayName: 'A経由の名前',
+    })).rejects.toThrow('friend_account_scope_changed');
+
+    expect(friendRow(sqlite, 'friend-u')).toMatchObject({ line_account_id: 'account-b', display_name: 'friend-u' });
+  });
+
+  test.each([true, false])('フォロー状態を別アカウントから変更しない（isFollowing=%s）', async (isFollowing) => {
+    const { sqlite, db } = makeDb({ globalUniqueLineUserId: true, beforeWrite: assignToAccountBBeforeUpdate });
+    insertFriend(sqlite, { id: 'friend-u', lineUserId: 'U-free', accountId: null });
+    const previous = isFollowing ? 0 : 1;
+    sqlite.prepare("UPDATE friends SET is_following = ? WHERE id = 'friend-u'").run(previous);
+
+    expect(await updateFriendFollowStatus(db, 'U-free', isFollowing, 'account-a')).toBe(false);
+
+    expect(friendRow(sqlite, 'friend-u')).toMatchObject({ line_account_id: 'account-b', is_following: previous });
+  });
+});
+
 describe('同一 line_user_id の行がアカウントごとに並存する場合 (C-2b後の形)', () => {
   test('AとBそれぞれの行が独立して解決される', async () => {
     const { sqlite, db } = makeDb({ globalUniqueLineUserId: false });
@@ -168,6 +241,35 @@ describe('同一 line_user_id の行がアカウントごとに並存する場�
     expect((await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-a'))?.id).toBe('friend-a');
     expect((await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-b'))?.id).toBe('friend-b');
     expect(await getFriendByLineUserIdForAccount(db, 'U-shared', 'account-c')).toBeNull();
+  });
+
+  test('同じアカウントの同時登録は複合一意制約のもとで1件に収束する', async () => {
+    const { sqlite, db } = makeDb({ globalUniqueLineUserId: false });
+    sqlite.exec('CREATE UNIQUE INDEX friends_account_uid ON friends (line_account_id, line_user_id)');
+    const input = { lineUserId: 'U-shared', lineAccountId: 'account-a' };
+
+    const [one, two] = await Promise.all([upsertFriend(db, input), upsertFriend(db, input)]);
+
+    expect(one.id).toBe(two.id);
+    expect(sqlite.prepare('SELECT COUNT(*) AS count FROM friends').get()).toEqual({ count: 1 });
+  });
+
+  test('同じアカウントの行が並行して作られたとき、未割当の履歴を混ぜない', async () => {
+    const { sqlite, db } = makeDb({
+      globalUniqueLineUserId: false,
+      beforeWrite(sql, raw) {
+        if (sql.startsWith('UPDATE friends')) {
+          insertFriend(raw, { id: 'friend-a', lineUserId: 'U-shared', accountId: 'account-a' });
+        }
+      },
+    });
+    sqlite.exec('CREATE UNIQUE INDEX friends_account_uid ON friends (line_account_id, line_user_id)');
+    insertFriend(sqlite, { id: 'friend-u', lineUserId: 'U-shared', accountId: null });
+
+    const friend = await upsertFriend(db, { lineUserId: 'U-shared', lineAccountId: 'account-a' });
+
+    expect(friend.id).toBe('friend-a');
+    expect(friendRow(sqlite, 'friend-u').line_account_id).toBeNull();
   });
 
   test('upsertFriend は自分のアカウントの行だけを更新する', async () => {

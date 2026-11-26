@@ -26,6 +26,11 @@ import {
   deleteGoogleContentForConnection,
   deleteGoogleContentStatements,
 } from '../services/google-business-retention.js';
+import {
+  GOOGLE_PRIMARY_KEY,
+  googleConnectionListSql,
+  googleConnectionPickSql,
+} from '../services/google-connection-primary.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
   GOOGLE_BUSINESS_REQUIRED_SCOPES,
@@ -74,7 +79,7 @@ type ReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'publ
  */
 async function canManageGoogleConnection(c: Context<Env>): Promise<boolean> {
   const staff = c.get('staff');
-  if (!staff) return false;
+  if (!staff || staff.readOnly) return false;
   if (staff.role === 'owner') return true;
   if (staff.role !== 'admin' || staff.id === 'env-owner') return false;
   const row = await dbFor(c.env)
@@ -310,14 +315,12 @@ async function ensureStoreForGoogle(c: Context<Env>): Promise<StoreContext | nul
   return store;
 }
 
-/** 主連携の正本。列は持たず account_settings に置く（sns-connection-ports.ts と同じ鍵）。 */
-const GOOGLE_PRIMARY_KEY = 'sns.google.primary_connection';
-
 /**
  * 操作対象の接続を1件に決める。
  * connectionId を渡した場合はその接続だけを見る（別の店舗の接続IDでは null になる）。
  * 省略した場合は主連携（account_settings の sns.google.primary_connection）を優先し、
  * 無ければ並び順 → 接続日時 → ID の決まった順で先頭を返す。接続が増えても取り違えない。
+ * 並べ方の正本は services/google-connection-primary.ts に1か所だけ置く。
  */
 export async function connectionForEnv(env: Env['Bindings'], storeId: string, connectionId?: string | null): Promise<ConnectionRow | null> {
   const db = dbFor(env, storeId);
@@ -328,17 +331,7 @@ export async function connectionForEnv(env: Env['Bindings'], storeId: string, co
       .first<ConnectionRow>();
   }
   return db
-    .prepare(
-      `SELECT c.* FROM rt_google_connections c
-       WHERE c.store_id = ?
-       ORDER BY CASE WHEN c.id = (
-             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
-             JOIN rt_stores s ON s.id = c.store_id
-             WHERE a.line_account_id = s.line_account_id AND a.key = ?
-           ) THEN 0 ELSE 1 END,
-         c.sort_order, COALESCE(c.connected_at, ''), c.id
-       LIMIT 1`,
-    )
+    .prepare(googleConnectionPickSql('c.*'))
     .bind(storeId, GOOGLE_PRIMARY_KEY)
     .first<ConnectionRow>();
 }
@@ -353,16 +346,7 @@ export async function connectionFor(c: Context<Env>, storeId: string, connection
  */
 async function connectionsFor(c: Context<Env>, storeId: string): Promise<ConnectionRow[]> {
   const rows = await dbFor(c.env, storeId)
-    .prepare(
-      `SELECT c.* FROM rt_google_connections c
-       WHERE c.store_id = ?
-       ORDER BY CASE WHEN c.id = (
-             SELECT json_extract(a.value, '$.data.connectionId') FROM account_settings a
-             JOIN rt_stores s ON s.id = c.store_id
-             WHERE a.line_account_id = s.line_account_id AND a.key = ?
-           ) THEN 0 ELSE 1 END,
-         c.sort_order, COALESCE(c.connected_at, ''), c.id`,
-    )
+    .prepare(googleConnectionListSql('c.*'))
     .bind(storeId, GOOGLE_PRIMARY_KEY)
     .all<ConnectionRow>();
   return rows.results ?? [];
@@ -644,11 +628,39 @@ restaurantGoogle.get('/api/restaurant-test/google/connections', async (c) => {
   });
 });
 
+async function canConnectGoogleForAccount(c: Context<Env>, lineAccountId: string | null): Promise<boolean> {
+  const staff = c.get('staff');
+  if (!lineAccountId || staff?.credential !== 'session') return false;
+  const scope = await getVisibleLineAccountScope(dbFor(c.env), staff);
+  return scope.accounts.some(account => account.id === lineAccountId && account.is_active === 1 && !account.archived_at);
+}
+
+async function activeGoogleOAuthStore(c: Context<Env>, storeId: string, lineAccountId: string) {
+  const tenantId = staffTenantId(c);
+  return dbFor(c.env, storeId)
+    .prepare(
+      `SELECT s.id, s.line_account_id
+         FROM rt_stores s
+         JOIN rt_organizations o ON o.id = s.organization_id
+         JOIN line_accounts a ON a.id = s.line_account_id
+        WHERE s.id = ? AND s.line_account_id = ? AND o.tenant_id = ?
+          AND COALESCE(a.tenant_id, ?) = ?
+          AND a.is_active = 1 AND a.archived_at IS NULL`,
+    )
+    .bind(storeId, lineAccountId, tenantId, DEFAULT_TENANT_ID, tenantId)
+    .first<{ id: string; line_account_id: string }>();
+}
+
 restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnectionManager, inputJsonBoundary(), async (c) => {
   const client = oauthClient(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
+  if (!await canConnectGoogleForAccount(c, accountId(c))) {
+    return fail(c, 404, '接続できるLINEアカウントを確認してください。', { code: 'LINE_ACCOUNT_NOT_FOUND' });
+  }
   const store = await ensureStoreForGoogle(c);
-  if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+  if (!store || !await activeGoogleOAuthStore(c, store.id, store.lineAccountId)) {
+    return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
+  }
   // connection_id を渡すとその接続のつなぎ直しになる（渡さないときは今までどおり主連携）。
   // mode=add は「接続を増やす」。既にある接続は一切見ないので、主連携を取り違えてつなぎ直さない。
   const adding = c.req.query('mode') === 'add';
@@ -716,31 +728,33 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         .bind(state)
         .first<{ state: string; store_id: string; line_account_id: string | null; connection_id: string | null; staff_id: string; mode: 'connect' | 'reconnect'; code_verifier_enc: string; expires_at: string; used_at: string | null }>()
     : null;
-  const lineAccountId = stateRow?.line_account_id ?? null;
-
-  if (!stateRow || (cookieState !== null && cookieState !== state) || stateRow.used_at || Date.parse(stateRow.expires_at) < Date.now()) {
-    return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
+  const actorId = c.get('staff')!.id;
+  const lineAccountId = stateRow?.line_account_id;
+  const expiresAt = Date.parse(stateRow?.expires_at ?? '');
+  if (!stateRow || !lineAccountId || stateRow.staff_id !== actorId ||
+      (cookieState !== null && cookieState !== state) || stateRow.used_at ||
+      !Number.isFinite(expiresAt) || expiresAt <= Date.now() ||
+      !await canConnectGoogleForAccount(c, lineAccountId)) {
+    return c.redirect(adminReturnUrl(c, null, 'error:invalid_state'));
   }
-  if (stateRow.staff_id !== c.get('staff')!.id) {
-    return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
-  }
-  // 営業時間の画面から始めた認可は、終わりでも中断でも営業時間へ戻す（state の先頭の合図で見分ける）。
+  // 営業時間の画面から始めた認可は、終わりでも中断でも営業時間へ戻す。
   const returnToSetup = (result: string) => adminReturnUrl(c, lineAccountId, result, stateRow.state.startsWith('hours.'));
-  await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
+  const store = await activeGoogleOAuthStore(c, stateRow.store_id, lineAccountId);
+  if (!store) return c.redirect(returnToSetup('error:store_missing'));
+
+  const db = dbFor(c.env, store.id);
+  const now = nowIso();
+  const claim = await db.prepare(
+    'UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ? AND staff_id = ? AND used_at IS NULL AND expires_at > ?',
+  ).bind(now, state, actorId, now).run();
+  if (!claim.meta.changes) return c.redirect(returnToSetup('error:invalid_state'));
   if (c.req.query('error') || !code) {
     return c.redirect(returnToSetup('error:denied'));
   }
-  // 店舗が今もこの担当者の統括に属しているか（stateの発行後に変わっていないか）。
-  const store = await dbFor(c.env, stateRow.store_id)
-    .prepare(`SELECT s.id, s.name, s.organization_id, s.line_account_id FROM rt_stores s JOIN rt_organizations o ON o.id = s.organization_id WHERE s.id = ? AND o.tenant_id = ? LIMIT 1`)
-    .bind(stateRow.store_id, staffTenantId(c))
-    .first<{ id: string; name: string; organization_id: string; line_account_id: string | null }>();
-  if (!store) return c.redirect(returnToSetup('error:store_missing'));
 
   const client = oauthClient(c);
   if (!client) return c.redirect(returnToSetup('error:oauth_not_configured'));
   const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
-  const db = dbFor(c.env, store.id);
   try {
     const tokens = await exchangeAuthorizationCode({
       client,
@@ -767,6 +781,9 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     const refreshEnc = tokens.refreshToken ? await encryptCredential(tokens.refreshToken, key) : existing?.refresh_token_enc ?? null;
     const accessEnc = await encryptCredential(tokens.accessToken, key);
     const accessExpires = new Date(tokens.expiresAtMs).toISOString();
+    if (!await activeGoogleOAuthStore(c, store.id, lineAccountId)) {
+      return c.redirect(returnToSetup('error:store_missing'));
+    }
 
     if (stateRow.mode === 'reconnect' && existing?.location_name) {
       const same = locations.find((location) => location.name === existing.location_name);

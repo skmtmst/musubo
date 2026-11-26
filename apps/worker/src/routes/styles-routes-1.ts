@@ -9,10 +9,11 @@ import {
   paymentSummary,
   paymentSummaryInWindow,
 } from '../features/booking/booking-payment-admin/index.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForAccount } from '../services/tenant-features.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 
 import type { Env } from '../worker-env.js';
 import { hasPendingStyleSelection } from '../services/style-profile.js';
@@ -52,8 +53,24 @@ import {
 export const styles = new Hono<Env>();
 styles.route('/', styleEcSummary);
 
+async function accountForStyle(c: Context<Env>) {
+  const id = await account(c);
+  if (c.req.query('registration') !== '1') return id;
+  edit(c);
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (scope.isAccountScoped) throw new StyleError('forbidden', 403);
+  const row = await c.env.DB.prepare(
+    'SELECT is_active, archived_at, created_by_staff_id FROM line_accounts WHERE id = ?',
+  ).bind(id).first<{ is_active: number; archived_at: string | null; created_by_staff_id: string | null }>();
+  if (!row || row.archived_at || (row.created_by_staff_id && row.created_by_staff_id !== c.get('staff').id)) {
+    throw new StyleError('not_found', 404);
+  }
+  if (!row.is_active) throw new StyleError('LINE_ACCOUNT_INACTIVE', 409);
+  return id;
+}
+
 styles.get(base, async (c) => {
-  const id = await account(c),
+  const id = await accountForStyle(c),
     p = await profile(c.env.DB, id),
     style = p?.style ?? 'standard';
   return c.json({
@@ -86,7 +103,7 @@ styles.get(base, async (c) => {
 
 styles.put(base, async (c) => {
   edit(c);
-  const id = await account(c);
+  const id = await accountForStyle(c);
   return c.json({
     success: true,
     data: await saveProfile(

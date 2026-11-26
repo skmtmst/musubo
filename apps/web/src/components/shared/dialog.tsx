@@ -51,6 +51,8 @@ export type DialogProps = {
   designHeaderHeight?: number
   /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
   headerAction?: ReactNode
+  /** 既定は窓の形で決まる。ガイドの窓にも閉じる操作が必要なら true。 */
+  showCloseButton?: boolean
   /** 題と説明の左に置く、線のアイコン。false なら印を省く。 */
   headerIcon?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
@@ -101,6 +103,8 @@ export type DialogProps = {
   confirmLockedReason?: string
   actionWidthReserve?: 'states' | 'idle'
   guideSlot?: string
+  /** 広い画面用の案内を本文に置く場合、フッター側は狭い画面だけで使う。 */
+  guideSlotNarrow?: boolean
   confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
@@ -159,6 +163,7 @@ export default function Dialog({
   designHeaderPadding,
   designHeaderHeight,
   headerAction,
+  showCloseButton,
   headerIcon,
   designContentPadding,
   designFooterPadding,
@@ -190,6 +195,7 @@ export default function Dialog({
   confirmLockedReason,
   actionWidthReserve,
   guideSlot,
+  guideSlotNarrow,
   confirmPlacement,
   onConfirm,
   onCancel,
@@ -345,8 +351,8 @@ export default function Dialog({
             {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
           </div>
           {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
-          {/* ガイドの窓はフッターの操作で閉じる。 */}
-          {designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker' ? (
+          {/* 窓の形に応じて閉じる操作を表示する。 */}
+          {(showCloseButton ?? (designLayout !== 'stacked-centered' && designLayout !== 'stacked-guided' && designLayout !== 'stacked-picker')) ? (
             <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={discard.requestClose} disabled={busy}>
               <X aria-hidden="true" size={20} />
             </IconButton>
@@ -359,7 +365,7 @@ export default function Dialog({
       {error || automaticError ? <Notice tone="danger" role="alert">
         {error || automaticError}
       </Notice> : null}
-      {open && guideSlot ? <div data-guide-slot={guideSlot} style={{ display: 'contents' }} /> : null}
+      {open && guideSlot ? <div data-guide-slot={guideSlot} data-guide-narrow={guideSlotNarrow || undefined} style={{ display: 'contents' }} /> : null}
       <div className={styles.footer} data-window-actions>
       {footer != null ? (layout === 'account-inset' ? <div className={styles.insetActions}>{footer}</div> : footer) : (onConfirm ? (
         /*
@@ -387,9 +393,8 @@ export default function Dialog({
               actionWording
               data-guide-anchor={guideSlot}
               data-guide-action-label={guideSlot ? confirmLabel : undefined}
-              data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
-              variant={confirmVariant ?? (primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? isDeleteConfirmation(confirmLabel) ? 'text' : 'secondary' : 'primary')}
-              textTone={tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? 'danger' : undefined}
+              data-dialog-action={confirmVariant === 'danger' || tone === 'destructive' ? 'danger' : primaryAction === 'cancel' ? 'secondary' : 'primary'}
+              variant={confirmVariant ?? (tone === 'destructive' ? 'danger' : primaryAction === 'cancel' ? 'secondary' : 'primary')}
               className={styles.designButton}
               widthReserve={actionWidthReserve}
               onClick={runConfirm}
@@ -433,12 +438,14 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children, leadingAction, align, padding, note }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; padding?: 'none'; note?: ReactNode }) {
+export function DialogActions({ children, leadingAction, align, layout, padding, note, summary }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; layout?: 'inline'; padding?: 'none'; note?: ReactNode; summary?: ReactNode }) {
   const centered = align === 'center' || leadingAction !== undefined
+  const hasSummary = summary != null
   const ref = useDialogActionWidth()
-  return <div ref={ref} className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-padding={padding}>
+  return <div ref={ref} className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-dialog-action-summary={hasSummary || undefined} data-action-layout={layout} data-padding={padding}>
+    {hasSummary ? <div role="status">{summary}</div> : null}
     {leadingAction ? <span data-dialog-action-leading className={centered ? styles.actionStart : styles.actionLead}>{typeof leadingAction === 'string' ? <span className={styles.footerLead}>{leadingAction}</span> : leadingAction}</span> : null}
-    {centered ? <span className={styles.buttonPair}>{children}</span> : children}
+    {centered || hasSummary ? <span className={styles.buttonPair}>{children}</span> : children}
     {note !== undefined ? <span className={styles.actionNote} role="status">{note}</span> : null}
   </div>
 }

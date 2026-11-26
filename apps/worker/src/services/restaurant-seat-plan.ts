@@ -1,9 +1,14 @@
 import type { RestaurantSeatAvailability } from '@line-crm/shared';
 
 export interface SeatPlanTable { id: string; label: string; seatType: string; minCapacity: number; maxCapacity: number; joinGroup: string | null; active: number }
-export interface SeatPlanBooking { id: string; startsAt: string; endsAt: string; guestCount: number; tableIds: string[] }
+export interface SeatPlanBooking { id: string; startsAt: string; endsAt: string; guestCount: number; tableIds: string[]; source?: string }
 export interface SeatPlanClosure { tableIds: string[]; periods: { startsAt: string; endsAt: string }[] }
-export interface SeatPlanState { tables: SeatPlanTable[]; reservations: SeatPlanBooking[]; waiting: SeatPlanBooking[]; closures: SeatPlanClosure[]; policy: string | null }
+export interface SeatPlanState {
+  tables: SeatPlanTable[]; reservations: SeatPlanBooking[]; waiting: SeatPlanBooking[]; closures: SeatPlanClosure[]; policy: string | null;
+  inventoryAllocation?: string | null;
+  inventoryRule?: { threshold: number; stop_line: number } | null;
+  inventorySlots?: Array<{ starts_at: string; slot_minutes: number; line_capacity: number }>;
+}
 export interface SeatPlanInput { startsAt: string; endsAt: string; guestCount: number; tableId?: string | null }
 type Candidate = RestaurantSeatAvailability['tables'][number];
 const overlaps = (a: { startsAt: string; endsAt: string }, b: { startsAt: string; endsAt: string }) => Date.parse(a.startsAt) < Date.parse(b.endsAt) && Date.parse(a.endsAt) > Date.parse(b.startsAt);

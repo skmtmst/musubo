@@ -51,3 +51,24 @@
   .info { margin-top: var(--mp-px-10); }
   .primary, .secondary { width: 100%; }
 }
+
+
+.registrationPage {
+  --registration-panel-width: 30.75rem;
+  --registration-panel-height: 13rem;
+  --registration-refresh-panel-height: 13.875rem;
+  --registration-action-width: 12.25rem;
+  --registration-stripe-width: 14.875rem;
+  display: flex; flex-direction: column; gap: var(--space-20);
+}
+:global(:root) .registrationPage h1 { white-space: normal; text-overflow: clip; }
+.registrationCard {
+  width: min(100%, var(--registration-panel-width));
+  min-height: var(--registration-panel-height);
+}
+.registrationCard:is([data-registration-payment-state='failed'], [data-registration-payment-state='processing']) { min-height: var(--registration-refresh-panel-height); }
+.registrationCopy h2 { margin: 0; font-size: var(--mp-px-20); }
+.registrationCopy p { margin: var(--space-12) 0 0; color: var(--color-ink-secondary); }
+.registrationActions { display: flex; flex-wrap: wrap; gap: var(--space-12); margin-top: auto; }
+.registrationAction { display: flex; min-width: min(100%, var(--registration-action-width)); }
+.registrationStripe { display: flex; min-width: min(100%, var(--registration-stripe-width)); background: var(--color-selection-bg); border-radius: var(--radius-primary-action); }

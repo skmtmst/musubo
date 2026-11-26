@@ -126,8 +126,8 @@ describe('頭の3つの印と保存した検索', () => {
     await act(async () => root.render(<ChatsPage />))
     const button = host.querySelector('button[aria-label="保存した検索"]') as HTMLButtonElement
     await act(async () => button.click())
-    await eventually(() => expect(host.textContent).toContain('未対応だけ'))
-    const menuButton = host.querySelector('button[aria-label="未対応だけの操作"]') as HTMLButtonElement
+    await eventually(() => expect(document.body.textContent).toContain('未対応だけ'))
+    const menuButton = document.querySelector('button[aria-label="未対応だけの操作"]') as HTMLButtonElement
     await act(async () => menuButton.click())
     await eventually(() => expect(document.querySelector('[data-menu-portal]')).not.toBeNull())
     const portal = document.querySelector('[data-menu-portal]')!
@@ -180,8 +180,8 @@ describe('頭の3つの印と保存した検索', () => {
     const button = host.querySelector('button[aria-label="保存した検索"]') as HTMLButtonElement
     await eventually(() => expect(button).not.toBeNull())
     await act(async () => { button.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
-    await eventually(() => expect(host.textContent).toContain('未対応だけ'))
-    const save = [...host.querySelectorAll('button')].find((item) => item.textContent === '今の条件を保存する')
+    await eventually(() => expect(document.body.textContent).toContain('未対応だけ'))
+    const save = [...document.body.querySelectorAll('button')].find((item) => item.textContent === '今の条件を保存する')
     expect(save).not.toBeUndefined()
     // 古い2つ目の入口の字は残らない。
     expect(host.textContent).not.toContain('現在の条件を保存する')

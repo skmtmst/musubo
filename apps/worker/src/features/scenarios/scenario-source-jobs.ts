@@ -50,7 +50,7 @@ async function sourceState(db: D1Database, j: ScenarioSourceJob): Promise<Source
   JOIN rt_store_followup_step_bindings b ON b.store_id=t.store_id AND b.enabled=1
   JOIN rt_reservation_events e ON e.id=? AND e.store_id=s.id
   JOIN rt_reservations r ON r.id=? AND r.store_id=s.id
-  JOIN friends f ON f.id=? AND f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid AND f.is_following=1
+  JOIN friends f ON f.id=? AND f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid AND f.is_following=1
   JOIN line_accounts la ON la.id=s.line_account_id AND la.is_active=1 AND la.archived_at IS NULL
   WHERE NOT EXISTS(SELECT 1 FROM rt_store_followup_targets ft WHERE ft.store_id=b.store_id AND ft.trigger=b.trigger AND ft.engine!='scenario') AND t.sending_status='active' AND s.status='active' AND s.line_account_id=?
   AND t.approved_version_id=? AND sc.current_published_version_id=t.approved_version_id

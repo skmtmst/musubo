@@ -13,11 +13,9 @@ import { useLayoutEffect } from 'react'
 */
 
 const GUIDE_SIGNAL_EVENT = 'lh:v8:guide-signal'
-const SETUP_SAVE_SIGNALS = new Set(['tables.form', 'hours.confirm', 'menu.save', 'reception.save', 'followup.save'])
 
 /**
  * 手順が終わった合図を出す。`anchor` は guide-script.ts の anchor と同じ名前。
- * 案内が一時停止していても、保存の合図で完了状況を読み直す。
  */
 export function emitGuideSignal(anchor: string, accountId?: string): void {
   if (typeof window === 'undefined') return
@@ -37,17 +35,4 @@ export function useGuideSignal(anchor: string | null, enabled: boolean, onSignal
     window.addEventListener(GUIDE_SIGNAL_EVENT, handle)
     return () => window.removeEventListener(GUIDE_SIGNAL_EVENT, handle)
   }, [anchor, enabled, onSignal, accountId])
-}
-
-/** 保存できたときだけ施設の設定を読み直す。入力途中の合図は対象にしない。 */
-export function useSetupSaveSignal(enabled: boolean, refresh: () => void): void {
-  useLayoutEffect(() => {
-    if (!enabled) return
-    const handle = (event: Event) => {
-      const anchor = (event as CustomEvent<{ anchor?: string }>).detail?.anchor
-      if (anchor && SETUP_SAVE_SIGNALS.has(anchor)) refresh()
-    }
-    window.addEventListener(GUIDE_SIGNAL_EVENT, handle)
-    return () => window.removeEventListener(GUIDE_SIGNAL_EVENT, handle)
-  }, [enabled, refresh])
 }

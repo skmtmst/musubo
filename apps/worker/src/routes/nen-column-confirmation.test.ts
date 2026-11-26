@@ -97,7 +97,7 @@ describe('コラム配信の確認', () => {
     testDb.raw.prepare("UPDATE friends SET line_user_id='U-new' WHERE id='a'").run();
     const original=testDb.db.prepare.bind(testDb.db);let restored=false;
     const spy=vi.spyOn(testDb.db,'prepare').mockImplementation((sql: string)=>{
-      if (!restored && sql.includes('SELECT f.line_user_id,f.line_account_id')) { restored=true;testDb.raw.prepare("UPDATE friends SET line_user_id='U-a' WHERE id='a'").run(); }
+      if (!restored && sql.includes('JOIN nen_delivery_jobs j ON j.friend_id=f.id')) { restored=true;testDb.raw.prepare("UPDATE friends SET line_user_id='U-a' WHERE id='a'").run(); }
       return original(sql);
     });
     const recipients:string[]=[];

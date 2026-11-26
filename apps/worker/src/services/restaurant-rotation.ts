@@ -2,6 +2,7 @@ import { restaurantCivilTime, validRestaurantDate } from './restaurant-booking.j
 import { closuresForRange, closureAffectsTable } from './restaurant-closures.js';
 import { addDays, reservationInstant, type RestaurantOpeningDay } from '@line-crm/shared';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 
 type Interval=[number,number];
 function union(intervals:Interval[]):Interval[] {const out:Interval[]=[];for(const range of intervals.sort((a,b)=>a[0]-b[0])){const last=out.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else if(range[1]>range[0])out.push([...range]);}return out;}
@@ -11,8 +12,9 @@ export async function restaurantRotation(db:D1Database,storeId:string,date:strin
  if(!validRestaurantDate(date))throw new Error('invalid_date');
  const store=await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{timezone:string}>();if(!store)throw new Error('store_missing');
  const setting=await db.prepare('SELECT hours_json FROM rt_opening_hours_settings WHERE store_id=?').bind(storeId).first<{hours_json:string}>();
- const googleConnection=await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?').bind(storeId).first<{status:string}>();
- const googleProfile=googleConnection?await connectedGoogleProfile(db,storeId):null;
+ // 接続の有無の判定と写しの読み取りで**同じ1件**を見る（773で互換索引が外れ接続が2件入り得る）。
+ const googleConnection=await primaryGoogleConnection(db,storeId);
+ const googleProfile=googleConnection?await connectedGoogleProfile(db,storeId,googleConnection.id):null;
  const hasHours=googleConnection?Boolean(googleProfile):Boolean(setting);
  const from=restaurantCivilTime(date,0,store.timezone),to=restaurantCivilTime(date,1440,store.timezone),start=Date.parse(from),end=Date.parse(to);
  const minute=(t:string)=>Number(t.slice(0,2))*60+Number(t.slice(3));

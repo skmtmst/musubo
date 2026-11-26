@@ -42,7 +42,8 @@ import PlatformNotices from '@/components/hq/platform-notices';
 import { accountIconUrl } from '@/components/hq/account-list';
 import { api, ApiError, bookingApi, fetchApi } from '@/lib/api';
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared';
-import { resolveStoreReturnPath } from '@/lib/hq-navigation';
+import { resolveStoreReturnPath } from '@/lib/hq-navigation'
+import { resolveLineAccountEntry } from '@/lib/line-account-entry';
 import { formatNumber } from '@/lib/format';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { readSessionSnapshot } from '@/lib/session-snapshot';
@@ -298,27 +299,27 @@ export default function HqHomeV8() {
     }
   }
 
-  const [enteringAccountId, setEnteringAccountId] = useState<string | null>(null)
+  const enteringAccount = useRef<string | null>(null)
+  useEffect(() => () => { enteringAccount.current = null }, [])
   const login = async (accountId: string) => {
-    if (enteringAccountId) return
-    setEnteringAccountId(accountId)
+    if (enteringAccount.current) return
+    enteringAccount.current = accountId
     try {
-      // 保存済みの引き継ぎ状態を毎回確認する。未完了・確認失敗時に店舗へ入れない。
-      const response = await api.lineAccounts.followerImportState(accountId)
-      if (!response.success) throw new Error(response.error || '引き継ぎの状態を確認できませんでした')
-      if (response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles') {
-        router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+      const entry = await resolveLineAccountEntry(accountId)
+      if (enteringAccount.current !== accountId) return
+      if ('href' in entry || entry.destination === 'unavailable') {
+        router.push('href' in entry ? entry.href : `/accounts/new?resume=${encodeURIComponent(accountId)}`)
         return
       }
     } catch (failure) {
+      if (enteringAccount.current !== accountId) return
       saveErrors.capture(failure)
       router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
       return
     } finally {
-      setEnteringAccountId(null)
+      enteringAccount.current = null
     }
     setSelectedAccountId(accountId)
-    // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
     router.push(back ?? '/')
   }
@@ -339,8 +340,12 @@ export default function HqHomeV8() {
     ? currentAccounts.reduce((sum, account) => sum + (attentionCounts[account.id] ?? 0), 0) : null
   const connectionTotal = knownConnectionTotal === 0 && connectionUnconfirmed > 0 ? null : knownConnectionTotal
   const connectionDetail = loadError || attentionError ? '読み込めませんでした'
-    : connectionUnconfirmed ? `${knownConnectionTotal ? 'ほかに' : ''}未確認 ${formatNumber(connectionUnconfirmed)} 件`
+    // 未確認は2行目に足すと箱だけ背が伸びるので、右上の札にまとめる。
+    : connectionUnconfirmed && connectionTotal !== null ? null
+      : connectionUnconfirmed ? `未確認 ${formatNumber(connectionUnconfirmed)} 件`
       : connectionTotal === null ? '接続の問題を確認できません' : null
+  const connectionBadgeText = connectionUnconfirmed && connectionTotal !== null && !(loadError || attentionError)
+    ? `${connectionTotal > 0 ? '要確認・' : ''}未確認 ${formatNumber(connectionUnconfirmed)}` : undefined
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
@@ -572,7 +577,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} badge={connectionBadgeText} badgeTone="warning" valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">

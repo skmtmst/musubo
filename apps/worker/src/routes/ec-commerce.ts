@@ -1121,7 +1121,7 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
 
   const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
-    `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
+    `SELECT id, line_platform_user_id AS line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
   ).bind(body.accountId, ...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string }>();
   const currentIds = friends.results.map((friend) => friend.id).sort();
   const expectedIds = Array.isArray(expectedRecipientIds) ? [...expectedRecipientIds].sort() : null;
@@ -1166,7 +1166,7 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), inp
     }
     const latestSet = sqlIdSet(latestIds);
     const latest = await c.env.DB.prepare(
-      `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${latestSet.sql})`,
+      `SELECT id, line_platform_user_id AS line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${latestSet.sql})`,
     ).bind(body.accountId, ...latestSet.binds).all<{ id: string; line_user_id: string }>();
     const snapshot = (items: Array<{ id: string; line_user_id: string }>) =>
       JSON.stringify(items.map((item) => [item.id, item.line_user_id]).sort((a, b) => a[0].localeCompare(b[0])));

@@ -109,7 +109,7 @@ function parseRecord(value: unknown, code: string, label: string): Record<string
 async function requireFriend(context: AutomationActionContext): Promise<ScopedFriend> {
   if (!context.friendId) throw invalid('friend_required', '対象の友だちが指定されていません');
   const friend = await context.db.prepare(
-    `SELECT id, line_user_id, metadata
+    `SELECT id, line_platform_user_id AS line_user_id, metadata
        FROM friends
       WHERE id = ? AND line_account_id = ?`,
   ).bind(context.friendId, context.lineAccountId).first<ScopedFriend>();

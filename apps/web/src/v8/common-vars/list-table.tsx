@@ -221,7 +221,7 @@ export function renderCommonVarList({ accountLoading, activeId, allOnPageSelecte
       {/* まとめての帯（選ぶと表の下に出る）。 */}
       {canWrite ? <BulkBar count={selected.size} total={filtered.length} onSelectAll={() => setSelected(new Set(filtered.map(item => item.id)))} hint="対象を確認してから操作を選んでください" onClear={() => setSelected(new Set())}>
         <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>選択を外す</Button>
-        <Button type="button" variant="danger" onClick={() => prepareRemoveSelected()} busyLabel="処理中…">選択した共通情報を削除</Button>
+        <Button type="button" variant="text" textTone="danger" onClick={() => prepareRemoveSelected()} busyLabel="処理中…">選択した共通情報を削除</Button>
       </BulkBar> : null}
     </>
   ))

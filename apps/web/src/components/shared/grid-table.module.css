@@ -167,3 +167,5 @@ html:root .table[data-table-presentation='comparison'] .row[data-head] .cell { f
 /* 見出しの字重は共通polishの規則もこの表の指定値を読む。 */
 .table { --grid-table-head-font-weight:var(--polish-control-weight); }
 html:root .table[data-table-presentation='comparison'] .row[data-head] .cell { --polish-control-weight:var(--grid-table-head-font-weight); }
+
+:root .cell[data-stack] { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-4); }

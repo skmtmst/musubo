@@ -31,6 +31,7 @@ export type GuideEngineAction = 'start' | 'pause' | 'resume' | 'advance' | 'adva
  */
 export type GuideControl = {
   phase: GuideEnginePhase
+  loading?: boolean
   /** 今案内している段。サーバーが正本で、控えは最初の表示を速くするためだけに使う。 */
   stepKey: string | null
   /** 今案内している手順の番号（1から）。 */
@@ -42,17 +43,17 @@ export type GuideControl = {
   pause: () => void
   resume: () => void
   reset: () => void
-  complete?: () => void
+  complete?: () => Promise<boolean>
   /** 同じ段の次の手順へ（1/3→2/3→3/3）。 */
-  advanceProcedure: () => void
+  advanceProcedure: (skipRemainingProcedures?: boolean, targetIndex?: number) => void
   /** 選んだ段の手順1から始める。持たない呼び出し元もあるので任意。 */
   startAt?: (stepKey: string) => void
 }
 
 const initialState: GuideEngineState = { phase: 'idle', stepKey: null, procedureIndex: 1 }
 
-export function guideEngineStorageKey(accountId: string): string {
-  return `lh:v8:guide-engine:${accountId}`
+export function guideEngineStorageKey(accountId: string, staffId?: string | null): string {
+  return staffId ? `lh:v8:guide-engine:${accountId}:${staffId}` : `lh:v8:guide-engine:${accountId}`
 }
 
 /**
@@ -68,10 +69,10 @@ export function clampProcedureIndex(stepKey: string | null, procedureIndex: numb
 }
 
 /** 控えの状態。壊れた値・読めない時は「まだ始めていない」に戻す（勝手に案内を出さない）。 */
-export function readGuideEngineState(accountId: string | null): GuideEngineState {
+export function readGuideEngineState(accountId: string | null, staffId?: string | null): GuideEngineState {
   if (!accountId || typeof window === 'undefined') return initialState
   try {
-    const raw = window.localStorage.getItem(guideEngineStorageKey(accountId))
+    const raw = window.localStorage.getItem(guideEngineStorageKey(accountId, staffId))
     if (!raw) return initialState
     const parsed = JSON.parse(raw) as Partial<GuideEngineState> | null
     const phase = parsed?.phase
@@ -88,9 +89,9 @@ export function readGuideEngineState(accountId: string | null): GuideEngineState
 /** 控えが変わった合図。全画面に1つ置く案内の入れ物が、案内中かどうかを知るために聞く。 */
 export const GUIDE_ENGINE_EVENT = 'lh:v8:guide-engine'
 
-export function writeGuideEngineState(accountId: string, state: GuideEngineState): void {
+export function writeGuideEngineState(accountId: string, state: GuideEngineState, staffId?: string | null): void {
   if (typeof window === 'undefined') return
-  try { window.localStorage.setItem(guideEngineStorageKey(accountId), JSON.stringify(state)) } catch { /* 覚えられなくても今の操作は続ける */ }
+  try { window.localStorage.setItem(guideEngineStorageKey(accountId, staffId), JSON.stringify(state)) } catch { /* 覚えられなくても今の操作は続ける */ }
   try {
     window.dispatchEvent(new CustomEvent(GUIDE_ENGINE_EVENT, { detail: { accountId, state } }))
   } catch { /* 合図が出せなくても案内そのものは続ける */ }
@@ -100,7 +101,7 @@ export function writeGuideEngineState(accountId: string, state: GuideEngineState
  * 状態遷移表。許されない遷移は今の状態をそのまま返し、再開先を失わない。
  * 段が変わる時は現在手順を1に戻す（新しい段の手順1から案内する）。
  */
-export function nextGuideEngineState(current: GuideEngineState, action: GuideEngineAction, stepKey: string | null = null): GuideEngineState {
+export function nextGuideEngineState(current: GuideEngineState, action: GuideEngineAction, stepKey: string | null = null, targetIndex?: number): GuideEngineState {
   switch (action) {
     case 'start': return current.phase === 'active' ? current : { phase: 'active', stepKey, procedureIndex: 1 }
     case 'pause': return current.phase === 'active' ? { ...current, phase: 'paused' } : current
@@ -118,7 +119,7 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
         吹き出しもガイド帯も出ない「案内が消えた」状態になる（枠14 の差し戻し）。
         最後の手順から先へは、段をまたぐ advance で進める。
       */
-      const next = clampProcedureIndex(current.stepKey, current.procedureIndex + 1)
+      const next = clampProcedureIndex(current.stepKey, Math.max(current.procedureIndex + 1, targetIndex ?? 1))
       return next === current.procedureIndex ? current : { ...current, procedureIndex: next }
     }
     case 'complete': return current.phase === 'done' ? current : { phase: 'done', stepKey: null, procedureIndex: 1 }
@@ -129,8 +130,7 @@ export function nextGuideEngineState(current: GuideEngineState, action: GuideEng
 export type GuideAnchor = { key: string; label: string; href: string }
 
 function needsGuideReview(state: GuideEngineState): boolean {
-  return state.stepKey === 'richMenu' ||
-    (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
+  return state.stepKey === 'richMenu' || (state.stepKey === 'attributes' && state.procedureIndex === 3) ||
     state.stepKey === 'hours' ||
     (state.stepKey === 'scenario' && state.procedureIndex === 2)
 }
@@ -189,8 +189,11 @@ const BLOCK_ON_SAVE_FAILURE: ReadonlySet<GuideEngineAction> = new Set(['advance'
  * 進行状態はサーバーが正本。開いた直後は控えを見せ、読み込めたらサーバーの値に合わせる。
  * 進む操作は保存できた時だけ確定し、保存に失敗した時は元の所に戻す。
  */
-export function useGuideEngine(accountId: string | null, summary: GuideSummary | null, scripted = true) {
+export function useGuideEngine(accountId: string | null, summary: GuideSummary | null, scripted = true, staffId?: string | null) {
   const [state, setState] = useState<GuideEngineState>(initialState)
+  const scope = accountId ? JSON.stringify([accountId, staffId]) : null
+  const [loadedScope, setLoadedScope] = useState<string | null>(null)
+  const loading = scope !== null && scope !== loadedScope
   /**
    * この案内の間だけ見送った段。済みにはしない（完了判定は実データ計測のまま）。
    * 覚えないと、見送った段がまた「次の案内」として選ばれて同じ所に戻ってしまう。
@@ -202,7 +205,8 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
 
   useEffect(() => {
     const current = ++generation.current
-    setState(readGuideEngineState(accountId))
+    setState(readGuideEngineState(accountId, staffId))
+    setLoadedScope(null)
     pending.current = Promise.resolve(true)
     if (!accountId) return
     const request = api.gettingStarted.guide.get(accountId)
@@ -212,35 +216,42 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
         if (!response?.success || !response.data) return
         const next = guideStateFromServer(response.data)
         setState(next)
-        writeGuideEngineState(accountId, next)
+        writeGuideEngineState(accountId, next, staffId)
       })
       .then(() => true, () => true)
+      .finally(() => { if (generation.current === current) setLoadedScope(scope) })
     pending.current = request
     return () => { generation.current += 1 }
-  }, [accountId])
+  }, [accountId, scope, staffId])
 
-  const persist = useCallback(async (next: GuideEngineState) => {
-    if (!accountId) return true
-    writeGuideEngineState(accountId, next)
+  const persist = useCallback((next: GuideEngineState, acknowledged = false) => {
+    if (!accountId) return Promise.resolve(false)
+    if (!acknowledged) writeGuideEngineState(accountId, next, staffId)
     const request = pending.current.then(async () => {
       try {
         const response = await api.gettingStarted.guide.save(accountId, {
           phase: next.phase, stepKey: next.stepKey, procedureIndex: next.procedureIndex,
         })
-        return Boolean(response?.success)
+        if (response?.success) return true
+      } catch { /* 保存されたが返答が途切れた場合に、下で読み直す。 */ }
+      if (!acknowledged) return false
+      try {
+        const response = await api.gettingStarted.guide.get(accountId)
+        return Boolean(response?.success && response.data?.phase === 'done')
       } catch { return false }
     })
     pending.current = request
     return request
-  }, [accountId])
+  }, [accountId, staffId])
 
-  const commit = useCallback((action: GuideEngineAction, stepKey: string | null = null) => {
+  const commit = useCallback((action: GuideEngineAction, stepKey: string | null = null, targetIndex?: number) => {
+    if (loading) return
     /*
       遷移はこの場で決める。setState の関数は描画の時まで走らないことがあり、
       中で決めた値を使うと「変わっていない」と誤判定して案内が始まらない。
     */
     const previous = state
-    const next = nextGuideEngineState(previous, action, stepKey)
+    const next = nextGuideEngineState(previous, action, stepKey, targetIndex)
     if (next === previous) return
     setState(next)
     const currentGeneration = generation.current
@@ -248,12 +259,23 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     void request.then(saved => {
       if (saved || !BLOCK_ON_SAVE_FAILURE.has(action) || generation.current !== currentGeneration || pending.current !== request) return
       setState(previous)
-      if (accountId) writeGuideEngineState(accountId, previous)
+      if (accountId) writeGuideEngineState(accountId, previous, staffId)
     })
-  }, [state, persist, accountId])
+  }, [state, persist, accountId, loading, staffId])
 
   const anchor = useMemo(() => guideAnchor(summary, skipped), [summary, skipped])
   const finished = Boolean(summary && summary.total > 0 && summary.done === summary.total)
+  const complete = useCallback(async () => {
+    if (!accountId || loading || !finished) return false
+    if (state.phase === 'done') return true
+    const next = nextGuideEngineState(state, 'complete')
+    const currentGeneration = generation.current
+    const saved = await persist(next, true)
+    if (!saved || generation.current !== currentGeneration) return false
+    setState(next)
+    writeGuideEngineState(accountId, next, staffId)
+    return true
+  }, [accountId, loading, finished, persist, staffId, state])
 
   /* 9項目が済んだら案内を閉じる。まだ始めていない人の記録は作らない。 */
   const reviewingCompletion = scripted && needsGuideReview(state)
@@ -273,11 +295,11 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   }, [state.phase, state.stepKey, reviewingCompletion, anchor, summary, skipped, commit])
 
   /** 手順を見送って次の段へ移る。済みにはせず、存在する次の案内へ渡す（枠14 共通ルール）。 */
-  const advanceProcedure = useCallback(() => {
+  const advanceProcedure = useCallback((skipRemainingProcedures = false, targetIndex?: number) => {
     if (state.phase !== 'active') return
     const total = scripted ? guideProcedureTotal(state.stepKey) : 0
-    if (state.procedureIndex < total) {
-      commit('advanceProcedure')
+    if (state.procedureIndex < total && !skipRemainingProcedures) {
+      commit('advanceProcedure', null, targetIndex)
       return
     }
     const current = state.stepKey
@@ -293,11 +315,12 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   }, [state, summary, skipped, commit, scripted, finished])
 
   return {
-    phase: state.phase,
-    stepKey: state.stepKey,
-    procedureIndex: state.procedureIndex,
+    loading,
+    phase: loading ? 'idle' : state.phase,
+    stepKey: loading ? null : state.stepKey,
+    procedureIndex: loading ? 1 : state.procedureIndex,
     anchor: state.phase === 'done' ? null : anchor,
-    pausedAnchor: state.phase === 'paused' ? savedGuideAnchor(summary, state) ?? anchor : null,
+    pausedAnchor: !loading && state.phase === 'paused' ? savedGuideAnchor(summary, state) ?? anchor : null,
     /** 最初から始める時は見送りの記憶も消す（また1段目から案内する）。 */
     start: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit(state.phase === 'active' ? 'advance' : 'start', guideAnchor(summary)?.key ?? null) }, [commit, summary, state.phase]),
     restart: useCallback(() => {
@@ -318,7 +341,7 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
     pause: useCallback(() => commit('pause'), [commit]),
     /** 続きから再開する時は見送った段を飛ばしたまま戻る。 */
     resume: useCallback(() => commit('resume', savedGuideAnchor(summary, state)?.key ?? guideAnchor(summary, skipped)?.key ?? null), [commit, summary, skipped, state]),
-    complete: useCallback(() => { if (finished) commit('complete') }, [commit, finished]),
+    complete,
     reset: useCallback(() => { setSkipped(EMPTY_SKIPPED); commit('reset') }, [commit]),
     /** 同じ段の次の手順へ。1/3→2/3→3/3。最後の手順では段をまたいで次の案内へ（枠14 の台本）。 */
     advanceProcedure,

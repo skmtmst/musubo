@@ -27,7 +27,7 @@ export default function TextLink({
   title,
   ...rest
 }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
-  tone?:'action'
+  tone?: 'action' | 'menu'
   iconTone?: 'link'
   /** 一覧の段の行で使う強めの文字（大きさ・太さは段から渡す）。既定のリンクは変えない。 */
   emphasis?: 'row-step'

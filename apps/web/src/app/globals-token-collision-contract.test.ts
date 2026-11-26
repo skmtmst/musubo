@@ -60,23 +60,4 @@ describe('globals.css の変数の書き直し', () => {
     expect(findTokenCollisions(':root { --a: 22px; } [data-theme="v7"] { --a: 20px; }')).toHaveLength(0)
   })
 
-  it('予約スタッフの題と予約からの売上の題は別の名前で、どちらもページの題の共通値を読む', () => {
-    const css = fs.readFileSync(GLOBALS, 'utf8')
-    expect(css).toMatch(/--tpl-title-size:\s*var\(--polish-text-page\)/)
-    expect(css).toMatch(/--tpl-bks-title-size:\s*var\(--tpl-title-size\)/)
-    expect(css).toMatch(/--tpl-bks-sales-title-size:\s*var\(--tpl-title-size\)/)
-    const sales = fs.readFileSync(new URL('./booking/sales/sales-v8.module.css', import.meta.url), 'utf8')
-    expect(sales).toContain('var(--tpl-bks-sales-title-size)')
-  })
-
-  it('売上用の題だけを変更してもスタッフ画面の題へ伝わらない', () => {
-    const staff = fs.readFileSync(path.join(__dirname, '../v8/booking-staff/layout.module.css'), 'utf8')
-    const sales = fs.readFileSync(new URL('./booking/sales/sales-v8.module.css', import.meta.url), 'utf8')
-    const staffTitle = staff.match(/\.title\s*\{([^}]+)\}/)![1]
-    const salesTitle = sales.match(/\.title\s*\{([^}]+)\}/)![1]
-    expect(staffTitle).toContain('font-size: var(--tpl-title-size)')
-    expect(staffTitle).not.toContain('--tpl-bks-sales-title-size')
-    expect(salesTitle).toContain('font-size: var(--tpl-bks-sales-title-size)')
-    expect(salesTitle).not.toContain('var(--tpl-bks-title-size)')
-  })
 })

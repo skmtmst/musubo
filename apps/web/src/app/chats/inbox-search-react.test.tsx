@@ -143,6 +143,17 @@ describe('会話の中を探す（V8 M0393 段13・枠 v7GV2）', () => {
     expect(rows[0].getAttribute('aria-posinset')).toBe('1499')
   })
 
+  it('上のバーの虫眼鏡を押すと検索の帯が開き、開いている間は押した状態になる', async () => {
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.textContent).toContain('定期便を追加したい'))
+    const button = host.querySelector<HTMLButtonElement>('button[aria-label="会話の中を探す"]')!
+    expect(button.getAttribute('aria-expanded')).toBe('false')
+    expect(host.querySelector('[role="search"]')).toBeNull()
+    await act(async () => { button.click() })
+    expect(host.querySelector('input[type="search"][aria-label="会話の中を探す"]')).not.toBeNull()
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="会話の中を探す"]')?.getAttribute('aria-expanded')).toBe('true')
+  })
+
   it('⌘F で帯を出し、読み込んでいない昔の当たりまで読み足して太い枠で示す', async () => {
     await act(async () => root.render(<ChatsPage />))
     await eventually(() => expect(host.textContent).toContain('定期便を追加したい'))

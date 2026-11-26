@@ -122,6 +122,24 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('style setup', () => {
+  test('registration style only reads and writes the current creator’s active account', async () => {
+    const path = root + '?account_id=a&registration=1';
+    const select = () => request('PUT', path, { expectedVersion: 1, style: 'restaurant' });
+    raw.prepare("UPDATE line_accounts SET created_by_staff_id = 'other' WHERE id = 'a'").run();
+    expect((await request('GET', path)).status).toBe(404);
+    expect((await select()).status).toBe(404);
+    raw.prepare("UPDATE line_accounts SET created_by_staff_id = 'owner', is_active = 0 WHERE id = 'a'").run();
+    expect(await value(await request('GET', path))).toMatchObject({ success: false, code: 'LINE_ACCOUNT_INACTIVE' });
+    expect((await select()).status).toBe(409);
+    raw.prepare("UPDATE line_accounts SET archived_at = '2026-11-24' WHERE id = 'a'").run();
+    expect((await select()).status).toBe(404);
+    expect((await get()).status).toBe(200);
+    raw.prepare("UPDATE line_accounts SET archived_at = NULL, is_active = 1 WHERE id = 'a'").run();
+    expect((await request('GET', path)).status).toBe(200);
+    expect((await select()).status).toBe(200);
+    expect(await value(await get())).toMatchObject({ data: { style: 'restaurant', styleSelected: true } });
+  });
+
   test('new account has a standard sample without sending or enabling anything', async () => {
     const p = await value(await get());
     expect(p.data).toMatchObject({

@@ -77,7 +77,9 @@ export default function GenerationPanel({
   usageHeading,
   monthRemaining,
   v8Layout = false,
+  accountSelector,
 }: {
+  accountSelector?: ReactNode
   presets: BannerPreset[]
   maxCount: number
   value: BannerGenerationInput
@@ -120,7 +122,7 @@ export default function GenerationPanel({
       variant="form"
       gap="normal"
       data-design-node="GcJHv"
-      className="w-full shrink-0 self-start xl:sticky xl:top-4"
+      className="w-full shrink-0 self-start"
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >
@@ -136,6 +138,7 @@ export default function GenerationPanel({
       </div>
 
       <div data-design-node="E8oZc" className="flex flex-col gap-4">
+        {accountSelector}
         <Field v8Layout={v8Layout} label="作りたい内容" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
           <SaveErrorField names={["customPrompt", "value.customPrompt", "custom_prompt", "value.custom_prompt"]}>
             <TextArea id={`${uid}-custom`} rows={3} maxLength={CUSTOM_PROMPT_MAX} disabled={disabled}

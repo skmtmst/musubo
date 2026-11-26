@@ -5,9 +5,12 @@
 
 .draft { width: 100%; min-height: var(--tpl-inbox-composer-input-h); padding: 0; border: 0; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-inbox-row-preview-lh); resize: none; outline: 1px solid transparent; }
 .draft::placeholder { color: var(--color-placeholder); }
+/* 札の入る返信の文：外枠が線と輪を持つので、枠・地・影を持たない。高さは上限まで伸びて、超えたら中でスクロールする。 */
+.draftEditor { box-sizing: border-box; width: 100%; min-height: var(--tpl-inbox-composer-input-h); max-height: var(--tpl-inbox-composer-input-max-h); padding: 0; border: 0; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-inbox-row-preview-lh); }
+:root .draftEditor[data-empty]::before { color: var(--color-placeholder); }
 .count { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-inbox-composer-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
 .bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tpl-inbox-composer-gap); }
-.actions { display: flex; flex: none; align-items: center; gap: var(--tpl-inbox-composer-gap); margin-left: auto; }
+.actions { display: flex; flex: 0 1 auto; min-width: 0; max-width: 100%; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-composer-gap); margin-left: auto; }
 .tool { flex: none; white-space: nowrap; }
 .tool[data-active] { background: var(--color-accent-soft); outline-color: var(--color-accent-deep); color: var(--color-accent-deep); }
 :global([data-drop-over]) .input { outline-color: var(--color-accent-deep); background: var(--color-accent-soft); }

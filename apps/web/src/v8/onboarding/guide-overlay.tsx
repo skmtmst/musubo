@@ -7,7 +7,7 @@ import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { balloonPlacement, dimPanels, isOffScreen, spotlightRing, type Rect } from './guide-overlay-geometry'
-import { guideProcedure, guideProcedureTotal } from './guide-script'
+import { guideProcedure, guideProcedureTotal, receptionGuideCopy } from './guide-script'
 import styles from './guide-overlay.module.css'
 
 /*
@@ -23,6 +23,9 @@ const ORDER_MARKS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '�
 /** 対象が見つからない時に待つ長さ。画面の移り変わりの間に一時停止させないための猶予。 */
 const MISSING_ANCHOR_WAIT_MS = 1500
 const NARROW_GUIDE_WIDTH = 480
+const TABLE_GUIDE_WIDTH = 316
+const TABLE_GUIDE_GAP = 27
+const TABLE_GUIDE_TOP = 91
 
 export type GuideOverlayProps = {
   /** 案内中だけ出す。一時停止・未開始・完了では何も出さない。 */
@@ -42,7 +45,7 @@ export type GuideOverlayProps = {
   /** 9項目それぞれの済み。実データ計測の値をそのまま渡す（ガイドで済みにしない）。 */
   segments: readonly boolean[]
   /** 「この手順をスキップ」と進行トリガーの両方から呼ぶ、次の手順へ。 */
-  onAdvanceProcedure: () => void
+  onAdvanceProcedure: (skipRemainingProcedures?: boolean) => void
   /** 帯の「一時停止」・ESC・対象外画面への移動から呼ぶ。 */
   onPause: () => void
   scripted?: boolean
@@ -55,6 +58,16 @@ function readRect(element: Element): Rect {
   return { left: box.left, top: box.top, width: box.width, height: box.height }
 }
 
+function readVisibleRect(element: Element, container: Element): Rect | null {
+  const box = element.getBoundingClientRect()
+  const area = container.getBoundingClientRect()
+  const left = Math.max(box.left, area.left)
+  const top = Math.max(box.top, area.top)
+  const width = Math.min(box.right, area.right) - left
+  const height = Math.min(box.bottom, area.bottom) - top
+  return width > 0 && height > 0 ? { left, top, width, height } : null
+}
+
 export function GuideOverlay({
   active, showOverlay = true, stepKey, stepLabel, stepOrder, procedureIndex, onTargetScreen = false,
   segments, onAdvanceProcedure, onPause, scripted = true, nextLabel, showProcedure = true,
@@ -64,6 +77,7 @@ export function GuideOverlay({
     台本に無い手順番号（古い保存値など）でも案内を消さない。
     台本が分かっている段なら最後の手順に寄せて見せる。段そのものが分からない時だけ何も出さない。
   */
+  const courseEditorStep = scripted && stepKey === 'friendAdd' && procedureIndex >= 2
   const safeIndex = total > 0 ? Math.min(Math.max(procedureIndex, 1), total) : procedureIndex
   const procedure = scripted && showProcedure ? guideProcedure(stepKey, safeIndex) : null
   const anchorName = procedure?.anchor ?? null
@@ -73,8 +87,11 @@ export function GuideOverlay({
   const [inDialog, setInDialog] = useState(false)
   const [actionLabel, setActionLabel] = useState<string | null>(null)
   const [applyingHours, setApplyingHours] = useState(false)
+  const [receptionMode, setReceptionMode] = useState<string | null>(null)
+  const [receptionSeats, setReceptionSeats] = useState<string | null>(null)
   const [inputReady, setInputReady] = useState(false)
   const [tableDialog, setTableDialog] = useState<Rect | null>(null)
+  const [tableConditions, setTableConditions] = useState(false)
   const [target, setTarget] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null)
   const [balloonHeight, setBalloonHeight] = useState(0)
@@ -94,7 +111,7 @@ export function GuideOverlay({
     const reserved = saveControls.map(element =>
       readRect(narrow ? element.closest('[data-shared-part="sticky-bar"]') ?? element : element),
     ).filter(box => box.height > 0 && box.top < height &&
-      (narrow ? box.top + box.height >= height - 32 : box.top > height - 160))
+      (narrow ? box.top + box.height >= height - (courseEditorStep ? 240 : 32) : box.top > height - 160))
     setBottomOffset(Math.max(0, ...reserved.map(box => height - box.top + 8)))
     const selector = `[data-guide-anchor="${anchorName}"]`
     const slotSelector = `[data-guide-slot="${anchorName}"]${width >= 1152 ? ':not([data-guide-narrow])' : ''}`
@@ -110,17 +127,23 @@ export function GuideOverlay({
       setActionLabel(guideLabel ?? null)
     }
     setApplyingHours(element?.hasAttribute('data-guide-hours-apply') ?? false)
-    setInputReady(element?.hasAttribute('data-guide-ready') ?? false)
+    setReceptionMode(element?.hasAttribute('data-guide-hours-setup') ? 'hours' : element?.getAttribute('data-guide-reception-state') ?? null)
+    setReceptionSeats(element?.getAttribute('data-guide-reception-count') ?? null)
+    const courseMenuOpen = anchorName?.startsWith('menu.') && element?.querySelector('[aria-expanded="true"]')
+    setInputReady(Boolean(element?.hasAttribute('data-guide-ready') && !courseMenuOpen))
     setInDialog(Boolean(dialog))
-    const tableSave = anchorName === 'tables.form' ? dialog?.querySelector('[data-guide-table-save=ready]') : null
+    const editingConditions = anchorName === 'tables.form' && Boolean(element?.querySelector('[data-table-conditions][aria-expanded="true"]'))
+    setTableConditions(editingConditions)
+    const tableSave = anchorName === 'tables.form' && !editingConditions ? dialog?.querySelector('[data-guide-table-save=ready]') : null
     const tableBox = anchorName === 'tables.form' && dialog ? readRect(dialog) : null
     setTableDialog(previous => previous && tableBox && previous.left === tableBox.left && previous.top === tableBox.top &&
       previous.width === tableBox.width && previous.height === tableBox.height ? previous : tableBox)
     const highlight = tableSave ?? (anchorName === 'tables.form' ? dialog ?? element : element)
-    const next = highlight ? readRect(highlight) : null
+    const clippingContainer = anchorName === 'followup.body' ? highlight?.closest('[data-dialog-content]') : null
+    const next = highlight && (clippingContainer ? readVisibleRect(highlight, clippingContainer) : readRect(highlight))
     setTarget(previous => previous && next && previous.left === next.left && previous.top === next.top &&
       previous.width === next.width && previous.height === next.height ? previous : next)
-  }, [anchorName])
+  }, [anchorName, courseEditorStep])
 
   /* スクロール追従・リサイズ再計算（枠14 izsr5）。 */
   useEffect(() => {
@@ -131,15 +154,24 @@ export function GuideOverlay({
       if (frame) return
       frame = window.requestAnimationFrame(() => { frame = 0; measure() })
     }
+    const onDialogTransitionEnd = (event: TransitionEvent) => {
+      if (event.propertyName === 'transform' && event.target instanceof Element && event.target.matches('[role=dialog]')) {
+        scheduleMeasure()
+      }
+    }
     const observer = new MutationObserver(scheduleMeasure)
-    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: ['data-guide-table-save', 'data-guide-ready'] })
+    observer.observe(document.body, { childList: true, subtree: true, attributeFilter: [
+      'data-guide-table-save', 'data-guide-ready', 'aria-expanded', 'data-guide-reception-state', 'data-guide-reception-count',
+    ] })
     window.addEventListener('scroll', scheduleMeasure, true)
     window.addEventListener('resize', scheduleMeasure)
+    window.addEventListener('transitionend', onDialogTransitionEnd, true)
     return () => {
       observer.disconnect()
       window.cancelAnimationFrame(frame)
       window.removeEventListener('scroll', scheduleMeasure, true)
       window.removeEventListener('resize', scheduleMeasure)
+      window.removeEventListener('transitionend', onDialogTransitionEnd, true)
     }
   }, [active, procedure, onTargetScreen, measure])
 
@@ -179,7 +211,9 @@ export function GuideOverlay({
     const stack = stackRef.current
     const overlap = fixedNarrowGuide && stack !== null && target.top + target.height > stack.getBoundingClientRect().top
     scrolledTarget.current = { element, anchor: anchorName, narrow: fixedNarrowGuide }
-    if (overlap || isOffScreen(target, viewport)) {
+    if (fixedNarrowGuide && anchorName === 'menu.save') {
+      element.closest('main')?.scrollTo({ top: 0, behavior: scrollMotion() })
+    } else if (overlap || isOffScreen(target, viewport)) {
       element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: scrollMotion() })
     }
   }, [active, showOverlay, anchorName, target, viewport, slot, fixedNarrowGuide])
@@ -240,16 +274,21 @@ export function GuideOverlay({
 
   if (!active || !showOverlay || !stepKey || !viewport) return null
 
-  const desktopTable = slot && tableDialog && tableDialog.left + tableDialog.width + 30 + 330 + 16 <= viewport.width &&
-    tableDialog.top + 30 + balloonHeight + 16 <= viewport.height ? tableDialog : null
+  const desktopTable = slot && tableDialog && tableDialog.left + tableDialog.width + TABLE_GUIDE_GAP + TABLE_GUIDE_WIDTH + 16 <= viewport.width &&
+    tableDialog.top + TABLE_GUIDE_TOP + balloonHeight + 16 <= viewport.height ? tableDialog : null
   const inlineGuide = Boolean(slot && !desktopTable)
-  const ring = target ? spotlightRing(target, desktopTable ? 12 : undefined) : null
+  const compactCourseGuide = fixedNarrowGuide && courseEditorStep && Boolean(procedure)
+  const compactTableGuide = inlineGuide && anchorName === 'tables.form' && viewport.width <= NARROW_GUIDE_WIDTH
+  const tableSaveTarget = tableDialog && target && target.width < tableDialog.width
+  const ring = target && (!compactTableGuide || tableSaveTarget)
+    ? spotlightRing(target, tableDialog ? 4 : undefined) : null
+  const tableRing = desktopTable && tableSaveTarget ? spotlightRing(desktopTable, 4) : null
   const panels = target && !slot ? dimPanels(target, viewport) : []
   const tablesComplete = stepKey === 'attributes' && safeIndex === 3 && Boolean(stepOrder && segments[stepOrder - 1])
-  const courseBasics = anchorName === 'menu.form' && viewport.width >= 1280
+  const courseBasics = courseEditorStep && anchorName !== 'menu.save' && viewport.width >= 1280
   const placement = target
     ? desktopTable
-      ? { left: desktopTable.left + desktopTable.width + 30, top: desktopTable.top + 30 }
+      ? { left: desktopTable.left + desktopTable.width + TABLE_GUIDE_GAP, top: desktopTable.top + TABLE_GUIDE_TOP }
       : anchorName === 'hours.confirm' && !applyingHours && !slot && viewport.width >= 1152
         ? { left: Math.min(viewport.width - 366, Math.max(760, target.left + target.width + 26)),
             top: Math.max(16, Math.min(target.top - 47, viewport.height - balloonHeight - 16)) }
@@ -261,12 +300,16 @@ export function GuideOverlay({
   const order = stepOrder ? ORDER_MARKS[stepOrder - 1] : ''
   const label = order && stepLabel ? `${order} ${stepLabel}` : stepLabel ?? '開店準備'
   const caption = total ? `${label}（手順 ${safeIndex}/${total}）` : label
+  const receptionCopy = stepKey === 'scenario' ? receptionGuideCopy(receptionMode, receptionSeats) : null
 
   const overlay = (
     <div className={styles.root} data-guide-dialog={inDialog || undefined}
       data-inline-guide={inlineGuide || undefined} data-guide-table-editor={Boolean(desktopTable) || undefined}
+      data-guide-table-compact={compactTableGuide || undefined}
+      data-guide-course-compact={compactCourseGuide || undefined}
+      data-guide-followup-editor={inlineGuide && (anchorName === 'followup.body' || anchorName === 'followup.confirm') || undefined}
       data-guide-course-basics={courseBasics || undefined} data-guide-table-complete={tablesComplete || undefined}
-      style={{ '--guide-save-clearance': `${bottomOffset}px` } as CSSProperties}>
+      style={{ '--guide-save-clearance': `${bottomOffset}px`, '--guide-table-balloon-width': `${TABLE_GUIDE_WIDTH}px` } as CSSProperties}>
       {panels.map((panel, index) => (
         <div
           key={`dim-${index}`}
@@ -274,6 +317,7 @@ export function GuideOverlay({
           style={{ left: panel.left, top: panel.top, width: panel.width, height: panel.height }}
         />
       ))}
+      {tableRing ? <div aria-hidden="true" className={`${styles.ring} ${styles.tableRing}`} style={{ left: tableRing.left, top: tableRing.top, width: tableRing.width, height: tableRing.height }} /> : null}
       {ring ? (
         <div
           className={styles.ring}
@@ -293,20 +337,26 @@ export function GuideOverlay({
         >
           <div className={styles.balloonHeader}>
             <span className={styles.pill}>{`手順 ${safeIndex}/${total}`}</span>
-            <span className={styles.title}>{procedure.title}</span>
+            <span className={styles.title}>{tableConditions ? '席の条件を確認する' : anchorName === 'menu.save' && compactCourseGuide ? '保存して追加する' : receptionCopy?.title ?? procedure.title}</span>
+            {compactCourseGuide ? <Button presentation="quiet-text" size="compact" onClick={onPause}>一時停止</Button> : null}
           </div>
-          <p className={styles.body}>{tablesComplete ? procedure.body
+          <p className={styles.body}>{tableConditions ? desktopTable ? '条件を確認して、必要に応じて変更できます。' : '席の条件を選び、プレビューへ戻れます。'
+            : tablesComplete ? procedure.body
             : stepKey === 'attributes' && safeIndex === 3 ? '受付中の卓を1件以上用意してください。追加を見送る場合は、この手順をスキップできます。'
             : anchorName === 'menu.save' && actionLabel && inDialog ? `内容を確認して「${actionLabel}」を押します。`
-            : anchorName === 'menu.save' && actionLabel && actionLabel !== '保存して追加する' ? `「保存する状態」で「公開」を選び、「${actionLabel}」を押します。確認画面で内容を確かめて公開します。`
-            : inlineGuide && anchorName === 'followup.save' ? '使わない場合は「今は使わない」を押します。'
+            : anchorName === 'menu.save' && actionLabel ? `「${actionLabel}」を押すと、次の設定へ進みます。`
+            : inlineGuide && (anchorName === 'followup.start' || anchorName === 'followup.save') && actionLabel === '今は使わない' ? '使わない場合は「今は使わない」を押します。'
             : inlineGuide && anchorName === 'hours.confirm' && inDialog ? '営業時間を見直して「変更内容を確認」を押します。'
-            : (anchorName === 'reception.lineSeats' || anchorName === 'reception.save') && actionLabel === 'この日の枠を作る' ? '選んだ日にはまだ予約枠がありません。「この日の枠を作る」を押してください。休みの日は営業日を選んでください。'
             : anchorName === 'hours.confirm' && applyingHours ? '変更内容を確かめて、「Googleに反映する」または「設定を保存する」を押します。'
-            : procedure.body}</p>
+            : receptionCopy ? receptionCopy.body
+            : viewport.width <= NARROW_GUIDE_WIDTH ? procedure.mobileBody ?? procedure.body : procedure.body}</p>
           <div className={styles.balloonFooter}>
-            <Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button>
-            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={onAdvanceProcedure}>次へ</Button> : null}
+            <Button presentation="quiet-text" onClick={() => {
+              if (courseEditorStep || (stepKey === 'followup' && safeIndex !== 2)) onAdvanceProcedure(true)
+              else onAdvanceProcedure()
+            }}>この手順をスキップ</Button>
+            {compactTableGuide ? <Button presentation="quiet-text" onClick={onPause}>一時停止</Button> : null}
+            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={() => onAdvanceProcedure()}>次へ</Button> : null}
           </div>
         </div> : null}
         {tablesComplete ? (
@@ -319,10 +369,10 @@ export function GuideOverlay({
                 {nextLabel ? ` ・ 次は「${nextLabel}」です` : null}
               </span>
             </div>
-            <Button size="compact" variant="primary" onClick={onAdvanceProcedure}>次へ進む</Button>
+            <Button size="compact" variant="primary" onClick={() => onAdvanceProcedure()}>次へ進む</Button>
           </div>
         ) : null}
-        <div className={styles.bar} data-guide-bar="">
+        {!compactCourseGuide && !compactTableGuide ? <div className={styles.bar} data-guide-bar="">
           <div className={styles.barHeader}>
             <span className={styles.barTitle}>開店準備ガイド</span>
             <Button presentation="quiet-text" onClick={onPause}>一時停止</Button>
@@ -333,8 +383,8 @@ export function GuideOverlay({
             ))}
           </div>
           <span className={styles.caption}>{caption}</span>
-          {!procedure && stepLabel ? <div className={styles.barHeader}><Button presentation="quiet-text" onClick={onAdvanceProcedure}>この手順をスキップ</Button></div> : null}
-        </div>
+          {!procedure && stepLabel ? <div className={styles.barHeader}><Button presentation="quiet-text" onClick={() => onAdvanceProcedure()}>この手順をスキップ</Button></div> : null}
+        </div> : null}
       </div>
     </div>
   )

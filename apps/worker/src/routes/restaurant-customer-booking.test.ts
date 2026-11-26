@@ -2,6 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { defaultRestaurantReservationForm } from '@line-crm/shared';
 import { saveRestaurantReservationForm } from '../services/restaurant-reservation-form.js';
 import { saveTableAutomation } from '../services/restaurant-table-automation.js';
+import { saveInventoryAllocation } from '../services/restaurant-inventory-allocation.js';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
@@ -720,4 +721,42 @@ it('styles §6-3: 空席確認後にLINE枠を停止したら新規の仮押さ�
   expect((await hold('closed_line')).status).toBe(409);
   expect(db.raw.prepare('SELECT COUNT(*) n FROM rt_reservations').get()).toEqual({n:0});
  }finally{vi.useRealTimers();}
+});
+
+it('営業日のLINE配分を実枠なしで表示・仮押さえ・確定へ適用する', async () => {
+  vi.useFakeTimers({toFake:['Date']});
+  vi.setSystemTime(new Date('2027-09-30T00:00:00Z'));
+  const {useSqliteClock}=await import('../test-utils/sqlite-clock.js');
+  useSqliteClock(db.raw,()=>new Date());
+  const allocation = {otaCapacity:1,lineCapacity:2,walkInCapacity:1};
+  try {
+    expect(await saveInventoryAllocation(db.db,'store','staff',0,{scope:'standard',allocation})).toEqual({version:1});
+    const slot = async () => (await (await request('/api/liff/restaurant/availability?storeId=store&date=2027-10-01&guestCount=2')).json() as {
+      data:{slots:Array<{startsAt:string;available:boolean}>}
+    }).data.slots.find(candidate => candidate.startsAt === start);
+    expect(await slot()).toMatchObject({available:true});
+    const first = await hold('standard-first');
+    expect(first.status).toBe(201);
+    expect(await slot()).toMatchObject({available:false});
+    expect((await hold('standard-second','two')).status).toBe(409);
+    const saved = (await read(first)).data;
+    expect(await saveInventoryAllocation(db.db,'store','staff',1,{scope:'standard',allocation:{...allocation,lineCapacity:0}})).toEqual({version:2});
+    expect((await request(`/api/liff/restaurant/reservations/${saved.id}/confirm`,{expectedVersion:saved.version})).status).toBe(409);
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM rt_inventory_slots').get()).toEqual({n:0});
+  } finally { vi.useRealTimers(); }
+});
+
+it('空き卓が複数でも、共通のLINE席数を同時の仮押さえで超えない', async () => {
+  vi.useFakeTimers({toFake:['Date']});
+  vi.setSystemTime(new Date('2027-09-30T00:00:00Z'));
+  const {useSqliteClock}=await import('../test-utils/sqlite-clock.js');
+  useSqliteClock(db.raw,()=>new Date());
+  try {
+    expect(await saveInventoryAllocation(db.db,'store','staff',0,{
+      scope:'standard',allocation:{otaCapacity:0,lineCapacity:2,walkInCapacity:0},
+    })).toEqual({version:1});
+    const responses = await Promise.all([hold('same-slot-first'), hold('same-slot-second','two')]);
+    expect(responses.map(response => response.status).sort()).toEqual([201,409]);
+    expect(db.raw.prepare('SELECT SUM(guest_count) AS seats FROM rt_reservations').get()).toEqual({seats:2});
+  } finally { vi.useRealTimers(); }
 });

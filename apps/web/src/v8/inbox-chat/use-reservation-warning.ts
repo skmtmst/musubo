@@ -2,30 +2,47 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 
-const reservationVariable = /^var\.(reservation_datetime|course_name|guest_count)$/
 const interpolationPattern = /\{\{[^{}]+\}\}/
 
-/** 見本と予約の不足は同じ応答で確かめ、前の宛先・本文の結果は表示しない。 */
-export function useInboxPreview(chatId: string | null, content: string): { preview: string | null; warning: string } {
+/**
+ * 送ったときの見え方。`ready` の `unresolved` は口が実際に解決できなかった差し込みの全部
+ * （予約の差し込みも、予約がある相手には入るので口の結果だけで決める）。
+ * 確かめられなかった時は `failed`（「問題なし」にしない）。
+ */
+export type InboxPreview =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; preview: string; unresolved: string[] }
+  | { status: 'failed' }
+
+const IDLE: InboxPreview = { status: 'idle' }
+const LOADING: InboxPreview = { status: 'loading' }
+
+/** 見本と入らない差し込みは同じ応答で確かめ、前の宛先・本文の結果は表示しない。 */
+export function useInboxPreview(chatId: string | null, content: string): InboxPreview {
   const scope = useRef({ chatId, content, generation: 0 })
   if (scope.current.chatId !== chatId || scope.current.content !== content) {
     scope.current = { chatId, content, generation: scope.current.generation + 1 }
   }
   const generation = scope.current.generation
-  const [result, setResult] = useState<{ generation: number; chatId: string; content: string; preview: string; variables: string[] } | null>(null)
+  const [result, setResult] = useState<{ generation: number; chatId: string; content: string; preview: InboxPreview } | null>(null)
   useEffect(() => {
     if (!chatId || !interpolationPattern.test(content)) return
     let active = true
     const timer = setTimeout(() => {
       void api.chats.renderPreview(chatId, { content, messageType: 'text' }).then(response => {
-        if (active && response.success) setResult({ generation, chatId, content, preview: response.data.content, variables: response.data.unresolved.filter(value => reservationVariable.test(value)) })
-      }).catch(() => {})
+        if (!active) return
+        setResult({
+          generation, chatId, content,
+          preview: response.success ? { status: 'ready', preview: response.data.content, unresolved: response.data.unresolved } : { status: 'failed' },
+        })
+      }).catch(() => {
+        if (active) setResult({ generation, chatId, content, preview: { status: 'failed' } })
+      })
     }, 250)
     return () => { active = false; clearTimeout(timer) }
   }, [chatId, content, generation])
-  if (!chatId || !interpolationPattern.test(content) || result?.generation !== generation || result.chatId !== chatId || result.content !== content) return { preview: null, warning: '' }
-  const warning = result.variables.length
-    ? `予約の値がないため ${result.variables.map(value => `{{${value}}}`).join(' ')} を埋められません。内容を修正してください。`
-    : ''
-  return { preview: result.preview, warning }
+  if (!chatId || !interpolationPattern.test(content)) return IDLE
+  if (result?.generation !== generation || result.chatId !== chatId || result.content !== content) return LOADING
+  return result.preview
 }

@@ -50,6 +50,8 @@ export interface ListPageBodyProps {
   folderWidth?: CSSProperties['width']
   /** 表以外の配布内容も一覧の道具列と同じ左右余白へ収める。 */
   contentInset?: boolean
+  /** カードを置く一覧は本文を板の地とそろえる。 */
+  contentSurface?: 'board'
   /** 表とページ送りを道具の段と同じ左右24の内側に置く板（絵が表を白い板の端まで伸ばさない：）。既定は  の領域いっぱい。 */
   tableInset?: boolean
   /** 窓の本文（左寄せの flex）でも、一覧の幅を窓いっぱいに広げる。 */
@@ -77,7 +79,7 @@ export interface ListPageBodyProps {
 export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   heightMode?: 'viewport' | 'content'
   boardId?: string
-  layout?: 'event-list'
+  layout?: 'event-list' | 'store-comparison'
   standalone?: boolean
   /** 明示された画面では、フォルダ機能を保ったまま主操作を題の右へ置く。 */
   createPlacement?: 'heading'
@@ -97,7 +99,7 @@ export function ListPageStats({ children }: { children: ReactNode }) {
 }
 
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, contentSurface, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const [folderActions, setFolderActions] = useState<FolderNarrowAction[]>([])
   const registerFolderAction = useCallback((action: FolderNarrowAction) => {
     setFolderActions(current => [...current.filter(item => item.key !== action.key), action])
@@ -117,7 +119,7 @@ export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders,
     {stats ? <ListPageStats>{stats}</ListPageStats> : null}
     <div className={styles.split} data-template-region="body">
       {folders ? noFolderChoices ? <div hidden>{folders}</div> : <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
-      <div className={styles.main}>
+      <div className={styles.main} data-content-surface={contentSurface}>
         {toolbar || collapsed || listHelp || explanation ? <div className={styles.toolbar} data-explanation-only={explanation && !toolbar && !collapsed && !listHelp || undefined} data-toolbar-row-gap={toolbarRowGap} data-toolbar-spacing={toolbarSpacing} data-notice-spacing={noticeSpacing} data-template-region="toolbar" data-list-toolbar={skeleton || undefined} data-collapsed-only={toolbar || listHelp || explanation || noFolderChoices ? undefined : ''}>
           {explanation ? <div className={styles.explanation}><PageExplanationBody keepMounted inset={explanationInset === 'notice' ? 'notice' : undefined}>{explanation}</PageExplanationBody></div> : null}
           {toolbar ? <ListToolbarLeading leading={collapsed} persistent={noFolderChoices} accessory={!helpAtEnd ? help : undefined} trailingAccessory={helpAtEnd ? help : undefined}>{toolbar}</ListToolbarLeading> : collapsed ? <div className={styles.collapsedFolders} data-template-region="collapsed-folders" data-toolbar-persistent={noFolderChoices || undefined}>{collapsed}</div> : null}

@@ -558,7 +558,7 @@ export async function applyEventChange(
     const targetRows = venueTouched
       ? await db
         .prepare(
-          `SELECT b.id AS booking_id, b.friend_id, b.slot_id, f.line_user_id
+          `SELECT b.id AS booking_id, b.friend_id, b.slot_id, f.line_platform_user_id AS line_user_id
              FROM event_bookings b
              JOIN friends f ON f.id = b.friend_id
             WHERE b.event_id = ? AND b.status = 'confirmed'`,
@@ -567,7 +567,7 @@ export async function applyEventChange(
         .all<{ booking_id: string; friend_id: string; slot_id: string; line_user_id: string }>()
       : await db
         .prepare(
-          `SELECT b.id AS booking_id, b.friend_id, b.slot_id, f.line_user_id
+          `SELECT b.id AS booking_id, b.friend_id, b.slot_id, f.line_platform_user_id AS line_user_id
              FROM event_bookings b
              JOIN friends f ON f.id = b.friend_id
             WHERE b.event_id = ? AND b.status = 'confirmed'

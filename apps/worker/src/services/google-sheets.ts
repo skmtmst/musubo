@@ -6,7 +6,7 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
  *
  * - OAuth・トークン・再試行は services/google-business.ts の実装を使う。
  *   ここでは Sheets API の形（タブ・行の upsert）と同期の流れだけを持つ。
- * - 1 LINE公式アカウント = 1 連携 = 1 スプレッドシート（DB の UNIQUE）。
+ * - 連携はLINE公式アカウントごとに1件。別のアカウントと出力先が重なる場合は友だちの同期を止める。
  * - データ種別ごとに1タブ・固定列。主キー列を読んで、ある行は上書き・
  *   無い行は末尾に足す（upsert）。増分は種別ごとのカーソルで進める。
  * - access token は保存しない。同期のたびに refresh_token から取り直す。
@@ -51,6 +51,8 @@ const RUN_STALE_MS = 30 * 60 * 1000;
 /** 手動実行が応答を待てる時間の目安。超えたら途中点を保存して partial で切る。 */
 export const MANUAL_SYNC_BUDGET_MS = 25 * 1000;
 export const SCHEDULED_SYNC_BUDGET_MS = 10 * 60 * 1000;
+
+class SharedFriendsExportTarget extends Error {}
 
 export type GoogleSheetsDataType = 'friends' | 'form_answers';
 export const GOOGLE_SHEETS_DATA_TYPES: readonly GoogleSheetsDataType[] = [
@@ -166,7 +168,7 @@ const friendsSource: DataSource = {
       binds.push(cursor.after, cursor.after, cursor.lastId);
     }
     const rows = await db.prepare(
-      `SELECT f.id, f.line_user_id, f.display_name, f.real_name, f.system_display_name,
+      `SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name, f.real_name, f.system_display_name,
               f.is_following, f.created_at, f.updated_at
          FROM friends f
         WHERE ${where}
@@ -212,7 +214,7 @@ const formAnswersSource: DataSource = {
     }
     const rows = await db.prepare(
       `SELECT s.id, s.created_at, s.data, fm.name AS form_name,
-              fr.display_name AS friend_display_name, fr.line_user_id
+              fr.display_name AS friend_display_name, fr.line_platform_user_id AS line_user_id
          FROM form_submissions s
          JOIN forms fm ON fm.id = s.form_id
          JOIN form_accounts fa ON fa.form_id = fm.id
@@ -550,10 +552,16 @@ export async function syncOneDataType(
   let rowsWritten = 0;
   let cursor = readSyncCursor(integration, type);
   try {
-    const accessToken = await sheetsAccessToken(env, integration, fetchFn);
-    const options: RequestOptions = { fetch: fetchFn, accessToken, sleep };
     const spreadsheetId = integration.spreadsheet_id;
     if (!spreadsheetId) throw new GoogleBusinessError('invalid_request', null, 'no_spreadsheet_target');
+    // 友だちタブの既存行はLINEユーザーIDで識別する。別アカウントの行を上書きしない。
+    if (type === 'friends' && await db.prepare(`SELECT 1 FROM google_sheets_integrations
+      WHERE spreadsheet_id = ? AND line_account_id <> ? LIMIT 1`)
+      .bind(spreadsheetId, integration.line_account_id).first()) {
+      throw new SharedFriendsExportTarget();
+    }
+    const accessToken = await sheetsAccessToken(env, integration, fetchFn);
+    const options: RequestOptions = { fetch: fetchFn, accessToken, sleep };
     await ensureTab(options, spreadsheetId, source);
     await sleep(PACE_MS);
     const keys = await readKeyColumn(options, spreadsheetId, source.sheetTitle);
@@ -591,7 +599,8 @@ export async function syncOneDataType(
     await finishRun(db, run.id, { status, rowsWritten, cursor, now: new Date().toISOString() });
     return { dataType: type, status, rowsWritten };
   } catch (error) {
-    const kind = error instanceof GoogleBusinessError ? error.kind : 'unknown';
+    const kind = error instanceof SharedFriendsExportTarget ? 'friends_target_shared'
+      : error instanceof GoogleBusinessError ? error.kind : 'unknown';
     await finishRun(db, run.id, {
       status: rowsWritten > 0 ? 'partial' : 'error',
       rowsWritten,

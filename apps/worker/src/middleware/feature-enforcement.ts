@@ -261,6 +261,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 /** 同じ prefix 内で公開経路と管理経路が分かれる例外。 */
 export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadata[] = [
   {
+    pattern: /^\/api\/(?:instagram|restaurant-test\/google)\/connections$/,
+    methods: ['GET'],
+    accountResolver: 'none',
+    classification: { kind: 'core', reason: 'SNS連携設定のGoogle・Instagram接続一覧。機能停止中も既存接続を管理でき、routeで認証と所属を確認する' },
+  },
+  {
     pattern: /^\/api\/instagram\/(?:connection|oauth\/start|oauth\/callback|refresh)$/,
     methods: ['GET', 'POST', 'DELETE'],
     accountResolver: 'none',

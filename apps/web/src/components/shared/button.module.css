@@ -162,6 +162,11 @@ html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--co
   height: var(--tpl-button-h);
 }
 
+/* 広い押し口を指定する窓の操作。通常のボタン寸法は引き継がない。 */
+:root .button.large {
+  min-height: calc(var(--space-24) + var(--space-20));
+}
+
 :root .primary {
   box-shadow: var(--shadow-primary-action);
 }
@@ -374,14 +379,14 @@ html:root .button.secondary[data-presentation='row-action']:focus-visible {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
-/* 主ボタンと白い副ボタンは、文字 14/600・印 16（線 1.75）・間 8。高さは変えない。 */
-:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action'], [data-presentation='step-action']) {
+/* 主・副・危険ボタンは文字と印の大きさをそろえる。 */
+:root .button:is(.primary, .secondary, .danger):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action'], [data-presentation='step-action']) {
   gap: var(--polish-space-row);
   font-size: 14px;
   font-weight: 600;
   line-height: 20px;
 }
-:root .button:is(.primary, .secondary):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action'], [data-presentation='step-action']) > svg {
+:root .button:is(.primary, .secondary, .danger):is(:not([data-presentation]), [data-presentation='restaurant'], [data-presentation='row-action'], [data-presentation='step-action']) > svg {
   width: 16px;
   height: 16px;
   stroke-width: var(--polish-icon-stroke);

@@ -32,6 +32,8 @@ import { PagePendingLayout } from './templates/page-pending'
 import { routePendingForPath } from '@/lib/route-pending'
 import MusuboLogo from './shared/musubo-logo'
 import { GuideHost } from '@/v8/onboarding/public/guide-overlay/index'
+import { useAuthSessionRefreshing } from './auth-refresh-context'
+import PagePending from './templates/page-pending'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -98,6 +100,7 @@ function AppShellContent({ children, pathname }: { children: React.ReactNode; pa
 
 function AuthenticatedAppShell({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   const onboarding = useOnboardingAccess() || pathname.startsWith('/hq/onboarding/')
+  const refreshing = useAuthSessionRefreshing()
   return (
       <AccountProvider>
         <PageChromeProvider>
@@ -130,7 +133,7 @@ function AuthenticatedAppShell({ children, pathname }: { children: React.ReactNo
                 {!onboarding ? <CommandPalette /> : null}
                 {onboarding ? <div className={styles.onboardingBrand}><MusuboLogo /></div> : <Sidebar />}
                 <Workspace>
-                  {children}
+                  {refreshing ? <PagePending stage="auth" /> : children}
                 </Workspace>
               </div>
             </div>

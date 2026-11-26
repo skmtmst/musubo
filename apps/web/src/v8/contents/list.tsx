@@ -1131,7 +1131,7 @@ export default function MediaLibraryListV8() {
               <Button type="button" variant="secondary" onClick={() => setSelected(new Set())}>
                 選択を外す
               </Button>
-              <Button type="button" variant="danger" onClick={() => removeSelected()} busyLabel="処理中…">
+              <Button type="button" variant="text" textTone="danger" onClick={() => removeSelected()} busyLabel="処理中…">
                 選択したメディアを削除
                 {selected.size > 0 && <span>（{selected.size}）</span>}
               </Button>

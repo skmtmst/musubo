@@ -16,6 +16,7 @@ import {
   updateBroadcastStatus,
   updateBroadcastBatchProgress,
   getFriendsByTag,
+  normalizeFriendLineUserId,
   jstNow,
   updateBroadcastLineRequestId,
   createBroadcastInsight,
@@ -409,7 +410,8 @@ export async function processBroadcastSend(
           WHERE c.broadcast_id=? AND ((c.state='claimed' AND c.dispatched_at IS NULL)
             OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))
             AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND f.id IN (${ids.sql}) ORDER BY c.friend_id`)
-          .bind(broadcastId,Number(broadcast.send_attempt_no ?? 1),...ids.bindings).all<import('@line-crm/db').Friend>()).results;
+          .bind(broadcastId,Number(broadcast.send_attempt_no ?? 1),...ids.bindings).all<import('@line-crm/db').Friend>()).results
+          .map(normalizeFriendLineUserId);
         totalCount = broadcast.total_count || known;
         successCount = Number(ledger?.sent ?? 0);
       } else {
@@ -1125,7 +1127,7 @@ async function processQueuedBroadcastBatches(
       AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND lock_version=? AND batch_offset=-1 AND stopped_at IS NULL)`).bind(broadcast.id,broadcast.id,lockVersion).run();
   // 固定済みの宛先も、現在の所属・表示状態だけは送信直前に確認する。元の条件は再評価しない。
   const currentRecipients = await scopeStoredBroadcastSegmentQuery(db, {
-    sql: `SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE f.is_following = 1 AND COALESCE(f.is_hidden,0)=0${fixedHqAudience ? ` AND (${DELIVERY_CONSENT_ALLOWED_SQL})` : ''}`,
+    sql: `SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name FROM friends f WHERE f.is_following = 1 AND COALESCE(f.is_hidden,0)=0${fixedHqAudience ? ` AND (${DELIVERY_CONSENT_ALLOWED_SQL})` : ''}`,
     bindings: [],
   }, accountId);
   const unavailable=await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'

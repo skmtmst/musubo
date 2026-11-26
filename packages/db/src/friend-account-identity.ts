@@ -1,6 +1,30 @@
 import type { Friend } from './friends/types/index.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
+export type FriendIdentityColumn = 'line_platform_user_id' | 'line_user_id';
+
+export type StoredFriend<T extends Friend = Friend> = T & { line_platform_user_id?: string };
+
+/** LINE/API へ公開する友だちには、保存用のキーを含めない。 */
+export function normalizeFriendLineUserId<T extends Friend>(row: StoredFriend<T>): T {
+  const { line_platform_user_id, ...friend } = row;
+  return { ...friend, line_user_id: line_platform_user_id ?? friend.line_user_id } as T;
+}
+
+export function encodeScopedFriendLineUserId(friendId: string, userId: string, accountId: string | null): string {
+  return accountId ? `musubo-scope:${friendId}:${userId}` : userId;
+}
+
+/** 既存DBでは旧キーを使い、追加列があるDBではアカウント単位の識別へ切り替える。 */
+export async function withFriendIdentityColumn<T>(query: (column: FriendIdentityColumn) => Promise<T>): Promise<T> {
+  try {
+    return await query('line_platform_user_id');
+  } catch (error) {
+    if (!/no such column:\s*(?:\w+\.)?line_platform_user_id\b/i.test(String(error))) throw error;
+    return query('line_user_id');
+  }
+}
+
 /**
  * アカウントスコープの friend 解決。同一プロバイダー配下の複数アカウントでは
  * line_user_id が同一になるため、無指定の先頭一致だと別アカウントの friend 行に
@@ -20,13 +44,20 @@ export async function getFriendByLineUserIdForAccount(
   lineUserId: string,
   lineAccountId: string | null,
 ): Promise<Friend | null> {
-  if (lineAccountId) {
-    // UNIQUE(line_account_id, line_user_id) へ移行すると同一スコープと
-    // 未割当の行が並存し得るため、厳密一致の行を優先して返す。
-    return db
+  return (await findFriendAccountIdentity(db, lineUserId, lineAccountId)).friend;
+}
+
+export async function findFriendAccountIdentity(
+  db: D1Database,
+  lineUserId: string,
+  lineAccountId: string | null,
+): Promise<{ friend: Friend | null; column: FriendIdentityColumn }> {
+  return withFriendIdentityColumn(async column => {
+    // 同じLINEユーザーの未割当行が残っていても、指定アカウントの行を優先する。
+    const row = lineAccountId ? await db
       .prepare(
         `SELECT * FROM friends
-          WHERE line_user_id = ?
+          WHERE ${column} = ?
             AND (line_account_id = ? OR (line_account_id IS NULL AND EXISTS (
               SELECT 1 FROM line_accounts legacy_owner WHERE legacy_owner.id = ?
                 AND COALESCE(legacy_owner.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
@@ -35,7 +66,9 @@ export async function getFriendByLineUserIdForAccount(
           LIMIT 1`,
       )
       .bind(lineUserId, lineAccountId, lineAccountId, lineAccountId)
-      .first<Friend>();
-  }
-  return db.prepare('SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL LIMIT 1').bind(lineUserId).first<Friend>();
+      .first<StoredFriend>()
+      : await db.prepare(`SELECT * FROM friends WHERE ${column} = ? AND line_account_id IS NULL LIMIT 1`)
+        .bind(lineUserId).first<StoredFriend>();
+    return { friend: row ? normalizeFriendLineUserId(row) : null, column };
+  });
 }

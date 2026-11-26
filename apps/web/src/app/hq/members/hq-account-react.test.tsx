@@ -103,7 +103,8 @@ describe('メンバー（36-5）', () => {
     await waitFor(() => expect(self.textContent).toContain(lastLoginShort('2026-10-20T09:15:00+09:00')))
     expect(within(table).queryByText('見本 30（あなた）')).toBeNull()
     expect(mocks.title).toHaveBeenCalledWith('メンバー')
-    expect(document.querySelectorAll('h1')).toHaveLength(0)
+    // 統括の情報・請求と同じ型で、題「メンバー」を1つ出す。
+    expect(Array.from(document.querySelectorAll('h1')).map((h) => h.textContent)).toEqual(['メンバー'])
   })
 
   it('招待で管理者・担当者・閲覧のみを選べ、送る口は統括の扱いにする', async () => {

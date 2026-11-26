@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StyleState } from './model'
 import { useSetupWizard } from './use-setup-wizard'
@@ -13,77 +13,57 @@ vi.mock('./wizard', () => ({ default: ({ accountId, initialStep, onClose }: { ac
 const state: StyleState = { style: 'restaurant', styleSelected: true, version: 1, answers: {} }
 function Host({ account = 'a', role = 'owner', data = state }: { account?: string | null; role?: string | null; data?: StyleState | null }) {
   const wizard = useSetupWizard(account, data, role, fixture.changed)
-  return <><button onClick={() => wizard.openStep('summary')}>中身</button><button onClick={() => wizard.openStep('unknown')}>未知の段</button>{wizard.dialog}</>
+  return wizard.dialog
 }
 beforeEach(() => { fixture.search = ''; vi.clearAllMocks() })
 afterEach(cleanup)
 
-it.each(['0', 'summary'])('URLの段%sを現在の店で開き、閉じても他の表示指定を残す', async step => {
+it.each(['0', 'summary', '1'])('旧URLの段%sでは旧画面を開かず、期間指定を保つ', step => {
   fixture.search = `setup=${step}&range=week&view=calendar`
   render(<Host />)
-  expect((await screen.findByRole('dialog')).getAttribute('data-step')).toBe(step)
-  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
   expect(screen.queryByRole('dialog')).toBeNull()
-  expect(fixture.replace).toHaveBeenCalledWith('/?range=week&view=calendar')
-  expect(fixture.changed).not.toHaveBeenCalled()
+  expect(fixture.replace).toHaveBeenCalledWith(`/?range=week&view=calendar${step === '1' ? '&guide=richMenu' : ''}`)
 })
 
-it.each(['viewer', 'staff', null])('役割%sではURLでも操作でも質問を開かない', async role => {
-  fixture.search = 'setup=0'
-  const view = render(<Host />)
-  await screen.findByRole('dialog')
-  view.rerender(<Host role={role} />)
-  fireEvent.click(screen.getByRole('button', { name: '中身' }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+it.each(['viewer', 'staff', null])('役割%sは設定からのURLでも質問を開かない', role => {
+  fixture.search = 'setup=0&setupReturn=accounts'
+  render(<Host role={role} />)
+  expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-it('設定を取れない時や、他店へ切り替えた直後は前の質問を表示しない', async () => {
-  fixture.search = 'setup=summary'
+it('他店へ切り替えた後に以前のアカウントを編集しない', async () => {
+  fixture.search = 'setup=0&setupReturn=accounts'
   const view = render(<Host />)
   expect((await screen.findByRole('dialog')).getAttribute('data-account')).toBe('a')
   view.rerender(<Host account="b" data={null} />)
-  expect(screen.queryByRole('dialog')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '中身' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   view.rerender(<Host account="b" />)
   expect((await screen.findByRole('dialog')).getAttribute('data-account')).toBe('b')
 })
 
-it('既知の段だけを開き、保存した時だけ設定を読み直す', async () => {
-  render(<Host />)
-  fireEvent.click(screen.getByRole('button', { name: '未知の段' }))
+it('未選択アカウントのホームで旧質問を自動起動しない', () => {
+  render(<Host data={{ ...state, styleSelected: false, shouldPromptStyleSelection: true }} />)
   expect(screen.queryByRole('dialog')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '中身' }))
-  expect((await screen.findByRole('dialog')).getAttribute('data-step')).toBe('summary')
-  fireEvent.click(screen.getByRole('button', { name: '保存を知らせる' }))
-  expect(fixture.changed).toHaveBeenCalledTimes(1)
-  expect(fixture.replace).not.toHaveBeenCalled()
 })
 
-it('新規の未選択だけを自動で案内し、閉じた質問やQRには割り込まない', async () => {
-  const fresh = { ...state, styleSelected: false, shouldPromptStyleSelection: true }
-  const view = render(<Host data={fresh} />)
-  await screen.findByRole('dialog')
-  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
-  view.rerender(<Host data={{ ...fresh }} />)
-  expect(screen.queryByRole('dialog')).toBeNull()
-  fixture.search = 'qr=base'
-  view.rerender(<Host account="b" data={fresh} />)
+it.each(['guide=richMenu', 'qr=base'])('実行中の%sに設定の窓を重ねない', query => {
+  fixture.search = `setup=0&setupReturn=accounts&${query}`
+  render(<Host />)
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 
 it.each(['閉じる', '保存を知らせる'])('設定から開いた質問を「%s」で閉じると設定へ戻る', async name => {
   fixture.search = 'setup=0&setupReturn=accounts'
   render(<Host />)
-  await screen.findByRole('dialog')
+  expect((await screen.findByRole('dialog')).getAttribute('data-step')).toBe('0')
   fireEvent.click(screen.getByRole('button', { name }))
   expect(fixture.replace).toHaveBeenCalledWith('/accounts')
+  expect(fixture.changed).toHaveBeenCalledTimes(name === '保存を知らせる' ? 1 : 0)
 })
 
-it('不明な戻り先を指定しても外のサイトに移らない', async () => {
+it('不明な戻り先の旧リンクは範囲だけを保つ', () => {
   fixture.search = 'setup=0&setupReturn=https%3A%2F%2Fevil.example&range=week'
   render(<Host />)
-  await screen.findByRole('dialog')
-  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
   expect(fixture.replace).toHaveBeenCalledWith('/?range=week')
 })

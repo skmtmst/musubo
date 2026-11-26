@@ -16,7 +16,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 vi.mock('@/v8/restaurant/dashboard/public/use-store-today/index', () => ({ useStoreToday: () => ({}) }))
 vi.mock('@/components/shared/preparing-dialog', () => ({ PREPARING_TITLE: 'preparing', PREPARING_WORD: '準備中', usePreparingDialog: () => ({ open: vi.fn(), dialog: null }) }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { summary: state.summary, schedule: state.schedule, get: state.get, saveCards: state.save, resetCards: state.reset, warnings: state.warnings, starterItems: state.items, starterSet: vi.fn().mockResolvedValue({ success: true, data: { definition: { items: [] } } }) } }))
-vi.mock('@/lib/api', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, entryRoutes: { ...actual.api.entryRoutes, list: vi.fn().mockResolvedValue({ success: true, data: [] }) } }, bookingApi: { ...actual.bookingApi, getPaymentConfig: vi.fn().mockResolvedValue({ data: {} }) } } })
+vi.mock('@/lib/api', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/api')>(); return { ...actual, api: { ...actual.api, gettingStarted: { ...actual.api.gettingStarted, guide: { get: vi.fn(async () => ({ success: true, data: { phase: 'idle', stepKey: null, procedureIndex: 1 } })), save: vi.fn(async () => ({ success: true })) } }, entryRoutes: { ...actual.api.entryRoutes, list: vi.fn().mockResolvedValue({ success: true, data: [] }) } }, bookingApi: { ...actual.bookingApi, getPaymentConfig: vi.fn().mockResolvedValue({ data: {} }) } } })
 
 vi.mock('@/components/dashboard/qr-dialog', () => ({ default: ({ open }: { open: boolean }) => open ? <div role="dialog" aria-label="友だち追加のQRコード" /> : null }))
 
@@ -176,16 +176,13 @@ it('使い方の状態が遅れたときは案内と数字を一緒に出す', a
   expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
 })
 
-it.each(['restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['0', 'summary'].map(step => [style, step])))('%sはsetup=%sを同じ専用画面で開き、閉じても期間を残す', async (style, step) => {
+it.each(['restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['0', 'summary'].map(step => [style, step])))('%sは旧setup=%sでも同じ専用画面を保つ', async (style, step) => {
   state.search = `setup=${step}&range=week`
   state.get.mockResolvedValue({ success: true, data: { style, styleSelected: true, version: 2, answers: {} } })
   const view = render(<StyleDashboard style={style as 'restaurant' | 'salon' | 'consult' | 'lesson'} />)
-  await screen.findByRole('dialog', { name: step === 'summary' ? '準備ができました' : '使い方のスタイルを選ぶ' })
-  if (step === 'summary') await screen.findByRole('heading', { name: '入った物', exact: true })
+  await waitFor(() => expect(state.replace).toHaveBeenLastCalledWith('/?range=week'))
   expect(view.container.querySelector('[data-style-dashboard]')?.getAttribute('data-style-dashboard')).toBe(style)
-  fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  expect(state.replace).toHaveBeenLastCalledWith('/?range=week')
+  expect(screen.queryByRole('dialog', { name: /使い方のスタイル|準備ができました/ })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
 })
 
@@ -198,7 +195,7 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sはQRを1つ�
 })
 
 it.each(['viewer', 'staff'])('役割%sでは専用画面のURLでも質問を開かない', async role => {
-  state.search = 'setup=0'
+  state.search = 'setup=0&setupReturn=accounts'
   const view = render(<StyleDashboard style="restaurant" />)
   await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   state.role = role

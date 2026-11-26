@@ -136,7 +136,7 @@ export async function markBroadcastRecipientsDispatched(
       const guard=db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND batch_offset=-1 AND lock_version=?)
         AND NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(
           SELECT 1 FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id AND c.broadcast_id=?
-          WHERE f.id=json_extract(e.value,'$.id') AND f.line_user_id=json_extract(e.value,'$.lineUserId')
+          WHERE f.id=json_extract(e.value,'$.id') AND f.line_platform_user_id=json_extract(e.value,'$.lineUserId')
             AND f.line_account_id IS ? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (${DELIVERY_CONSENT_ALLOWED_SQL})
             AND ((c.state='claimed' AND c.dispatched_at IS NULL) OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))))
         THEN 1 ELSE json('HQ_RECIPIENT_CHANGED') END`)

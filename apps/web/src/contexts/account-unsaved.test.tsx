@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] }) }))
 const router = vi.hoisted(() => ({ push: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => router }))
+vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/friends' }))
 import { AccountProvider, useAccount } from './account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 function Editor({ busy = false }: { busy?: boolean }) {

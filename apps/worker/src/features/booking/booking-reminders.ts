@@ -88,7 +88,7 @@ export async function processDueReminders(
               s.display_name AS staff_name,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id,
+              f.line_platform_user_id AS line_user_id,
               bs.timezone, ast.style AS notification_style
          FROM booking_reminders r
          INNER JOIN bookings b ON b.id = r.booking_id
@@ -235,7 +235,7 @@ export async function processDueReminders(
               WHERE r.id=? AND r.status IN ('pending','failed') AND r.retry_count=? AND r.sent_at=?
                 AND b.status='confirmed' AND b.starts_at>?
                 AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=b.friend_id
-                  AND live_friend.line_account_id=b.line_account_id AND live_friend.is_following=1 AND live_friend.line_user_id=?)
+                  AND live_friend.line_account_id=b.line_account_id AND live_friend.is_following=1 AND live_friend.line_platform_user_id=?)
                 AND ${activeTenantLineAccountSql('b.line_account_id')}
                 AND CASE r.kind WHEN 'day_before' THEN json_extract(b.notification_policy_snapshot,'$.day_before')
                   ELSE json_extract(b.notification_policy_snapshot,'$.hours_before') END IS NOT 0)

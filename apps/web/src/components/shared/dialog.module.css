@@ -401,10 +401,14 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-design-layout='stacked-centered'] .title { font-size: var(--text-title); line-height: var(--space-24); }
 :root .panel[data-design-layout='stacked-centered'] > .description { text-align: center; font-weight: var(--font-weight-reading); }
 :root .panel:is([data-design-layout='stacked-centered'], [data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) > .content::after { content: none; }
-:root .panel[data-design-layout='stacked-guided'] { padding: calc(var(--space-24) + var(--space-2)); gap: var(--space-16); }
+:root .panel[data-design-layout='stacked-guided'] {
+  padding: var(--space-24) 23px var(--space-14);
+  gap: var(--space-12);
+}
 :root .panel[data-design-layout='stacked-picker'] { gap: var(--space-10); }
 :root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .title { width: 100%; }
-:root .panel:is([data-design-layout='stacked-guided'], [data-design-layout='stacked-picker']) .actions { justify-content: flex-start; }
+:root .panel[data-design-layout='stacked-guided'] .actions { justify-content: center; gap: var(--space-12); }
+:root .panel[data-design-layout='stacked-picker'] .actions { justify-content: flex-start; }
 :root .panel[data-design-layout='stacked-centered'] .buttonPair { gap: var(--space-12); }
 :root .panel[data-design-layout='stacked-centered'] .buttonPair > button {
   min-height: calc(var(--control-h) + var(--space-4));
@@ -503,7 +507,7 @@ html:root .panel[data-confirm-placement='start'] .actions .buttonPair > button:l
 html:root .panel:not([data-design-header-padding]):not([data-design-header-height]):not([data-layout]):not([data-design-layout]) > .headerRow {
   padding: var(--polish-space-section) var(--polish-space-section) 0;
 }
-html:root .panel:not([data-layout]):not([data-design-layout]):not([style*='--dialog-design-footer-padding']) > .footer > .actions:not([data-padding='none']) {
+html:root .panel:not([data-layout]):not([data-design-layout]):not([style*='--dialog-design-footer-padding']) > .footer > .actions:not([data-padding='none'], [data-dialog-action-summary]) {
   padding: var(--polish-window-divider-space) var(--polish-space-section) var(--polish-space-section);
 }
 .headerIcon {
@@ -579,7 +583,7 @@ html:root .panel:not([data-confirmation='compact']):not([data-layout]):not([data
 }
 
 /* 個別の左右・下の余白を保ち、線から操作までの上だけ共通化する。 */
-html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actions:not([data-padding='none']) {
+html:root .panel:not([data-layout]):not([data-design-layout]) > .footer > .actions:not([data-padding='none'], [data-dialog-action-summary]) {
   padding-block-start: var(--polish-window-divider-space);
 }
 
@@ -599,6 +603,15 @@ html:root .panel[data-confirmation='compact'][data-design-layout^='stacked'] > .
   :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] .buttonPair { grid-column: 1; justify-self: stretch; }
 }
 
+html:root .actions[data-dialog-action-pair][data-action-layout='inline'] { grid-template-columns: minmax(0, 1fr); }
+html:root .actions[data-action-layout='inline'] > .buttonPair {
+  grid-column: 1;
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+}
+html:root .actions[data-action-layout='inline'] > .buttonPair > :is(button, a) { align-self: center; }
+
 .confirmReason { grid-column: 1 / -1; margin: 0; min-width: 0; text-align: center; color: var(--color-ink-secondary); font-size: var(--text-caption); overflow-wrap: anywhere; }
 
 /* 表示を指定した題だけ、親の内容幅を使わず省略できる幅へ縮める。 */
@@ -607,6 +620,26 @@ html:root .panel[data-title-content] .title { min-width: 0; }
 html:root .panel[data-title-content] .title > span:last-child { min-width: 0; flex: 1; }
 
 .actionNote { grid-column: 1 / -1; flex-basis: 100%; min-height: var(--space-24); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--space-20); text-align: center; }
+
+/* 選択数などを上の段に置く窓。幅が狭くても2つの操作を横に並べる。 */
+:root .actions[data-dialog-action-summary] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: calc(var(--space-24) + var(--space-12));
+  padding: var(--space-16) var(--space-24) var(--space-24);
+}
+:root .actions[data-dialog-action-summary] > .buttonPair {
+  grid-column: 1;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: var(--space-10);
+}
+@media (max-width: 640px) {
+  :root .actions[data-dialog-action-summary] {
+    gap: var(--space-12);
+    padding: var(--space-12) var(--space-16) var(--space-16);
+  }
+}
 
 /* 画面全体を使う案内では、パネルを縮めず本文で動きを指定する。 */
 :root .overlay[data-design-layout='fullscreen'] {
@@ -643,7 +676,28 @@ html:root .panel[data-title-content] .title > span:last-child { min-width: 0; fl
   }
 }
 
-:root .overlay:has(> .panel > [data-guide-slot="tables.form"] [data-guide-table-editor]) {
+:root .overlay:has(> .panel > [data-guide-slot="tables.form"] :is([data-guide-table-editor], [data-guide-table-compact])) {
+  background: var(--color-guide-scrim);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+@media (min-width: 1424px) and (min-height: 800px) {
+  :root .overlay:has(> .panel > [data-guide-slot="tables.form"]) {
+    justify-content: flex-start;
+    padding-inline-start: calc(50% - 471px);
+  }
+}
+
+:root .panel:has(> [data-guide-slot="tables.form"] [data-inline-guide]) > .content { order: 1; }
+:root .panel:has(> [data-guide-slot="tables.form"] [data-inline-guide]) > .footer { order: 2; }
+
+@media (max-width: 480px) and (min-height: 800px) {
+  :root .overlay[data-viewport-fit][data-design-top]:has(> .panel > [data-guide-slot="tables.form"]) {
+    padding-top: var(--polish-guided-table-mobile-top);
+  }
+
+  :root .overlay[data-viewport-fit][data-design-top] > .panel:has(> [data-guide-slot="tables.form"]) {
+    max-height: calc(100dvh - var(--polish-guided-table-mobile-top) - var(--space-24));
+  }
 }

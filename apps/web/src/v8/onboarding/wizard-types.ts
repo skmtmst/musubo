@@ -18,6 +18,7 @@ export type Props = {
   state: StyleState
   /** 開く手順（0＝スタイル、1＝見た目、2〜＝質問、'summary'＝最後の一覧）。 */
   initialStep?: WizardStep
+  styleOnly?: boolean
   onClose: (changed: boolean) => void
 }
 

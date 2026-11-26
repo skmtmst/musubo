@@ -40,8 +40,8 @@ async function readTestRecipients(db:D1Database,accountId:string) {
   let ids:unknown;try{ids=JSON.parse(setting?.value??'null');}catch{ids=null;}
   const shape=Array.isArray(ids)&&ids.length>0&&ids.length<=5&&ids.every(id=>typeof id==='string')&&new Set(ids).size===ids.length;
   const list=Array.isArray(ids)?ids:[];
-  const friends=shape?(await db.prepare(`SELECT id,line_user_id,display_name FROM friends WHERE line_account_id=? AND id IN (${list.map(()=>'?').join(',')})
-    AND is_following=1 AND COALESCE(is_hidden,0)=0 AND line_user_id IS NOT NULL AND line_user_id<>''`).bind(accountId,...list).all<TestFriend>()).results:[];
+  const friends=shape?(await db.prepare(`SELECT id,line_platform_user_id AS line_user_id,display_name FROM friends WHERE line_account_id=? AND id IN (${list.map(()=>'?').join(',')})
+    AND is_following=1 AND COALESCE(is_hidden,0)=0 AND line_platform_user_id IS NOT NULL AND line_platform_user_id<>''`).bind(accountId,...list).all<TestFriend>()).results:[];
   const valid=shape&&friends.length===list.length;
   const ordered=[...friends].sort((a,b)=>a.id.localeCompare(b.id));
   const bytes=new TextEncoder().encode(JSON.stringify([accountId,ordered.map(f=>[f.id,f.line_user_id])]));

@@ -46,8 +46,13 @@ it('非同期の例外は窓内の日本語へ寄せ、もう一度でも元の�
   render(<ConfirmDialog {...base} title="削除しますか？" confirmLabel="削除する" destructive open onCancel={() => {}} onSuccess={vi.fn()} onConfirm={request} />)
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '削除する' })); await Promise.resolve() })
   expect(screen.getByRole('alert').textContent).not.toContain('API error')
-  expect(screen.getByRole('button', { name: 'もう一度' }).getAttribute('data-variant')).toBe('text')
-  expect(screen.getByRole('button', { name: 'もう一度' }).className).toMatch(/danger/i)
+  const retry = screen.getByRole('button', { name: 'もう一度' })
+  const cancel = screen.getByRole('button', { name: 'キャンセル' })
+  expect(retry.getAttribute('data-variant')).toBe('danger')
+  expect(retry.className).toContain('standard')
+  expect(cancel.className).toContain('standard')
+  await act(async () => { fireEvent.click(retry); await Promise.resolve() })
+  expect(request).toHaveBeenCalledTimes(2)
 })
 
 it('閉じた窓から遅れて届く成功で、別の確認を終了しない', async () => {

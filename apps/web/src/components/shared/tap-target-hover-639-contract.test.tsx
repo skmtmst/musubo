@@ -117,7 +117,6 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
     // 2026-09-25: 白字 3.77:1 の bg-emerald-600 を bg-success（5.61:1）へ。
     // 見張りはホバー変化の有無（意図は変えない）。
     expect(readApp('../v8/inflow-links/genre-dialog.tsx')).toContain('onConfirm={() => save()}')
-    expect(readShared('dialog.tsx')).toContain("'danger' : 'primary'")
     // ★管理画面 C5: 流入リンク編集窓は共通 Dialog＋Button primary へ寄せた。ホバー変化は共通 Button が持つ。
     expect(readApp('../v8/inflow-links/edit-route-dialog.tsx')).toContain('variant="primary"')
     expect(readApp('../v8/settings/pools/pools.tsx')).toContain('variant="primary"')

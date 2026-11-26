@@ -7,6 +7,13 @@
   --tpl-guide-connection-width: 640px;
   max-inline-size: var(--tpl-guide-connection-width);
 }
+/* 説明は本文の大きさ。指定が無いと外側の大きい文字を受け継ぐ。 */
+.guideText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  line-height: 1.6;
+}
 
 .stateBox {
   padding: var(--tpl-rt-state-pad);

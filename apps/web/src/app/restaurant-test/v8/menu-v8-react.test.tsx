@@ -85,19 +85,20 @@ describe('MJoJR メニュー管理のV8', () => {
 
   it('コースの所要時間を編集して保存する', async () => {
     render(<MenuEditV8 />)
-    const duration = await screen.findByLabelText('所要時間')
-    expect((duration as HTMLInputElement).value).toBe('120')
-    fireEvent.change(duration, { target: { value: '90' } })
+    const duration = await screen.findByRole('button', { name: '所要時間' })
+    expect(duration.textContent).toContain('2時間（120分）')
+    fireEvent.click(duration)
+    fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: '1時間30分（90分）' }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ durationMinutes: 90 })))
   })
 
-  it('新規コースの所要時間は入力した値を保存する', async () => {
+  it('新規コースの所要時間は選んだ値を保存する', async () => {
     nav.params = new URLSearchParams('store=store-1')
     try {
       render(<MenuEditV8 />)
-      const duration = await screen.findByLabelText('所要時間')
-      expect((duration as HTMLInputElement).value).toBe('')
+      const duration = await screen.findByRole('button', { name: '所要時間' })
+      expect(duration.textContent).toContain('所要時間を選ぶ')
       expect(screen.getByRole('button', { name: '提供時間', exact: true }).textContent).toContain('提供時間帯を選ぶ')
       fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '新コース' } })
       fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '5000' } })
@@ -105,7 +106,8 @@ describe('MJoJR メニュー管理のV8', () => {
       expect(screen.getByText('所要時間を入力してください。')).toBeTruthy()
       expect(fixture.createMenu).not.toHaveBeenCalled()
       expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('新コース')
-      fireEvent.change(duration, { target: { value: '150' } })
+      fireEvent.click(duration)
+      fireEvent.click(within(screen.getByRole('listbox')).getByRole('button', { name: '2時間30分（150分）' }))
       fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
       await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ durationMinutes: 150, servicePeriods: [] })))
     } finally { nav.params = new URLSearchParams('id=m1') }
@@ -138,6 +140,7 @@ describe('MJoJR メニュー管理のV8', () => {
   it('コースの既存画像を読めない場合は外し、店舗の登録写真を選び直せる', async () => {
     fixture.snapshot.mockResolvedValue({ data: { ...data, menuItems: data.menuItems.map(item =>
       item.id === 'm1' ? { ...item, image_media_id: 'missing-image' } : item) } })
+    vi.spyOn(api.folders, 'list').mockResolvedValue({ success: true, data: [] })
     vi.spyOn(api.media, 'list').mockResolvedValue({ success: true, data: {
       items: [
         { id: 'media-test', filename: '料理.png', lineAccountId: 'account-1', kind: 'image' },
@@ -157,9 +160,12 @@ describe('MJoJR メニュー管理のV8', () => {
     expect(screen.queryByText(warning)).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '写真を追加' }))
-    const photo = await screen.findByRole('option', { name: /料理.png/ })
-    expect(screen.queryByRole('option', { name: /別の店舗.png/ })).toBeNull()
+    const gallery = within(screen.getByRole('dialog', { name: 'コースの写真を選ぶ' }))
+    const photo = await gallery.findByRole('checkbox', { name: '料理.png' })
+    expect(gallery.queryByRole('checkbox', { name: '別の店舗.png' })).toBeNull()
     fireEvent.click(photo)
+    expect(photo.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(gallery.getByRole('button', { name: '1枚を追加' }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledExactlyOnceWith('account-1', 'm1',
       expect.objectContaining({ photos: [{ mediaId: 'media-test', x: 50, y: 50 }], expectedVersion: 1 })))

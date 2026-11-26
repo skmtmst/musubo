@@ -2,8 +2,9 @@ import { Hono } from 'hono';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
-import { createTestD1, dropCompatIndexes772, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { instagram } from './instagram.js';
+import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';
 import {
   verifyInstagramSignature,
   purgeInstagramTransientData,
@@ -32,13 +33,14 @@ const config = {
   META_TOKEN_ENCRYPTION_KEY: btoa('x'.repeat(32)),
   META_WEBHOOK_VERIFY_TOKEN: 'verify_mock',
 };
-function app(staff = admin, configured = true) {
+function app(staff = admin, configured = true, enforceFeatures = false) {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
     c.env = { DB: db.db, ...(configured ? config : {}) } as Env['Bindings'];
     c.set('staff', staff);
     await next();
   });
+  if (enforceFeatures) a.use('/api/*', featureEnforcementMiddleware);
   a.route('/', instagram);
   return a;
 }
@@ -218,6 +220,24 @@ it('接続一覧は同じLINEアカウントの接続を全件、既定と同じ
   // 合鍵は行ごとにも出さない。
   expect(JSON.stringify(list)).not.toContain('token');
   expect(JSON.stringify(list)).not.toContain('encrypted');
+});
+it('機能停止中も実middlewareを通って接続2件を読め、別統括の接続は読めない', async () => {
+  await connect();
+  addSecondConnection();
+  db.raw.prepare('INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)')
+    .run('ig-disabled', 'a1', 'feature.external_integrations', JSON.stringify({ enabled: false }));
+  const original = db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all();
+  vi.mocked(fetch).mockClear();
+
+  const response = await app(admin, true, true).request('/api/instagram/connections?lineAccountId=a1');
+  expect(response.status).toBe(200);
+  const list = await read(response);
+  expect(list.data.connections.map((row) => row.instagramId)).toEqual(['20', '21']);
+  expect(JSON.stringify(list)).not.toMatch(/token|encrypted/);
+  expect((await app({ ...admin, tenantId: 't2' }, true, true)
+    .request('/api/instagram/connections?lineAccountId=a1')).status).toBe(404);
+  expect(db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all()).toEqual(original);
+  expect(fetch).not.toHaveBeenCalled();
 });
 it('接続一覧は行ごとに期限を見て、1件が切れても他の行は使えるままにする', async () => {
   await connect();
@@ -1099,8 +1119,6 @@ it('写真DMと受信時刻の順、別アカウントのカーソルを守る',
  * 並び順を後ろにして「既定の1件」にはならないようにする。
  */
 function addSecondConnection() {
-  // 2件目が入るのは互換索引の無い形（773 適用後）。bootstrap はまだ互換期間の形。
-  dropCompatIndexes772(db.raw);
   db.raw
     .prepare(
       `INSERT INTO instagram_connections
@@ -1223,6 +1241,48 @@ it('接続を増やすときは宛先を持たず、接続IDの同時指定は�
   expect(
     db.raw.prepare('SELECT connection_id FROM instagram_oauth_states').all(),
   ).toEqual([{ connection_id: null }]);
+});
+
+it.each([1, 2])('既存接続が%i件あっても、追加の認可完了では既存行を変えず別の接続を保存する', async (existingCount) => {
+  await connect();
+  db.raw.prepare('UPDATE instagram_connections SET sort_order=7').run();
+  if (existingCount === 2) addSecondConnection();
+  const existing = db.raw.prepare('SELECT * FROM instagram_connections ORDER BY id').all();
+  const existingOrder = db.raw.prepare('SELECT instagram_id FROM instagram_connections ORDER BY sort_order,id').all();
+  const upstream = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (url: URL | string, init?: RequestInit) =>
+    new URL(String(url)).pathname.endsWith('/me')
+      ? Response.json({ id: '22', username: 'another_cafe' })
+      : upstream(url as RequestInfo, init),
+  ));
+
+  const start = await read(await req('/api/instagram/oauth/start?mode=add', {}));
+  const state = new URL(start.data.url).searchParams.get('state')!;
+  const response = await req('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
+  const back = new URL(response.headers.get('location')!);
+  expect(back.searchParams.get('instagram')).toBe('connected');
+  expect(db.raw.prepare("SELECT * FROM instagram_connections WHERE instagram_id<>'22' ORDER BY id").all()).toEqual(existing);
+  expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_connections').get()).toEqual({ count: existingCount + 1 });
+  expect(db.raw.prepare('SELECT instagram_id FROM instagram_connections ORDER BY sort_order,id').all()).toEqual([
+    ...existingOrder, { instagram_id: '22' },
+  ]);
+  expect(db.raw.prepare("SELECT instagram_id,username,version FROM instagram_connections WHERE instagram_id='22'").get()).toEqual({
+    instagram_id: '22', username: 'another_cafe', version: 1,
+  });
+  expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_oauth_states').get()).toEqual({ count: 0 });
+});
+
+it('追加で同じInstagramを認可しても、既存接続を上書きせず重複として返す', async () => {
+  await connect();
+  const existing = db.raw.prepare('SELECT * FROM instagram_connections').all();
+  const start = await read(await req('/api/instagram/oauth/start?mode=add', {}));
+  const state = new URL(start.data.url).searchParams.get('state')!;
+  const response = await req('/api/instagram/oauth/callback?' + new URLSearchParams({ state, code: 'mock_code' }));
+  const back = new URL(response.headers.get('location')!);
+  expect(back.searchParams.get('instagram')).toBe('failed');
+  expect(back.searchParams.get('instagram_code')).toBe('instagram_account_already_connected');
+  expect(db.raw.prepare('SELECT * FROM instagram_connections').all()).toEqual(existing);
+  expect(db.raw.prepare('SELECT COUNT(*) AS count FROM instagram_oauth_states').get()).toEqual({ count: 0 });
 });
 
 it('別のLINEアカウントの接続IDを渡しても見つからない扱いにする', async () => {

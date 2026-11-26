@@ -320,7 +320,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
 
   const placeholders = sqlIdSet(friendIds).sql;
   const friends = await c.env.DB.prepare(
-    `SELECT id, line_user_id, display_name FROM friends WHERE id IN (${placeholders})`
+    `SELECT id, line_platform_user_id AS line_user_id, display_name FROM friends WHERE id IN (${placeholders})`
   ).bind(...(friendIds.length ? sqlIdSet(friendIds).binds : [])).all<{ id: string; line_user_id: string; display_name: string | null }>();
 
   const account = await getLineAccountById(c.env.DB, accountId);

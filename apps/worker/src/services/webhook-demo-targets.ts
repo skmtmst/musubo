@@ -5,7 +5,7 @@ export interface WebhookDemoTarget {
 }
 /** 体験送信先。通常の送信と同じく店と統括の状態を確認する境界。 */
 export async function webhookDemoTargets(db: D1Database, userId: string, sourceAccountId: string): Promise<WebhookDemoTarget[]> {
- const rows=await db.prepare(`SELECT f.line_user_id, f.line_account_id, la.channel_access_token, la.channel_access_token_encrypted
+ const rows=await db.prepare(`SELECT f.line_platform_user_id AS line_user_id, f.line_account_id, la.channel_access_token, la.channel_access_token_encrypted
  FROM friends f JOIN line_accounts la ON la.id=f.line_account_id
  JOIN line_accounts source ON source.id=?
  WHERE f.user_id=? AND f.line_account_id<>source.id AND f.is_following=1

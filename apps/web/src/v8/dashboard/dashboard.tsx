@@ -360,7 +360,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
   /* 初回ポップアップ（枠 02 / 02b）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
-    accountId: d.selectedAccountId, canManage, summary: onboardingSummary, guidePhase: start.guide.phase,
+    accountId: d.selectedAccountId, canManage, summary: onboardingSummary, guidePhase: wizard.dialog || start.guide.loading ? 'loading' : start.guide.phase,
   })
   const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
@@ -370,7 +370,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
       {starterRetry}
       {showOnboarding ? <FirstStepsCard
-        onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle}
+        onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle} guide={start.guide}
         onRecheck={start.watchExpired ? start.rewatch : undefined}
         feedback={<>
           {start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
@@ -438,7 +438,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
         {rows}
         <RecentActivity items={d.notifications} failed={d.notificationFailed} />
       </div>
-      {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
+      {/* 設定 › アカウントから操作した場合だけ開く。 */}
       {/* 最初の1通が、この画面で見ている間に届いた時だけ（SPEC-11 ③）。 */}
       {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {/* 「開店準備を始めましょう」（枠 02 ＝ PC / 枠 02b ＝ スマホ下部固定）。 */}

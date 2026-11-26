@@ -216,3 +216,23 @@ test.each(['Escape', 'キャンセル'])('未保存の基本情報を%sで閉じ
   expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
   expect(document.activeElement).toBe(screen.getByRole('button', { name: '編集' }))
 })
+
+test('基本の項目は基本の直下で並び替わり、保存後に欄へ反映する', () => {
+  render(<CustomerInfoPanel friendId="f" fields={fields} state="ready" canEdit sections={[{key:'support', label:'対応', content:'対応内容'}]} />)
+  fireEvent.click(screen.getByRole('button', {name:'表示項目を編集'}))
+  const dialog = screen.getByRole('dialog', {name:'表示項目'})
+  const labels = [...dialog.querySelectorAll('[data-reorder-id]')].map(el => el.getAttribute('data-reorder-id'))
+  expect(labels.indexOf('fixed:name')).toBe(labels.indexOf('names') + 1)
+  fireEvent.keyDown(screen.getByRole('button', {name:/ふりがな.*並び/}), {key:'ArrowUp'})
+  fireEvent.click(screen.getByRole('button', {name:'保存する'}))
+  const terms = [...screen.getByRole('region', {name:'基本'}).querySelectorAll('dt')].map(el => el.textContent)
+  expect(terms.slice(0,2)).toEqual(['ふりがな','名前'])
+})
+
+test('友だち詳細のリンクは閲覧権限がある場合だけ表示する', () => {
+  const props = {friendId:'a b',profile:{name:'山田',addedAt:'2026/1/1'},fields:[],state:'ready' as const,canEdit:false,sections:[]}
+  const view = render(<CustomerInfoPanel {...props} canViewFriend />)
+  expect(screen.getByRole('link',{name:'友だちの詳細を開く：山田'}).getAttribute('href')).toContain('id=a%20b')
+  view.rerender(<CustomerInfoPanel {...props} canViewFriend={false} />)
+  expect(screen.queryByRole('link',{name:'友だちの詳細を開く：山田'})).toBeNull()
+})

@@ -9,13 +9,12 @@ import AccountRegisterV8 from './register'
 import { allV06RowsOk, checkErrorText, LOGIN_ACKS, toV06CheckRows, toV8CheckRows, WEBHOOK_ACKS } from './logic'
 
 const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), check: vi.fn(), receipt: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.check, registrationReceipt: calls.receipt } } }))
+vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.check, registrationReceipt: calls.receipt, get: vi.fn(async () => ({ success: false })) } } }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn() } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/qr-image', () => ({ qrToDataURL: vi.fn(async () => '') }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
-vi.mock('./resume-style', () => ({ default: () => null }))
 
 const result = (): LineAccountConnectData => ({
   steps: [1, 2, 3, 4, 5].map(order => ({ order: order as 1, state: 'passed', message: '認証済み' })),
@@ -86,38 +85,35 @@ function confirmation() {
   fill('v8-login-channel-id', '2000000002'); fill('v8-login-channel-secret', 'b'.repeat(32))
   LOGIN_ACKS.forEach(ack => fireEvent.click(screen.getByRole('checkbox', { name: ack.label }))); next()
 }
-function expectManualGuidance() {
-  const guide = screen.getByText(manualGuidance, { exact: false })
-  expect(guide.textContent).toContain('Messaging APIとLINEログインのチャネルが同じプロバイダー内')
-  expect(guide.closest('[role="alert"]')).toBeNull()
+function expectNoManualGuidance() {
+  expect(screen.queryByText(manualGuidance, { exact: false })).toBeNull()
+  expect(screen.queryByRole('checkbox', { name: /同じプロバイダー/ })).toBeNull()
 }
 
-it('確認前・確認成功・模擬保存後も、所属の手動確認を読める形で残す', async () => {
-  confirmation(); expectManualGuidance()
+it('確認前から登録後まで、プロバイダーの手動確認を表示しない', async () => {
+  confirmation(); expectNoManualGuidance()
   expect(screen.getByText('両方のチャネルの認証結果を確認します。')).toBeTruthy()
   expect(document.body.textContent).not.toMatch(unsupportedClaim)
   expect(calls.check).not.toHaveBeenCalled(); expect(calls.connect).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect((screen.getByRole('button', { name: '登録する' }) as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 })
-  expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
+  expectNoManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
   await screen.findByText('友だち追加できるか確かめます')
-  expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
+  expectNoManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
   expect(calls.connect).toHaveBeenCalledTimes(1)
 })
 
-it.each([1, 4])('段%sの認証が失敗した画面でも手動確認を示し、登録APIを呼ばない', async order => {
+it.each([1, 4])('段%sの認証が失敗したら登録APIを呼ばず、再確認できる', async order => {
   const connection = result(); connection.steps[order - 1].state = 'failed'
   connection.verification!.sameProvider = false
   if (order === 1) connection.verification!.tokenOk = false
   else connection.verification!.loginOk = false
   calls.check.mockResolvedValue({ success: true, data: connection })
   confirmation();
-  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await screen.findByRole('button', { name: 'もう一度確かめる' }, { timeout: 5000 })
-  expectManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
+  expectNoManualGuidance(); expect(document.body.textContent).not.toMatch(unsupportedClaim)
   const register = screen.queryByRole('button', { name: '登録する' }) as HTMLButtonElement | null
   expect(register === null || register.disabled).toBe(true)
   expect(calls.connect).not.toHaveBeenCalled()
@@ -146,7 +142,6 @@ it('接続情報の必須欄が空の間は次へを止め、入力する内容�
 it('接続確認の通信失敗を操作内容より先に表示し、再確認できる', async () => {
   calls.check.mockRejectedValueOnce(new Error('offline'))
   confirmation()
-  fireEvent.click(screen.getByRole('checkbox', { name: 'LINE Developersで同じプロバイダーにあることを確かめた' }))
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   const notice = await screen.findByText(/接続の確認結果を確認できませんでした/)
   const card = screen.getByRole('region', { name: '接続確認' })

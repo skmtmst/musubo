@@ -38,6 +38,40 @@ beforeEach(() => {
 afterEach(cleanup)
 const values = (progress: Awaited<ReturnType<typeof loadStyleSetupProgress>>) => Object.values(progress.steps).map(step => step?.complete)
 
+it('入口の確認中は飲食店の進捗を隠し、確認後は取得済みの値を使う', async () => {
+  const view = renderHook(({ enabled }) => useStyleSetupProgress('a', 'restaurant', enabled, 'store'), { initialProps: { enabled: true } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  view.rerender({ enabled: false })
+  expect(view.result.current.status).toBe('idle')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+  view.rerender({ enabled: true })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.restaurantProgress).toHaveBeenCalledTimes(1)
+})
+
+it('担当者や権限が変わった直後は飲食店の前の進捗を表示しない', async () => {
+  const view = renderHook(({ identity }) => useStyleSetupProgress('a', 'restaurant', true, 'store', identity), { initialProps: { identity: 'staff-owner' } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  view.rerender({ identity: 'staff-viewer' })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(net.restaurantProgress).toHaveBeenCalledTimes(2)
+})
+
+it('保存後に入口の確認が入った場合は飲食店の古い進捗を隠して再取得する', async () => {
+  const view = renderHook(({ enabled }) => useStyleSetupProgress('a', 'restaurant', enabled, 'store'), { initialProps: { enabled: true } })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  act(() => view.result.current.markStale())
+  view.rerender({ enabled: false })
+  net.restaurantProgress.mockResolvedValueOnce({ success: true, data: { storeId: 'store', tables: false, hours: true, menus: true, reception: true, followup: true, followupRequired: true } })
+  act(() => view.result.current.refresh())
+  view.rerender({ enabled: true })
+  expect(view.result.current.status).toBe('loading')
+  await waitFor(() => expect(view.result.current.progress?.steps.attributes?.complete).toBe(false))
+  expect(net.restaurantProgress).toHaveBeenCalledTimes(2)
+})
+
 it.each(ACCOUNT_STYLES)('%sはその段の既存APIの実設定だけを使う', async style => {
   const progress = await loadStyleSetupProgress('a', style)
   expect(progress.style).toBe(style)
@@ -153,3 +187,127 @@ it('破損した予約フォームの修復案内を、選んだ店舗のダッ�
  net.restaurantProgress.mockResolvedValue({success:true,data:{storeId:'another',tables:true,hours:true,menus:true,reception:true,followup:true,reservationForm:{available:false,message,repairPath:'/other'}}});
  expect((await loadStyleSetupProgress('a','restaurant','store')).notices).toBeUndefined();
 });
+
+it('保存後の再確認中は古い済みを消し、先に始まった遅い応答も戻さない', async () => {
+  const view = renderHook(() => useStyleSetupProgress('a', 'salon'))
+  await waitFor(() => expect(view.result.current.progress?.steps.attributes?.complete).toBe(true))
+  let resolveOld!: (value: unknown) => void
+  net.menus.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  act(() => view.result.current.reload())
+  await waitFor(() => expect(net.menus).toHaveBeenCalledTimes(2))
+  act(() => view.result.current.invalidate())
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+  await act(async () => { resolveOld({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [{ id: 'staff' }] }] }) })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+})
+
+it('別アカウントや未確定スタイルを挟んで元のアカウントへ戻した時、再取得完了前に古い済みを表示しない', async () => {
+  const view = renderHook(({ id, style }) => useStyleSetupProgress(id, style), {
+    initialProps: { id: 'a' as string | null, style: 'salon' as 'salon' | null },
+  })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  let resolveB!: (value: unknown) => void
+  let resolveA!: (value: unknown) => void
+  net.menus
+    .mockImplementationOnce(() => new Promise(resolve => { resolveB = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { resolveA = resolve }))
+
+  view.rerender({ id: 'b', style: 'salon' })
+  expect(view.result.current.status).toBe('loading')
+  view.rerender({ id: 'a', style: 'salon' })
+  expect(view.result.current.status).toBe('loading')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBeNull()
+
+  await act(async () => {
+    resolveB({ menus: [] })
+    resolveA({ menus: [] })
+  })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
+
+  let resolveStyleReload!: (value: unknown) => void
+  net.menus.mockImplementationOnce(() => new Promise(resolve => { resolveStyleReload = resolve }))
+  view.rerender({ id: 'a', style: null })
+  expect(view.result.current.status).toBe('idle')
+  view.rerender({ id: 'a', style: 'salon' })
+  expect(view.result.current.status).toBe('loading')
+  await act(async () => { resolveStyleReload({ menus: [{ id: 'menu', is_active: 1, assigned_staff: [{ id: 'staff' }] }] }) })
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+})
+
+it('裏でのrefreshは直前の済みを保ったまま新しい値へ更新する', async () => {
+  const view = renderHook(() => useStyleSetupProgress('a', 'salon'))
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  let resolveRefresh!: (value: unknown) => void
+  net.menus.mockImplementationOnce(() => new Promise(resolve => { resolveRefresh = resolve }))
+  act(() => {
+    view.result.current.markStale()
+    view.result.current.refresh()
+  })
+  expect(view.result.current.status).toBe('ready')
+  expect(view.result.current.revalidating).toBe(true)
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  await act(async () => { resolveRefresh({ menus: [] }) })
+  await waitFor(() => expect(view.result.current.revalidating).toBe(false))
+  expect(view.result.current.status).toBe('ready')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
+})
+
+it('業種進捗でも保存より前に始まったrefreshの応答では結果も確認中の印も変えず、再確認失敗を記録する', async () => {
+  const view = renderHook(() => useStyleSetupProgress('a', 'salon'))
+  await waitFor(() => expect(view.result.current.status).toBe('ready'))
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  let resolveEarlier!: (value: unknown) => void
+  let resolveNext!: (value: unknown) => void
+  net.menus
+    .mockImplementationOnce(() => new Promise(resolve => { resolveEarlier = resolve }))
+    .mockImplementationOnce(() => new Promise(resolve => { resolveNext = resolve }))
+
+  act(() => view.result.current.refresh())
+  act(() => view.result.current.markStale())
+  expect(view.result.current.revalidating).toBe(true)
+
+  await act(async () => { resolveEarlier({ menus: [] }) })
+  expect(view.result.current.revalidating).toBe(true)
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(true)
+
+  act(() => view.result.current.refresh())
+  await act(async () => { resolveNext({ menus: [] }) })
+  await waitFor(() => expect(view.result.current.revalidating).toBe(false))
+  expect(view.result.current.revalidationStatus).toBe('idle')
+  expect(view.result.current.progress?.steps.attributes?.complete).toBe(false)
+})
+
+it('他のLINEに紐づく唯一の現役店や古い応答から飲食店の進捗を読まない', async () => {
+  net.snapshot.mockResolvedValue({ success: true, data: { stores: [{ id: 'other-store', line_account_id: 'b', status: 'active' }] } });
+  net.context.mockResolvedValue({ success: true, data: { selectedStore: null } });
+  expect((await loadStyleSetupProgress('a', 'restaurant')).steps.attributes?.complete).toBeNull();
+  expect(net.restaurantProgress).not.toHaveBeenCalled();
+
+  net.restaurantProgress.mockResolvedValue({ success: true, data: { storeId: 'store', lineAccountId: 'b', tables: true, hours: true, menus: true, reception: true, followup: true } });
+  expect((await loadStyleSetupProgress('a', 'restaurant', 'store')).steps.attributes?.complete).toBeNull();
+});
+
+it('ECの進捗確認ではストア接続の応答を待たずにGoogleの接続確認を並列で始める', async () => {
+  let resolveConnector!: (value: unknown) => void
+  net.connector.mockImplementationOnce(() => new Promise(resolve => { resolveConnector = resolve }))
+  const pending = loadStyleSetupProgress('a', 'ec')
+  expect(net.connector).toHaveBeenCalledWith('a')
+  expect(net.googleConnection).toHaveBeenCalledWith('a')
+  resolveConnector({
+    success: true,
+    data: { configured: true, connector: { status: 'connected', secretConfigured: true, eventTypes: ['ec.order.confirmed'] }, health: { lastSucceededAt: '2026-10-28T00:00:00Z' } },
+  })
+  const progress = await pending
+  expect(progress.steps.attributes?.complete).toBe(true)
+  expect(progress.steps.hours?.complete).toBe(true)
+})

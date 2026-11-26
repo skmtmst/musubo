@@ -36,23 +36,26 @@ async function loadRestaurantStoreProgress(accountId: string, selectedStoreId?: 
     const [stores, context] = await Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)])
     if (!stores.success || !context.success) return unknownRestaurantSetup('店舗の設定を読み込めませんでした')
     const selected = context.data.selectedStore?.id
-    const active = stores.data.stores.filter(store => store.status === 'active')
-    const owned = active.filter(store => store.line_account_id === accountId)
-    if (selected && owned.length > 0 && !owned.some(store => store.id === selected))
+    const owned = stores.data.stores.filter(store => store.status === 'active' && store.line_account_id === accountId)
+    if (selected && !owned.some(store => store.id === selected))
       return unknownRestaurantSetup('このアカウントの店舗を選んで設定を確認してください')
-    storeId = selected ?? (owned.length === 1 ? owned[0].id : active.length === 1 ? active[0].id : null)
-    if (storeId && !active.some(store => store.id === storeId)) return unknownRestaurantSetup('店舗の設定を確認できませんでした')
+    storeId = selected ?? (owned.length === 1 ? owned[0].id : null)
   }
   if (!storeId) return unknownRestaurantSetup('店舗を選んで設定を確認してください')
   const response = await restaurantTestApi.setupProgress(accountId, storeId)
   if (!response.success || response.data.storeId !== storeId
+    || (response.data.lineAccountId !== undefined && response.data.lineAccountId !== accountId)
     || !['tables', 'hours', 'menus', 'reception', 'followup'].every(key => typeof response.data[key as keyof typeof response.data] === 'boolean'))
     return unknownRestaurantSetup('店舗の設定を読み込めませんでした')
   const data = response.data
-  return { style: 'restaurant', ...(data.reservationForm?.available===false?{notices:[{message:data.reservationForm.message,href:data.reservationForm.repairPath}]}:{}), steps: {
+  const exposure = data.bookingExposure
+  const bookingExposure = exposure && typeof exposure.reservationLink === 'boolean'
+    && typeof exposure.publicReservationMenu === 'boolean' && typeof exposure.availableCapacity === 'boolean'
+    ? exposure : undefined
+  return { style: 'restaurant', bookingExposure, ...(data.reservationForm?.available===false?{notices:[{message:data.reservationForm.message,href:data.reservationForm.repairPath}]}:{}), steps: {
     attributes: { complete: data.tables, reason: '卓を作るか、停止中の卓の受付を再開してください' },
     hours: { complete: data.hours, reason: '予約を受け付ける曜日と時間を設定してください' },
-    friendAdd: { complete: data.menus, reason: 'コースとメニューを登録してください' },
+    friendAdd: { complete: data.menus || data.courseRegistered === true, reason: 'コースとメニューを登録してください' },
     scenario: { complete: data.reception, reason: 'LINEの予約ページと、これからの受付枠を用意してください' },
     followup: followupEvidence(data.followupSetup, data.followup),
   } }

@@ -259,7 +259,7 @@ export async function resolveAnnouncementAudience(
   }
   const { results } = await db
     .prepare(`SELECT sm.id AS staff_id, sm.name AS staff_name, sm.email AS staff_email, t.id AS tenant_id, t.name AS tenant_name,
-                     t.plan_key, t.plan_status, sm.notice_friend_id, f.line_user_id
+                     t.plan_key, t.plan_status, sm.notice_friend_id, f.line_platform_user_id AS line_user_id
                 FROM staff_members sm
                 JOIN tenants t ON t.id = sm.tenant_id
                 LEFT JOIN friends f ON f.id = sm.notice_friend_id AND f.is_following = 1

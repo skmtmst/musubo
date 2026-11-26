@@ -164,6 +164,28 @@ describe('切り戻し（X-5）', () => {
     ).get()).toEqual({ rolled_back_by: 'owner-a', rollback_note: 'やり直し' });
   });
 
+  it('移し元で同じLINEユーザーが再登録したときはすべての行を保ち競合を返す', async () => {
+    const { sqlite, db } = setupHandoverDb();
+    try {
+      await complete(sqlite, db);
+      sqlite.prepare(`INSERT INTO friends (id, line_user_id, line_account_id)
+        VALUES ('friend-new', 'musubo-scope:friend-new:U1', 'from-acc')`).run();
+
+      expect(await rollbackHandover(db, 'h-1', { rolledBackBy: 'owner-a' })).toMatchObject({
+        ok: false, conflict: true,
+      });
+      expect(sqlite.prepare('SELECT id, line_account_id FROM friends ORDER BY id').all()).toEqual([
+        { id: 'friend-1', line_account_id: 'to-acc' },
+        { id: 'friend-2', line_account_id: 'to-acc' },
+        { id: 'friend-new', line_account_id: 'from-acc' },
+      ]);
+      expect(sqlite.prepare("SELECT rolled_back_at FROM account_handovers WHERE id = 'h-1'").get())
+        .toEqual({ rolled_back_at: null });
+    } finally {
+      sqlite.close();
+    }
+  });
+
   it('終わっていない引き継ぎは戻せない', async () => {
     const { db } = setupHandoverDb();
     const result = await rollbackHandover(db, 'h-1', {});

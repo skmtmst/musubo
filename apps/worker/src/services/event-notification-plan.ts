@@ -28,7 +28,7 @@ export async function prepareEventNotification(db:D1Database,input:{accountId:st
 export async function prepareConfirmedEventBooking(db:D1Database,bookingId:string,now:Date):Promise<D1PreparedStatement[]> {
   const row=await db.prepare(`SELECT e.name AS event_name,e.venue_name,e.venue_url,e.confirmation_message_extra,
       e.reminder_day_before_enabled,e.reminder_hours_before,s.starts_at AS slot_starts_at,
-      b.line_account_id,b.slot_id,b.lock_version,f.line_user_id
+      b.line_account_id,b.slot_id,b.lock_version,f.line_platform_user_id AS line_user_id
     FROM event_bookings b JOIN events e ON e.id=b.event_id JOIN event_slots s ON s.id=b.slot_id
     JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id WHERE b.id=?`)
     .bind(bookingId).first<{event_name:string;venue_name:string|null;venue_url:string|null;confirmation_message_extra:string|null;

@@ -203,11 +203,26 @@ it('追加決まり1: 読み直すは日付の段の中（本線B28形）', asyn
 it('追加決まり1: 右の列の開閉はタブの段に入り単独の段を作らない', async () => {
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toHaveLength(5))
-  const toggle = await screen.findByRole('button', { name: '新着・お支払いを見る' })
+  const toggle = await screen.findByRole('button', { name: '今日の確認を見る' })
   const columns = document.querySelector('[data-detail-columns]')!
   // タブの段（タブの後・本文の前）にあり、本文の2列の下の段には無い。
   expect(toggle.closest('[data-detail-columns]')).toBeNull()
   expect(toggle.compareDocumentPosition(columns) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it('面談の結果待ちタブでも、狭い板で畳む「今日の確認」をタブの段から開け閉めできる', async () => {
+  state.params = 'tab=bookings'
+  state.summary.mockResolvedValue({ data: { ...snapshot, style: 'consult' } })
+  vi.mocked(styleApi.schedule).mockResolvedValue({ success: true, data: { ...schedule, style: 'consult' } })
+  render(<StyleDashboard style="consult" />)
+  const toggle = await screen.findByRole('button', { name: '今日の確認を見る' })
+  const aside = await waitFor(() => { const node = document.querySelector<HTMLElement>('[data-detail-columns="style-dashboard"] aside'); expect(node).not.toBeNull(); return node! })
+  expect(within(aside).getByRole('region', { name: '今日の確認' })).toBeTruthy()
+  expect(aside.hasAttribute('data-expanded')).toBe(false)
+  fireEvent.click(toggle)
+  expect(aside.hasAttribute('data-expanded')).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '右の列を畳む' }))
+  expect(aside.hasAttribute('data-expanded')).toBe(false)
 })
 
 it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせない）', async () => {

@@ -18,7 +18,7 @@
 .inlineLink { color: var(--color-link); text-decoration: underline; }
 
 /* 使っている所の行：種類96・名前・版120・状態80・開く。下に線。 */
-.usageRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-usage-pad); box-shadow: var(--shadow-row-line); }
+.usageRow { display: flex; align-items: center; gap: var(--tpl-eds-row-gap); min-width: 0; padding: var(--tpl-eds-usage-pad); box-shadow: var(--shadow-row-line); font-size: var(--text-body); }
 .usageKind { flex: 0 0 var(--tpl-eds-kind-w); overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
 .usageName,
 .usageNameQuiet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

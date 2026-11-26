@@ -1,7 +1,7 @@
 import { GapError } from '../../services/gap-common.js';
 export type BroadcastPurpose='transaction'|'notice'|'marketing';
 
-export const audience=`f.line_account_id=b.line_account_id AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND COALESCE(f.line_user_id,'')<>'' AND (b.target_type='all' OR b.target_type='tag' AND EXISTS(SELECT 1 FROM friend_tags t WHERE t.friend_id=f.id AND t.tag_id=b.target_tag_id))`;
+export const audience=`f.line_account_id=b.line_account_id AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND COALESCE(f.line_platform_user_id,'')<>'' AND (b.target_type='all' OR b.target_type='tag' AND EXISTS(SELECT 1 FROM friend_tags t WHERE t.friend_id=f.id AND t.tag_id=b.target_tag_id))`;
 
 export const permitted=`NOT EXISTS(SELECT 1 FROM friend_delivery_consents c WHERE c.line_account_id=f.line_account_id AND c.friend_id=f.id AND c.state='revoked' AND c.purpose IN(SELECT value FROM json_each(CASE x.purpose WHEN 'transaction' THEN '["transaction","transactional","reservation"]' WHEN 'notice' THEN '["notice","notification"]' ELSE '["marketing","promotion","advertising","宣伝"]' END)))`;
 

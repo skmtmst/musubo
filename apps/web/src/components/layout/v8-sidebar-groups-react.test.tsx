@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
-import { act } from 'react'
+import { act, useInsertionEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MENU_SECTIONS, SCREEN_MENU_OWNER } from '@/lib/menu'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
@@ -128,6 +128,24 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」の見出しが無い`).toBeGreaterThan(0)
     }
     expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+  })
+
+  it('履歴が挿入エフェクト中に変わっても、警告を出さず所属を更新する', async () => {
+    fixture.pathname = '/accounts'
+    window.history.replaceState({}, '', '/accounts')
+    const view = await renderSidebar()
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    function Navigate() {
+      useInsertionEffect(() => { window.history.replaceState({}, '', '/accounts?tab=migration') }, [])
+      return null
+    }
+    try {
+      render(<Navigate />)
+      await waitFor(() => expect(view.container.querySelector('aside[data-design-node="J33xq"] a[href="/friends"]')?.getAttribute('aria-current')).toBe('page'))
+      expect(errors.mock.calls.flat().join(' ')).not.toContain('useInsertionEffect must not schedule updates')
+    } finally {
+      errors.mockRestore()
+    }
   })
 
   it('受信箱の札は全アカウント合計でなく選択中のアカウントの要返信件数を出す', async () => {

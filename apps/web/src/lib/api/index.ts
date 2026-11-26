@@ -146,6 +146,7 @@ export const api = {
   nenCampaigns: nenCampaignsMethods.nenCampaigns,
   nenMembers: nenMembersMethods.nenMembers,
   instagram: settingsMethods.instagram,
+  snsConnections: settingsMethods.snsConnections,
   autoReplyUnmatched: autoRepliesMethods.autoReplyUnmatched,
   scenarioDrafts: scenariosMethods.scenarioDrafts,
   chats: chatsMethods.chats,

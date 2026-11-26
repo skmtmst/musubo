@@ -6,6 +6,7 @@ import { StyleError } from './style-setup.js';
 import { closuresForRange, openSeatTablePeriods, type ClosurePeriod } from './restaurant-closures.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import { connectedGoogleProfile, googleOpeningDay } from './restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 
 export async function seatSchedule(db:D1Database,account:string,query:Record<string,string|undefined>,style:StyleSnapshot['style'],from:string,to:string,asOf:string,timeZone:string,days:StyleSchedule['days'],closures:StyleSchedule['closures'],availability:StyleSchedule['availability']) {
   if (style === 'restaurant') {
@@ -40,9 +41,9 @@ export async function seatSchedule(db:D1Database,account:string,query:Record<str
         )
         .bind(store.id)
         .first<{ hours_json: string }>();
-      const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-        .bind(store.id).first<{ status: string }>();
-      const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id) : null;
+      // 接続の有無の判定と写しの読み取りで**同じ1件**を見る（773で互換索引が外れ接続が2件入り得る）。
+      const googleConnection = await primaryGoogleConnection(db, store.id);
+      const googleProfile = googleConnection ? await connectedGoogleProfile(db, store.id, googleConnection.id) : null;
       const hasHours = googleConnection ? Boolean(googleProfile) : Boolean(setting);
       if (!hasHours) {
         availability.status = 'unconfigured';

@@ -47,6 +47,23 @@ function assertContract(subscription: StripeSubscription, tenantId: string, cust
   }
 }
 
+/** Read the verified monthly options period without creating or charging anything. */
+export async function getMusuboOptionsBillingPeriod(
+  env: WorkerBindings,
+  tenantId: string,
+): Promise<{ start: string; end: string }> {
+  const billing = await getMusuboTenantBilling(env.DB, tenantId);
+  if (!billing || billing.status !== 'active' || billing.termination_requested_at
+    || !billing.options_subscription_id) {
+    throw new Error('The musubo options contract is not active');
+  }
+  const legacy = await getTenantBilling(env.DB, tenantId);
+  if (!legacy?.stripe_customer_id) throw new Error('Stripe customer is unavailable');
+  const options = await stripeApi.retrieveSubscription(env, billing.options_subscription_id);
+  assertContract(options, tenantId, legacy.stripe_customer_id, 'musubo_options');
+  return period(options);
+}
+
 /** The server and Stripe dates, never a client price, determine the incremental charge. */
 export async function quoteMusuboLineAddition(env: WorkerBindings, tenantId: string, now = new Date()) {
   const billing = await getMusuboTenantBilling(env.DB, tenantId);
@@ -137,7 +154,7 @@ async function findInvoice(env: WorkerBindings, customerId: string, tenantId: st
   throw new Error('Stripe invoice list is incomplete');
 }
 
-function verifiedInvoice(invoice: StripeInvoice, addition: MusuboPendingLineAddition, customerId: string): void {
+export function verifyMusuboLineAdditionInvoice(invoice: StripeInvoice, addition: MusuboPendingLineAddition, customerId: string): void {
   if (invoice.customer !== customerId || invoice.metadata?.tenant_id !== addition.tenant_id
     || invoice.metadata?.purpose !== 'musubo_addition' || invoice.metadata.addition_id !== addition.id
     || invoice.currency !== 'jpy') throw new Error('Addition invoice does not match the approved request');
@@ -155,7 +172,7 @@ export async function collectMusuboLineAddition(env: WorkerBindings, addition: M
   if (!invoice) invoice = await stripeApi.createMusuboAdditionInvoice(env, {
     customerId, tenantId: addition.tenant_id, additionId: addition.id,
   });
-  verifiedInvoice(invoice, addition, customerId);
+  verifyMusuboLineAdditionInvoice(invoice, addition, customerId);
   if (!addition.stripe_invoice_id) {
     await env.DB.prepare(`UPDATE musubo_pending_additions SET stripe_invoice_id=?,updated_at=?
       WHERE id=? AND stripe_invoice_id IS NULL AND status='awaiting_payment'`)
@@ -234,7 +251,7 @@ export async function reserveMusuboLineAddition(env: WorkerBindings, tenantId: s
       ? await stripeApi.retrieveInvoice(env, existing.stripe_invoice_id)
       : await findInvoice(env, legacy.stripe_customer_id, tenantId, existing.id);
     if (invoice) {
-      verifiedInvoice(invoice, existing, legacy.stripe_customer_id);
+      verifyMusuboLineAdditionInvoice(invoice, existing, legacy.stripe_customer_id);
       if (invoice.status === 'paid' && invoice.amount_paid >= existing.amount_due_yen) {
         await env.DB.prepare(`UPDATE musubo_pending_additions SET status='paid',stripe_invoice_id=?,paid_at=?,updated_at=?
           WHERE id=? AND status='awaiting_payment'`).bind(invoice.id, now.toISOString(), now.toISOString(), existing.id).run();
@@ -319,9 +336,9 @@ export async function connectReservedMusuboLine(env: WorkerBindings, input: {
       if (collected.status !== 'paid') return 'pending_payment';
     } catch { return 'pending_payment'; }
   }
-  try { await reconcilePaidMusuboLine(env, pending.id, input.tenantId); }
-  catch { return 'pending_reconciliation'; }
-  return 'active';
+  try {
+    return await reconcilePaidMusuboLine(env, pending.id, input.tenantId) ? 'active' : 'pending_reconciliation';
+  } catch { return 'pending_reconciliation'; }
 }
 
 /** May be retried by the scheduled worker after a Stripe timeout or partial D1 write. */
@@ -340,9 +357,11 @@ export async function reconcilePaidMusuboLine(env: WorkerBindings, additionId: s
     google_business_count,instagram_count,billed_linked_slots FROM musubo_line_usage
     WHERE tenant_id=? AND status IN ('active','ending') ORDER BY activated_at`)
     .bind(tenantId).all<UsageRow>();
-  const pendingUsage = await env.DB.prepare(`SELECT line_account_id,friend_count_excluding_blocked,
-    google_business_count,instagram_count,billed_linked_slots FROM musubo_line_usage
-    WHERE tenant_id=? AND line_account_id=? AND status='pending'`)
+  const pendingUsage = await env.DB.prepare(`SELECT u.line_account_id,u.friend_count_excluding_blocked,
+    u.google_business_count,u.instagram_count,u.billed_linked_slots FROM musubo_line_usage u
+    JOIN line_accounts a ON a.id=u.line_account_id AND a.tenant_id=u.tenant_id
+    WHERE u.tenant_id=? AND u.line_account_id=? AND u.status='pending'
+      AND a.is_active=0 AND a.archived_at IS NULL`)
     .bind(tenantId, pending.line_account_id).first<UsageRow>();
   if (!pendingUsage || pendingUsage.friend_count_excluding_blocked === null
     || !active.results?.length || active.results.some((line) => line.friend_count_excluding_blocked === null)) {
@@ -413,7 +432,13 @@ export async function reconcilePaidMusuboLine(env: WorkerBindings, additionId: s
     env.DB.prepare(`UPDATE musubo_pending_additions SET status='activated',activated_at=?,updated_at=?,
       price_snapshot_json=json_set(price_snapshot_json,'$.activatedCoreYen',?,'$.activatedOptionsYen',?,
         '$.activatedTrialing',?,'$.activatedInterval',?,'$.activatedDiscountPercent',?)
-      WHERE id=? AND tenant_id=? AND line_account_id=? AND status='paid'`)
+      WHERE id=? AND tenant_id=? AND line_account_id=? AND status='paid'
+        AND EXISTS (SELECT 1 FROM line_accounts a
+          WHERE a.id=musubo_pending_additions.line_account_id AND a.tenant_id=musubo_pending_additions.tenant_id
+            AND a.is_active=0 AND a.archived_at IS NULL)
+        AND EXISTS (SELECT 1 FROM musubo_line_usage u
+          WHERE u.line_account_id=musubo_pending_additions.line_account_id AND u.tenant_id=musubo_pending_additions.tenant_id
+            AND u.status='pending')`)
       .bind(activatedAt, activatedAt, coreAmountYen, optionsAmountYen,
         billing.status === 'trialing' ? 1 : 0, billing.billing_interval,
         quote ? 0 : lineBasicDiscountForDate(condition,
@@ -427,7 +452,12 @@ export async function reconcilePaidMusuboLine(env: WorkerBindings, additionId: s
       .bind(activatedAt, pending.line_account_id, tenantId),
   ]);
   if (updates.some((result) => (result.meta?.changes ?? 0) !== 1)) {
-    throw new Error('Paid LINE activation was not committed');
+    const alreadyActivated = await env.DB.prepare(`SELECT 1 FROM musubo_pending_additions p
+      JOIN musubo_line_usage u ON u.line_account_id=p.line_account_id AND u.tenant_id=p.tenant_id AND u.status='active'
+      JOIN line_accounts a ON a.id=p.line_account_id AND a.tenant_id=p.tenant_id AND a.is_active=1 AND a.archived_at IS NULL
+      WHERE p.id=? AND p.tenant_id=? AND p.line_account_id=? AND p.status='activated'`)
+      .bind(additionId, tenantId, pending.line_account_id).first();
+    if (!alreadyActivated) throw new Error('Paid LINE activation was not committed');
   }
   return true;
 }

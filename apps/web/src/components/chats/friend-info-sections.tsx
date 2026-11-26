@@ -83,7 +83,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
       <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
       {/* ①対応状況（3つのボタン・1タップ）。押した瞬間に変えて裏で保存。 */}
       <div>
-        <span className="text-micro text-ink-faint">対応状況（Sキー）</span>
+        <span className="text-micro text-ink-faint">対応状況</span>
         {canEditChat ? (
           /* ★V8 ：共通の選ぶ欄（会話の頭と同じ色の点）。選んだ瞬間に変えて裏で保存・知らせに元に戻す。保留も選べる。 */
           <div ref={statusButtonRef} className={v8.editField}>
@@ -147,7 +147,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
       </div>
       {/* ④メモ（書くのをやめて1秒で自動保存）。 */}
       <div data-customer-memo>
-        <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ（Mキー）{memoSaving ? '・保存中…' : ''}</label>
+        <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ{memoSaving ? '・保存中…' : ''}</label>
         {canEditChat ? (
           /* ★V8 ：共通の複数行の入力欄。書くのをやめて1秒で保存し、知らせに元に戻す。 */
           <div className={v8.editField}>
@@ -255,7 +255,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
   const renderTags = (friend: FriendDetail) => (
     <div data-customer-section="tags" style={sectionStyle('tags')} className={`px-5 py-4 ${v8.tagsSection}`}>
       <div className="mb-1.5 flex items-center justify-between">
-        <h4 className="text-ink text-xs font-bold">タグ（Tキー）</h4>
+        <h4 className="text-ink text-xs font-bold">タグ</h4>
         {canEditFriend ? <Button variant="text" size="inline" aria-expanded={tagPickerOpen} aria-controls="inbox-panel-tag-picker" onClick={() => setTagPickerOpen((value) => !value)}>＋ 追加</Button> : <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
           すべて見る
         </a>}

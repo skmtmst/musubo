@@ -5,6 +5,7 @@ import { join, relative } from 'node:path'
 import ts from 'typescript'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { mockFetch } from './mock-local.mjs'
+import { mockRegistrationResume, registrationAccountId } from './registration-resume-mock.mjs'
 import { stubApi } from './speed-budget.mjs'
 import { trackPendingApiRequests, waitForNavigationContent } from './navigation-content-ready.mjs'
 import { scanLeadingActions } from './dialog-leading-browser.mjs'
@@ -17,24 +18,13 @@ const menu = async (page, trigger, item) => { await button(page, trigger).click(
 const rowMenu = async (page, item) => { await page.locator('main tbody button[aria-haspopup="menu"]').first().click(); await page.getByRole('menuitem', { name: item, exact: true }).click() }
 const support = async page => { await page.getByRole('region', { name: 'チケットの一覧' }).locator('li button').first().click(); await page.getByRole('textbox', { name: '返信', exact: true }).waitFor() }
 
-const menuStep = async page => {
-  let dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true })
-  await dialog.getByRole('group', { name: '見るスタイル', exact: true }).getByRole('button', { name: /^飲食店/ }).click()
-  const choose = dialog.getByRole('button', { name: 'このスタイルにする', exact: true })
-  if (await choose.count()) await choose.click()
-  await dialog.getByRole('button', { name: '次へ', exact: true }).click()
-  dialog = page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ', exact: true })
-  await dialog.waitFor()
-}
-
 const recipes = [
   { source: 'components/friends/bulk-run-dialog.tsx', path: '/friends', open: async page => { const checks = page.locator('main tbody input[type="checkbox"]'); await checks.nth(0).check(); await checks.nth(1).check(); await button(page, '操作を選ぶ').click() } },
-  { source: 'v8/onboarding/wizard.tsx', index: 0, path: '/?setup=0', after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
-  { source: 'v8/onboarding/wizard.tsx', index: 1, path: '/?setup=0', after: menuStep, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
+  { source: 'v8/onboarding/wizard.tsx', index: 0, path: '/?setup=0&setupReturn=accounts', after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
+  { source: 'v8/onboarding/wizard.tsx', index: 1, path: '/?setup=0&setupReturn=accounts', noLeading: true, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
   { source: 'components/friend-fields/edit-tag-page-v4.tsx', path: '/tags/edit?id=tag-0', dependencyFailure: true, open: async page => { await button(page, 'タグを削除する').click() } },
   { source: 'components/friend-fields/tags-page-v4.tsx', path: '/tags', dependencyFailure: true, open: async page => { await rowMenu(page, '保管する') } },
-  { source: 'v8/account-new/registration-style-dialog.tsx', index: 0, path: '/accounts/new', registration: true, after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
-  { source: 'v8/account-new/registration-style-dialog.tsx', index: 1, path: '/accounts/new', registration: true, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
+  { source: 'v8/account-new/registration-style-dialog.tsx', index: 0, path: `/accounts/new?resume=${registrationAccountId}`, registration: true, after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
   { source: 'v8/hq/account-dialogs.tsx', path: '/hq', open: async page => { await button(page, /の設定$/).click() } },
   { source: 'v8/broadcasts/quick-send.tsx', path: '/broadcasts', dialogTitle: 'かんたんに送る', open: async page => { await menu(page, /^配信を作る/, 'かんたんに送る') }, fault: 'alignment' },
   { source: 'v8/ops/support.tsx', path: '/ops/support', open: async page => { await support(page); await page.getByRole('textbox', { name: '返信', exact: true }).fill('確認用の返信'); await button(page, '返信する').click() } },
@@ -75,14 +65,12 @@ for (const width of [1152, 1440]) for (const recipe of recipes) test(`leading ac
   mkdirSync(dir, { recursive: true })
   const browser = await connectGuardBrowser(), context = await browser.newContext({ viewport: { width, height: 1080 }, locale: 'ja-JP', reducedMotion: 'reduce' }), page = await context.newPage()
   page.setDefaultTimeout(7000)
-  const identity = JSON.parse((await mockFetch('GET', '/api/staff/me')).body).data
-  const resumeKey = `musubo-registration-style:${encodeURIComponent(identity.tenantId)}:${encodeURIComponent(identity.id)}`
-  await page.addInitScript(({ values, resumeKey, registration }) => { for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value); if (registration) sessionStorage.setItem(resumeKey, 'visual-qa-account') }, { values: PARITY_INIT, resumeKey, registration: recipe.registration })
+  await page.addInitScript(values => { for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value) }, PARITY_INIT)
   const pending = trackPendingApiRequests(page), errors = []; let normal = null, changed = null, broken = null, restored = null, narrowBroken = null, centerBroken = null, failure = null
   page.on('pageerror', error => errors.push(error.message))
   await stubApi(page, async (method, path) => {
     if (recipe.dependencyFailure && /\/tags\/[^/]+\/dependencies/.test(new URL(path, base).pathname)) return { status: 200, body: JSON.stringify({ success: false, error: '影響を確認できませんでした' }) }
-    const response = await mockFetch(method, path)
+    const response = await (recipe.registration ? mockRegistrationResume : mockFetch)(method, path)
     if (recipe.source === 'v8/hq-templates/saved-distribution-dialog.tsx' && new URL(path, base).pathname === '/api/hq/templates/visual-hq-tpl-autumn' && method === 'GET') {
       const body = JSON.parse(response.body)
       body.data.definition = { schemaVersion: 1, template: { ...body.data.definition.template, messageType: 'text', messageContent: '操作帯を確認するための本文です。' }, media: [] }
@@ -108,6 +96,17 @@ for (const width of [1152, 1440]) for (const recipe of recipes) test(`leading ac
     if (recipe.dialogTitle) await page.getByRole('dialog', { name: recipe.dialogTitle, exact: true }).waitFor()
     const dialogs = page.locator('[role="dialog"], [role="alertdialog"]').filter({ visible: true })
     await dialogs.last().waitFor()
+    if (recipe.noLeading) {
+      await dialogs.last().getByRole('button', { name: '保存する', exact: true }).waitFor()
+      assert.equal(await dialogs.last().locator('[data-dialog-action-leading]').count(), 0)
+      for (const name of ['あとで設定する', '手動で設定する']) {
+        assert.equal(await dialogs.last().getByRole('button', { name, exact: true }).count(), 0)
+      }
+      normal = await capture('normal')
+      assert.deepEqual(normal, [], '意図した設定入口の実画面に旧補助操作を出さない')
+      assert.deepEqual(errors, [], '画面の未処理エラー0')
+      return
+    }
     await dialogs.last().locator('[data-dialog-action-leading]').waitFor()
     assert.ok(await dialogs.last().locator('[data-dialog-action-leading]').count() > 0, '開いた窓そのものに補助操作がある')
     await page.locator('[data-dialog-action-leading]:visible').first().waitFor()

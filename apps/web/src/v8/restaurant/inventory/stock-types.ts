@@ -17,6 +17,6 @@ export type Conflict = {
   who: string
   at: string
   scope: string
-  attemptedAlloc: Alloc | null
-  attemptedHours: Hours | null
+  attemptedHours: Hours
+  latestHours: Hours | null
 }

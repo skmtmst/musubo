@@ -193,7 +193,7 @@ export async function registerMeetConsultation(
   if (start.getTime() <= now.getTime()) throw new Error('startsAt must be in the future');
 
   const friend = await db
-    .prepare('SELECT id, line_account_id,line_user_id FROM friends WHERE id = ? AND is_following = 1')
+    .prepare('SELECT id, line_account_id,line_platform_user_id AS line_user_id FROM friends WHERE id = ? AND is_following = 1')
     .bind(input.friendId)
     .first<{ id: string; line_account_id: string | null;line_user_id:string }>();
   if (!friend) throw new Error('friend not found or not following');
@@ -708,7 +708,7 @@ export async function processDueMeetConsultationReminders(
               c.booking_id AS snapshot_booking_id,
               c.booking_version AS snapshot_booking_version,
               c.friend_id AS snapshot_friend_id,
-              f.line_user_id, f.line_account_id, la.channel_access_token,
+              f.line_platform_user_id AS line_user_id, f.line_account_id, la.channel_access_token,
               la.channel_access_token_encrypted
          FROM meet_consultation_notification_runs r
          INNER JOIN meet_consultations c ON c.id = r.consultation_id
@@ -718,7 +718,7 @@ export async function processDueMeetConsultationReminders(
           AND r.retry_count < ?
           AND r.scheduled_at <= ?
           AND c.status = 'confirmed' AND r.schedule_revision=c.schedule_revision
-          AND r.friend_id=c.friend_id AND r.recipient_id=f.line_user_id AND r.line_account_id=f.line_account_id
+          AND r.friend_id=c.friend_id AND r.recipient_id=f.line_platform_user_id AND r.line_account_id=f.line_account_id
           AND julianday(r.starts_at)=julianday(c.starts_at) AND r.meet_url=c.meet_url
           AND c.starts_at > ?
           AND f.is_following = 1
@@ -831,7 +831,7 @@ export async function processDueMeetConsultationReminders(
           && !!await db.prepare(`SELECT 1 ok FROM meet_consultations c WHERE c.id=? AND c.status='confirmed'
             AND ${LINKED_BOOKING_ALIVE_SQL} ${candidateSnapshotSql()}
             AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=c.friend_id
-              AND live_friend.line_account_id=? AND live_friend.line_user_id=? AND live_friend.is_following=1
+              AND live_friend.line_account_id=? AND live_friend.line_platform_user_id=? AND live_friend.is_following=1
               AND ${activeTenantLineAccountSql('live_friend.line_account_id')})`)
             .bind(row.consultation_id,...candidateSnapshotBinds(row),row.line_account_id,saved.to).first(),
         send: (_signal, saved, key) => pushViaHarnessProxy(options.proxyBaseUrl, accessToken, saved.to,
@@ -840,7 +840,7 @@ export async function processDueMeetConsultationReminders(
           SELECT 1 FROM meet_consultations c WHERE c.id=? AND c.status='confirmed'
             AND ${LINKED_BOOKING_ALIVE_SQL} ${candidateSnapshotSql()}
             AND EXISTS(SELECT 1 FROM friends live_friend WHERE live_friend.id=c.friend_id AND live_friend.line_account_id=?
-              AND live_friend.line_user_id=? AND live_friend.is_following=1 AND ${activeTenantLineAccountSql('live_friend.line_account_id')}))
+              AND live_friend.line_platform_user_id=? AND live_friend.is_following=1 AND ${activeTenantLineAccountSql('live_friend.line_account_id')}))
           THEN 'true' ELSE 'meet_reminder_obsolete' END)`)
           .bind(row.consultation_id,...candidateSnapshotBinds(row),row.line_account_id,row.line_user_id),db.prepare("UPDATE meet_consultation_notification_runs SET call_state='started',updated_at=? WHERE id=?").bind(nowIso,row.id)]
           : next.phase === 'succeeded' ? [db.prepare(`UPDATE meet_consultation_notification_runs

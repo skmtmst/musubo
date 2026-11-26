@@ -96,7 +96,7 @@ export default function RegisterPage() {
         </AuthField>
         <AuthField label="担当者名" htmlFor="register-contact" error={messages.contactName}>
           <TextField id="register-contact" value={contactName} onChange={(event) => setContactName(event.target.value)}
-            autoComplete="name" maxLength={80} placeholder="見本 141" invalid={Boolean(messages.contactName)} />
+            autoComplete="name" maxLength={80} placeholder="山田 太郎" invalid={Boolean(messages.contactName)} />
         </AuthField>
         <AuthField label="メールアドレス" htmlFor="register-email" error={messages.email}>
           <TextField

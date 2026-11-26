@@ -204,14 +204,15 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  'v8/events/edit.tsx': 'v8/events/edit-form.tsx',
   'v8/restaurant/google/hours-edit-panel.tsx': 'v8/restaurant/google/hours.tsx',
   'components/shared/folder-row-actions.tsx': 'components/shared/folder-add-dialog.tsx',
   // タブ枠は子の名前編集を保持し、確認は子の共通ガードが担当する。
   'v8/tags/list.tsx': 'components/shared/use-inline-detail-guard.tsx',
   'v8/common-vars/list-dialogs.tsx': 'v8/common-vars/list.tsx',
   'v8/templates/list-dialogs.tsx': 'v8/templates/list.tsx',
-  // 再開画面のスタイル・メニューは共通の登録状態が離脱を守る。
-  'v8/account-new/resume-style.tsx': 'v8/account-new/registration-unsaved-guard.tsx',
+  // 新規・再開とも、接続の秘密値とスタイルの選択を登録用の番兵に渡す。
+  'v8/account-new/register.tsx': 'v8/account-new/registration-unsaved-guard.tsx',
   // 飲食店のフォームと選択中の値は組織画面の番兵へ伝える。
   'v8/restaurant/organization/organization-forms.tsx': 'v8/restaurant/organization/organization.tsx',
   // 統合ユーザーの2つの一覧・詳細は子窓の番兵へ委譲し、履歴とパンくずの切替を連携する。
@@ -401,8 +402,6 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/analytics/funnel.tsx':
     '★V8 分析のファネル。選ぶ欄は見る条件で、結果から対象者を作って友だち一覧・配信へ渡すだけ。保存する編集画面ではなく、画面に残る下書きを持たない',
   /* 2026-10-07：src/v8 に一から書いた画面の分類。元の画面ファイルがあるものはその扱いに合わせた。 */
-  'v8/account-new/register.tsx':
-    '登録の秘密値とスタイル・初期メニューは registration-unsaved-guard.tsx の番兵で保護。前半の非秘密入力は端末に保存されるが、確認項目などほかの一時状態は別途確認する。',
   'v8/reminders/detail.tsx':
     'app/reminders/detail/detail-v8.tsx と同じ画面の★V8版。登録者の基準日は行内の小さな編集で「基準日を保存」で確定する。元の画面と同じ扱い',
   'v8/settings/line-notifications/screen.tsx':

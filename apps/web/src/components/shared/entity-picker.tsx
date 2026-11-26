@@ -81,6 +81,7 @@ export function EntityPickerWindow(props: EntityPickerWindowProps) {
     footer={<>
       {props.scrollBody ? null : content}
       {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
+      {props.notice ? <div className={styles.tpNotice}>{props.notice}</div> : null}
       {props.band}
       <div className={styles.tpFoot}>{props.footer}</div>
     </>}>{props.scrollBody ? content : null}</Dialog>

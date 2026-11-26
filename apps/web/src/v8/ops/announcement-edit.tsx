@@ -384,7 +384,7 @@ export default function OpsAnnouncementEditV8() {
             <Send aria-hidden="true" />{scheduled ? '配信を予約する' : '今すぐ送る'}
           </Button>
         </>}
-        destructive={deletable ? <Button variant="danger" lockedReason={lock} disabled={busy || unknown} onClick={() => { if (editingId && editId === editingId) { deleteContext.current = { generation: routeContext.current.generation, id: editingId }; setDeleting(true) } }}>削除する</Button> : null}
+        destructive={deletable ? <Button variant="text" textTone="danger" lockedReason={lock} disabled={busy || unknown} onClick={() => { if (editingId && editId === editingId) { deleteContext.current = { generation: routeContext.current.generation, id: editingId }; setDeleting(true) } }}>削除する</Button> : null}
       >
         <div className={styles.formPage}>
           {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}

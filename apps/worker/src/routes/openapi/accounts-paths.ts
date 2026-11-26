@@ -376,6 +376,20 @@ export const accountsPaths = {
       },
     },
   },
+  '/api/line-accounts/registration-resume': {
+    get: {
+      tags: ['LINE Accounts'],
+      summary: '本人が始めたLINE登録を再開する',
+      description: '指定されたMessaging APIのチャネルで、ログイン中の本人が登録し、使い方がまだ未選択の有効なアカウントを確認する。',
+      parameters: [{ name: 'channel_id', in: 'query', required: true, schema: { type: 'string', pattern: '^[0-9]{1,32}$' } }],
+      responses: {
+        '200': { description: '再開できるアカウントID' },
+        '403': { description: '登録できる管理者権限がない' },
+        '404': { description: '再開できるアカウントがない' },
+        '422': { description: 'チャネルIDの形式が正しくない' },
+      },
+    },
+  },
   '/api/line-accounts/{id}/registration-receipt': {
     get: {
       tags: ['LINE Accounts'],
@@ -385,7 +399,8 @@ export const accountsPaths = {
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
       responses: {
         '200': { description: 'waiting / confirmed / error のいずれか' },
-        '404': { description: 'アカウントが見つからないか、閲覧権限がない' },
+        '404': { description: '対象を確認できないか、本人の登録ではない' },
+        '409': { description: 'LINE_ACCOUNT_INACTIVE' },
       },
     },
   },

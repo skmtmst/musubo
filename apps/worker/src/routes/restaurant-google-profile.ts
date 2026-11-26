@@ -240,7 +240,9 @@ async function saveProfile(c: Context<Env>, connection: ConnectionRef, locationN
     )
     .bind(storeId, connection.id, locationName, JSON.stringify({ profile, extras: keep }), profile.fingerprint, fetchedAt, fetchedAt)
     .run();
-  await syncGoogleOpeningWeek(dbFor(c.env, storeId), storeId, locationName, profile);
+  // 今保存した接続を渡す。予約の週設定は店舗に1行しかないので、主連携でない接続の
+  // 営業時間では上書きしない（syncGoogleOpeningWeek 側で主連携と照合する）。
+  await syncGoogleOpeningWeek(dbFor(c.env, storeId), storeId, locationName, profile, connection.id);
   return fetchedAt;
 }
 
@@ -257,7 +259,7 @@ async function refreshProfile(c: Context<Env>, store: StoreContext, connection: 
     };
     const fetchedAt = await saveProfile(c, connection, connection.location_name!, profile, extras);
     if (connection.status !== 'connected') await setConnectionStatus(c, connection, 'connected', null);
-    if (connection.status !== 'connected') await syncGoogleOpeningWeek(dbFor(c.env, store.id), store.id, connection.location_name!, profile);
+    if (connection.status !== 'connected') await syncGoogleOpeningWeek(dbFor(c.env, store.id), store.id, connection.location_name!, profile, connection.id);
     return { profile, extras, fetchedAt };
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, connection, 'no_permission', 'no_permission');

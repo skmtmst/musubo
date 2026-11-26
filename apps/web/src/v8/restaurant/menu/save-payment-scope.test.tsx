@@ -15,6 +15,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 const payment = vi.hoisted(() => ({ saveCourseMode: vi.fn() }))
 
+vi.mock('@/components/shared/allergy-field', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account, accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))

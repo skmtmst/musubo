@@ -36,7 +36,7 @@
 .required { color: var(--color-danger); font-size: var(--text-micro); font-weight: 600; }
 
 /* クーポンの回数・公開範囲：小さい題＋切り替え。 */
-.typeRow { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }
+.typeRow { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); font-size: var(--text-body); }
 
 /* 本文の箱：余白14・間8。字 13/22 の4行・間の16・差し込むの並び。 */
 .bodyBox {

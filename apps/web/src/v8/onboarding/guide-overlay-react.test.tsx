@@ -47,7 +47,7 @@ describe('手順別ガイドの重ね表示', () => {
     renderOverlay()
     expect(screen.getByText('手順 1/3')).toBeTruthy()
     expect(screen.getByText('まず卓を作りましょう')).toBeTruthy()
-    expect(screen.getByText(/「卓を作る」を押すと、卓の名前と席数を入れるフォームが開きます/)).toBeTruthy()
+    expect(screen.getByText(/「卓を作る」を押すと、卓番・表示名や席の条件を設定できます/)).toBeTruthy()
     expect(screen.getByText('④ 卓と席を登録する（手順 1/3）')).toBeTruthy()
     expect(screen.getByText('開店準備ガイド')).toBeTruthy()
   })
@@ -76,7 +76,7 @@ describe('手順別ガイドの重ね表示', () => {
 
   it('保存で進む手順では、対象を押しただけでは進めない', () => {
     const element = mountTarget('menu.save')
-    const props = renderOverlay({ stepKey: 'friendAdd', stepOrder: 6, procedureIndex: 3 })
+    const props = renderOverlay({ stepKey: 'friendAdd', stepOrder: 6, procedureIndex: 6 })
     fireEvent.click(element)
     expect(props.onAdvanceProcedure).not.toHaveBeenCalled()
   })
@@ -84,8 +84,21 @@ describe('手順別ガイドの重ね表示', () => {
   it('コース下書きのガイドには編集画面の保存名を使う', () => {
     const element = mountTarget('menu.save')
     element.textContent = '保存する'
-    renderOverlay({ stepKey: 'friendAdd', stepOrder: 5, procedureIndex: 3 })
-    expect(screen.getByText(/「公開」を選び、「保存する」を押します/)).toBeTruthy()
+    renderOverlay({ stepKey: 'friendAdd', stepOrder: 5, procedureIndex: 6 })
+    expect(screen.getByText('「保存する」を押すと、次の設定へ進みます。')).toBeTruthy()
+  })
+
+  it('コースは欄の入力を済ませてから「次へ」で進める', async () => {
+    const element = mountTarget('menu.name')
+    const props = renderOverlay({ stepKey: 'friendAdd', stepOrder: 5, procedureIndex: 3 })
+    const next = screen.getByRole('button', { name: '次へ' })
+    expect(next).toHaveProperty('disabled', true)
+    element.setAttribute('data-guide-ready', '')
+    await waitFor(() => expect(next).toHaveProperty('disabled', false))
+    fireEvent.click(element)
+    expect(props.onAdvanceProcedure).not.toHaveBeenCalled()
+    fireEvent.click(next)
+    expect(props.onAdvanceProcedure).toHaveBeenCalledOnce()
   })
 
   it('ESCと帯の「一時停止」でその場で止める', () => {

@@ -182,6 +182,7 @@ import { analytics } from './routes/analytics.js';
 import { analyticsExports } from './routes/analytics-exports.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+import { snsConnections } from './routes/sns-connections.js';
 
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantExternalLinks } from './routes/restaurant-external-links.js';
@@ -498,6 +499,7 @@ app.route('/', analyticsExports);
 app.route('/', dashboard);
 app.route('/', styles);
 app.route('/', siteTracking);
+app.route('/', snsConnections);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', visitStamps);
 app.route('/', restaurantExternalLinks);

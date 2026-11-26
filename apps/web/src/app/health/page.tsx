@@ -473,7 +473,7 @@ export default function HealthPage() {
                 }
               />
             ) : migrations.length === 0 ? (
-              <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
+              <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-caption text-ink-faint">
                 移行履歴はありません
               </div>
             ) : (

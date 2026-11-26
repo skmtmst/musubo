@@ -1,5 +1,5 @@
 import { CHAT_RESERVATION_KEYS, chatReservationVariables } from './chat-reservation-variables.js';
-import { listInterpolations } from '@line-crm/shared';
+import { listInterpolations, normalizeStoreInterpolations } from '@line-crm/shared';
 import {
   renderBroadcastMessageContent,
   type BroadcastRenderContext,
@@ -12,6 +12,8 @@ import {
   contentNeedsFriendFields,
   type CommonVarSendSource,
 } from './interpolation-context.js';
+import { commonVarKeysInContent } from './common-var-snapshot.js';
+import { resolveMusuboCommonVarsAt } from './google-common-vars.js';
 
 /*
  * 1対1トーク(手動返信・送信予約・プレビュー)の差し込み解決。
@@ -85,9 +87,32 @@ export async function renderChatMessageContent(
       throw error;
     }
   } else {
-    const extra = await resolveInterpolationExtra(db, friend.id, commonContent);
+    // プレビューも送信時と同じ期限・代替値を使う。未解決の共通情報を
+    // 空文字へ変えず残すことで、画面が「入りません」と表示できる。
+    const normalized = normalizeStoreInterpolations(commonContent);
+    const extra = await resolveInterpolationExtra(db, friend.id, normalized.replace(/\{\{\s*var\.[a-z][a-z0-9_]*\s*\}\}/g, ''));
     context.fields = extra.fields;
-    context.vars = extra.vars;
+    const keys = commonVarKeysInContent(normalized);
+    if (keys.length) {
+      const vars = Object.fromEntries(keys.map(key => [key, `{{var.${key}}}`]));
+      if (friend.line_account_id) {
+        const at = new Date().toISOString();
+        let remaining = keys;
+        while (remaining.length) {
+          const result = await resolveMusuboCommonVarsAt(db, friend.line_account_id, remaining, at);
+          if (result.ok) {
+            Object.assign(vars, result.values);
+            break;
+          }
+          // 未解決だけを除き、有効な値は表示する。必ず件数を減らして終了する。
+          const failures = new Set(result.failures.map(item => item.varKey));
+          const next = remaining.filter(key => !failures.has(key));
+          if (next.length === remaining.length) break;
+          remaining = next;
+        }
+      }
+      context.vars = vars;
+    }
   }
 
   if (reservationKeys.length) {

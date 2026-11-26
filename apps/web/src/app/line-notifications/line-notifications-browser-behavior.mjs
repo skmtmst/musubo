@@ -216,6 +216,12 @@ async function openHarness(browser) {
       return json({ success: true, data: { id: 'staff-me', name: 'owner利用者', role: 'owner', permissions: [], viewPermissions: [] } })
     }
     if (path === '/api/line-accounts') return json({ success: true, data: accounts })
+    const entryAccount = /^\/api\/line-accounts\/([^/]+)\/follower-import$/.exec(path)
+    if (request.method() === 'GET' && entryAccount && url.searchParams.get('entry') === '1') {
+      return accounts.some(account => account.id === decodeURIComponent(entryAccount[1]))
+        ? json({ success: true, data: { destination: 'dashboard', canResume: false } })
+        : json({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND' }, 404)
+    }
     if (path === '/api/dashboard/style') return json({ success: true, data: { style: 'standard', styleSelected: true } })
     if (path === '/api/settings/features') {
       return json({ success: true, data: { features: {}, sidebarOrder: null, sidebarItemOrder: null, parentChildMode: false, specializedFeatureKeys: [], version: 1 } })

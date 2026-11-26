@@ -27,7 +27,7 @@ window.fixtureClicks=0;window.opened=0;createRoot(document.getElementById('root'
     plugins: [{ name: 'text-button-fixture', setup(b) {
       b.onResolve({ filter: /(?:staff-identity-state|session-snapshot)$/ }, args => ({ path: args.path, namespace: 'identity-fixture' }))
       b.onLoad({ filter: /.*/, namespace: 'identity-fixture' }, args => ({ contents: args.path.endsWith('staff-identity-state')
-        ? 'const identity={role:"viewer"};export const readStaffIdentity=()=>identity;export const effectiveStaffRole=()=>"viewer";export const subscribeStaffIdentity=()=>()=>{};'
+        ? 'const identity={role:"viewer"};export const readStaffIdentity=()=>identity;export const effectiveStaffRole=()=>"viewer";export const subscribeStaffIdentity=()=>()=>{};export const rememberStaffIdentity=()=>{};export const forgetStaffIdentity=()=>{};export const staffIdentityGeneration=()=>0;'
         : 'export const readPermissionSessionSnapshot=()=>null;export const SESSION_SNAPSHOT_CHANGED="fixture-session";', loader: 'js' }))
       b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'next-fixture' }))
       b.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'next-fixture' }))

@@ -74,8 +74,10 @@ export async function loadStyleSetupProgress(accountId: string, style: AccountSt
       scenario: evidence(open, open === false ? '開催日時を決めてクラスを公開してください' : 'クラスの受付状況を確認できていません'),
     } }
   }
-  const connector = await read(() => api.ecCommerce.connector(accountId))
-  const googleHours = await loadGoogleHoursEvidence(accountId)
+  const [connector, googleHours] = await Promise.all([
+    read(() => api.ecCommerce.connector(accountId)),
+    loadGoogleHoursEvidence(accountId),
+  ])
   const data = connector?.success ? connector.data : null
   const connected = data && typeof data.configured === 'boolean' ? Boolean(data.configured && data.connector?.status === 'connected' && data.connector.secretConfigured) : null
   const events = data?.connector?.eventTypes

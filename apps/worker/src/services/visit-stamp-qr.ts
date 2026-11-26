@@ -134,7 +134,7 @@ export async function redeemStampQr(db:D1Database,accountId:string,friendId:stri
   if(visitId&&(!visit||visit.account_id!==accountId||visit.friend_id!==submittedFriendId||!visit.visited||!await db.prepare("SELECT 1 FROM rt_seat_visit_marks WHERE reservation_id=? AND kind='visited' AND undone_at IS NULL").bind(visitId).first()))throw new StampError('本人の来店済み予約を選んでください',409,['visitId']);
   if(!visitId){
    const visits=(await db.prepare(`SELECT r.id,s.name AS storeName,r.starts_at AS startsAt,(r.status IN('visited','seated') AND EXISTS(SELECT 1 FROM rt_seat_visit_marks m WHERE m.reservation_id=r.id AND m.kind='visited' AND m.undone_at IS NULL)) AS arrived
-    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid
+    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid
     WHERE f.id=? AND s.line_account_id=? AND r.status NOT IN('cancelled','no_show') AND r.hold_expires_at IS NULL
     AND (date(r.starts_at,'+9 hours')=date(?,'+9 hours') OR EXISTS(SELECT 1 FROM rt_seat_visit_marks m WHERE m.reservation_id=r.id AND m.kind='visited' AND m.undone_at IS NULL AND date(m.marked_at,'+9 hours')=date(?,'+9 hours')))
     ORDER BY r.starts_at,r.id`).bind(submittedFriendId,accountId,at,at).all<{id:string;storeName:string;startsAt:string;arrived:number}>()).results;
@@ -157,7 +157,7 @@ export async function redeemStampQr(db:D1Database,accountId:string,friendId:stri
       JOIN line_accounts a ON a.id=q.line_account_id JOIN visit_stamp_card_accounts ca ON ca.card_id=c.id AND ca.line_account_id=a.id
       WHERE q.id=? AND q.status='active' AND (q.expires_at IS NULL OR q.expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')) AND c.active=1 AND c.version=q.card_version
       AND a.is_active=1 AND a.archived_at IS NULL AND w.friend_id=? AND EXISTS(SELECT 1 FROM friends f WHERE f.id=? AND f.line_account_id=a.id AND f.is_following=1)
-      AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid WHERE r.id=? AND f.id=? AND s.line_account_id=q.line_account_id AND r.status IN ('visited','seated') AND EXISTS(SELECT 1 FROM rt_seat_visit_marks m WHERE m.reservation_id=r.id AND m.kind='visited' AND m.undone_at IS NULL))) AND ${interval.sql}`)
+      AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid WHERE r.id=? AND f.id=? AND s.line_account_id=q.line_account_id AND r.status IN ('visited','seated') AND EXISTS(SELECT 1 FROM rt_seat_visit_marks m WHERE m.reservation_id=r.id AND m.kind='visited' AND m.undone_at IS NULL))) AND ${interval.sql}`)
       .bind(entryId,first,regular,row.kind==='staff'?row.issued_by:null,row.kind==='storefront'?'店頭のQR':'店員のQR',key,visitKey,...expiry.args,at,row.id,friendId,submittedFriendId,visitId??null,visitId??null,submittedFriendId,...interval.args),
     db.prepare(`UPDATE visit_stamp_qr_codes SET status='used',consumed_friend_id=?,consumed_at=?,consumed_entry_id=?
       WHERE id=? AND kind='staff' AND status='active' AND EXISTS(SELECT 1 FROM visit_stamp_entries WHERE id=?)`)
@@ -166,7 +166,7 @@ export async function redeemStampQr(db:D1Database,accountId:string,friendId:stri
       WHERE id=? AND kind='staff' AND status='active' AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now')
       AND EXISTS(SELECT 1 FROM visit_stamp_cards WHERE id=? AND active=1 AND version=?)
       AND EXISTS(SELECT 1 FROM visit_stamp_entries WHERE card_id=? AND friend_id=? AND visit_key=? AND kind='visit')
-      AND EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid WHERE r.id=? AND f.id=? AND r.status IN('visited','seated') AND EXISTS(SELECT 1 FROM rt_seat_visit_marks m WHERE m.reservation_id=r.id AND m.kind='visited' AND m.undone_at IS NULL))`)
+      AND EXISTS(SELECT 1 FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id JOIN friends f ON f.line_account_id=s.line_account_id AND f.line_platform_user_id=r.line_uid WHERE r.id=? AND f.id=? AND r.status IN('visited','seated') AND EXISTS(SELECT 1 FROM rt_seat_visit_marks m WHERE m.reservation_id=r.id AND m.kind='visited' AND m.undone_at IS NULL))`)
       .bind(friendId,now(),row.card_id,friendId,visitKey,row.id,row.card_id,row.card_version,row.card_id,friendId,visitKey,visitId,submittedFriendId)]:[]),
   ]);
   if(visit){const counted=await db.prepare("SELECT id,delta,occurred_at FROM visit_stamp_entries WHERE card_id=? AND friend_id=? AND visit_key=? AND kind='visit'").bind(row.card_id,friendId,visitKey).first<{id:string;delta:number;occurred_at:string}>();

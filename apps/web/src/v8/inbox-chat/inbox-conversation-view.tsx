@@ -23,7 +23,7 @@ import { withHonorific } from '@line-crm/shared'
 import { canEditFeature } from '@/lib/staff-capability'
 import { lockReason } from '@/components/shared/permission-lock'
 
-export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget }: Props) {
+export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, tokenNames, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget }: Props) {
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
   return (<InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || selectedThreadId)}>
     {selectedThreadId ? (
@@ -40,7 +40,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
       />
     ) : deepLinkNotice ? (
       // URL指定の会話が開けなかったときの空状態。別人は開かず、
-      // 理由と戻り先だけ出す(#673)。不正IDではselectedChatIdがnullに
+      // 理由と戻り先だけ出す。不正IDではselectedChatIdがnullに
       // なるため、通常の「選択してください」より先に判定する。
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="max-w-md text-center">
@@ -215,6 +215,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
           clearPendingAttachment={clearPendingAttachment}
           retryAttachment={retryAttachment}
           textareaRef={textareaRef}
+          tokenNames={tokenNames}
           messageContent={messageContent}
           setMessageContent={setMessageContent}
           handleKeyDown={handleKeyDown}

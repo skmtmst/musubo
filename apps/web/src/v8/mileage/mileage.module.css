@@ -670,6 +670,7 @@
   display: flex;
   justify-content: flex-end;
   margin-top: var(--tpl-sub-gap);
+  font-size: var(--text-caption);
 }
 
 

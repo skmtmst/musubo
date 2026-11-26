@@ -4,7 +4,7 @@
 .chead {
   display: flex;
   flex: none;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--tpl-inbox-chead-gap);
   padding: var(--tpl-inbox-chead-pad);
@@ -12,16 +12,7 @@
   background: var(--color-canvas);
   position: relative;
 }
-/* 🔍：頭の段には置かず、頭の下の右端に浮かせる（絵の頭は4つ）。探す帯が開いている間は隠す。 */
-.cheadSearch {
-  position: absolute;
-  z-index: 1;
-  top: 100%;
-  right: var(--tpl-inbox-chead-search-right);
-  margin-top: var(--tpl-inbox-chead-gap);
-}
-.cheadSearch[aria-expanded='true'] { visibility: hidden; }
-.cheadWho { display: flex; min-width: 0; flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
+.cheadWho { display: flex; min-width: 120px; flex: 1 1 120px; align-items: center; gap: var(--tpl-inbox-chead-gap); }
 .cheadBack { flex: none; border: 0; background: none; color: var(--color-ink-faint); cursor: pointer; }
 .cheadText { display: flex; min-width: 0; flex-direction: column; }
 .cheadName {
@@ -41,14 +32,10 @@
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
 }
-.cheadName[aria-expanded='true'] { height: auto; white-space: normal; word-break: break-all; }
 .cheadSub { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
-.cheadTools { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
-@media (min-width: 1280px) {
-  .chead, .cheadTools { flex-wrap: nowrap; }
-}
+.cheadTools { display: flex; flex: none; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
+.cheadTools { min-width: 0; }
 .cheadSquare {
   display: inline-flex;
   flex: none;
@@ -72,3 +59,9 @@
 
 .cheadName:focus-visible, .cheadSquare:focus-visible, .cheadBack:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 }
+
+.cheadTools :global([data-compact-operator]) { position: relative; display: inline-flex; flex: none; }
+.cheadTools :global([data-compact-operator])::after { content: attr(data-initial); position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-size: var(--text-caption); font-weight: 600; }
+.cheadTools :global([data-compact-operator] [data-choice-value]), .cheadTools :global([data-compact-operator] [data-choice-chevron]) { visibility: hidden; }
+.cheadTools :global([data-compact-operator]) { width: 36px; }
+.cheadTools :global([data-compact-operator] [data-choice-field]) { box-sizing: border-box; width: 36px; min-width: 0; padding: 0; }

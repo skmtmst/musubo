@@ -31,6 +31,7 @@ export function Steps({
   layout = 'horizontal',
   summaries,
   summaryLayout = 'default',
+  hideSummaryChangeKeys = [],
   readOnly = false,
   variant = 'default',
   animate = false,
@@ -46,6 +47,7 @@ export function Steps({
   /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
   summaries?: Readonly<Record<string, string>>
   summaryLayout?: 'default' | 'aligned'
+  hideSummaryChangeKeys?: readonly string[]
   readOnly?: boolean
   /** `auth` はログイン前の画面の小さな帯（丸 24・文字 12・線 2）。 */
   variant?: 'default' | 'auth'
@@ -173,7 +175,7 @@ export function Steps({
         {summaryItems.map((step) => <div role="listitem" key={step.key} className={styles.sectionHead}>
           <span className={styles.sectionTitle}>{step.label}</span>
           <span className={styles.sectionSummary} title={summaries[step.key]}>{summaries[step.key]}</span>
-          {step.onSelect && !readOnly ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変える`} onClick={step.onSelect}>変える</Button> : null}
+          {step.onSelect && !readOnly && !hideSummaryChangeKeys.includes(step.key) ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変える`} onClick={step.onSelect}>変える</Button> : null}
         </div>)}
       </div> : null}
     </nav>

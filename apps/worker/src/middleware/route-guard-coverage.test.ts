@@ -532,6 +532,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     // 登録の接続確認は owner/admin のウィザードでのみ使う。
     'GET /api/line-accounts/:id/registration-receipt',
     'GET /api/line-accounts/:id/skipped-deliveries',
+    'GET /api/line-accounts/registration-resume',
     'GET /api/line-webhook-events',
     'GET /api/list-stats',
     'GET /api/login-audit',
@@ -590,6 +591,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/restaurant-test/login-members',
     'GET /api/search-console/performance',
     'GET /api/settings/features',
+    'GET /api/settings/sns/connections',
     'GET /api/site/pages',
     'GET /api/site/summary',
     'GET /api/site/tracking-key',
@@ -858,6 +860,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/restaurant-test/tables/layout',
     'PUT /api/settings/company',
     'PUT /api/settings/features',
+    'PUT /api/settings/sns/google-primary',
     'PUT /api/traffic-pools/:id',
     'PUT /api/traffic-pools/:id/accounts/:accountId',
     'PUT /api/users/:id',

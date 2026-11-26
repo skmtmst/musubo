@@ -169,7 +169,7 @@ describe('UnfamiliarLoginNotice（V-2）', () => {
     fixture.snapshot!.unfamiliarAt = '2026-10-04T01:00:00.000Z'
     await act(async () => { render(<UnfamiliarLoginNotice />) })
     await screen.findByText(/大事な操作の前に毎回、本人確認をします/)
-    expect(screen.getByRole('link', { name: 'ログイン中の端末を見る' }).getAttribute('href')).toBe('/staff')
+    expect(screen.getByRole('link', { name: 'ログイン中の端末を見る' }).getAttribute('href')).toBe('/staff?section=sessions')
     expect(screen.getByText('いつもと違う端末・場所からのログインです')).toBeTruthy()
   })
 })

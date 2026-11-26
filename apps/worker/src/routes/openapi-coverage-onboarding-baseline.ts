@@ -1,0 +1,17 @@
+export const ONBOARDING_BASELINE = [
+  'GET /api/getting-started/first-message',
+  'POST /api/getting-started/first-message/identity',
+  'POST /api/getting-started/first-message/send',
+  'GET /api/getting-started/guide',
+  'PUT /api/getting-started/guide',
+  'GET /api/hq/billing/musubo/last-line-end',
+  'POST /api/hq/billing/musubo/last-line-end',
+  'GET /api/hq/billing/musubo/line-addition',
+  'GET /api/hq/billing/musubo/line-removal/{lineId}',
+  'GET /api/hq/billing/musubo/resumption',
+  'GET /api/hq/billing/musubo/resumption/complete',
+  'POST /api/hq/billing/musubo/line-addition',
+  'POST /api/hq/billing/musubo/line-removal/{lineId}',
+  'POST /api/hq/billing/musubo/resumption/accept',
+  'POST /api/hq/billing/musubo/resumption/connect',
+] as const;

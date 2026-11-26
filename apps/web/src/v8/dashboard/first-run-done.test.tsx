@@ -102,11 +102,30 @@ describe('最初の1通が届いた時の窓', () => {
     await waitFor(() => expect(screen.getByText('止めています')).toBeTruthy())
     expect(screen.queryByText(/読まれ/)).toBeNull()
     const next = screen.getAllByRole('link', { name: '開く' }).map((link) => link.getAttribute('href'))
-    expect(next).toEqual(['/getting-started/rich-menu', '/restaurant-test/tables', '/restaurant-test/google?tab=hours', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
+    expect(next).toEqual(['/?guide=richMenu', '/restaurant-test/tables', '/restaurant-test/google?tab=hours', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
     expect(screen.queryByText('コースとメニューを登録する')).toBeNull()
     expect(next).toHaveLength(5)
     for (const button of screen.getAllByRole('button', { name: '閉じる' })) fireEvent.click(button)
     expect(onClose).toHaveBeenCalled()
     expect(net.dismiss).not.toHaveBeenCalled()
   })
+})
+
+it('共通の進捗を使いながら最初の1通を監視し、完了後も同じ結果を表示する', async () => {
+  const { GuideSharedProvider } = await import('@/v8/onboarding/public/guide-shared/index')
+  const setWatch = vi.fn()
+  const run = { status: 'ready', steps: steps({ firstMessage: 'todo' }), refresh: vi.fn(), reload: vi.fn(), watchExpired: false, rewatch: vi.fn() }
+  const progress = { status: 'ready', progress: null, reload: vi.fn() }
+  const makeValue = () => ({ guide: null, summary: null, setup: { accountId: 'a', run, progress, setWatch } })
+  const { result, rerender } = renderHook(({ value }) => useFirstSteps('a', 'owner', { style: 'standard' }), {
+    initialProps: { value: makeValue() },
+    wrapper: ({ children }) => <GuideSharedProvider value={makeValue() as never}>{children}</GuideSharedProvider>,
+  })
+  await waitFor(() => expect(setWatch).toHaveBeenCalledWith(expect.any(Symbol), true))
+  expect(result.current.summary).not.toBeNull()
+  expect(net.progress).not.toHaveBeenCalled()
+  run.steps = steps({})
+  rerender({ value: makeValue() })
+  await waitFor(() => expect(result.current.summary?.steps.find(step => step.key === 'firstMessage')?.done).toBe(true))
+  expect(net.progress).not.toHaveBeenCalled()
 })

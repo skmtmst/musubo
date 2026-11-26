@@ -139,7 +139,7 @@ async function fulfillJson(route, body, status = 200) {
 function lineAccount(id, name, order) {
   return {
     id, channelId: `channel-${id}`, name, displayName: name,
-    isActive: true, country: 'JP', role: 'owner', displayOrder: order,
+    isActive: true, country: 'JP', role: 'owner', displayOrder: order, emailInboxEnabled: true,
   }
 }
 
@@ -183,6 +183,13 @@ async function prepareInbox(page, options = {}) {
         lineAccount(OTHER_ACCOUNT, 'A社アカウント', 2),
       ] })
       return
+    }
+    const accountEntry = path.match(/^\/api\/line-accounts\/([^/]+)\/follower-import$/)
+    if (request.method() === 'GET' && accountEntry && url.searchParams.get('entry') === '1') {
+      if (accountEntry[1] !== SELECTED_ACCOUNT && accountEntry[1] !== OTHER_ACCOUNT) {
+        return fulfillJson(route, { success: false, error: 'LINE_ACCOUNT_NOT_FOUND' }, 404)
+      }
+      return fulfillJson(route, { success: true, data: { destination: 'dashboard', canResume: false } })
     }
     if (path === '/api/settings/features') {
       await fulfillJson(route, { success: true, data: {
@@ -355,6 +362,9 @@ test('存在しないfriendでは別人を開かず案内を出し、会話詳�
   await openFriend(page, 'blocked')
   await expect(talkText(page, '会話を開けませんでした')).toBeVisible()
   await expect(page.getByRole('button', { name: '受信箱の一覧へ戻る' })).toBeVisible()
+  if (await page.getByRole('button', { name: '一覧を表示' }).isVisible()) {
+    await page.getByRole('button', { name: '一覧を表示' }).click()
+  }
   await expect(page.getByText('手動選択 次郎', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('手動選択 次郎の会話', { exact: true })).toHaveCount(0)
   expect(detailCalls).not.toContain('blocked')
@@ -416,12 +426,18 @@ test('手動のLINE選択とメール選択で古いdeep-link URLを消す', asy
   await openFriend(page, 'old')
   await expect(talkText(page, '古い対象の会話')).toBeVisible()
 
+  if (await page.getByRole('button', { name: '一覧を表示' }).isVisible()) {
+    await page.getByRole('button', { name: '一覧を表示' }).click()
+  }
   await page.getByText('手動選択 次郎', { exact: true }).first().click()
   await expect(talkText(page, '手動で選んだ会話')).toBeVisible()
   await expect(page).toHaveURL(`${baseUrl}/chats`)
 
   await page.evaluate(() => window.history.pushState(null, '', '/chats?friend=old'))
   await expect(talkText(page, '古い対象の会話')).toBeVisible()
+  if (await page.getByRole('button', { name: '一覧を表示' }).isVisible()) {
+    await page.getByRole('button', { name: '一覧を表示' }).click()
+  }
   await page.getByText('メール 花子', { exact: true }).first().click()
   await expect(talkText(page, 'メール本文')).toBeVisible()
   await expect(page).toHaveURL(`${baseUrl}/chats`)

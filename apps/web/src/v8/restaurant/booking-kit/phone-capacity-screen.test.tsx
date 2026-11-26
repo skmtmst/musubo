@@ -9,6 +9,7 @@ import { snapshotOf, tables } from './test-data'
 import type { RestaurantSnapshot } from '@/lib/restaurant-test-api'
 
 const api = vi.hoisted(() => ({ snapshot: vi.fn(), openingHours: vi.fn(), reservationsDay: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(), createReservation: vi.fn() }))
+vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: { floors: vi.fn(async () => ({ data: [] })) } }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))

@@ -1,0 +1,1826 @@
+[
+  {
+    "route": "/booking/bookings",
+    "node": "acRIl",
+    "tag": "P",
+    "text": "次の予約はありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings?range=all",
+    "node": "acRIl",
+    "tag": "P",
+    "text": "次の予約はありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/webinars/edit?id=webinar-1&pane=video",
+    "node": "VWNaA",
+    "tag": "P",
+    "text": "NEN活用スタートセミナー",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff",
+    "node": "nku0f",
+    "tag": "P",
+    "text": "Mac・Chrome",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見るシナリオが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/contents/vars/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集する共通情報が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/tags/searches/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集する保存した検索が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/analytics?view=conversion-report",
+    "node": "AzrZq",
+    "tag": "P",
+    "text": "この期間の成果はありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "T1 · 2人卓",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "T2 · 2人卓",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "T3 · 窓側4人卓",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "T4 · 4人卓",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "C1 · カウンター",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "C2 · カウンター",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "個室A · 個室",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "個室B · 個室",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/tables",
+    "node": "BERxg",
+    "tag": "P",
+    "text": "TR1 · テラス",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/rich-menus?item=visual-hq-tpl-menu&mode=edit",
+    "node": "gobhu",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/rich-menus?item=visual-hq-tpl-menu&mode=edit",
+    "node": "gobhu",
+    "tag": "SPAN",
+    "text": "公式アカウント",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/broadcasts/reserved",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "予約中の配信が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus",
+    "node": "owaS3",
+    "tag": "P",
+    "text": "お客さまの予約画面",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus",
+    "node": "owaS3",
+    "tag": "SPAN",
+    "text": "トリミング（小型犬）",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus",
+    "node": "owaS3",
+    "tag": "SPAN",
+    "text": "トリミング（中型犬）",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus",
+    "node": "owaS3",
+    "tag": "SPAN",
+    "text": "シャンプーのみ",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus",
+    "node": "owaS3",
+    "tag": "SPAN",
+    "text": "初回相談",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus",
+    "node": "owaS3",
+    "tag": "SPAN",
+    "text": "担当を選ぶ",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/new",
+    "node": "CcA4k",
+    "tag": "DIV",
+    "text": "顔写真（正方形・1MB まで）",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/new",
+    "node": "CcA4k",
+    "tag": "SPAN",
+    "text": "指名なし",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/new",
+    "node": "CcA4k",
+    "tag": "SPAN",
+    "text": "佐々木",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/new",
+    "node": "CcA4k",
+    "tag": "SPAN",
+    "text": "高田",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/new",
+    "node": "CcA4k",
+    "tag": "SPAN",
+    "text": "中川",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/new",
+    "node": "CcA4k",
+    "tag": "SPAN",
+    "text": "日時を選ぶ",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/google?tab=settings",
+    "node": "y3GGTs",
+    "tag": "SPAN",
+    "text": "然 渋谷店",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/inflow-links/new",
+    "node": "KMaMk",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/shifts",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "トリミング台",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/shifts",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "台",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/shifts",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "シャンプー台",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/shifts",
+    "node": "yRPxl",
+    "tag": "P",
+    "text": "お客さまの予約画面",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/shifts",
+    "node": "yRPxl",
+    "tag": "P",
+    "text": "10月2日（金） の空き",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/staff/shifts",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "内容を確かめる",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/templates/edit",
+    "node": "u5YC6",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/broadcasts/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る配信が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/rich-menus/new",
+    "node": "JeINq",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/rich-menus/new",
+    "node": "JeINq",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/broadcasts/new",
+    "node": "FU2aU",
+    "tag": "SPAN",
+    "text": "配信名",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/analytics/reports/new",
+    "node": "H5UoIu",
+    "tag": "P",
+    "text": "週次まとめ （前の 7 日）",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/broadcasts/new",
+    "node": "BBRDb",
+    "tag": "SPAN",
+    "text": "店の名前",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/tags/fields/migrate",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "移行する項目が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq",
+    "node": "JKjsE",
+    "tag": "SPAN",
+    "text": "然",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/friends/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る友だちが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/form-submissions/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集する回答フォームが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/new",
+    "node": "cpdDi If9Mh",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/new",
+    "node": "cpdDi If9Mh",
+    "tag": "SPAN",
+    "text": "公式アカウント",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/new",
+    "node": "cpdDi If9Mh",
+    "tag": "P",
+    "text": "お客様",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/new",
+    "node": "cpdDi If9Mh",
+    "tag": "P",
+    "text": "ご予約を承りました。",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/new",
+    "node": "cpdDi If9Mh",
+    "tag": "P",
+    "text": "日時を選ぶと表示されます",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/new",
+    "node": "cpdDi If9Mh",
+    "tag": "P",
+    "text": "メニューを選ぶと表示されます ／ 担当 —",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/templates/carousel",
+    "node": "J60utH",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=holidays",
+    "node": "KRgTQ",
+    "tag": "SPAN",
+    "text": "2026年11月",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=holidays",
+    "node": "KRgTQ",
+    "tag": "P",
+    "text": "お客さまの予約画面",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=holidays",
+    "node": "KRgTQ",
+    "tag": "P",
+    "text": "10月2日（金） の空き",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=holidays",
+    "node": "KRgTQ",
+    "tag": "SPAN",
+    "text": "内容を確かめる",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/webinars/new",
+    "node": "j7PP04",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/webinars/new",
+    "node": "j7PP04",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/broadcasts/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "開く一括配信が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/chats",
+    "node": "eovoG",
+    "tag": "P",
+    "text": "対応が必要な会話があります",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/form-submissions/responses",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る回答フォームが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/friend-add-settings/runs/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る実行詳細が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "SPAN",
+    "text": "保存",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "P",
+    "text": "保存済み 10月1日 14:02",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "SPAN",
+    "text": "開始のきっかけ",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "P",
+    "text": "友だち追加のとき",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "SPAN",
+    "text": "配信",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "SPAN",
+    "text": "選んだ通（1通目）の見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0",
+    "node": "PMLkX",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/ops/tenants/detail",
+    "node": "Oub6x",
+    "tag": "P",
+    "text": "見る契約先が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/support/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "開くお問い合わせが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/tags/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集するタグが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus/new",
+    "node": "QqER7",
+    "tag": "P",
+    "text": "お客さまの予約画面",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus/new",
+    "node": "QqER7",
+    "tag": "SPAN",
+    "text": "メニュー名",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus/new",
+    "node": "QqER7",
+    "tag": "SPAN",
+    "text": "トリミング（小型犬）",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus/new",
+    "node": "QqER7",
+    "tag": "SPAN",
+    "text": "トリミング（中型犬）",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus/new",
+    "node": "QqER7",
+    "tag": "SPAN",
+    "text": "シャンプーのみ",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus/new",
+    "node": "QqER7",
+    "tag": "SPAN",
+    "text": "担当を選ぶ",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/reminders/edit?id=reminder-new&stage=schedule",
+    "node": "T0nis",
+    "tag": "P",
+    "text": "条件に合う送信予定はありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/reminders/edit?id=reminder-new&stage=schedule",
+    "node": "T0nis",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/reminders/edit?id=reminder-new&stage=schedule",
+    "node": "T0nis",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/first-step",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "1通目を作るシナリオが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/templates/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見るテンプレートが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/friend-add-settings/publish",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "公開する下書きが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/inventory?tab=closures",
+    "node": "UVnvR",
+    "tag": "P",
+    "text": "これからの休業・貸切はありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=hours",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "トリミング台",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=hours",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "台",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=hours",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "シャンプー台",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=hours",
+    "node": "yRPxl",
+    "tag": "P",
+    "text": "お客さまの予約画面",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=hours",
+    "node": "yRPxl",
+    "tag": "P",
+    "text": "10月2日（金） の空き",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=hours",
+    "node": "yRPxl",
+    "tag": "SPAN",
+    "text": "内容を確かめる",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/scenarios/results",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "配信結果を見るシナリオが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/inventory",
+    "node": "Y8SjT2",
+    "tag": "SPAN",
+    "text": "予約台帳",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/rich-menus",
+    "node": "rZEGN",
+    "tag": "SPAN",
+    "text": "予約する",
+    "px": "34px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/chats?status=unread",
+    "node": "eovoG",
+    "tag": "P",
+    "text": "対応が必要な会話があります",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/broadcasts/new?step=message",
+    "node": "FU2aU",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/rich-menus/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集するリッチメニューが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/reminders/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集するリマインダが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/templates/questions/new",
+    "node": "l87p1J",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/reservations?date=2026-10-02",
+    "node": "l9NlC0",
+    "tag": "P",
+    "text": "見本 143さん・4名",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/reservations?date=2026-10-02",
+    "node": "l9NlC0",
+    "tag": "SPAN",
+    "text": "LINE",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/reminders/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "リマインダが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/contents/vars/new",
+    "node": "p82v9",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/contents/vars/new",
+    "node": "p82v9",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/form-submissions?item=visual-hq-tpl-form&mode=edit&tab=after",
+    "node": "XXFT4",
+    "tag": "P",
+    "text": "お客さまに見える形",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/tags/marks/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集する対応マークが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/rich-menus/connections",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "つながりを見るメニューが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=rules",
+    "node": "x1OZS6",
+    "tag": "P",
+    "text": "お客さまの予約画面",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=rules",
+    "node": "x1OZS6",
+    "tag": "P",
+    "text": "10月2日（金） の空き",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=rules",
+    "node": "x1OZS6",
+    "tag": "SPAN",
+    "text": "内容を確かめる",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/restaurant-test/line-followup",
+    "node": "n9vvGx",
+    "tag": "SPAN",
+    "text": "然 渋谷店",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/form-submissions?item=visual-hq-tpl-form&mode=edit&tab=appearance",
+    "node": "tpRRT",
+    "tag": "P",
+    "text": "お客さまに見える形",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/form-submissions?item=visual-hq-tpl-form&mode=edit&tab=appearance",
+    "node": "tpRRT",
+    "tag": "P",
+    "text": "来店アンケート",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/settings/sns",
+    "node": "y3GGTs",
+    "tag": "SPAN",
+    "text": "然 渋谷店",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/nen-campaigns/columns/new",
+    "node": "yRDwW",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/nen-campaigns/columns/new",
+    "node": "yRDwW",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/common-actions/versions",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "版を確認する共通アクションが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/visit-stamps?tab=history",
+    "node": "NVN1Y",
+    "tag": "SPAN",
+    "text": "＋1 個",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/friends/detail?tab=info",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る友だちが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/form-submissions/edit?tab=appearance",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集する回答フォームが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/webinars/published",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "確認するウェビナーが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/rich-menus/sample",
+    "node": "cAaGY",
+    "tag": "P",
+    "text": "見本を読み込めませんでした",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/auto-replies/publish",
+    "node": "Guoye",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/auto-replies/publish",
+    "node": "Guoye",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/register/complete",
+    "node": "r2pk7",
+    "tag": "P",
+    "text": "安全のため、この画面では申込情報を表示しません。",
+    "px": "14px",
+    "reason": "申込画面で明示されている14px"
+  },
+  {
+    "route": "/register/complete",
+    "node": "r2pk7",
+    "tag": "P",
+    "text": "まだアカウントを作成していない場合は、申込時のメールアドレスを添えてお問い合わせください。担当者が登録状況を確認します。",
+    "px": "14px",
+    "reason": "申込画面で明示されている14px"
+  },
+  {
+    "route": "/restaurant-test",
+    "node": "JKjsE",
+    "tag": "SPAN",
+    "text": "然",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/new",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "運用状態のエラー",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/new",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "緊急停止・復旧",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/new",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "ログイン・権限変更",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/new",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "システム更新",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/invite",
+    "node": "",
+    "tag": "DIV",
+    "text": "管理画面への招待",
+    "px": "24px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/invite",
+    "node": "",
+    "tag": "P",
+    "text": "招待情報が見つかりません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/recipes/clone",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "作るレシピが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "このユーザーを編集できません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/email-change",
+    "node": "",
+    "tag": "DIV",
+    "text": "メールアドレスの変更",
+    "px": "24px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/staff/email-change",
+    "node": "",
+    "tag": "P",
+    "text": "確認情報が見つかりません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/conversions/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "この成果地点を編集できません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/support",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "対応するお問い合わせを選択してください",
+    "px": "14px",
+    "reason": "受信箱の空状態で明示されている14px"
+  },
+  {
+    "route": "/ops/applications",
+    "node": "kWaRc",
+    "tag": "P",
+    "text": "該当する申し込みがありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/common-actions/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集する共通アクションが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/ops/applications/quote",
+    "node": "CyW0E",
+    "tag": "P",
+    "text": "個別見積もりを読み込めませんでした",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/ops/applications/detail",
+    "node": "g6NuH",
+    "tag": "P",
+    "text": "申込を読み込めませんでした",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/automations/drafts",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "開く下書きが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/updates",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "更新履歴はまだありません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "予定数は見積り用。実際に有効になったLINE数で請求します。",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "GoogleマイビジネスとInstagramは、それぞれ1個までLINEの基本料金に含まれます。 追加料金は数が多いほうの2個目から、1個につき月額 ¥3,300 （税込）です。 たとえばGoogleマイビジネス2個・Instagram1個なら、追加は1個分です。",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "お支払いプラン",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "適用中の条件",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "通常条件 ・ 30日 無料",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "SPAN",
+    "text": "本日の請求",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "友だち数を入力すると、予定料金を表示します。",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/pricing",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "最初のLINE有効化日から 30日 無料",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/accounts/new/handover",
+    "node": "Plmq1",
+    "tag": "P",
+    "text": "アカウントを確認できません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/onboarding/quotes",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "お見積もりを読み込めませんでした",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "予定数は見積り用。実際に有効になったLINE数で請求します。",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "GoogleマイビジネスとInstagramは、それぞれ1個までLINEの基本料金に含まれます。 追加料金は数が多いほうの2個目から、1個につき月額 ¥3,300 （税込）です。 たとえばGoogleマイビジネス2個・Instagram1個なら、追加は1個分です。",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "お支払いプラン",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "適用中の条件",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "DIV",
+    "text": "通常条件 ・ 30日 無料",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "SPAN",
+    "text": "本日の請求",
+    "px": "16px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "友だち数を入力すると、予定料金を表示します。",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/hq/onboarding/card",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "最初のLINE有効化日から 30日 無料",
+    "px": "14px",
+    "reason": "料金の案内で明示されている14px"
+  },
+  {
+    "route": "/restaurant-test/stores",
+    "node": "JKjsE",
+    "tag": "SPAN",
+    "text": "然",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/hq/open",
+    "node": "JKjsE",
+    "tag": "SPAN",
+    "text": "然",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/webhooks/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "直す送り先が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/mileage/earning-rules/edit",
+    "node": "ctLwT",
+    "tag": "P",
+    "text": "この決めごとが見つかりません",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/inflow-links/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "この経路を編集できません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/mileage/score-rules",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "点をつける・引くこと",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/mileage/score-rules",
+    "node": "J33xq",
+    "tag": "SPAN",
+    "text": "0にする",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/mileage/score-rules",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "帯の分けかた",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/mileage/score-rules",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "つながる先",
+    "px": "14px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/inflow-links/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る流入経路が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/events/preview",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "確認するイベントが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/events/edit",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "編集するイベントが指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/ops/invite",
+    "node": "tVaUh",
+    "tag": "P",
+    "text": "この招待は使えません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/bookings/detail",
+    "node": "J33xq",
+    "tag": "P",
+    "text": "見る予約が指定されていません",
+    "px": "15px",
+    "reason": "見出し・名前・プレビュー・指定された強調文字"
+  },
+  {
+    "route": "/booking/menus?tab=holidays",
+    "node": "KRgTQ",
+    "tag": "SPAN",
+    "text": "2026年10月",
+    "px": "14px",
+    "reason": "予定表の見出し・次の予約の名前と区分"
+  },
+  {
+    "route": "/restaurant-test/reservations",
+    "node": "l9NlC0",
+    "tag": "P",
+    "text": "見本 114さん・2名",
+    "px": "16px",
+    "reason": "予定表の見出し・次の予約の名前と区分"
+  },
+  {
+    "route": "/restaurant-test/reservations",
+    "node": "l9NlC0",
+    "tag": "SPAN",
+    "text": "LINE",
+    "px": "16px",
+    "reason": "予定表の見出し・次の予約の名前と区分"
+  },
+  {
+    "route": "/friends/detail?id=friend-1",
+    "node": "Q5F2QE",
+    "tag": "SPAN",
+    "text": "10月4日",
+    "px": "34px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "SPAN",
+    "text": "保存",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "P",
+    "text": "保存済み 10月1日 14:02",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "SPAN",
+    "text": "開始のきっかけ",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "P",
+    "text": "友だち追加のとき",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "SPAN",
+    "text": "配信",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "SPAN",
+    "text": "選んだ通（1通目）の見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/detail?id=scenario-0-paused",
+    "node": "ARuZ4",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/broadcasts/new?step=schedule",
+    "node": "FU2aU",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/broadcasts/new?step=confirm",
+    "node": "FU2aU",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/analytics/reports/new?id=report-weekly-friends",
+    "node": "H5UoIu",
+    "tag": "P",
+    "text": "毎週の友だちの増減 （前の 7 日）",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=confirm",
+    "node": "XJUqs",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=confirm",
+    "node": "XJUqs",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=priority",
+    "node": "Guoye",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=priority",
+    "node": "Guoye",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=trigger",
+    "node": "A0pDt",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/auto-replies/edit?id=ar-new&step=trigger",
+    "node": "A0pDt",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/form-submissions/edit?id=form-1",
+    "node": "m1cWEy",
+    "tag": "P",
+    "text": "お客さまに見える形",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/form-submissions/edit?id=form-1",
+    "node": "m1cWEy",
+    "tag": "P",
+    "text": "来店アンケート",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/form-submissions/edit?id=form-1&tab=after",
+    "node": "XXFT4",
+    "tag": "P",
+    "text": "お客さまに見える形",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/friend-add-settings/publish?id=rule-shop",
+    "node": "U8Xm3X",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/friend-add-settings/publish?id=rule-shop",
+    "node": "U8Xm3X",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/friend-add-settings?view=edit&id=rule-autumn&step=message",
+    "node": "al47K",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/friend-add-settings?view=edit&id=rule-autumn&step=message",
+    "node": "al47K",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/rich-menus/edit?id=rmg-1&step=publish",
+    "node": "F4gELj",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/rich-menus/edit?id=rmg-1&step=publish",
+    "node": "F4gELj",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/rich-menus/edit?id=rmg-1&step=targeting",
+    "node": "OxEMM",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/rich-menus/edit?id=rmg-1&step=targeting",
+    "node": "OxEMM",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/rich-menus/new?id=rmg-draft&step=buttons",
+    "node": "Z0uO6",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/rich-menus/new?id=rmg-draft&step=buttons",
+    "node": "Z0uO6",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/first-step?id=scenario-0",
+    "node": "V6xAo",
+    "tag": "SPAN",
+    "text": "LINEでの見え方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/scenarios/first-step?id=scenario-0",
+    "node": "V6xAo",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/carousel?visual=1",
+    "node": "J60utH",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/detail?id=template-1",
+    "node": "UTbi1",
+    "tag": "SPAN",
+    "text": "届き方",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/detail?id=template-1",
+    "node": "UTbi1",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/edit?id=template-80",
+    "node": "u5YC6",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/edit?kind=coupon&visual=1",
+    "node": "S6FEuB",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/edit?kind=coupon&visual=1",
+    "node": "S6FEuB",
+    "tag": "P",
+    "text": "20%引き",
+    "px": "32px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/edit?kind=research&visual=1",
+    "node": "EsYo4",
+    "tag": "P",
+    "text": "定期便のご満足度",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/templates/edit?kind=rich_message&visual=1",
+    "node": "EFV8l",
+    "tag": "SPAN",
+    "text": "然-NEN-TEST",
+    "px": "14px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/webinars/edit?id=webinar-1&pane=review",
+    "node": "XCUNf",
+    "tag": "P",
+    "text": "NEN活用スタートセミナー",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  },
+  {
+    "route": "/webinars/edit?id=webinar-scheduled&pane=video",
+    "node": "LPOe7",
+    "tag": "P",
+    "text": "NEN活用スタートセミナー",
+    "px": "15px",
+    "reason": "見出し・数・プレビューの意図した表示"
+  }
+]

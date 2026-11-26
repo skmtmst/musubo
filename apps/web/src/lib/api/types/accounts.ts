@@ -40,6 +40,13 @@ export type LineAccountConnectVerification = {
   followerTotal: number | null
 }
 
+export type LineAccountConnectPending = {
+  success: false
+  error: string
+  code: 'MUSUBO_ADDITION_PENDING_RECONCILIATION'
+  data: { accountId: string }
+}
+
 export type LineAccountConnectData = {
   additionState?: 'active' | 'pending_payment' | 'pending_reconciliation' | null
   steps: LineAccountConnectStep[]

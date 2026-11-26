@@ -187,6 +187,7 @@
 .slots { display: flex; flex: 1 0 100%; width: 100%; flex-direction: column; min-width: 0; gap: var(--tpl-list-gap); }
 .slotsRow { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--tpl-list-gap); }
 .searchSlot { flex: 0 1 var(--list-search-width, var(--tpl-list-search-w)); min-width: min(var(--list-search-width, var(--tpl-list-search-min)), 100%); max-width: 100%; }
+.searchSlot[data-flexible] { flex: 1 1 auto; min-width: 0; }
 .searchSlot > * { width: 100%; min-width: 0; }
 .slotsEnd { display: flex; flex-wrap: wrap; align-items: center; margin-left: auto; min-width: 0; gap: var(--tpl-list-gap); }
 html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-width: max-content; max-width: none; flex: none; }
@@ -390,3 +391,5 @@ html:root .leading > :is(button, a) { width: max-content; flex: none; }
 html:root .trailing:has([data-period-range]) { min-width: 0; flex: 1 1 100%; width: 100%; flex-wrap: wrap; }
 
 :root .slotTool[data-toolbar-role='action'] { order: 5; align-self: center; }
+
+.conversation { display: flex; align-items: center; gap: var(--tpl-inbox-search-gap); padding: var(--tpl-inbox-search-pad); background: var(--color-surface-pearl); box-shadow: var(--tpl-inbox-search-line-bottom); }

@@ -119,11 +119,11 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
   const css = () =>
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
 
-  it('箱は高さ98・内側16・間8・角丸12（オン・オフ共通）', () => {
+  it('箱は内側16・間8・角丸12を保つ（最低の高さは下の「アイコン付きの箱だけ最低98」で見る）', () => {
     const blocks = [...css().matchAll(/:root\s*\.card\s*\{[^}]*\}/gs)].map((m) => m[0])
     expect(blocks.length, 'v8 の箱の指定がありません').toBeGreaterThan(0)
     // 値は複数の v8 ブロックに分かれる。どれかにあればよい（後勝ちで打ち消しなし）。
-    for (const re of [/min-height:\s*98px/, /padding:\s*var\(--polish-space-card\)/, /gap:\s*var\(--polish-space-row\)/, /border-radius:\s*var\(--polish-radius-card\)/]) {
+    for (const re of [/padding:\s*var\(--polish-space-card\)/, /gap:\s*var\(--polish-space-row\)/, /border-radius:\s*var\(--polish-radius-card\)/]) {
       expect(blocks.some((b) => re.test(b)), `${re} が v8 の箱にありません`).toBe(true)
     }
   })
@@ -185,8 +185,6 @@ describe('選ぶカードの行型（BHEl9・変わり形）', () => {
     expect(rowRadio, '行型の丸の指定がありません').toBeTruthy()
     expect(rowRadio![0]).toMatch(/width:\s*18px/)
     expect(rowRadio![0]).toMatch(/position:\s*static/)
-    // 箱（fNPdg/r3xz1W）の既定は変えない。
-    expect(css).toMatch(/:root\s*\.card\s*{[^}]*min-height:\s*98px/s)
   })
 })
 
@@ -208,7 +206,6 @@ describe('LINEでの見え方の題（#1482 で基本の見た目が消えた再
 })
 
 describe('ラジオカードの高さ 90 の口（★V8 E-3 ウォークインの卓 PUWyq）', () => {
-  const css = () => readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
 
   it('既定の箱には付かず、height="short" を渡したときだけ付く', () => {
     render(
@@ -225,8 +222,14 @@ describe('ラジオカードの高さ 90 の口（★V8 E-3 ウォークイン�
     expect(labelOf('行').className).not.toMatch(/short/)
   })
 
-  it('高さ 90 は V8 の段の .short にだけあり、既定の箱の 98 は変えない', () => {
-    expect(css()).toMatch(/:root \.short \{[^}]*min-height:\s*90px[^}]*padding-bottom:\s*6px/)
-    expect(css()).toMatch(/:root \.card \{[^}]*min-height:\s*98px/)
+  it('上のアイコンの有無に応じて高さの対象を区別する', () => {
+    render(<RadioCardGroup legend="選択">
+      <RadioCard name="height" value="icon" checked={false} onChange={() => {}} title="アイコンあり" icon={<span>印</span>} />
+      <RadioCard name="height" value="plain" checked onChange={() => {}} title="アイコンなし" />
+    </RadioCardGroup>)
+    expect(screen.getByRole('radio', { name: 'アイコンあり' }).closest('label')?.hasAttribute('data-top-icon')).toBe(true)
+    expect(screen.getByRole('radio', { name: 'アイコンなし' }).closest('label')?.hasAttribute('data-top-icon')).toBe(false)
   })
+
+
 })

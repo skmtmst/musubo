@@ -3,7 +3,7 @@
 .header { position: relative; display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-8); row-gap: var(--tpl-inbox-head-gap); padding: var(--tpl-inbox-head-pad-top) var(--tpl-inbox-head-pad-x) 0; }
 .headline { display: flex; width: 100%; min-width: 0; align-items: center; gap: var(--tpl-inbox-head-tools-gap); }
 .headline > [data-page-title] { flex: 1; min-width: max-content; }
-.search { padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0; }
+.search { padding: var(--tpl-inbox-head-gap) var(--polish-space-section) 0; }
 .header > [data-segmented-control] { width: 100%; }
 .filters { display: flex; flex-wrap: nowrap; gap: var(--space-8); margin-top: var(--tpl-inbox-head-gap); }
 .filters > * { flex: 1 1 0; min-width: 0; }

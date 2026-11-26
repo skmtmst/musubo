@@ -77,7 +77,7 @@ export async function canSignPrivateImage(c: Context<Env>, key: string): Promise
   const friendId = object.customMetadata?.friendId
     ?? (key.startsWith('form-uploads/') ? key.split('/')[2] : key.split('/')[1]);
   if (!friendId) return false;
-  const friend = await c.env.DB.prepare('SELECT line_account_id, line_user_id FROM friends WHERE id = ?')
+  const friend = await c.env.DB.prepare('SELECT line_account_id, line_platform_user_id AS line_user_id FROM friends WHERE id = ?')
     .bind(friendId).first<{ line_account_id: string; line_user_id: string }>();
   if (!friend?.line_account_id) return false;
   if (staff) return (await getVisibleLineAccountScope(c.env.DB, staff)).ids.includes(friend.line_account_id);

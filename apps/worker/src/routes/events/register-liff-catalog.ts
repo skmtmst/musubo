@@ -21,7 +21,7 @@ events.get('/api/liff/events',async c=>{
    FROM events e WHERE e.id>? AND e.deleted_at IS NULL AND e.is_published=1
    AND (e.lifecycle_status IS NULL OR e.lifecycle_status='published')
    AND ((e.target_type='single' AND e.line_account_id=?) OR (e.target_type='multi-account-dedup' AND EXISTS(SELECT 1 FROM json_each(e.account_ids) WHERE value=?)))
-   AND (e.visible_tag_id IS NULL OR EXISTS(SELECT 1 FROM friend_tags ft JOIN friends f ON f.id=ft.friend_id WHERE f.line_user_id=? AND f.line_account_id=? AND ft.tag_id=e.visible_tag_id))
+   AND (e.visible_tag_id IS NULL OR EXISTS(SELECT 1 FROM friend_tags ft JOIN friends f ON f.id=ft.friend_id WHERE f.line_platform_user_id=? AND f.line_account_id=? AND ft.tag_id=e.visible_tag_id))
    AND EXISTS(SELECT 1 FROM event_slots s WHERE s.event_id=e.id AND s.is_active=1 AND s.deleted_at IS NULL AND julianday(s.starts_at)>julianday('now')) ORDER BY e.id LIMIT 51`).bind(cursor,account,account,caller,account).all<{id:string;name:string;image_url:string|null;venue_name:string|null;nextStartsAt:string}>()).results;
  const items=rows.slice(0,50);
  return liffBookingJson(c,{items,nextCursor:rows.length>50?items.at(-1)!.id:null});
@@ -62,7 +62,7 @@ events.get('/api/liff/events/:id', async (c) => {
   }
   if (caller) {
     const friend = await c.env.DB
-      .prepare(`SELECT id, user_id, picture_url FROM friends WHERE line_user_id = ? AND line_account_id = ?`)
+      .prepare(`SELECT id, user_id, picture_url FROM friends WHERE line_platform_user_id = ? AND line_account_id = ?`)
       .bind(caller, account_id)
       .first<{ id: string; user_id: string | null; picture_url: string | null }>();
     if (friend) {
@@ -94,7 +94,7 @@ events.get('/api/liff/events/:id', async (c) => {
       .prepare(
         `SELECT 1 FROM friend_tags ft
            JOIN friends f ON f.id = ft.friend_id
-          WHERE f.line_user_id = ? AND f.line_account_id = ? AND ft.tag_id = ?
+          WHERE f.line_platform_user_id = ? AND f.line_account_id = ? AND ft.tag_id = ?
           LIMIT 1`,
       )
       .bind(caller, account_id, row.visible_tag_id as string)

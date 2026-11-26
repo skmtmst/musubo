@@ -65,7 +65,7 @@ export async function applyRichMenuTargeting(
   if (candidates.length === 0) return { kind: 'skipped', reason: 'no rules' };
 
   const friend = await db
-    .prepare('SELECT line_user_id FROM friends WHERE id = ?')
+    .prepare('SELECT line_platform_user_id AS line_user_id FROM friends WHERE id = ?')
     .bind(friendId)
     .first<{ line_user_id: string }>();
   if (!friend) return { kind: 'skipped', reason: 'friend not found' };

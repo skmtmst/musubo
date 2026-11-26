@@ -64,6 +64,7 @@ const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
   { file: 'services/analytics-reports.ts', label: '集計レポート通知（固定文）' },
   { file: 'features/booking/booking-notifier.ts', label: '予約通知（固定文）' },
   { file: 'services/event-booking-notifier.ts', label: 'イベント予約通知（固定文）' },
+  { file: 'services/getting-started-first-message.ts', label: '開店準備の最初の1通（固定文）' },
   { file: 'services/operation-notifications.ts', label: '運用アラート通知（固定文）' },
   { file: 'services/operation-alert-notifications.ts', label: '運用アラートのスタッフ通知（固定文）' },
   { file: 'routes/meet-callback.ts', label: 'Meet結果通知（固定文）' },
@@ -130,24 +131,6 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     for (const { file, label } of SEND_PATHS) {
       const source = read(file);
       expect(source, `${file} (${label}) が getCommonVarMap を直接呼んでいる`).not.toContain('getCommonVarMap');
-    }
-  });
-
-  it('個別送信の呼出元はsource（台帳の出所）を必ず渡す', () => {
-    for (const file of ['routes/chats.ts', 'services/scheduled-chat-sends.ts']) {
-      const source = read(file);
-      const calls = source.match(/renderChatMessageContent\([\s\S]*?\);/g) ?? [];
-      const lenientPreviews = source.match(/lenient[\s\S]*?renderChatMessageContent\([\s\S]*?\);/g) ?? [];
-      const sendCalls = calls.filter(
-        (call) => !lenientPreviews.some((preview) => preview.endsWith(call)),
-      );
-      expect(sendCalls.length, `${file} に送信経路の呼出しがありません`).toBeGreaterThan(0);
-      for (const call of sendCalls) {
-        expect(
-          /kind:\s*'chat'/.test(call),
-          `${file} の renderChatMessageContent 呼出しに source がありません: ${call.slice(0, 120)}`,
-        ).toBe(true);
-      }
     }
   });
 

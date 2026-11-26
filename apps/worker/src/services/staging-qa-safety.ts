@@ -54,7 +54,7 @@ async function simulateLineSend(request: Request, env: WorkerBindings): Promise<
   if (recipients.length > 500 || (!recipients.length && !url.pathname.endsWith('/broadcast'))) return null;
   for (const recipient of recipients) {
     if (typeof recipient !== 'string') return null;
-    const friend = await env.DB.prepare(`SELECT id FROM friends WHERE line_user_id=?
+    const friend = await env.DB.prepare(`SELECT id FROM friends WHERE line_platform_user_id=?
       AND line_account_id=? AND is_following=1 AND id IN (SELECT value FROM json_each(?))`)
       .bind(recipient, run.accountId, JSON.stringify(run.friendIds)).first();
     if (!friend) return null;

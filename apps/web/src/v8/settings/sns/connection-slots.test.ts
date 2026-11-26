@@ -17,6 +17,7 @@ import {
   SNS_CONNECTION_LIMIT,
   SNS_DEFAULT_CONTRACTED,
   SNS_SLOT_UNIT_YEN,
+  asConnectionPorts,
   connectionStatusLabel,
   googleSlots,
   instagramSlots,
@@ -296,6 +297,17 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
     expect(row.connectionId).toBeNull()
   })
 
+  it('主連携はサーバーの値で決め、先頭を主連携と決め打ちしない', () => {
+    const data = googleData({ id: 'gc-1', status: 'connected', locationTitle: '然カフェ 本店', confirmationRevision: 4 })
+
+    // サーバーがこの接続を主連携としているとき。
+    expect(googleSlots(data, fmt, null, 'gc-1').connections[0]!.primary).toBe(true)
+    // 別の接続が主連携のときは札を付けない。
+    expect(googleSlots(data, fmt, null, 'gc-2').connections[0]!.primary).toBe(false)
+    // 口が取れないとき（null）は今までどおり1件しか出せないので主連携として扱う。
+    expect(googleSlots(data, fmt).connections[0]!.primary).toBe(true)
+  })
+
   it('Google の未接続・読み取れないときは行を作らない', () => {
     expect(googleSlots(googleData({ status: 'disconnected' }), fmt).connections).toHaveLength(0)
     expect(googleSlots(null, fmt).connections).toHaveLength(0)
@@ -484,5 +496,56 @@ describe('API の返事を一覧の形へ直す（受入条件5）', () => {
       expect(plan.connectedAfter).toBe(1)
       expect(plan.contracted).toBe(2)
     })
+  })
+})
+
+describe('契約枠・主連携・請求の段の形の確かめ', () => {
+  const PORTS = {
+    lineAccountId: 'acc-1',
+    contracted: 2,
+    counts: { googleBusiness: 1, instagram: 1 },
+    linkedSlots: 1,
+    billing: { kind: 'trialing' },
+    googleConnections: [{ id: 'g-1', label: '然カフェ 本店', state: 'connected', version: 4, isPrimary: true }],
+    primaryVersion: 7,
+  }
+
+  it('必要な項目がそろった返事はそのまま受け取る', () => {
+    expect(asConnectionPorts(PORTS)).toBe(PORTS)
+  })
+
+  it('別アカウントの契約枠と不正な請求日数は追加の許可に使わない', () => {
+    expect(asConnectionPorts(PORTS, 'acc-2')).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, contracted: Infinity })).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, contracted: 1.5 })).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, primaryVersion: -1 })).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, billing: { kind: 'paid', monthlyDaysRemaining: 31, monthlyDaysInPeriod: 30 } })).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, billing: { kind: 'paid', monthlyDaysRemaining: 3, monthlyDaysInPeriod: 30 } }, 'acc-1')).toBeTruthy()
+  })
+
+  it('主連携の配列が無い返事は取れなかった扱いにする', () => {
+    expect(asConnectionPorts({ ...PORTS, googleConnections: undefined })).toBeNull()
+    expect(asConnectionPorts({ items: [], total: 0, page: 1, limit: 20 })).toBeNull()
+  })
+
+  it('契約枠・版が数で無い返事は取れなかった扱いにする', () => {
+    expect(asConnectionPorts({ ...PORTS, contracted: '2' })).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, primaryVersion: null })).toBeNull()
+  })
+
+  it('接続の行に ID・主連携の印が無い返事は取れなかった扱いにする', () => {
+    expect(asConnectionPorts({ ...PORTS, googleConnections: [{ label: '然カフェ 本店' }] })).toBeNull()
+    expect(asConnectionPorts({ ...PORTS, googleConnections: [null] })).toBeNull()
+  })
+
+  it('返事が中身を持たないときは取れなかった扱いにする', () => {
+    expect(asConnectionPorts(undefined)).toBeNull()
+    expect(asConnectionPorts(null)).toBeNull()
+    expect(asConnectionPorts('')).toBeNull()
+  })
+
+  it('接続が0件の返事は形がそろっていれば受け取る', () => {
+    const empty = { ...PORTS, googleConnections: [] }
+    expect(asConnectionPorts(empty)).toBe(empty)
   })
 })

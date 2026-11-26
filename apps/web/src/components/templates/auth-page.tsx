@@ -2,7 +2,7 @@ import type { FormHTMLAttributes, ReactNode } from 'react'
 import AuthCard from '@/components/auth/auth-card'
 import styles from './auth-page.module.css'
 
-/** Login confirmation and enrollment share the login card, its head (brand and step) and its spacing. */
+/** Login confirmation and enrollment share the login card, its brand and spacing. */
 export function AuthPage({ title, help, titleId, boardId, step = { current: 2, total: 2 }, layout = 'admin', wide = false, children }: { title: string; help?: ReactNode; titleId?: string; boardId?: string; step?: { current: number; total: number }; layout?: 'admin' | 'ops'; /** QR と鍵を横に並べる設定の画面など、中身が広い時。 */ wide?: boolean; children: ReactNode }) {
   return <AuthCard variant="totp" title={title} titleId={titleId} description={help} cardNode={boardId} authLayout={layout} step={step} wide={wide}>{children}</AuthCard>
 }

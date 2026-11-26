@@ -13,10 +13,12 @@ import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';
 import { connectedGoogleProfile, googleOpeningDay } from '../services/restaurant-google-hours-source.js';
+import { primaryGoogleConnection } from '../services/google-connection-primary.js';
 import { validRestaurantDate, restaurantCivilTime } from '../services/restaurant-booking.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { hasOrganizationSelector, requiredAccount, organizationFor, storeBelongsTo, acquireLock, adjustInventoryReservedCount, releaseLock } from './restaurant-test-definition.js';
 import type { Context } from 'hono';
+import { readScopedInventoryDay } from './restaurant-test-inventory-allocation.js';
 
 export const post__api_restaurant_test_inventory_generate_1 = async (c: Context<Env, "/api/restaurant-test/inventory/generate">) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
@@ -33,9 +35,10 @@ export const post__api_restaurant_test_inventory_generate_1 = async (c: Context<
   const allocation = [body.otaCapacity, body.lineCapacity, body.walkInCapacity,body.sameDayCapacity??0];
   if (allocation.some(n => !Number.isSafeInteger(n) || Number(n)<0) || allocation.reduce<number>((sum,n)=>sum+Number(n),0)>total) return inputError(c, { success: false, error: '稼働中の卓の席数以内で配分してください' }, 400, ["otaCapacity","lineCapacity","walkInCapacity","sameDayCapacity","storeId"]);
   const hours = validateRestaurantOpeningHours(JSON.parse(setting.hours_json))!;
-  const googleConnection = await db.prepare('SELECT status FROM rt_google_connections WHERE store_id=?')
-    .bind(body.storeId).first<{ status: string }>();
-  const googleProfile = googleConnection ? await connectedGoogleProfile(db, body.storeId) : null;
+  // 接続の有無の判定と写しの読み取りで**同じ1件**を見る。接続が2件あるとき、
+  // 店舗の接続を store_id だけで引くとどちらが返るか決まらない（773で互換索引が外れる）。
+  const googleConnection = await primaryGoogleConnection(db, body.storeId);
+  const googleProfile = googleConnection ? await connectedGoogleProfile(db, body.storeId, googleConnection.id) : null;
   if (googleConnection && !googleProfile) return c.json({ success: false, error: 'Googleビジネスの接続と営業時間を確認してください' }, 409);
   const weekday = new Date(body.date!).getUTCDay();
   const mins = (time: string) => Number(time.slice(0,2))*60+Number(time.slice(3));
@@ -130,6 +133,15 @@ export const get__api_restaurant_test_inventory_rules_4 = async (c: Context<Env,
  if(date===undefined)return c.json({success:true,data});
  const store=await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{timezone:string}>();
  const state=await getRestaurantInventoryRuleState(db,storeId,restaurantCivilTime(date,0,store!.timezone),restaurantCivilTime(date,1440,store!.timezone));
+ if(data.stopLine){
+   const {data:slots}=await readScopedInventoryDay(db,storeId,date);
+   const stopped=slots.filter(slot=>slot.id.startsWith('operating:')&&slot.auto_line_original!==null).map(slot=>({
+     slotId:slot.id,startsAt:slot.starts_at,lineOriginal:slot.auto_line_original,sameDayOriginal:null,
+     remainingSeats:slot.total_capacity-slot.occupied_seats-slot.unassigned_guests,threshold:data.threshold,
+   }));
+   state.stoppedTotal+=stopped.length;
+   state.stopped=[...state.stopped,...stopped].sort((a,b)=>Date.parse(a.startsAt)-Date.parse(b.startsAt)).slice(0,100);
+ }
  return c.json({success:true,data,state});
 };
 

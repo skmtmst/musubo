@@ -1,4 +1,4 @@
-import { BookOpen, CircleHelp, Copy, Info, LifeBuoy, Link as LinkIcon, Lock, Save } from 'lucide-react'
+import { BookOpen, CircleHelp, Copy, Info, LifeBuoy, Link as LinkIcon, Lock } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
@@ -29,7 +29,7 @@ const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
   { title: 'LINEログインの2項目', note: '同じプロバイダーの中に作る' },
 ]
 
-function AcOutline({ sub }: { sub: number }) {
+function AcOutline({ sub, onBackTo }: { sub: number; onBackTo: (step: number) => void }) {
   return (
     <Card className={styles.outlineCard} frame="ring" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-gap-xs)" data-design-node="g48QV">
       <p className={styles.outlineTitle}>操作ステップ</p>
@@ -37,20 +37,18 @@ function AcOutline({ sub }: { sub: number }) {
       <div className={styles.outlineGap} aria-hidden="true" />
       {AC_OUTLINE.map((row, index) => {
         const number = index + 1
-        return (
-          /* 札の状態を現在の段に合わせる。 */
-          <div
-            key={row.title}
-            className={`${styles.outlineRow} ${number < sub ? styles.outlineDone : number === sub ? styles.outlineCurrent : styles.outlineFuture}`}
-            aria-current={number === sub ? 'step' : undefined}
-          >
+        const content = (
+          <span className={`${styles.outlineRow} ${number < sub ? styles.outlineDone : number === sub ? styles.outlineCurrent : styles.outlineFuture}`} aria-current={number === sub ? 'step' : undefined}>
             <span className={styles.outlineNum} aria-hidden="true">{number}</span>
-            <div className={styles.outlineText}>
-              <p className={styles.outlineRowTitle}>{row.title}</p>
-              <p className={styles.outlineRowNote}>{row.note}</p>
-            </div>
-          </div>
+            <span className={styles.outlineText}>
+              <span className={styles.outlineRowTitle}>{row.title}</span>
+              <span className={styles.outlineRowNote}>{row.note}</span>
+            </span>
+          </span>
         )
+        return number < sub
+          ? <Button key={row.title} type="button" variant="text" size="inline" fullWidth onClick={() => onBackTo(number)}>{content}</Button>
+          : <div key={row.title}>{content}</div>
       })}
       <div className={styles.outlineSpacer} aria-hidden="true" />
       <div className={styles.outlineAuto}>
@@ -66,10 +64,11 @@ function AcOutline({ sub }: { sub: number }) {
 export type Step2Field = 'channelId' | 'channelSecret' | 'providerId' | 'loginChannelId' | 'loginChannelSecret'
 
 export default function Step2Connect({
-  sub, badge, values, fieldErrors, touchedFields, acks, onUpdate, onTouchField, onValidateField, onToggleAck,
+  sub, badge, values, fieldErrors, touchedFields, acks, onUpdate, onTouchField, onValidateField, onToggleAck, onBackTo,
 }: {
   /** ②の中の小さな段（1〜4）。 */
   sub: number
+  onBackTo: (step: number) => void
   /** 「Step 1 / 4」などの札。 */
   badge: string
   /** いま入っているチャネルの4項目とプロバイダーID。 */
@@ -89,13 +88,10 @@ export default function Step2Connect({
   const warningText = (key: Step2Field) => warning(key) && <p id={`v8-${key}-warning`} className={styles.inputWarning} role="status">{warning(key)}</p>
   return (
     /* 正本 v07 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
-       白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */
-    <CreateStepColumns data-design-node="Fqy29" outlineTitle="操作ステップ" outline={<AcOutline sub={sub} />} previewTitle="マニュアル" preview={(
+       マニュアルとサポートへの案内。 */
+    <CreateStepColumns data-design-node="Fqy29" outlineTitle="操作ステップ" outline={<AcOutline sub={sub} onBackTo={onBackTo} />} previewTitle="マニュアル" preview={(
       <Card className={styles.aside} layout="vertical" surface="standard" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="マニュアル">
         <Button external href={MANUAL} icon={<BookOpen size={16} aria-hidden="true" />}>マニュアルを開く</Button>
-        <div className={styles.asideLine} aria-hidden="true" />
-        {/* 下書きは入力のたびに端末へ残るので、閉じるだけでよい（行き先は下の「キャンセル」と同じ）。 */}
-        <Button href="/hq" icon={<Save size={16} aria-hidden="true" />}>途中保存して閉じる</Button>
         <div className={styles.asideLine} aria-hidden="true" />
         <h2 className={styles.asideH3}>うまくいかないとき</h2>
         <Button href="/hq/support" icon={<LifeBuoy size={16} aria-hidden="true" />}>サポートに聞く</Button>

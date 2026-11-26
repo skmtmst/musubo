@@ -219,7 +219,6 @@ export default function BroadcastForm({
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
   }, [previewOpen])
-  const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
   const [preflightStatus, setPreflightStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
   const [condition, setCondition] = useState<SegmentCondition | null>(initialCondition)
@@ -1435,7 +1434,7 @@ export default function BroadcastForm({
     </div>
     <BroadcastLengthNotice visible={shows('message')} notice={lengthNotice} />
       </StepContent>
-      <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
+      <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
     <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(

@@ -5,6 +5,7 @@
  */
 export { jstNow, toJstString, isTimeBefore, jstDateString, nextDateString, nextVersionToken, MAX_LIST_LIMIT } from './utils';
 export { DEFAULT_TENANT_ID } from '@line-crm/shared';
+export { encodeScopedFriendLineUserId, normalizeFriendLineUserId } from './friend-account-identity';
 export {
   CredentialEncryptionKeyError, decryptCredential, encryptCredential,
 } from './credential-crypto';

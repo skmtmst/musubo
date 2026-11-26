@@ -12,7 +12,7 @@
 .join{stroke:var(--color-accent);stroke-width:var(--tpl-floor-outline-w);pointer-events:none;}
 
 .penTable>rect:not(.chair):not(.selection),.penTable>ellipse,.penTable>circle{fill:var(--color-canvas);stroke:var(--color-control-border);stroke-width:2;}
-.penTable .selection{fill:#e0efff;stroke:#4b9be8;stroke-width:2;}
+.selection,.penTable .selection{fill:#e0efff;stroke:#4b9be8;stroke-width:2;pointer-events:none;}
 .penTable .chair{fill:var(--color-ink-faint);stroke:none;}
 .penTable text{fill:var(--color-ink-faint);font-size:var(--text-caption);}
 .penTable .tableCaption{fill:var(--color-ink);}

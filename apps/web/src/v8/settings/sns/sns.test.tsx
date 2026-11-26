@@ -12,9 +12,9 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  *  - 戻り先 `?instagram=connected|failed` の帯。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { InstagramConnectionStatus } from '@line-crm/shared'
+import type { InstagramConnectionStatus, SnsConnectionPorts } from '@line-crm/shared'
 import type { GoogleConnection, GoogleConnectionData } from '@/lib/restaurant-google-api'
 import SnsSettingsPage from './sns'
 
@@ -23,24 +23,37 @@ const LOCKED_REASON = 'オーナーか管理者だけが接続を変更できま
 /** 閲覧のみの帯（この画面だけの言い回し）。 */
 const READ_ONLY_NOTICE = '閲覧のみの権限です。接続の追加・解除・主連携の変更はオーナーか管理者だけができます。'
 
-const fixture = vi.hoisted(() => ({
-  googleConnection: vi.fn(),
-  googleConnections: vi.fn(),
-  igConnections: vi.fn(),
-  googleConnectStart: vi.fn(),
-  googleSelectLocation: vi.fn(),
-  googleDisconnect: vi.fn(),
-  igConnection: vi.fn(),
-  igStart: vi.fn(),
-  igDisconnect: vi.fn(),
-  igRefresh: vi.fn(),
-  replace: vi.fn(),
-  role: { value: 'owner' as string | null },
-  style: { value: 'restaurant' as string },
-  search: { value: '' },
-  account: { selected: 'acc-1', accounts: [] as Array<{ id: string; name?: string }> },
-  selectAccount: vi.fn(),
-}))
+const fixture = vi.hoisted(() => {
+  /** `@/lib/api` の ApiError と同じ形。画面は `status === 409` で版の競合を見分ける。 */
+  class MockApiError extends Error {
+    status: number
+    constructor(status: number, message = '') {
+      super(message)
+      this.status = status
+    }
+  }
+  return {
+    googleConnection: vi.fn(),
+    googleConnections: vi.fn(),
+    igConnections: vi.fn(),
+    googleConnectStart: vi.fn(),
+    googleSelectLocation: vi.fn(),
+    googleDisconnect: vi.fn(),
+    igConnection: vi.fn(),
+    igStart: vi.fn(),
+    igDisconnect: vi.fn(),
+    igRefresh: vi.fn(),
+    snsPorts: vi.fn(),
+    snsSetPrimary: vi.fn(),
+    ApiError: MockApiError,
+    replace: vi.fn(),
+    role: { value: 'owner' as string | null },
+    style: { value: 'restaurant' as string },
+    search: { value: '' },
+    account: { selected: 'acc-1', accounts: [] as Array<{ id: string; name?: string }> },
+    selectAccount: vi.fn(),
+  }
+})
 
 vi.mock('@/lib/restaurant-google-api', () => ({
   restaurantGoogleApi: { connection: fixture.googleConnection, connections: fixture.googleConnections, connectStart: fixture.googleConnectStart, selectLocation: fixture.googleSelectLocation, disconnect: fixture.googleDisconnect },
@@ -55,8 +68,12 @@ vi.mock('@/lib/api', () => ({
       disconnect: fixture.igDisconnect,
       refresh: fixture.igRefresh,
     },
+    snsConnections: {
+      get: fixture.snsPorts,
+      setGooglePrimary: fixture.snsSetPrimary,
+    },
   },
-  ApiError: class ApiError extends Error {},
+  ApiError: fixture.ApiError,
   /* 開店準備ガイドの入れ物が、はじめにやることの実測（コース・担当・出来事）を通る。 */
   bookingApi: { listMenus: vi.fn(), listStaff: vi.fn(), getSettings: vi.fn() },
   eventsApi: { listEvents: vi.fn() },
@@ -121,6 +138,31 @@ const CONNECTED = {
   version: 3,
   syncedAt: '2026-10-07T01:00:00.000Z',
 }
+
+/**
+ * 契約枠・主連携・請求の段（`GET /api/settings/sns/connections`）の返事。
+ * 契約枠は両サービス共通の1つの数。金額は画面で数え直さないので、ここでも増分は入れない。
+ */
+function portsData(overrides: Partial<SnsConnectionPorts> = {}): { success: true; data: SnsConnectionPorts } {
+  return {
+    success: true,
+    data: {
+      lineAccountId: 'acc-1',
+      contracted: 1,
+      counts: { googleBusiness: 0, instagram: 0 },
+      linkedSlots: 0,
+      billing: null,
+      googleConnections: [],
+      primaryVersion: 1,
+      ...overrides,
+    },
+  }
+}
+
+beforeEach(() => {
+  /* 既定は「契約枠の記録が無い LINEアカウント」（404）。口が入る前と同じ表示になることを保つ。 */
+  fixture.snsPorts.mockRejectedValue(new fixture.ApiError(404, 'not_found'))
+})
 
 function setup(state: InstagramConnectionStatus['state'], connection?: InstagramConnectionStatus['connection']) {
   fixture.googleConnection.mockResolvedValue(googleData())
@@ -192,8 +234,9 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     await openIgMenu()
     expect(screen.getAllByRole('menuitem', { name: 'つなぎ直す' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('menuitem', { name: '解除する' }).length).toBeGreaterThan(0)
-    // 主連携を切り替える口がまだ無いので項目を出さない。
+    // 主連携は Google 接続だけの考え方なので、Instagram には出さない（要件 §4-3）。
     expect(screen.queryByRole('menuitem', { name: '主連携にする' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '主連携にする' })).toBeNull()
   })
 
   it('［接続を確かめる］は認可をやり直さず、いまの接続をサーバーに確かめ直す', async () => {
@@ -334,7 +377,7 @@ describe('Instagram のカード（★v7 F1・F2・F7・F8）', () => {
     expect(dialog.getByText('1個（変わりません）')).toBeTruthy()
     expect(dialog.getByText('有料の追加連携枠')).toBeTruthy()
     expect(dialog.getByText('0枠 → 0枠')).toBeTruthy()
-    // 次の請求日を返す口がまだ無いので減額の箱は出さない。
+    // 請求の段に次回の請求日は入っていないので、減額の箱は出さない（日付を画面で作らない）。
     expect(dialog.queryByText(/次回の月次請求から/)).toBeNull()
   })
 
@@ -717,6 +760,158 @@ describe('一覧の口の返事を2行として出す（受入条件1・v10 F1�
   })
 })
 
+describe('契約枠・主連携・請求の口（★v9 F3・F4／GET /api/settings/sns/connections）', () => {
+  it('主連携の保存中にアカウントを変えたら、遅い応答で前のアカウントを読み直さない', async () => {
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { id: 'gc-1', status: 'connected' } })
+    fixture.googleConnections.mockResolvedValue({ connections: [
+      { id: 'gc-1', status: 'connected', locationTitle: '本店', confirmationRevision: 2 },
+      { id: 'gc-2', status: 'connected', locationTitle: '支店', confirmationRevision: 4 },
+    ] })
+    fixture.snsPorts.mockImplementation(async (lineAccountId: string) => portsData({
+      lineAccountId, contracted: 2, googleConnections: [
+        { id: 'gc-1', label: '本店', state: 'connected', version: 2, isPrimary: true },
+        { id: 'gc-2', label: '支店', state: 'connected', version: 4, isPrimary: false },
+      ],
+    }))
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    let finish!: (value: unknown) => void
+    fixture.snsSetPrimary.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<SnsSettingsPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '主連携にする' }))
+    await waitFor(() => expect(fixture.snsSetPrimary).toHaveBeenCalledTimes(1))
+    fixture.account.selected = 'acc-2'
+    view.rerender(<SnsSettingsPage />)
+    await waitFor(() => expect(fixture.snsPorts).toHaveBeenLastCalledWith('acc-2'))
+    await act(async () => { finish({ success: true, data: { connectionId: 'gc-2', version: 2 } }) })
+    expect(fixture.snsPorts.mock.calls.map(args => args[0])).toEqual(['acc-1', 'acc-2'])
+  })
+
+  it('契約枠内の2件目は既存の接続IDを付けず、新しい接続として開始する', async () => {
+    fixture.snsPorts.mockResolvedValue(portsData({ contracted: 2 }))
+    setup('connected', CONNECTED)
+    const add = await igCard().findAllByRole('button', { name: '接続を追加する' })
+    fireEvent.click(add[0])
+    await waitFor(() => expect(fixture.igStart).toHaveBeenCalledWith('acc-1', { connectionId: null, add: true }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('複数行の主連携の切替は選んだ接続IDと、サーバーから読んだ版を送る', async () => {
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { id: 'gc-1', status: 'connected' } })
+    fixture.googleConnections.mockResolvedValue({ connections: [
+      { id: 'gc-1', status: 'connected', locationTitle: '本店', confirmationRevision: 2 },
+      { id: 'gc-2', status: 'connected', locationTitle: '支店', confirmationRevision: 4 },
+    ] })
+    fixture.snsPorts.mockResolvedValue(portsData({
+      contracted: 2, primaryVersion: 7,
+      googleConnections: [
+        { id: 'gc-1', label: '本店', state: 'connected', version: 2, isPrimary: false },
+        { id: 'gc-2', label: '支店', state: 'connected', version: 4, isPrimary: true },
+      ],
+    }))
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    fixture.snsSetPrimary.mockResolvedValue({ success: true, data: { connectionId: 'gc-1', version: 8 } })
+    render(<SnsSettingsPage />)
+    const card = screen.getByRole('region', { name: 'Google ビジネス' })
+    await waitFor(() => expect(card.querySelectorAll('[data-connection-id]')).toHaveLength(2))
+    const rows = Array.from(card.querySelectorAll<HTMLElement>('[data-connection-id]'))
+    expect(within(rows[1]!).getByText('主連携')).toBeTruthy()
+    fireEvent.click(within(rows[0]!).getByRole('button', { name: '主連携にする' }))
+    await waitFor(() => expect(fixture.snsSetPrimary).toHaveBeenCalledWith({ lineAccountId: 'acc-1', connectionId: 'gc-1', expectedVersion: 7 }))
+  })
+
+  /** 接続済みのGoogle 1件（主連携の札を見るため id を揃える）。 */
+  function connectedGoogle(id = 'conn-1') {
+    return {
+      ...googleData(),
+      connection: { status: 'connected' as const, id, locationName: 'locations/1', locationTitle: '然カフェ 本店' },
+    }
+  }
+
+  it('契約枠はサーバーの値を出す（画面で 1 を決め打ちしない）', async () => {
+    fixture.snsPorts.mockResolvedValue(portsData({ contracted: 3, counts: { googleBusiness: 1, instagram: 1 } }))
+    setup('connected', CONNECTED)
+
+    expect(await igCard().findByText('連携 1個（契約枠 3個）')).toBeTruthy()
+    expect(fixture.snsPorts).toHaveBeenCalledWith('acc-1')
+  })
+
+  it('口が取れないLINEアカウントでは今までの表示（契約枠1）へ戻す', async () => {
+    fixture.snsPorts.mockRejectedValue(new fixture.ApiError(404, 'not_found'))
+    setup('connected', CONNECTED)
+
+    expect(await igCard().findByText('連携 1個（契約枠 1個）')).toBeTruthy()
+    // 読めないことを画面の失敗として出さない（契約枠の記録が無いだけ）。
+    expect(screen.queryByText(/連携の状態を読み取れませんでした/)).toBeNull()
+  })
+
+  it('請求の段が取れると、枠を超える追加で料金の確認をはさむ', async () => {
+    fixture.snsPorts.mockResolvedValue(portsData({
+      contracted: 1,
+      counts: { googleBusiness: 0, instagram: 1 },
+      billing: { kind: 'trialing' },
+    }))
+    setup('connected', CONNECTED)
+
+    /* 広い画面と細い画面の両方に出るので先頭を押す（F2）。 */
+    const add = await igCard().findAllByRole('button', { name: '接続を追加する' })
+    expect(add[0].getAttribute('aria-disabled')).not.toBe('true')
+    fireEvent.click(add[0])
+
+    // 無料期間中（trialing）は F4。認可画面へは確認してから進む。
+    const dialog = within(await screen.findByRole('dialog'))
+    expect(dialog.getByText('追加料金はかかりません')).toBeTruthy()
+    expect(fixture.igStart).not.toHaveBeenCalled()
+  })
+
+  it('請求の段が取れないときは枠を超える追加を押せない状態にして理由を添える', async () => {
+    fixture.snsPorts.mockResolvedValue(portsData({
+      contracted: 1,
+      counts: { googleBusiness: 0, instagram: 1 },
+      billing: null,
+    }))
+    setup('connected', CONNECTED)
+
+    const add = await igCard().findAllByRole('button', { name: '接続を追加する' })
+    expect(add[0].getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(add[0])
+    // 金額を画面で作らないため、小窓も認可画面も開かない（AGENTS.md §15）。
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(fixture.igStart).not.toHaveBeenCalled()
+    expect(igCard().getAllByText('追加の料金を確かめられないため、いまは枠を超える追加ができません。しばらくしてからもう一度お試しください。').length).toBeGreaterThan(0)
+  })
+
+  it('主連携の札はサーバーの isPrimary で出す', async () => {
+    fixture.googleConnection.mockResolvedValue(connectedGoogle())
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    fixture.snsPorts.mockResolvedValue(portsData({
+      counts: { googleBusiness: 1, instagram: 0 },
+      googleConnections: [{ id: 'conn-1', label: '然カフェ 本店', state: 'connected', version: 2, isPrimary: true }],
+      primaryVersion: 4,
+    }))
+    render(<SnsSettingsPage />)
+
+    expect(await googleCard().findByText('接続済み')).toBeTruthy()
+    expect(googleCard().getByText('主連携')).toBeTruthy()
+  })
+
+  it('サーバーが別の接続を主連携としているときは札を出さない（先頭を主連携と決め打ちしない）', async () => {
+    fixture.googleConnection.mockResolvedValue(connectedGoogle('conn-1'))
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    fixture.snsPorts.mockResolvedValue(portsData({
+      counts: { googleBusiness: 2, instagram: 0 },
+      googleConnections: [
+        { id: 'conn-2', label: '渋谷店', state: 'connected', version: 1, isPrimary: true },
+        { id: 'conn-1', label: '然カフェ 本店', state: 'connected', version: 2, isPrimary: false },
+      ],
+      primaryVersion: 4,
+    }))
+    render(<SnsSettingsPage />)
+
+    expect(await googleCard().findByText('接続済み')).toBeTruthy()
+    expect(googleCard().queryByText('主連携')).toBeNull()
+  })
+})
+
 describe('Instagram の返事の形が違うとき', () => {
   it('成功でも状態が無ければ読み込み中のまま止めず、失敗の表示を出す', async () => {
     fixture.googleConnection.mockResolvedValue(googleData())
@@ -724,6 +919,19 @@ describe('Instagram の返事の形が違うとき', () => {
     render(<SnsSettingsPage />)
 
     await waitFor(() => expect(igCard().queryByRole('button', { name: /もう一度/ })).toBeTruthy())
+  })
+})
+
+describe('契約枠・主連携・請求の口の返事の形が違うとき', () => {
+  it('成功でも別の形の中身なら画面を止めず、既定（契約枠1）で出す', async () => {
+    fixture.googleConnection.mockResolvedValue(googleData())
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('connected', CONNECTED) })
+    /* 口を持たないサーバーが一覧の形で返す場合。主連携を探すところで画面を止めない。 */
+    fixture.snsPorts.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
+    render(<SnsSettingsPage />)
+
+    expect(await igCard().findByText('連携 1個（契約枠 1個）')).toBeTruthy()
+    expect(screen.queryByText(/連携の状態を読み取れませんでした/)).toBeNull()
   })
 })
 

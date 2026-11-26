@@ -26,7 +26,7 @@ import {
 export const methods1 = {
   ecSummary: (accountId: string, query: { range?: 'today' | 'week' | 'month'; date?: string; from?: string; to?: string } = {}) =>
     fetchApi<Result<import('@line-crm/shared').EcStyleSummary>>(url(root + '/ec-summary', accountId, query)),
-  get: (accountId: string) =>
+  get: (accountId: string, registration = false) =>
     fetchApi<
       Result<StyleSelectionStatus & {
         style: AccountStyle;
@@ -48,9 +48,9 @@ export const methods1 = {
           modes: Array<SetupAnswer['mode']>;
         }>;
       }>
-    >(url(root, accountId)),
+    >(url(root, accountId, { registration: registration ? '1' : undefined }), registration ? { cache: 'no-store' } : undefined),
 
-  save: (accountId: string, body: StyleSelection) =>
+  save: (accountId: string, body: StyleSelection, registration = false) =>
     fetchApi<
       Result<StyleSelectionStatus & {
         style: AccountStyle;
@@ -71,7 +71,7 @@ export const methods1 = {
           requiresActivation: boolean;
         }>;
       }>
-    >(url(root, accountId), write('PUT', body)),
+    >(url(root, accountId, { registration: registration ? '1' : undefined }), write('PUT', body)),
 
   warnings: (accountId: string) =>
     fetchApi<

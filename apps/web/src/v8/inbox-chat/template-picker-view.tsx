@@ -9,7 +9,7 @@
  * ここは見た目だけを受け持つ。
  */
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
-import { useLayoutEffect, useRef, type RefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import { CornerDownLeft, FolderOpen, Search, Send } from 'lucide-react'
 import { EntityPickerDialog } from '@/components/shared/entity-picker'
 import Button from '@/components/shared/button'
@@ -21,9 +21,22 @@ import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import styles from '@/components/shared/entity-picker.module.css'
 import { InsertText } from '@/components/shared/insert-text-field'
+import { insertDisplayText, insertTokenTraits } from '@/components/shared/insert-tokens'
+import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
 import { formatNumber } from '@/lib/format'
+import { CHAT_INSERT_TOKENS, PREVIEW_FAILED_TEXT, unresolvedNoticeText } from './chat-inserts'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
+
+/**
+ * 選んだテンプレートを、今の相手で確かめた結果（送信と同じ解決器の render-preview）。
+ * `names` には口が実際に解決できなかった差し込みだけが入る（予約がある相手には予約の値が入る）。
+ * まとめて送るときは `templates` に該当するテンプレートの名前を入れる。
+ */
+export type TemplatePickCheck =
+  | { status: 'unresolved'; names: string[]; templates: string[] }
+  | { status: 'failed' }
 
 export type TemplatePickerViewProps = {
   accountId?: string | null
@@ -59,8 +72,9 @@ export type TemplatePickerViewProps = {
   remaining: number
   loadingMore: boolean
   onLoadMore: () => void
-  resolvedPreview: { id: string; content: string } | null
-  unresolved: string[] | null
+  /** 今の相手で確かめた本文（テンプレートの id → 解決後の本文）。確かめたものだけ入る。 */
+  resolvedPreviews: Readonly<Record<string, string>>
+  check: TemplatePickCheck | null
   onConfirm: () => void
   confirmDisabled: boolean
 }
@@ -70,6 +84,19 @@ const PACK_MAX = 5
 export default function TemplatePickerView(props: TemplatePickerViewProps) {
   const { side, packMode, packItems } = props
   const tokenNames = useInsertTokenNames(props.channel === 'line' ? props.accountId ?? null : null)
+  /* 一覧の印は本文と名前の表だけで決まる。描き直しのたびに全部の本文を読み直さない。 */
+  const namesKey = JSON.stringify([tokenNames.vars ?? null, tokenNames.varsComplete ?? false, tokenNames.unavailableVars ? [...tokenNames.unavailableVars] : null])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 名前の表は中身（namesKey）で比べる
+  const traits = useMemo(() => new Map(props.templates.map(template => [template.id, insertTokenTraits(template.content, tokenNames)])), [props.templates, namesKey])
+  const resolvedFor = (id: string) => (Object.hasOwn(props.resolvedPreviews, id) ? props.resolvedPreviews[id] : undefined)
+  /*
+   * 一覧の抜粋は元の本文から項目名の札（予約の日時・コース名など）で見せる。
+   * 相手に合わせた値（入った値・「入りません」）は右の中身だけに出す（送る前の表示は返信欄の下）。
+   */
+  const insertsOf = (content: string, resolvedValue?: string) => <InsertText tokenNames={tokenNames} extraTokens={CHAT_INSERT_TOKENS} markUnknown value={content} resolvedValue={resolvedValue} />
+  const noticeText = !props.check ? '' : props.check.status === 'failed'
+    ? PREVIEW_FAILED_TEXT.insert
+    : unresolvedNoticeText(props.check.names, tokenNames, packMode ? 'pack' : 'insert', props.check.templates)
   const previewTriggers = useRef(new Map<string, HTMLButtonElement>())
   const returnFocus = useRef<string | null>(null)
   useLayoutEffect(() => {
@@ -100,9 +127,10 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
       preview={props.channel === 'line' && preview ? {
         title: preview.name,
         onClose: () => { returnFocus.current = preview.id; props.onClosePreview() },
-        content: <LinePreview fit title={null}><LinePreviewMessage accountName="" avatar={null} time="">{props.resolvedPreview?.id === preview.id ? props.resolvedPreview.content : preview.content}</LinePreviewMessage></LinePreview>,
+        // 差し込みは札・入った値・「入りません」で見せる（見本の値で埋めたり、生の記号を出したりしない）。
+        content: <LinePreview fit title={null}><LinePreviewMessage accountName="" avatar={null} time="">{insertsOf(preview.content, resolvedFor(preview.id))}</LinePreviewMessage></LinePreview>,
       } : undefined}
-      error={props.unresolved?.length ? `解決できない差し込みがあります: ${props.unresolved.map(v => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。` : undefined}
+      notice={noticeText && props.channel === 'line' ? <Notice tone={props.check?.status === 'failed' ? 'info' : 'warn'} message={noticeText} /> : undefined}
       band={packMode && packItems.length > 0 ? (
             <div className={styles.tpBand}>
               <span className={styles.tpBandLabel}>続けて送る順：</span>
@@ -177,8 +205,11 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                               : <span className={styles.tpBox} aria-hidden="true" />
                           ) : null}
                           <span className={styles.tpCardText}>
-                            <span className={styles.tpCardName} title={template.name}>{template.name}</span>
-                            <span className={styles.tpCardBody} data-lines={props.channel === 'line' ? '2' : undefined} title={template.content}>{props.channel === 'line' ? <InsertText tokenNames={tokenNames} value={template.content} resolvedValue={props.resolvedPreview?.id === template.id ? props.resolvedPreview.content : undefined} /> : template.content}</span>
+                            <span className={styles.tpCardHead}>
+                              <span className={styles.tpCardName} title={template.name}>{template.name}</span>
+                              {props.channel === 'line' ? <TemplateTraitBadges traits={traits.get(template.id)} /> : null}
+                            </span>
+                            <span className={styles.tpCardBody} data-lines={props.channel === 'line' ? '2' : undefined} title={props.channel === 'line' ? insertDisplayText(template.content, { names: tokenNames, extra: CHAT_INSERT_TOKENS, markUnknown: true }) : template.content}>{props.channel === 'line' ? insertsOf(template.content) : template.content}</span>
                           </span>
                         </button>
                         {props.channel === 'line' ? <IconButton ref={node => { if (node) previewTriggers.current.set(template.id, node); else previewTriggers.current.delete(template.id) }} aria-label={`${template.name}の中身を見る`} title="中身を見る" onClick={() => props.onPreview(template.id)}><Search size={16} aria-hidden="true" /></IconButton> : null}
@@ -195,5 +226,20 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
             </div>
           </div>
     </EntityPickerDialog>
+  )
+}
+
+/**
+ * 一覧の名前に添える印（入り切らなければ名前の下の行）。予約の差し込みは相手の予約しだいなので「予約の知らせ用」（注意の色にしない）、
+ * 誰に送っても入らないと分かる差し込みは「ここでは入らない差し込みあり」に分ける。
+ */
+function TemplateTraitBadges({ traits }: { traits?: ReturnType<typeof insertTokenTraits> }) {
+  if (!traits || (!traits.reservation && !traits.unfillable.length)) return null
+  return (
+    <span className={styles.tpCardBadges}>
+      {/* どの差し込みが・なぜ入らないかは、抜粋の札の説明と選んだ時の知らせで言う。 */}
+      {traits.reservation ? <StatusBadge tone="info" size="compact" dot={false}>予約の知らせ用</StatusBadge> : null}
+      {traits.unfillable.length ? <StatusBadge tone="warning" size="compact" dot={false}>ここでは入らない差し込みあり</StatusBadge> : null}
+    </span>
   )
 }

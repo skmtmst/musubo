@@ -8,11 +8,15 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { ProgressBar } from '@/components/shared/progress'
 import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus, StyleChooseAction } from '@/v8/onboarding/public/style-choice'
+import { readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
 import styles from '@/v8/onboarding/wizard.module.css'
 
+const REGISTRATION_STYLES = ['restaurant'] as const
+
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
-export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onSkip, onClose }: {
+export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onClose, presentationKey = null }: {
   accountName?: string
+  presentationKey?: string | null
   open: boolean
   choice: AccountStyle | ''
   busy: boolean
@@ -20,14 +24,16 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
   error: string
   onChoose: (style: AccountStyle) => void
   onSave: () => void
-  onSkip: () => void
   onClose: () => void
 }) {
-  const [demoOpen, setDemoOpen] = useState(false)
-  const [demoPage, setDemoPage] = useState(0)
-  const [viewing, setViewing] = useState<AccountStyle>(() => choice || 'restaurant')
-  useEffect(() => { if (choice) setViewing(choice) }, [choice])
+  const [initial] = useState(() => readRegistrationPresentation(presentationKey))
+  const [demoOpen, setDemoOpen] = useState(initial.demoOpen === true)
+  const [demoPage, setDemoPage] = useState(initial.demoPage ?? 0)
+  const [viewing, setViewing] = useState<AccountStyle>('restaurant')
   useEffect(() => { if (!open) { setDemoOpen(false); setDemoPage(0) } }, [open])
+  useEffect(() => {
+    rememberRegistrationPresentation(presentationKey, { viewing, demoOpen, demoPage })
+  }, [presentationKey, viewing, demoOpen, demoPage])
   if (!open) return null
   return <Dialog
     open
@@ -38,7 +44,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
     designTop={60}
     fitViewport
     contentLayout="form"
-    steps={<StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} />}
+    steps={<StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} allowedStyles={REGISTRATION_STYLES} />}
     designNode="xxpM9"
     onCancel={demoOpen ? () => setDemoOpen(false) : onClose}
     busy={busy}
@@ -49,7 +55,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
     footer={demoOpen ? <DialogActions leadingAction={<Button onClick={() => { if (demoPage > 0) setDemoPage(demoPage - 1) }} aria-disabled={demoPage === 0} disabled={busy}>前のページ</Button>}>
       <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
-    </DialogActions> : <DialogActions leadingAction={<Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}>
+    </DialogActions> : <DialogActions>
       <Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? '「このスタイルにする」を押して選んでください' : null}>次へ<ArrowRight size={16} aria-hidden="true" /></Button>
     </DialogActions>}
   >

@@ -15,6 +15,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 
 const account = vi.hoisted(() => ({ id: 'account-1' }))
+vi.mock('@/components/shared/allergy-field', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
@@ -57,9 +58,13 @@ async function openEditor(mode: 'create' | 'edit', kind: 'course' | 'a_la_carte'
   const price = await screen.findByLabelText('価格（税込）') as HTMLInputElement
   if (mode === 'create') {
     fireEvent.change(screen.getByLabelText('メニュー名'), { target: { value: '架空のメニュー' } })
-    if (kind === 'a_la_carte') {
+    if (kind === 'course') {
+      fireEvent.click(screen.getByRole('button', { name: '所要時間' }))
+      fireEvent.click(within(screen.getByRole('option', { name: '2時間（120分）' })).getByRole('button'))
+    } else {
       fireEvent.click(screen.getByRole('button', { name: '種類' }))
-      fireEvent.click(screen.getByRole('option', { name: '単品' }))
+      fireEvent.click(within(screen.getByRole('option', { name: '単品' })).getByRole('button', { name: '単品' }))
+      expect(screen.queryByLabelText('所要時間')).toBeNull()
     }
   }
   return price
@@ -107,7 +112,6 @@ it('0円の新規コースは送る値を保って一度だけ作れる', async 
   changePrice(price, '-500')
   expect(await screen.findByText(reason)).toBeTruthy()
   changePrice(price, '0')
-  fireEvent.change(screen.getByLabelText('所要時間'), { target: { value: '120' } })
   fireEvent.click(saveButton())
   await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledExactlyOnceWith('account-1', {
     storeId: 'store-1', kind: 'course', name: '架空のメニュー', price: 0, durationMinutes: 120,

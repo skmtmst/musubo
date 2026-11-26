@@ -86,6 +86,18 @@ afterEach(async () => {
 })
 const render = async () => { await act(async () => root.render(<ChatsPage />)) }
 async function click(text: string) {
+  if (text === '要返信' || text === '1時間以上待ち') {
+    let control = document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')
+    if (!control) {
+      const open = document.querySelector<HTMLButtonElement>('button[aria-label="絞り込み"]')!
+      await act(async () => { open.click() })
+      control = document.querySelector<HTMLButtonElement>('button[aria-label="期限で絞り込む"]')
+    }
+    await act(async () => { control!.click() })
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(el => el.textContent?.trim().startsWith(text))!
+    await act(async () => { option.querySelector('button')!.click() })
+    return
+  }
   const button = [...document.querySelectorAll('button')].find(b => b.textContent?.trim().startsWith(text) || b.getAttribute('aria-label') === text)
   expect(button, text).toBeTruthy()
   await act(async () => { button!.click() })

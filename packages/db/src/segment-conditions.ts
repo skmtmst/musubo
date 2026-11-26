@@ -567,7 +567,7 @@ export function buildSegmentWhere(condition: SegmentCondition): { sql: string; b
 export function buildSegmentQuery(condition: SegmentCondition): { sql: string; bindings: unknown[] } {
   const where = buildSegmentWhere(condition)
   return {
-    sql: `SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE ${where.sql} ORDER BY f.created_at ASC, f.id ASC`,
+    sql: `SELECT f.id, f.line_platform_user_id AS line_user_id, f.display_name FROM friends f WHERE ${where.sql} ORDER BY f.created_at ASC, f.id ASC`,
     bindings: where.bindings,
   }
 }

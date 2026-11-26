@@ -2,8 +2,10 @@
 import React from 'react'
 import { act,cleanup,fireEvent,render,screen,waitFor,within } from '@testing-library/react'
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
-import { defaultRestaurantReservationForm,type RestaurantFollowupTrigger } from '@line-crm/shared'
+import { defaultRestaurantReservationForm,type RestaurantFollowupTrigger,type StaffMember } from '@line-crm/shared'
 import { ApiError } from '@/lib/api/transport/errors'
+import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
+import { GuideSharedProvider } from '@/v8/onboarding/public/guide-shared/index'
 const f=vi.hoisted(()=>({role:'owner' as string|null,account:'a',store:'s',read:vi.fn(),saveForm:vi.fn(),initialize:vi.fn(),saveRow:vi.fn(),test:vi.fn(),start:vi.fn(),notUsing:vi.fn(),push:vi.fn()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:f.account})}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>f.role}))
@@ -20,6 +22,7 @@ function initial(){
 }
 beforeEach(()=>{
  f.role='owner';f.account='a';f.store='s';snapshot=initial()
+ rememberStaffIdentity({ id: 'test-owner', tenantId: 'test-hq', role: 'owner' } as StaffMember)
  f.read.mockImplementation(async()=>structuredClone(snapshot))
  f.saveRow.mockImplementation(async(_a,_s,trigger,input)=>{const row=snapshot.page.rows.find(row=>row.trigger===trigger)!,engine=snapshot.board.engines.find(row=>row.trigger===trigger)!;row.enabled=input.enabled;row.version++;engine.enabled=input.enabled;engine.targetVersion++;engine.contentRevision='revision2';engine.editorContent={timing:input.timing,messageParts:input.messageBubbles.map((bubble:{content:{text:string}})=>({messageType:'text',messageContent:bubble.content.text}))};return {}})
  f.saveForm.mockImplementation(async(_a,_s,_v,definition)=>{snapshot.form={version:snapshot.form.version+1,definition};return snapshot.form})
@@ -28,13 +31,123 @@ beforeEach(()=>{
  f.start.mockImplementation(async(_a,_s,trigger)=>{snapshot.board.engines.find(row=>row.trigger===trigger)!.effectiveSendingStatus='active';return {sendingStatus:'active'}})
  f.notUsing.mockImplementation(async()=>{snapshot.page.setup={notUsing:true,version:1,decidedAt:'2026-11-01'};return snapshot.page.setup})
 })
-afterEach(()=>{cleanup();vi.resetAllMocks()})
+afterEach(()=>{cleanup();sessionStorage.clear();forgetStaffIdentity();vi.resetAllMocks()})
 const card=(trigger:RestaurantFollowupTrigger)=>screen.getByRole('article',{name:FOLLOWUP_NAMES[trigger]})
 async function ready(){render(<LineFollowupV8/>);await screen.findByRole('article',{name:'予約の回答フォーム'})}
 async function edit(trigger:RestaurantFollowupTrigger='reservation_created'){fireEvent.click(within(card(trigger)).getByRole('button',{name:'変える'}));await screen.findByRole('dialog',{name:`${FOLLOWUP_NAMES[trigger]}を変える`})}
 async function text(value:string){const field=screen.getByRole('textbox',{name:'本文'});await act(async()=>{field.textContent=value;fireEvent.input(field)})}
 async function accept(){fireEvent.click(screen.getByRole('button',{name:'この内容でオンにする'}));await waitFor(()=>expect(screen.queryByRole('button',{name:'この内容でオンにする'})).toBeNull())}
 async function save(){fireEvent.click(screen.getByRole('button',{name:'保存して作る'}));await screen.findByRole('dialog',{name:'保存の結果'})}
+
+describe('開店準備の案内', () => {
+ const guideAt = (procedureIndex: number) => ({
+  phase: 'active' as const, stepKey: 'followup', procedureIndex, anchor: null, pausedAnchor: null,
+  start: vi.fn(), startAt: vi.fn(), pause: vi.fn(), resume: vi.fn(), reset: vi.fn(), advanceProcedure: vi.fn(),
+ })
+
+ it('初回はオフで始まり、本文の確定まで一覧を変えず、選んだ送り方だけを保存する', async () => {
+  snapshot.board.engines = []
+  snapshot.page.rows.forEach(row => { row.enabled = false })
+  const guide = guideAt(1)
+  const view = render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await screen.findByRole('article', { name: '予約の回答フォーム' })
+  const toggle = within(card('reservation_created')).getByRole('switch')
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  expect((screen.getByRole('button', { name: '保存して作る' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(toggle)
+  view.rerender(<GuideSharedProvider value={{ guide: { ...guide, procedureIndex: 2 }, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  const body = screen.getByRole('textbox', { name: '本文' })
+  expect(body.closest('[data-guide-anchor="followup.body"]')?.hasAttribute('data-guide-ready')).toBe(true)
+  expect(toggle.getAttribute('aria-checked')).toBe('false')
+  expect(f.initialize).not.toHaveBeenCalled()
+  view.rerender(<GuideSharedProvider value={{ guide: { ...guide, procedureIndex: 3 }, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  expect(screen.getByRole('button', { name: 'この内容でオンにする' }).getAttribute('data-guide-anchor')).toBe('followup.confirm')
+  await accept()
+  expect(toggle.getAttribute('aria-checked')).toBe('true')
+  expect(f.initialize).not.toHaveBeenCalled()
+  await save()
+  expect(f.initialize).toHaveBeenCalledWith('a', 's', expect.arrayContaining([
+   expect.objectContaining({ trigger: 'reservation_created', input: expect.objectContaining({ enabled: true }) }),
+   expect.objectContaining({ trigger: 'reservation_24h', input: expect.objectContaining({ enabled: false }) }),
+  ]))
+  expect(f.test).not.toHaveBeenCalled()
+  expect(f.start).not.toHaveBeenCalled()
+ })
+
+ it.each([2, 3])('手順 %s を再読込すると同じ本文と編集窓を戻す', async index => {
+  snapshot.page.rows[0]!.enabled = false
+  const first = render(<GuideSharedProvider value={{ guide: guideAt(1), summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await screen.findByRole('article', { name: '予約の回答フォーム' })
+  fireEvent.click(within(card('reservation_created')).getByRole('switch'))
+  await text('再読込しても残す本文')
+  fireEvent.click(screen.getByRole('radio', { name: 'きっかけから時間を置いて送る' }))
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'きっかけから待つ時間' }), { target: { value: '15' } })
+  first.unmount()
+
+  const guide = guideAt(index)
+  render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await screen.findByRole('dialog', { name: '予約したときを変える' })
+  const body = screen.getByRole('textbox', { name: '本文' })
+  expect(body.textContent).toContain('再読込しても残す本文')
+  expect((screen.getByRole('spinbutton', { name: 'きっかけから待つ時間' }) as HTMLInputElement).value).toBe('15')
+  expect(within(card('reservation_created')).getByRole('switch').getAttribute('aria-checked')).toBe('false')
+  if (index === 2) expect(body.closest('[data-guide-anchor="followup.body"]')).toBeTruthy()
+  else expect(screen.getByRole('button', { name: 'この内容でオンにする' }).getAttribute('data-guide-anchor')).toBe('followup.confirm')
+  expect(guide.startAt).not.toHaveBeenCalled()
+  expect(f.initialize).not.toHaveBeenCalled()
+  expect(f.saveRow).not.toHaveBeenCalled()
+  expect(f.test).not.toHaveBeenCalled()
+  expect(f.start).not.toHaveBeenCalled()
+ })
+
+ it('確定後の再読込では未保存の内容を手順4へ戻し、利用者が保存するまで登録しない', async () => {
+  snapshot.page.rows[0]!.enabled = false
+  const first = render(<GuideSharedProvider value={{ guide: guideAt(3), summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await screen.findByRole('article', { name: '予約の回答フォーム' })
+  fireEvent.click(within(card('reservation_created')).getByRole('switch'))
+  await text('確定済みの未保存本文')
+  await accept()
+  first.unmount()
+
+  const guide = guideAt(4)
+  render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await waitFor(() => expect(within(card('reservation_created')).getByText('未保存')).toBeTruthy())
+  expect(within(card('reservation_created')).getByRole('switch').getAttribute('aria-checked')).toBe('true')
+  expect(within(card('reservation_created')).getByText('確定済みの未保存本文')).toBeTruthy()
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(f.saveRow).not.toHaveBeenCalled()
+  await save()
+  expect(f.saveRow).toHaveBeenCalledWith('a', 's', 'reservation_created', expect.objectContaining({
+   enabled: true, messageBubbles: [expect.objectContaining({ content: expect.objectContaining({ text: '確定済みの未保存本文' }) })],
+  }))
+  expect(f.test).not.toHaveBeenCalled()
+  expect(f.start).not.toHaveBeenCalled()
+ })
+
+ it('別の保存が先に行われたら、以前の下書きで現在の送り方を上書きしない', async () => {
+  const first = render(<GuideSharedProvider value={{ guide: guideAt(2), summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await screen.findByRole('article', { name: '予約の回答フォーム' })
+  await edit()
+  await text('前の版の本文')
+  first.unmount()
+  snapshot.page.rows[0]!.version++
+
+  const guide = guideAt(3)
+  render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await waitFor(() => expect(guide.startAt).toHaveBeenCalledWith('followup'))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(f.saveRow).not.toHaveBeenCalled()
+ })
+
+ it('途中から開いたときに未保存の編集窓がなければ、最初の案内へ戻す', async () => {
+  const guide = guideAt(3)
+  render(<GuideSharedProvider value={{ guide, summary: null }}><LineFollowupV8 /></GuideSharedProvider>)
+  await waitFor(() => expect(guide.startAt).toHaveBeenCalledWith('followup'))
+  expect(f.initialize).not.toHaveBeenCalled()
+  expect(f.saveRow).not.toHaveBeenCalled()
+ })
+})
+
 describe('8枚のカードと保存',()=>{
  it('状態の応答が欠けた時は画面を壊さず、読み直す理由を出して保存しない',async()=>{f.read.mockResolvedValue({...snapshot,board:{...snapshot.board,engines:undefined}});render(<LineFollowupV8/>);await screen.findByText('送り方の状態を読み込めませんでした。読み直してください');expect(screen.queryByRole('article')).toBeNull();expect(screen.getByRole('button',{name:'読み直す'})).toBeTruthy();expect(f.saveRow).not.toHaveBeenCalled();expect(f.initialize).not.toHaveBeenCalled()})
  it('予約フォームは切り替え無し、残る7枚は実物の中身と状態を表示する',async()=>{await ready();expect(screen.getAllByRole('article')).toHaveLength(8);expect(screen.getAllByRole('switch')).toHaveLength(7);expect(within(screen.getByRole('article',{name:'予約の回答フォーム'})).queryByRole('switch')).toBeNull();expect(within(card('reservation_created')).getByText('予約したときの本文')).toBeTruthy();expect(screen.getAllByText('準備済み・送信停止中')).toHaveLength(2)})
@@ -109,7 +222,7 @@ it('予約の日時の差し込みは日本語で見せ、保存するキーを�
  snapshot.board.engines[0]!.editorContent.messageParts[0]!.messageContent='日時：{{var.reservation_datetime}}';
  await ready();await edit();
  const field=screen.getByRole('textbox',{name:'本文'});
- expect(field.textContent).toContain('予約の時間');expect(field.textContent).not.toContain('reservation_datetime');
+ expect(field.textContent).toContain('予約の日時');expect(field.textContent).not.toContain('reservation_datetime');
  fireEvent.click(screen.getByRole('button',{name:'人数',exact:true}));await accept();await save();
  expect(f.saveRow.mock.calls[0][3].messageBubbles[0].content.text).toContain('{{var.reservation_datetime}}');
 });

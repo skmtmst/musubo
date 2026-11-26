@@ -45,7 +45,7 @@ export async function recoverEcIdentityPending(db: D1Database, now: string): Pro
     LEFT JOIN identity_candidate_decisions c ON c.candidate_id=l.candidate_id AND c.to_status='linked'
       AND c.candidate_version=(SELECT MAX(d.candidate_version) FROM identity_candidate_decisions d WHERE d.candidate_id=l.candidate_id AND d.to_status='linked')
     WHERE e.status='identity_pending' AND (
-      (l.friend_id IS NULL AND EXISTS(SELECT 1 FROM friends f WHERE f.line_user_id=e.line_user_id AND f.line_account_id=e.line_account_id))
+      (l.friend_id IS NULL AND EXISTS(SELECT 1 FROM friends f WHERE f.line_platform_user_id=e.line_user_id AND f.line_account_id=e.line_account_id))
       OR (l.friend_id IS NOT NULL AND json_extract(c.reprocess_scope_json,'$.mode') IN ('analytics_snapshot','non_delivery_actions')
         AND EXISTS(SELECT 1 FROM friends f WHERE f.id=l.friend_id AND f.line_account_id=e.line_account_id)
         AND (json_extract(c.reprocess_scope_json,'$.from') IS NULL OR datetime(json_extract(e.payload,'$.occurred_at'))>=datetime(json_extract(c.reprocess_scope_json,'$.from')))
@@ -55,8 +55,8 @@ export async function recoverEcIdentityPending(db: D1Database, now: string): Pro
   for(const row of rows.results) {
     const scope = JSON.parse(row.reprocess_scope_json??'{"mode":"future_only"}') as {mode:string;from?:string;to?:string};
     const event=JSON.parse(row.payload) as EcEvent;
-    const friend= row.friend_id ? await db.prepare('SELECT id,line_user_id FROM friends WHERE id=? AND line_account_id=?').bind(row.friend_id,row.line_account_id).first<{id:string;line_user_id:string}>()
-      : await db.prepare('SELECT id,line_user_id FROM friends WHERE line_user_id=? AND line_account_id=?').bind(row.line_user_id,row.line_account_id).first<{id:string;line_user_id:string}>();
+    const friend= row.friend_id ? await db.prepare('SELECT id,line_platform_user_id AS line_user_id FROM friends WHERE id=? AND line_account_id=?').bind(row.friend_id,row.line_account_id).first<{id:string;line_user_id:string}>()
+      : await db.prepare('SELECT id,line_platform_user_id AS line_user_id FROM friends WHERE line_platform_user_id=? AND line_account_id=?').bind(row.line_user_id,row.line_account_id).first<{id:string;line_user_id:string}>();
     if(!friend || (row.friend_id && scope.mode==='future_only') || (scope.from && Date.parse(event.occurred_at)<Date.parse(scope.from)) || (scope.to && Date.parse(event.occurred_at)>Date.parse(scope.to))) continue;
     // 本人未確定の処理済み記録で今回の実行まで抑止しないよう、処理の名前空間を分ける。
     const payload={...event,line_user_id:friend.line_user_id};

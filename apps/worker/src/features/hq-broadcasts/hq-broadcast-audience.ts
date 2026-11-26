@@ -69,7 +69,7 @@ export async function countHqAudience(db:D1Database,accountId:string,condition:S
   const where=buildSegmentWhere(condition);
   const result=await db.prepare(`SELECT COALESCE(SUM(${DELIVERY_CONSENT_ALLOWED_SQL}),0) AS count,
     COALESCE(SUM(NOT (${DELIVERY_CONSENT_ALLOWED_SQL})),0) AS consentExcluded FROM friends f WHERE f.line_account_id=? AND COALESCE(f.is_hidden,0)=0
-    AND f.line_user_id IS NOT NULL AND f.line_user_id<>'' AND (${where.sql})`).bind(accountId,...where.bindings).first<{count:number;consentExcluded:number}>();
+    AND f.line_platform_user_id IS NOT NULL AND f.line_platform_user_id<>'' AND (${where.sql})`).bind(accountId,...where.bindings).first<{count:number;consentExcluded:number}>();
   if (!result) throw new Error('audience_count_unavailable');
   return result;
 }

@@ -130,6 +130,22 @@ export const settingsMethods = {
       readiness: { fullDataset: boolean }
     }>>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
   },
+  /**
+   * 設定 › SNS 連携の口（契約枠・主連携・請求の段）。形は `apps/worker/src/routes/sns-connections.ts`。
+   * 契約枠の記録が無い LINEアカウントでは 404 が返る。画面はその場合だけ今までの既定値へ戻す。
+   */
+  snsConnections: {
+    get: (accountId: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').SnsConnectionPorts>>(
+        `/api/settings/sns/connections?${new URLSearchParams({ lineAccountId: accountId })}`,
+      ),
+    /** 主連携を切り替える。版が合わなければ 409（画面は読み直す）。 */
+    setGooglePrimary: (input: import('@line-crm/shared').SetSnsGooglePrimaryInput) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').SetSnsGooglePrimaryResult>>(
+        '/api/settings/sns/google-primary',
+        { method: 'PUT', body: JSON.stringify(input) },
+      ),
+  },
   instagram: {
     // connectionId は操作する接続そのものの id。省略すると既定の1件が相手になるため、
     // 接続が2つ以上あるときは画面で選んだ行の id を必ず渡す。

@@ -5,6 +5,9 @@
 .markDone { background: var(--color-accent-deep); box-shadow: none; color: var(--color-canvas); }
 .stepDoneTitle { color: var(--color-ink-secondary); }
 .bar { flex: 1; min-width: 0; }
+.stepTitle { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.stepTitle > :first-child { min-width: 0; }
+.stepTitle > [data-tone] { flex: none; }
 .stepBody { display: flex; flex-direction: column; gap: var(--tpl-bm-2); min-width: 0; }
 .stepSub, .stepBlocked, .cardLine { color: var(--color-ink-secondary); font-size: var(--text-caption); margin: 0; }
 .bottom { display: flex; align-items: flex-start; gap: var(--polish-space-card); }
@@ -24,7 +27,8 @@
 
 @media (max-width: 900px) {
   .bottom { flex-direction: column; align-items: stretch; }
-  .stepRow[data-step-state] { grid-template-columns: max-content minmax(0, 1fr); height: auto; padding-block: var(--space-8); }
+  .stepRow[data-step-state] { grid-template-columns: max-content minmax(0, 1fr); height: auto; padding-block: var(--space-8); row-gap: var(--space-6); }
+  :global(html:root) :global([data-page-template="settings"]) :global([role="table"][data-list-density-scope="general"]) .stepRow[data-step-state] { height: auto; padding-block: var(--space-8); row-gap: var(--space-6); }
   .stepRow > :last-child { grid-column: 2; justify-self: start; }
-  .stepRow .stepBody span { white-space: normal; }
+  .stepRow .stepBody .stepTitle > :first-child span, .stepRow .stepBody .stepSub span { white-space: normal; }
 }

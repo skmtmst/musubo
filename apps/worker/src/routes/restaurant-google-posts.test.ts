@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { createTestD1, dropCompatIndexes772, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 type MockStaff = {
   id: string;
@@ -924,8 +924,6 @@ describe('接続が2件あるとき（複数接続）', () => {
 
   /** 同じ店舗の2件目の接続。location が違うので一意索引（store_id, location_name）に当たらない。 */
   async function seedSecondConnection(): Promise<void> {
-    // 2件目が入るのは互換索引の無い形（773 適用後）。bootstrap はまだ互換期間の形。
-    dropCompatIndexes772(testDb.raw);
     testDb.raw
       .prepare(
         `INSERT INTO rt_google_connections

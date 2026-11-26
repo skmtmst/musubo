@@ -225,6 +225,38 @@ describe('syncGoogleSheetsIntegration', () => {
     seed(testDb);
   });
 
+  it('同じ出力先が別アカウントにも設定されている間は友だちの行を書き換えない', async () => {
+    const integration = await makeIntegration(testDb);
+    const sheet: FakeSheet = { tabs: new Map() };
+    const initial = makeGoogleFetch(sheet);
+    const first = await syncOneDataType(envFor(testDb), integration, 'friends', {
+      kind: 'manual', now: NOW, fetch: initial.fetch, sleep,
+    });
+    expect(first.status).toBe('ok');
+    const originalRows = structuredClone(sheet.tabs.get('友だち'));
+
+    testDb.raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active)
+      VALUES ('acc-2', 'ch-2', 'A2', 'tok', 'sec', 1);
+      INSERT INTO friends (id, line_user_id, line_account_id, display_name, is_following)
+      VALUES ('other-friend', 'musubo-scope:other-friend:U001', 'acc-2', '店舗2の表示名', 0);
+      INSERT INTO google_sheets_integrations (id, line_account_id, refresh_token_enc, status, spreadsheet_id)
+      SELECT 'int-2', 'acc-2', refresh_token_enc, 'connected', spreadsheet_id
+        FROM google_sheets_integrations WHERE id = 'int-1';
+    `);
+    const other = (await testDb.db.prepare('SELECT * FROM google_sheets_integrations WHERE id = ?')
+      .bind('int-2').first<GoogleSheetsIntegrationRow>())!;
+    const shared = makeGoogleFetch(sheet);
+    const run = await syncOneDataType(envFor(testDb), other, 'friends', {
+      kind: 'manual', now: NOW, fetch: shared.fetch, sleep,
+    });
+    expect(run).toEqual({ dataType: 'friends', status: 'error', rowsWritten: 0, error: 'friends_target_shared' });
+    expect(shared.calls).toEqual([]);
+    expect(sheet.tabs.get('友だち')).toEqual(originalRows);
+    expect(testDb.raw.prepare('SELECT status, error FROM google_sheets_sync_runs WHERE integration_id = ?').get('int-2'))
+      .toEqual({ status: 'error', error: 'friends_target_shared' });
+  });
+
   it('初回は全件バックフィルしてタブとヘッダを作る', async () => {
     const integration = await makeIntegration(testDb);
     const sheet: FakeSheet = { tabs: new Map() };

@@ -1,4 +1,5 @@
-import { jstNow } from '@line-crm/db';
+import { encodeScopedFriendLineUserId, jstNow } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 import type {
   FollowerImportClient,
@@ -7,14 +8,7 @@ import type {
 } from './follower-import-state.js';
 
 const LINE_USER_ID_PATTERN = /^U[0-9a-f]{32}$/;
-// `WHERE line_user_id IN (?, ?, ...)` の ? の数。D1 が 1 文に受け付ける
-// バインド変数は 100 個までなので、他の条件を足す余地を見て 90 に抑えている。
-// **この数はこの SQL 文の形に紐づく。** 文に条件を足すときは一緒に減らす。
-const LOOKUP_CHUNK_SIZE = 90;
-// db.batch にまとめて渡す **文の数**。上の 90 とは別の理由で決まる。
-// batch は文ごとに独立してバインドするので、変数 100 個の制限には当たらない。
-// ここは 1 回のトランザクションをどこまで大きくするかの話で、
-// 大きすぎると失敗したときに巻き戻る範囲が広くなる。
+// db.batch にまとめる文の上限。ID 取り込みは 1 人につき 2 文を使う。
 const WRITE_CHUNK_SIZE = 100;
 // LINE のプロフィール取得は 1 人ずつしか引けない（まとめて引く API が無い）。
 // 以下の 2 つは「1 回の実行でどこまで進めるか」を決める数で、
@@ -35,12 +29,6 @@ const PROFILE_CONCURRENCY = 12;
 // 「まだ display_name が NULL の人」だけをもう一度引き直す。
 // 引けた人は NULL でなくなるので、巡回のたびに対象は減る。
 const PROFILE_MAX_PASSES = 3;
-
-interface ExistingFriend {
-  line_user_id: string;
-  line_account_id: string | null;
-  is_following: number;
-}
 
 function chunks<T>(items: T[], size: number): T[][] {
   const result: T[][] = [];
@@ -83,83 +71,43 @@ export async function importIdPage(
   const validIds = [...new Set(receivedIds.filter((id) => LINE_USER_ID_PATTERN.test(id)))];
   const invalid = receivedIds.filter((id) => !LINE_USER_ID_PATTERN.test(id)).length;
 
-  const existingById = new Map<string, ExistingFriend>();
-  for (const group of chunks(validIds, LOOKUP_CHUNK_SIZE)) {
-    const placeholders = group.map(() => '?').join(',');
-    const scopedRows = await db
-      .prepare(
-        `SELECT line_user_id, line_account_id, is_following
-           FROM friends
-          WHERE line_account_id = ?
-            AND line_user_id IN (${placeholders})`,
-      )
-      .bind(lineAccountId, ...group)
-      .all<ExistingFriend>();
-    for (const row of scopedRows.results ?? []) existingById.set(row.line_user_id, row);
-
-    // C-2bまでは、未割当行や別アカウント行を従来どおり競合として扱う。
-    // 指定アカウントで見つからなかったIDだけ無指定検索へフォールバックする。
-    const unresolved = group.filter((lineUserId) => !existingById.has(lineUserId));
-    if (unresolved.length > 0) {
-      const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
-      const fallbackRows = await db
-        .prepare(
-          `SELECT line_user_id, line_account_id, is_following
-             FROM friends
-            WHERE line_user_id IN (${unresolvedPlaceholders})`,
-        )
-        .bind(...unresolved)
-        .all<ExistingFriend>();
-      for (const row of fallbackRows.results ?? []) existingById.set(row.line_user_id, row);
-    }
-  }
-
-  const writableIds: string[] = [];
-  for (const lineUserId of validIds) {
-    const existing = existingById.get(lineUserId);
-    if (!existing) {
-      state.imported += 1;
-      writableIds.push(lineUserId);
-    } else if (existing.line_account_id === null) {
-      state.claimedUnassigned += 1;
-      writableIds.push(lineUserId);
-    } else if (existing.line_account_id !== lineAccountId) {
-      // C-2b: 複合一意制約へ移行したら、競合ではなくこのアカウント用の行を取り込む。
-      state.conflicts += 1;
-    } else if (existing.is_following === 0) {
-      state.reactivated += 1;
-      writableIds.push(lineUserId);
-    } else {
-      state.alreadyPresent += 1;
-    }
-  }
-
-  // ここも所有権を条件に入れる。この文が書くのはプロフィール NULL の新規行と
-  // 「未割当だった行の割り当て」だけで、ON CONFLICT 側の WHERE が
-  // 「すでにこのアカウントで is_following = 1」の行を弾くので、新しい表示名を
-  // 壊すことはない。それでも条件を付けるのは「期限切れの旧実行は friends に
-  // 何も書けない」という一本の約束にしておくため。
-  // VALUES のままでは条件を足せないので SELECT ... WHERE EXISTS の形にする
-  // （SQLite は upsert を付けるとき SELECT 側に WHERE を要求する）。
+  const counts = { imported: 0, claimedUnassigned: 0, reactivated: 0, alreadyPresent: 0 };
   const now = jstNow();
-  for (const group of chunks(writableIds, WRITE_CHUNK_SIZE)) {
-    await db.batch(group.map((lineUserId) =>
-      db.prepare(
-        `INSERT INTO friends
-           (id, line_user_id, display_name, picture_url, status_message,
-            is_following, line_account_id, created_at, updated_at)
-         SELECT ?, ?, NULL, NULL, NULL, 1, ?, ?, ?
-          WHERE ${guard.sql}
-         ON CONFLICT(line_user_id) DO UPDATE SET
-           line_account_id = COALESCE(friends.line_account_id, excluded.line_account_id),
-           is_following = 1,
-           updated_at = excluded.updated_at
-         WHERE (friends.line_account_id IS NULL OR friends.line_account_id = excluded.line_account_id)
-           AND (friends.line_account_id IS NULL OR friends.is_following != 1)`,
-      ).bind(crypto.randomUUID(), lineUserId, lineAccountId, now, now, ...guard.binds()),
-    ));
+  for (const group of chunks(validIds, WRITE_CHUNK_SIZE / 2)) {
+    const proposed = group.map((lineUserId) => ({ id: crypto.randomUUID(), lineUserId }));
+    // 未割当行の取得とアカウント内の追加は同じトランザクションで行う。
+    // 先行して他店が取得した行には触れず、対象アカウントの行を作る。
+    const results = await db.batch<{ id: string }>(proposed.flatMap(({ id, lineUserId }) => [
+      db.prepare(`UPDATE friends SET line_account_id = ?, is_following = 1, updated_at = ?
+        WHERE line_account_id IS NULL AND line_platform_user_id = ?
+          AND EXISTS (SELECT 1 FROM line_accounts WHERE id = ? AND COALESCE(tenant_id, ?) = ?)
+          AND NOT EXISTS (SELECT 1 FROM friends scoped WHERE scoped.line_account_id = ?
+            AND scoped.line_platform_user_id = ?)
+          AND ${guard.sql}`,
+      ).bind(lineAccountId, now, lineUserId, lineAccountId, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID,
+        lineAccountId, lineUserId, ...guard.binds()),
+      db.prepare(`INSERT INTO friends (id, line_user_id, is_following, line_account_id, created_at, updated_at)
+        SELECT ?, ?, 1, ?, ?, ? WHERE ${guard.sql}
+        ON CONFLICT(line_account_id, line_platform_user_id) DO UPDATE SET
+          is_following = 1, updated_at = excluded.updated_at
+        WHERE friends.is_following = 0
+        RETURNING id`,
+      ).bind(id, encodeScopedFriendLineUserId(id, lineUserId, lineAccountId), lineAccountId, now, now, ...guard.binds()),
+    ]));
+    if (results.every((result) => result.meta.changes === 0) && !(await guard.stillOwned())) return;
+    for (const [index, { id }] of proposed.entries()) {
+      const saved = results[index * 2 + 1]?.results?.[0];
+      if (results[index * 2]?.meta.changes === 1) counts.claimedUnassigned += 1;
+      else if (saved?.id === id) counts.imported += 1;
+      else if (saved) counts.reactivated += 1;
+      else counts.alreadyPresent += 1;
+    }
   }
 
+  state.imported += counts.imported;
+  state.claimedUnassigned += counts.claimedUnassigned;
+  state.reactivated += counts.reactivated;
+  state.alreadyPresent += counts.alreadyPresent;
   state.received += receivedIds.length;
   state.invalid += invalid;
   state.cursor = typeof page.next === 'string' && page.next ? page.next : null;
@@ -199,7 +147,7 @@ export async function hydrateProfilePage(
 ): Promise<HydratePageResult> {
   const take = Math.max(1, Math.min(PROFILE_PAGE_SIZE, limit));
   const rows = await db.prepare(
-    `SELECT id, line_user_id
+    `SELECT id, line_platform_user_id AS line_user_id
        FROM friends
       WHERE line_account_id = ?
         AND is_following = 1
@@ -251,10 +199,10 @@ export async function hydrateProfilePage(
         return db.prepare(
           `UPDATE friends
               SET display_name = ?, picture_url = ?, status_message = ?, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND line_account_id = ? AND is_following = 1 AND display_name IS NULL
               AND ${guard.sql}`,
         ).bind(
-          profile.displayName, profile.pictureUrl, profile.statusMessage, now, row.id,
+          profile.displayName, profile.pictureUrl, profile.statusMessage, now, row.id, lineAccountId,
           ...guard.binds(),
         );
       }));

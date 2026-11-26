@@ -10,6 +10,8 @@
   color: var(--color-ink); background: var(--color-board-tint);
 }
 :global(:root) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+/* 比較・分析は見出しから下端まで同じ地にする。 */
+:global(:root) .frame[data-template-layout='store-comparison'] { background: var(--color-canvas); }
 :global(:root) .frame:is([data-template-layout='event-list'], [data-template-layout='event-roster'], [data-template-layout='distribution']) {
   --tpl-head-pad-top: var(--space-16);
   --tpl-head-pad-bottom: var(--space-8);
@@ -57,13 +59,15 @@
 :global(:root) .main { min-width: 0; flex: 1; }
 /* 表の塊は白。フォルダの列は板の地のまま。 */
 :global(:root) .split > .main:has([data-shared-part='list-table']) { background: var(--color-canvas); }
+/* カードを載せる本文は、表があっても板と同じ地にする。 */
+:global(:root) .split > .main[data-content-surface='board'] { background: var(--color-board-tint); }
 /* ：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global(:root) .folders + .main { border-left: 0; }
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global(:root) .toolbar:is([data-toolbar-spacing='section'], [data-toolbar-spacing='stats']) { padding-block: var(--polish-space-card); }
-/* 題から最初の道具・数の帯までは道具側の余白だけ。間にタブ・帯・閲覧案内がある板は対象外。 */
-:global(:root) .frame > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]):not(:has(> [data-kpi-strip])) { padding-top: 0; }
+/* 比較・分析だけは見出しと操作の間に余白を残す。 */
+:global(:root) .frame:not([data-template-layout='store-comparison']) > .heading + .listBody > .split:first-child > .main > .toolbar:first-child:not([data-collapsed-only]):not(:has(> [data-kpi-strip])) { padding-top: 0; }
 :global(:root) .toolbar[data-notice-spacing='section'] { row-gap: var(--polish-space-card); }
 :global(:root) .toolbar[data-explanation-only] { padding-bottom: 0; }
 :global(:root) .toolbar[data-toolbar-row-gap='card'] { row-gap: var(--polish-space-card); }
@@ -166,6 +170,8 @@
 :global(:root) .inboxList { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 :global(:root) .conversation { position: relative; min-height: 0; overflow: hidden; }
 :global(:root) .inboxMessages { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; padding: var(--tpl-inbox-thread-pad); background: var(--color-shell); }
+/* 頭の下の右端に浮かせた「会話の中を探す」の下へ吹き出しを潜らせない。ボタンの幅と右の余白・間の分だけ右を空ける。 */
+:global(:root) .inboxMessages { padding-inline-end: calc(var(--tpl-inbox-chead-search-right) + var(--tpl-inbox-chead-ctl) + var(--tpl-inbox-chead-gap)); }
 /* 枠の強調で会話の高さを変えず、検索の移動位置を保つ。 */
 .inboxMessages :global([data-search-hit='current']) { box-shadow: var(--tpl-inbox-search-hit-current); }
 .inboxMessages :global([data-search-hit='other']) { box-shadow: var(--tpl-inbox-search-hit-other); }
@@ -308,6 +314,7 @@
 :global(:root) .frame[data-has-footer] > .settingsFlow > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
+:global(:root) .footer[data-shadow-inset] { margin-inline: calc(var(--polish-space-section) * 2); margin-bottom: calc(var(--polish-space-section) * 2 + var(--space-8)); }
 /* 帯の位置は保ち、入力のスクロール領域は帯の上までに収める。 */
 :global(:root) .footer[data-footer-placement='floating'] {
   margin-top: 0;
@@ -337,6 +344,8 @@
   width: var(--tpl-preview-content-width); flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; gap: var(--polish-space-field);
 }
+/* 見え方の欄を送っても、端末の切り替えが欄の上端に残る。上の手順の帯には重ねない。 */
+:global(:root) [data-page-template="create"][data-has-footer] .previewContent > :has(> :global([aria-label="プレビューの端末"])) { position: sticky; top: 0; z-index: 1; background: var(--color-canvas); }
 /* 設定カードは欄の幅を使う。端末の見本は自身の幅を保つ。 */
 :global(:root) .previewContent > :global([data-card-variant='aside']) { width: 100%; align-self: stretch; }
 :global(:root) [data-page-template='create'][data-has-footer] .createContent > *,
@@ -437,6 +446,14 @@
 .detailColumns[data-presentation='notification'] { grid-template-columns: minmax(0, 1fr) var(--tpl-hb2-op-side-w); gap: var(--tpl-hb2-op-gap); margin-right: 0; }
 .detailColumns[data-presentation='notification'] .detailColumnMain { gap: var(--tpl-hb2-op-col-gap); }
 .detailColumns[data-presentation='notification'] .detailColumnAside { display: flex; flex-direction: column; gap: var(--tpl-hb2-op-col-gap); padding-left: 0; border-left: 0; }
+.detailColumns[data-detail-columns='followup-editor'] { margin-right: 0; }
+/* ダイアログはページコンテナの外に描画される。画面幅に合わせて見本を開閉する。 */
+@media (width < 1152px) {
+  .detailColumns[data-detail-columns='followup-editor'] { width: 100%; grid-template-columns: minmax(0, 1fr); gap: var(--tpl-body-pad); }
+  .detailColumns[data-detail-columns='followup-editor'] .detailColumnToggle { display: block; }
+  .detailColumns[data-detail-columns='followup-editor'] .detailColumnAside { display: none; grid-row: 2; min-height: 0; padding-left: 0; border-left: 0; }
+  .detailColumns[data-detail-columns='followup-editor'] .detailColumnAside[data-expanded] { display: block; }
+}
 @container v8-page (max-width: 1099px) {
   .detailColumns, .detailColumns[data-detail-columns^='restaurant-'] { grid-template-columns: minmax(0, 1fr); margin-right: 0; gap: var(--tpl-body-pad); }
   .detailColumns:is([data-presentation='card'], [data-presentation='notification']) { grid-template-columns: minmax(0, 1fr); }
@@ -538,6 +555,7 @@
 /* ：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
+:global(:root) .listBody .toolbar[data-collapsed-only] { padding-inline: 0; margin-inline: var(--tpl-list-inset); }
 /* 画面が道具の段を本文の直下に置いたとき（中身と一緒に読み込む一覧）も、型の道具の段と同じ余白にする。本文は表のために左右 0。 */
 :global(:root) .listBody .content > :global([data-shared-part='list-toolbar']) { box-sizing: border-box; padding: var(--tpl-toolbar-pad-block) var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
@@ -632,6 +650,8 @@
   .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnToggle { display: flex; }
   .detailColumns:is([data-detail-columns='style-dashboard'], [data-detail-columns='style-roster']) .detailColumnAside { display: none; flex-basis: auto; inline-size: auto; }
   .detailColumns[data-detail-columns='style-dashboard'] .detailColumnAside[data-expanded] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  /* 補助欄の中身が1つ（1枚のカード・日の一覧）なら、2列の片側に寄せず横いっぱいに置く。 */
+  .detailColumns[data-detail-columns='style-dashboard'] .detailColumnAside[data-expanded] > :only-child { grid-column: 1 / -1; }
   .detailColumns[data-detail-columns='style-roster'] .detailColumnAside[data-expanded] { display: flex; }
 }
 
@@ -719,3 +739,16 @@
 }
 
 :global(:root) .titleRow:has([data-help-reserving]) { align-items: flex-start; }
+
+@media (min-width: 1024px) {
+  :global(:root) .inboxSummaryPane:not([data-wide]) { top: 184px; bottom: 240px; height: auto; }
+}
+
+:global(:root) .inboxBack { flex: none; padding: var(--space-8) var(--space-16); }
+:global(:root) .inbox[data-inbox-narrow="list"] .inboxList { display: flex; width: 100%; border-right: 0; }
+:global(:root) .inbox[data-inbox-narrow="list"] .conversation,
+:global(:root) .inbox[data-inbox-narrow="list"] .inboxSummaryPane { display: none; }
+:global(:root) .inbox[data-inbox-narrow="detail"] .inboxList { display: none; }
+
+:global(:root) [data-template-layout='record-detail'] > .split[data-detail-separators='none'] { border-top: 0; }
+:global(:root) .preview[data-detail-separators='none'] { border-left: 0; }

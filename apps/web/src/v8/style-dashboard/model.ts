@@ -88,6 +88,11 @@ export interface StyleBoard {
 }
 
 export interface StyleSideRow { label: string; value: string; tone?: 'danger' }
+/**
+ * 右の列の新着予約の1行。来店の日時・名前・人数（飲食だけ）・予約の経路（口の生の値。空なら経路を返さない口）。
+ * sourceName は経路の札の名前（飲食は予約台帳と同じ言葉）。無い時は共通の札の言葉で出す。
+ */
+export interface StyleSideBooking { id: string; when: string; name: string; people: number | null; source: string; sourceName?: string }
 export interface StyleSideCard {
   id: string
   title: string
@@ -96,6 +101,12 @@ export interface StyleSideCard {
   rows: StyleSideRow[]
   action?: { label: string; icon?: 'send' | 'line' } | null
   more?: { label: string; href: string } | null
+  /** 「今日の確認」で閉じている時に見出しの下へ出す要約。tone は注意が要る中身があるときだけ。empty は中身が無い（なし・—）時で灰色に出す。 */
+  summary?: { text: string; tone?: 'danger' | 'warning'; empty?: boolean }
+  /** 新着予約の本当の件数。表示する行の数（まだありませんの1行を含む）で数えない。 */
+  count?: number
+  /** 新着予約の代表の行（予約が入った新しい順）。 */
+  bookings?: StyleSideBooking[]
 }
 
 export interface StyleWeekDay { date: string; label: string; sub: string; closed?: boolean; today?: boolean }

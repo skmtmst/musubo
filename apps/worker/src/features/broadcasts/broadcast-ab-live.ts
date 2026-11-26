@@ -45,7 +45,7 @@ export async function startAbLive(db:D1Database,id:string,expectedVersion:number
  for(let i=0;i<rows.length;i+=100){const chunk=rows.slice(i,i+100);statements.push(db.prepare("INSERT INTO broadcast_ab_live_recipients(broadcast_id,friend_id,variant_key,state) SELECT ?,json_extract(value,'$.id'),json_extract(value,'$.key'),'pending' FROM json_each(?)").bind(id,JSON.stringify(chunk)));}
  statements.push(clearAssertions(db));
  try{await db.batch(statements);}catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw new GapError('version_conflict',409);throw e;}
- const lineUsers=new Map((await db.prepare(`SELECT id,line_user_id FROM friends WHERE line_account_id=(SELECT line_account_id FROM broadcasts WHERE id=?) AND id IN (SELECT friend_id FROM broadcast_ab_live_recipients WHERE broadcast_id=?)`).bind(id,id).all<{id:string;line_user_id:string|null}>()).results.map(r=>[r.id,r.line_user_id]));
+ const lineUsers=new Map((await db.prepare(`SELECT id,line_platform_user_id AS line_user_id FROM friends WHERE line_account_id=(SELECT line_account_id FROM broadcasts WHERE id=?) AND id IN (SELECT friend_id FROM broadcast_ab_live_recipients WHERE broadcast_id=?)`).bind(id,id).all<{id:string;line_user_id:string|null}>()).results.map(r=>[r.id,r.line_user_id]));
  for(const variantKey of ['A','B'] as const){
   const targets=rows.filter(x=>x.key===variantKey);
   const unavailable=targets.filter(x=>!lineUsers.get(x.id)).map(x=>x.id);

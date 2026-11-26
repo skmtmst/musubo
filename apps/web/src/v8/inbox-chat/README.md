@@ -35,6 +35,10 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [customer-panel-react.test.tsx](customer-panel-react.test.tsx)
 - [deep-link-react.test.tsx](deep-link-react.test.tsx)
 - [head-menus.test.tsx](head-menus.test.tsx)
+- [inbox-reply-composer-inserts.test.tsx](inbox-reply-composer-inserts.test.tsx)（返信欄の差し込み：テンプレートを入れた後の札・札を消す・カーソル・コピー・送る値は {{…}} のまま・送るとこうなりますの改行と「入りません」・全文の窓・入らない差し込みの知らせ）
+- [send-preview.test.tsx](send-preview.test.tsx)（全文の窓は相手・本文・結果が変わったら閉じ、戻っても開き直さない）
+- [chat-inserts.test.ts](chat-inserts.test.ts)（入らない差し込みの知らせと送信を止めた時の文：札の名前・理由を言い切らない・生の記号を出さない）
+- [use-reservation-warning.test.tsx](use-reservation-warning.test.tsx)（送るとこうなりますの取得：未解決の全部・確かめられない時・遅れた応答）
 - [manual-send-path.test.ts](manual-send-path.test.ts)
 - [mobile-talk-screen.test.tsx](mobile-talk-screen.test.tsx)（電話の画面：1 回だけ送る・失敗の後に同じキー・閲覧のみ・別のアカウント・権限）
 - [rules-popover.test.tsx](rules-popover.test.tsx)

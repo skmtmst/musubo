@@ -228,7 +228,9 @@ describe('停止由来の引き継ぎ (N-244差戻・実DB)', () => {
   }
 
   function friendRow(userId: string) {
-    return dbs.raw.prepare('SELECT * FROM friends WHERE line_user_id = ?').get(userId) as Record<string, unknown>;
+    return dbs.raw.prepare(`SELECT id, ref_code, metadata FROM friends
+      WHERE line_account_id = 'acc1' AND line_platform_user_id = ?`)
+      .get(userId) as { id: string; ref_code: string | null; metadata: string | null };
   }
 
   function lastEvent() {

@@ -622,7 +622,7 @@ export async function getNotificationDeliveryForRetry(
   return db.prepare(`
     SELECT d.id, d.line_account_id, d.status, d.retryable, d.attempts,
            d.idempotency_key, d.version, d.channel, d.recipient_type, d.recipient_id,
-           f.line_user_id, v.line_template_json,
+           f.line_platform_user_id AS line_user_id, v.line_template_json,
            f.is_following AS friend_is_following,
            (SELECT oa.action FROM operation_audit oa
              WHERE oa.target_kind = 'notification_delivery' AND oa.target_id = d.id

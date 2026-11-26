@@ -10,9 +10,9 @@ import AppShell from './app-shell'
  * 設定の中のメニューは付けない。どちらも認証と全 gate は保つ。
  */
 const route = vi.hoisted(() => ({ pathname: '/accounts/new', theme: 'v7' as 'v7' | 'v8' }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', async () => ({
+  ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => route.pathname,
-  useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {}, prefetch: () => {} }),
 }))
 vi.mock('./layout/sidebar', () => ({ default: () => <aside data-test="sidebar" /> }))
 vi.mock('./layout/settings-inner-nav', () => ({

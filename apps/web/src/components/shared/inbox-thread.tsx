@@ -16,7 +16,8 @@ export function InboxMessage({ outgoing, last, time, onQuote, onCorrect, searchH
   onCorrect?: () => void
   sendStatus?: 'sending' | 'sent'; searchHit?: string | null; senderName?: string | null; autoLabel?: string | null; children: ReactNode
 }) {
-  const meta = <span className={styles.meta}><span className={styles.delivery}><time>{time}</time>{outgoing && sendStatus ? <span role="status">{sendStatus === 'sending' ? '送信中…' : '送信済み'}</span> : null}</span>{onQuote ? <button type="button" data-inbox-v6="quote-reply" className={styles.quoteBtn} onClick={onQuote}>引用</button> : null}{onCorrect ? <button type="button" data-inbox-v6="correct-message" className={styles.quoteBtn} onClick={onCorrect}>訂正を送る</button> : null}</span>
+  const actions = onQuote || onCorrect ? <span className={styles.actions}>{onQuote ? <button type="button" data-inbox-v6="quote-reply" className={styles.quoteBtn} onClick={onQuote}>引用</button> : null}{onCorrect ? <button type="button" data-inbox-v6="correct-message" className={styles.quoteBtn} onClick={onCorrect}>訂正を送る</button> : null}</span> : null
+  const meta = <span className={styles.meta}>{outgoing ? actions : null}<span className={styles.delivery}><time>{time}</time>{outgoing && sendStatus ? <span role="status">{sendStatus === 'sending' ? '送信中…' : '送信済み'}</span> : null}</span>{!outgoing ? actions : null}</span>
   const bubble = <div className={outgoing ? styles.bubbleOut : styles.bubbleIn} data-search-hit={searchHit ?? undefined}>{children}</div>
   return <div className={outgoing ? styles.rowOut : styles.rowIn} data-last={last || undefined}>
     {outgoing ? <div className={styles.outCol}><div className={styles.outLine}>{meta}{bubble}</div>

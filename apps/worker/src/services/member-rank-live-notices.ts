@@ -6,10 +6,10 @@ type Transmit=(input:{accountId:string;friendId:string;noticeId:string;to:string
 
 /** 送信直前の判定。同意の読取と停止の判定を予約のたびにやり直す。 */
 async function candidate(db:D1Database,id:string,now:Date):Promise<Candidate|null>{
- return db.prepare(`SELECT n.id,n.account_id,n.friend_id,f.line_user_id,n.scheduled_at,n.status,n.messages_json original_messages,n.base_messages_json base_messages,
+ return db.prepare(`SELECT n.id,n.account_id,n.friend_id,f.line_platform_user_id AS line_user_id,n.scheduled_at,n.status,n.messages_json original_messages,n.base_messages_json base_messages,
  CASE WHEN NOT EXISTS(SELECT 1 FROM member_rank_programs p WHERE p.account_id=n.account_id AND p.status='active' AND CASE WHEN n.kind='upgrade' THEN p.notify_upgrade ELSE p.notify_downgrade END=1) THEN 'skipped_disabled'
  WHEN julianday(?)>julianday(n.scheduled_at,'+3 hours') THEN 'skipped_late'
- WHEN f.id IS NULL OR f.is_following<>1 OR f.is_hidden=1 OR f.line_user_id IS NULL OR trim(f.line_user_id)='' THEN 'skipped_blocked'
+ WHEN f.id IS NULL OR f.is_following<>1 OR f.is_hidden=1 OR f.line_platform_user_id IS NULL OR trim(f.line_platform_user_id)='' THEN 'skipped_blocked'
  WHEN EXISTS(SELECT 1 FROM friend_delivery_consents c WHERE c.friend_id=n.friend_id AND c.line_account_id=n.account_id AND c.purpose IN('notice','notification') AND c.state='revoked') THEN 'skipped_opted_out'
  WHEN n.kind='downgrade_warning' AND NOT EXISTS(SELECT 1 FROM member_ranks r WHERE r.account_id=n.account_id AND r.friend_id=n.friend_id AND r.downgrade_due_at=n.change_key) THEN 'cancelled'
  ELSE NULL END gate,

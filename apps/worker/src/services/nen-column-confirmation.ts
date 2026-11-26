@@ -14,8 +14,8 @@ const BASE_SQL = `SELECT json_object('campaign_key',campaign_key,'label',label,'
   'trigger_event',trigger_event,'delay_days',delay_days,'delivery_time',delivery_time,'is_enabled',is_enabled,
   'title',title,'body_text',body_text,'button_label',button_label,'button_url',button_url,
   'image_url',image_url,'updated_at',updated_at) AS value FROM nen_campaign_settings WHERE campaign_key='column'`;
-const AUDIENCE_SQL = `SELECT f.id,f.line_user_id FROM friends f
-  WHERE f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (${DELIVERY_CONSENT_ALLOWED_SQL}) AND f.line_user_id IS NOT NULL AND trim(f.line_user_id)<>''
+const AUDIENCE_SQL = `SELECT f.id,f.line_platform_user_id AS line_user_id FROM friends f
+  WHERE f.line_account_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND (${DELIVERY_CONSENT_ALLOWED_SQL}) AND f.line_platform_user_id IS NOT NULL AND trim(f.line_platform_user_id)<>''
   AND (? != 'tag' OR EXISTS(SELECT 1 FROM friend_tags ft WHERE ft.friend_id=f.id AND ft.tag_id=?))
   AND NOT EXISTS(SELECT 1 FROM nen_delivery_jobs j WHERE j.campaign_key='column' AND j.friend_id=f.id AND j.source_key=?)`;
 

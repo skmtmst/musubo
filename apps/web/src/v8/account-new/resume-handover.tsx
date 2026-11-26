@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
+import LineAccountEntryGate from '@/components/line-account-entry-gate'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
@@ -16,8 +17,7 @@ import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import Step5Completion from './step5-completion'
 import { handoverProgress, latestFollowerImportState } from './logic'
-import { registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
-import { REGISTRATION_STYLE_KEY } from './use-registration-style'
+import { REGISTRATION_STYLE_KEY, registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
 import styles from './register.module.css'
 
 const LABELS = ['事前確認', 'アカウント接続', '接続確認', '使い方を選ぶ', '完了'] as const
@@ -28,9 +28,15 @@ const STYLE_LABELS: Record<string, string> = {
 /** 統括から戻っても、登録時と同じ進捗カードで保存済みのジョブを再開する。 */
 export default function ResumeFollowerHandover() {
   usePageTitle('LINEアカウントを登録')
-  const router = useRouter()
   const accountId = useSearchParams().get('accountId') ?? ''
-  useStaffRole()
+  return <LineAccountEntryGate key={accountId} accountId={accountId} allowHandover>
+    <FollowerHandover accountId={accountId} />
+  </LineAccountEntryGate>
+}
+
+function FollowerHandover({ accountId }: { accountId: string }) {
+  const router = useRouter()
+  const canAdvance = canManageRole(useStaffRole())
   const choiceKey = registrationImportChoiceKey(registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity()), accountId)
   const { accounts, setSelectedAccountId } = useAccount()
   const account = accounts.find((item) => item.id === accountId)
@@ -78,7 +84,7 @@ export default function ResumeFollowerHandover() {
   }, [accountId])
 
   useEffect(() => {
-    if (!running || !accountId) return
+    if (!running || !accountId || !canAdvance) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const advance = async () => {
@@ -100,7 +106,7 @@ export default function ResumeFollowerHandover() {
     }
     void advance()
     return () => { active = false; if (timer) clearTimeout(timer) }
-  }, [accountId, running])
+  }, [accountId, canAdvance, running])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)

@@ -9,6 +9,14 @@ const payload = (code: string) => ({ success: false, data: { currentVersion: 4 }
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('管理画面の共通失敗契約', () => {
+  it('未解決の差し込みだけは安全な変数名を残し、本文や余分なデータを渡さない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: false, code: 'UNRESOLVED_TEMPLATE_VARIABLES',
+      data: { variables: ['var.guest_count', 'var.closure_datetime', '<script>secret</script>'], content: '非公開の本文' },
+    }), { status: 400 })))
+    const error = await fetchApi('/api/chats/test/send', { method: 'POST', body: '{}' }).catch(e => e)
+    expect(error).toMatchObject({ status: 400, code: 'UNRESOLVED_TEMPLATE_VARIABLES', data: { variables: ['var.guest_count', 'var.closure_datetime'] } })
+  })
   it.each([400, 409, 422, 429, 502])('HTTP %iの状態・コード・追跡・待機・機械データを保つ', async status => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload('VERSION_CONFLICT')), {
       status, headers: { 'Retry-After': '60', 'X-Request-ID': id },

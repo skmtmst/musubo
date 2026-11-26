@@ -83,7 +83,7 @@ events.get('/api/events/admin/events/:id/bookings', async (c) => {
     .prepare(
       `SELECT b.*,
               s.starts_at AS slot_starts_at, s.ends_at AS slot_ends_at,
-              f.display_name AS friend_display_name, f.line_user_id AS friend_line_user_id
+              f.display_name AS friend_display_name, f.line_platform_user_id AS friend_line_user_id
          ${fromWhere}
         ORDER BY b.requested_at DESC, b.id DESC
         LIMIT ? OFFSET ?`,

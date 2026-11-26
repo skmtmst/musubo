@@ -6,7 +6,7 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-e1-form-gap);
+  gap: var(--tpl-e1-gap-l);
 }
 
 .field {
@@ -173,4 +173,21 @@
 
 .cardsWrap > fieldset {
   width: 100%;
+}
+
+.floorGroups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-l);
+}
+
+.contactRow, .peopleDateRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-e1-gap-l);
+  align-items: start;
+}
+
+.peopleDateRow {
+  grid-template-columns: minmax(0, 1fr) auto;
 }

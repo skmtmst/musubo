@@ -48,6 +48,10 @@ pnpm --dir packages/db generate:bootstrap   # bootstrap.sql と bootstrap-meta.j
 
 ## いま置いてあるもの
 
-| ファイル | 当てる時期 |
-| --- | --- |
-| `773_sns_multi_connections_drop_compat.sql` | 772 を当て、接続IDで読み書きする新しい Worker を配り終えて既存接続の互換性を確かめた後 |
+ありません。
+
+### 済んだもの
+
+| ファイル | 移した日 | 移す条件 |
+| --- | --- | --- |
+| `773_sns_multi_connections_drop_compat.sql` | 2026-11-24 | 共有検証D1へ 772 だけを当て、接続IDで読み書きする新しい Worker と Web を配備し、既存接続の互換性を確かめた（上の1〜3）。`packages/db/migrations/` へ移したので、次の Worker 配備は 773 を当ててからになる（上の4〜5） |

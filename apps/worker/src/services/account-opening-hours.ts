@@ -1,4 +1,5 @@
 import type { GoogleProfile } from './google-business-profile.js';
+import { primaryGoogleConnection } from './google-connection-primary.js';
 import { connectedGoogleProfile, googleOpeningDay, googleOpeningWeek } from './restaurant-google-hours-source.js';
 
 /** One LINE account maps to one Google location. An invalid connected snapshot never falls back to old hours. */
@@ -8,14 +9,14 @@ export type AccountOpeningHours =
   | { source: 'google_unavailable'; profile: null };
 
 export async function accountOpeningHours(db: D1Database, accountId: string): Promise<AccountOpeningHours> {
-  const row = await db.prepare(`SELECT s.id AS store_id,c.status
-    FROM rt_stores s LEFT JOIN rt_google_connections c ON c.store_id=s.id
-    WHERE s.line_account_id=? ORDER BY s.id LIMIT 1`)
-    .bind(accountId).first<{ store_id: string; status: string | null }>();
-  if (!row?.status) {
-    return { source: 'manual', profile: null };
-  }
-  const profile = await connectedGoogleProfile(db, row.store_id);
+  // 店舗を決めてから、その店舗の接続を1件に決め、その接続IDで写しを読む。
+  // 同じ店舗に接続が2件以上あっても、ここと connectedGoogleProfile が同じ1件を見る。
+  const store = await db.prepare('SELECT id FROM rt_stores WHERE line_account_id=? ORDER BY id LIMIT 1')
+    .bind(accountId).first<{ id: string }>();
+  if (!store) return { source: 'manual', profile: null };
+  const connection = await primaryGoogleConnection(db, store.id);
+  if (!connection) return { source: 'manual', profile: null };
+  const profile = await connectedGoogleProfile(db, store.id, connection.id);
   return profile ? { source: 'google_business', profile } : { source: 'google_unavailable', profile: null };
 }
 

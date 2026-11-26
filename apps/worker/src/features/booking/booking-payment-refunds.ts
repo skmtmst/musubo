@@ -72,7 +72,7 @@ export async function simulatePaymentRefund(db: D1Database, payment: BookingPaym
           CASE WHEN ?=0 THEN 'not_requested' WHEN EXISTS(
             SELECT 1 FROM bookings b JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
               WHERE b.id=p.booking_id AND b.line_account_id=p.line_account_id AND f.is_following=1
-                AND f.line_user_id IS NOT NULL) THEN 'simulated' ELSE 'unavailable' END,?
+                AND f.line_platform_user_id IS NOT NULL) THEN 'simulated' ELSE 'unavailable' END,?
         FROM booking_payments p WHERE p.id=? AND p.line_account_id=? AND p.status='paid'
           AND p.provider='stripe' AND substr(p.provider_payment_id,1,8)='pi_test_'
           AND p.currency='JPY' AND p.amount-p.refunded_amount>0

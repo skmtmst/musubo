@@ -1,12 +1,27 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
-import Notice, { useNoticeClosedToday } from '@/components/shared/notice'
+import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
-import { isSecurityNoticePinned } from '@/components/security-notice-paths'
+
+const CLOSED_PREFIX = 'notice-closed:unfamiliar-login:'
+
+/** 閉じたログイン（unfamiliarAt）だけを、この端末で覚える。別のいつもと違うログインはまた出す。 */
+function useClosedForLogin(unfamiliarAt: string | null) {
+  const [closed, setClosed] = useState(false)
+  useEffect(() => {
+    if (!unfamiliarAt) return
+    try { setClosed(localStorage.getItem(CLOSED_PREFIX + unfamiliarAt) === '1') } catch { setClosed(false) }
+  }, [unfamiliarAt])
+  const close = () => {
+    setClosed(true)
+    if (!unfamiliarAt) return
+    try { localStorage.setItem(CLOSED_PREFIX + unfamiliarAt, '1') } catch { /* この画面の間だけ閉じる */ }
+  }
+  return { closed, close }
+}
 
 /**
  * V-2: いつもと違う端末・場所からのログインの知らせ（管理画面-30 §14）。
@@ -19,13 +34,12 @@ import { isSecurityNoticePinned } from '@/components/security-notice-paths'
  * この帯が出ているあいだ、そのセッションの大事な操作は毎回の本人確認が要る
  * （Worker側で強制）。心当たりがない人の逃げ道として、セッション管理への
  * リンク（他の端末のログイン解除）を右に置く。
- * ［閉じる］でその日は（その端末で）出さない。ダッシュボードと設定の画面には残す。
+ * ［閉じる］で、そのログインについてはその端末でずっと出さない。どの画面でも閉じられる。
+ * 別のいつもと違うログインがあれば、また出す（知らない人のログインに気づけるようにするため）。
  */
 export default function UnfamiliarLoginNotice({ className }: { className?: string }) {
   const [unfamiliarAt, setUnfamiliarAt] = useState<string | null>(null)
-  const pathname = usePathname()
-  const pinned = isSecurityNoticePinned(pathname)
-  const { closed, close } = useNoticeClosedToday(`unfamiliar-login:${unfamiliarAt ?? ''}`)
+  const { closed, close } = useClosedForLogin(unfamiliarAt)
 
   useEffect(() => {
     let cancelled = false
@@ -44,15 +58,15 @@ export default function UnfamiliarLoginNotice({ className }: { className?: strin
     return () => { cancelled = true }
   }, [])
 
-  if (!unfamiliarAt || (closed && !pinned)) return null
+  if (!unfamiliarAt || closed) return null
   return (
     <Notice
       className={className}
       tone="warn"
       heading="いつもと違う端末・場所からのログインです"
       message="大事な操作の前に毎回、本人確認をします。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください。"
-      action={<Button href="/staff" variant="secondary">ログイン中の端末を見る</Button>}
-      onClose={pinned ? undefined : close}
+      action={<Button href="/staff?section=sessions" variant="secondary">ログイン中の端末を見る</Button>}
+      onClose={close}
     />
   )
 }

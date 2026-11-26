@@ -1,4 +1,5 @@
 'use client'
+import { compareRestaurantTables } from '@/lib/restaurant-table-order'
 import { useLedgerFloor } from './use-ledger-floor'
 import LedgerEmpty from './ledger-empty'
 import ListState from '@/components/shared/list-state'
@@ -74,7 +75,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   /* 結合予約の全卓を残し、時間の盤では卓番で並べる。 */
   const columns = useMemo(() => {
     const used = new Set(entries.flatMap(item => item.resourceIds))
-    return tables.filter((table) => table.is_active || used.has(table.id)).sort((a,b) => a.code.localeCompare(b.code,'ja',{numeric:true}) || a.id.localeCompare(b.id))
+    return tables.filter((table) => table.is_active || used.has(table.id)).sort(compareRestaurantTables)
   }, [tables, entries])
   const visibleFloor = floor ? {...floor,tables:floor.tables.filter(table => columns.some(column => column.id===table.id))} : undefined
   const hidden = tables.filter((table) => !table.is_active && !columns.includes(table))

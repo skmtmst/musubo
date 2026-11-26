@@ -52,7 +52,7 @@ async function industryRows(
     r.customer_name name,r.starts_at startsAt,r.ends_at endsAt,r.created_at requestedAt,r.status,r.staff_id staffId,r.course_id menuId,m.name menuName,r.store_id storeId,COALESCE(r.table_id,(SELECT l.table_id FROM rt_reservation_table_links l WHERE l.reservation_id=r.id LIMIT 1)) slotId,r.departed_at departedAt,
     r.guest_count partySize,0 price,r.status IN('visited','seated') visited,r.hold_expires_at IS NOT NULL held,r.source,NULL cancelledAt,
     (SELECT response FROM rt_reservation_confirmations WHERE reservation_id=r.id ORDER BY requested_at DESC LIMIT 1) confirmedResponse
-    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN rt_menu_items m ON m.id=r.course_id AND m.store_id=r.store_id LEFT JOIN friends f ON f.line_user_id=r.line_uid AND f.line_account_id=s.line_account_id
+    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN rt_menu_items m ON m.id=r.course_id AND m.store_id=r.store_id LEFT JOIN friends f ON f.line_platform_user_id=r.line_uid AND f.line_account_id=s.line_account_id
     WHERE s.line_account_id=?`;
   else if (style === 'lesson')
     sql = `SELECT b.id,b.updated_at updatedAt,'event' kind,b.friend_id friendId,b.friend_id personKey,f.display_name name,s.starts_at startsAt,s.ends_at endsAt,

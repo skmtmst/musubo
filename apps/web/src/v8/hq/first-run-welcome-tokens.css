@@ -1,5 +1,6 @@
-/* 承認済みの「ようこそ」Pen v06 の表示寸法。 */
+/* 承認済み Pen v06（t5jY0、taDDt）の表示寸法。 */
 :root {
+  --first-run-welcome-logo-center-offset: 35px;
   --first-run-welcome-logo-width: 228px;
   --first-run-welcome-writing-width: 136.5704px;
   --first-run-welcome-writing-gap: 32.8945px;
@@ -8,7 +9,4 @@
   --first-run-welcome-mobile-writing-width: 114.8085px;
   --first-run-welcome-mobile-writing-gap: 35.4121px;
   --first-run-welcome-mobile-writing-offset: 1.8023px;
-  --first-run-welcome-skip-width: 150px;
-  --first-run-welcome-skip-height: 44px;
-  --first-run-welcome-skip-offset: 13px;
 }

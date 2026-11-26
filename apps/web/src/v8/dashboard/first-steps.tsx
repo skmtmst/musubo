@@ -33,7 +33,7 @@ export type { FirstStepsGuide, FirstStepsSummary } from './first-steps-model'
 /**
  * 9項目の一覧の下に置く再開の導線。
  * 承認済み Pen「はじめにやること08d_v04」(sL2CD/rvGC6) どおり
- * 「続きから進める」「最初から始める」と注記をこの順で出す。
+ * 「続きから進める」「最初から始める」を並べる。
  * 一時停止は案内の帯側で受けるので、ここには出さない（同じ操作を2か所に置かない）。
  */
 export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
@@ -43,21 +43,15 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
     <div className={styles.guideFooter}>
       <Button size="compact" variant="primary" presentation="step-action" onClick={guide.phase === 'paused' ? guide.resume : guide.start}>続きから進める</Button>
       <Button size="compact" presentation="step-action" onClick={guide.restart ?? guide.start}>最初から始める</Button>
-      <FirstStepsGuideNote />
     </div>
   )
 }
 
-/** チェックの付き方の注記。狭い幅でも切れないよう、帯の中ではなくカードの下に置く。 */
-export function FirstStepsGuideNote() {
-  return <p className={styles.note}>チェックは設定の実データで自動判定。ガイドを使わなくても付きます</p>
-}
-
 /*
-  カードは「見出し → 9項目 → 続きから/最初から/注記」だけにする。
+  カードは「見出し → 手順 → 続きから/最初から」を表示する。
   「選んだ機能の設定」ブロックと「使い方の設定を開く」は置かない（利用者判断）。
 */
-export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean }) {
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false, firstMessageInline = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; firstMessageInline?: boolean }) {
   const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total)
   const nextKey = summary ? nextFirstStepKey(summary) : null
   /* 再開の導線はガイド進行中だけ（承認済み Pen：通常 la9o6/FJ6Xd には無く、進行中 sL2CD/rvGC6 にだけある）。
@@ -67,6 +61,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
     <Card as="section" className={styles.card} layout="vertical" contentPadding="var(--step-card-pad-block) var(--step-card-pad-inline)" gap="var(--step-card-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
+        <HelpTip label="はじめにやることのチェックについて">チェックは設定の実データで自動判定。ガイドを使わなくても付きます</HelpTip>
         {summary ? <>
           <span className={styles.count}>{`${summary.done} / ${summary.total} 済み`}</span>
           <span className={styles.pips}><ProgressBar appearance="onboarding" value={summary.done} max={summary.total} label="はじめにやることの進み" /></span>
@@ -96,7 +91,15 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
               <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}（${actionLabel}）`}>{actionLabel}</TextLink>
             ) : (
               /* まだの段はどれも、この行からその段のガイドを始める。 */
-              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={() => guide?.startAt?.(step.key)}>{actionLabel}</TextLink>
+              <TextLink tone="action" emphasis="row-step" href={step.href!} className={styles.link} aria-label={`${step.label}を${actionLabel}`} onClick={(event) => {
+                if (firstMessageInline && step.key === 'firstMessage' && guide?.startAt) {
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                  event.preventDefault()
+                } else if (step.href?.startsWith('/?guide=')) {
+                  return
+                }
+                guide?.startAt?.(step.key)
+              }}>{actionLabel}</TextLink>
             )}
           </SetupStepRow>
           )
