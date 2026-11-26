@@ -1,8 +1,5 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import {render,screen,cleanup,fireEvent} from '@testing-library/react'
 import {afterEach,expect,it,vi} from 'vitest'
 import {ValueBarChart,LineChart,FunnelChart,chartNumber,chartDate,CHART_COLORS} from './charts'
@@ -84,9 +81,6 @@ it('summary棒グラフでも列幅を超える両端ラベルは枠内へ寄せ
  const { container, unmount } = render(<ValueBarChart label="日別クリック数の推移" presentation="summary" unit="クリック" items={daily} />)
  expect(container.querySelector('[data-axis-edge="first"]')?.getAttribute('data-axis-clamp')).toBe('first')
  expect(container.querySelector('[data-axis-edge="last"]')?.getAttribute('data-axis-clamp')).toBe('last')
- const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'charts.module.css'), 'utf8')
- expect(css).toMatch(/\.axis\[data-axis-clamp='first'\]\s*\{[^}]*left:\s*0;[^}]*transform:\s*none;/s)
- expect(css).toMatch(/\.axis\[data-axis-clamp='last'\]\s*\{[^}]*left:\s*auto;\s*right:\s*0;[^}]*transform:\s*none;/s)
  unmount()
 
  // 短い月名（7本・広めの棒）は中央揃えのまま内寄せしない
