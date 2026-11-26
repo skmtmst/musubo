@@ -66,6 +66,12 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => { root.unmount() }); container.remove(); delete document.documentElement.dataset.theme })
 
 describe('現役V8の公開予約の確認と取消', () => {
+  it('未知の状態が組み込み名と同じでも状態を確認中と表示する', async () => {
+    net.list.mockResolvedValue({ success: true, data: ['constructor', 'toString', '__proto__', 'future'].map((status, i) => ({ ...item(status), id: `unknown-${i}` })) })
+    const dialog = await openSchedules()
+    expect(await within(dialog).findAllByText('状態を確認しています')).toHaveLength(4)
+    expect(within(dialog).queryByRole('button', { name: '予約を取り消す' })).toBeNull()
+  })
   it('全状態を区別し、まだ始まっていない予約だけ取り消せる', async () => {
     net.list.mockResolvedValue({ success: true, data: ['scheduled', 'publishing', 'published', 'restoring', 'completed', 'cancelled', 'failed'].map((status, i) => ({ ...item(status), id: `schedule-${i}` })) })
     const dialog = await openSchedules()
