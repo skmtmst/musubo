@@ -1,4 +1,6 @@
 'use client'
+
+import { notifySaved } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 
@@ -540,6 +542,8 @@ export default function SavedSearchEditV8() {
    * 内容を表示しない。
    */
   const loadGenerationRef = useRef(0)
+  const mountedRef = useRef(false)
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
 
   /*
    * R179: 保存直後の再計算は、保存応答の新しい版と正規化済み条件を
@@ -738,6 +742,8 @@ export default function SavedSearchEditV8() {
       setError('')
       return
     }
+    const accountAtSave = selectedAccountId
+    const generationAtSave = loadGenerationRef.current
     setSaving(true)
     setError('')
     try {
@@ -751,6 +757,7 @@ export default function SavedSearchEditV8() {
       setPreviewStale(false)
       /* R179: 保存応答の新しい版と正規化済み条件で数え直す。古い版では409になる。 */
       await recount({ revision: refreshed.data.revision, conditions: normalized })
+      if (mountedRef.current && accountRef.current === accountAtSave && loadGenerationRef.current === generationAtSave) notifySaved('検索条件を保存しました。')
     } catch (saveError) {
       const fieldFailure = saveErrors.capture(saveError)
 
