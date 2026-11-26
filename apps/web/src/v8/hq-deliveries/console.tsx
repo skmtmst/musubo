@@ -27,6 +27,7 @@ import Button from '@/components/shared/button'
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Notice from '@/components/shared/notice'
 import EmptyList from '@/components/shared/empty-list'
+import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
@@ -68,7 +69,11 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [listError, setListError] = useState('')
   const [notice, setNotice] = useState('')
+  const loadSeq = useRef(0)
+  const accountsSeq = useRef(0)
+  const foldersSeq = useRef(0)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [choices, setChoices] = useState<Record<string, string>>({})
@@ -81,12 +86,51 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   usePageTitle(view === 'edit' ? titleOf(type) : `${titleOf(type)}を配る`)
 
   const load = useCallback(async () => {
-    setLoading(true); setRowsReady(false); setError('')
-    try { setRows(await hqDeliveriesApi.list(type)); setRowsReady(true) }
-    catch { setError('ひな形を読み込めませんでした。もう一度お試しください。') }
-    finally { setLoading(false) }
+    const seq = ++loadSeq.current
+    setLoading(true); setRowsReady(false); setListError('')
+    try {
+      const loaded = await hqDeliveriesApi.list(type)
+      if (seq !== loadSeq.current) return
+      setRows(loaded); setRowsReady(true)
+    } catch {
+      if (seq !== loadSeq.current) return
+      setRows([]); setListError('ひな形を読み込めませんでした。もう一度お試しください。')
+    } finally {
+      if (seq === loadSeq.current) setLoading(false)
+    }
   }, [type])
-  useEffect(() => { void load(); void hqTemplatesApi.accounts().then((data) => { setAccounts(data); setAccountsFailed(false); setAccountsReady(true) }).catch(() => { setAccounts([]); setAccountsFailed(true); setAccountsReady(false) }); void hqTemplatesApi.folders.list().then((data)=>{setFolders(data);setFoldersFailed(false)}).catch(() => {setFolders([]);setFoldersFailed(true)}) }, [load])
+  const loadAccounts = useCallback(async () => {
+    const seq = ++accountsSeq.current
+    try {
+      const data = await hqTemplatesApi.accounts()
+      if (seq !== accountsSeq.current) return
+      setAccounts(data); setAccountsFailed(false); setAccountsReady(true)
+    } catch {
+      if (seq !== accountsSeq.current) return
+      setAccounts([]); setAccountsFailed(true); setAccountsReady(false)
+    }
+  }, [])
+  const loadFolders = useCallback(async () => {
+    const seq = ++foldersSeq.current
+    try {
+      const data = await hqTemplatesApi.folders.list()
+      if (seq !== foldersSeq.current) return
+      setFolders(data); setFoldersFailed(false)
+    } catch {
+      if (seq !== foldersSeq.current) return
+      setFolders([]); setFoldersFailed(true)
+    }
+  }, [])
+  useEffect(() => {
+    void load()
+    void loadAccounts()
+    void loadFolders()
+    return () => {
+      loadSeq.current += 1
+      accountsSeq.current += 1
+      foldersSeq.current += 1
+    }
+  }, [load, loadAccounts, loadFolders])
 
   const edit = async (row: HqDeliveryTemplate) => {
     setError(''); setNotice(''); setBusy(true)
@@ -155,7 +199,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   }
 
   const back = () => guard.guarded(() => { setSelected(null); setPreflight(null); setNotice(''); setView('list') })
-  const notices = <><ConfirmDialog open={guard.leaveTarget !== null} title="入力を破棄しますか？" description="保存していないひな形の変更があります。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="保存せずに移る" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />{foldersFailed && <Notice tone="warn">フォルダを読み込めませんでした。ページを再読み込みしてください。</Notice>}{!canEdit && <Notice tone="info">閲覧のみで見ています。変更や配布は統括の管理者に頼んでください。</Notice>}{error && <Notice tone="warn">{error}</Notice>}{notice && <Notice tone="success">{notice}</Notice>}{accountsFailed && <Notice tone="warn">配布先を読み込めませんでした。ページを再読み込みしてください。</Notice>}</>
+  const notices = <><ConfirmDialog open={guard.leaveTarget !== null} title="入力を破棄しますか？" description="保存していないひな形の変更があります。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="保存せずに移る" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />{foldersFailed && <Notice tone="warn" action={<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadFolders()}>もう一度読み込む</Button>}>フォルダを読み込めませんでした。</Notice>}{!canEdit && <Notice tone="info">閲覧のみで見ています。変更や配布は統括の管理者に頼んでください。</Notice>}{error && <Notice tone="warn">{error}</Notice>}{notice && <Notice tone="success">{notice}</Notice>}{accountsFailed && <Notice tone="warn" action={<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadAccounts()}>もう一度読み込む</Button>}>配布先を読み込めませんでした。</Notice>}</>
   const stats = <KpiBand>
     <KpiCard title="ひな形" value={!rowsReady ? null : rows.length} unit="件" detail={titleOf(type)} />
     <KpiCard title="配布先" value={!accountsReady ? null : accounts.length} unit="アカウント" detail="配ることのできるアカウント" />
@@ -163,9 +207,9 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     <KpiCard title="配ったひな形" value={!rowsReady ? null : rows.filter(row => (row.distributed_account_count ?? 0) > 0).length} unit="件" detail="1つ以上のアカウントへ配った" />
   </KpiBand>
   const folderRows = [
-    {id:'all', label:'すべて', count:loading ? null : rows.length},
-    ...folders.map(folder=>({id:folder.id,label:folder.name,color:folder.color,count:loading ? null : rows.filter(row=>row.folder_id===folder.id).length})),
-    {id:'none',label:'未分類',count:loading ? null : rows.filter(row=>!row.folder_id).length},
+    {id:'all', label:'すべて', count:!rowsReady ? null : rows.length},
+    ...folders.map(folder=>({id:folder.id,label:folder.name,color:folder.color,count:!rowsReady ? null : rows.filter(row=>row.folder_id===folder.id).length})),
+    {id:'none',label:'未分類',count:!rowsReady ? null : rows.filter(row=>!row.folder_id).length},
   ]
   if (view === 'list') {
     const shown = rows.filter(row => (folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter) && `${row.name} ${row.content_summary ?? ''}`.includes(query.trim()))
@@ -175,7 +219,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:<PermissionGatedButton allowed={canEdit} need="tenantWide" variant="primary" onClick={create}>ひな形を作る</PermissionGatedButton>}}
       toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value={query} onChange={setQuery} />}>
       {notices}
-      {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" textTone="ink" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:null,updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={16} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <EmptyList icon={<Send aria-hidden="true" />} title={`まだ${titleOf(type)}のひな形がありません`} description="ひな形を保存すると、各アカウントへ下書きとして配れます。" create={{ label: 'ひな形を作る', onClick: create }} canCreate={canEdit} filtered={rows.length > 0} onClearFilters={() => { setQuery(''); setFolderFilter('all') }} />}
+      {loading ? <p role="status">読み込み中…</p> : listError ? <ListState permissionScope="hq" kind="error" title="ひな形を読み込めませんでした" description={listError} onRetry={() => void load()} /> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" textTone="ink" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:null,updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={16} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <EmptyList icon={<Send aria-hidden="true" />} title={`まだ${titleOf(type)}のひな形がありません`} description="ひな形を保存すると、各アカウントへ下書きとして配れます。" create={{ label: 'ひな形を作る', onClick: create }} canCreate={canEdit} filtered={rows.length > 0} onClearFilters={() => { setQuery(''); setFolderFilter('all') }} />}
     </ListPage></SaveErrorScope>
   }
   /* 自動応答は店と同じ手順の段で作る。ほかの種類は今の1枚の画面。 */
