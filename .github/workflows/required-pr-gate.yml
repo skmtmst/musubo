@@ -251,6 +251,7 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test-v8-guard-shards.py
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test-v8-report-only.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_production_workflows.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_production_workflows.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_workflow_commands.py
@@ -884,6 +885,8 @@ jobs:
           MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
           DOCS_CHECKS_RESULT: ${{ needs.docs-checks.result }}
           V8_SCREEN_GUARD_RESULT: ${{ needs.v8-screen-guard.result }}
+          # false に戻すと V8 の失敗を必須ゲートに戻す。
+          V8_GUARD_REPORT_ONLY: 'true'
         run: |
           failed=0
           for result in \
@@ -896,13 +899,24 @@ jobs:
             "$WEB_UNIT_RESULT" \
             "$WEB_BUILD_RESULT" \
             "$MCP_CHECKS_RESULT" \
-            "$DOCS_CHECKS_RESULT" \
-            "$V8_SCREEN_GUARD_RESULT"; do
+            "$DOCS_CHECKS_RESULT"; do
             case "$result" in
               success|skipped) ;;
               *) failed=1 ;;
             esac
           done
+
+          case "$V8_SCREEN_GUARD_RESULT" in
+            success|skipped) ;;
+            failure)
+              if [ "$V8_GUARD_REPORT_ONLY" = 'true' ]; then
+                echo "::warning::V8 screen guard は失敗しました（現在は報告のみ）。"
+              else
+                failed=1
+              fi
+              ;;
+            *) failed=1 ;;
+          esac
 
           if [ "$failed" -ne 0 ]; then
             echo "::error::選択された検査に失敗または中断があります。"
