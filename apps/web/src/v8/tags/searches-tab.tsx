@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 import { DetailContent, DetailFields, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import { notifySaved, notifyToast } from '@/components/shared/toast';
@@ -88,10 +89,10 @@ export function conditionSummary(split: { all: string[]; any: string[]; note: st
 export function usageSummary(usedIn: SavedSearch['usedIn']): string {
   if (usedIn === undefined) return '—'
   if (usedIn.length === 0) return 'なし'
-  if (usedIn.length === 1) return `${USAGE_WORDS[usedIn[0].kind] ?? 'そのほか'}「${usedIn[0].name}」`
+  if (usedIn.length === 1) return `${knownValue(USAGE_WORDS, usedIn[0].kind, 'そのほか')}「${usedIn[0].name}」`
   const counts = new Map<string, number>()
   for (const usage of usedIn) {
-    const word = USAGE_WORDS[usage.kind] ?? 'そのほか'
+    const word = knownValue(USAGE_WORDS, usage.kind, 'そのほか')
     counts.set(word, (counts.get(word) ?? 0) + 1)
   }
   return [...counts].map(([word, count]) => `${word} ${count}`).join('・')

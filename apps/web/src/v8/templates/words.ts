@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * ★V8 テンプレートの一覧で使う言葉と、読み込みの状態の分け方。
  * 今までの一覧（app/templates の list-state-kind・template-message-type・
@@ -74,7 +75,7 @@ const MESSAGE_TYPE_LABELS: Record<string, string> = {
 }
 
 export function messageTypeText(type: string): string {
-  return MESSAGE_TYPE_LABELS[type] ?? 'その他'
+  return knownValue(MESSAGE_TYPE_LABELS, type, 'その他')
 }
 
 /** 削除の確認窓の説明。使っていないものだけがここへ来る。 */

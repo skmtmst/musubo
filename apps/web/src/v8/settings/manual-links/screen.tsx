@@ -21,7 +21,7 @@ import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
-import { LINK_STATUS_LABEL, checkedLabel, urlLabel } from './manual-link-view'
+import { manualLinkStatusLabel, checkedLabel, urlLabel } from './manual-link-view'
 import { useManualLinks } from './use-manual-links'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
@@ -173,8 +173,8 @@ export default function ManualLinksScreen() {
                     )}
                   </GridCell>
                   <GridCell role="cell" className={styles.cell} title={checkedLabel(row.checkedAt)}><span data-list-date-time>{checked}</span></GridCell>
-                  <GridCell role="cell" className={styles.cell} title={LINK_STATUS_LABEL[row.status]}>
-                    <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : LINK_STATUS_LABEL[row.status]}</StatusBadge>
+                  <GridCell role="cell" className={styles.cell} title={manualLinkStatusLabel(row.status)}>
+                    <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : manualLinkStatusLabel(row.status)}</StatusBadge>
                   </GridCell>
                   <GridCell role="cell" className={styles.actions}>
                     {editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', lockedReason: permissionReason, disabled: staff === null, onSelect: () => startEdit(key) }]} />}
