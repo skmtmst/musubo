@@ -1433,3 +1433,4 @@
 - [運営メンバー管理と統合ユーザー一覧の読み込み失敗時の表示と再読み込み](release-log/unreleased/PR-kenta-later-gemini19-1127.md) — 反映履歴、確認 2026-11-27。
 - [サイトスクリプトと自動応答作成の読み込み失敗時の表示と再読み込み](release-log/unreleased/PR-kenta-later-gemini20-1127.md) — 反映履歴、確認 2026-11-27。
 - [EC連携の自動LINE送った件数再取得とウェビナー分析の読み込み・失敗表示](release-log/unreleased/PR-kenta-later-gemini22-1127.md) — 反映履歴、確認 2026-11-27。
+- [保存した検索の失敗表示・条件名再取得と自動応答実行結果の読み込み・失敗表示](release-log/unreleased/PR-kenta-later-gemini23-1127.md) — 反映履歴、確認 2026-11-27。
