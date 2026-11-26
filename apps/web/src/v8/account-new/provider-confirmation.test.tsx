@@ -15,6 +15,7 @@ import AccountRegisterV8 from './register'
 
 const calls = vi.hoisted(() => ({
   me: vi.fn(), check: vi.fn(), connect: vi.fn(), receipt: vi.fn(), list: vi.fn(), resume: vi.fn(), account: vi.fn(),
+  retryStyle: vi.fn(), getStyle: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0, shouldPromptStyleSelection: false } })),
   oldCheck: undefined as (() => void) | undefined,
   update: undefined as ((key: Step2Field, value: string) => void) | undefined,
   retry: undefined as StepUpRequest['retry'] | undefined,
@@ -28,7 +29,7 @@ vi.mock('@/lib/api', async original => {
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => null }))
 vi.mock('@/lib/api/helpers/styles', () => ({
-  styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })) },
+  styleApi: { get: calls.getStyle, retryRegistrationInitialization: calls.retryStyle },
 }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/lib/qr-image', () => ({ qrToDataURL: vi.fn(async () => '') }))
@@ -140,6 +141,30 @@ it('初回登録は追加の本人確認を挟まず、LINE受信が確認でき
   expect(screen.queryByText('友だち追加できるか確かめます')).toBeNull()
   const key = registrationStorageKey(REGISTRATION_STYLE_KEY, { id: 'owner-a', tenantId: 'tenant-a' })!
   expect(sessionStorage.getItem(key)).toBe('mock-account')
+})
+it('初期設定の保存失敗後、同じアカウントとスタイルでやり直す', async () => {
+  calls.connect.mockRejectedValueOnce(new ApiError(502, '保存失敗', 'style_save_failed', { accountId: 'mock-account', style: 'consult' }))
+  calls.receipt.mockResolvedValue({ success: true, data: { status: 'confirmed' } })
+  calls.retryStyle.mockRejectedValueOnce(new Error('failed')).mockResolvedValueOnce({ success: true, data: { version: 1 } })
+  open(); await checkConnection(); submit()
+  const button = await screen.findByRole('button', { name: 'もう一度保存する' })
+  expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
+  fireEvent.click(button)
+  await waitFor(() => expect(calls.retryStyle).toHaveBeenCalledTimes(1))
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度保存する' }))
+  await waitFor(() => expect(calls.retryStyle).toHaveBeenCalledTimes(2))
+  expect(calls.retryStyle).toHaveBeenLastCalledWith('mock-account', 'consult')
+  expect(calls.connect).toHaveBeenCalledTimes(1)
+})
+it('保存後の応答が失われた場合は保存済みのスタイルを確認して先へ進む', async () => {
+  calls.connect.mockRejectedValueOnce(new ApiError(502, '保存失敗', 'style_save_failed', { accountId: 'mock-account', style: 'consult' }))
+  calls.receipt.mockResolvedValue({ success: true, data: { status: 'confirmed' } })
+  calls.retryStyle.mockRejectedValueOnce(new ApiError(409, '競合', 'version_conflict'))
+  calls.getStyle.mockResolvedValueOnce({ success: true, data: { style: 'consult', styleSelected: true, version: 1, shouldPromptStyleSelection: false } })
+  open(); await checkConnection(); submit()
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度保存する' }))
+  await waitFor(() => expect(screen.queryByText('初期設定を保存できませんでした')).toBeNull())
+  expect(calls.getStyle).toHaveBeenCalledWith('mock-account', true)
 })
 it('引き継ぎを選んだ時だけ行う説明と、自然な確認ボタンを出す', () => {
   open()

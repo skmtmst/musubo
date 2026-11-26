@@ -56,7 +56,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
       <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : <DialogActions>
-      <Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? '「このスタイルにする」を押して選んでください' : null}>次へ<ArrowRight size={16} aria-hidden="true" /></Button>
+      <Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? '「このスタイルにする」を押して選んでください' : null}>{error ? 'もう一度保存する' : '次へ'}<ArrowRight size={16} aria-hidden="true" /></Button>
     </DialogActions>}
   >
     <div className={styles.body}>

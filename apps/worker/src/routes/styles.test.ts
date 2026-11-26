@@ -121,6 +121,26 @@ afterEach(() => {
   raw.close();
   vi.useRealTimers();
 });
+
+test('登録時の初期化失敗は同じスタイルで復旧し、再試行しても二重に配らない', async () => {
+  raw.prepare("DELETE FROM style_starter_items WHERE line_account_id='a'").run();
+  raw.prepare("DELETE FROM account_styles WHERE line_account_id='a'").run();
+  const path = root + '?account_id=a&registration=1';
+  const body = { retryRegistrationInitialization: true, expectedVersion: 0, style: 'consult' };
+  expect((await request('PUT', path, body)).status).toBe(200);
+  const before = raw.prepare("SELECT COUNT(*) AS n FROM style_starter_items WHERE line_account_id='a'").get() as { n: number };
+  expect(before.n).toBeGreaterThan(0);
+  expect(raw.prepare("SELECT style FROM account_styles WHERE line_account_id='a'").get()).toEqual({ style: 'consult' });
+  expect((await request('PUT', path, body)).status).toBe(409);
+  expect(raw.prepare("SELECT COUNT(*) AS n FROM style_starter_items WHERE line_account_id='a'").get()).toEqual(before);
+});
+
+test('閲覧のみは登録時の初期化をやり直せない', async () => {
+  actor.role = 'viewer';
+  actor.readOnly = true;
+  const response = await request('PUT', root + '?account_id=a&registration=1', { retryRegistrationInitialization: true, expectedVersion: 0, style: 'consult' });
+  expect(response.status).toBe(403);
+});
 describe('style setup', () => {
   test('registration style only reads and writes the current creator’s active account', async () => {
     const path = root + '?account_id=a&registration=1';

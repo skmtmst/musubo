@@ -24,6 +24,10 @@ import {
   StyleClassDetails,
 } from './styles-common';
 export const methods1 = {
+  retryRegistrationInitialization: (accountId: string, style: AccountStyle | null) =>
+    fetchApi<Result<{ version: number }>>(url(root, accountId, { registration: '1' }), write('PUT', {
+      retryRegistrationInitialization: true, expectedVersion: 0, style,
+    })),
   ecSummary: (accountId: string, query: { range?: 'today' | 'week' | 'month'; date?: string; from?: string; to?: string } = {}) =>
     fetchApi<Result<import('@line-crm/shared').EcStyleSummary>>(url(root + '/ec-summary', accountId, query)),
   get: (accountId: string, registration = false) =>
