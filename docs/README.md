@@ -1406,3 +1406,4 @@
 - [セキュリティの見張りの表示と操作](release-log/unreleased/PR-kenta-later-codex14.md) — 異常の操作と表示に関する修正の履歴。確認 2026-11-27。
 - [統括の配信候補の表示](release-log/unreleased/PR-kenta-later-codex15.md) — 配信候補の表示を直した反映履歴。確認 2026-11-27。
 - [受け取り口と健康日記の表示](release-log/unreleased/PR-kenta-later-codex16.md) — 未対応の種類があるときの表示を直した反映履歴。確認 2026-11-27。
+- [回答フォームの項目表示](release-log/unreleased/PR-kenta-later-codex17.md) — 回答の項目名と未回答の表示を直した反映履歴。確認 2026-11-27。
