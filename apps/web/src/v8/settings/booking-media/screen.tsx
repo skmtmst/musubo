@@ -22,7 +22,7 @@ import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import Checkbox from '@/components/shared/checkbox'
-import Radio from '@/components/shared/radio'
+import Radio, { RadioGroup } from '@/components/shared/radio'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
@@ -38,7 +38,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import styles from './screen.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { isSaveConflict, withPermissionFailure } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -505,7 +505,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         if (mounted.current) setSaveError('別の画面で表示中の店舗が変わった可能性があります。店舗を確認してから、もう一度操作してください。')
         return
       }
-      if (caught instanceof ApiError && caught.status === 409) {
+      if (isSaveConflict(caught)) {
         setConflict(true)
         return
       }
@@ -564,7 +564,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         if (mounted.current) setSaveError('別の画面で表示中の店舗が変わった可能性があります。店舗を確認してから、もう一度操作してください。')
         return
       }
-      if (caught instanceof ApiError && caught.status === 409) {
+      if (isSaveConflict(caught)) {
         setResuming(null)
         setConflict(true)
         return
@@ -962,14 +962,14 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
             {`停止中に受け取ったメールのうち ${formatNumber(resuming.upcomingExpiringCount)} 通が、あと ${formatNumber(resuming.daysUntilNearestUpcomingHeldExpiry)} 日で保管期限（最長30日）を迎えます。`}
           </Notice>
         ) : null}
-        <div className={styles.dialogFields} role="radiogroup" aria-label="保留中のメールの扱い">
+        <RadioGroup className={styles.dialogFields} label="保留中のメールの扱い">
           <Radio name="resume-held-action" checked={resumeHeldAction === 'import'} onChange={() => setResumeHeldAction('import')}>
             保留分をまとめて取り込む（新規・変更・取消を受信順に予約台帳へ反映します）
           </Radio>
           <Radio name="resume-held-action" checked={resumeHeldAction === 'archive'} onChange={() => setResumeHeldAction('archive')}>
             取り込まない（保管だけにする・予約台帳には入れません）
           </Radio>
-        </div>
+        </RadioGroup>
       </Dialog>
 
       <Dialog
