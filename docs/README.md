@@ -26,6 +26,8 @@
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
 
+- [時刻・日付の範囲表示の修正履歴](release-log/unreleased/PR-kenta-time-range.md)
+
 ## 使う人の手引き
 
 - [LINE Harness](../README.en.md)

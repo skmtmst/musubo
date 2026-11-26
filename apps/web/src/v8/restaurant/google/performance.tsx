@@ -24,6 +24,7 @@ import {
   type GooglePerformanceDays,
   type GooglePerformanceTotals,
 } from '@/lib/restaurant-google-api'
+import { displayRange } from '@/lib/display-range'
 import { errorMessage } from './format'
 import { useGooglePermission } from './use-google-permission'
 import styles from './google.module.css'
@@ -125,7 +126,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
     }
   }, [accountId, canSync, load, syncing])
 
-  const range = data ? `${data.range.startDate.replace(/-/g, '/')}–${data.range.endDate.slice(5).replace('-', '/')}` : ''
+  const range = data ? displayRange(data.range.startDate.replace(/-/g, '/'), data.range.endDate.slice(5).replace('-', '/')) : ''
 
   return (
     <>
