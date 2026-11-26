@@ -13,6 +13,7 @@ import Card from '@/components/shared/card'
 import { ValueBarChart } from '@/components/shared/charts'
 import DeltaChip from '@/components/shared/delta-chip'
 import Drawer from '@/components/shared/drawer'
+import DisplayItemsDialog from '@/components/shared/display-items-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -87,6 +88,8 @@ export default function StoreComparisonList() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const [visibleMetrics, setVisibleMetrics] = useState<MetricDef['key'][]>(() => METRICS.map(metric => metric.key))
   const period = useMemo(() => pastPeriod(days), [days])
 
   const load = useCallback(async () => {
@@ -152,7 +155,8 @@ export default function StoreComparisonList() {
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   const last = Math.min(page * pageSize, total)
   const openRow = data?.rows.find((row) => row.accountId === openId) ?? null
-  const columns = data && diffOnly ? columnsWithDiff(data.rows, data.average) : METRICS
+  const matchingColumns = data && diffOnly ? columnsWithDiff(data.rows, data.average) : METRICS
+  const columns = visibleMetrics.flatMap(key => matchingColumns.filter(metric => metric.key === key))
 
   /* 切り替えは URL に残す（再読込・共有でも同じ表示）。ほかの URL の条件は消さない。 */
   const setDiffOnly = (next: boolean) => {
@@ -179,6 +183,7 @@ export default function StoreComparisonList() {
         <DiffOnlyToggle checked={diffOnly} onChange={setDiffOnly} />
       </>}
       trailing={<>
+        <Button variant="secondary" onClick={() => setColumnsOpen(true)}>表示する列</Button>
         <PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />
         <Button variant="secondary" icon={<Download size={16} aria-hidden="true" />} onClick={() => void exportCsv()} busy={exporting} disabled={exporting}>CSVで書き出す</Button>
       </>}
@@ -192,7 +197,7 @@ export default function StoreComparisonList() {
   ) : !data || data.rows.length === 0 ? (
     <ListState kind="empty" emptyPreset="readonly" title="比べる店がまだありません" description="統括に店が入ると、ここで数を並べて見られます。" />
   ) : columns.length === 0 ? (
-    <ListState kind="empty" emptyPreset="filtered" title="全店の平均と違う数はありません" description="どの店も、7 つの数が全店の平均と同じです。" action={<Button variant="secondary" onClick={() => setDiffOnly(false)}>すべて表示</Button>} />
+    <ListState kind="empty" emptyPreset="filtered" title={matchingColumns.length === 0 ? '全店の平均と違う数はありません' : '表示する列に、全店の平均と違う数はありません'} description={matchingColumns.length === 0 ? 'どの店も、7 つの数が全店の平均と同じです。' : '列を変更するか、違いだけ表示を解除してください。'} action={<Button variant="secondary" onClick={() => setDiffOnly(false)}>すべて表示</Button>} />
   ) : (
     <ListPageSection>
       <DataTable columns={`minmax(0, 1.1fr) repeat(${columns.length}, minmax(0, 1fr))`}>
@@ -274,6 +279,15 @@ export default function StoreComparisonList() {
         ) : null}
         {body}
       </ListPage>
+      {columnsOpen ? <DisplayItemsDialog title="表示する列" presentation="columns" fixedLabel="店" minSelected={1} description="表に出す指標を選んで並べ替えます。CSV にはすべての指標が入ります。" items={METRICS.map(metric => ({ key: metric.key, label: metric.label, group: '指標' }))} selected={visibleMetrics} onCancel={() => setColumnsOpen(false)} onConfirm={keys => {
+        const next = keys as MetricDef['key'][]
+        setVisibleMetrics(next)
+        if (!next.includes(sort)) {
+          const first = next.find(key => matchingColumns.some(metric => metric.key === key)) ?? next[0]
+          if (first) { setPage(1); setSort(first); setOrder(METRICS.find(metric => metric.key === first)?.good === 'low' ? 'desc' : 'asc') }
+        }
+        setColumnsOpen(false)
+      }} /> : null}
       <StoreDrawer row={openRow} period={period} compare={compare} average={data?.average ?? null} diffOnly={diffOnly} onDiffOnly={setDiffOnly} onClose={() => setOpenId(null)} />
     </>
   )

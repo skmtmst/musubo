@@ -68,6 +68,32 @@ describe('数の書き方', () => {
 })
 
 describe('店の比較の表', () => {
+  it('指標列を外し、順序を変えても店名と取得条件を保つ', async () => {
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    const calls = api.get.mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: '表示する列' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'ブロック率' }))
+    fireEvent.keyDown(within(dialog).getByRole('button', { name: /来店.*並び/ }), { key: 'ArrowUp' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存する' }))
+    expect(screen.queryByRole('button', { name: 'ブロック率で並べ替える' })).toBeNull()
+    const headers = within(screen.getByRole('table')).getAllByRole('columnheader').map(cell => cell.textContent)
+    expect(headers[0]).toBe('店')
+    expect(headers.indexOf('来店')).toBeLessThan(headers.indexOf('予約▲'))
+    expect(api.get).toHaveBeenCalledTimes(calls)
+  })
+  it('並べ替え中の列を隠すと、表示中の先頭の列で並べ替える', async () => {
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    fireEvent.click(screen.getByRole('button', { name: '表示する列' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/CSV にはすべての指標/)).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'friendChange', order: 'asc', page: 1 })))
+    expect(screen.getByRole('button', { name: '友だちの増減で並べ替える' }).closest('th')?.getAttribute('aria-sort')).toBe('ascending')
+  })
   it('店と7つの数を出し、初めは予約の少ない順で頼む。取れない数は「—」', async () => {
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
