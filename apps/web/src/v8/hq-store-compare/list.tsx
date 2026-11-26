@@ -317,7 +317,7 @@ export default function StoreComparisonList() {
 function DiffOnlyToggle({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
   return (
     <span className={styles.diffToggle}>
-      <Toggle checked={checked} label="違いだけ表示" onChange={onChange} />
+      <Toggle size="toolbar" checked={checked} label="違いだけ表示" onChange={onChange} />
       <span aria-hidden="true">違いだけ表示</span>
     </span>
   )
