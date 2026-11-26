@@ -39,6 +39,24 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
+it('選択欄は店名を優先し、候補では同名店舗を ID で見分けられる', async () => {
+  net.list.mockResolvedValue({ data: { stores: [
+    { id: 'store-one-123456', name: '見本のお店 渋谷', line_account_id: 'a', status: 'active' },
+    { id: 'store-two-987654', name: '見本のお店 渋谷', line_account_id: 'a', status: 'active' },
+  ] } })
+  net.contextId = 'store-one-123456'
+  render(<BookingMedia />)
+  const button = await screen.findByRole('button', { name: '店舗', exact: true })
+  const field = button.closest('[data-choice-field]')!
+  expect(field.textContent).toContain('見本のお店 渋谷')
+  expect(field.textContent).not.toContain('store-one-123456')
+  expect(field.querySelector('[title*="見本のお店 渋谷"]')).toBeTruthy()
+  fireEvent.click(button)
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByText(/store-one-123456/)).toBeTruthy()
+  expect(within(dialog).getByText(/store-two-987654/)).toBeTruthy()
+})
+
 it('媒体の URL は全文を確認でき、外部リンクの矢印と同じ行に収める', async () => {
   render(<BookingMedia />)
   const link = await screen.findByRole('link', { name: 'fixture.invalid/page' })
