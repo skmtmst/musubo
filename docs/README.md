@@ -9,7 +9,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [列車4の画面修正の反映履歴](release-log/unreleased/PR-kenta-train4-1126.md)
+- [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
@@ -27,7 +27,7 @@
 
 
 
-- [夜間の画面修正の反映履歴](release-log/unreleased/PR-kenta-train-night-1126.md)
+- [夜間の画面修正の反映履歴](release-log/unreleased/243-kenta-train-night-1126.md)
 
 - [AI応答の動作](../apps/web/src/v8/ai-reply/BEHAVIOR.md)
 
@@ -1414,5 +1414,5 @@
 
 
 
-- [画面の読み直しと表示の列車5](release-log/unreleased/PR-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
-- [画面の読み直しと操作の列車6](release-log/unreleased/PR-kenta-train6-1126.md) — 読み直しと画面操作の改善履歴。確認 2026-11-26。
+- [画面の読み直しと表示の列車5](release-log/unreleased/243-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
+- [画面の読み直しと操作の列車6](release-log/unreleased/243-kenta-train6-1126.md) — 読み直しと画面操作の改善履歴。確認 2026-11-26。
