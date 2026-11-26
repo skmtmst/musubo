@@ -17,9 +17,9 @@ export const ACTION_LABELS: Record<string, string> = Object.assign(Object.create
   branch: '条件で分ける',
 })
 
-const FAILURE_LABELS: Record<string, string> = {
+const FAILURE_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   stop: '止める', continue: '次へ進む',
-}
+})
 
 function stepLabel(type: string): string {
   return ACTION_LABELS[type] ?? '処理'
