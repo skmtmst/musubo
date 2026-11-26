@@ -6,7 +6,8 @@ import { PhonePreviewScale } from './phone-preview-scale'
 import { Fragment, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
-import FlexPreview from '@/components/flex-preview'
+import FlexPreview, { safeFlexAssetUrl, sampleFlexText } from '@/components/flex-preview'
+import { broadcastButtonsFlex } from '@line-crm/shared'
 import { fillPreviewSample, previewSampleNote } from './preview-sample'
 import styles from './line-preview.module.css'
 import TruncatedText from './truncated-text'
@@ -185,7 +186,7 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
 
 /**
  * カルーセル：写真・題・短い文・押す所のカードを横に並べ、はみ出した分は横へ送る。
- * 見本なので押す所は押せない文字にする。写真が無いカードは灰の地。
+ * 見本なので押す所は押せない文字にする。写真が無いカードは画像欄を省く。
  */
 export function LinePreviewCarousel({ columns, time }: {
   columns: Array<{ title: string; text: string; imageUrl?: string | null; actions: string[] }>; time?: string
@@ -193,12 +194,12 @@ export function LinePreviewCarousel({ columns, time }: {
   return <div className={styles.cardRow}>
     <div className={styles.carouselTrack}>
       {columns.map((column, index) => <div key={index} className={`${styles.productCard} ${styles.carouselCard}`}>
-        <div className={styles.productImage} role="img" aria-label={column.title || 'カードの写真'} style={column.imageUrl ? { backgroundImage: `url(${JSON.stringify(column.imageUrl)})` } : { background: 'var(--color-canvas-sunken)' }} />
+        {column.imageUrl ? <div className={styles.productImage} role="img" aria-label={fillPreviewSample(column.title || 'カードの写真').text} style={{ backgroundImage: `url(${JSON.stringify(column.imageUrl)})` }} /> : null}
         <div className={styles.productCopy}>
-          {column.title ? <span className={styles.productTitle} title={column.title}>{column.title}</span> : null}
-          {column.text ? <span className={styles.productDescription} title={column.text}>{column.text}</span> : null}
+          {column.title ? <span className={styles.productTitle} title={fillPreviewSample(column.title).text}>{fillPreviewSample(column.title).text}</span> : null}
+          {column.text ? <span className={styles.productDescription} title={fillPreviewSample(column.text).text}>{fillPreviewSample(column.text).text}</span> : null}
         </div>
-        {column.actions.map((label) => <span key={label} className={styles.productAction}>{label}</span>)}
+        {column.actions.map((label) => <span key={label} className={styles.productAction}>{fillPreviewSample(label).text}</span>)}
       </div>)}
     </div>
     {time ? <span className={styles.messageTime}>{time}</span> : null}
@@ -206,4 +207,45 @@ export function LinePreviewCarousel({ columns, time }: {
 }
 
 /** Flex はトーク枠内で描く。JSON の検査・安全な描画は既存レンダラーに任せる。 */
-export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWidth?: number }) { return <FlexPreview content={content} maxWidth={maxWidth} /> }
+function TemplatePreview({ value, maxWidth }: { value: Record<string, unknown>; maxWidth?: number }) {
+  if ((value.type === 'carousel' || value.type === 'image_carousel') && Array.isArray(value.columns)) {
+    return <div style={{ display: 'flex', gap: 8, overflowX: 'auto', maxWidth: '100%' }}>{value.columns.map((column, index) => {
+      if (!column || typeof column !== 'object') return null
+      const card = column as Record<string, unknown>
+      if (value.type === 'image_carousel') {
+        const image = typeof card.imageUrl === 'string' ? safeFlexAssetUrl(card.imageUrl) : null
+        const label = typeof (card.action as Record<string, unknown> | undefined)?.label === 'string' ? String((card.action as Record<string, unknown>).label) : ''
+        return image ? <div key={index} style={{ position: 'relative', width: maxWidth || 210, flexShrink: 0, overflow: 'hidden', borderRadius: 12 }}><img src={image} alt="" width={210} height={210} style={{ display: 'block', width: '100%', aspectRatio: '1', objectFit: 'cover' }} referrerPolicy="no-referrer" />{label ? <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px', textAlign: 'center', color: 'var(--color-on-accent)', background: 'rgba(0,0,0,.45)' }}>{label}</span> : null}</div> : null
+      }
+      return <div key={index} style={{ flexShrink: 0 }}><TemplatePreview value={{ ...card, type: 'buttons' }} maxWidth={maxWidth} /></div>
+    })}</div>
+  }
+  const actions = Array.isArray(value.actions) ? value.actions : []
+  const horizontal = value.type === 'confirm'
+  const image = typeof value.thumbnailImageUrl === 'string' ? safeFlexAssetUrl(value.thumbnailImageUrl) : null
+  return <div style={{ width: maxWidth || 210, maxWidth: '100%', overflow: 'hidden', borderRadius: 12, background: 'var(--color-canvas)', color: 'var(--color-ink)' }}>
+    {image ? <img src={image} alt="" width={210} height={140} style={{ width: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" /> : null}
+    <div style={{ padding: '12px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+      {typeof value.title === 'string' && value.title ? <strong>{value.title}</strong> : null}
+      <div>{typeof value.text === 'string' ? value.text : ''}</div>
+    </div>
+    <div style={{ display: 'flex', flexDirection: horizontal ? 'row' : 'column', borderTop: '1px solid var(--color-hairline)' }}>
+      {actions.map((item, index) => <div key={index} style={{ flex: 1, minWidth: 0, padding: '12px 4px', color: 'var(--tpl-rt-rich-link)', textAlign: 'center', borderTop: !horizontal && index ? '1px solid var(--color-hairline)' : undefined, borderLeft: horizontal && index ? '1px solid var(--color-hairline)' : undefined, overflowWrap: 'anywhere' }}>{item && typeof item === 'object' && 'label' in item ? String(item.label) : ''}</div>)}
+    </div>
+  </div>
+}
+
+export function LinePreviewFlex({ content, maxWidth }: { content: string; maxWidth?: number }) {
+  try {
+    const parsed = sampleFlexText(JSON.parse(content)) as Record<string, unknown> | null
+    const template = parsed?.type === 'template' && parsed.template && typeof parsed.template === 'object' ? parsed.template as Record<string, unknown> : parsed
+    if (template && (template.type === 'buttons' || template.type === 'confirm' || ((template.type === 'carousel' || template.type === 'image_carousel') && Array.isArray(template.columns)))) return <TemplatePreview value={template} maxWidth={maxWidth} />
+  } catch { /* FlexPreview は不正な JSON を案内する。 */ }
+  return <FlexPreview content={content} maxWidth={maxWidth} sample />
+}
+
+/** 別の Flex として送る追加ボタンを、同じ送信データから表示する。 */
+export function LinePreviewButtons({ buttons }: { buttons: Array<{ label: string; value: string; type?: string }> }) {
+  if (!buttons.length) return null
+  return <div style={{ paddingLeft: 40 }}><LinePreviewFlex maxWidth={210} content={JSON.stringify(broadcastButtonsFlex(buttons))} /></div>
+}

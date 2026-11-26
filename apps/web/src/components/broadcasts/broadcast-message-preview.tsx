@@ -1,5 +1,6 @@
-import { LinePreviewFlex } from '@/components/shared/line-preview'
+import { LinePreviewFlex, LinePreviewButtons, LinePreviewMessage } from '@/components/shared/line-preview'
 import { MapPin } from 'lucide-react'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import { contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
@@ -9,7 +10,7 @@ import { contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
  *
  * 以前は `messageContent` をそのまま出していたので、位置情報は
  * `{"latitude":91,...}` という JSON が並び、ボタン付きテキストでは
- * ボタンが出なかった。作成画面の見え方（1通目の下にボタン）とそろえる。
+ * ボタンが出なかった。作成画面と同じく、本文の後に別のメッセージとして表示する。
  *
  * 吹き出しが無い古い配信は、従来の種別＋本文から1件分を作る。
  * 読めない中身は種別名だけにして、生の JSON は出さない。
@@ -20,6 +21,9 @@ export default function BroadcastMessagePreview({
   messageContent,
   buttons = null,
   unsentNote = false,
+  accountName = '公式アカウント',
+  avatar,
+  time = '',
 }: {
   bubbles?: BroadcastBubble[] | null
   messageType: string
@@ -27,6 +31,9 @@ export default function BroadcastMessagePreview({
   buttons?: BroadcastMessageButton[] | null
   /** 下書きのとき、まだ誰にも届いていないことを添える。 */
   unsentNote?: boolean
+  accountName?: string
+  avatar?: React.ReactNode
+  time?: string
 }) {
   const saved = (bubbles ?? []).filter(isPreviewBubble)
   const items: Array<{ key: string; type: string; text: string; location: LocationView | null }> =
@@ -41,6 +48,7 @@ export default function BroadcastMessagePreview({
       )}
       {items.map((item, index) => (
         <div key={item.key}>
+          <LinePreviewMessage accountName={accountName} avatar={avatar ?? accountName.slice(0, 1)} time={time} bare>
           {items.length > 1 && (
             <p className="mb-1 text-xs text-ink-faint">
               {index + 1}通目・{messageTypeLabel(item.type)}
@@ -48,7 +56,7 @@ export default function BroadcastMessagePreview({
           )}
           {item.type === 'text' ? (
             <p className="whitespace-pre-wrap rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-sm leading-6 text-ink shadow-card">
-              {item.text || 'テキストを入力すると表示されます'}
+              {fillPreviewSample(item.text || 'テキストを入力すると表示されます').text}
             </p>
           ) : item.type === 'flex' ? <LinePreviewFlex content={item.text} /> : item.location ? (
             <div className="rounded-card bg-canvas p-3 text-sm shadow-card">
@@ -68,17 +76,10 @@ export default function BroadcastMessagePreview({
               {contentExcerpt(item.type, item.text) || messageTypeLabel(item.type)}
             </p>
           )}
-          {index === 0 && (buttons ?? []).map((button) => (
-            <p
-              key={`${button.label}-${button.value}`}
-              className="mt-1 truncate rounded-control bg-accent-deep px-3 py-2 text-center text-xs font-medium text-on-accent"
-              title={button.value}
-            >
-              {button.label || 'ボタン'}
-            </p>
-          ))}
+          </LinePreviewMessage>
         </div>
       ))}
+      <LinePreviewButtons buttons={buttons ?? []} />
     </div>
   )
 }

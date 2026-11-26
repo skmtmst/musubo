@@ -1,5 +1,7 @@
 'use client'
 
+import { LinePreviewButtons } from '@/components/shared/line-preview'
+
 import type { AccountWithStats } from '@/contexts/account-context'
 import type { Tag } from '@line-crm/shared'
 import { BubblePreview } from './broadcast-preview-model'
@@ -76,7 +78,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const people = (value: number | null | undefined) => (value === null || value === undefined ? null : `${formatNumber(value)} 人`)
   const messagePreview = (compact: boolean) => <div className={styles.phonePreview}>
           <LinePreview compact={compact} accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
-            <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} time={scheduledLabel?.match(/\b\d{2}:\d{2}\b/)?.[0]} buttons={index === 0 ? messageButtons : []} />)}</div>
+            <div className="flex flex-col gap-3 text-ink">{previewBubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} time={scheduledLabel?.match(/\b\d{2}:\d{2}\b/)?.[0]} />)}<LinePreviewButtons buttons={messageButtons} /></div>
           </LinePreview>
           <p className={styles.previewCaption}>PC の LINE では見え方が少し変わります</p>
         </div>
