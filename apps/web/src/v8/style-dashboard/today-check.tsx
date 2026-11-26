@@ -51,7 +51,7 @@ export function TodayCheck({ cards, accountId, style, canWrite, onAction, extra 
           const badge = todayCheckBadge(card)
           return badge ? <StatusBadge key={card.id} tone="danger" size="micro" dot={false}>{badge}</StatusBadge> : null
         }) : null}
-        <DisclosureToggle open={!folded} controls={contentId} onToggle={toggle} />
+        <DisclosureToggle open={!folded} controls={contentId} onToggle={toggle} subject="今日の確認" />
       </div>
       <div id={contentId} hidden={folded}>
         {cards.map((card) => (

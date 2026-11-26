@@ -1407,3 +1407,4 @@
 - [口コミ一覧の列幅と受信日時の揃え](release-log/unreleased/PR-kenta-google-top.md) — 投稿者名や年付き日時で列がずれないように直した反映履歴。確認 2026-11-26。
 - [今日の確認の開閉と開店準備ガイドの閉じる操作](release-log/unreleased/PR-kenta-today-fold.md) — 反映履歴、確認 2026-11-26。
 - [操作の言葉と予約台帳の見やすさ](release-log/unreleased/PR-kenta-label-board.md) — 反映履歴、確認 2026-11-26。
+- [ホームの開閉操作の読み上げ](release-log/unreleased/PR-kenta-later-ui.md) — 反映履歴、確認 2026-11-26。

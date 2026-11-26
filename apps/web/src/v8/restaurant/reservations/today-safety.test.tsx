@@ -113,12 +113,23 @@ it('卓の表示名と定員を分け、空き枠は1時間の升目全体に重
  const onAdd=vi.fn()
  const {container}=render(<TodayView {...props} rows={[]} canWrite onAdd={onAdd} tables={[{...tables[0],label:'窓側',max_capacity:2}]}/> )
  const track=container.querySelector('[data-resource-id="t1"]') as HTMLElement
- expect(track.previousElementSibling?.textContent).toContain('窓側（T1）・2名')
+ expect(track.previousElementSibling?.getAttribute('title')).toBe('T1 窓側・2名')
+ expect(track.previousElementSibling?.querySelector('.sr-only')?.textContent).toBe('・')
+ expect(track.previousElementSibling?.querySelector('small')?.textContent).toBe('2名')
  const slot=within(track).getByRole('button',{name:/T1 17:00に予約を入れる/})
  expect(slot.getAttribute('data-placement')).toBe('timeline')
  expect(parseFloat((slot.parentElement as HTMLElement).style.width)).toBeCloseTo(100/6)
  fireEvent.click(slot)
  expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({tableId:'t1',time:'17:00'}))
+})
+
+it('同じ表示名の卓も卓番を先に出して見分けられる',()=>{
+ const list=tables.slice(0,2).map(t=>({...t,label:'窓側'}))
+ const {container}=render(<TodayView {...props} tables={list}/> )
+ for(const table of list){
+  const heading=container.querySelector(`[data-resource-id="${table.id}"]`)?.previousElementSibling
+  expect(heading?.firstChild?.textContent).toBe(`${table.code} 窓側`)
+ }
 })
 
 it('カレンダーをキーボードで操作し、確定した日へ切り替える',()=>{
@@ -142,10 +153,10 @@ it('右欄の各段と全体を開閉し、畳んだ時は正の件数だけ札�
  const care=within(side).getByRole('button',{name:'気をつけること'})
  fireEvent.click(care)
  expect(within(side).getByText(/承認待ち 1件・アレルギー 1件/)).toBeTruthy()
- fireEvent.click(within(side).getByRole('button',{name:'畳む'}))
+ fireEvent.click(within(side).getByRole('button',{name:'今日の確認を畳む'}))
  expect(within(side).getByText('注意 2')).toBeTruthy()
  expect(within(side).getByText('予約 1')).toBeTruthy()
  expect(within(side).queryByRole('button',{name:'気をつけること'})).toBeNull()
- fireEvent.click(within(side).getByRole('button',{name:'開く'}))
+ fireEvent.click(within(side).getByRole('button',{name:'今日の確認を開く'}))
  expect(within(side).getByRole('button',{name:'気をつけること'})).toBeTruthy()
 })

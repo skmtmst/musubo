@@ -161,7 +161,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               {`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}
             </Notice> : null} floor={visibleFloor} dates={[toYmd(day)]}
           onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={entries}
-          resourceNames={Object.fromEntries(columns.map(t=>[t.id,t.label?.trim() && t.label.trim() !== t.code ? `${t.label.trim()}（${t.code}）` : t.code]))}
+          resourceNames={Object.fromEntries(columns.map(t=>[t.id,t.label?.trim() && t.label.trim() !== t.code ? `${t.code} ${t.label.trim()}` : t.code]))}
           resources={columns.map(t=>({id:t.id,label:t.code,groupLabel:t.join_group ? `結合 ${t.join_group}` : undefined,capacity:t.max_capacity,active:!!t.is_active}))}
           canWrite={canWrite} busy={busy} onOpen={onDetail}
           onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);onReload()}}
@@ -175,7 +175,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
               {sideFolded && next ? <StatusBadge tone="danger" size="micro" dot={false}>次の予約 1</StatusBadge> : null}
               {sideFolded && careCount > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`注意 ${careCount}`}</StatusBadge> : null}
               {sideFolded && countedBookings.length > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`予約 ${countedBookings.length}`}</StatusBadge> : null}
-              <DisclosureToggle open={!sideFolded} controls={sideId} onToggle={toggleSide} />
+              <DisclosureToggle open={!sideFolded} controls={sideId} onToggle={toggleSide} subject="今日の確認" />
             </div>
             <div id={sideId} hidden={sideFolded}>
               <DisclosureItem title="次の予約" summary={nextSummary} empty={!next} open={sideOpen('next')} onOpenChange={value => setSideOpen('next', value)}>
