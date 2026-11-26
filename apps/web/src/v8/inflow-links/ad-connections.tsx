@@ -58,13 +58,17 @@ export default function AdConnectionsV8() {
   const [saveError, setSaveError] = useState('')
   const [editing, setEditing] = useState<AdEventMapping | null>(null)
   const generationRef = useRef(0)
+  const mappingsInFlightRef = useRef(false)
 
-  const loadMappings = useCallback(async () => {
+  const loadMappings = useCallback(async ({ userInitiated = false } = {}) => {
+    if (userInitiated && mappingsInFlightRef.current) return
     const generation = ++generationRef.current
     if (!accountId) {
+      mappingsInFlightRef.current = false
       setMapping({ kind: 'ready', rows: [] })
       return
     }
+    mappingsInFlightRef.current = true
     setMapping({ kind: 'loading' })
     try {
       const res = await api.adPlatforms.mappings(accountId)
@@ -74,13 +78,18 @@ export default function AdConnectionsV8() {
       saveErrors.capture(saveFailure);
 
       if (generation === generationRef.current) setMapping({ kind: 'error' })
+    } finally {
+      if (generation === generationRef.current) mappingsInFlightRef.current = false
     }
   }, [accountId, saveErrors])
 
   useEffect(() => {
     void loadMappings();
 
-    return () => { generationRef.current += 1 }
+    return () => {
+      generationRef.current += 1
+      mappingsInFlightRef.current = false
+    }
   }, [loadMappings])
 
   /*
@@ -181,7 +190,7 @@ export default function AdConnectionsV8() {
         kind="error"
         title="対応表を読み込めませんでした"
         description="対応は消えていません。読み直して、もう一度お試しください。"
-        onRetry={() => void loadMappings()}
+        onRetry={() => void loadMappings({ userInitiated: true })}
       />
     )
   } else if (mapping.rows.length === 0) {
@@ -239,13 +248,13 @@ export default function AdConnectionsV8() {
             kind="error"
             title="広告への送信の数を表示できませんでした"
             description="送信の記録は消えていません。読み直して、もう一度お試しください。"
-            onRetry={() => void model.reload()}
+            onRetry={() => { if (!model.loading) void model.reload() }}
           />
         ) : (
           <KpiBand aria-label="広告への送信の概要">
-            <KpiCard icon={<Send size={16} aria-hidden="true" />} title="送った件数" value={model.loading ? null : model.sentCount} unit="件" detail="この30日" />
-            <KpiCard icon={<Clock size={16} aria-hidden="true" />} title="待っている" value={model.loading ? null : model.pendingCount} unit="件" detail="送信処理を待っています" />
-            <KpiCard icon={<XCircle size={16} aria-hidden="true" />} title="断られた" value={model.loading ? null : model.failedCount} unit="件" detail="送信履歴で理由を見られます" />
+            <KpiCard icon={<Send size={16} aria-hidden="true" />} title="送った件数" loading={model.loading} value={model.loading ? null : model.sentCount} unit="件" detail={model.loading ? '読み込んでいます' : 'この30日'} />
+            <KpiCard icon={<Clock size={16} aria-hidden="true" />} title="待っている" loading={model.loading} value={model.loading ? null : model.pendingCount} unit="件" detail={model.loading ? '読み込んでいます' : '送信処理を待っています'} />
+            <KpiCard icon={<XCircle size={16} aria-hidden="true" />} title="断られた" loading={model.loading} value={model.loading ? null : model.failedCount} unit="件" detail={model.loading ? '読み込んでいます' : '送信履歴で理由を見られます'} />
             {/* やり直して成功の数を返す口が無いので「—」（0 にしない）。 */}
             <KpiCard icon={<RotateCw size={16} aria-hidden="true" />} title="やり直して成功" value={null} unit="" detail="自動でやり直し" />
           </KpiBand>
