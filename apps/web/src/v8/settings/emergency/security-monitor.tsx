@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState, { ListEmptyMessage } from '@/components/shared/list-state'
+import { notifySaved } from '@/components/shared/toast'
 import { isSaveConflict, SaveConflictBand } from '@/components/shared/save-conflict'
 import Notice from '@/components/shared/notice'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -123,8 +124,10 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
     setBusyId(pending.alert.id); setActionError(''); setActionConflict(false)
     try {
       const call = pending.action === 'acknowledge' ? securityMonitorApi.acknowledge : securityMonitorApi.resolve
-      await call(pending.alert.id, pending.alert.version, accountId)
+      const response = await call(pending.alert.id, pending.alert.version, accountId)
       if (!active.current) return
+      if (!response.success) throw new Error('update failed')
+      notifySaved(pending.action === 'acknowledge' ? '異常を確かめたことを記録しました。' : '異常を解決済みにしました。')
       setPending(null)
       invalidate()
       void load(true)
