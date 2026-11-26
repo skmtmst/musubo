@@ -18,7 +18,7 @@ export function isMobileShellPath(pathname: string | null | undefined): boolean 
   return pathname === MOBILE_ROOT || pathname.startsWith(`${MOBILE_ROOT}/`)
 }
 
-export type MobileTabId = 'talk' | 'todo'
+export type MobileTabId = 'today' | 'talk' | 'todo' | 'more'
 
 export type MobileTab = {
   id: MobileTabId
@@ -28,10 +28,12 @@ export type MobileTab = {
   permission: string | null
 }
 
-/** 下のタブ。段①はトークと対応だけ（今日・もっとは作ったら足す）。 */
+/** 下のタブ。権限に応じて見せる。 */
 export const MOBILE_TABS: readonly MobileTab[] = [
+  { id: 'today', label: '今日', href: '/m/today', permission: '/booking/bookings' },
   { id: 'talk', label: 'トーク', href: '/m/chats', permission: '/chats' },
   { id: 'todo', label: '対応', href: '/m/todo', permission: null },
+  { id: 'more', label: 'もっと', href: '/m/more', permission: null },
 ]
 
 /** 今の住所に当たるタブ。どれにも当たらなければ null。 */
