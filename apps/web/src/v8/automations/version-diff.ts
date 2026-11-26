@@ -22,7 +22,11 @@ const FAILURE_LABELS: Record<string, string> = {
 }
 
 function stepLabel(type: string): string {
-  return ACTION_LABELS[type] ?? '処理'
+  return Object.prototype.hasOwnProperty.call(ACTION_LABELS, type) ? ACTION_LABELS[type] : '処理'
+}
+
+function failureLabel(value: string): string {
+  return Object.prototype.hasOwnProperty.call(FAILURE_LABELS, value) ? FAILURE_LABELS[value] : '動作を確認できません'
 }
 
 function waitMinutes(params: Record<string, unknown>): number | null {
@@ -81,7 +85,7 @@ function describeStepChange(oldStep: CommonActionStep, newStep: CommonActionStep
     }
   }
   if (oldStep.onFailure !== newStep.onFailure) {
-    lines.push(`「${label}」の失敗時を「${FAILURE_LABELS[oldStep.onFailure] ?? oldStep.onFailure}」から「${FAILURE_LABELS[newStep.onFailure] ?? newStep.onFailure}」にした`)
+    lines.push(`「${label}」の失敗時を「${failureLabel(oldStep.onFailure)}」から「${failureLabel(newStep.onFailure)}」にした`)
   }
   if (newStep.type === 'branch') {
     lines.push(...describeBranchChange(oldStep, newStep))
