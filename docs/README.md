@@ -18,16 +18,13 @@
 - [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
-<<<<<<< HEAD
 - [画面の読み込みと案内の修正の反映履歴](release-log/unreleased/266-kenta-train-night3-1127.md)（説明・2026-11-27確認）
 - [契約先の操作履歴の表示の反映履歴](release-log/unreleased/PR-kenta-tenant-audit-unknown.md)（説明・2026-11-27確認）
 - [アカウントのアーカイブ理由の反映履歴](release-log/unreleased/PR-kenta-archive-blocker-unknown.md)（説明・2026-11-27確認）
 - [ファネルの未対応条件の反映履歴](release-log/unreleased/PR-kenta-funnel-unknown-kind.md)（説明・2026-11-27確認）
-=======
 - [EC連携の未対応の出来事の反映履歴](release-log/unreleased/259-kenta-ec-unknown-event.md)（説明・2026-11-27確認）
 - [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
->>>>>>> origin/codex/development
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
@@ -1415,10 +1412,8 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-<<<<<<< HEAD
 - [カルーセル編集と質問テンプレート編集の読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini6-1127.md) — 反映履歴、確認 2026-11-27。
 - [リッチビデオ編集と運用状態の更新履歴の読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini7-1127.md) — 反映履歴、確認 2026-11-27。
-=======
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
@@ -1432,4 +1427,3 @@
 - [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
->>>>>>> origin/codex/development
