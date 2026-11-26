@@ -9,6 +9,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { NotificationCenterItem } from '@line-crm/shared'
+import { formatDateTime } from '@/lib/format'
 
 const push = vi.fn()
 const fx = vi.hoisted(() => ({ query: '', role: 'owner' as string | null }))
@@ -75,6 +76,17 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('V8 通知', () => {
+  test('新しい通知は相対時刻と正確な日時を示し、日時が不正な通知も残す', async () => {
+    const recent = new Date(Date.now() - 2 * 60 * 60_000).toISOString()
+    items = [item('recent', 'test', 'update', '最近の通知', false, recent), item('invalid', 'test', 'update', '日時のない通知', true, 'invalid')]
+    render(<NotificationsV8 />)
+    const row = (await screen.findByText('最近の通知')).closest('li')!
+    const time = within(row).getByText('2時間前')
+    expect(time.getAttribute('title')).toBe(formatDateTime(recent, '日時不明'))
+    const invalidRow = screen.getByText('日時のない通知').closest('li')!
+    expect(within(invalidRow).getByText('日時不明').getAttribute('title')).toBe('日時不明')
+  })
+
   test('統括からの通知は更新履歴と運用状態に戻り先を引き継ぐ', async () => {
     fx.query = 'from=hq'
     render(<NotificationsV8 />)
