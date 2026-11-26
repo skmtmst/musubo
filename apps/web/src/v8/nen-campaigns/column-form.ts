@@ -200,7 +200,7 @@ export function failureOf(input: { status?: number; code?: string }): Failure {
   if (input.status === 409) {
     return { kind: 'conflict', message: CODE_MESSAGE.column_already_exists }
   }
-  const known = input.code ? CODE_MESSAGE[input.code] : undefined
+  const known = input.code && Object.prototype.hasOwnProperty.call(CODE_MESSAGE, input.code) ? CODE_MESSAGE[input.code] : undefined
   if (input.status === 400 || input.status === 413) {
     return { kind: 'input', message: known ?? CODE_MESSAGE.request_invalid }
   }
