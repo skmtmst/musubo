@@ -1428,3 +1428,4 @@
 - [初回案内とリッチメニューの参照表示](release-log/unreleased/PR-kenta-later-codex25.md) — 反映履歴。確認 2026-11-27。
 - [UID移行と申込一覧の状態表示](release-log/unreleased/PR-kenta-later-codex26.md) — 反映履歴。確認 2026-11-27。
 - [通知記録とシナリオのアクション件数](release-log/unreleased/PR-kenta-later-codex27.md) — 反映履歴。確認 2026-11-27。
+- [友だち追加の実行結果と統括一括配信一覧の読み込み失敗表示と再読み込み](release-log/unreleased/PR-kenta-later-gemini18-1127.md) — 反映履歴、確認 2026-11-27。

@@ -25,6 +25,7 @@ import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
@@ -100,7 +101,10 @@ export default function HqBroadcastList() {
   const role = useStaffRole()
   const canManage = useTenantWideAccess()
   const [runs, setRuns] = useState<HqBroadcastRun[] | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<unknown>(null)
+  const listSeqRef = useRef(0)
+  const listInFlightRef = useRef<number | null>(null)
   const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useState<StatusKey>('all')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
@@ -109,6 +113,21 @@ export default function HqBroadcastList() {
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
   /* 左の列のフォルダ（店の一斉配信と同じ。API-18 の統括のフォルダ）。読めなくても一覧は出す。 */
   const [folders, setFolders] = useState<HqFolder[] | null>(null)
+  const [folderLoading, setFolderLoading] = useState(true)
+  const [folderLoadError, setFolderLoadError] = useState(false)
+  const folderSeqRef = useRef(0)
+  const folderInFlightRef = useRef<number | null>(null)
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      listSeqRef.current += 1
+      listInFlightRef.current = null
+      folderSeqRef.current += 1
+      folderInFlightRef.current = null
+    }
+  }, [])
   const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', 'all')
   const [folderDialog, setFolderDialog] = useState<{ editing: HqFolder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
@@ -126,30 +145,55 @@ export default function HqBroadcastList() {
   })
   const [folderError, setFolderError] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && listInFlightRef.current !== null) return
+    const seq = ++listSeqRef.current
+    listInFlightRef.current = seq
+    setLoading(true)
+    setError(null)
     try {
       const res = await hqBroadcastsApi.list()
-      setRuns(res.data); setError(null)
+      if (!aliveRef.current || seq !== listSeqRef.current) return
+      if (!res || (res as { success?: boolean }).success === false || !Array.isArray(res.data)) {
+        throw new Error('invalid_hq_broadcast_list')
+      }
+      setRuns(res.data)
+      setError(null)
     } catch (caught) {
+      if (!aliveRef.current || seq !== listSeqRef.current) return
       const fieldFailure = saveErrors.capture(caught)
-
-      { if (!fieldFailure)
-
-      setError(caught)
-    }
-  }
-  }, [saveErrors]);
-
-  const loadFolders = useCallback(async () => {
-    try {
-      const res = await hqBroadcastsApi.folders()
-      setFolders(res.data)
-    } catch (saveFailure) {
-      saveErrors.capture(saveFailure)
-      setFolders(null)
+      if (!fieldFailure) setError(caught)
+    } finally {
+      if (listInFlightRef.current === seq) listInFlightRef.current = null
+      if (aliveRef.current && seq === listSeqRef.current) setLoading(false)
     }
   }, [saveErrors])
-  useEffect(() => { void load(); void loadFolders() }, [load, loadFolders]);
+
+  const loadFolders = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && folderInFlightRef.current !== null) return
+    const seq = ++folderSeqRef.current
+    folderInFlightRef.current = seq
+    setFolderLoading(true)
+    setFolderLoadError(false)
+    try {
+      const res = await hqBroadcastsApi.folders()
+      if (!aliveRef.current || seq !== folderSeqRef.current) return
+      if (!res || (res as { success?: boolean }).success === false || !Array.isArray(res.data)) {
+        throw new Error('invalid_hq_broadcast_folders')
+      }
+      setFolders(res.data)
+      setFolderLoadError(false)
+    } catch (saveFailure) {
+      if (!aliveRef.current || seq !== folderSeqRef.current) return
+      saveErrors.capture(saveFailure)
+      setFolders(null)
+      setFolderLoadError(true)
+    } finally {
+      if (folderInFlightRef.current === seq) folderInFlightRef.current = null
+      if (aliveRef.current && seq === folderSeqRef.current) setFolderLoading(false)
+    }
+  }, [saveErrors])
+  useEffect(() => { void load({ force: true }); void loadFolders({ force: true }) }, [load, loadFolders]);
 
 
   const all = useMemo(() => runs ?? [], [runs])
@@ -171,7 +215,9 @@ export default function HqBroadcastList() {
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
 
   /* 数の帯（一括配信の記録から数えられるもの）。 */
-  const ready = runs !== null
+  const ready = !loading && !error && runs !== null
+  const listFailed = Boolean(error) && runs === null
+  const kpiFallback = listFailed ? '読み込めませんでした' : emptyValue('unknown')
   const sentRuns = all.filter((run) => statusKeyOf(run) === 'sent')
   const delivered = sentRuns.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded).reduce((s, t) => s + t.successCount, 0), 0)
   const failedStores = all.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded && (t.status === 'failed' || failedCount(t) > 0)).length, 0)
@@ -185,10 +231,10 @@ export default function HqBroadcastList() {
   const openReached = sentTargets.reduce((sum, t) => sum + t.successCount, 0)
   const openRate = openKnown && openReached > 0 ? Math.round((sentTargets.reduce((sum, t) => sum + (t.openedCount ?? 0), 0) / openReached) * 1000) / 10 : null
   const kpis = [
-    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : emptyValue('unknown') },
-    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : emptyValue('unknown') },
-    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : emptyValue('unknown') },
-    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : emptyValue('unknown') },
+    { key: 'scheduled', title: '予約中', icon: CalendarClock, value: ready ? counts.scheduled : null, unit: '件', detail: ready ? `下書き ${formatNumber(counts.draft)}件` : kpiFallback },
+    { key: 'sent', title: '送った配信', icon: Send, value: ready ? counts.sent : null, unit: '件', detail: ready ? `${formatNumber(delivered)}人に届いた` : kpiFallback },
+    { key: 'error', title: 'エラー', icon: AlertCircle, value: ready ? counts.error : null, unit: '件', detail: ready ? `失敗したアカウント ${formatNumber(failedStores)}件` : kpiFallback },
+    { key: 'open', title: '平均の開封率', icon: MailOpen, value: ready ? openRate : null, unit: '%', detail: ready ? (openRate == null ? 'まだ数えていません' : '送った配信の合計') : kpiFallback },
   ]
 
   const createButton = (full: boolean) => (
@@ -225,7 +271,7 @@ export default function HqBroadcastList() {
     try {
       if (folderDialog.editing) await hqBroadcastsApi.updateFolder(folderDialog.editing.id, name, latestFolder(folderDialog.editing).revision, folderColor)
       else await hqBroadcastsApi.createFolder(name, folderColor)
-      await loadFolders()
+      await loadFolders({ force: true })
       setFolderDialog(null)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
@@ -234,11 +280,11 @@ export default function HqBroadcastList() {
 
       if (failure.kind === 'missing') {
         notifyToast(failure.message, { tone: 'error' })
-        await loadFolders()
+        await loadFolders({ force: true })
         setFolderDialog(null)
         return
       }
-      if (failure.kind === 'conflict') await loadFolders()
+      if (failure.kind === 'conflict') await loadFolders({ force: true })
       if (failure.nameError) { if (!fieldFailure) setFolderNameError(failure.nameError) }
       else { if (!fieldFailure) setFolderError(failure.message) }
     } finally {
@@ -254,7 +300,7 @@ export default function HqBroadcastList() {
       if (renderedFolderDeleteTicket !== folderDeleteTicket.current) return
       folderDeleteTicket.current = null
       setDeletingFolder(null); setFolderFilter('all')
-      await loadFolders()
+      await loadFolders({ force: true })
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
 
@@ -265,10 +311,10 @@ export default function HqBroadcastList() {
         folderDeleteTicket.current = null
         setDeletingFolder(null)
         notifyToast(failure.message, { tone: 'error' })
-        await loadFolders()
+        await loadFolders({ force: true })
         return
       }
-      if (failure.kind === 'conflict') await loadFolders()
+      if (failure.kind === 'conflict') await loadFolders({ force: true })
       { if (!fieldFailure)
       setFolderError(failure.message) }
     } finally {
@@ -280,6 +326,24 @@ export default function HqBroadcastList() {
   /* 店の一覧と同じ2段：探す／札 … 件数・並び。1段にまとめると件数と並びが縦に割れる。 */
   const toolbar = (
     <ListToolbarFrame layout="stacked">
+      {folderLoadError ? (
+        <Notice
+          tone="warn"
+          message="フォルダを読み込めませんでした。一覧の確認はそのまま続けられます。"
+          action={
+            <Button
+              variant="text"
+              size="inline"
+              onClick={() => void loadFolders()}
+              disabled={folderLoading}
+              busy={folderLoading}
+              busyLabel="読み込んでいます"
+            >
+              フォルダを読み直す
+            </Button>
+          }
+        />
+      ) : null}
       <ListToolbarRow>
         <ListToolbarSearchSlot>
           <SearchField aria-label="タイトル・内容で探す" placeholder="タイトル・内容で探す" value={query} onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
@@ -313,7 +377,8 @@ export default function HqBroadcastList() {
   const firstEmpty = !error && runs != null && filtered.length === 0 && !hasFilters
 
   let content
-  if (error && !runs) content = <ListState permissionScope="hq" kind="error" error={error} onRetry={() => void load()} />
+  if (loading && !runs) content = <ListState permissionScope="hq" kind="loading" />
+  else if (error && !runs) content = <ListState permissionScope="hq" kind="error" error={error} onRetry={() => void load()} />
   else if (!runs) content = <ListState permissionScope="hq" kind="loading" />
   else if (filtered.length === 0) {
     content = (
@@ -410,7 +475,7 @@ export default function HqBroadcastList() {
       stats={(
         <KpiBand>
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" density="compact" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
+            <KpiCard key={kpi.key} presentation="band" density="compact" loading={loading && runs === null} title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       )}
