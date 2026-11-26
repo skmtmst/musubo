@@ -1405,3 +1405,4 @@
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 - [パスキー一覧とかんたんに送るの読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini8-1127.md) — 反映履歴、確認 2026-11-27。
+- [読み込みの再試行と保存のお知らせ](release-log/unreleased/PR-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
