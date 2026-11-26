@@ -312,6 +312,11 @@
 :global(:root) .frame[data-has-footer] > .settingsFlow > .settings { min-height: 0; overflow-y: auto; }
 :global(:root) .frame[data-has-footer] > [data-template-region='body'],
 :global(:root) .frame[data-has-footer] > .settingsFlow > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
+/* 下部の操作帯があるウィザードは、本文末尾を帯の上へ送れる余白を持つ。 */
+:global(:root) .frame[data-page-template='wizard'][data-has-footer]:has(> .footer) > [data-template-region='body']::after {
+  --tpl-wizard-footer-clearance: 96px;
+  content: ''; display: block; flex: none; height: var(--tpl-wizard-footer-clearance);
+}
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
 :global(:root) .footer[data-shadow-inset] { margin-inline: calc(var(--polish-space-section) * 2); margin-bottom: calc(var(--polish-space-section) * 2 + var(--space-8)); }
