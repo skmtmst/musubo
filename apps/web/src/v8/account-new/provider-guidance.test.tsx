@@ -80,6 +80,8 @@ function confirmation() {
   const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
   const next = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
   fill('v8-channel-id', '1234567890'); fill('v8-channel-secret', 'a'.repeat(32)); next()
+  expect(screen.getByText('Messaging APIチャネルのプロバイダーIDを入力します。')).toBeTruthy()
+  expect(screen.queryByText('Messaging APIとLINEログインを同じプロバイダーにつなぎます。')).toBeNull()
   fill('v8-provider-id', '2000000001'); next()
   WEBHOOK_ACKS.forEach(ack => fireEvent.click(screen.getByRole('checkbox', { name: ack.label }))); next()
   fill('v8-login-channel-id', '2000000002'); fill('v8-login-channel-secret', 'b'.repeat(32))
