@@ -12,6 +12,8 @@ import { DetailPage } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { formatNumber } from '@/lib/format';
@@ -85,6 +87,7 @@ function Connections() {
   const router = useRouter()
   const groupId = useSearchParams().get('id') ?? ''
   const canEdit = useFeatureAccess('richMenus')
+  const editReason = usePermissionLockReason(canEdit)
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const activeAccountIdRef = useRef(selectedAccountId)
   const requestGenerationRef = useRef(0)
@@ -165,7 +168,7 @@ function Connections() {
   const taps = group.monthlyStats?.taps ?? null
 
   const menuItems: ActionMenuItem[] = [
-    ...(canEdit && pages.length >= MAX_PAGES ? [{ id: 'buttons', label: 'ボタンの動きを直す', href: buttonsHref, onSelect: () => router.push(buttonsHref) }] : []),
+    ...(pages.length >= MAX_PAGES ? [{ id: 'buttons', label: 'ボタンの動きを直す', ...(canEdit ? { href: buttonsHref, onSelect: () => router.push(buttonsHref) } : { lockedReason: editReason, disabled: !editReason }) }] : []),
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -226,15 +229,15 @@ function Connections() {
           })}
         </div>
         <div className={styles.addRow}>
-          {canEdit && pages.length < MAX_PAGES ? (
-            <Button variant="text" href={buttonsHref}><Plus size={16} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
+          {pages.length < MAX_PAGES ? (
+            <PermissionGatedButton allowed={canEdit} variant="text" href={buttonsHref}><Plus size={16} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</PermissionGatedButton>
           ) : pages.length >= MAX_PAGES ? <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span> : null}
           <span className={styles.count}>{`${pages.length} 枚`}</span>
         </div>
       </Card>
       <CreateSummaryCard title="よくある事故の見張り" beforeRows={noReturn.map(page => (
         <Notice key={page.id} tone="warn" message={`「${page.name}」に${entry ? `${entry.name}へ` : ''}戻るタブがありません。押した人が元のメニューに帰れません。`}
-          action={canEdit ? <Button href={buttonsHref}>{`${page.name}を開いて直す`}</Button> : undefined} />
+          action={<PermissionGatedButton allowed={canEdit} href={buttonsHref}>{`${page.name}を開いて直す`}</PermissionGatedButton>} />
       ))} rows={[
         ...(analysis.missingTargetEdges.length > 0 ? [{ label: '切替先が見つからないタブ', value: <StatusBadge tone="danger">{`${formatNumber(analysis.missingTargetEdges.length)} 件`}</StatusBadge> }] : []),
         ...(analysis.unreachablePageIds.size > 0 ? [{ label: 'どこからも来られないメニュー', value: <StatusBadge tone="danger">{`${analysis.unreachablePageIds.size} 件`}</StatusBadge> }] : []),
