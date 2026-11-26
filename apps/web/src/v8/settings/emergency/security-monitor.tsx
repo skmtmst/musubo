@@ -51,6 +51,7 @@ function monitorView(monitor: SecurityAlertsResponse['data']['monitor'], now: nu
   if (monitor.status === 'failed') return { tone: 'danger', label: '見張りが失敗しています', late: true }
   if (monitor.status === 'unknown' || Number.isNaN(completed)) return { tone: 'neutral', label: 'まだ確認できていません', late: true }
   if (monitor.status === 'stale' || late) return { tone: 'warning', label: '見張りが止まっているかもしれません', late: true }
+  if (monitor.status !== 'running') return { tone: 'neutral', label: '見張りの状態を確認できません', late: true }
   return { tone: 'success', label: '見張りは動いています', late: false }
 }
 
@@ -162,7 +163,7 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
 
       {view.late ? (
         <Notice tone="danger" role="alert">
-          {data.monitor.status === 'failed' ? '見張りの処理が失敗しています。最新の異常を確認できていない可能性があります。' : '見張りの最後の完了が15分以上前か、まだ確認できていません。見張りそのものが止まっている可能性があります。'}この間は、異常があっても一覧に出ません。時間をおいても直らないときは、運営へ連絡してください。
+          {data.monitor.status === 'failed' ? '見張りの処理が失敗しています。最新の異常を確認できていない可能性があります。' : !['running', 'stale', 'unknown'].includes(data.monitor.status) ? '見張りの状態を確認できません。見張りそのものが止まっている可能性があります。' : '見張りの最後の完了が15分以上前か、まだ確認できていません。見張りそのものが止まっている可能性があります。'}この間は、異常があっても一覧に出ません。時間をおいても直らないときは、運営へ連絡してください。
         </Notice>
       ) : null}
       {!data.configurationValid ? (
@@ -191,18 +192,20 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
               </GridHeadRow>
             </div>
             <div role="rowgroup">
-              {data.items.filter((item): item is SecurityAlert & { status: 'open' | 'acknowledged' } => item.status !== 'resolved').map((item) => (
-                <GridRow key={item.id}>
+              {data.items.filter((item): item is SecurityAlert & { status: 'open' | 'acknowledged' } => item.status !== 'resolved').map((item) => {
+                const knownStatus = Object.prototype.hasOwnProperty.call(STATUS, item.status) ? STATUS[item.status] : null
+                const notification = Object.prototype.hasOwnProperty.call(NOTIFICATION_LABEL, item.notification) ? NOTIFICATION_LABEL[item.notification] : '通知不明'
+                return <GridRow key={item.id}>
                   <GridCell role="cell" className={styles.stack}>
                     <span className={styles.main} title={item.summary}><TruncatedText value={item.summary} /></span>
                     <span className={styles.sub}>初回：{formatOperationDate(item.firstDetectedAt)}</span>
                   </GridCell>
                   <GridCell role="cell" className={styles.num}>{formatNumber(item.count)}<span className={styles.sub}>基準 {formatNumber(item.threshold)}</span></GridCell>
                   <GridCell role="cell"><TruncatedText value={formatOperationDate(item.lastDetectedAt)} /></GridCell>
-                  <GridCell role="cell"><TruncatedText value={NOTIFICATION_LABEL[item.notification]} /></GridCell>
-                  <GridCell role="cell"><StatusBadge tone={STATUS[item.status].tone}>{STATUS[item.status].label}</StatusBadge></GridCell>
+                  <GridCell role="cell"><TruncatedText value={notification} /></GridCell>
+                  <GridCell role="cell"><StatusBadge tone={knownStatus?.tone ?? 'neutral'}>{knownStatus?.label ?? '状態不明'}</StatusBadge></GridCell>
                   <GridCell role="cell" className={styles.actions}>
-                    {canOperate ? <>
+                    {canOperate && knownStatus ? <>
                       <RowActions subjectName={item.summary} menuItems={[
                         ...(item.status === 'open' ? [{ id: 'acknowledge', label: '確かめた', disabled: busyId !== null, onSelect: () => { setActionError(''); setActionConflict(false); setPending({ alert: item, action: 'acknowledge' }) } }] : []),
                         { id: 'resolve', label: '解決した', disabled: busyId !== null, onSelect: () => { setActionError(''); setActionConflict(false); setPending({ alert: item, action: 'resolve' }) } },
@@ -210,7 +213,7 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
                     </> : null}
                   </GridCell>
                 </GridRow>
-              ))}
+              })}
             </div>
           </GridTable>
         )}
