@@ -310,3 +310,15 @@ it.each(['', 'tab=library'])('数・タブ・説明とフォルダなしの作�
   expect(frame.querySelector('[data-template-region="heading"] button[aria-label="この画面の説明"]')).toBeTruthy()
   expect(within(frame.querySelector<HTMLElement>('[data-template-region="heading"]')!).getByRole('button', { name: query ? '画像を取り込む' : 'プロジェクトを作る', exact: true })).toBeTruthy()
 })
+
+it('空一覧では閲覧のみのプロジェクト作成を理由付きで止める', async () => {
+    roleBox.role = 'viewer'
+    listProjects.mockResolvedValue({ success: true, data: [] })
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    const b = buttonNamed('最初のプロジェクトを作る')!
+    expect(b.getAttribute('aria-disabled')).toBe('true')
+    expect(host.textContent).toContain('統括の管理権限が必要です')
+    act(() => { b.click() })
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+  })

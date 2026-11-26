@@ -1354,11 +1354,9 @@ export default function RemindersListV8() {
           </ManagedFolderPanel>
         </>}
         collapsedFolders={<>
-          {canEdit ? (
-            <Button href="/reminders/new" variant="primary">
-              ＋ リマインダを作る
-            </Button>
-          ) : null}
+          <PermissionGatedButton allowed={canEdit} href="/reminders/new" variant="primary">
+            ＋ リマインダを作る
+          </PermissionGatedButton>
           {folderSelect}
         </>}
         toolbar={<>

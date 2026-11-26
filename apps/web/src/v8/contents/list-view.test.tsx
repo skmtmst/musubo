@@ -15,7 +15,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const fixture = vi.hoisted(() => ({ role: 'admin' as 'admin' | 'staff' }))
+const fixture = vi.hoisted(() => ({ role: 'admin' as 'admin' | 'staff' | 'viewer' }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
@@ -419,4 +419,15 @@ describe('フォルダの列（R37）', () => {
     await expectLockedFolderMenu(host.querySelector('button[aria-label="フォルダ「01_商品写真」の操作"]'))
     expect(host.textContent).toContain('01_商品写真')
   })
+  it('空の一覧では閲覧のみの人はメディアを登録できない', async () => {
+    fixture.role = 'viewer'
+    media = []
+    await render()
+    const create = button('最初のメディアを登録する')!
+    expect(create).toBeTruthy()
+    expect(create.disabled || create.getAttribute('aria-disabled') === 'true').toBe(true)
+    await click(create)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+  })
+
 })

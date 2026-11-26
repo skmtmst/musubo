@@ -11,8 +11,9 @@ type Need = Exclude<PermissionLockKind, 'viewer'>
  * 権限があればふつうの Button。無ければ押す先（onClick・href）を外し、理由を Button の lockedReason へ渡す。
  * 押下・Enter・スペースの防止と吹き出しは Button が持つ。役割が読めるまでは理由が無いので押せないだけにする。
  */
-export default function PermissionGatedButton({ allowed, need = 'feature', ...props }: ButtonProps & { allowed: boolean; need?: Need }) {
-  const reason = usePermissionLockReason(allowed, need)
+export default function PermissionGatedButton({ allowed, need = 'feature', deniedReason, ...props }: ButtonProps & { allowed: boolean; need?: Need; deniedReason?: string }) {
+  const standardReason = usePermissionLockReason(allowed, need)
+  const reason = deniedReason ?? standardReason
   if (allowed) return <Button {...(props as ButtonProps)} />
   const locked = { ...(props as Record<string, unknown>) }
   delete locked.onClick
