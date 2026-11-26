@@ -33,6 +33,7 @@
 - ［休みを入れる］：飲食は既存の `restaurantTestApi.createClosure`（卓は tableIds）、ほかは `styleApi.closeHours` を担当 1 人ずつ（途中の失敗をまとめて成功にしない）。既存の予約は取り消さない。
 - 教室の名簿：既存の `eventsApi.listBookings`（回＝slot_id）、出席は `eventsApi.updateBooking(status=attended)`。
 - 飲食：口が読めないときは今の飲食の口から組み立てる（`restaurant-today.ts`）。異常の帯は今の「枠を閉じる知らせ」。
+- 飲食の表示店舗を確認できないときは全体情報を保ち、店舗の選択先と読み直しを案内する。店舗を使う操作は確認できるまで止める。
 - 口が無い物（支払いの札・今日の入金・支払いのリンク・返金・お支払いのカード）は値を作らず、押すと共通の準備中の窓（`preparing-dialog.tsx`・B-314）。
 
 ## 操作
