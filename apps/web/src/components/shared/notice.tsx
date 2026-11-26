@@ -166,7 +166,7 @@ export default function Notice({
       {helpHref ? <a href={helpHref}>くわしく</a> : null}
     </HelpTip>
   ) : null
-  const closeButton = onClose ? <button type="button" className={styles.close} data-notice-close onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null
+  const closeButton = onClose ? <button data-close-control="" type="button" className={styles.close} data-notice-close onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null
   return (
     <div
       {...props}

@@ -92,7 +92,7 @@
   cursor: pointer;
 }
 
-.close:hover:not(:disabled) {
+.close:is(:hover, :focus-visible):not(:disabled) {
   background: var(--color-canvas-sunken);
 }
 

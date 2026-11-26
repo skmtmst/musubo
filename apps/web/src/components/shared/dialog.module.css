@@ -343,7 +343,7 @@
   margin: var(--polish-space-field) 0 var(--polish-space-card);
 }
 :root .panel[data-design-layout^='stacked'] > .descriptionBand { padding: 0; margin: 0; }
-:root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+:root .close { border: 0; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
 :root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
