@@ -18,6 +18,7 @@ const mockPush = vi.fn()
 
 const summary = { active: 1, trialing: 0, suspended: 0, pastDue: 0 }
 let postedBody: unknown = null
+let tenantRows: Array<Record<string, unknown>> = []
 
 let host: HTMLDivElement
 let root: Root
@@ -26,11 +27,12 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   mockPush.mockReset()
   postedBody = null
+  tenantRows = []
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (url.endsWith('/api/ops/tenants') && (!init || !init.method || init.method === 'GET')) {
-      return new Response(JSON.stringify({ success: true, data: [], summary }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ success: true, data: tenantRows, summary }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (url.endsWith('/api/tenants') && init?.method === 'POST') {
       postedBody = JSON.parse(String(init.body))
@@ -71,6 +73,25 @@ function setInputValue(input: HTMLInputElement, value: string) {
   setter.call(input, value)
   input.dispatchEvent(new Event('input', { bubbles: true }))
 }
+
+describe('契約先の請求状態', () => {
+  it('未知の状態を解約済みと決めつけず、既知の解約はそのまま出す', async () => {
+    const base = { status: 'active', featurePacks: [], plan_key: 'standard', trial_ends_at: null, current_period_ends_at: null, created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-01T00:00:00Z', account_count: 1, staff_count: 1, last_login_at: null }
+    tenantRows = [
+      { ...base, id: 'unknown', name: '見本 未知', plan_status: 'constructor' },
+      { ...base, id: 'known', name: '見本 解約', plan_status: 'canceled' },
+    ]
+    await act(async () => { root.render(<OpsTenantsPage />) })
+    await flush()
+    const rows = Array.from(host.querySelectorAll('tbody tr'))
+    const unknown = rows.find((row) => row.textContent?.includes('見本 未知'))!
+    const known = rows.find((row) => row.textContent?.includes('見本 解約'))!
+    expect(unknown.textContent).toContain('確認が必要')
+    expect(unknown.textContent).not.toContain('請求解約')
+    expect(unknown.querySelector('[title*="請求"]')?.getAttribute('title')).toContain('請求 constructor')
+    expect(known.textContent).toContain('請求解約')
+  })
+})
 
 describe('契約先を作る小窓（板 i0FTN）', () => {
   it('一覧には出さず、押したときだけ小窓が出る', async () => {
