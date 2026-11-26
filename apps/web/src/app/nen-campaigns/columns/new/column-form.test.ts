@@ -80,6 +80,11 @@ describe('失敗の言い換え', () => {
     expect(failureOf({ status: 413, code: 'payload_too_large' }).message).toContain('本文は入力せず')
   })
 
+  it.each(['constructor', 'toString', '__proto__'])('未登録のコード %s は状態ごとの案内を返す', (code) => {
+    expect(failureOf({ status: 400, code })).toEqual({ kind: 'input', message: '送れない項目が含まれていました。入力を確認してください。' })
+    expect(failureOf({ status: 500, code })).toEqual({ kind: 'failure', message: '下書きを保存できませんでした。時間をおいて、もう一度お試しください。' })
+  })
+
   it('権限不足と入力の誤りと保存失敗を混ぜない', () => {
     // 読む人が次にすることが違う。
     expect(failureOf({ status: 403 }).kind).toBe('forbidden')
