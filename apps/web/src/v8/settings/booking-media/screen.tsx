@@ -521,6 +521,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
           )}
         />
         <div className={styles.body}>
+          {storeSelection.contextId === null && storeSelection.id && (role === 'owner' || role === 'admin' || role === 'staff') ? <Notice tone="info" action={<Button onClick={() => void storeSelection.switchContext(true)} busy={storeSelection.switching}>この店舗を表示店舗にする</Button>}>管理画面の表示店舗はまだ選ばれていません。必要なら、この店舗を表示店舗にできます。</Notice> : null}
           {conflict ? (
             <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>}>
               ほかの人が先にこの店の媒体の設定を変えました。読み直してから、もう一度変えてください。

@@ -122,7 +122,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const viewErrors = useSaveFormErrors()
   const restaurantStoreReady = Boolean(accountId && !store.loading && !store.error && store.tableDefinition?.accountId === accountId && store.tableDefinition.snapshot === store.snapshot && store.store && store.snapshot?.stores.includes(store.store))
   const cancelStoreId = cancelRow?.booking?.storeId ?? store.today?.find(row => row.id === cancelRow?.reservationId)?.store_id
-  const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。読み直してからお試しください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
+  const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。店舗の選択を確認するか、読み直してください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
   const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
     <>
@@ -256,6 +256,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {absence.notice}
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
+        {style === 'restaurant' && store.error ? <Notice tone="warn" action={<>{canWrite ? <Button href="/settings/booking-media">店舗の選択を確認する</Button> : null}<Button onClick={() => void store.reload()}>店舗情報を読み直す</Button></>}>{canWrite ? '店舗情報を確認できませんでした。店舗の選択を確認するか、読み直してください。' : '店舗情報を確認できませんでした。読み直しても解決しない場合は管理者にお問い合わせください。'}</Notice> : null}
         {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide} firstMessageInline={style === 'restaurant'}

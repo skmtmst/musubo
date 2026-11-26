@@ -3,23 +3,25 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { deferred } from '@/test-utils/race'
-const net = vi.hoisted(() => ({ account: 'a', contextId: null as string | null, list: vi.fn(), context: vi.fn(), select: vi.fn(), media: vi.fn(), save: vi.fn(), link: vi.fn(), channels: vi.fn(), notice: vi.fn(), saveNotice: vi.fn() }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
+const net = vi.hoisted(() => ({ account: 'a', role: 'owner', contextId: null as string | null, list: vi.fn(), context: vi.fn(), select: vi.fn(), media: vi.fn(), save: vi.fn(), link: vi.fn(), channels: vi.fn(), tasks: vi.fn(), notice: vi.fn(), saveNotice: vi.fn() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/close-tasks', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: net.account }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {}, useHideSettingsNav: () => {} }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => net.role, canManageRole: () => net.role === 'owner' || net.role === 'admin' }))
 vi.mock('@/lib/api', async load => ({ ...await load<typeof import('@/lib/api')>(), fetchApi: net.channels }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: {
   listStores: net.list, storeContext: net.context, selectStore: net.select,
   mediaLinks: net.media, saveMediaLink: net.save, reservationLink: net.link,
+  channelCloseTasks: net.tasks,
   closeNotificationSettings: net.notice, saveCloseNotificationSettings: net.saveNotice,
   snapshot: async () => ({ data: { memberships: [] } }),
 } }))
 import BookingMedia from './screen'
+import CloseTasks from '@/v8/restaurant/close-tasks/close-tasks'
 import { ApiError } from '@/lib/api'
 const row = { code: 'fixture', name: '人工媒体', acceptsReservations: true, pageUrl: 'https://fixture.invalid/page', loginUrl: null, closeOnBooking: false, version: 3 }
 beforeEach(() => {
-  vi.resetAllMocks(); net.account = 'a'; net.contextId = null
+  vi.resetAllMocks(); net.account = 'a'; net.role = 'owner'; net.contextId = null
   net.list.mockResolvedValue({ data: { stores: [
     { id: 'other', name: '別の店', line_account_id: 'b', status: 'active' },
     { id: 'old', name: '現在の店', line_account_id: 'a', status: 'archived' },
@@ -29,6 +31,7 @@ beforeEach(() => {
   net.select.mockImplementation(async (_account, id) => { net.contextId = id; return { data: { selectedStore: { id, name: '店' } } } })
   net.media.mockResolvedValue({ data: [{ ...row }] })
   net.channels.mockResolvedValue({ data: [] })
+  net.tasks.mockResolvedValue({ data: [] })
   net.link.mockResolvedValue({ data: { url: 'https://fixture.invalid/reserve', html: '', available: true } })
   net.save.mockResolvedValue({ data: { version: 4 } })
   net.notice.mockResolvedValue({ data: { notifyReopen: false, recipientMode: 'responsible', membershipIds: [], version: 1 } })
@@ -132,6 +135,31 @@ it('現役の候補が複数なら未選択から始め、実在する店舗を�
   fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
   await screen.findByText('人工媒体')
   expect(net.media).toHaveBeenCalledExactlyOnceWith('a', 'current')
+  expect(net.select).not.toHaveBeenCalled()
+})
+
+it('未選択の複数店舗で選んだ店を表示店舗にすると、知らせ画面でその店を読める', async () => {
+  net.list.mockResolvedValue({ data: { stores: [
+    { id: 'current', name: '現在の店', line_account_id: 'a', status: 'active' },
+    { id: 'second', name: 'もう一つの店', line_account_id: 'a', status: 'active' },
+  ] } })
+  const view = render(<BookingMedia />)
+  fireEvent.click(await screen.findByRole('button', { name: '店舗', exact: true }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.click(within(dialog).getByRole('radio', { name: 'もう一つの店', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
+  fireEvent.click(await screen.findByRole('button', { name: 'この店舗を表示店舗にする' }))
+  await waitFor(() => expect(net.contextId).toBe('second'))
+  view.unmount()
+  render(<CloseTasks />)
+  await waitFor(() => expect(net.tasks).toHaveBeenCalledWith('a', 'second'))
+})
+
+it('閲覧のみでは表示店舗を切り替える操作を出さない', async () => {
+  net.role = 'viewer'
+  render(<BookingMedia />)
+  await screen.findByText('人工媒体')
+  expect(screen.queryByRole('button', { name: 'この店舗を表示店舗にする' })).toBeNull()
   expect(net.select).not.toHaveBeenCalled()
 })
 

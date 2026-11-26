@@ -2,6 +2,8 @@
 
 # 予約サイト・グルメ媒体（V8）の動き
 
+- ログイン中の表示店舗が未選択のとき、選んだ店を管理画面の表示店舗にする操作を明示的に選べる。選んだだけでは切り替えない。
+
 入口：`app/settings/booking-media/page.tsx`（新しい画面なので V8 だけ）。絵：提案 E-4 `aSmph`（V8.pen の eGrSP）。
 飲食店向け（テスト）が使えない環境（`NEXT_PUBLIC_RESTAURANT_TEST_ENABLED` が true でない）では統括へ戻す。
 
