@@ -8,6 +8,7 @@ import { useChatSearch } from '@/v8/inbox-search/public/use-chat-search/index'
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { EmailInboxItem, OldestAttentionTarget, PendingAttachment } from './inbox-model';
 import { Chat } from './inbox-model';
+import type { UnconfiguredInboxChannel } from './inbox-channel-tabs';
 export type Props = {
   operators: { id: string; name: string }[]
   selectedChatId: string | null
@@ -112,4 +113,6 @@ export type Props = {
   chats: ChatListItem[]
   emailItems: EmailInboxItem[]
   onOpenAttentionTarget: (target: OldestAttentionTarget) => void
+  unconfiguredChannel?: UnconfiguredInboxChannel
+  onOpenChannelSettings?: (href: string) => void
 }

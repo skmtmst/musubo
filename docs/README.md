@@ -1,4 +1,5 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+- [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 # 文書の入口
 
@@ -357,6 +358,7 @@
 - [mistakes.md — やらかしと再発防止](brain/rules/mistakes.md)
 - [F-20 公式サイト掲載の閲覧数 — 設計メモ](f20-site-views-design.md)
 - [Lステップ・Liny 画面／裏側挙動の再調査と実装仕様](lstep-liny-screen-behavior-research-2026-08.md)
+- [ダイニー（dinii）比較調査と将来像メモ](rival-dinii-2026-11.md)
 - [revfix-b-load-failures.tsv](qa/revfix-b-load-failures.tsv) — 説明用データ・付随資料、確認 2026-10-19
 - [TikTok利益計算の自動化（設計）](tiktok-pnl/design.md)
 - [V8 の絵（Pencil の板）と画面のコードの対応表](v8-board-to-code.md)
@@ -1398,3 +1400,6 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 - [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
+- [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
+- 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
+- [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
