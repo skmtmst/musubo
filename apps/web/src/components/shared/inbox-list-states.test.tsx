@@ -15,6 +15,17 @@ describe('受信箱の空と失敗はほかの一覧と同じ形', () => {
     expect(filtered).toContain('絞り込みを外す')
   })
 
+  it('未設定の Instagram・メールはそれぞれの空案内とマークを出す', () => {
+    const ig = renderToStaticMarkup(<InboxListEmpty filtered={false} channel="instagram" unconfigured onClear={() => {}} />)
+    expect(ig).toContain('data-brand-mark="instagram"')
+    expect(ig).toContain('Instagram はまだつながっていません')
+    expect(ig).toContain('Instagram をつなぐと、DM がここに届きます。')
+
+    const mail = renderToStaticMarkup(<InboxListEmpty filtered={false} channel="email" unconfigured onClear={() => {}} />)
+    expect(mail).toContain('メールはまだ設定されていません')
+    expect(mail).toContain('メールを設定すると、問い合わせメールがここに届きます。')
+  })
+
   it('会話とメールが両方失敗しても、知らせと「もう一度読み込む」は1つ', () => {
     const html = renderToStaticMarkup(<InboxListFailure failed={['line', 'email']} shown={['line', 'email']} onRetry={() => {}} />)
     expect(html.match(/role="alert"/g)?.length).toBe(1)
