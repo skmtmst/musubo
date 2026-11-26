@@ -251,6 +251,7 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test-v8-report-only.py
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test-v8-backlog-report.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_production_workflows.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_production_workflows.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_workflow_commands.py

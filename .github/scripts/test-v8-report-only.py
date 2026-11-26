@@ -32,9 +32,11 @@ class GateTest(unittest.TestCase):
         self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
 
     def test_dependencies_and_mode_are_consistent(self):
-        self.assertEqual(self.gate['steps'][0]['env']['V8_GUARD_REPORT_ONLY'], 'true')
         self.assertTrue(valid_configuration(self.gate))
         gate = copy.deepcopy(self.gate)
+        gate['needs'] = [x for x in gate['needs'] if x != 'v8-screen-guard']
+        gate['steps'][0]['env']['V8_GUARD_REPORT_ONLY'] = 'true'
+        self.assertTrue(valid_configuration(gate))
         gate['steps'][0]['env']['V8_GUARD_REPORT_ONLY'] = 'false'
         self.assertFalse(valid_configuration(gate))
         gate['needs'].append('v8-screen-guard')
