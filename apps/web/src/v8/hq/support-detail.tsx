@@ -7,7 +7,7 @@ import { PageContent } from '@/components/templates/page-frame'
 import StatusBadge from '@/components/shared/status-badge'
 import { Paperclip, Send, X } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
-import { Suspense, useCallback, useEffect, useId, useState } from 'react'
+import { Suspense, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -92,11 +92,18 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const [tenantName, setTenantName] = useState('')
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [history, setHistory] = useState<HqSupportRequest[] | null>(null)
+  const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [senderError, setSenderError] = useState(false)
+  const [auxLoading, setAuxLoading] = useState(false)
   const [body, setBody] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const loadSeqRef = useRef(0)
+  const loadInFlightRef = useRef(false)
+  const auxSeqRef = useRef(0)
+  const auxInFlightRef = useRef(false)
 
   useEffect(() => {
     setId(queryId)
@@ -111,32 +118,78 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const idMissing = id === null
   const hasSenderEmail = (me?.email ?? '').trim().length > 0
 
-  const load = useCallback(async (requestId: string) => {
+  const load = useCallback(async (requestId: string, options?: { force?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current) return
+    const seq = ++loadSeqRef.current
+    loadInFlightRef.current = true
     setLoadError('')
     setDetailMissing(false)
     setDetailLoading(true)
     try {
       const res = await api.hqSupport.detail(requestId)
+      if (seq !== loadSeqRef.current) return
       if (!res.success) { setLoadError(res.error || '読み込めませんでした'); return }
       setDetail(res.data)
     } catch (caught) {
+      if (seq !== loadSeqRef.current) return
       if (caught instanceof ApiError && caught.status === 404) setDetailMissing(true)
       else setLoadError('読み込めませんでした')
     } finally {
-      setDetailLoading(false)
+      if (seq === loadSeqRef.current) {
+        loadInFlightRef.current = false
+        setDetailLoading(false)
+      }
     }
+  }, [])
+
+  const loadAux = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && auxInFlightRef.current) return
+    const seq = ++auxSeqRef.current
+    auxInFlightRef.current = true
+    setAuxLoading(true)
+    setHistoryState((prev) => (prev === 'error' ? 'loading' : prev))
+    const [meRes, tenantRes, listRes, contextRes] = await Promise.allSettled([
+      loadStaffIdentity(),
+      api.tenants.me(),
+      api.hqSupport.list(),
+      api.hqSupport.context(),
+    ])
+    if (seq !== auxSeqRef.current) return
+    auxInFlightRef.current = false
+    setAuxLoading(false)
+    let meOk = false
+    let tenantOk = false
+    if (meRes.status === 'fulfilled' && meRes.value.success) {
+      meOk = true
+      setMe(meRes.value.data)
+    }
+    if (tenantRes.status === 'fulfilled' && tenantRes.value.success) {
+      tenantOk = true
+      setTenantName(tenantRes.value.data.name)
+    }
+    if (listRes.status === 'fulfilled' && listRes.value.success && Array.isArray(listRes.value.data)) {
+      setHistory(listRes.value.data)
+      setHistoryState('ready')
+    } else {
+      setHistoryState('error')
+    }
+    if (contextRes.status === 'fulfilled' && contextRes.value.success && Array.isArray(contextRes.value.data?.accounts)) {
+      setAccounts(contextRes.value.data.accounts)
+    }
+    setSenderError(!meOk || !tenantOk)
   }, [])
 
   useEffect(() => {
     if (!id) return
-    void load(id)
-    void Promise.allSettled([loadStaffIdentity(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
-      if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
-      if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)
-      if (listRes.status === 'fulfilled' && listRes.value.success) setHistory(listRes.value.data)
-      if (contextRes.status === 'fulfilled' && contextRes.value.success && Array.isArray(contextRes.value.data?.accounts)) setAccounts(contextRes.value.data.accounts)
-    })
-  }, [id, load])
+    void load(id, { force: true })
+    void loadAux({ force: true })
+    return () => {
+      loadSeqRef.current += 1
+      loadInFlightRef.current = false
+      auxSeqRef.current += 1
+      auxInFlightRef.current = false
+    }
+  }, [id, load, loadAux])
 
   const addFile = async (file: File | undefined) => {
     if (!file) return
@@ -175,7 +228,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
       attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl))
       setAttachments([])
       setNotice(sentNotice(hasSenderEmail))
-      await load(id)
+      await load(id, { force: true })
     } catch (caught) {
       setError(describeApiFailure(caught, '送信', { scope: 'hq' }))
     } finally {
@@ -277,6 +330,12 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
               {`メール：${me?.email ?? emptyValue('unknown')}`}<br />
               {`統括：${tenantName || emptyValue('unknown')}`}
             </p>
+            {senderError ? (
+              <div className={styles.sideError}>
+                <Notice tone="info">送信者の一部を読み込めませんでした。</Notice>
+                <Button onClick={() => void loadAux()} disabled={auxLoading} busy={auxLoading} busyLabel="読み込み中…">もう一度読み込む</Button>
+              </div>
+            ) : null}
           </section>
 
           <CreateSummaryCard title="これまでの問い合わせ" variant="record" rows={Array.isArray(history) ? history.slice(0, 10).map(item => ({
@@ -284,7 +343,16 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
             label: <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} aria-current={item.id === id ? 'page' : undefined} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</Link>,
             value: <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>,
           })) : []}>
-            {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
+            {historyState === 'loading' && history === null ? (
+              <DetailLoading />
+            ) : historyState === 'error' ? (
+              <div className={styles.sideError}>
+                <Notice tone="danger">これまでの問い合わせを読み込めませんでした。</Notice>
+                <Button onClick={() => void loadAux()} disabled={auxLoading} busy={auxLoading} busyLabel="読み込み中…">もう一度読み込む</Button>
+              </div>
+            ) : Array.isArray(history) && history.length === 0 ? (
+              <p>まだ問い合わせはありません。</p>
+            ) : null}
           </CreateSummaryCard>
         </aside> : null}
       </PageContent>
