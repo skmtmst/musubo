@@ -1415,3 +1415,4 @@
 
 
 - [画面の読み直しと表示の列車5](release-log/unreleased/PR-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
+- [画面の読み直しと操作の列車6](release-log/unreleased/PR-kenta-train6-1126.md) — 読み直しと画面操作の改善履歴。確認 2026-11-26。
