@@ -17,6 +17,7 @@
 - [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
+- [画面の読み込みと案内の修正の反映履歴](release-log/unreleased/PR-kenta-train-night3-1127.md)（説明・2026-11-27確認）
 - [契約先の操作履歴の表示の反映履歴](release-log/unreleased/PR-kenta-tenant-audit-unknown.md)（説明・2026-11-27確認）
 - [アカウントのアーカイブ理由の反映履歴](release-log/unreleased/PR-kenta-archive-blocker-unknown.md)（説明・2026-11-27確認）
 - [ファネルの未対応条件の反映履歴](release-log/unreleased/PR-kenta-funnel-unknown-kind.md)（説明・2026-11-27確認）
