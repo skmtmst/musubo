@@ -40,8 +40,10 @@ html:root .plot[data-presentation='summary'] .axis { top: calc(100% + var(--spac
 /* 軸だけ間引く。棒・読み上げ・焦点の吹き出しは全件残す。 */
 html:root .axis { left: 50%; right: auto; width: max-content; max-width: none; transform: translateX(-50%); overflow: visible; }
 html:root .axis[hidden] { display: none; }
-html:root .plot[data-presentation='standard'] .axis[data-axis-edge='first'] { left: 0; transform: none; }
-html:root .plot[data-presentation='standard'] .axis[data-axis-edge='last'] { left: auto; right: 0; transform: none; }
+html:root .plot[data-presentation='standard'] .axis[data-axis-edge='first'],
+html:root .axis[data-axis-clamp='first'] { left: 0; transform: none; max-width: var(--chart-columns-width, none); overflow: hidden; text-overflow: ellipsis; }
+html:root .plot[data-presentation='standard'] .axis[data-axis-edge='last'],
+html:root .axis[data-axis-clamp='last'] { left: auto; right: 0; transform: none; max-width: var(--chart-columns-width, none); overflow: hidden; text-overflow: ellipsis; }
 
 /* 横棒（HorizontalBarChart・絵 ）。 */
 .hbar { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
