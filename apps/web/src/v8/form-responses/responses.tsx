@@ -265,7 +265,7 @@ function Responses() {
       return []
     }
   }, [form])
-  const labels = useMemo(() => Object.fromEntries(fields.map((field) => [field.name, field.label])), [fields])
+  const labels = useMemo<Record<string, string>>(() => Object.assign(Object.create(null), Object.fromEntries(fields.map((field) => [field.name, field.label]))), [fields])
   const fieldKeys = useMemo(() => {
     const fromDefinition = fields.map((field) => field.name)
     const fromRows = items.flatMap((item) => Object.keys(item.data as Record<string, unknown>))
