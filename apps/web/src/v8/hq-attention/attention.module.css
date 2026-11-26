@@ -1,4 +1,4 @@
-/* 対応が要るもの（Kyf8U）。件数の列は 5 つ同じ幅、行の高さ 60。 */
+/* 対応が要るもの（Kyf8U）。接続理由を含む3行が収まる高さ。 */
 .buttonIcon {
   width: var(--polish-icon-control);
   height: var(--polish-icon-control);
@@ -6,11 +6,11 @@
 }
 
 .table {
+  --polish-table-row: 60px;
   --hqa-col-wide: 120px;
   --hqa-col-mid: 110px;
   --hqa-col-narrow: 90px;
   --hqa-col-menu: 28px;
-  --hqa-row-h: 60px;
   width: 100%;
 }
 
@@ -29,8 +29,11 @@
 }
 
 .style {
+  overflow: hidden;
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .count {

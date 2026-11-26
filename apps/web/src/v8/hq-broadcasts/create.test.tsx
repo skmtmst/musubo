@@ -1096,3 +1096,19 @@ it('単独運用の最終確認を閉じた後は古い確定から送らない'
   expect(hq.send).not.toHaveBeenCalled()
   if (originalApproval) hq.approval.mockImplementation(originalApproval)
 })
+
+it('配信名が空では進めず、入力後は戻っても値を保つ', async () => {
+  render(<HqBroadcastCreate />)
+  const next = screen.getByRole('button', { name: '対象設定へ' }) as HTMLButtonElement
+  expect(next.disabled).toBe(true)
+  expect(screen.getByText('配信名を入れてください')).toBeTruthy()
+  fireEvent.blur(screen.getByLabelText('配信名'))
+  expect(screen.getAllByText('配信名を入れてください')).toHaveLength(2)
+  expect(screen.getByLabelText('配信名').getAttribute('aria-invalid')).toBe('true')
+  fireEvent.change(screen.getByLabelText('配信名'), { target: { value: 'お知らせ' } })
+  expect(next.disabled).toBe(false)
+  fireEvent.click(next)
+  expect(await screen.findByRole('button', { name: '基本設定へ戻る' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '基本設定へ戻る' }))
+  expect((screen.getByLabelText('配信名') as HTMLInputElement).value).toBe('お知らせ')
+})

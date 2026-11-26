@@ -11,6 +11,7 @@
 
 - [丸い卓の椅子配置の反映履歴](release-log/unreleased/PR-kenta-round-chairs.md)
 - [空の一斉配信一覧からの作成画面を修正](release-log/unreleased/PR-kenta-empty-create.md)
+- [接続確認と配信作成の修正履歴](release-log/unreleased/PR-kenta-hq-attention.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)

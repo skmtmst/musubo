@@ -74,8 +74,8 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const blocked = preflight?.exclusions?.blocked
   const matched = preflight?.audience?.matched
   const people = (value: number | null | undefined) => (value === null || value === undefined ? null : `${formatNumber(value)} 人`)
-  const messagePreview = <div className={styles.phonePreview}>
-          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
+  const messagePreview = (compact: boolean) => <div className={styles.phonePreview}>
+          <LinePreview compact={compact} accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
             <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} time={scheduledLabel?.match(/\b\d{2}:\d{2}\b/)?.[0]} buttons={index === 0 ? messageButtons : []} />)}</div>
           </LinePreview>
           <p className={styles.previewCaption}>PC の LINE では見え方が少し変わります</p>
@@ -95,7 +95,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
         </> : <>
         <div className={styles.previewHead}><h3>LINE の見え方</h3>{closeButton}</div>
         {ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}
-        {messagePreview}
+        {messagePreview(true)}
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
         <div className={styles.previewSummary}><h3>設定内容</h3><dl>{[
           ['送る相手', `${confirmAudienceLabel}${audienceDisplayCount === null ? '' : `（${formatNumber(audienceDisplayCount)}人）`}`],
@@ -103,7 +103,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
           ['送る日時', sendWhenLabel ?? '未設定'],
           ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={16} aria-hidden /> テストを送る</Button><PreviewLauncher key={reviewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview}{ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}</PreviewLauncher></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={16} aria-hidden /> テストを送る</Button><PreviewLauncher key={reviewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview(false)}{ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}</PreviewLauncher></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed} disabled={!review.ready} disabledReason={ab.hasB ? 'A・B 両案の配信イメージを開いてください' : '配信イメージを開いて確認してください'}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
         </>}

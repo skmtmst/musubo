@@ -167,22 +167,22 @@ it('表の対応が要る件数は同じアカウントの全種類の合計を�
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   const row = container.querySelector('tbody tr')!
-  expect(row.children[3].textContent).toContain('7 件')
+  expect(row.children[3].textContent).toContain('6 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
-it('対応一覧と同じ口の５種類を合計する', async () => {
+it('接続はアカウント1件、他は口の件数として合計する', async () => {
   attention.mockResolvedValue({ success: true, data: { items: [attentionFixture] } })
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('15 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('12 件')
 })
 
-it('対応が要る数が０件なら、１件に補正しない', async () => {
+it('接続が要確認なら点検が0件でも1アカウントとして数える', async () => {
   attention.mockResolvedValue({ success: true, data: { items: [{ ...attentionFixture, counts: { unhandledChats: 0, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
 })
 
 it('対応が要る数に欠けた種類がある場合は合計を不明にする', async () => {
@@ -201,7 +201,7 @@ it('対応一覧の取得失敗は 0 件とせず不明を示す', async () => {
   expect(container.textContent).not.toContain('機能設定')
   attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } })
   await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('2 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
@@ -233,7 +233,7 @@ it('接続情報を更新したら対応件数も取り直す', async () => {
   expect(attention.mock.calls.length).toBeGreaterThanOrEqual(2)
   expect(attention).toHaveBeenLastCalledWith({ cache: 'reload' })
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
@@ -249,7 +249,7 @@ it('更新中に古い対応件数が届いても表示しない', async () => {
   await act(async () => { resolveOld({ success: true, data: { items: [{ accountId: 'acc-1', counts: { unhandledChats: 9, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 0 } }] } }) })
   expect(container.querySelector('tbody tr')!.children[3].textContent).toBe('—')
   await act(async () => { resolveUpdate({ success: true }) })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('0 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="カード"]')!.click() })
 })
 
@@ -634,7 +634,7 @@ describe('アーカイブから戻す入口の権限表示', () => {
 it('表の対応件数は対応が要る全種類を数える', async () => {
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('7 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('6 件')
 })
 
 it('接続の件数が取得できないとき不明とし、再読込できる', async () => {
@@ -645,22 +645,37 @@ it('接続の件数が取得できないとき不明とし、再読込できる'
   expect(container.textContent).toContain('対応件数：表示できませんでした')
   attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'acc-1', counts: { connections: 2, unhandledChats: 0, pendingBookings: 0, unpaid: 0, stoppedDeliveries: 0 } }] } })
   await act(async () => { [...container.querySelectorAll('button')].find(button => button.textContent === 'もう一度読み込む')!.click() })
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('2 件')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('1 件')
 })
 
 it('接続の問題の帯は接続のみ、表は全種類の合計を出す', async () => {
   await render()
   await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!.click() })
   const band = [...container.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.includes('接続に問題'))
-  expect(band?.textContent).toMatch(/2\s*件/)
-  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('7 件')
+  expect(band?.textContent).toMatch(/1\s*件/)
+  expect(band?.textContent).toContain('要確認 1')
+  expect(band?.textContent).not.toContain('未確認 0')
+  expect(container.querySelector('tbody tr')!.children[3].textContent).toContain('6 件')
   expect(container.querySelector('thead')!.textContent).toContain('対応が要る')
 })
 
-it('接続の問題を取得できないとき、帯も不明として0件にしない', async () => {
+it('対応件数が取得できなくてもアカウントから接続状態を数える', async () => {
   attention.mockRejectedValue(new Error('offline'))
   await render()
   const band = [...container.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.includes('接続に問題'))
-  expect(band?.textContent).toContain('読み込めませんでした')
-  expect(band?.textContent).not.toMatch(/0\s*件/)
+  expect(band?.textContent).toContain('要確認 1')
+  expect(band?.textContent).not.toContain('未確認 0')
+  expect(band?.textContent).toMatch(/1\s*件/)
+})
+
+it('要確認5・未確認1のとき接続に問題6アカウントと内訳を示す', async () => {
+  accounts.mockResolvedValue({ success: true, data: [
+    ...Array.from({ length: 5 }, (_, i) => ({ ...warnedAccount, id: `warn-${i}`, name: `要確認${i}` })),
+    { ...warnedAccount, id: 'unknown', name: '未確認', connection: { status: 'unknown' } },
+  ] })
+  await render()
+  const band = [...container.querySelectorAll('[data-kpi-presentation]')].find(el => el.textContent?.includes('接続に問題'))
+  expect(band?.textContent).toContain('要確認 5・未確認 1')
+  expect(band?.textContent).toMatch(/6\s*件/)
+  expect(band?.querySelector('button[aria-label="接続に問題：要確認 5・未確認 1を開く"]')).toBeTruthy()
 })

@@ -8,6 +8,7 @@ const fixture = vi.hoisted(() => ({
   select: vi.fn(),
   toast: vi.fn(),
   attention: vi.fn(),
+  list: vi.fn(),
   accounts: [{ id: 'account-a', name: '本店' }],
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fixture.push }) }))
@@ -18,7 +19,7 @@ vi.mock('@/components/shared/toast', () => ({ notifyToast: fixture.toast }))
 vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: fixture.attention } }))
 vi.mock('@/lib/api', async (original) => ({
   ...await original<typeof import('@/lib/api')>(),
-  api: { lineAccountFolders: { list: async () => ({ success: true, data: { folders: [] } }) } },
+  api: { lineAccounts: { list: fixture.list }, lineAccountFolders: { list: async () => ({ success: true, data: { folders: [] } }) } },
 }))
 
 import AttentionPage from '@/app/hq/attention/page'
@@ -27,16 +28,18 @@ beforeEach(() => {
   fixture.push.mockReset()
   fixture.select.mockReset()
   fixture.toast.mockReset()
+  fixture.list.mockResolvedValue({ success: true, data: [{ id: 'account-a', name: '本店', isActive: true, connection: { status: 'warn' } }] })
   fixture.attention.mockResolvedValue({ success: true, data: { items: [{
     accountId: 'account-a', name: '本店', counts: { connections: 1, unhandledChats: 2 }, details: {},
   }] } })
 })
 afterEach(cleanup)
 
-it('統括の表と同じ口の５種類をそのまま表示する', async () => {
+it('接続はアカウント数で、他の４種類は口の件数を表示する', async () => {
   fixture.attention.mockResolvedValue({ success: true, data: { items: [attentionFixture] } })
+  fixture.list.mockResolvedValue({ success: true, data: [{ id: 'acc-1', name: '本店', isActive: true, connection: { status: 'warn' } }] })
   render(<AttentionPage />)
-  for (const [label, count] of [['未対応のトーク', 1], ['承認待ちの予約', 2], ['未払い', 3], ['接続の異常', 4], ['止まった配信', 5]] as const) {
+  for (const [label, count] of [['未対応のトーク', 1], ['承認待ちの予約', 2], ['未払い', 3], ['接続の異常', 1], ['止まった配信', 5]] as const) {
     expect(await screen.findByRole('button', { name: `本店の${label} ${count}件を開く` })).toBeTruthy()
   }
   expect(fixture.attention).toHaveBeenCalled()
@@ -83,4 +86,28 @@ it('接続の行き先は他のアカウントの指定を使わない', async (
   fireEvent.click(await screen.findByRole('button', { name: '本店の接続の異常 1件を開く' }))
   expect(fixture.select).toHaveBeenCalledWith('account-a')
   expect(fixture.push).toHaveBeenCalledWith('/accounts/detail?id=account-a')
+})
+
+it('未確認も1アカウントとして出し理由と操作を示す', async () => {
+  window.history.replaceState(null, '', '/hq/attention?kind=connections')
+  fixture.attention.mockResolvedValue({ success: true, data: { items: [] } })
+  fixture.list.mockResolvedValue({ success: true, data: [{ id: 'account-a', name: '本店', isActive: true, connection: { status: 'unknown' } }] })
+  render(<AttentionPage />)
+  expect(await screen.findByText('未確認：接続を確認できていません')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '本店の接続の異常 1件を開く' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '本店の接続の異常 1件を開く' }))
+  expect(fixture.push).toHaveBeenCalledWith('/accounts/detail?id=account-a')
+  window.history.replaceState(null, '', '/hq/attention')
+})
+it('接続状態が正常でも別の点検異常を消さない', async () => {
+  fixture.list.mockResolvedValue({ success: true, data: [{ id: 'account-a', name: '本店', isActive: true, connection: { status: 'ok' } }] })
+  render(<AttentionPage />)
+  expect(await screen.findByText('別の接続点検に異常 1 アカウント')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '設定を開く' })).toBeTruthy()
+})
+it('アカウント取得の失敗でも他の対応件数を残す', async () => {
+  fixture.list.mockRejectedValue(new Error('offline'))
+  render(<AttentionPage />)
+  expect(await screen.findByText(/アカウントの接続状態を取得できませんでした/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: '本店の未対応のトーク 2件を開く' })).toBeTruthy()
 })

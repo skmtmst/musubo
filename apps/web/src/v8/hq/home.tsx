@@ -101,7 +101,6 @@ export default function HqHomeV8() {
   // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
   const [loadError, setLoadError] = useState<unknown>(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const [attentionCounts, setAttentionCounts] = useState<Record<string, number> | null>(null)
   const [attentionTotals, setAttentionTotals] = useState<Record<string, number> | null>(null)
   const [attentionKey, setAttentionKey] = useState(0)
   const [attentionError, setAttentionError] = useState<unknown>(null)
@@ -171,21 +170,16 @@ export default function HqHomeV8() {
   useEffect(() => {
     let cancelled = false
     const epoch = attentionEpoch.current
-    setAttentionCounts(null)
     setAttentionTotals(null)
     setAttentionError(null)
     void import('@/lib/api/helpers/styles').then(({ hqStyleApi }) => hqStyleApi.attention(attentionKey || reloadKey ? { cache: 'reload' } : undefined)).then((result) => {
       if (cancelled || epoch !== attentionEpoch.current) return
       if (!result.success) { setAttentionError(new Error('attention failed')); return }
-      const counts: Record<string, number> = {}
       const totals: Record<string, number> = {}
       for (const item of result.data.items) {
-        const value = item.counts.connections
-        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) counts[item.accountId] = value
-        const parts = [item.counts.unhandledChats, item.counts.pendingBookings, item.counts.unpaid, item.counts.connections, item.counts.stoppedDeliveries]
+        const parts = [item.counts.unhandledChats, item.counts.pendingBookings, item.counts.unpaid, item.counts.stoppedDeliveries]
         if (parts.every(part => typeof part === 'number' && Number.isFinite(part) && part >= 0)) totals[item.accountId] = parts.reduce((sum, part) => sum + part, 0)
       }
-      setAttentionCounts(counts)
       setAttentionTotals(totals)
     }).catch((error: unknown) => { if (!cancelled && epoch === attentionEpoch.current) setAttentionError(error ?? new Error('attention failed')) })
     return () => { cancelled = true }
@@ -208,7 +202,6 @@ export default function HqHomeV8() {
   const reloadAfterSave = async () => {
     setReloadFailed(false)
     attentionEpoch.current += 1
-    setAttentionCounts(null)
     setAttentionTotals(null)
     setAttentionError(null)
     setAttentionRefreshing(true)
@@ -228,7 +221,6 @@ export default function HqHomeV8() {
     connectionUpdateInFlight.current = true
     setCheckingConnections(true)
     attentionEpoch.current += 1
-    setAttentionCounts(null)
     setAttentionTotals(null)
     setAttentionError(null)
     setAttentionRefreshing(true)
@@ -252,7 +244,6 @@ export default function HqHomeV8() {
     connectionUpdateInFlight.current = true
     setCheckingConnections(true)
     attentionEpoch.current += 1
-    setAttentionCounts(null)
     setAttentionTotals(null)
     setAttentionError(null)
     setAttentionRefreshing(true)
@@ -332,20 +323,9 @@ export default function HqHomeV8() {
     unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
-  const connectionUnconfirmed = attentionCounts ? currentAccounts.filter(account => {
-    const state = statusOf(account).label
-    return state !== '停止中' && (state === '未確認' || attentionCounts[account.id] === undefined)
-  }).length : 0
-  const knownConnectionTotal = attentionCounts
-    ? currentAccounts.reduce((sum, account) => sum + (attentionCounts[account.id] ?? 0), 0) : null
-  const connectionTotal = knownConnectionTotal === 0 && connectionUnconfirmed > 0 ? null : knownConnectionTotal
-  const connectionDetail = loadError || attentionError ? '読み込めませんでした'
-    // 未確認は2行目に足すと箱だけ背が伸びるので、右上の札にまとめる。
-    : connectionUnconfirmed && connectionTotal !== null ? null
-      : connectionUnconfirmed ? `未確認 ${formatNumber(connectionUnconfirmed)} 件`
-      : connectionTotal === null ? '接続の問題を確認できません' : null
-  const connectionBadgeText = connectionUnconfirmed && connectionTotal !== null && !(loadError || attentionError)
-    ? `${connectionTotal > 0 ? '要確認・' : ''}未確認 ${formatNumber(connectionUnconfirmed)}` : undefined
+  const connectionTotal = accountsReadable ? totals.warnings + totals.unconfirmed : null
+  const connectionDetail = loadError ? '読み込めませんでした' : null
+  const connectionBadgeText = connectionTotal ? [totals.warnings && `要確認 ${formatNumber(totals.warnings)}`, totals.unconfirmed && `未確認 ${formatNumber(totals.unconfirmed)}`].filter(Boolean).join('・') : undefined
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
@@ -577,7 +557,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} badge={connectionBadgeText} badgeTone="warning" valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable ? connectionTotal : null} loading={loading} unit="件" detail={connectionDetail} badge={connectionBadgeText} badgeTone="warning" badgeAction={() => router.push('/hq/attention?kind=connections')} valueAction={{ label: '接続に問題のあるアカウントを開く', expanded: false, onClick: () => router.push('/hq/attention?kind=connections') }} valueTone={connectionTotal !== null && connectionTotal > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -744,7 +724,7 @@ export default function HqHomeV8() {
                   if (!pay || pay === 'unknown') return emptyValue('unknown')
                   return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
                 })()}</Td>
-                <Td>{attentionTotals?.[account.id] !== undefined ? `${formatNumber(attentionTotals[account.id])} 件` : emptyValue('unknown')}</Td>
+                <Td>{attentionTotals?.[account.id] !== undefined ? `${formatNumber(attentionTotals[account.id] + (['要確認', '未確認'].includes(statusOf(account).label) ? 1 : 0))} 件` : emptyValue('unknown')}</Td>
                 <Td>{accountFriendCount(account)}</Td>
                 <Td>{typeof account.stats?.messagesThisMonth === 'number' ? formatNumber(account.stats.messagesThisMonth) : emptyValue('unknown')}</Td>
                 <Td>{tableMenu(account)}</Td>
