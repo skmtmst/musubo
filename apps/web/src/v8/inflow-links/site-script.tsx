@@ -84,6 +84,8 @@ export default function SiteScriptV8() {
   const readonly = !canManageRole(role)
   const { selectedAccountId } = useAccount()
   const [pages, setPages] = useState<PageRow[]>([])
+  const [pagesFailed, setPagesFailed] = useState(false)
+  const [pagesLoading, setPagesLoading] = useState(false)
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -123,13 +125,26 @@ export default function SiteScriptV8() {
    * 前のアカウントの遅い応答・操作の結果を今の画面へ書かない。
    */
   const gate = useResponseGate()
+  const loadInFlightRef = useRef(false)
+  const pagesSeqRef = useRef(0)
+  const pagesInFlightRef = useRef<number | null>(null)
   const accountRef = useRef(selectedAccountId)
   const previousAccountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  useEffect(() => () => {
+    loadInFlightRef.current = false
+    pagesSeqRef.current += 1
+    pagesInFlightRef.current = null
+  }, [])
   useEffect(() => {
     if (previousAccountRef.current === selectedAccountId) return
     previousAccountRef.current = selectedAccountId
+    loadInFlightRef.current = false
+    pagesSeqRef.current += 1
+    pagesInFlightRef.current = null
     setPages([])
+    setPagesFailed(false)
+    setPagesLoading(false)
     setSummary(null)
     setSites([])
     setSitesFailed(false)
@@ -141,32 +156,74 @@ export default function SiteScriptV8() {
     setSiteBusy(false)
   }, [selectedAccountId])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current) return
+    loadInFlightRef.current = true
     const token = gate.begin()
+    const pagesSeq = ++pagesSeqRef.current
+    pagesInFlightRef.current = null
     setLoading(true)
     setFailed(false)
-    const [pagesResult, summaryResult, sitesResult] = await Promise.allSettled([
-      api.siteTracking.pages({ accountId: selectedAccountId ?? undefined }),
-      api.siteTracking.summary(selectedAccountId ?? undefined),
-      api.measurementSites.list(selectedAccountId ?? undefined),
-    ])
-    if (!gate.current(token)) return
-    if (pagesResult.status === 'fulfilled' && pagesResult.value.success) setPages(pagesResult.value.data)
-    if (summaryResult.status === 'fulfilled' && summaryResult.value.success) setSummary(summaryResult.value.data)
-    else setFailed(true)
-    if (sitesResult.status === 'fulfilled' && sitesResult.value.success && Array.isArray(sitesResult.value.data)) {
-      setSites(sitesResult.value.data)
-      setSitesFailed(false)
-    } else {
-      setSitesFailed(true)
+    setPagesFailed(false)
+    setPagesLoading(false)
+    try {
+      const [pagesResult, summaryResult, sitesResult] = await Promise.allSettled([
+        api.siteTracking.pages({ accountId: selectedAccountId ?? undefined }),
+        api.siteTracking.summary(selectedAccountId ?? undefined),
+        api.measurementSites.list(selectedAccountId ?? undefined),
+      ])
+      if (!gate.current(token)) return
+      if (pagesSeq === pagesSeqRef.current) {
+        if (pagesResult.status === 'fulfilled' && pagesResult.value.success && Array.isArray(pagesResult.value.data)) {
+          setPages(pagesResult.value.data)
+          setPagesFailed(false)
+        } else {
+          setPagesFailed(true)
+        }
+      }
+      if (summaryResult.status === 'fulfilled' && summaryResult.value.success) setSummary(summaryResult.value.data)
+      else setFailed(true)
+      if (sitesResult.status === 'fulfilled' && sitesResult.value.success && Array.isArray(sitesResult.value.data)) {
+        setSites(sitesResult.value.data)
+        setSitesFailed(false)
+      } else {
+        setSitesFailed(true)
+      }
+    } finally {
+      if (gate.current(token)) {
+        loadInFlightRef.current = false
+        setLoading(false)
+      }
     }
-    setLoading(false)
   }, [selectedAccountId, gate])
 
-
+  const reloadPages = useCallback(async () => {
+    if (pagesInFlightRef.current !== null || loadInFlightRef.current) return
+    const seq = ++pagesSeqRef.current
+    const accountAtStart = selectedAccountId
+    pagesInFlightRef.current = seq
+    setPagesLoading(true)
+    try {
+      const res = await api.siteTracking.pages({ accountId: accountAtStart ?? undefined })
+      if (seq !== pagesSeqRef.current || accountRef.current !== accountAtStart) return
+      if (res.success && Array.isArray(res.data)) {
+        setPages(res.data)
+        setPagesFailed(false)
+      } else {
+        setPagesFailed(true)
+      }
+    } catch {
+      if (seq === pagesSeqRef.current && accountRef.current === accountAtStart) {
+        setPagesFailed(true)
+      }
+    } finally {
+      if (pagesInFlightRef.current === seq) pagesInFlightRef.current = null
+      if (seq === pagesSeqRef.current && accountRef.current === accountAtStart) setPagesLoading(false)
+    }
+  }, [selectedAccountId])
 
   useEffect(() => {
-    void load()
+    void load({ force: true })
   }, [load])
 
   useEffect(() => {
@@ -296,7 +353,7 @@ export default function SiteScriptV8() {
   const sitesBody = sitesFailed ? (
     <p className={styles.note} role="status">
       計測サイトを読み込めませんでした。
-      <button type="button" onClick={() => void load()} className={styles.textLink}>もう一度読み込む</button>
+      <button type="button" onClick={() => void load()} disabled={loading} className={styles.textLink}>もう一度読み込む</button>
     </p>
   ) : sites.length === 0 ? (
     <p className={styles.note}>まだサイトがありません。追加するとサイトごとの計測コードが出ます。</p>
@@ -442,29 +499,48 @@ export default function SiteScriptV8() {
                       <p className={styles.faint}>コードを貼ったあと、サイトを開くと数分で表示されます。</p>
                     </>
                   )}
-                  <span><Button onClick={() => void load()} busyLabel="処理中…"><RefreshCw size={16} aria-hidden="true" />いま届いているか確かめる</Button></span>
+                  <span><Button onClick={() => void load()} disabled={loading} busy={loading} busyLabel="処理中…"><RefreshCw size={16} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
-                <DataTable aria-label="ページごとの表示" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
-                  <TableHeadRow data-table-layout="columns">
-                    <Th grow>ページ</Th>
-                    <Th className={styles.numCol} align="right">この30日のページ表示</Th>
-                    <Th className={styles.numColNarrow} align="right">訪問者数<HelpTip label="訪問者数の説明">この30日にページを訪れた人数です。同じ訪問者は1人として数えます。LINEの友だち追加数は含みません。</HelpTip></Th>
-                  </TableHeadRow></thead><tbody>
-                  {pages.slice(0, 4).map((page) => (
-                    <Tr key={`${page.host ?? ''}:${page.path}`} data-table-layout="columns">
-                      <Td grow><span className={styles.cellSmall} title={page.host ? `${page.host}${page.path}` : page.path}>{page.path}</span></Td>
-                      <Td className={styles.numCol} align="right">{formatNumber(page.views)}</Td>
-                      <Td className={styles.numColNarrow} align="right">{formatNumber(page.visitors)}</Td>
-                    </Tr>
-                  ))}
-                  {pages.length === 0 ? (
-                    <Tr data-table-layout="columns">
-                      <Td grow>同意なし</Td>
-                      <Td className={styles.numCol} align="right">{emptyValue('unknown')}</Td>
-                      <Td className={styles.numColNarrow} align="right">{emptyValue('unknown')}</Td>
-                    </Tr>
-                  ) : null}
-                </tbody></DataTable>
+                {pagesFailed ? (
+                  <Notice
+                    tone="warn"
+                    message="ページごとの表示を読み込めませんでした。上の確認は続けられます。"
+                    action={
+                      <Button
+                        variant="text"
+                        size="inline"
+                        onClick={() => void reloadPages()}
+                        disabled={pagesLoading || loading}
+                        busy={pagesLoading}
+                        busyLabel="読み込んでいます"
+                      >
+                        ページ表示を読み直す
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <DataTable aria-label="ページごとの表示" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
+                    <TableHeadRow data-table-layout="columns">
+                      <Th grow>ページ</Th>
+                      <Th className={styles.numCol} align="right">この30日のページ表示</Th>
+                      <Th className={styles.numColNarrow} align="right">訪問者数<HelpTip label="訪問者数の説明">この30日にページを訪れた人数です。同じ訪問者は1人として数えます。LINEの友だち追加数は含みません。</HelpTip></Th>
+                    </TableHeadRow></thead><tbody>
+                    {pages.slice(0, 4).map((page) => (
+                      <Tr key={`${page.host ?? ''}:${page.path}`} data-table-layout="columns">
+                        <Td grow><span className={styles.cellSmall} title={page.host ? `${page.host}${page.path}` : page.path}>{page.path}</span></Td>
+                        <Td className={styles.numCol} align="right">{formatNumber(page.views)}</Td>
+                        <Td className={styles.numColNarrow} align="right">{formatNumber(page.visitors)}</Td>
+                      </Tr>
+                    ))}
+                    {pages.length === 0 ? (
+                      <Tr data-table-layout="columns">
+                        <Td grow>同意なし</Td>
+                        <Td className={styles.numCol} align="right">{emptyValue('unknown')}</Td>
+                        <Td className={styles.numColNarrow} align="right">{emptyValue('unknown')}</Td>
+                      </Tr>
+                    ) : null}
+                  </tbody></DataTable>
+                )}
               </Card>
 
               <Card variant="aside" contentPadding="var(--polish-space-card)" gap="var(--polish-space-row)" aria-labelledby="ss-how">
