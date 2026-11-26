@@ -190,6 +190,8 @@ export type FieldBase = {
   state?: ReactNode
   placeholder?: string
   valuePrefix?: string
+  /** 選択後の欄では補足を隠し、候補の窓には残す。 */
+  hideSelectedMeta?: boolean
   compact?: boolean
   actionHidden?: boolean | 'label'
   disabled?: boolean

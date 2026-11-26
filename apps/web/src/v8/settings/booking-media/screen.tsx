@@ -427,7 +427,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         onConfirm={() => { if (pendingStoreId) setStoreId(pendingStoreId); setPendingStoreId(null) }}
       />)
   const storePicker = stores.length > 1 || (!storeSelection.id && stores.length > 0) ? (
-    <EntitySelect aria-label="店舗" noun="店舗" placeholder="店舗を選んでください" valuePrefix="店舗：" value={storeSelection.id} disabled={storeSelection.switching} onChange={(value) => { if (value === storeSelection.id) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={[...stores.map(store => ({ ...entityOptionMetadata(store), value: store.id, label: store.name, hint: `${store.status === 'paused' ? '一時停止' : '現役'} · ID: ${store.id}` }))]} />
+    <EntitySelect aria-label="店舗" noun="店舗" placeholder="店舗を選んでください" valuePrefix="店舗：" hideSelectedMeta width={240} value={storeSelection.id} disabled={storeSelection.switching} onChange={(value) => { if (value === storeSelection.id) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={[...stores.map(store => ({ ...entityOptionMetadata(store), value: store.id, label: store.name, hint: `${store.status === 'paused' ? '一時停止' : '現役'} · ID: ${store.id}` }))]} />
   ) : null
   if (!storeId) {
     const desired = stores.find(store => store.id === storeSelection.id)

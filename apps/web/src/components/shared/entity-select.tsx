@@ -55,6 +55,8 @@ type CommonProps = {
   label?: string
   /** 絞り込みの欄で、選んだ値の前に項目名を残す。窓の候補名は変えない。 */
   valuePrefix?: string
+  /** 選択後は名前を優先し、補足は候補の窓だけに出す。 */
+  hideSelectedMeta?: boolean
   placeholder?: string
   loading?: boolean
   candidatesStatus?: 'loading' | 'ready' | 'error'
@@ -101,7 +103,7 @@ export default function EntitySelect(props: EntitySelectProps) {
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, disabledReason: props.disabledReason, lockedReason: props.lockedReason, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
-    describedBy: [props['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, actionHidden: props.actionHidden,
+    describedBy: [props['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, hideSelectedMeta: props.hideSelectedMeta, actionHidden: props.actionHidden,
   }
   const defaultValue = props.values === undefined && (options.some(option => option.value === props.value && isAllOption(option)) || (!props.value && /すべて/.test(props.placeholder ?? '')))
   return <div className={[selectStyles.root, selectStyles[size === 'page-size' ? 'pageSize' : size], className].filter(Boolean).join(' ')} style={width ? { width, maxWidth: '100%', flexShrink: 0 } : undefined} data-entity-picker-field data-entity-default={defaultValue || undefined} data-entity-content={size === 'content' || undefined}>

@@ -419,7 +419,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
       }) : undefined
   const selection = props.canChangeNow && changeDisabled && pills ? <fieldset disabled className="contents">{pills}</fieldset> : pills
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? (props.valuePrefix ? `${filterHead(props.valuePrefix)}${picked.name}` : picked.name) : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={changeDisabled} disabledReason={disabledReason} lockedReason={lockedReason} readOnly={readOnly}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? (props.valuePrefix ? `${filterHead(props.valuePrefix)}${picked.name}` : picked.name) : picked.name} color={pickedColor} meta={props.hideSelectedMeta && !picked.missing ? undefined : picked.meta} placeholder={placeholder} disabled={changeDisabled} disabledReason={disabledReason} lockedReason={lockedReason} readOnly={readOnly}
       ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} prefixedValue={prefixedValue} compact={props.compact} actionHidden={props.actionHidden}
       selection={selection}
       invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} describedBy={joinDescribedBy(describedBy, props['aria-describedby'])} onOpen={() => { if (!readOnly && (currentLock.current || !canChangeNow())) return; onOpen?.(); setOpen(true) }}
