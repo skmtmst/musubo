@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, fireEvent } from '@testing-library/react'
-import { useEffect, useState } from 'react'
-import { DashboardAsideSection, DashboardColumns, DashboardPage, DashboardRow } from './dashboard-page'
+import { useEffect, useState, type ReactNode } from 'react'
+import { DashboardAsideSection, DashboardColumns, DashboardPage, DashboardRow, DashboardTop } from './dashboard-page'
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 afterEach(cleanup)
@@ -53,4 +53,13 @@ describe('段のまとまりの見せ方', () => {
     expect(root.querySelector('[data-design-part="card"]')).toBeNull()
     expect(root.querySelector('[data-grouping]')).toBeNull()
   })
+})
+
+it('案内の有無にかかわらず、期間の操作を数の帯の直前に並べる', () => {
+  const renderTop = (intro: ReactNode) => <DashboardTop intro={intro} controls={<div>期間の操作</div>}><div>数の帯</div></DashboardTop>
+  const view = render(renderTop(<div>はじめにやること</div>))
+  expect(view.container.textContent).toBe('はじめにやること期間の操作数の帯')
+  view.rerender(renderTop(null))
+  expect(view.container.textContent).toBe('期間の操作数の帯')
+  expect(view.container.children).toHaveLength(2)
 })
