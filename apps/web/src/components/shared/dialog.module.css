@@ -532,7 +532,7 @@ html:root .panel .close {
   border-radius: var(--radius-pill);
   box-shadow: none;
 }
-html:root .panel[data-plain-close] .close:not(:focus-visible) {
+html:root .panel[data-plain-close] .close:not(:hover):not(:focus-visible) {
   outline-color: transparent;
   background: transparent;
 }
