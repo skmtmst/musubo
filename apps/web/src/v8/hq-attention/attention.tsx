@@ -9,6 +9,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import EntitySelect from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
 import { AttentionCount } from '@/components/shared/attention-count'
@@ -21,7 +22,7 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { lineAccountConnectionState } from '@/lib/line-account-state'
-import { connectionReasonLine } from '@/v8/hq/connection-reasons'
+import { connectionReasonLine } from '@/v8/hq'
 import { api } from '@/lib/api'
 import { notifyToast } from '@/components/shared/toast'
 import type { AccountStyle } from '@line-crm/shared'
@@ -64,7 +65,7 @@ export default function HqAttentionV8() {
   const router = useRouter()
   const { accounts, setSelectedAccountId } = useAccount()
   const [connectionError, setConnectionError] = useState(false)
-  const [connectionAccounts, setConnectionAccounts] = useState<AccountWithStats[]>([])
+  const [connectionAccounts, setConnectionAccounts] = useState<AccountWithStats[] | null>(null)
   const [items, setItems] = useState<HqAttentionItem[] | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -100,7 +101,7 @@ export default function HqAttentionV8() {
           byId.set(account.id, { ...item, counts: { ...item.counts, otherConnections: needsAttention ? 0 : item.counts.otherConnections ?? 0, connections: needsAttention ? 1 : 0 } })
         }
       } catch {
-        setConnectionAccounts([])
+        setConnectionAccounts(null)
         setConnectionError(true)
       }
       setItems([...byId.values()])
@@ -176,8 +177,8 @@ export default function HqAttentionV8() {
       toolbar={toolbar}
       tableInset
     >
-      {otherConnections.length > 0 ? <Notice tone="warn"><details><summary>別の接続点検に異常 {otherConnections.length} アカウント</summary>{otherConnections.map(item => <div key={item.accountId}>{item.name} <Button onClick={() => open(item.accountId, `/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>設定を開く</Button></div>)}</details></Notice> : null}
-      {connectionError ? <Notice tone="warn">アカウントの接続状態を取得できませんでした。接続の数は従来の点検件数です。読み直してください。</Notice> : null}
+      {otherConnections.length > 0 ? <Notice tone="warn"><Disclosure appearance="section" size="compact" title={`別の接続点検に異常 ${otherConnections.length} アカウント`}>{otherConnections.map(item => <div key={item.accountId}>{item.name} <Button onClick={() => open(item.accountId, `/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>設定を開く</Button></div>)}</Disclosure></Notice> : null}
+      {connectionError ? <Notice tone="warn">アカウントの接続状態を読み込めませんでした。接続の数は従来の点検件数です。読み直してください。</Notice> : null}
       {error ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度試す</Button>}>{error}</Notice> : null}
       <div className={styles.stack}>
       {items === null ? (error ? null : <ListState kind="loading" title="読み込んでいます…" />) : shown.length === 0 && !error ? (
@@ -194,7 +195,7 @@ export default function HqAttentionV8() {
               <GridCell className={styles.account}>
                 <RowNameButton className={styles.name} title={item.name} onClick={() => router.push(`/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>{item.name}</RowNameButton>
                 {item.style ? <span className={styles.style} title={styleLabel(item.style)}>{styleLabel(item.style)}</span> : null}
-                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.style} title={state === '要確認' ? connectionReasonLine(account).title : '未確認：接続を確認できていません'}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
+                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts?.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.style} title={state === '要確認' ? connectionReasonLine(account).title : '未確認：接続を確認できていません'}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
               </GridCell>
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)

@@ -21,22 +21,22 @@ const md = (value: string) => `${value.slice(0, 4)}/${Number(value.slice(5, 7))}
 export default function MilesTab({ friendId, balanceSource }: { friendId: string; balanceSource: 'ec' | 'musubo' | null }) {
   const { selectedAccountId } = useAccount()
   const [retry, setRetry] = useState(0)
-  const [state, setState] = useState<{ key: string; status: 'loading' | 'ready' | 'error'; history: RankHistory[]; names: Record<string, string> } | null>(null)
+  const [state, setState] = useState<{ key: string; status: 'ready'; history: RankHistory[]; names: Record<string, string> } | { key: string; status: 'loading' | 'error' } | null>(null)
   const key = JSON.stringify([selectedAccountId, friendId])
   const visible = state?.key === key ? state : null
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
-    setState({ key, status: 'loading', history: [], names: {} })
+    setState({ key, status: 'loading' })
     void Promise.all([memberRanksApi.friend(selectedAccountId, friendId), memberRanksApi.program(selectedAccountId)]).then(([rank, program]) => {
       if (!alive) return
       if (!rank.success || !program.success) throw new Error('rank history unavailable')
       setState({ key, status: 'ready', history: ((rank.data as { history?: RankHistory[] } | null)?.history) ?? [], names: Object.fromEntries(program.data.tiers.map((tier) => [tier.id, tier.name])) })
-    }).catch(() => { if (alive) setState({ key, status: 'error', history: [], names: {} }) })
+    }).catch(() => { if (alive) setState({ key, status: 'error' }) })
     return () => { alive = false }
   }, [selectedAccountId, friendId, key, retry])
   const history = visible?.status === 'ready' ? visible.history : []
-  const names = visible?.names ?? {}
+  const names = visible?.status === 'ready' ? visible.names : {}
   return (
     <>
       <EmptyTab

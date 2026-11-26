@@ -24,7 +24,7 @@ import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import Card from '@/components/shared/card'
 import { DisclosureItem, DisclosureToggle } from '@/components/shared/disclosure'
 import StatusBadge from '@/components/shared/status-badge'
-import { useTodayCheckFolded, useTodayCheckOpen } from '@/v8/style-dashboard/use-today-check-open'
+import { useTodayCheckFolded, useTodayCheckOpen } from '@/v8/style-dashboard'
 
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'

@@ -108,6 +108,6 @@ it('接続状態が正常でも別の点検異常を消さない', async () => {
 it('アカウント取得の失敗でも他の対応件数を残す', async () => {
   fixture.list.mockRejectedValue(new Error('offline'))
   render(<AttentionPage />)
-  expect(await screen.findByText(/アカウントの接続状態を取得できませんでした/)).toBeTruthy()
+  expect(await screen.findByText(/アカウントの接続状態を読み込めませんでした/)).toBeTruthy()
   expect(screen.getByRole('button', { name: '本店の未対応のトーク 2件を開く' })).toBeTruthy()
 })

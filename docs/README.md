@@ -9,13 +9,6 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [丸い卓の椅子配置の反映履歴](release-log/unreleased/PR-kenta-round-chairs.md)
-- [空の一斉配信一覧からの作成画面を修正](release-log/unreleased/PR-kenta-empty-create.md)
-- [接続確認と配信作成の修正履歴](release-log/unreleased/PR-kenta-hq-attention.md)
-- [バナー生成の一覧更新の修正履歴](release-log/unreleased/PR-kenta-banner-refresh.md)
-- [バナー生成の利用設定の反映履歴](release-log/unreleased/PR-kenta-banner-ai-setting.md)
-- [NEN配信の読み込みを改善](release-log/unreleased/PR-kenta-screen-loading.md) — 取得失敗と切り替え時の修正履歴。確認 2026-11-26。
-- [友だち引き継ぎの状態確認を改善](release-log/unreleased/PR-kenta-handover-loading.md) — 状態確認の修正履歴。確認 2026-11-26。
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
@@ -32,8 +25,10 @@
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
 
-- [時刻・日付の範囲表示の修正履歴](release-log/unreleased/PR-kenta-time-range.md)
-- [閲覧のみの作成操作の修正履歴](release-log/unreleased/PR-kenta-viewer-actions.md)
+
+- [夜間の画面修正の反映履歴](release-log/unreleased/PR-kenta-train-night-1126.md)
+
+- [AI応答の動作](../apps/web/src/v8/ai-reply/BEHAVIOR.md)
 
 ## 使う人の手引き
 
@@ -1411,9 +1406,3 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-- [口コミ一覧の列幅と受信日時の揃え](release-log/unreleased/PR-kenta-google-top.md) — 投稿者名や年付き日時で列がずれないように直した反映履歴。確認 2026-11-26。
-- [今日の確認の開閉と開店準備ガイドの閉じる操作](release-log/unreleased/PR-kenta-today-fold.md) — 反映履歴、確認 2026-11-26。
-- [操作の言葉と予約台帳の見やすさ](release-log/unreleased/PR-kenta-label-board.md) — 反映履歴、確認 2026-11-26。
-- [ホームの開閉操作の読み上げ](release-log/unreleased/PR-kenta-later-ui.md) — 反映履歴、確認 2026-11-26。
-- [配信の受け取り履歴の再読み込み](release-log/unreleased/PR-kenta-consent-history.md) — 履歴の取得失敗から再読み込みできるようにした反映履歴。確認 2026-11-26。
-- [はじめの設定の確認中の案内](release-log/unreleased/PR-kenta-later-today.md) — 反映履歴、確認 2026-11-26。

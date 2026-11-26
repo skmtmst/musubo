@@ -101,7 +101,7 @@ describe('タグ編集の権限と保存後の対象', () => {
 
   it('配信の受け取りを開いた後に取得失敗したら編集を止める', () => {
     const view = render(rail('A', vi.fn(async () => {})))
-    fireEvent.click(within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変える' }))
+    fireEvent.click(within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変更する' }))
     expect(fixture.consentCanEdit).toBe(true)
     fixture.consentStatus = 'error'
     view.rerender(rail('A', vi.fn(async () => {})))
@@ -112,7 +112,7 @@ describe('タグ編集の権限と保存後の対象', () => {
   it.each(['loading', 'error'] as const)('配信の受け取りが%sの間は編集を開かない', status => {
     fixture.consentStatus = status
     render(rail('A', vi.fn(async () => {})))
-    const action = within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変える' })
+    const action = within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変更する' })
     expect((action as HTMLButtonElement).disabled).toBe(true)
   })
 

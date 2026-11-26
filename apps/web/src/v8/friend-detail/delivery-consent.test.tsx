@@ -27,7 +27,7 @@ describe('配信の受け取り', () => {
     const retry = vi.fn()
     render(<Drawer open friendId="f1" friendName="見本1" rows={[]} canEdit={false} status="error" onRetry={retry} onClose={() => {}} onSaved={() => {}} />)
     expect(screen.queryByText('不明')).toBeNull()
-    expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     expect(retry).toHaveBeenCalledOnce()
   })
@@ -49,7 +49,7 @@ describe('配信の受け取り', () => {
     let finishSave!: () => void
     const onSaved = () => new Promise<void>(resolve => { finishSave = resolve })
     const view = render(<Drawer open friendId="f1" friendName="見本1" rows={ROWS as never} canEdit onClose={() => {}} onSaved={onSaved} />)
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '本人からの連絡' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(finishSave).toBeTypeOf('function'))

@@ -688,14 +688,19 @@ describe('ファネルの集計状態', () => {
     expect(host.textContent).toContain('まだ途中の人は完了した人に含めません')
   })
 
-  it('閲覧のみの人には対象者づくりの操作を置かず、誰ができるかを書く', async () => {
+  it('閲覧のみの人には対象者づくりを理由付きで表示し、操作は送らない', async () => {
     fixture.role = 'viewer'
     net.handler = funnelHandler({ success: true, data: funnelRun() })
     await render('funnel')
 
     expect(host.textContent).toContain('この段で止まった人 2 人')
-    expect(Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('対象者を開く'))).toBe(false)
-    expect(host.textContent).toContain('対象者づくりは統括・管理者が行えます。')
+    for (const label of ['対象者を開く', 'この対象者へ配信を作る']) {
+      const control = button(label)
+      expect(control.disabled || control.getAttribute('aria-disabled') === 'true').toBe(true)
+      await click(control)
+    }
+    expect(host.textContent).toContain('閲覧のみのため変更できません')
+    expect(net.calls.some(call => call.path.includes('/audiences?'))).toBe(false)
   })
 
   it('結果の定義版といまの定義版がずれていたら、旧版の結果だと断る', async () => {

@@ -160,6 +160,20 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(stats).toHaveBeenCalledTimes(2)
   })
 
+  it('作成後の一覧更新が失敗しても新しい案件を残し、読み直せる', async () => {
+    act(() => { root.render(<HqBannersListV8 />) }); await flush()
+    act(() => { buttonNamed('プロジェクトを作る')!.click() }); await flush()
+    fireEvent.change(document.querySelector('input[placeholder="例：春の感謝祭 2周年"]')!, { target: { value: '新しい案件' } })
+    listProjects.mockRejectedValueOnce(new Error('offline'))
+    act(() => { buttonNamed('作って開く')!.click() }); await flush()
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).toContain('一覧を更新できませんでした')
+    listProjects.mockResolvedValue({ success: true, data: [project('p9', '新しい案件'), project('p1', '秋のキャンペーン')] })
+    act(() => { buttonNamed('もう一度読み込む')!.click() }); await flush()
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).not.toContain('一覧を更新できませんでした')
+  })
+
   it('作成前の遅い件数応答で新しい件数を上書きしない', async () => {
     let resolveOld!: (value: unknown) => void
     stats.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
