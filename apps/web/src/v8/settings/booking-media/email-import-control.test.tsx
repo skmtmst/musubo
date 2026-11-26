@@ -77,6 +77,9 @@ type ChannelFixture = {
   expiringHeldCount: number
   nearestHeldExpiresAt: string | null
   daysUntilNearestHeldExpiry: number | null
+  overdueCount?: number
+  upcomingExpiringCount?: number
+  daysUntilNearestUpcomingHeldExpiry?: number | null
 }
 
 let channelFixtures: ChannelFixture[] = []
@@ -271,6 +274,54 @@ it('対象媒体だけに設定状態と受信状況を分けて出し、非対�
   expect(within(ikyuRow).queryByRole('button', { name: '止める' })).toBeNull()
 })
 
+it('有効な媒体で残った保留を件数付きで示し、停止せず再試行できる', async () => {
+  channelFixtures[0]!.heldCount = 2
+  render(<BookingMedia />)
+  await screen.findByText('ホットペッパー')
+  const row = rowFor('ホットペッパー')
+  expect(within(row).getByText('保留 2 通')).toBeTruthy()
+  fireEvent.click(within(row).getByRole('button', { name: '保留分を再試行' }))
+  const dialog = await screen.findByRole('dialog', { name: 'ホットペッパーの保留メールを再試行' })
+  fireEvent.click(within(dialog).getByRole('button', { name: '実行する' }))
+  await waitFor(() => expect(net.fetchApi.mock.calls.some(([url, init]) => String(url).includes('/media-email-import/hotpepper') && JSON.parse(init?.body ?? '{}').heldAction === 'import')).toBe(true))
+  await waitFor(() => expect(within(rowFor('ホットペッパー')).queryByRole('button', { name: '保留分を再試行' })).toBeNull())
+})
+
+it('再開後も保管された原文の期限を警告し、再開操作を求めない', async () => {
+  channelFixtures[0]!.emailImportEnabled = true
+  channelFixtures[0]!.heldCount = 0
+  channelFixtures[0]!.expiringHeldCount = 1
+  channelFixtures[0]!.daysUntilNearestHeldExpiry = 5
+  render(<BookingMedia />)
+  const warning = await screen.findByText(/停止中に受け取った予約メール 1 通が、あと 5 日で保管期限/)
+  expect(warning.textContent).not.toContain('［再開する］')
+  expect(within(rowFor('ホットペッパー')).queryByRole('button', { name: '保留分を再試行' })).toBeNull()
+})
+
+it('期限を過ぎて削除待ちの原文は、あと0日ではなく超過を知らせる', async () => {
+  channelFixtures[0]!.emailImportEnabled = false
+  channelFixtures[0]!.heldCount = 0
+  channelFixtures[0]!.expiringHeldCount = 1
+  channelFixtures[0]!.daysUntilNearestHeldExpiry = 0
+  render(<BookingMedia />)
+  const warning = await screen.findByText(/保管期限を過ぎています/)
+  expect(warning.textContent).toContain('原文の削除を再試行しています')
+  expect(warning.textContent).not.toContain('あと 0 日')
+  expect(screen.queryByRole('button', { name: '再開・保管を選ぶ' })).toBeNull()
+})
+
+it('期限超過と7日以内のメールが混在しても、それぞれを警告し期限前の保留を選べる', async () => {
+  Object.assign(channelFixtures[0]!, { emailImportEnabled: false, heldCount: 1, expiringHeldCount: 2,
+    daysUntilNearestHeldExpiry: 0, overdueCount: 1, upcomingExpiringCount: 1, daysUntilNearestUpcomingHeldExpiry: 4 })
+  render(<BookingMedia />)
+  expect(await screen.findByText(/保管期限を過ぎています/)).toBeTruthy()
+  expect(screen.getByText(/あと 4 日で保管期限（最長30日）を迎えます/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '再開・保管を選ぶ' }))
+  const dialog = await screen.findByRole('dialog', { name: 'ホットペッパーの予約メールの取り込みを再開' })
+  expect(within(dialog).getByText(/保管期限を過ぎています/)).toBeTruthy()
+  expect(within(dialog).getByText(/あと 4 日で保管期限/)).toBeTruthy()
+})
+
 it('取り込みを止めると他行の未保存URL編集を残したまま保留件数と期限警告を表示し、再開の窓から取り込みまたは保管だけを選べる', async () => {
   render(<BookingMedia />)
   await screen.findByText('ホットペッパー')
@@ -300,7 +351,7 @@ it('取り込みを止めると他行の未保存URL編集を残したまま保�
   const hpAfterStop = rowFor('ホットペッパー')
   await within(hpAfterStop).findByText('止めています（保留 2 通）')
   expect(within(hpAfterStop).getByText(/受信：届いています・保管期限まであと5日/)).toBeTruthy()
-  expect(screen.getByText(/あと 5 日で保管期限（30日）を迎えます/)).toBeTruthy()
+  expect(screen.getByText(/あと 5 日で保管期限（最長30日）を迎えます/)).toBeTruthy()
   expect(within(rowFor('食べログ')).getByRole('link', { name: 'tabelog.com/unsaved-edit/' })).toBeTruthy()
 
   fireEvent.click(within(hpAfterStop).getByRole('button', { name: '再開する', exact: true }))
@@ -310,7 +361,7 @@ it('取り込みを止めると他行の未保存URL編集を残したまま保�
   })
   await within(resumeDialog).findByText('対象LINE-A')
   expect(within(resumeDialog).getByText('現在の店')).toBeTruthy()
-  expect(within(resumeDialog).getByText(/保留中のうち 1 通が、あと 5 日で保管期限（30日）を迎えます/)).toBeTruthy()
+  expect(within(resumeDialog).getByText(/停止中に受け取ったメールのうち 1 通が、あと 5 日で保管期限（最長30日）を迎えます/)).toBeTruthy()
 
   const archiveRadio = within(resumeDialog).getByRole('radio', { name: /取り込まない（保管だけにする/ })
   fireEvent.click(archiveRadio)

@@ -414,7 +414,6 @@ export async function deleteExpiredRestaurantRawEmails(
 ): Promise<{ checked: number; deleted: number; failed: number; retentionDays: number }> {
   const retentionDays = rawMailRetentionDays(env);
   const now = options.now ?? new Date();
-  const nowIso = now.toISOString();
   const cutoff = new Date(now.getTime() - retentionDays * 86_400_000).toISOString();
   const maxPerRun = Math.max(1, Math.min(options.maxPerRun ?? RETENTION_MAX_PER_RUN, RETENTION_MAX_PER_RUN));
   const db = dbFor(env);
@@ -429,7 +428,7 @@ export async function deleteExpiredRestaurantRawEmails(
 
   while (checked < maxPerRun) {
     const limit = Math.min(RETENTION_BATCH_SIZE, maxPerRun - checked);
-    // 機能オフ中の店舗分と、保留期間中または再開処理中のメールは消さずに残す。
+    // 30日期限の管理台帳がある原文は、専用の削除処理と監査が完了するまで他の経路で消さない。
     const { results } = await db.prepare(`SELECT e.id, e.r2_key
       FROM rt_inbound_emails e LEFT JOIN rt_stores st ON st.id = e.store_id
       WHERE e.r2_key <> '' AND datetime(e.received_at) < datetime(?)
@@ -437,13 +436,10 @@ export async function deleteExpiredRestaurantRawEmails(
         AND NOT EXISTS (
           SELECT 1 FROM rt_held_reservation_emails h
           WHERE h.inbound_email_id = e.id
-            AND (
-              (h.state = 'held' AND datetime(h.expires_at) > datetime(?))
-              OR (h.state = 'processing' AND h.claim_expires_at IS NOT NULL AND datetime(h.claim_expires_at) > datetime(?))
-            )
+            AND h.state <> 'expired'
         )
       ORDER BY e.received_at, e.id
-      LIMIT ?`).bind(cutoff, nowIso, nowIso, limit).all<{ id: string; r2_key: string }>();
+      LIMIT ?`).bind(cutoff, limit).all<{ id: string; r2_key: string }>();
     if (results.length === 0) break;
     checked += results.length;
 

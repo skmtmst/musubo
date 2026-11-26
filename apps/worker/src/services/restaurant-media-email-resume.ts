@@ -92,7 +92,7 @@ export async function drainHeldReservationEmails(
         fallbackSubject,
         fallbackDate,
       },
-      { mode: 'resume', claimToken, now },
+      { mode: 'resume', claimToken, now: options.now },
     );
 
     if (result.outcome === 'processed' || result.outcome === 'quarantined') {
@@ -153,7 +153,8 @@ export async function saveStoreMediaEmailImportSetting(input: {
       WHERE ? = 0 OR EXISTS (SELECT 1 FROM rt_store_media_email_settings WHERE store_id = ? AND media_id = ?)
       ON CONFLICT(store_id, media_id) DO UPDATE SET
         enabled = excluded.enabled,
-        version = rt_store_media_email_settings.version + 1,
+        version = CASE WHEN rt_store_media_email_settings.enabled = 1 AND excluded.enabled = 1 AND ? = 1
+          THEN rt_store_media_email_settings.version ELSE rt_store_media_email_settings.version + 1 END,
         updated_by = excluded.updated_by,
         updated_at = datetime('now')
       WHERE rt_store_media_email_settings.version = ?`)
@@ -165,6 +166,7 @@ export async function saveStoreMediaEmailImportSetting(input: {
       input.expectedVersion,
       input.storeId,
       media.id,
+      input.enabled && input.heldAction === 'import' ? 1 : 0,
       input.expectedVersion,
     )
     .run();

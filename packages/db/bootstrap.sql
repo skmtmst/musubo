@@ -7921,7 +7921,7 @@ CREATE TABLE rt_held_reservation_emails (
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
   media_id TEXT NOT NULL REFERENCES rt_media(id),
   sync_event_id TEXT NOT NULL UNIQUE REFERENCES rt_sync_events(id) ON DELETE CASCADE,
-  state TEXT NOT NULL CHECK (state IN ('held', 'processing', 'archived', 'processed', 'expired')),
+  state TEXT NOT NULL CHECK (state IN ('held', 'processing', 'archived', 'processed', 'expiring', 'expired')),
   claim_token TEXT UNIQUE,
   claim_expires_at TEXT,
   last_error TEXT,
@@ -11783,6 +11783,8 @@ CREATE INDEX idx_rt_google_write_log_connection_772
   ON rt_google_write_log(connection_id, created_at DESC);
 
 CREATE INDEX idx_rt_google_write_log_store ON rt_google_write_log(store_id, created_at DESC);
+
+CREATE INDEX idx_rt_held_reservation_emails_expiry ON rt_held_reservation_emails(state, expires_at);
 
 CREATE INDEX idx_rt_held_reservation_emails_media ON rt_held_reservation_emails(store_id, media_id, state, expires_at);
 

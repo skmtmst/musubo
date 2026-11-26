@@ -1,4 +1,4 @@
-import { accountFeatureOffExclusionSql, recordAuditEvent } from '@line-crm/db';
+import { auditEventStatement } from '@line-crm/db';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
@@ -9,6 +9,8 @@ import { reconcileRestaurantInventory } from './restaurant-inventory-rules.js';
 export const HELD_RESERVATION_EMAIL_RETENTION_DAYS = 30;
 export const HELD_RESERVATION_EMAIL_WARNING_DAYS = 7;
 export const CLAIM_LEASE_MS = 5 * 60_000;
+// 6時間ごとの掃除と処理中リースの余裕を期限から先に差し引く。
+const RETENTION_SWEEP_BUFFER_MS = 6 * 60 * 60_000 + CLAIM_LEASE_MS;
 export const DEFAULT_STAY_MINUTES = 120;
 const DEFAULT_HOLD_END_HOUR = 23;
 
@@ -27,6 +29,9 @@ export type StoreMediaEmailImportState = {
   expiringHeldCount: number;
   nearestHeldExpiresAt: string | null;
   daysUntilNearestHeldExpiry: number | null;
+  overdueCount: number;
+  upcomingExpiringCount: number;
+  daysUntilNearestUpcomingHeldExpiry: number | null;
 };
 
 export function nextBusinessDayHoldExpiry(startsFrom: string, endHour = DEFAULT_HOLD_END_HOUR): string {
@@ -69,6 +74,9 @@ export function heldExpiryMetrics(
   expiringHeldCount: number;
   nearestHeldExpiresAt: string | null;
   daysUntilNearestHeldExpiry: number | null;
+  overdueCount: number;
+  upcomingExpiringCount: number;
+  daysUntilNearestUpcomingHeldExpiry: number | null;
 } {
   const nowMs = now.getTime();
   const warningWindowMs = HELD_RESERVATION_EMAIL_WARNING_DAYS * 86_400_000;
@@ -76,13 +84,18 @@ export function heldExpiryMetrics(
   let expiringHeldCount = 0;
   let nearestMs = Infinity;
   let nearestIso: string | null = null;
+  let overdueCount = 0;
+  let upcomingExpiringCount = 0;
+  let nearestUpcomingMs = Infinity;
 
   for (const raw of expiresAtList) {
     const iso = normalizeSqlTimestamp(raw);
     const ms = Date.parse(iso);
-    if (!Number.isFinite(ms) || ms <= nowMs) continue;
+    if (!Number.isFinite(ms)) continue;
     heldCount += 1;
     const remainingMs = ms - nowMs;
+    if (remainingMs <= 0) overdueCount += 1;
+    else if (remainingMs <= warningWindowMs) { upcomingExpiringCount += 1; nearestUpcomingMs = Math.min(nearestUpcomingMs, ms); }
     if (remainingMs <= warningWindowMs) expiringHeldCount += 1;
     if (ms < nearestMs) {
       nearestMs = ms;
@@ -95,7 +108,10 @@ export function heldExpiryMetrics(
     expiringHeldCount,
     nearestHeldExpiresAt: nearestIso,
     daysUntilNearestHeldExpiry:
-      nearestIso !== null ? Math.max(1, Math.ceil((nearestMs - nowMs) / 86_400_000)) : null,
+      nearestIso !== null ? Math.max(0, Math.ceil((nearestMs - nowMs) / 86_400_000)) : null,
+    overdueCount,
+    upcomingExpiringCount,
+    daysUntilNearestUpcomingHeldExpiry: Number.isFinite(nearestUpcomingMs) ? Math.ceil((nearestUpcomingMs - nowMs) / 86_400_000) : null,
   };
 }
 
@@ -104,7 +120,6 @@ export async function loadStoreMediaEmailImportStates(
   storeId: string,
   now = new Date(),
 ): Promise<Map<string, StoreMediaEmailImportState>> {
-  const nowIso = now.toISOString();
   const [mediaRows, settingRows, heldRows] = await Promise.all([
     db
       .prepare('SELECT id, code, is_active, accepts_reservations FROM rt_media')
@@ -114,19 +129,22 @@ export async function loadStoreMediaEmailImportStates(
       .bind(storeId)
       .all<{ media_id: string; enabled: number; version: number }>(),
     db
-      .prepare(`SELECT media_id, expires_at
-        FROM rt_held_reservation_emails
-        WHERE store_id = ? AND state IN ('held', 'processing') AND datetime(expires_at) > datetime(?)`)
-      .bind(storeId, nowIso)
-      .all<{ media_id: string; expires_at: string }>(),
+      .prepare(`SELECT h.media_id, h.expires_at, h.state
+        FROM rt_held_reservation_emails h JOIN rt_inbound_emails e ON e.id = h.inbound_email_id
+        WHERE h.store_id = ? AND h.state IN ('held', 'processing', 'archived', 'processed', 'expiring')
+          AND e.r2_key <> '' AND e.status <> 'raw_deleted'`)
+      .bind(storeId)
+      .all<{ media_id: string; expires_at: string; state: string }>(),
   ]);
 
   const settingsByMedia = new Map(settingRows.results.map((row) => [row.media_id, row]));
   const heldByMedia = new Map<string, string[]>();
+  const pendingByMedia = new Map<string, number>();
   for (const row of heldRows.results) {
     const list = heldByMedia.get(row.media_id) ?? [];
     list.push(row.expires_at);
     heldByMedia.set(row.media_id, list);
+    if ((row.state === 'held' || row.state === 'processing') && Date.parse(normalizeSqlTimestamp(row.expires_at)) > now.getTime()) pendingByMedia.set(row.media_id, (pendingByMedia.get(row.media_id) ?? 0) + 1);
   }
 
   const out = new Map<string, StoreMediaEmailImportState>();
@@ -135,12 +153,13 @@ export async function loadStoreMediaEmailImportStates(
     const setting = settingsByMedia.get(media.id);
     const metrics = supported
       ? heldExpiryMetrics(heldByMedia.get(media.id) ?? [], now)
-      : { heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null };
+      : { heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null, overdueCount: 0, upcomingExpiringCount: 0, daysUntilNearestUpcomingHeldExpiry: null };
     out.set(media.id, {
       emailImportSupported: supported,
       emailImportEnabled: supported ? (setting ? setting.enabled === 1 : true) : false,
       emailImportVersion: setting?.version ?? 0,
       ...metrics,
+      heldCount: pendingByMedia.get(media.id) ?? 0,
     });
   }
   return out;
@@ -172,7 +191,7 @@ async function computeHeldExpiryIso(
   const originMs = Number.isFinite(baseMs) ? baseMs : now.getTime();
   return {
     heldAt: now.toISOString(),
-    expiresAt: new Date(originMs + HELD_RESERVATION_EMAIL_RETENTION_DAYS * 86_400_000).toISOString(),
+    expiresAt: new Date(originMs + HELD_RESERVATION_EMAIL_RETENTION_DAYS * 86_400_000 - RETENTION_SWEEP_BUFFER_MS).toISOString(),
   };
 }
 
@@ -224,6 +243,7 @@ const RESUME_CLAIM_ACTIVE_SQL = `(
     WHERE inbound_email_id = ? AND store_id = ? AND media_id = ?
       AND state = 'processing' AND claim_token = ?
       AND datetime(expires_at) > datetime(?)
+      AND claim_expires_at IS NOT NULL AND datetime(claim_expires_at) > datetime(?)
   )
   AND NOT EXISTS (
     SELECT 1 FROM rt_store_media_email_settings
@@ -239,6 +259,54 @@ export async function isLiveImportSettingUnchanged(
 ): Promise<boolean> {
   const current = await loadStoreMediaEmailImportSnapshot(db, storeId, mediaId);
   return current.enabled && current.version === observedVersion;
+}
+
+/** 失敗時も設定版または処理権を同じD1バッチで確認する。 */
+export async function quarantineReservationEmailAtomically(input: {
+  env: Env['Bindings']; storeId: string; inboundEmailId: string; eventId: string;
+  media: RestaurantMediaRow; mode: 'live' | 'resume'; observedVersion?: number;
+  claimToken?: string; now: Date; payload: Record<string, unknown>; reason: string;
+}): Promise<'quarantined' | 'held' | 'skipped'> {
+  const db = dbFor(input.env, input.storeId);
+  const live = input.mode === 'live';
+  const guard = live ? LIVE_SETTING_UNCHANGED_SQL : RESUME_CLAIM_ACTIVE_SQL;
+  const params = live
+    ? [input.observedVersion ?? 0, input.storeId, input.media.id, input.storeId, input.media.id, input.observedVersion ?? 0]
+    : [input.inboundEmailId, input.storeId, input.media.id, input.claimToken ?? '', input.now.toISOString(), input.now.toISOString(), input.storeId, input.media.id];
+  const pending = "EXISTS (SELECT 1 FROM rt_sync_events WHERE id = ? AND status = 'received')";
+  const statements = [
+    db.prepare(`UPDATE rt_inbound_emails SET status = 'quarantined', quarantine_reason = ? WHERE id = ? AND ${pending} AND ${guard}`)
+      .bind(input.reason, input.inboundEmailId, input.eventId, ...params),
+    db.prepare(`UPDATE rt_sync_events SET status = 'failed', payload_json = json_patch(payload_json, ?), error_message = ?, processed_at = datetime('now')
+      WHERE id = ? AND status = 'received' AND ${guard}`)
+      .bind(JSON.stringify(input.payload), input.reason, input.eventId, ...params),
+  ];
+  if (live) {
+    const { heldAt, expiresAt } = await computeHeldExpiryIso(db, input.inboundEmailId, input.now);
+    statements.push(db.prepare(`INSERT INTO rt_held_reservation_emails
+      (inbound_email_id, store_id, media_id, sync_event_id, state, held_at, expires_at, updated_at)
+      SELECT ?, ?, ?, ?, 'held', ?, ?, datetime('now') WHERE ${pending} AND NOT (${guard})
+      ON CONFLICT(inbound_email_id) DO NOTHING`)
+      .bind(input.inboundEmailId, input.storeId, input.media.id, input.eventId, heldAt, expiresAt, input.eventId, ...params));
+    statements.push(db.prepare(`UPDATE rt_sync_events SET payload_json = json_patch(payload_json, ?), error_message = NULL
+      WHERE id = ? AND status = 'received' AND NOT (${guard}) AND EXISTS
+        (SELECT 1 FROM rt_held_reservation_emails WHERE inbound_email_id = ? AND state = 'held')`)
+      .bind(JSON.stringify({ media: input.media.code, held: true }), input.eventId, ...params, input.inboundEmailId));
+  } else {
+    statements.push(db.prepare(`UPDATE rt_held_reservation_emails SET state = 'processed', claim_token = NULL,
+      claim_expires_at = NULL, last_error = ?, updated_at = datetime('now')
+      WHERE inbound_email_id = ? AND state = 'processing' AND claim_token = ? AND ${guard}`)
+      .bind(input.reason, input.inboundEmailId, input.claimToken ?? '', ...params));
+    statements.push(db.prepare(`UPDATE rt_held_reservation_emails SET state = 'held', claim_token = NULL,
+      claim_expires_at = NULL, updated_at = datetime('now') WHERE inbound_email_id = ? AND state = 'processing'
+      AND claim_token = ? AND EXISTS (SELECT 1 FROM rt_store_media_email_settings WHERE store_id = ? AND media_id = ? AND enabled = 0)`)
+      .bind(input.inboundEmailId, input.claimToken ?? '', input.storeId, input.media.id));
+  }
+  const result = await db.batch(statements);
+  if ((result[1]?.meta.changes ?? 0) > 0) return 'quarantined';
+  if (live && (result[2]?.meta.changes ?? 0) > 0) return 'held';
+  if (!live && (result[3]?.meta.changes ?? 0) > 0) return 'held';
+  return 'skipped';
 }
 
 /**
@@ -266,7 +334,7 @@ export async function commitReservationEmailAtomically(input: {
   const guardSql = isLive ? LIVE_SETTING_UNCHANGED_SQL : RESUME_CLAIM_ACTIVE_SQL;
   const guardParams = isLive
     ? [input.observedVersion ?? 0, input.storeId, input.media.id, input.storeId, input.media.id, input.observedVersion ?? 0]
-    : [input.inboundEmailId, input.storeId, input.media.id, input.claimToken ?? '', nowIso, input.storeId, input.media.id];
+    : [input.inboundEmailId, input.storeId, input.media.id, input.claimToken ?? '', nowIso, nowIso, input.storeId, input.media.id];
 
   const statements: D1PreparedStatement[] = [];
   let hasReservationStatement = false;
@@ -500,14 +568,14 @@ export async function expireHeldReservationEmails(
       JOIN rt_stores st ON st.id = h.store_id
       JOIN rt_organizations org ON org.id = st.organization_id
       WHERE (
-        h.state = 'held'
+        h.state IN ('held', 'archived', 'processed')
         OR (h.state = 'processing' AND h.claim_expires_at IS NOT NULL AND datetime(h.claim_expires_at) <= datetime(?))
+        OR (h.state = 'expiring' AND h.claim_expires_at IS NOT NULL AND datetime(h.claim_expires_at) <= datetime(?))
       )
         AND datetime(h.expires_at) <= datetime(?)
-        AND NOT ${accountFeatureOffExclusionSql('st.line_account_id', 'restaurant_test')}
       ORDER BY datetime(h.expires_at) ASC, h.inbound_email_id ASC
       LIMIT ?`)
-    .bind(nowIso, nowIso, limit)
+    .bind(nowIso, nowIso, nowIso, limit)
     .all<ExpiredHeldCandidate>();
 
   let checked = 0;
@@ -517,16 +585,18 @@ export async function expireHeldReservationEmails(
   for (const row of results) {
     checked += 1;
     const expiryToken = crypto.randomUUID();
+    const expiryLease = new Date(now.getTime() + CLAIM_LEASE_MS).toISOString();
     const claimed = await db
       .prepare(`UPDATE rt_held_reservation_emails
-        SET state = 'expired', claim_token = ?, claim_expires_at = NULL, updated_at = datetime('now')
+        SET state = 'expiring', claim_token = ?, claim_expires_at = ?, updated_at = datetime('now')
         WHERE inbound_email_id = ?
           AND (
-            state = 'held'
+            state IN ('held', 'archived', 'processed')
             OR (state = 'processing' AND claim_expires_at IS NOT NULL AND datetime(claim_expires_at) <= datetime(?))
+            OR (state = 'expiring' AND claim_expires_at IS NOT NULL AND datetime(claim_expires_at) <= datetime(?))
           )
           AND datetime(expires_at) <= datetime(?)`)
-      .bind(expiryToken, row.inbound_email_id, nowIso, nowIso)
+      .bind(expiryToken, expiryLease, row.inbound_email_id, nowIso, nowIso, nowIso)
       .run();
 
     if (!claimed.meta.changes) continue;
@@ -537,54 +607,40 @@ export async function expireHeldReservationEmails(
         await env.RAW_MAIL.delete(row.r2_key);
       }
       const storeDb = dbFor(env, row.store_id);
-      await storeDb.batch([
+      const claimGuard = "EXISTS (SELECT 1 FROM rt_held_reservation_emails WHERE inbound_email_id = ? AND state = 'expiring' AND claim_token = ?)";
+      const updates = await storeDb.batch([
         storeDb
           .prepare(`UPDATE rt_inbound_emails
             SET r2_key = '', status = 'raw_deleted'
-            WHERE id = ?`)
-          .bind(row.inbound_email_id),
+            WHERE id = ? AND ${claimGuard}`)
+          .bind(row.inbound_email_id, row.inbound_email_id, expiryToken),
         storeDb
           .prepare(`UPDATE rt_sync_events
             SET status = 'failed', error_message = 'held_expired', processed_at = datetime('now')
-            WHERE id = ? AND status = 'received'`)
-          .bind(row.sync_event_id),
+            WHERE id = ? AND status = 'received' AND ${claimGuard}`)
+          .bind(row.sync_event_id, row.inbound_email_id, expiryToken),
+        auditEventStatement(storeDb, {
+          sourceKind: 'rt_held_email_expiry', sourceId: row.inbound_email_id,
+          tenantId: row.tenant_id ?? undefined, lineAccountId: row.line_account_id,
+          category: 'business', actorPrincipalId: 'system:retention', actorRole: 'system',
+          action: 'restaurant.media_email_import.held_expired', targetKind: 'rt_held_reservation_email',
+          targetId: row.inbound_email_id, result: 'success',
+          after: { storeId: row.store_id, mediaCode: row.media_code, heldAt: row.held_at, expiresAt: row.expires_at },
+          createdAt: nowIso,
+        }, { sql: claimGuard, params: [row.inbound_email_id, expiryToken] }),
         storeDb
           .prepare(`UPDATE rt_held_reservation_emails
-            SET claim_token = NULL, updated_at = datetime('now')
-            WHERE inbound_email_id = ? AND state = 'expired' AND claim_token = ?`)
+            SET state = 'expired', claim_token = NULL, claim_expires_at = NULL, updated_at = datetime('now')
+            WHERE inbound_email_id = ? AND state = 'expiring' AND claim_token = ?`)
           .bind(row.inbound_email_id, expiryToken),
       ]);
-      try {
-        await recordAuditEvent(storeDb, {
-          sourceKind: 'rt_held_email_expiry',
-          sourceId: row.inbound_email_id,
-          tenantId: row.tenant_id ?? undefined,
-          lineAccountId: row.line_account_id,
-          category: 'business',
-          actorPrincipalId: 'system:retention',
-          actorRole: 'system',
-          action: 'restaurant.media_email_import.held_expired',
-          targetKind: 'rt_held_reservation_email',
-          targetId: row.inbound_email_id,
-          result: 'success',
-          after: {
-            storeId: row.store_id,
-            mediaCode: row.media_code,
-            heldAt: row.held_at,
-            expiresAt: row.expires_at,
-          },
-          createdAt: nowIso,
-        });
-      } catch {
-        logger.error('restaurant_email.record_held_expiry_audit_failed');
-      }
-      deleted += 1;
+      if ((updates[3]?.meta.changes ?? 0) > 0) deleted += 1;
     } catch {
       await dbFor(env, row.store_id)
         .prepare(`UPDATE rt_held_reservation_emails
-          SET state = 'held', claim_token = NULL, updated_at = datetime('now')
-          WHERE inbound_email_id = ? AND state = 'expired' AND claim_token = ?`)
-        .bind(row.inbound_email_id, expiryToken)
+          SET claim_expires_at = ?, updated_at = datetime('now')
+          WHERE inbound_email_id = ? AND state = 'expiring' AND claim_token = ?`)
+        .bind(nowIso, row.inbound_email_id, expiryToken)
         .run()
         .catch(() => undefined);
       failed += 1;

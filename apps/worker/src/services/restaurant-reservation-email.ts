@@ -7,9 +7,9 @@ import {
   DEFAULT_STAY_MINUTES,
   commitReservationEmailAtomically,
   holdInboundReservationEmail,
-  isLiveImportSettingUnchanged,
   loadStoreMediaEmailImportSnapshot,
   nextBusinessDayHoldExpiry,
+  quarantineReservationEmailAtomically,
   type RestaurantMediaRow,
 } from './restaurant-media-email-import.js';
 
@@ -95,22 +95,6 @@ function htmlToText(html: string): string {
     .replace(/&#39;/gi, "'");
 }
 
-async function markEvent(
-  env: Env['Bindings'],
-  storeId: string,
-  eventId: string,
-  status: 'processed' | 'failed',
-  payload: Record<string, unknown>,
-  errorMessage: string | null,
-): Promise<void> {
-  await dbFor(env, storeId).prepare(`UPDATE rt_sync_events
-    SET status = ?, payload_json = json_patch(payload_json, ?), error_message = ?, processed_at = datetime('now')
-    WHERE id = ?`).bind(status, JSON.stringify(payload), errorMessage, eventId).run();
-  await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails SET status = ?, quarantine_reason = ?
-    WHERE store_id = ? AND message_id = (SELECT external_event_id FROM rt_sync_events WHERE id = ? AND provider = 'email')`)
-    .bind(status === 'failed' ? 'quarantined' : 'received', errorMessage, storeId, eventId).run();
-}
-
 export type ProcessStoredEmailResult = {
   outcome: 'processed' | 'held' | 'quarantined' | 'retry_later' | 'skipped';
 };
@@ -122,46 +106,18 @@ async function settleFailedParse(
   reason: string,
 ): Promise<ProcessStoredEmailResult> {
   const db = dbFor(input.env, input.storeId);
-  if (options.mode === 'live') {
-    const unchanged = await isLiveImportSettingUnchanged(
-      db,
-      input.storeId,
-      input.media.id,
-      options.observedVersion ?? 0,
-    );
-    if (!unchanged) {
-      await holdInboundReservationEmail(db, {
-        inboundEmailId: input.inboundEmailId,
-        storeId: input.storeId,
-        mediaId: input.media.id,
-        syncEventId: input.eventId,
-        mediaCode: input.media.code,
-        now: options.now,
-      });
-      return { outcome: 'held' };
-    }
-    await markEvent(input.env, input.storeId, input.eventId, 'failed', payload, reason);
-    return { outcome: 'quarantined' };
-  }
-
-  if (options.transient) {
-    await db
+  if (options.mode === 'resume' && options.transient) {
+    const released = await db
       .prepare(`UPDATE rt_held_reservation_emails
         SET state = 'held', claim_token = NULL, claim_expires_at = NULL, last_error = ?, updated_at = datetime('now')
-        WHERE inbound_email_id = ? AND state = 'processing' AND claim_token = ?`)
-      .bind(reason, input.inboundEmailId, options.claimToken ?? '')
+        WHERE inbound_email_id = ? AND state = 'processing' AND claim_token = ?
+          AND claim_expires_at IS NOT NULL AND datetime(claim_expires_at) > datetime(?)`)
+      .bind(reason, input.inboundEmailId, options.claimToken ?? '', options.now.toISOString())
       .run();
-    return { outcome: 'retry_later' };
+    return { outcome: released.meta.changes ? 'retry_later' : 'skipped' };
   }
 
-  await markEvent(input.env, input.storeId, input.eventId, 'failed', payload, reason);
-  await db
-    .prepare(`UPDATE rt_held_reservation_emails
-      SET state = 'processed', claim_token = NULL, claim_expires_at = NULL, last_error = ?, updated_at = datetime('now')
-      WHERE inbound_email_id = ? AND state = 'processing' AND claim_token = ?`)
-    .bind(reason, input.inboundEmailId, options.claimToken ?? '')
-    .run();
-  return { outcome: 'quarantined' };
+  return { outcome: await quarantineReservationEmailAtomically({ ...input, ...options, payload, reason }) };
 }
 
 export async function processStoredRestaurantEmail(
@@ -193,7 +149,7 @@ export async function processStoredRestaurantEmail(
   if (!parser) {
     return settleFailedParse(
       input,
-      { mode, observedVersion, claimToken: options.claimToken, now },
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
       { media: input.media.code, parserKey: input.media.parser_key },
       'unprocessed:parser_not_found',
     );
@@ -206,15 +162,15 @@ export async function processStoredRestaurantEmail(
   } catch (error) {
     return settleFailedParse(
       input,
-      { mode, observedVersion, claimToken: options.claimToken, now, transient: true },
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date(), transient: true },
       { media: input.media.code, objectKey: input.objectKey },
-      `unprocessed:raw_mail_read_failed:${error instanceof Error ? error.message : String(error)}`,
+      'unprocessed:raw_mail_read_failed',
     );
   }
   if (!object) {
     return settleFailedParse(
       input,
-      { mode, observedVersion, claimToken: options.claimToken, now },
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
       { media: input.media.code, objectKey: input.objectKey },
       'unprocessed:raw_mail_missing',
     );
@@ -223,7 +179,7 @@ export async function processStoredRestaurantEmail(
     await object.body.cancel('reservation_email_parse_size_limit');
     return settleFailedParse(
       input,
-      { mode, observedVersion, claimToken: options.claimToken, now },
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
       { media: input.media.code, objectKey: input.objectKey, rawSize: object.size },
       'unprocessed:parse_size_limit',
     );
@@ -247,7 +203,7 @@ export async function processStoredRestaurantEmail(
     if (!validation.valid) {
       return settleFailedParse(
         input,
-        { mode, observedVersion, claimToken: options.claimToken, now },
+        { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
         { media: input.media.code, kind: parsed.kind, parserVersion: parser.version },
         `unprocessed:${validation.reason}`,
       );
@@ -268,15 +224,15 @@ export async function processStoredRestaurantEmail(
       mode,
       observedVersion,
       claimToken: options.claimToken,
-      now,
+      now: options.now ?? new Date(),
     });
     return { outcome: committed };
   } catch (error) {
     return settleFailedParse(
       input,
-      { mode, observedVersion, claimToken: options.claimToken, now },
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
       { media: input.media.code, parserVersion: parser.version },
-      `unprocessed:parse_failed:${error instanceof Error ? error.message : String(error)}`,
+      'unprocessed:parse_failed',
     );
   }
 }

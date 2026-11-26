@@ -6,6 +6,12 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
 import { SCHEDULED_CRONS, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
 import { scheduled } from './scheduled.js';
+import * as tokenRefresh from '../services/token-refresh.js';
+
+const heldSweep = vi.hoisted(() => vi.fn(async () => ({ checked: 0, deleted: 0, failed: 0 })));
+vi.mock('../services/restaurant-media-email-import.js', async original => ({
+  ...await original<Record<string, unknown>>(), expireHeldReservationEmails: heldSweep,
+}));
 
 const staging = {
   DEPLOY_ENV: 'staging',
@@ -27,6 +33,31 @@ describe('staging LINE token renewal', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    heldSweep.mockClear();
+    vi.restoreAllMocks();
+  });
+
+  it('検証環境の実際の5分tickで保留メールの期限を掃除し、環境や機能が一致しなければ動かさない', async () => {
+    const { db, raw } = createTestD1();
+    try {
+      await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, RESTAURANT_TEST_ENABLED: 'true' });
+      expect(heldSweep).toHaveBeenCalledOnce();
+      expect(heldSweep).toHaveBeenCalledWith(expect.objectContaining({ DB: db }), expect.objectContaining({ maxPerRun: 200, now: expect.any(Date) }));
+      heldSweep.mockClear();
+      await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, RESTAURANT_TEST_ENABLED: 'false' });
+      await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, RESTAURANT_TEST_ENABLED: 'true', D1_DATABASE_ID: 'incorrect-db' });
+      await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, RESTAURANT_TEST_ENABLED: 'true', DEPLOY_ENV: 'production' });
+      expect(heldSweep).not.toHaveBeenCalled();
+    } finally { raw.close(); }
+  });
+
+  it('トークン更新が失敗しても保留メールを掃除し、更新失敗を隠さない', async () => {
+    const { db, raw } = createTestD1();
+    try {
+      vi.spyOn(tokenRefresh, 'refreshLineAccessTokens').mockRejectedValueOnce(new Error('token refresh failed'));
+      await expect(tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, RESTAURANT_TEST_ENABLED: 'true' })).rejects.toThrow('token refresh failed');
+      expect(heldSweep).toHaveBeenCalledOnce();
+    } finally { raw.close(); }
   });
 
   it('registers exactly the token renewal tick in the deployed staging configuration', async () => {

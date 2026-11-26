@@ -34,12 +34,10 @@ describe('予約媒体ごとのメール取込設定と保留メール台帳', (
         VALUES ('mail-1', 'store-1', 'media-hotpepper', 'ev-1', 'held', 'claim-1', '2030-01-31T00:00:00.000Z')
       `).run();
 
-      expect(() =>
-        db.prepare(`
-          INSERT INTO rt_held_reservation_emails (inbound_email_id, store_id, media_id, sync_event_id, state, expires_at)
-          VALUES ('mail-1', 'store-1', 'media-hotpepper', 'ev-1', 'invalid_state', '2030-01-31T00:00:00.000Z')
-        `).run(),
-      ).toThrow();
+      db.prepare(`UPDATE rt_held_reservation_emails SET state = 'expiring' WHERE inbound_email_id = 'mail-1'`).run();
+      expect(() => db.prepare(`UPDATE rt_held_reservation_emails SET state = 'invalid_state' WHERE inbound_email_id = 'mail-1'`).run()).toThrow();
+      const expiryIndex = db.pragma('index_info(idx_rt_held_reservation_emails_expiry)') as Array<{ name: string }>;
+      expect(expiryIndex.map(column => column.name)).toEqual(['state', 'expires_at']);
 
       expect(RETENTION_TABLES.rt_store_media_email_settings?.category).toBe('purge');
       expect(RETENTION_TABLES.rt_held_reservation_emails?.category).toBe('purge');

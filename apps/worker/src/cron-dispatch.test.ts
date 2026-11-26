@@ -54,6 +54,7 @@ const processors = vi.hoisted(() => Object.fromEntries([
   "runEventBookingExpirer",
   "syncBillingInvoicesDaily",
   "deleteExpiredRestaurantRawEmails",
+  "expireHeldReservationEmails",
   "processGoogleBusinessDailyMetrics",
   "processTenantDataPurge",
   "purgeExpiredRegistrationApplications",
@@ -169,6 +170,9 @@ vi.mock('./services/restaurant-email-intake.js',async original=>({
   ...await original<Record<string,unknown>>(),
   deleteExpiredRestaurantRawEmails:processors.deleteExpiredRestaurantRawEmails,
 }));
+vi.mock('./services/restaurant-media-email-import.js',async original=>({
+  ...await original<Record<string,unknown>>(), expireHeldReservationEmails: processors.expireHeldReservationEmails,
+}));
 vi.mock('./services/step-delivery.js',async original=>({
   ...await original<Record<string,unknown>>(),
   processStepDeliveries:processors.processStepDeliveries,
@@ -215,6 +219,7 @@ const processorCases = [
   ["event booking expirer", "runEventBookingExpirer", "sixHourlyHeavy"],
   ["billing invoice sync", "syncBillingInvoicesDaily", "sixHourlyHeavy"],
   ["restaurant raw mail retention", "deleteExpiredRestaurantRawEmails", "sixHourlyHeavy"],
+  ["restaurant held email retention", "expireHeldReservationEmails", "frequentHeavy"],
   ["google business metrics", "processGoogleBusinessDailyMetrics", "sixHourlyHeavy"],
   ["tenant data retention purge", "processTenantDataPurge", "sixHourlyHeavy"],
   ["registration application retention", "purgeExpiredRegistrationApplications", "sixHourlyHeavy"],
@@ -253,6 +258,7 @@ async function invoke(cron: string, scheduledTime=Date.parse('2026-10-19T15:01:0
       expect(processors[name],name).toHaveBeenCalledOnce();
       const first=processors[name]!.mock.calls[0]?.[0];
       expect(first&&typeof first==='object'&&'DB' in first?first.DB:first,name).toBe(fixture.db);
+      if (name === 'expireHeldReservationEmails') expect(processors[name]!.mock.calls[0]?.[1]).toEqual({ now: new Date(scheduledTime), maxPerRun: 200 });
     }
     if (lane === 'sixHourlyHeavy') expect(processors.purgeExpiredRegistrationApplications).toHaveBeenCalledWith(fixture.db, new Date(scheduledTime));
     expect(network).not.toHaveBeenCalled();
@@ -301,6 +307,17 @@ test('統括の削除失敗を6時間ごとのジョブ失敗として知らせ�
     const job = observed.jobs.find(item => item.name === 'tenant data retention purge');
     expect(job).toBeDefined();
     await expect(job!.run()).rejects.toThrow('tenant_data_purge_retry_required');
+  } finally { fixture.raw.close(); }
+});
+
+test.each([['test', true], ['production', false]])('保留メールの期限掃除は検証用の環境門を守る: %s', async (environment, expected) => {
+  const { runFrequentHeavyJobs } = await import('./cron/frequent.js');
+  const fixture = createTestD1();
+  try {
+    await runFrequentHeavyJobs({ scheduledTime: Date.now() } as ScheduledEvent, {
+      DB: fixture.db, DEPLOY_ENV: environment, RESTAURANT_TEST_ENABLED: 'true', LINE_CHANNEL_ACCESS_TOKEN: 'fixture',
+    } as import('./index.js').Env['Bindings']);
+    expect(observed.jobs.some(job => job.name === 'restaurant held email retention')).toBe(expected);
   } finally { fixture.raw.close(); }
 });
 

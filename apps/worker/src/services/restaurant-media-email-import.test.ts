@@ -9,6 +9,7 @@ import type { Env } from '../worker-env.js';
 import { routeInboundEmail } from './inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './restaurant-email-intake.js';
 import { drainHeldReservationEmails } from './restaurant-media-email-resume.js';
+import { expireHeldReservationEmails, loadStoreMediaEmailImportStates, quarantineReservationEmailAtomically } from './restaurant-media-email-import.js';
 import { processStoredRestaurantEmail, type RestaurantMediaRow } from './restaurant-reservation-email.js';
 
 type MockStaff = {
@@ -708,6 +709,55 @@ describe('店舗×媒体ごとの予約メール取り込み停止・再開', ()
     ).toEqual({ state: 'held' });
   });
 
+  it('解析失敗の直前に停止したメールは保留し、別の処理が完了した後の古い失敗は反映しない', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_inbound_emails (id, message_id, store_id, r2_key, status, size_bytes)
+      VALUES ('mail-failed-race', '<failed-race@example.test>', 'store-ginza', 'race.eml', 'stored', 100)`).run();
+    testDb.raw.prepare(`INSERT INTO rt_sync_events (id, store_id, provider, external_event_id, payload_json, status)
+      VALUES ('ev-failed-race', 'store-ginza', 'email', '<failed-race@example.test>', '{}', 'received')`).run();
+    const media = testDb.raw.prepare(`SELECT id, code, name, parser_key FROM rt_media WHERE code = 'hotpepper'`).get() as RestaurantMediaRow;
+    testDb.raw.prepare(`INSERT INTO rt_store_media_email_settings (store_id, media_id, enabled, version, updated_by)
+      VALUES ('store-ginza', 'media-hotpepper', 0, 1, 'owner')`).run();
+    const input = { env, storeId: 'store-ginza', inboundEmailId: 'mail-failed-race', eventId: 'ev-failed-race', media,
+      now: new Date(), payload: {}, reason: 'unprocessed:kind_unknown' };
+    expect(await quarantineReservationEmailAtomically({ ...input, mode: 'live', observedVersion: 0 })).toBe('held');
+    expect(testDb.raw.prepare(`SELECT status FROM rt_inbound_emails WHERE id = 'mail-failed-race'`).get()).toEqual({ status: 'stored' });
+    expect(testDb.raw.prepare(`SELECT json_extract(payload_json, '$.held') AS held FROM rt_sync_events WHERE id = 'ev-failed-race'`).get()).toEqual({ held: 1 });
+    testDb.raw.prepare(`UPDATE rt_store_media_email_settings SET enabled = 1, version = 2`).run();
+    testDb.raw.prepare(`UPDATE rt_held_reservation_emails SET state = 'processing', claim_token = 'old-claim', claim_expires_at = ? WHERE inbound_email_id = 'mail-failed-race'`)
+      .run(new Date(input.now.getTime() - 60_000).toISOString());
+    expect(await quarantineReservationEmailAtomically({ ...input, mode: 'resume', claimToken: 'old-claim' })).toBe('skipped');
+    expect(testDb.raw.prepare(`SELECT status FROM rt_sync_events WHERE id = 'ev-failed-race'`).get()).toEqual({ status: 'received' });
+    testDb.raw.prepare(`UPDATE rt_held_reservation_emails SET state = 'processing', claim_token = 'new-claim', claim_expires_at = ? WHERE inbound_email_id = 'mail-failed-race'`)
+      .run(new Date(input.now.getTime() + 60_000).toISOString());
+    expect(await quarantineReservationEmailAtomically({ ...input, mode: 'resume', claimToken: 'old-claim' })).toBe('skipped');
+    expect(testDb.raw.prepare(`SELECT status FROM rt_sync_events WHERE id = 'ev-failed-race'`).get()).toEqual({ status: 'received' });
+    expect(testDb.raw.prepare(`SELECT state, claim_token FROM rt_held_reservation_emails WHERE inbound_email_id = 'mail-failed-race'`).get()).toEqual({ state: 'processing', claim_token: 'new-claim' });
+    testDb.raw.prepare(`UPDATE rt_held_reservation_emails SET state = 'processed', claim_token = NULL WHERE inbound_email_id = 'mail-failed-race'`).run();
+    testDb.raw.prepare(`UPDATE rt_sync_events SET status = 'processed' WHERE id = 'ev-failed-race'`).run();
+    expect(await quarantineReservationEmailAtomically({ ...input, mode: 'resume', claimToken: 'old-claim' })).toBe('skipped');
+    expect(testDb.raw.prepare(`SELECT status FROM rt_sync_events WHERE id = 'ev-failed-race'`).get()).toEqual({ status: 'processed' });
+    expect(testDb.raw.prepare(`SELECT status FROM rt_inbound_emails WHERE id = 'mail-failed-race'`).get()).toEqual({ status: 'stored' });
+  });
+
+  it('再開時の一時失敗は有効のまま保留を再試行でき、二重登録しない', async () => {
+    await apiRequest('/api/restaurant-test/media-email-import/hotpepper?account_id=account-1', {
+      method: 'PUT', body: { storeId: 'store-ginza', enabled: false, expectedVersion: 0 },
+    });
+    await routeInboundEmail(makeEmail({ to: ginzaRecipient, from: 'jp_kanri@hotpepper.jp',
+      subject: '【即予約】予約の申し込み', date: 'Sat, 22 Aug 2026 12:00:00 +0900', body: hotpepperBookingBody('HP-RETRY', 2) }), env);
+    vi.mocked(env.RAW_MAIL!.get).mockRejectedValueOnce(new Error('PRIVATE_EMAIL_CONTENT'));
+    const first = await apiRequest('/api/restaurant-test/media-email-import/hotpepper?account_id=account-1', {
+      method: 'PUT', body: { storeId: 'store-ginza', enabled: true, expectedVersion: 1, heldAction: 'import' },
+    });
+    expect(await first.json()).toMatchObject({ data: { emailImportEnabled: true, heldCount: 1, failedHeldCount: 1 } });
+    expect(testDb.raw.prepare(`SELECT last_error FROM rt_held_reservation_emails WHERE state = 'held'`).get()).toEqual({ last_error: 'unprocessed:raw_mail_read_failed' });
+    const retry = await apiRequest('/api/restaurant-test/media-email-import/hotpepper?account_id=account-1', {
+      method: 'PUT', body: { storeId: 'store-ginza', enabled: true, expectedVersion: 2, heldAction: 'import' },
+    });
+    expect(await retry.json()).toMatchObject({ data: { emailImportVersion: 2, heldCount: 0, importedCount: 1, failedHeldCount: 0 } });
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM rt_reservations WHERE external_id = 'HP-RETRY'`).get()).toEqual({ count: 1 });
+  });
+
   it('再開時に保管だけを選んだ場合は原文を残したまま台帳へ入れず、その後の新着は通常どおり取り込む', async () => {
     await apiRequest('/api/restaurant-test/media-email-import/hotpepper?account_id=account-1', {
       method: 'PUT',
@@ -746,6 +796,19 @@ describe('店舗×媒体ごとの予約メール取り込み停止・再開', ()
     expect(
       testDb.raw.prepare(`SELECT state FROM rt_held_reservation_emails`).get(),
     ).toEqual({ state: 'archived' });
+    const timing = testDb.raw.prepare(`SELECT e.received_at, h.expires_at FROM rt_held_reservation_emails h JOIN rt_inbound_emails e ON e.id = h.inbound_email_id`).get() as { received_at: string; expires_at: string };
+    const receivedAt = /(?:Z|[+-]\d\d:\d\d)$/.test(timing.received_at) ? timing.received_at : `${timing.received_at.replace(' ', 'T')}Z`;
+    expect(Date.parse(timing.expires_at) - Date.parse(receivedAt)).toBe(30 * 86_400_000 - 6 * 60 * 60_000 - 5 * 60_000);
+
+    const warning = (await loadStoreMediaEmailImportStates(testDb.db, 'store-ginza', new Date(Date.now() + 24 * 86_400_000))).get('media-hotpepper');
+    expect(warning).toMatchObject({ heldCount: 0, expiringHeldCount: 1, daysUntilNearestHeldExpiry: 6 });
+    testDb.raw.prepare(`UPDATE rt_held_reservation_emails SET state = 'processed'`).run();
+    const processedWarning = (await loadStoreMediaEmailImportStates(testDb.db, 'store-ginza', new Date(Date.now() + 24 * 86_400_000))).get('media-hotpepper');
+    expect(processedWarning).toMatchObject({ heldCount: 0, expiringHeldCount: 1, daysUntilNearestHeldExpiry: 6 });
+    testDb.raw.prepare(`UPDATE rt_held_reservation_emails SET state = 'archived'`).run();
+    const expired = await expireHeldReservationEmails(env, { now: new Date(Date.now() + 31 * 86_400_000) });
+    expect(expired.deleted).toBe(1);
+    expect(rawObjects.size).toBe(0);
 
     await routeInboundEmail(
       makeEmail({
@@ -772,7 +835,7 @@ describe('店舗×媒体ごとの予約メール取り込み停止・再開', ()
       id: string,
       receivedAt: string,
       expiresAt: string,
-      state: 'held' | 'processing' = 'held',
+      state: 'held' | 'processing' | 'expiring' | 'archived' | 'processed' = 'held',
       claimToken: string | null = null,
       claimExpiresAt: string | null = null,
     ) => {
@@ -855,6 +918,31 @@ describe('店舗×媒体ごとの予約メール取り込み停止・再開', ()
       mediaCode: 'hotpepper',
     });
 
+    // 削除前・R2削除後に中断した処理権と、取り込み済み原文も再回収する。
+    seedHeld('before-crash', isoOffsetDays(-31), isoOffsetDays(-1), 'expiring', 'old-before', isoOffsetDays(-1));
+    seedHeld('after-crash', isoOffsetDays(-31), isoOffsetDays(-1), 'expiring', 'old-after', isoOffsetDays(-1));
+    seedHeld('processed', isoOffsetDays(-31), isoOffsetDays(-1), 'processed');
+    seedHeld('soon-again', isoOffsetDays(-20), isoOffsetDays(10));
+    rawObjects.delete('restaurant-intake/store-ginza/after-crash.eml');
+    const overdue = (await loadStoreMediaEmailImportStates(testDb.db, 'store-ginza', sweepNow)).get('media-hotpepper');
+    expect(overdue).toMatchObject({ heldCount: 2, daysUntilNearestHeldExpiry: 0, upcomingExpiringCount: 1, daysUntilNearestUpcomingHeldExpiry: 4 });
+    expect(overdue!.expiringHeldCount).toBeGreaterThanOrEqual(3);
+    testDb.raw.prepare(`INSERT INTO account_settings (id, line_account_id, key, value) VALUES ('off-restaurant', 'account-2', 'feature.restaurant_test', 'false')`).run();
+    const recovered = await expireHeldReservationEmails(env, { now: sweepNow });
+    expect(recovered.deleted).toBe(3);
+    for (const id of ['before-crash', 'after-crash', 'processed']) {
+      expect(rawObjects.has(`restaurant-intake/store-ginza/${id}.eml`)).toBe(false);
+      expect(testDb.raw.prepare('SELECT state FROM rt_held_reservation_emails WHERE inbound_email_id = ?').get(`mail-${id}`)).toEqual({ state: 'expired' });
+      expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM audit_events WHERE action = 'restaurant.media_email_import.held_expired' AND target_id = ?`).get(`mail-${id}`)).toEqual({ count: 1 });
+    }
+    expect((await expireHeldReservationEmails(env, { now: sweepNow })).deleted).toBe(0);
+    seedHeld('active-expiry', isoOffsetDays(-31), isoOffsetDays(-1), 'expiring', 'active-expiry-token', new Date(sweepNow.getTime() + 240_000).toISOString());
+    testDb.raw.prepare(`DELETE FROM account_settings WHERE id = 'off-restaurant'`).run();
+    env.RAW_MAIL_RETENTION_DAYS = '1';
+    await deleteExpiredRestaurantRawEmails(env, { now: sweepNow });
+    expect(rawObjects.has('restaurant-intake/store-ginza/active-expiry.eml')).toBe(true);
+    expect(testDb.raw.prepare(`SELECT status FROM rt_inbound_emails WHERE id = 'mail-active-expiry'`).get()).toEqual({ status: 'stored' });
+
     testDb.raw
       .prepare(`UPDATE rt_store_media_email_settings SET enabled = 1, version = 2 WHERE store_id = 'store-ginza' AND media_id = 'media-hotpepper'`)
       .run();
@@ -862,9 +950,9 @@ describe('店舗×媒体ごとの予約メール取り込み停止・再開', ()
       .prepare(`SELECT id, code, name, parser_key FROM rt_media WHERE code = 'hotpepper'`)
       .get() as RestaurantMediaRow;
     const drained = await drainHeldReservationEmails(env, 'store-ginza', media, { now: sweepNow });
-    expect(drained.importedCount).toBe(1);
+    expect(drained.importedCount).toBe(2);
     expect(
-      testDb.raw.prepare(`SELECT external_id FROM rt_reservations WHERE store_id = 'store-ginza'`).all(),
-    ).toEqual([{ external_id: 'HP-fresh' }]);
+      testDb.raw.prepare(`SELECT external_id FROM rt_reservations WHERE store_id = 'store-ginza' ORDER BY external_id`).all(),
+    ).toEqual([{ external_id: 'HP-fresh' }, { external_id: 'HP-soon-again' }]);
   });
 });

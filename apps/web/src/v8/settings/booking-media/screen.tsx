@@ -80,6 +80,9 @@ export type ChannelState = {
   expiringHeldCount?: number
   nearestHeldExpiresAt?: string | null
   daysUntilNearestHeldExpiry?: number | null
+  overdueCount?: number
+  upcomingExpiringCount?: number
+  daysUntilNearestUpcomingHeldExpiry?: number | null
 }
 
 type ResumingTarget = {
@@ -87,8 +90,10 @@ type ResumingTarget = {
   name: string
   expectedVersion: number
   heldCount: number
-  expiringHeldCount: number
-  daysUntilNearestHeldExpiry: number | null
+  overdueCount: number
+  upcomingExpiringCount: number
+  daysUntilNearestUpcomingHeldExpiry: number | null
+  alreadyEnabled: boolean
 }
 
 /** 予約メールの取り込みを店舗×媒体ごとに止める・再開できる媒体か。 */
@@ -461,8 +466,10 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
       name: row.name,
       expectedVersion: channel?.emailImportVersion ?? 0,
       heldCount: channel?.heldCount ?? 0,
-      expiringHeldCount: channel?.expiringHeldCount ?? 0,
-      daysUntilNearestHeldExpiry: channel?.daysUntilNearestHeldExpiry ?? null,
+      overdueCount: channel?.overdueCount ?? (channel?.daysUntilNearestHeldExpiry === 0 ? channel?.expiringHeldCount ?? 0 : 0),
+      upcomingExpiringCount: channel?.upcomingExpiringCount ?? (channel?.daysUntilNearestHeldExpiry ? channel.expiringHeldCount ?? 0 : 0),
+      daysUntilNearestUpcomingHeldExpiry: channel?.daysUntilNearestUpcomingHeldExpiry ?? (channel?.daysUntilNearestHeldExpiry || null),
+      alreadyEnabled: channel?.emailImportEnabled !== false,
     })
     setResumeHeldAction('import')
     setResumeError('')
@@ -534,7 +541,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
       if (!mounted.current) return
       setResuming(null)
       if ((res.data?.failedHeldCount ?? 0) > 0) {
-        setSaveError(`「${target.name}」の取り込みは再開しましたが、保留中のメールのうち ${formatNumber(res.data.failedHeldCount)} 通を処理できませんでした。時間をおいて確認してください。`)
+        setSaveError(`「${target.name}」の取り込みは再開しましたが、保留中のメールのうち ${formatNumber(res.data.failedHeldCount)} 通を処理できませんでした。時間をおいて［保留分を再試行］からやり直してください。`)
       } else if (resumeHeldAction === 'import') {
         notifySaved(
           (res.data?.importedCount ?? 0) > 0
@@ -606,15 +613,14 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
     if (!isEmailImportTarget(row, channel)) return []
     const expiringHeldCount = channel?.expiringHeldCount ?? 0
     const daysUntilNearestHeldExpiry = channel?.daysUntilNearestHeldExpiry ?? null
-    if (expiringHeldCount <= 0 || daysUntilNearestHeldExpiry === null) return []
-    return [{
-      code: row.code,
-      row,
-      channel,
-      enabled: channel?.emailImportEnabled !== false,
-      expiringHeldCount,
-      daysUntilNearestHeldExpiry,
-    }]
+    const overdueCount = channel?.overdueCount ?? (daysUntilNearestHeldExpiry === 0 ? expiringHeldCount : 0)
+    const upcomingCount = channel?.upcomingExpiringCount ?? (daysUntilNearestHeldExpiry ? expiringHeldCount : 0)
+    const upcomingDays = channel?.daysUntilNearestUpcomingHeldExpiry ?? (daysUntilNearestHeldExpiry || null)
+    const common = { code: row.code, row, channel, enabled: channel?.emailImportEnabled !== false }
+    return [
+      ...(overdueCount > 0 ? [{ ...common, kind: 'overdue' as const, count: overdueCount, days: 0 }] : []),
+      ...(upcomingCount > 0 && upcomingDays !== null ? [{ ...common, kind: 'upcoming' as const, count: upcomingCount, days: upcomingDays }] : []),
+    ]
   })
 
   let table
@@ -644,7 +650,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
             const remainingDays = channel?.daysUntilNearestHeldExpiry ?? null
             const receiptText = receiptStatusText(channel)
             const metaText = !enabled && expiringCount > 0 && remainingDays !== null
-              ? `${receiptText}・保管期限まであと${formatNumber(remainingDays)}日`
+              ? remainingDays === 0 ? `${receiptText}・保管期限を超過` : `${receiptText}・保管期限まであと${formatNumber(remainingDays)}日`
               : receiptText
             const changed = dirty.some((d) => d.code === row.code)
             return (
@@ -678,6 +684,10 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
                           {enabled ? '止める' : '再開する'}
                         </PermissionGatedButton>
                       </div>
+                      {enabled && heldCount > 0 ? <div className={styles.importTop}>
+                        <span>{`保留 ${formatNumber(heldCount)} 通`}</span>
+                        <PermissionGatedButton allowed={canManage} size="compact" disabled={togglingCode !== null} onClick={() => openResumeDialog(row, channel)}>保留分を再試行</PermissionGatedButton>
+                      </div> : null}
                       <span className={styles.importMeta} title={metaText}>{metaText}</span>
                     </div>
                   ) : (
@@ -737,16 +747,18 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
           {saveError ? <Notice tone="danger" role="alert">{saveError}</Notice> : null}
           {expiringWarnings.map((item) => (
             <Notice
-              key={item.code}
+              key={`${item.code}-${item.kind}`}
               tone="warn"
               role="status"
-              action={canManage && !item.enabled ? (
+              action={item.kind === 'upcoming' && canManage && !item.enabled && (item.channel?.heldCount ?? 0) > 0 ? (
                 <Button size="compact" onClick={() => openResumeDialog(item.row, item.channel)}>
                   再開・保管を選ぶ
                 </Button>
               ) : undefined}
             >
-              {`「${item.row.name}」で保留中の予約メール ${formatNumber(item.expiringHeldCount)} 通が、あと ${formatNumber(item.daysUntilNearestHeldExpiry)} 日で保管期限（30日）を迎えます。期限を過ぎると決まりどおり削除して監査に残します。［再開する］からまとめて取り込むか、取り込まず保管だけにするかを選んでください。`}
+              {item.kind === 'overdue'
+                ? `「${item.row.name}」で停止中に受け取った予約メール ${formatNumber(item.count)} 通は保管期限を過ぎています。原文の削除を再試行しています。`
+                : `「${item.row.name}」で停止中に受け取った予約メール ${formatNumber(item.count)} 通が、あと ${formatNumber(item.days)} 日で保管期限（最長30日）を迎えます。期限を過ぎると決まりどおり削除して監査に残します。${item.enabled ? '' : '［再開する］からまとめて取り込むか、取り込まず保管だけにするかを選んでください。'}`}
             </Notice>
           ))}
 
@@ -931,18 +943,23 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
 
       <Dialog
         open={resuming !== null}
-        title={resuming ? `${resuming.name}の予約メールの取り込みを再開` : '予約メールの取り込みを再開'}
-        description={resuming ? (resuming.heldCount > 0 ? `止めている間に届いた保留中のメールが ${formatNumber(resuming.heldCount)} 通あります。再開するにあたり、保留分を予約台帳へまとめて取り込むか、取り込まず保管だけにするかを選んでください。` : '止めている間に届いた保留中のメールはありません（0 通）。再開すると、これから届く予約メールを予約台帳へ取り込みます。') : undefined}
-        confirmLabel="再開する"
+        title={resuming?.alreadyEnabled ? `${resuming.name}の保留メールを再試行` : resuming ? `${resuming.name}の予約メールの取り込みを再開` : '予約メールの取り込みを再開'}
+        description={resuming ? (resuming.heldCount > 0 ? `保留中のメールが ${formatNumber(resuming.heldCount)} 通あります。予約台帳へまとめて取り込むか、取り込まず保管だけにするかを選んでください。` : '止めている間に届いた保留中のメールはありません（0 通）。再開すると、これから届く予約メールを予約台帳へ取り込みます。') : undefined}
+        confirmLabel={resuming?.alreadyEnabled ? '実行する' : '再開する'}
         busy={resuming !== null && togglingCode === resuming.code}
         onConfirm={() => void confirmResume()}
         onCancel={() => { if (!togglingCode) { setResuming(null); setResumeError('') } }}
         error={resumeError || undefined}
       >
         <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: storeId, name: stores.find(store => store.id === storeId)?.name }} />
-        {resuming && resuming.expiringHeldCount > 0 && resuming.daysUntilNearestHeldExpiry !== null ? (
+        {resuming && resuming.overdueCount > 0 ? (
           <Notice tone="warn" role="status">
-            {`保留中のうち ${formatNumber(resuming.expiringHeldCount)} 通が、あと ${formatNumber(resuming.daysUntilNearestHeldExpiry)} 日で保管期限（30日）を迎えます。`}
+            {`停止中に受け取ったメール ${formatNumber(resuming.overdueCount)} 通は保管期限を過ぎています。原文の削除を再試行しています。`}
+          </Notice>
+        ) : null}
+        {resuming && resuming.upcomingExpiringCount > 0 && resuming.daysUntilNearestUpcomingHeldExpiry !== null ? (
+          <Notice tone="warn" role="status">
+            {`停止中に受け取ったメールのうち ${formatNumber(resuming.upcomingExpiringCount)} 通が、あと ${formatNumber(resuming.daysUntilNearestUpcomingHeldExpiry)} 日で保管期限（最長30日）を迎えます。`}
           </Notice>
         ) : null}
         <div className={styles.dialogFields} role="radiogroup" aria-label="保留中のメールの扱い">
