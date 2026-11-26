@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
@@ -251,7 +253,7 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
             return (
               <Tr key={channel.id} data-row-id={channel.id}>
                 <Td><TruncatedText value={channel.name} /></Td>
-                <Td><TruncatedText value={METHOD_LABEL[channel.receiveMethod]} /></Td>
+                <Td><TruncatedText value={knownValue(METHOD_LABEL, channel.receiveMethod, '受け取り方法を確認できません')} /></Td>
                 <Td><Status value={state.value} label={state.label} /></Td>
                 <Td>{preparing || channel.todayCount === null ? emptyValue('unknown') : channel.todayCount}</Td>
                 <Td>{preparing ? emptyValue('unknown') : formatAt(channel.lastReceivedAt, timezone)}</Td>

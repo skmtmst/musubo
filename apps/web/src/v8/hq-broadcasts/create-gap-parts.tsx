@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { scheduledJstIso } from '@/lib/jst-datetime';
 import type { HqBroadcastInput, HqBroadcastRun, SegmentCondition } from '@line-crm/shared';
@@ -34,7 +36,7 @@ function errorText(caught: unknown, fallback: string): string {
 
 /** 配信の中身の種類（「テキスト＋カルーセル」）。 */
 function runKinds(run: HqBroadcastRun): string {
-  return [...new Set(bubblesFromInput(run.input ?? { messageContent: '' }).map((b) => HQ_KIND_LABEL[b.kind]))].join('＋')
+  return [...new Set(bubblesFromInput(run.input ?? { messageContent: '' }).map((b) => knownValue(HQ_KIND_LABEL, b.kind, '種類を確認できません')))].join('＋')
 }
 
 
