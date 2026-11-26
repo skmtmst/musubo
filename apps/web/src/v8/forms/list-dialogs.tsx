@@ -324,6 +324,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
               busy={renaming}
               busyLabel="保存中"
               disabled={renaming || !renameName.trim()}
+              disabledReason={!renameName.trim() ? 'フォーム名を入力してください。' : undefined}
               onClick={() => void saveRename()}
             >
               保存する
@@ -331,7 +332,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
           </DialogActions>)}
       >
         <OperationTargetSummary accounts={[{ id: renameAccountId ?? '' }]} />
-        <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><SharedTextField
+        <Field label="フォーム名" required><SaveErrorField names={["renameName","rename_name"]}><SharedTextField
             type="text"
             value={renameName}
             onChange={(e) => setRenameName(e.target.value)}
