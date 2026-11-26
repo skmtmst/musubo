@@ -74,6 +74,12 @@ const STATUS: Record<EcNotificationRun['status'], { label: string; tone: 'good' 
   failed: { label: '送れなかった', tone: 'danger' },
 }
 
+function statusView(status: string): { label: string; tone: 'good' | 'info' | 'muted' | 'danger' } {
+  return Object.prototype.hasOwnProperty.call(STATUS, status)
+    ? STATUS[status as keyof typeof STATUS]
+    : { label: '状態不明', tone: 'muted' }
+}
+
 /** 「10/1 21:30」。オフセットの無い古い行は既に日本時間として読む（今の部品と同じ決まり）。 */
 function shortJst(value: string | null | undefined): string {
   const normalized = value && !/[zZ]|[+-]\d{2}:\d{2}$/.test(value) ? `${value.replace(' ', 'T')}+09:00` : value
@@ -226,7 +232,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           </thead>
           <tbody>
             {visibleItems.map((item) => {
-              const status = STATUS[item.status]
+              const status = statusView(item.status)
               const who = item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'
               const reason = reasonWords(item)
               return <Tr key={item.id} data-row-id={item.id}>
@@ -267,8 +273,8 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     >
       {detail ? (
         <div className={styles.runDetail}>
-          <LogEntryCopy canCopy={canResolve} entry={{ occurredAt: detail.receivedAt, target: detail.friendName || '名前は未取得', status: STATUS[detail.status].label, reason: reasonWords(detail) }} />
-          <p className={styles.minor}>{`状態：${STATUS[detail.status].label}／理由：${reasonWords(detail)}`}</p>
+          <LogEntryCopy canCopy={canResolve} entry={{ occurredAt: detail.receivedAt, target: detail.friendName || '名前は未取得', status: statusView(detail.status).label, reason: reasonWords(detail) }} />
+          <p className={styles.minor}>{`状態：${statusView(detail.status).label}／理由：${reasonWords(detail)}`}</p>
           {detail.resolved ? <p className={styles.minor}>{`対応済み ${shortJst(detail.resolvedAt)}${detail.resolvedBy ? `／${detail.resolvedBy}` : ''}`}</p> : null}
           {(detail.attemptHistory?.length ?? 0) > 0 ? (
             <ul className={styles.runAttempts} aria-label="試行の履歴">

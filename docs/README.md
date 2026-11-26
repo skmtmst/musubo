@@ -1427,3 +1427,4 @@
 - [配信分析と受信設定の表示修正](release-log/unreleased/PR-kenta-later-codex23.md) — 反映履歴。確認 2026-11-27。
 - [初回案内とリッチメニューの参照表示](release-log/unreleased/PR-kenta-later-codex25.md) — 反映履歴。確認 2026-11-27。
 - [UID移行と申込一覧の状態表示](release-log/unreleased/PR-kenta-later-codex26.md) — 反映履歴。確認 2026-11-27。
+- [通知記録とシナリオのアクション件数](release-log/unreleased/PR-kenta-later-codex27.md) — 反映履歴。確認 2026-11-27。
