@@ -1412,3 +1412,4 @@
 - [オートメーション一覧・自動応答一覧の集計再読み込みと読み込み表示の修正](release-log/unreleased/PR-kenta-later-gemini14-1127.md) — 反映履歴、確認 2026-11-27。
 - [ウェビナー一覧・コンバージョン一覧の集計再読み込みと読み込み表示の修正](release-log/unreleased/PR-kenta-later-gemini15-1127.md) — 反映履歴、確認 2026-11-27。
 - [マイル残高一覧・広告連携の集計失敗分離と再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini16-1127.md) — 反映履歴、確認 2026-11-27。
+- [マイル履歴の直近30日集計と会員ランクの人数見込みの再読み込み](release-log/unreleased/PR-kenta-later-gemini17-1127.md) — 反映履歴、確認 2026-11-27。

@@ -79,7 +79,7 @@ type Preview = { byTier: Array<{ tierId: string; name: string; count: number }>;
 
 export default function RanksTab() {
   const { readonly, narrow } = useMileageShell()
-  const { selectedAccountId: accountId, selectedAccount, accounts } = useAccountContext()
+  const { selectedAccountId: accountId, selectedAccount, accounts, loading: accountLoading } = useAccountContext()
   const scope = useRef({ id: accountId, generation: 0 })
   if (scope.current.id !== accountId) scope.current = { id: accountId, generation: scope.current.generation + 1 }
   const loadedScope = useRef(-1)
@@ -94,7 +94,11 @@ export default function RanksTab() {
   const [program, setProgram] = useState<RankProgram | null>(null)
   const [programAccountId,setProgramAccountId]=useState<string|null>(null)
   const loadEpoch=useRef(0)
+  const previewEpoch=useRef(0)
+  const previewInFlight=useRef<number|null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState(false)
   const [notice, setNotice] = useState('')
   const [edit, setEdit] = useState<{ id: string | null; tier: RankTier | null } | null>(null)
   const [confirm, setConfirm] = useState<'activate' | 'stop' | null>(null)
@@ -106,11 +110,63 @@ export default function RanksTab() {
   const [menuIndex, setMenuIndex] = useState<number | null>(null)
 
   const renderScope = scope.current.generation
+  const loadPreview = useCallback(async (targetAccountId: string, targetScope: number, parentRequest?: number) => {
+    const request = ++previewEpoch.current
+    previewInFlight.current = request
+    setPreviewLoading(true)
+    setPreviewError(false)
+    try {
+      const counts = await memberRanksApi.preview(targetAccountId)
+      if (
+        request !== previewEpoch.current
+        || targetScope !== scope.current.generation
+        || (parentRequest !== undefined && parentRequest !== loadEpoch.current)
+      ) return
+      if (!counts || !counts.success || !counts.data || !Array.isArray(counts.data.byTier)) {
+        setPreview(null)
+        setPreviewError(true)
+        return
+      }
+      setPreview(counts.data)
+      setPreviewError(false)
+    } catch {
+      if (
+        request !== previewEpoch.current
+        || targetScope !== scope.current.generation
+        || (parentRequest !== undefined && parentRequest !== loadEpoch.current)
+      ) return
+      setPreview(null)
+      setPreviewError(true)
+    } finally {
+      if (previewInFlight.current === request) previewInFlight.current = null
+      if (
+        request === previewEpoch.current
+        && targetScope === scope.current.generation
+        && (parentRequest === undefined || parentRequest === loadEpoch.current)
+      ) setPreviewLoading(false)
+    }
+  }, [])
+
+  const reloadPreview = useCallback(() => {
+    if (!accountId || status !== 'ready' || previewInFlight.current !== null) return
+    void loadPreview(accountId, scope.current.generation)
+  }, [accountId, loadPreview, status])
+
   const load = useCallback(async () => {
-    if (!accountId || accountId !== scope.current.id || renderScope !== scope.current.generation) return
+    if (accountLoading) return
+    if (!accountId) {
+      loadEpoch.current++
+      previewEpoch.current++
+      previewInFlight.current = null
+      setProgram(null); setProgramAccountId(null); setPreview(null); setPreviewLoading(false); setPreviewError(false); setStatus('ready')
+      return
+    }
+    if (accountId !== scope.current.id || renderScope !== scope.current.generation) return
     const request=++loadEpoch.current
+    previewEpoch.current++
+    previewInFlight.current = null
     const requestScope = renderScope
-    setStatus('loading');setProgramAccountId(null);setPreview(null)
+    setStatus('loading');setProgramAccountId(null);setPreview(null);setPreviewLoading(false);setPreviewError(false)
     try {
       const response = await memberRanksApi.program(accountId)
       if(request!==loadEpoch.current)return
@@ -118,16 +174,24 @@ export default function RanksTab() {
       if (requestScope !== scope.current.generation) return
       setProgram(response.data);setProgramAccountId(accountId);loadedScope.current = requestScope
       setStatus('ready')
-      const counts = await memberRanksApi.preview(accountId).catch(() => null)
-      if(request===loadEpoch.current && requestScope===scope.current.generation)setPreview(counts && counts.success ? counts.data : null)
+      await loadPreview(accountId, requestScope, request)
     } catch (reason) {
       if(request!==loadEpoch.current || requestScope!==scope.current.generation)return
       setError(reason)
+      setPreviewLoading(false)
+      setPreviewError(false)
       setStatus('error')
     }
-  }, [accountId, renderScope])
+  }, [accountId, accountLoading, loadPreview, renderScope])
 
-  useEffect(() => { void load();return()=>{loadEpoch.current++} }, [load])
+  useEffect(() => {
+    void load()
+    return () => {
+      loadEpoch.current++
+      previewEpoch.current++
+      previewInFlight.current = null
+    }
+  }, [load])
   useEffect(() => { setDeleteId(null); setConfirm(null); setOperationAccount(null) }, [accountId])
 
   const tiers = useMemo(() => program?.tiers ?? [], [program])
@@ -201,7 +265,15 @@ export default function RanksTab() {
                   ? <>{`${tier.mileMultiplier} 倍`}{tier.benefitDescriptions?.length ? <span className={styles.sub} title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : null}</>
                   : tier.benefitDescriptions?.length ? <span title={tier.benefitDescriptions.join('・')}>{tier.benefitDescriptions.join('・')}</span> : <EmptyCell />}
               </Td>
-              <Td align="right">{count === undefined ? <EmptyCell /> : `${formatNumber(count)} 人`}</Td>
+              <Td align="right">
+                {previewLoading
+                  ? <span className={styles.unavailableValue}>確認中…</span>
+                  : previewError
+                    ? <span className={styles.unavailableValue} title="今の人数を読み込めませんでした">未取得</span>
+                    : count === undefined
+                      ? <EmptyCell />
+                      : `${formatNumber(count)} 人`}
+              </Td>
               <ActionCell>
                 {readonly ? null : (
                   <span className={styles.menuBox}>
@@ -242,7 +314,9 @@ export default function RanksTab() {
     </>
   )
 
-  const body = status === 'loading' && !program ? (
+  const body = !accountLoading && !accountId ? (
+    <ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、会員ランクを確認できます。" />
+  ) : status === 'loading' && !program ? (
     <ListState kind="loading" title="会員ランクを読み込んでいます" />
   ) : status === 'error' ? (
     <ListState kind="error" error={error} onRetry={() => void load()} />
@@ -250,6 +324,24 @@ export default function RanksTab() {
     <ListPageSection><div className={narrow ? `${styles.layout} ${styles.layoutNarrow}` : styles.layout}>
       <div className={styles.main}>
         {notice ? <Notice tone="danger" message={notice} action={reviewRequired && !edit && !confirm && !deleteId ? <Button variant="text" size="inline" onClick={closeReviewed}>最新のランクを確認する</Button> : undefined} /> : null}
+        {status === 'ready' && tiers.length > 0 && previewError ? (
+          <Notice
+            tone="warn"
+            message="今の人数と、動かしたときに変わる人数の見込みを読み込めませんでした。段の編集はそのまま続けられます。"
+            action={
+              <Button
+                variant="text"
+                size="inline"
+                onClick={reloadPreview}
+                disabled={previewLoading}
+                busy={previewLoading}
+                busyLabel="読み込んでいます"
+              >
+                人数を読み直す
+              </Button>
+            }
+          />
+        ) : null}
         <section className={styles.card} aria-label="ランクの段">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle}>ランクの段</h3>
@@ -345,12 +437,35 @@ export default function RanksTab() {
           {confirm === 'activate' ? (
             <>
               <p className={styles.note}>動かすと、全員に今の成績で段が付きます。最初は LINE を送りません。</p>
-              <ul className={styles.windowList} aria-label="段ごとの人数">
-                {(preview?.byTier ?? []).map((item) => (
-                  <li key={item.tierId} className={styles.windowRow}><span>{item.name}</span><span>{`${formatNumber(item.count)} 人`}</span></li>
-                ))}
-              </ul>
-              {preview ? <p className={styles.note}>{`上がる人 ${formatNumber(preview.wouldUpgrade)} 人・下がる人 ${formatNumber(preview.wouldDowngrade)} 人`}</p> : null}
+              {previewLoading ? (
+                <p className={styles.note}>段ごとの人数と、上がる人・下がる人の見込みを確認しています…</p>
+              ) : previewError ? (
+                <Notice
+                  tone="warn"
+                  message="段ごとの人数と、上がる人・下がる人の見込みを読み込めませんでした。人数を確かめてから動かすことをおすすめします。"
+                  action={
+                    <Button
+                      variant="text"
+                      size="inline"
+                      onClick={reloadPreview}
+                      disabled={previewLoading}
+                      busy={previewLoading}
+                      busyLabel="読み込んでいます"
+                    >
+                      人数を読み直す
+                    </Button>
+                  }
+                />
+              ) : (
+                <>
+                  <ul className={styles.windowList} aria-label="段ごとの人数">
+                    {(preview?.byTier ?? []).map((item) => (
+                      <li key={item.tierId} className={styles.windowRow}><span>{item.name}</span><span>{`${formatNumber(item.count)} 人`}</span></li>
+                    ))}
+                  </ul>
+                  {preview ? <p className={styles.note}>{`上がる人 ${formatNumber(preview.wouldUpgrade)} 人・下がる人 ${formatNumber(preview.wouldDowngrade)} 人`}</p> : null}
+                </>
+              )}
             </>
           ) : (
             <p className={styles.note}>止めると、段の判定とランクのタグの付け外しが止まります。今の段は残ります。</p>

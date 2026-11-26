@@ -52,8 +52,12 @@ export default function HistoryTab() {
   const alive = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const requestRef = useRef(0)
+  const periodRequestRef = useRef(0)
+  const periodInFlightRef = useRef<number | null>(null)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
   const [periodResult, setPeriodResult] = useState<MileageAdminHistory | null>(null)
+  const [periodLoading, setPeriodLoading] = useState(true)
+  const [periodSummaryError, setPeriodSummaryError] = useState(false)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [exportError, setExportError] = useState('')
   const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem; accountId: string; generation: number } | null>(null)
@@ -105,17 +109,21 @@ export default function HistoryTab() {
 
   const load = useCallback(async () => {
     const request = ++requestRef.current
+    const periodRequest = ++periodRequestRef.current
+    periodInFlightRef.current = null
     const requestScope = scope.current.generation
     setLoading(true)
     setError(false)
+    setPeriodLoading(true)
+    setPeriodSummaryError(false)
     setExportError('')
     setInputRejected(null)
     if (!selectedAccountId) {
-      setResult(null); setPeriodResult(null); setLoadedAccountId(null); setLoading(false)
+      setResult(null); setPeriodResult(null); setLoadedAccountId(null); setLoading(false); setPeriodLoading(false)
       return
     }
     if (validateHistoryPeriod(from, to)) {
-      setResult(null); setPeriodResult(null); setLoading(false)
+      setResult(null); setPeriodResult(null); setLoading(false); setPeriodLoading(false)
       return
     }
     try {
@@ -136,19 +144,53 @@ export default function HistoryTab() {
       if (spentOnly) {
         response.data.items = response.data.items.filter((item) => !isGranted(item))
       }
-      setPeriodResult(period?.success ? period.data : null)
+      const periodData = period?.success && Array.isArray(period.data?.summary?.byType) ? period.data : null
+      if (periodRequest === periodRequestRef.current) {
+        setPeriodResult(periodData)
+        setPeriodSummaryError(periodData === null)
+      }
       setResult(response.data)
       setLoadedAccountId(selectedAccountId)
       loadedScope.current = requestScope
     } catch (caught) {
       if (request !== requestRef.current || requestScope !== scope.current.generation) return
-      setResult(null); setPeriodResult(null)
+      setResult(null); setPeriodResult(null); setPeriodSummaryError(false)
       if (caught instanceof ApiError && caught.status === 400) setInputRejected('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')
       else setError(true)
     } finally {
       if (request === requestRef.current && requestScope === scope.current.generation) setLoading(false)
+      if (periodRequest === periodRequestRef.current && requestScope === scope.current.generation) setPeriodLoading(false)
     }
   }, [entryTypeFilter, from, modeFilter, page, pageSize, search, selectedAccountId, spentOnly, to, customStatus])
+
+  const reloadPeriodSummary = useCallback(async () => {
+    if (!selectedAccountId || periodInFlightRef.current !== null) return
+    const periodRequest = ++periodRequestRef.current
+    const requestScope = scope.current.generation
+    periodInFlightRef.current = periodRequest
+    setPeriodLoading(true)
+    setPeriodSummaryError(false)
+    try {
+      const period = await api.mileage.history({
+        accountId: selectedAccountId,
+        from: daysAgo(29),
+        to: daysAgo(0),
+        limit: 1,
+        offset: 0,
+      })
+      if (periodRequest !== periodRequestRef.current || requestScope !== scope.current.generation) return
+      const periodData = period?.success && Array.isArray(period.data?.summary?.byType) ? period.data : null
+      setPeriodResult(periodData)
+      setPeriodSummaryError(periodData === null)
+    } catch {
+      if (periodRequest !== periodRequestRef.current || requestScope !== scope.current.generation) return
+      setPeriodResult(null)
+      setPeriodSummaryError(true)
+    } finally {
+      if (periodInFlightRef.current === periodRequest) periodInFlightRef.current = null
+      if (periodRequest === periodRequestRef.current && requestScope === scope.current.generation) setPeriodLoading(false)
+    }
+  }, [selectedAccountId])
 
   useEffect(() => {
     if (accountLoading) return
@@ -246,10 +288,11 @@ export default function HistoryTab() {
     setPage(1)
   }
 
-  const ready = !loading && !error && periodResult !== null
+  const ready = !loading && !error && !periodLoading && !periodSummaryError && periodResult !== null
 
   const stats = <HistoryStats title="直近30日の動き"
-    ready={ready} total={mileagePaginationTotal(periodResult)} grantedCount={grantedCount}
+    ready={ready} loading={loading || periodLoading} failed={error} summaryFailed={!loading && !error && periodSummaryError}
+    total={mileagePaginationTotal(periodResult)} grantedCount={grantedCount}
     spendCount={countOf('spend')} reversalCount={reversalCount}
     manualCount={result?.summary.manualCount} pendingCount={result?.summary.pendingCount}
     grantAmount={amountOf('grant')} spendAmount={amountOf('spend')} />
@@ -275,7 +318,30 @@ export default function HistoryTab() {
   const toolbar = (
     <MileageToolbar
       narrow={narrow}
-      notices={<>{ecSource ? <Notice tone="info">これはmusubo側の履歴です。現在の残高とランクはECと同期しています。</Notice> : null}<ToolbarNotices error={exportError} /></>}
+      notices={<>
+        {ecSource ? <Notice tone="info">これはmusubo側の履歴です。現在の残高とランクはECと同期しています。</Notice> : null}
+        {!loading && !error && periodSummaryError ? (
+          <div className={styles.fullRow}>
+            <Notice
+              tone="warn"
+              message="直近30日の集計を読み込めませんでした。履歴の一覧はそのまま確認できます。"
+              action={
+                <Button
+                  variant="text"
+                  size="inline"
+                  onClick={() => void reloadPeriodSummary()}
+                  disabled={periodLoading}
+                  busy={periodLoading}
+                  busyLabel="読み込んでいます"
+                >
+                  集計を読み直す
+                </Button>
+              }
+            />
+          </div>
+        ) : null}
+        <ToolbarNotices error={exportError} />
+      </>}
       search={{
         placeholder: '友だち・できごとで探す',
         value: searchInput,
