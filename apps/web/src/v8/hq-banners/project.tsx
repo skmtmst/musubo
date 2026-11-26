@@ -666,13 +666,15 @@ function ProjectInner() {
           aside={canManage ? <div ref={panelRef}>
             <GenerationPanel v8Layout accountSelector={<div className="flex flex-col gap-1.5">
               <span className="text-caption font-semibold text-ink">AI を使うアカウント</span>
-              {aiAccountsStatus === 'ready' && aiAccounts.length === 1 ? <p className="truncate text-caption text-ink" title={aiAccounts[0].displayName ?? aiAccounts[0].name}>{aiAccounts[0].displayName ?? aiAccounts[0].name}</p> : aiAccountsStatus === 'ready' && aiAccounts.length > 1 ? <EntitySelect aria-label="AI を使うアカウント" noun="アカウント" placeholder="選んでください" size="full" value={aiAccountId} options={aiAccounts.map(account => ({ ...entityOptionMetadata(account), value: account.id, label: account.displayName ?? account.name }))} onChange={id => { setAiAccountId(id); try { localStorage.setItem('lh_hq_banner_ai_account', id) } catch { /* storage unavailable */ } }} disabled={busy} /> : aiAccountsStatus === 'ready' && aiAccounts.length === 0 ? <Notice tone="danger" statusWord={false}>
+              {aiAccountsStatus === 'ready' && aiAccounts.length === 1 ? <p className="truncate text-caption text-ink" title={aiAccounts[0].displayName ?? aiAccounts[0].name}>{aiAccounts[0].displayName ?? aiAccounts[0].name}</p> : aiAccountsStatus === 'ready' && aiAccounts.length > 1 ? <EntitySelect aria-label="AI を使うアカウント" noun="アカウント" placeholder="選んでください" size="full" value={aiAccountId} options={aiAccounts.map(account => ({ ...entityOptionMetadata(account), value: account.id, label: account.displayName ?? account.name }))} onChange={id => { setAiAccountId(id); try { localStorage.setItem('lh_hq_banner_ai_account', id) } catch { /* storage unavailable */ } }} disabled={busy} /> : aiAccountsStatus === 'ready' && aiAccounts.length === 0 ? <>
+                <Notice tone="danger" statusWord={false}>
                 AI を使えるアカウントがありません。店舗の 設定 › 機能設定 で「バナー生成」をオンにしてください。
+                </Notice>
                 <div className={styles.aiSettingsActions}>
                   {settingsAccounts.length > 1 ? <EntitySelect size="full" aria-label="設定する店舗" noun="店舗" placeholder="店舗を選んでください" value={settingsAccountId} options={settingsAccounts.map(account => ({ value: account.id, label: account.displayName ?? account.name }))} onChange={setSettingsAccountId} /> : null}
                   {settingsAccounts.length > 0 ? <Button variant="secondary" size="compact" disabled={!settingsTarget} disabledReason={!settingsTarget ? '店舗を選んでください' : undefined} onClick={() => { if (settingsTarget) guard.guarded(() => { setSelectedAccountId(settingsTarget); router.push('/settings#ai-features') }) }}>機能設定を開く</Button> : <Button href="/hq" variant="secondary" size="compact">アカウント一覧を確認</Button>}
                 </div>
-              </Notice> : <p className="text-caption text-ink-secondary">{accountReason}</p>}
+              </> : <p className="text-caption text-ink-secondary">{accountReason}</p>}
             </div>} presets={presets} maxCount={maxCount} value={input}
               onChange={(next) => { setInputTouched(true); setInput(next) }} disabled={Boolean(running) || archived || !engineReady}
               referenceImages={referenceImages} onPickReference={openPicker} onUploadReference={(file) => void uploadReference(file)}
