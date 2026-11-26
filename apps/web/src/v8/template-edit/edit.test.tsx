@@ -962,3 +962,42 @@ it('メッセージ公開の窓を閉じた後は古い確定から公開しな�
   await act(async () => { await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
   expect(templatesApi.publish).not.toHaveBeenCalled()
 })
+
+it('メッセージのフォルダ取得に失敗したら選択を止め、読み直せる', async () => {
+  listFolders.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [{ id: 'f', name: '新しい候補' }] })
+  await mount()
+  expect(screen.getByText(/フォルダを読み込めませんでした/)).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'フォルダ' }) as HTMLButtonElement).disabled).toBe(true)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
+  await flush()
+  expect(screen.queryByText(/フォルダを読み込めませんでした/)).toBeNull()
+  expect((screen.getByRole('button', { name: 'フォルダ' }) as HTMLButtonElement).disabled).toBe(false)
+})
+
+it('メッセージのアカウント切替後は古いフォルダ応答を捨てる', async () => {
+  let resolve!: (value: unknown) => void
+  const old = new Promise(done => { resolve = done })
+  listFolders.mockReturnValueOnce(old).mockResolvedValueOnce({ success: true, data: [{ id: 'b', name: '新しい店のフォルダ' }] })
+  await mount()
+  expect((screen.getByRole('button', { name: 'フォルダ' }) as HTMLButtonElement).disabled).toBe(true)
+  account.id = 'account-b'
+  await act(async () => { root.render(<TemplateEditV8 />) })
+  await flush()
+  await act(async () => { resolve({ success: true, data: [{ id: 'a', name: '前の店のフォルダ' }] }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+  expect(screen.getByText('新しい店のフォルダ')).toBeTruthy()
+  expect(screen.queryByText('前の店のフォルダ')).toBeNull()
+})
+
+it('新規メッセージでアカウントを替えたら選んだフォルダを外す', async () => {
+  listFolders.mockResolvedValue({ success: true, data: [{ id: 'shared', name: '夏' }] })
+  await mount()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+  await act(async () => { fireEvent.click(screen.getByText('夏')) })
+  expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('夏')
+  account.id = 'account-b'
+  await act(async () => { root.render(<TemplateEditV8 />) })
+  await flush()
+  expect((screen.getByRole('button', { name: 'フォルダ' }) as HTMLButtonElement).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).not.toContain('夏')
+})

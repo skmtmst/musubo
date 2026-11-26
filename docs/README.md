@@ -1412,3 +1412,4 @@
 - [今日の確認の開閉と開店準備ガイドの閉じる操作](release-log/unreleased/PR-kenta-today-fold.md) — 反映履歴、確認 2026-11-26。
 - [操作の言葉と予約台帳の見やすさ](release-log/unreleased/PR-kenta-label-board.md) — 反映履歴、確認 2026-11-26。
 - [ホームの開閉操作の読み上げ](release-log/unreleased/PR-kenta-later-ui.md) — 反映履歴、確認 2026-11-26。
+- [配信の受け取り履歴の再読み込み](release-log/unreleased/PR-kenta-consent-history.md) — 履歴の取得失敗から再読み込みできるようにした反映履歴。確認 2026-11-26。

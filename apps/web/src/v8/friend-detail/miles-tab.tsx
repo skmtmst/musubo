@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { Star } from 'lucide-react'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
 import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import EmptyTab from './empty-tab'
@@ -19,18 +20,23 @@ const md = (value: string) => `${value.slice(0, 4)}/${Number(value.slice(5, 7))}
 
 export default function MilesTab({ friendId, balanceSource }: { friendId: string; balanceSource: 'ec' | 'musubo' | null }) {
   const { selectedAccountId } = useAccount()
-  const [history, setHistory] = useState<RankHistory[]>([])
-  const [names, setNames] = useState<Record<string, string>>({})
+  const [retry, setRetry] = useState(0)
+  const [state, setState] = useState<{ key: string; status: 'loading' | 'ready' | 'error'; history: RankHistory[]; names: Record<string, string> } | null>(null)
+  const key = JSON.stringify([selectedAccountId, friendId])
+  const visible = state?.key === key ? state : null
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
+    setState({ key, status: 'loading', history: [], names: {} })
     void Promise.all([memberRanksApi.friend(selectedAccountId, friendId), memberRanksApi.program(selectedAccountId)]).then(([rank, program]) => {
       if (!alive) return
-      if (rank.success) setHistory(((rank.data as { history?: RankHistory[] } | null)?.history) ?? [])
-      if (program.success) setNames(Object.fromEntries(program.data.tiers.map((tier) => [tier.id, tier.name])))
-    }).catch(() => undefined)
+      if (!rank.success || !program.success) throw new Error('rank history unavailable')
+      setState({ key, status: 'ready', history: ((rank.data as { history?: RankHistory[] } | null)?.history) ?? [], names: Object.fromEntries(program.data.tiers.map((tier) => [tier.id, tier.name])) })
+    }).catch(() => { if (alive) setState({ key, status: 'error', history: [], names: {} }) })
     return () => { alive = false }
-  }, [selectedAccountId, friendId])
+  }, [selectedAccountId, friendId, key, retry])
+  const history = visible?.status === 'ready' ? visible.history : []
+  const names = visible?.names ?? {}
   return (
     <>
       <EmptyTab
@@ -39,6 +45,7 @@ export default function MilesTab({ friendId, balanceSource }: { friendId: string
         text="マイル残高と履歴は、マイル画面で確認できます。"
         actions={[{ label: 'マイルを確認 ↗', href: `/mileage/friends/detail?id=${encodeURIComponent(friendId)}` }]}
       />
+      {balanceSource !== null && selectedAccountId && visible?.status === 'error' ? <ListState kind="error" title="会員ランクの履歴を読み込めませんでした" onRetry={() => setRetry(value => value + 1)} /> : null}
       {history.length > 0 && balanceSource !== null ? (
         <section className={styles.body} aria-label={balanceSource === 'ec' ? 'musubo側の会員ランク履歴' : '会員ランクの履歴'}>
           <h3 className={styles.sectionTitle}>{balanceSource === 'ec' ? 'musubo側の会員ランク履歴' : '会員ランクの履歴'}</h3>

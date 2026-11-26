@@ -10,7 +10,7 @@
  */
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Download, History, MinusCircle, PlusCircle, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -50,6 +50,8 @@ export default function PetsV8({
 
   const [kpis, setKpis] = useState<NenPetKpis | null>(null)
   const [kpisFailed, setKpisFailed] = useState(false)
+  const [kpiRetry, setKpiRetry] = useState(0)
+  const handleKpisFailed = useCallback((failed: boolean) => { setKpisFailed(failed); if (failed) setKpis(null) }, [])
   /** 一覧の絞り込み。CSV も同じ条件で書き出す（今の画面と同じ）。 */
   const [query, setQuery] = useListUrlJsonValue<PetsQuery>('query', EMPTY_QUERY)
   const [exporting, setExporting] = useState(false)
@@ -63,16 +65,17 @@ export default function PetsV8({
     void nenPetsApi.pets(accountId, { pageSize: 1 }).then((res) => {
       if (!active) return
       if (res.success) setKpis(res.data.kpis)
-      else setKpisFailed(true)
-    }).catch(() => { if (active) setKpisFailed(true) })
+      else { setKpis(null); setKpisFailed(true) }
+    }).catch(() => { if (active) { setKpis(null); setKpisFailed(true) } })
     return () => { active = false }
-  }, [accountId, tab])
+  }, [accountId, tab, kpiRetry])
 
   // アカウントを替えたら、前のアカウントの数を出さない。
   const [kpiAccount, setKpiAccount] = useState(accountId)
   if (kpiAccount !== accountId) {
     setKpiAccount(accountId)
     setKpis(null)
+    setKpisFailed(false)
     setQuery(EMPTY_QUERY)
   }
 
@@ -116,6 +119,7 @@ export default function PetsV8({
         <KpiCard presentation="band" title="目安を出せる" icon={<MinusCircle size={16} aria-hidden="true" />} value={pending ? null : kpis.computable} unit="匹" loading={pending && !kpisFailed} detail="犬・猫で体重と主食がそろっている" detailLayout="single" />
         <KpiCard presentation="band" title="体重が古い" icon={<Undo2 size={16} aria-hidden="true" />} value={pending ? null : kpis.staleWeight} unit="匹" loading={pending && !kpisFailed} detail="90日 更新なし" />
       </KpiBand>
+      {tab === 'feeding' && kpisFailed ? <Notice tone="danger">ペットの数を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setKpiRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}
     </>
   ) : undefined
 
@@ -145,7 +149,7 @@ export default function PetsV8({
       ) : tab === 'feeding' ? (
         <FeedingV8 accountId={accountId} canEdit={canEdit} />
       ) : (
-        <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} />
+        <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} onKpisFailed={handleKpisFailed} />
       )}
     </ListPage>
   )
