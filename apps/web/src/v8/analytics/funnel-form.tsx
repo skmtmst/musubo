@@ -56,7 +56,7 @@ export const FUNNEL_STEP_KINDS = [
 
 const NO_VALUE_KINDS = ['friend_add', 'purchase', 'message', 'booking']
 const OTHER = '__other__'
-const ENTITY_TARGETS: Record<string, RemoteEntityKind> = { tag: 'tag', field: 'friend_field', form: 'form', link_click: 'tracked_link', conversion: 'conversion', automation: 'automation' }
+const ENTITY_TARGETS: Record<string, RemoteEntityKind> = Object.assign(Object.create(null), { tag: 'tag', field: 'friend_field', form: 'form', link_click: 'tracked_link', conversion: 'conversion', automation: 'automation' })
 const MAX_STEPS = 10
 const MIN_STEPS = 2
 
@@ -113,8 +113,7 @@ export function choiceOf(step: Pick<Step, 'kind' | 'value' | 'other'>, targets: 
   return OTHER
 }
 
-const TARGET_LABEL: Record<Target['kind'], string> = { conversion: '成果', tag: 'タグ', form: 'フォーム' }
-const EMPTY_LABEL: Record<Target['kind'], string> = { conversion: '成果（成果地点を選ぶ）', tag: 'タグ（タグを選ぶ）', form: 'フォーム（フォームを選ぶ）' }
+const EMPTY_LABEL: Record<Target['kind'], string> = Object.assign(Object.create(null), { conversion: '成果（成果地点を選ぶ）', tag: 'タグ（タグを選ぶ）', form: 'フォーム（フォームを選ぶ）' })
 
 function isoDay(offsetDays: number): string {
   return jstDateOffset(offsetDays)
@@ -222,7 +221,8 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
     // 相手がまだ決まっていない段（成果地点を選ぶ前など）は、その旨の選択肢を先頭に出す。
     if (choice.endsWith(':')) {
       const kind = choice.slice(0, -1) as Target['kind']
-      return [{ value: choice, label: EMPTY_LABEL[kind] ?? `${TARGET_LABEL[kind] ?? kind}を選ぶ` }, ...options]
+      const label = EMPTY_LABEL[kind] ?? (FUNNEL_STEP_KINDS.some((item) => item.key === kind) ? `${kind}を選ぶ` : '未対応の条件')
+      return [{ value: choice, label }, ...options]
     }
     return options
   }
