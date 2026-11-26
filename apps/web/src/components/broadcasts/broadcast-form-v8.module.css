@@ -118,8 +118,7 @@
   .header { flex-wrap: wrap; gap: var(--space-12); }
   .stepRail { order: 3; flex-basis: 100%; }
   /* 開いた見え方は入力の後ろに並べ、本文や下の操作を覆わない。 */
-  .root .preview[data-open='true'] { display: flex; position: static; contain: none; width: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--color-hairline); }
-  .preview[data-open='true'] .phonePreview { max-width: 380px; }
+  .root .preview[data-open='true'] { display: flex; position: static; contain: none; width: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--color-hairline); justify-content: center; }
   .previewClose { display: inline-flex; }
   .input { max-width: 900px; width: 100%; margin-inline: auto; }
 }
