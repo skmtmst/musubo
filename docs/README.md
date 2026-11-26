@@ -15,7 +15,7 @@
 - [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
-- [流入経路の注文状態の反映履歴](release-log/unreleased/PR-kenta-inflow-order-status.md)（説明・2026-11-27確認）
+- [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
