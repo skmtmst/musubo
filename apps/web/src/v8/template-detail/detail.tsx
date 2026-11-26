@@ -78,6 +78,8 @@ export default function TemplateDetailV8() {
   const [error, setError] = useState('')
   const [missing, setMissing] = useState(false)
   const [folderName, setFolderName] = useState<string | null>(null)
+  const [folderStatus, setFolderStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [folderAttempt, setFolderAttempt] = useState(0)
   const [monthlySends, setMonthlySends] = useState<number | null | undefined>(undefined)
 
   const [showAllUsages, setShowAllUsages] = useState(false)
@@ -173,14 +175,18 @@ export default function TemplateDetailV8() {
 
   /* フォルダ名と今月送った数は詳細口に無いので、持っている口で拾う。 */
   useEffect(() => {
-    if (!selectedAccountId) return
+    setFolderName(null)
+    if (!selectedAccountId) { setFolderStatus('loading'); return }
     let cancelled = false
+    setFolderStatus('loading')
     api.folders.list('template', selectedAccountId).then((res) => {
-      if (cancelled || !res.success) return
+      if (cancelled) return
+      if (!res.success) { setFolderStatus('error'); return }
       setFolderName(res.data.find((folder) => folder.id === template?.folderId)?.name ?? null)
-    }).catch(() => {})
+      setFolderStatus('ready')
+    }).catch(() => { if (!cancelled) setFolderStatus('error') })
     return () => { cancelled = true }
-  }, [selectedAccountId, template?.folderId])
+  }, [selectedAccountId, template?.folderId, folderAttempt])
 
   useEffect(() => {
     if (!selectedAccountId || !template) return
@@ -355,7 +361,7 @@ export default function TemplateDetailV8() {
   const editHref = template.question
     ? `/templates/questions/new?id=${encodeURIComponent(id)}`
     : `/templates/edit?id=${encodeURIComponent(id)}${template.messageType === 'imagemap' && /"video"\s*:/.test(draftContent) ? '&kind=rich_video' : ''}`
-  const folderLabel = folderName ?? (template.folderId ? template.category : '未分類')
+  const folderLabel = !template.folderId ? '未分類' : folderStatus === 'loading' ? '読み込み中…' : folderStatus === 'error' ? 'フォルダを確認できません' : folderName ?? template.category
   const insertions = insertionNames(draftContent)
   const visibleUsages = showAllUsages ? usageRows : usageRows.slice(0, USAGE_VISIBLE)
   const compareBefore = compareTarget === 'draft' ? inUseVersion?.messageContent ?? null : (versions ?? []).find((v) => v.versionNumber === compareTarget)?.messageContent ?? null
@@ -418,7 +424,7 @@ export default function TemplateDetailV8() {
         <CardHeader size="content" title="このテンプレートについて" />
         <dl className={styles.aboutList}>
           <div className={styles.aboutRow}><dt>種類</dt><dd>{messageTypeText(template.messageType)}</dd></div>
-          <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderLabel}</dd></div>
+          <div className={styles.aboutRow}><dt>フォルダ</dt><dd>{folderLabel}{template.folderId && folderStatus === 'error' ? <Button type="button" variant="secondary" onClick={() => setFolderAttempt(value => value + 1)}>フォルダを読み直す</Button> : null}</dd></div>
           <div className={styles.aboutRow}><dt>今月送った数</dt><dd>{monthlySends === undefined ? '読み込み中…' : monthlySends === null ? '—' : `${polishFormatNumber(monthlySends)} 通`}</dd></div>
           <div className={styles.aboutRow}><dt>差し込み</dt><dd title={insertions.join('・')}>{insertions.length > 0 ? insertions.join('・') : 'なし'}</dd></div>
         </dl>
