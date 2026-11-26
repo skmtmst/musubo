@@ -16,6 +16,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage, CreatePage } from '@/components/templates'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -178,10 +179,13 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const saveFolder = async () => {
     if (!folderDialog || !folderName.trim() || busy || lock.current || !canEdit) return
     lock.current = true
+    const request = sequence.current
     setBusy(true); setFolderError('')
     try {
       if (folderDialog === 'new') await api.folders.create(folderName.trim(), folderColor)
       else await api.folders.update(folderDialog.id, folderName.trim(), folderDialog.revision, folderColor)
+      if (!alive.current || request !== sequence.current) return
+      notifySaved(folderDialog === 'new' ? 'フォルダを作りました。' : 'フォルダを保存しました。')
       setFolderDialog(null); await loadFolders()
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)

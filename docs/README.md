@@ -1412,3 +1412,4 @@
 - [対応が要るものと健康日記の読み込み失敗時KPI表示](release-log/unreleased/PR-kenta-later-gemini10-1127.md) — 反映履歴、確認 2026-11-27。
 - [流入フォルダと友だち情報欄の保存通知](release-log/unreleased/PR-kenta-later-codex9.md) — 保存の完了を知らせる修正の履歴。確認 2026-11-27。
 - [コラム紹介文と対応マーク一覧の読み込み失敗表示・再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini11-1127.md) — 反映履歴、確認 2026-11-27。
+- [ウェビナーと統括のフォルダの保存通知](release-log/unreleased/PR-kenta-later-codex10.md) — 作成・保存の完了を知らせる修正の履歴。確認 2026-11-27。

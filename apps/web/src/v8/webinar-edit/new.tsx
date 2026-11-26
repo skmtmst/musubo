@@ -6,6 +6,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { ArrowRight } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -64,6 +65,10 @@ function NewInner() {
   const [saving, setSaving] = useState<false | 'list' | 'video'>(false)
   const savingRef = useRef(false)
   const folderRequest = useRef(0)
+  const saveScope = useRef({ accountId: selectedAccountId, generation: 0, mounted: true })
+  if (saveScope.current.accountId !== selectedAccountId) { saveScope.current.accountId = selectedAccountId; saveScope.current.generation++ }
+  useEffect(() => { saveScope.current.mounted = true; return () => { saveScope.current.mounted = false } }, [])
+  useEffect(() => { savingRef.current = false; setSaving(false) }, [selectedAccountId])
 
   const dirty = values.title.trim() !== '' || values.slug.trim() !== '' || values.description.trim() !== '' || values.deliveryKind !== 'on_demand' || values.folderId !== ''
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving !== false })
@@ -104,6 +109,8 @@ function NewInner() {
       setError(problems.title ?? problems.slug ?? null)
       return
     }
+    const generation = saveScope.current.generation
+    const current = () => saveScope.current.mounted && saveScope.current.generation === generation
     savingRef.current = true
     setSaving(next)
     setError(null)
@@ -124,8 +131,12 @@ function NewInner() {
         viewingCondition: { kind: 'registered', label: '申込者向け' },
         publicDescription: values.description.trim() || undefined,
       })
+      if (!current()) return
+      if (('success' in created && created.success === false) || !created.data?.id) throw new Error('save failed')
+      notifySaved('ウェビナーの下書きを作成しました。')
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : createPageReturnHref('/webinars', created.data.id))
     } catch (cause) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
