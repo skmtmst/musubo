@@ -70,13 +70,13 @@ export function describeConditionRule(
     }
     case 'scenario_state': {
       const id = typeof v?.scenarioId === 'string' ? v.scenarioId : ''
-      const states: Record<string, string> = {
+      const states: Record<string, string> = Object.assign(Object.create(null), {
         subscribed: 'を購読中',
         not_subscribed: 'を購読していない',
         completed: 'を読み終えた',
         ever: 'を1度でも購読した',
-      }
-      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'を購読中'}の人`
+      })
+      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'の購読状態が不明'}の人`
     }
     case 'form_answered':
       return typeof rule.value === 'string' && rule.value
