@@ -95,16 +95,26 @@ export function TagEditForm({
   const actionsRef = useRef<HTMLElement>(null)
 
   /* IDEA-04：同名のタグがすでにあるとき、保存する前に知らせる。 */
-  const [siblingNames, setSiblingNames] = useState<Array<{ id: string; name: string }>>([])
+  const duplicateSkip = Boolean(host) || readOnly
+  const duplicateScope = useMemo(() => ({ accountId, skip: duplicateSkip }), [accountId, duplicateSkip])
+  const [siblings, setSiblings] = useState<{ scope: typeof duplicateScope; state: 'ready' | 'error'; names: Array<{ id: string; name: string }> } | null>(null)
+  const [siblingsRetry, setSiblingsRetry] = useState(0)
   useEffect(() => {
-    if (host) return
+    if (duplicateScope.skip) return
     let cancelled = false
-    void api.tags.list({ accountId })
-      .then((res) => { if (!cancelled && res.success) setSiblingNames(res.data.map((item) => ({ id: item.id, name: item.name }))) })
-      .catch(() => {})
+    setSiblings(null)
+    void api.tags.list({ accountId: duplicateScope.accountId })
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) setSiblings({ scope: duplicateScope, state: 'ready', names: res.data.map(item => ({ id: item.id, name: item.name })) })
+        else setSiblings({ scope: duplicateScope, state: 'error', names: [] })
+      })
+      .catch(() => { if (!cancelled) setSiblings({ scope: duplicateScope, state: 'error', names: [] }) })
     return () => { cancelled = true }
-  }, [accountId, host])
-  const nameDuplicates = useMemo(() => findDuplicateNames(siblingNames, name, tag.id), [siblingNames, name, tag.id])
+  }, [duplicateScope, siblingsRetry])
+  const visibleSiblings = siblings?.scope === duplicateScope && siblings.state === 'ready' ? siblings.names : []
+  const nameDuplicates = findDuplicateNames(visibleSiblings, name, tag.id)
+  const duplicateFailed = !duplicateScope.skip && siblings?.scope === duplicateScope && siblings.state === 'error'
 
   const fingerprint = JSON.stringify({ name, groupId, isStarred, linked, reward, referralReward, multiplier, priority, applyToExisting, reapplyMode, actions })
   const baseline = useRef({ version: tag.version, fingerprint })
@@ -246,7 +256,8 @@ export function TagEditForm({
           <Card variant="form" gap="normal" aria-label="基本">
             <CardHeader size="stacked" title="基本" />
             <div className={styles.field}><Field required error={nameError || undefined} label="タグ名" htmlFor="tag-edit-name">{readOnly ? <span className={styles.roValue}>{name}</span> : <SaveErrorField names={["name", "tag.name", "definition.tag.name"]}><TextField id="tag-edit-name" ref={nameRef} value={name} onChange={(event) => { setName(event.target.value); setNameError('') }} placeholder="例：定期購入者" aria-required="true" /></SaveErrorField>}
-<DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></Field></div>
+<DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
+{duplicateFailed ? <Notice tone="warn" action={<Button onClick={() => setSiblingsRetry(n => n + 1)}>重複を確認し直す</Button>}>同じ名前のタグを確認できませんでした。</Notice> : null}</Field></div>
             <div className={styles.field}>
               <span className={styles.label}>所属フォルダ</span>
               <div className={styles.folderBox}>
