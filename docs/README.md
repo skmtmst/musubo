@@ -1414,3 +1414,4 @@
 - [緊急コントロール送信経路と友だち配信受け取り履歴の再読み込み](release-log/unreleased/255-kenta-later-gemini4-1127.md) — 反映履歴、確認 2026-11-27。
 - [スマホ幅のリマインダ名と共通アクションの未対応の種類の表示を直した反映履歴](release-log/unreleased/257-kenta-later-codex2.md) — 反映履歴、確認 2026-11-27。
 - [EC 連携：注文の詳細でフォローを見送った理由を正しく表示する（LATER）](release-log/unreleased/258-kenta-ec-followup-reason.md) — 反映履歴、確認 2026-11-27。
+- [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。

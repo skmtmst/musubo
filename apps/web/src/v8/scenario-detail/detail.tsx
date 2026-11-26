@@ -80,6 +80,7 @@ export default function ScenarioDetailV8({
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [folderRetry, setFolderRetry] = useState(0)
   const { selectedAccountId, accounts } = useAccount()
 
   /*
@@ -146,7 +147,7 @@ export default function ScenarioDetailV8({
     return () => {
       cancelled = true
     }
-  }, [folderAccountId])
+  }, [folderAccountId, folderRetry])
 
   /*
    * 保存済みのフォルダが、このアカウントの候補に無いか（SCENARIO-20）。
@@ -154,7 +155,7 @@ export default function ScenarioDetailV8({
    * 候補に無い保存値は、理由を示したうえで値そのものは保持する。
    */
   const editFolderMissing = Boolean(
-    editForm.folderId && !folders.some((f) => f.id === editForm.folderId),
+    folderState === 'ready' && editForm.folderId && !folders.some((f) => f.id === editForm.folderId),
   )
   const scenarioFolderName = !scenario?.folderId
     ? '未分類'
@@ -799,6 +800,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
         handleSaveScenario={handleSaveScenario}
         editForm={editForm}
         folderState={folderState}
+        onReloadFolders={() => setFolderRetry((value) => value + 1)}
         folders={folders}
         canEdit={canEdit}
         setFolders={setFolders}
