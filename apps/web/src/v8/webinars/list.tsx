@@ -339,6 +339,7 @@ function WebinarList() {
 
   const requestGeneration = useRef(0)
   const overviewGeneration = useRef(0)
+  const grandTotalGeneration = useRef(0)
   const folderGeneration = useRef(0)
   const [items, setItems] = useState<WebinarListItem[]>([])
   const [total, setTotal] = useState(0)
@@ -349,6 +350,7 @@ function WebinarList() {
   const [overview, setOverview] = useState<WebinarOverview | null>(null)
   const [overviewAccountId, setOverviewAccountId] = useState<string | null>(null)
   const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
+  const [overviewLoading, setOverviewLoading] = useState(true)
   /*
    * 検索語・フォルダ・状態・並び順・件数・ページは URL に置く（動きの点検 5 番）。
    * 詳細へ行って「戻る」と、同じ絞り込み・同じページの一覧に戻る。
@@ -450,11 +452,18 @@ function WebinarList() {
     setOverview(null)
     setOverviewFailure(null)
     setOverviewAccountId(null)
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setOverviewLoading(false)
+      return
+    }
+    setOverviewLoading(true)
     const accountId = selectedAccountId
     try {
       const res = await webinarApi.overview(accountId)
       if (overviewGeneration.current !== generation) return
+      if (!res || ('success' in res && (res as { success?: boolean }).success === false) || !res.data || typeof res.data !== 'object' || !res.data.metrics) {
+        throw new ApiError(500, '集計が読めない形で返りました')
+      }
       setOverview(res.data)
       setOverviewAccountId(accountId)
     } catch (cause) {
@@ -464,11 +473,16 @@ function WebinarList() {
       { if (!fieldFailure)
       setOverviewFailure(webinarLoadFailure(cause))
     }
-  }
+  } finally {
+      if (overviewGeneration.current === generation) {
+        setOverviewLoading(false)
+      }
+    }
   }, [selectedAccountId, saveErrors]);
 
 
   const refreshGrandTotal = useCallback(async () => {
+    const generation = ++grandTotalGeneration.current
     if (!selectedAccountId) {
       setGrandTotal(0)
       setGrandAccountId(null)
@@ -478,10 +492,12 @@ function WebinarList() {
     const accountId = selectedAccountId
     try {
       const res = await webinarApi.list(accountId, { limit: 1 })
+      if (grandTotalGeneration.current !== generation) return
       if (!res.data || typeof res.data.total !== 'number') return
       setGrandTotal(res.data.total)
       setGrandAccountId(accountId)
     } catch (saveFailure) {
+      if (grandTotalGeneration.current !== generation) return
       saveErrors.capture(saveFailure)
       /* 欄の件数だけの補助取得。失敗時は前の値を残す。 */
     }
@@ -491,12 +507,14 @@ function WebinarList() {
         webinarApi.list(accountId, { limit: 1, status: 'active' }),
         webinarApi.list(accountId, { limit: 1, status: 'draft' }),
       ])
+      if (grandTotalGeneration.current !== generation) return
       const activeTotal = activeRes.data?.total
       const draftTotal = draftRes.data?.total
       setChipCounts(typeof activeTotal === 'number' && typeof draftTotal === 'number'
         ? { accountId, active: activeTotal, draft: draftTotal }
         : null)
     } catch (saveFailure) {
+      if (grandTotalGeneration.current !== generation) return
       saveErrors.capture(saveFailure)
       setChipCounts(null)
     }
@@ -846,7 +864,15 @@ function WebinarList() {
   } else if (!selectedAccountId) {
     listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (loadFailure && visibleItems.length === 0) {
-    listBody = <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={() => refresh()} busyLabel="処理中…">もう一度読み込む</Button> : undefined} />
+    listBody = (
+      <ListState
+        kind={loadFailure.kind}
+        title={loadFailure.title}
+        description={loadFailure.description}
+        onRetry={loadFailure.retryable ? () => void refresh() : undefined}
+        retrying={loading || refreshing}
+      />
+    )
   } else if (visibleItems.length === 0) {
     /* 修正案 D-2：空の一覧。 */
     listBody = (
@@ -979,7 +1005,21 @@ function WebinarList() {
         {csvError ? <div className={styles.statsNotice}><Notice tone="info">{csvError}</Notice></div> : null}
         {overviewFailure && !loadFailure ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => refreshOverview()} busyLabel="処理中…">集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice>
+            <Notice
+              tone="info"
+              action={overviewFailure.retryable ? (
+                <Button
+                  onClick={() => void refreshOverview()}
+                  disabled={overviewLoading}
+                  busy={overviewLoading}
+                  busyLabel="読み込み中…"
+                >
+                  集計を読み直す
+                </Button>
+              ) : undefined}
+            >
+              集計を表示できませんでした。
+            </Notice>
           </div>
         ) : null}
         <KpiBand>
@@ -991,7 +1031,9 @@ function WebinarList() {
               icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
-              detail={kpi.detail}
+              detail={overviewFailure ? '集計を読み込めませんでした' : kpi.detail}
+              loading={accountLoading || overviewLoading}
+              onRetry={overviewFailure?.retryable && !overviewLoading ? () => void refreshOverview() : undefined}
             />
           ))}
         </KpiBand>
