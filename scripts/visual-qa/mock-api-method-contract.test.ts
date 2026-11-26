@@ -53,6 +53,15 @@ describe('Visual QA モックの HTTP method 受け渡し', () => {
     child?.kill('SIGTERM')
   })
 
+  it('メール接続の確認は未接続の状態を返し、更新は許可しない', async () => {
+    const url = `${baseUrl}/api/account-email/visual-qa-account/connection`
+    const response = await fetch(url)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ success: true, data: { status: 'disconnected', connectionId: null, address: null, mailbox: null, forwardingConfirmation: null, canReply: false } })
+    const write = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    expect(write.status).toBe(405)
+  })
+
   it('撮影用の機能設定は全キーと版を返し、見本用の機能だけ有効にする', async () => {
     const response = await fetch(`${baseUrl}/api/settings/features`)
     expect(response.status).toBe(200)
