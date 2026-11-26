@@ -22,7 +22,7 @@ describe('NEN配信のテスト送信先', () => {
 
   test('編集画面でもLINE連携済みログインユーザーを最初から選べる', () => {
     expect(editor).toContain('setTestCandidates(candidates)');
-    expect(editor).toContain('accountId: selectedAccountId ?? undefined');
+    expect(editor).toContain('api.friends.list({ search: query, accountId: selectedAccountId, limit: 5 })');
   });
 
   test('設定・履歴・コラム・実績・クーポンを選択中LINEアカウントへ限定する', () => {
