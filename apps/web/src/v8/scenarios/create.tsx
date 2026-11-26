@@ -74,6 +74,8 @@ export default function ScenarioCreateV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderId, setFolderId] = useState('')
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [folderReloadKey, setFolderReloadKey] = useState(0)
+  const loadedFolderAccountRef = useRef<string | null | undefined>(undefined)
   const [detailsSaving, setDetailsSaving] = useState(false)
   const detailsSavePromise = useRef<Promise<boolean> | null>(null)
   const scope = useRef({ id, accountId: selectedAccountId, loading: accountLoading })
@@ -205,11 +207,16 @@ export default function ScenarioCreateV8() {
   const folderAccountId = scenario?.lineAccountId ?? selectedAccountId
   useEffect(() => {
     let active = true
+    if (loadedFolderAccountRef.current !== folderAccountId) {
+      loadedFolderAccountRef.current = undefined
+      setFolders([])
+    }
     setFolderState('loading')
     void api.folders.list('scenario', folderAccountId ?? undefined)
       .then((res) => {
         if (!active) return
         if (res.success) {
+          loadedFolderAccountRef.current = folderAccountId
           setFolders(res.data)
           setFolderState('ready')
         } else {
@@ -220,7 +227,7 @@ export default function ScenarioCreateV8() {
         if (active) setFolderState('error')
       })
     return () => { active = false }
-  }, [folderAccountId])
+  }, [folderAccountId, folderReloadKey])
 
   /** 名前が空のまま押したら、欄の下にも理由を出して欄へ移す（R172）。止めたとき真。 */
   const rejectEmptyName = (): boolean => {
@@ -495,7 +502,10 @@ export default function ScenarioCreateV8() {
                 : '配信方式の選択・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'
             }
             error={scenarioError ?? undefined}
-            onRetry={() => setScenarioReloadKey((key) => key + 1)}
+            onRetry={() => {
+              setScenarioReloadKey((key) => key + 1)
+              if (folderState === 'error') setFolderReloadKey((key) => key + 1)
+            }}
           />
         ) : null}
         {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
@@ -522,9 +532,11 @@ export default function ScenarioCreateV8() {
             /></SaveErrorField>
             </Field>
           </div>
-          <Field label="フォルダ" optional note={folderState !== 'ready' || detailsSaving
-            ? folderState === 'loading' ? 'フォルダを読み込んでいます。' : folderState === 'error' ? 'フォルダを確認できないため、いまは変更できません。' : 'フォルダを保存しています。'
-            : undefined}>
+          <Field label="フォルダ" optional note={folderState === 'loading'
+            ? 'フォルダを読み込んでいます。'
+            : detailsSaving
+              ? 'フォルダを保存しています。'
+              : undefined}>
             <span title={selectedFolderName}>
               <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
@@ -552,6 +564,14 @@ export default function ScenarioCreateV8() {
                   }, folderById, (created) => setFolders((current) => [...current, created]))}
               /></SaveErrorField>
             </span>
+            {folderState === 'error' ? (
+              <Notice tone="danger">
+                フォルダを確認できないため、いまは変更できません。
+                <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setFolderReloadKey((key) => key + 1)}>
+                  もう一度読み込む
+                </Button>
+              </Notice>
+            ) : null}
             {/* 保存済みのフォルダがこのアカウントの候補に無いときは理由を出す（黙って未分類に見せない）。 */}
             {folderState === 'ready' && selectedFolderMissing ? (
               <Notice tone="warn">選択中のフォルダはこのアカウントの候補にありません（別アカウントまたは削除済み）。このまま保存すると外れます。</Notice>
