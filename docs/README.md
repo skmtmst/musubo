@@ -1397,3 +1397,5 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 - [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
+
+- [カルーセルと質問のフォルダの読み直し](release-log/unreleased/PR-kenta-later-bottom5.md) — フォルダの取得失敗からの復帰。確認 2026-11-26。

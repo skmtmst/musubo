@@ -3,12 +3,12 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const calls = vi.hoisted(() => ({ prepare: vi.fn(), put: vi.fn(), complete: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), get: vi.fn(), publish: vi.fn() }))
+const calls = vi.hoisted(() => ({ folders: vi.fn(), prepare: vi.fn(), put: vi.fn(), complete: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn(), get: vi.fn(), publish: vi.fn() }))
 const staffRole = vi.hoisted(() => ({ value: 'owner' as 'owner' | 'viewer' }))
 const account = vi.hoisted(() => ({ id: 'a-1' }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error {}, api: {
   media: { prepareUploads: calls.prepare, completeUpload: calls.complete, detail: calls.detail },
-  templates: { create: calls.create, update: calls.update, get: calls.get, publish: calls.publish }, folders: { list: async () => ({ success: true, data: [] }) },
+  templates: { create: calls.create, update: calls.update, get: calls.get, publish: calls.publish }, folders: { list: calls.folders },
 } }))
 vi.mock('../contents/media-direct-upload', async (original) => ({
   ...await original<Record<string, unknown>>(), extractMediaMetadata: async () => ({ width: 1040, height: 1040 }), putMediaFile: calls.put,
@@ -29,7 +29,7 @@ import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
  * カルーセルの保存で落ちた欄（・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
  * 欄が赤くなり真下に理由、別のカードならそのカードを開いて移り、カードの札に赤い丸が付く。
  */
-beforeEach(() => { account.id = 'a-1'; staffRole.value = 'owner'; calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
+beforeEach(() => { calls.folders.mockResolvedValue({ success: true, data: [] }); account.id = 'a-1'; staffRole.value = 'owner'; calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
 afterEach(() => { cleanup(); forgetStaffIdentity(); vi.resetAllMocks() })
 
 const fillFirst = () => {
@@ -217,4 +217,71 @@ it('空の名前・本文では主保存を止め、本文まで入れると主�
   fillFirst()
   expect(save.disabled).toBe(false)
   expect(calls.create).not.toHaveBeenCalled()
+})
+
+it.each(['response', 'network'])('カルーセルのフォルダ取得%s失敗を入力を残して読み直せる', async failure => {
+  verifiedStaffRole('owner')
+  if (failure === 'response') calls.folders.mockResolvedValueOnce({ success: false })
+  else calls.folders.mockRejectedValueOnce(new Error('offline'))
+  render(<Carousel />)
+  fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '編集中' } })
+  await screen.findByText(/フォルダを読み込めませんでした/)
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  await waitFor(() => expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false))
+  expect((screen.getByPlaceholderText('例：夏の定番5点') as HTMLInputElement).value).toBe('編集中')
+  expect(calls.folders).toHaveBeenCalledTimes(2)
+})
+it('新規カルーセルのアカウント切替後は選択したフォルダを外す', async () => {
+  verifiedStaffRole('owner')
+  calls.folders.mockResolvedValue({ success: true, data: [{ id: 'summer', name: '夏' }] })
+  const view = render(<Carousel />)
+  await waitFor(() => expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(screen.getByText('夏'))
+  expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('夏')
+  account.id = 'a-2'; view.rerender(<Carousel />)
+  await waitFor(() => expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false))
+  expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('未分類')
+  fillFirst(); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+  await waitFor(() => expect(calls.create).toHaveBeenCalled())
+  expect(calls.create.mock.calls[0][0]).toMatchObject({ accountId: 'a-2', folderId: null })
+})
+it('保存済みカルーセルは元のアカウントのフォルダを使い、別のアカウントから更新しない', async () => {
+  verifiedStaffRole('owner')
+  calls.folders.mockResolvedValue({ success: true, data: [{ id: 'summer', name: '夏' }] })
+  const view = render(<Carousel />)
+  await waitFor(() => expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })); fireEvent.click(screen.getByText('夏'))
+  fillFirst(); fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+  await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(1))
+  await act(async () => {})
+  account.id = 'a-2'; view.rerender(<Carousel />)
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(true)
+  expect(screen.getByText(/作成したLINEアカウントに切り替えてからフォルダ/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+  expect(calls.update).not.toHaveBeenCalled()
+  expect(calls.folders.mock.calls.every(call => call[1] === 'a-1')).toBe(true)
+})
+it('カルーセルの切替前の遅いフォルダ応答を使わない', async () => {
+  verifiedStaffRole('owner')
+  let resolveOld!: (value: unknown) => void
+  calls.folders.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  calls.folders.mockResolvedValue({ success: true, data: [{ id: 'new', name: '新しい店' }] })
+  const view = render(<Carousel />)
+  account.id = 'a-2'; view.rerender(<Carousel />)
+  await waitFor(() => expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false))
+  await act(async () => { resolveOld({ success: true, data: [{ id: 'old', name: '前の店' }] }) })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  expect(screen.getByText('新しい店')).toBeTruthy()
+  expect(screen.queryByText('前の店')).toBeNull()
+})
+it('統括のカルーセルは親のフォルダを使い取得しない', async () => {
+  verifiedStaffRole('owner')
+  render(<Carousel host={{ description: '', folders: [{ value: 'hq', label: '統括フォルダ' }], folder: '', onFolderChange: vi.fn(), busy: false, onSave: vi.fn(), onCancel: vi.fn() }} />)
+  await act(async () => {})
+  expect(calls.folders).not.toHaveBeenCalled()
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  expect(screen.getByText('統括フォルダ')).toBeTruthy()
 })
