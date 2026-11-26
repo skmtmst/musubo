@@ -100,6 +100,7 @@ export function TagEditForm({
   const [siblings, setSiblings] = useState<{ scope: typeof duplicateScope; state: 'ready' | 'error'; names: Array<{ id: string; name: string }> } | null>(null)
   const [siblingsRetry, setSiblingsRetry] = useState(0)
   useEffect(() => {
+    if (host) return
     if (duplicateScope.skip) return
     let cancelled = false
     setSiblings(null)
@@ -111,7 +112,7 @@ export function TagEditForm({
       })
       .catch(() => { if (!cancelled) setSiblings({ scope: duplicateScope, state: 'error', names: [] }) })
     return () => { cancelled = true }
-  }, [duplicateScope, siblingsRetry])
+  }, [duplicateScope, siblingsRetry, host])
   const visibleSiblings = siblings?.scope === duplicateScope && siblings.state === 'ready' ? siblings.names : []
   const nameDuplicates = findDuplicateNames(visibleSiblings, name, tag.id)
   const duplicateFailed = !duplicateScope.skip && siblings?.scope === duplicateScope && siblings.state === 'error'
