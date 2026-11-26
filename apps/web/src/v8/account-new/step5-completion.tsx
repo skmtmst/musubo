@@ -10,6 +10,13 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import type { HandoverProgress } from './check-rows'
 import styles from './register.module.css'
 
+function elapsedDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}分`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}時間`
+  return `${Math.floor(seconds / 86400)}日`
+}
+
 /** 登録完了と友だちの引き継ぎ。保存処理は親が持つ。 */
 export default function Step5Completion({ connection, accountName, createdId, importRunning, importFriends, importState, handover, idleSeconds, requestError, onRefresh, refreshing = false }: {
   connection: Pick<LineAccountConnectData, 'displayName' | 'basicId' | 'followerImport' | 'remainingActions' | 'verification'>; accountName: string; createdId: string; importRunning: boolean; importFriends: boolean
@@ -45,7 +52,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
   const referenceTotal = connection.verification?.followerTotal
   const updateLabel = complete
     ? `完了：${new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(new Date(importState?.completedAt ?? importState?.updatedAt ?? Date.now()))}`
-    : importState?.updatedAt ? `最終更新：${idleSeconds < 60 ? `${idleSeconds}秒前` : `${Math.floor(idleSeconds / 60)}分前`}` : '最新の状態を確認中'
+    : importState?.updatedAt ? `最終更新：${elapsedDuration(idleSeconds)}前` : '最新の状態を確認中'
   return (
             <Card surface="standard" layout="vertical" contentPadding={showHandover ? 'var(--tpl-htn6-handover-card-pad)' : 'var(--tpl-htn-panel-pad)'} gap={showHandover ? 'var(--tpl-htn6-handover-card-gap)' : 'var(--tpl-htn-panel-gap)'} className={styles.panel} aria-label={showHandover ? '友だちの引き継ぎ' : '登録完了'} data-design-node="Plmq1">
               {showHandover ? <>
@@ -69,7 +76,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                   {countsKnown && <p className={styles.progressNote}>{`内訳：新規${polishFormatNumber(handover.imported)}人、登録済み${polishFormatNumber(handover.alreadyPresent)}人、再登録${polishFormatNumber(handover.restored)}人。`}</p>}
                   <div className={styles.handoverProgressHead}><span>友だちの引き継ぎ進捗</span><strong aria-live="polite">{progressLabel}</strong></div>
                   <ProgressBar className={styles.handoverProgressBar} appearance="quota" max={total === 0 ? 1 : total ?? 1} value={total === 0 && complete ? 1 : processed} indeterminate={total === null} indeterminateVisual="empty" label="友だちの引き継ぎ進捗" />
-                  <p className={styles.handoverCurrent} data-attention={checking || undefined} role="status" aria-live="polite">{complete ? `${polishFormatNumber(processed)}人の友だちを引き継ぎました` : checking ? idleSeconds >= 60 ? `${Math.floor(idleSeconds / 60)}分間、引き継ぎの状態が更新されていません` : '進み具合を確認できません。状態を再確認してください。' : total === null ? 'LINEから友だちの一覧を確認しています' : remaining === 0 ? 'サーバーの完了を確認しています' : `${polishFormatNumber(total)}人のうち${polishFormatNumber(processed)}人を引き継ぎました。残り${polishFormatNumber(remaining)}人を処理中です。`}</p>
+                  <p className={styles.handoverCurrent} data-attention={checking || undefined} role="status" aria-live="polite">{complete ? `${polishFormatNumber(processed)}人の友だちを引き継ぎました` : checking ? idleSeconds >= 60 ? `${elapsedDuration(idleSeconds)}${idleSeconds < 3600 || idleSeconds >= 86400 ? '間' : ''}、引き継ぎの状態が更新されていません` : '進み具合を確認できません。状態を再確認してください。' : total === null ? 'LINEから友だちの一覧を確認しています' : remaining === 0 ? 'サーバーの完了を確認しています' : `${polishFormatNumber(total)}人のうち${polishFormatNumber(processed)}人を引き継ぎました。残り${polishFormatNumber(remaining)}人を処理中です。`}</p>
                   <p className={styles.progressNote}>{complete ? '友だち一覧で確認できます。' : checking ? '状態を再確認できます。引き継ぎ中のデータは保持されます。' : total === null ? '人数が分かりしだい、引き継ぎの進み具合を表示します。' : '完了した人数に合わせてバーが伸びます。'}</p>
                   {handover.needsReview > 0 ? <Notice tone="warn" compact>{polishFormatNumber(handover.needsReview)}件は取り込めず、確認が必要です。</Notice> : null}
                   {importState && importState.profileErrors > 0 ? <Notice tone="warn" compact>一部のプロフィールを読み込めませんでした。友だち一覧で確認してください。</Notice> : null}
