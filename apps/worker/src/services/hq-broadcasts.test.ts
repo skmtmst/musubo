@@ -11,6 +11,11 @@ beforeEach(()=>{f=createTestD1();for(const id of ['shop1','shop2']){f.raw.prepar
 });
 afterEach(()=>{f.raw.close();vi.unstubAllGlobals();});
 describe('統括の一括配信',()=>{
+ it.each(['future_kind','constructor','__proto__'])('未知の吹き出し %s を含む配信は保存しない',async kind=>{
+  const messageBubblesJson=JSON.stringify([{type:'text',content:{text:'お知らせ'}},{type:kind,content:{}}]);
+  await expect(prepareHqBroadcast(f.db,tenant,'owner',{...input,messageBubblesJson})).rejects.toMatchObject({status:400});
+  expect(f.raw.prepare('SELECT COUNT(*) AS count FROM hq_broadcast_runs').get()).toEqual({count:0});
+ });
  it('詳細の読み直しでは宛先をハッシュせず、確認窓の取得時だけ作る',async()=>{
   const r=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
   const sent=await dispatchHqBroadcast(f.db,r,'owner',1),child=sent.targets[0].broadcastId!;

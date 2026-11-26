@@ -138,7 +138,7 @@ export function hqBubbleProblem(item: HqBubble): string | null {
     if (!item.content.assetId) return `${HQ_KIND_LABEL[item.kind]}を選んでください`
     return assetBubbleError({ id: 'check', type: item.kind === 'rich' ? 'rich_message' : item.kind === 'research' ? 'research' : 'coupon', content: item.content }) || null
   }
-  return null
+  return 'この吹き出しの種類は送れません。消して作り直してください'
 }
 
 /** 1行の要約（開いていない吹き出しの見出し。絵：「カルーセル ・ 秋の新商品 3種（カード1枚）」）。 */
