@@ -23,6 +23,7 @@ export {
   nextFirstStepKey,
   readFirstStepsFolded,
   shouldShowFirstSteps,
+  shouldKeepFirstStepsVisible,
   summarizeFirstSteps,
   useFirstMessageArrived,
   useFirstSteps,

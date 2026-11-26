@@ -1415,3 +1415,4 @@
 - [操作の言葉と予約台帳の見やすさ](release-log/unreleased/PR-kenta-label-board.md) — 反映履歴、確認 2026-11-26。
 - [ホームの開閉操作の読み上げ](release-log/unreleased/PR-kenta-later-ui.md) — 反映履歴、確認 2026-11-26。
 - [配信の受け取り履歴の再読み込み](release-log/unreleased/PR-kenta-consent-history.md) — 履歴の取得失敗から再読み込みできるようにした反映履歴。確認 2026-11-26。
+- [はじめの設定の確認中の案内](release-log/unreleased/PR-kenta-later-today.md) — 反映履歴、確認 2026-11-26。

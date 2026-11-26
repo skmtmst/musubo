@@ -120,6 +120,11 @@
   min-width: 0;
 }
 
+/* 狭い画面でも名前の幅を確保し、残りの列は表の中で横に送れるようにする。 */
+@media (max-width: 640px) {
+  .tableWrap :global(table) { min-width: 40rem; }
+}
+
 .rowClick {
   cursor: pointer;
 }
