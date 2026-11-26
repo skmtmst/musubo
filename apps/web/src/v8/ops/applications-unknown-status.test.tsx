@@ -11,4 +11,5 @@ it.each(['toString', 'constructor', '__proto__', 'future'])('未対応の申込�
   render(<OpsApplications />)
   const row = (await screen.findByRole('link', { name: '見本の会社' })).closest('tr')!
   expect(within(row).getByText('状態不明')).toBeTruthy()
+  expect(within(row).getByText('sample@example.invalid').getAttribute('title')).toBe('sample@example.invalid')
 })
