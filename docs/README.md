@@ -356,6 +356,7 @@
 - [mistakes.md — やらかしと再発防止](brain/rules/mistakes.md)
 - [F-20 公式サイト掲載の閲覧数 — 設計メモ](f20-site-views-design.md)
 - [Lステップ・Liny 画面／裏側挙動の再調査と実装仕様](lstep-liny-screen-behavior-research-2026-08.md)
+- [ダイニー（dinii）比較調査と将来像メモ](rival-dinii-2026-11.md)
 - [revfix-b-load-failures.tsv](qa/revfix-b-load-failures.tsv) — 説明用データ・付随資料、確認 2026-10-19
 - [TikTok利益計算の自動化（設計）](tiktok-pnl/design.md)
 - [V8 の絵（Pencil の板）と画面のコードの対応表](v8-board-to-code.md)
