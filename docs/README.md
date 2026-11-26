@@ -1,9 +1,6 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
-- [プールとメディアの保存通知](release-log/unreleased/PR-kenta-later-codex6.md)（説明・2026-11-27確認）
-- [検索条件と共通情報の保存通知](release-log/unreleased/PR-kenta-later-codex7.md)（説明・2026-11-27確認）
-- [流入リンクと共通アクションの保存通知](release-log/unreleased/PR-kenta-later-codex8.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
@@ -1409,17 +1406,7 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-- [パスキー一覧とかんたんに送るの読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini8-1127.md) — 反映履歴、確認 2026-11-27。
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/PR-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
-- [認証アプリ確認とマイペット一覧の読み込み失敗時表示・再読み込み](release-log/unreleased/PR-kenta-later-gemini9-1127.md) — 反映履歴、確認 2026-11-27。
-- [対応が要るものと健康日記の読み込み失敗時KPI表示](release-log/unreleased/PR-kenta-later-gemini10-1127.md) — 反映履歴、確認 2026-11-27。
-- [流入フォルダと友だち情報欄の保存通知](release-log/unreleased/PR-kenta-later-codex9.md) — 保存の完了を知らせる修正の履歴。確認 2026-11-27。
-- [コラム紹介文と対応マーク一覧の読み込み失敗表示・再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini11-1127.md) — 反映履歴、確認 2026-11-27。
-- [ウェビナーと統括のフォルダの保存通知](release-log/unreleased/PR-kenta-later-codex10.md) — 作成・保存の完了を知らせる修正の履歴。確認 2026-11-27。
-- [予約スタッフ登録とシナリオ作成の読み込み失敗表示・再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini12-1127.md) — 反映履歴、確認 2026-11-27。
-- [自動応答と休業日の保存通知](release-log/unreleased/PR-kenta-later-codex11.md) — 操作の完了を知らせる修正の履歴。確認 2026-11-27。
-- [成果地点作成と外部連携の読み込み失敗表示・再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini13-1127.md) — 反映履歴、確認 2026-11-27。
-- [見本からの下書きと Google 連携先の保存通知](release-log/unreleased/PR-kenta-later-codex12.md) — 操作の完了を知らせる修正の履歴。確認 2026-11-27。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
