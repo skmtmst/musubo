@@ -87,38 +87,40 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
 
   const load = useCallback(async () => {
     const seq = ++loadSeq.current
-    setLoading(true); setRowsReady(false); setListError('')
+    setLoading(true); setRowsReady(false); setRows([]); setListError('')
     try {
       const loaded = await hqDeliveriesApi.list(type)
       if (seq !== loadSeq.current) return
       setRows(loaded); setRowsReady(true)
     } catch {
       if (seq !== loadSeq.current) return
-      setRows([]); setListError('ひな形を読み込めませんでした。もう一度お試しください。')
+      setListError('ひな形を読み込めませんでした。もう一度お試しください。')
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
   }, [type])
   const loadAccounts = useCallback(async () => {
     const seq = ++accountsSeq.current
+    setAccounts([]); setAccountsFailed(false); setAccountsReady(false)
     try {
       const data = await hqTemplatesApi.accounts()
       if (seq !== accountsSeq.current) return
       setAccounts(data); setAccountsFailed(false); setAccountsReady(true)
     } catch {
       if (seq !== accountsSeq.current) return
-      setAccounts([]); setAccountsFailed(true); setAccountsReady(false)
+      setAccountsFailed(true); setAccountsReady(false)
     }
   }, [])
   const loadFolders = useCallback(async () => {
     const seq = ++foldersSeq.current
+    setFolders([]); setFoldersFailed(false)
     try {
       const data = await hqTemplatesApi.folders.list()
       if (seq !== foldersSeq.current) return
       setFolders(data); setFoldersFailed(false)
     } catch {
       if (seq !== foldersSeq.current) return
-      setFolders([]); setFoldersFailed(true)
+      setFoldersFailed(true)
     }
   }, [])
   useEffect(() => {
