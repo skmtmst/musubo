@@ -35,9 +35,10 @@ class GuardShardsTest(unittest.TestCase):
         for step in speed:
             self.assertIn("matrix.shard == 'general'", step['if'])
 
-    def test_gate_waits_for_the_matrix_and_checks_its_result(self):
+    def test_gate_can_observe_matrix_result_when_restored(self):
         gate = self.workflow['jobs']['required-pr-gate']
-        self.assertIn('v8-screen-guard', gate['needs'])
+        self.assertNotIn('v8-screen-guard', gate['needs'])
+        self.assertEqual(gate['steps'][0]['env']['V8_GUARD_REPORT_ONLY'], 'true')
         self.assertEqual(gate['steps'][0]['env']['V8_SCREEN_GUARD_RESULT'], '${{ needs.v8-screen-guard.result }}')
         self.assertIn('"$V8_SCREEN_GUARD_RESULT"', gate['steps'][0]['run'])
 
