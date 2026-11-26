@@ -233,14 +233,21 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carouselDraftSnapshot])
 
+  const [loadRetry, setLoadRetry] = useState(0)
   useEffect(() => {
     if (!id) return
+    let cancelled = false
+    setLoading(true)
+    setLoadFailed(false)
+    setError('')
     const markLoadFailed = (caught?: unknown) => {
+      if (cancelled) return
       setLoadFailed(true)
-      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, 'カルーセル') : '読み込めませんでした。開き直してください。')
+      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, 'カルーセル') : '読み込めませんでした。もう一度お試しください。')
     }
     void api.templates.get(id)
       .then((res) => {
+        if (cancelled) return
         if (!res.success) { markLoadFailed(); return }
         editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
         setName(res.data.name)
@@ -261,8 +268,9 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         }
       })
       .catch((caught: unknown) => markLoadFailed(caught))
-      .finally(() => setLoading(false))
-  }, [id, saveErrors])
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id, saveErrors, loadRetry])
 
   useEffect(() => {
     if (loading || snapshotTaken) return
@@ -494,7 +502,24 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         )}
       >
         {host?.notice}
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Notice
+            tone="danger"
+            message={error}
+            action={loadFailed && id ? (
+              <Button
+                variant="text"
+                size="inline"
+                data-notice-inline-action
+                type="button"
+                disabled={loading}
+                onClick={() => setLoadRetry((value) => value + 1)}
+              >
+                もう一度読み込む
+              </Button>
+            ) : undefined}
+          />
+        ) : null}
         {publishError ? <Notice tone="danger" message={publishError} /> : null}
         {saveFailed ? <Notice tone="warn" message="入力した内容はそのまま残っています。もう一度保存を押してください。" /> : null}
         {loading ? <ListState kind="loading" title="カルーセルを読み込んでいます" /> : (
