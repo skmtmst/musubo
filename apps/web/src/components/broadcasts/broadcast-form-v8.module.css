@@ -86,7 +86,7 @@
  * 2段にすると帯が倍の高さになり、1024 で本文の［アクションを追加する］に重なって押せない。
  * 狭い幅では理由（左・伸びる）と操作（右）の1段に保ち、長い理由は左の中で折る。
  */
-@media (max-width: 1100px) {
+@container broadcast-create (max-width: 1100px) {
   .root .footer { display: flex; align-items: center; }
   .root .footer > [data-sticky-lead] { flex: 1 1 0; }
   .root .footer > [data-sticky-actions] { flex: 0 0 auto; justify-content: flex-end; }

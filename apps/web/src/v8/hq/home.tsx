@@ -49,7 +49,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { readSessionSnapshot } from '@/lib/session-snapshot';
 import { useAccount, type AccountWithStats } from '@/contexts/account-context';
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8 } from './account-dialogs';
-import { connectionNoticeLine } from './connection-reasons';
+import { connectionNoticeLine } from '@/lib/line-account-connection-reasons';
 import styles from './home.module.css';
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
 import StatusBadge from '@/components/shared/status-badge';
