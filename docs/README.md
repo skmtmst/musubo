@@ -1407,3 +1407,4 @@
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
 - [統括の情報・統括配布一覧の読み込み失敗時再読み込み](release-log/unreleased/251-kenta-later-gemini2-1127.md) — 反映履歴、確認 2026-11-27。
 - [コラム下書き保存の想定外エラー処理](release-log/unreleased/252-kenta-column-error.md) — 反映履歴、確認 2026-11-27。
+- [LINEフォローのテンプレート選択とバナー取り込み窓の再読み込み](release-log/unreleased/253-kenta-later-gemini3-1127.md) — 反映履歴、確認 2026-11-27。
