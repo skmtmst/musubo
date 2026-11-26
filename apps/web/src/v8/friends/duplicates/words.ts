@@ -13,6 +13,14 @@ export const STATUS_WORD: Record<IdentityCandidateStatus, string> = {
   invalidated: '無効',
 }
 
+export function candidateStatusWord(status: string): string {
+  return Object.prototype.hasOwnProperty.call(STATUS_WORD, status) ? (STATUS_WORD as Record<string, string>)[status] : '状態を確認できません'
+}
+
+export function confidenceWord(label: string): string {
+  return Object.prototype.hasOwnProperty.call(CONFIDENCE_WORD, label) ? (CONFIDENCE_WORD as Record<string, string>)[label] : '未確認'
+}
+
 /** 状態の札（絵の順：すべて・未確認・保留・結び付けた・別人）。値は今の API と同じ。 */
 export const STATUS_FILTERS: ReadonlyArray<{ value: string; label: string }> = [
   { value: '', label: 'すべて' },
