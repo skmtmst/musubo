@@ -1416,3 +1416,5 @@
 - [カルーセルと質問のフォルダの読み直し](release-log/unreleased/PR-kenta-later-bottom5.md) — フォルダの取得失敗からの復帰。確認 2026-11-26。
 
 - [タグの同名確認とイベントの予約枠の読み直し](release-log/unreleased/PR-kenta-later-bottom6.md) — 取得失敗時の表示と再試行の履歴。確認 2026-11-26。
+
+- [担当スタッフの設定と統括の友だち数の読み直し](release-log/unreleased/PR-kenta-later-bottom7.md) — 取得失敗時の表示と再試行の履歴。確認 2026-11-26。
