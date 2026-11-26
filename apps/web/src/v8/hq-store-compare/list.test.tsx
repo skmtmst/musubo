@@ -6,10 +6,12 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import { columnsWithDiff, diffCount, diffTone, formatDiff, formatMetric, METRICS } from './metrics'
+import { columnPreferenceKey } from './column-preference'
 
 const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn(),replace:vi.fn(),search:''}))
-const accountState = vi.hoisted(() => ({ accounts: [] as Array<Record<string, unknown>>, refresh: vi.fn(), role: 'owner' as string | null }))
+const accountState = vi.hoisted(() => ({ accounts: [] as Array<Record<string, unknown>>, refresh: vi.fn(), role: 'owner' as string | null, selectedAccountId: 'a' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 const notify = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/lib/api')>(), fetchApi }))
@@ -18,7 +20,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => accountState.role, canM
 const api = vi.hoisted(() => ({ get: vi.fn(), detail: vi.fn(), export: vi.fn(), exportStatus: vi.fn(), download: vi.fn() }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ storeComparisonApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: navigation.push, replace: navigation.replace }), usePathname: () => '/hq/store-comparison', useSearchParams: () => new URLSearchParams(navigation.search) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', setSelectedAccountId: navigation.select, loading: false, accounts: accountState.accounts, refreshAccounts: accountState.refresh }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: accountState.selectedAccountId, setSelectedAccountId: navigation.select, loading: false, accounts: accountState.accounts, refreshAccounts: accountState.refresh }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
 const { default: StoreComparisonList } = await import('./list')
@@ -42,7 +44,7 @@ beforeEach(() => {
   api.get.mockResolvedValue({ success: true, data: DATA })
   api.detail.mockResolvedValue({ success: true, data: { recentBroadcasts: [{ id: 'b1', title: '秋の新メニュー', status: 'sent', sent_at: '2026-10-14T01:00:00Z' }], attention: null } })
 })
-afterEach(() => { cleanup(); forgetSessionSnapshot(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner'; navigation.search = ''; window.history.replaceState(null, '', '/hq/store-comparison') })
+afterEach(() => { cleanup(); forgetSessionSnapshot(); forgetStaffIdentity(); localStorage.clear(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner'; accountState.selectedAccountId = 'a'; navigation.search = ''; window.history.replaceState(null, '', '/hq/store-comparison') })
 
 describe('数の書き方', () => {
   it('単位と符号：人は ±、割合は pt、件・分はそのまま', () => {
@@ -68,6 +70,37 @@ describe('数の書き方', () => {
 })
 
 describe('店の比較の表', () => {
+  it('保存した並びを読み直す間、遅れて届いた古い結果を表示しない', async () => {
+    rememberStaffIdentity({ id: 'staff-a', tenantId: 'tenant-a', role: 'owner' } as Parameters<typeof rememberStaffIdentity>[0])
+    localStorage.setItem(columnPreferenceKey('tenant-a', 'staff-a', 'a'), JSON.stringify(['visits']))
+    let resolveOld!: (value: unknown) => void
+    api.get.mockImplementation(({ sort }: { sort: string }) => sort === 'bookings'
+      ? new Promise(resolve => { resolveOld = resolve })
+      : Promise.resolve({ success: true, data: DATA }))
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    await act(async () => resolveOld({ success: true, data: { ...DATA, rows: [row('old', '古い店舗', 1, 0, 1, 0)] } }))
+    expect(screen.queryByText('古い店舗')).toBeNull()
+    expect(screen.getByText('大宮店')).toBeTruthy()
+  })
+  it('列の選択は再表示で戻り、別の店舗には混ざらない', async () => {
+    rememberStaffIdentity({ id: 'staff-a', tenantId: 'tenant-a', role: 'owner' } as Parameters<typeof rememberStaffIdentity>[0])
+    const view = render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    fireEvent.click(screen.getByRole('button', { name: '表示する列' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('checkbox', { name: 'ブロック率' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '保存する' }))
+    view.unmount()
+    const again = render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'ブロック率で並べ替える' })).toBeNull())
+    accountState.selectedAccountId = 'b'
+    again.rerender(<StoreComparisonList />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'ブロック率で並べ替える' })).toBeTruthy())
+    accountState.selectedAccountId = 'a'
+    again.rerender(<StoreComparisonList />)
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'ブロック率で並べ替える' })).toBeNull())
+  })
   it('指標列を外し、順序を変えても店名と取得条件を保つ', async () => {
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')

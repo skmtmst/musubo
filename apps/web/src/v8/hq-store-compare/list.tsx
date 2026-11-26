@@ -3,7 +3,7 @@ import { DetailContent, DetailField, DetailSection, DetailSectionTitle } from '@
 
 import PeriodPicker from '@/components/shared/period-picker'
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Download } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
@@ -36,6 +36,8 @@ import styles from './list.module.css'
 import { formatNumber } from '@/lib/format'
 import { EmptyCell } from '@/components/shared/empty-value'
 import { notifyToast } from '@/components/shared/toast'
+import { readStaffIdentity, subscribeStaffIdentity } from '@/lib/staff-identity-state'
+import { columnPreferenceKey, readColumnPreference } from './column-preference'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
@@ -70,7 +72,9 @@ export default function StoreComparisonList() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [diffOnly, setDiffOnlyState] = useState(() => searchParams.get('diffOnly') === '1')
-  const { accounts, refreshAccounts } = useAccount()
+  const { accounts, refreshAccounts, selectedAccountId } = useAccount()
+  const identity = useSyncExternalStore(subscribeStaffIdentity, readStaffIdentity, () => null)
+  const preferenceKey = identity?.tenantId && identity.id ? columnPreferenceKey(identity.tenantId, identity.id, selectedAccountId) : null
   const role = useStaffRole()
   const canManage = readSessionSnapshot()?.impersonation?.mode !== 'read' && canManageRole(role)
   const [checkingId, setCheckingId] = useState<string | null>(null)
@@ -83,23 +87,39 @@ export default function StoreComparisonList() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<10 | 20 | 50>(20)
   const [status, setStatus] = useState<Status>('loading')
+  const loadSequence = useRef(0)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<StoreComparisonResult | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [columnsOpen, setColumnsOpen] = useState(false)
-  const [visibleMetrics, setVisibleMetrics] = useState<MetricDef['key'][]>(() => METRICS.map(metric => metric.key))
+  const [preference, setPreference] = useState<{ key: string | null; metrics: MetricDef['key'][] }>(() => ({ key: null, metrics: METRICS.map(metric => metric.key) }))
+  const visibleMetrics = preference.key === preferenceKey ? preference.metrics : METRICS.map(metric => metric.key)
   const period = useMemo(() => pastPeriod(days), [days])
 
+  useEffect(() => {
+    let metrics: MetricDef['key'][] | null = null
+    try { if (preferenceKey) metrics = readColumnPreference(window.localStorage, preferenceKey) } catch { /* 保存領域を使えないときは既定値。 */ }
+    const next = metrics ?? METRICS.map(metric => metric.key)
+    setPreference({ key: preferenceKey, metrics: next })
+    const initialSort = next.includes('bookings') ? 'bookings' : next[0]
+    setSort(initialSort)
+    setOrder(METRICS.find(metric => metric.key === initialSort)?.good === 'low' ? 'desc' : 'asc')
+    setPage(1)
+  }, [preferenceKey])
+
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setStatus('loading')
     try {
       const response = await storeComparisonApi.get({ from: period.from, to: period.to, compare, sort, order, page, pageSize })
       if (!response.success) throw new Error('store_comparison_failed')
+      if (sequence !== loadSequence.current) return
       setData(response.data)
       setStatus('ready')
     } catch (reason) {
+      if (sequence !== loadSequence.current) return
       setError(reason)
       setStatus('error')
     }
@@ -281,7 +301,8 @@ export default function StoreComparisonList() {
       </ListPage>
       {columnsOpen ? <DisplayItemsDialog title="表示する列" presentation="columns" fixedLabel="店" minSelected={1} description="表に出す指標を選んで並べ替えます。CSV にはすべての指標が入ります。" items={METRICS.map(metric => ({ key: metric.key, label: metric.label, group: '指標' }))} selected={visibleMetrics} onCancel={() => setColumnsOpen(false)} onConfirm={keys => {
         const next = keys as MetricDef['key'][]
-        setVisibleMetrics(next)
+        setPreference({ key: preferenceKey, metrics: next })
+        if (preferenceKey) { try { window.localStorage.setItem(preferenceKey, JSON.stringify(next)) } catch { /* この画面では選択を保持する。 */ } }
         if (!next.includes(sort)) {
           const first = next.find(key => matchingColumns.some(metric => metric.key === key)) ?? next[0]
           if (first) { setPage(1); setSort(first); setOrder(METRICS.find(metric => metric.key === first)?.good === 'low' ? 'desc' : 'asc') }
