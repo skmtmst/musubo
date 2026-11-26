@@ -139,7 +139,8 @@ test('受信箱を開いたまま時間が進むと時刻だけを更新し、�
   const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
   try {
     const list = await renderList()
-    const lineRow = list.querySelector('#chat-row-name-chat-new')?.closest('button')!
+    const lineRow = list.querySelector('#chat-row-name-chat-new')?.closest('button')
+    if (!lineRow) throw new Error('LINEのトーク行が見つかりません')
     expect(lineRow.textContent).toContain('たった今')
     const calls = fixture.chatQueries.length
     now += 60_000
@@ -174,7 +175,8 @@ test('時計の更新前に新着が届いて再描画される時は現在の�
   let now = Date.parse('2026-09-02T23:59:30Z')
   vi.spyOn(Date, 'now').mockImplementation(() => now)
   const list = await renderList()
-  const lineRow = list.querySelector('#chat-row-name-chat-new')?.closest('button')!
+  const lineRow = list.querySelector('#chat-row-name-chat-new')?.closest('button')
+  if (!lineRow) throw new Error('LINEのトーク行が見つかりません')
   expect(lineRow.textContent).not.toContain('たった今')
   now += 35_000
   await act(async () => root.render(<ChatsPage />))
