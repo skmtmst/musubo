@@ -117,6 +117,9 @@ export interface BandCell {
   value: number | null
   unit: string
   detail: ReactNode
+  loading?: boolean
+  onRetry?: () => void
+  retryLabel?: string
 }
 
 /** 数の帯（タブの直下・4つのマス）。どのタブも同じ形。 */
@@ -133,6 +136,9 @@ export function AutomationBand({ cells, label }: { cells: BandCell[]; label: str
             value={cell.value}
             unit={cell.value === null ? '' : cell.unit}
             detail={cell.detail}
+            loading={cell.loading}
+            onRetry={cell.onRetry}
+            retryLabel={cell.retryLabel}
           />
         ))}
       </KpiBand>
