@@ -5,6 +5,12 @@ export const RUN_KIND_LABEL: Record<GoogleSheetsSyncRun['kind'], string> = { man
 const RUN_DATA_LABEL: Record<GoogleSheetsSyncRun['dataType'], string> = { friends: '友だち', form_answers: 'フォーム回答' }
 export const RUN_STATUS_LABEL: Record<GoogleSheetsSyncRun['status'], string> = { running: '実行中', ok: '完了', partial: '一部だけ完了', error: '失敗' }
 
+function label(table: object, key: string, fallback: string): string {
+  return Object.prototype.hasOwnProperty.call(table, key) ? (table as Record<string, string>)[key] : fallback
+}
+export const runKindLabel = (kind: string): string => label(RUN_KIND_LABEL, kind, '種類を確認できません')
+export const runStatusLabel = (status: string): string => label(RUN_STATUS_LABEL, status, '状態を確認できません')
+
 /** 30分以上「実行中」のままの記録は止まったものとみなす（管理画面 と同じ）。 */
 export const STALE_RUN_MS = 30 * 60 * 1000
 
@@ -16,7 +22,7 @@ export function groupRuns(runs: GoogleSheetsSyncRun[]): RunGroup[] {
   for (const run of runs) {
     const content = run.status === 'error' && run.rowsWritten === 0
       ? null
-      : `${RUN_DATA_LABEL[run.dataType] ?? run.dataType} ${formatNumber(run.rowsWritten)}`
+      : `${label(RUN_DATA_LABEL, run.dataType, '内容を確認できません')} ${formatNumber(run.rowsWritten)}`
     const existing = groups.get(run.startedAt)
     if (!existing) {
       groups.set(run.startedAt, { key: run.startedAt, startedAt: run.startedAt, kind: run.kind, parts: content ? [content] : [], status: run.status })
