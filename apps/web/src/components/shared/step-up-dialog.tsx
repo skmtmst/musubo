@@ -85,7 +85,7 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
     >
       {mfaOff ? <p>{isTotp ? '続けるには、あなたの認証アプリの6桁を入れてください。' : '続けるには、あなたのパスワードを入れてください。'}</p> : null}
       {isTotp ? (
-        <div className={mfaOff ? undefined : 'mx-auto w-fit max-w-full'}>
+        <>
           <p id={labelId} className="mt-1 block text-sm font-medium text-ink">{mfaOff ? '認証コード（6桁）' : '認証アプリに表示された6桁コード'}</p>
           {/* ★V7 共通 認証コード入力（xHzFK）。6桁目が入った瞬間に確かめる（「本人確認して実行」も残す）。 */}
           <div className="mt-2">
@@ -99,7 +99,7 @@ export default function StepUpDialog({ open, action, showActionInTitle = false, 
               autoFocus
             />
           </div>
-        </div>
+        </>
       ) : (
         <>
           <label htmlFor={labelId} className="mt-1 block text-sm font-medium text-ink">パスワード</label>
