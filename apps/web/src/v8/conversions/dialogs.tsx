@@ -129,7 +129,9 @@ const INGEST_REASON_LABELS: Record<string, string> = {
 /** 受信履歴1件を運用者の言葉にする。検証の受信は本番実績と区別して出す。 */
 function ingestionEventLabel(event: ConversionIngestionEvent): string {
   const reason = event.reason
-    ? INGEST_REASON_LABELS[event.reason] ?? '受け取れませんでした。理由は管理側の記録を確認してください'
+    ? Object.prototype.hasOwnProperty.call(INGEST_REASON_LABELS, event.reason)
+      ? INGEST_REASON_LABELS[event.reason]
+      : '受け取れませんでした。理由は管理側の記録を確認してください'
     : null
   const base = event.isTest
     ? event.result === 'rejected' ? '検証の受信（受け取れなかった）' : '検証の受信（実績には数えません）'
