@@ -90,14 +90,22 @@ describe('CommandPalette（探す窓・F②）', () => {
     expect(screen.queryByRole('option', { name: /メッセージのテンプレートを探す「/ })).toBeNull()
     fireEvent.change(input, { target: { value: '  予約 & お知らせ  ' } })
     fireEvent.click(screen.getByRole('option', { name: 'メッセージのテンプレートを探す「予約 & お知らせ」' }))
-    expect(push).toHaveBeenCalledWith('/templates?q=%E4%BA%88%E7%B4%84%20%26%20%E3%81%8A%E7%9F%A5%E3%82%89%E3%81%9B')
+    expect(push).toHaveBeenCalledWith('/templates?q=%E4%BA%88%E7%B4%84%20%26%20%E3%81%8A%E7%9F%A5%E3%82%89%E3%81%9B&tab=message')
+  })
+
+  it.each([['カルーセル', 'card_message'], ['リッチメッセージ', 'rich_message'], ['リッチビデオ', 'rich_video'], ['質問', 'question'], ['クーポン', 'coupon'], ['リサーチ', 'research']])('%s の検索は対応するタブに送る', (label, tab) => {
+    render(<CommandPalette items={items} />)
+    openPalette()
+    fireEvent.change(screen.getByRole('textbox', { name: '機能と友だちを探す' }), { target: { value: '予約' } })
+    fireEvent.click(screen.getByRole('option', { name: `${label}のテンプレートを探す「予約」` }))
+    expect(push).toHaveBeenCalledWith(`/templates?q=%E4%BA%88%E7%B4%84&tab=${tab}`)
   })
 
   it('テンプレートの入口が見えない人にはテンプレート検索を出さない', () => {
     render(<CommandPalette items={[{ href: '/friends', label: '友だち' }]} />)
     openPalette()
     fireEvent.change(screen.getByRole('textbox', { name: '機能と友だちを探す' }), { target: { value: '予約' } })
-    expect(screen.queryByRole('option', { name: /メッセージのテンプレートを探す/ })).toBeNull()
+    expect(screen.queryByRole('option', { name: /テンプレートを探す/ })).toBeNull()
   })
 
   it('テンプレート一覧で検索をやり直すとURLと一覧へ変更を伝える', () => {
@@ -111,7 +119,7 @@ describe('CommandPalette（探す窓・F②）', () => {
       fireEvent.click(screen.getByRole('option', { name: 'メッセージのテンプレートを探す「予約」' }))
       expect(window.location.pathname).toBe('/templates')
       expect(new URLSearchParams(window.location.search).get('q')).toBe('予約')
-      expect(new URLSearchParams(window.location.search).get('tab')).toBeNull()
+      expect(new URLSearchParams(window.location.search).get('tab')).toBe('message')
       expect(onLocation).toHaveBeenCalledTimes(1)
     } finally { window.removeEventListener('popstate', onLocation) }
   })
@@ -123,7 +131,7 @@ describe('CommandPalette（探す窓・F②）', () => {
     fireEvent.click(screen.getByRole('option', { name: 'メッセージのテンプレートを探す「予約」' }))
     expect(push).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
-    expect(push).toHaveBeenCalledWith('/templates?q=%E4%BA%88%E7%B4%84')
+    expect(push).toHaveBeenCalledWith('/templates?q=%E4%BA%88%E7%B4%84&tab=message')
   })
 
   it('書きかけの画面では、選んでもすぐ移らず未保存の確認を通す', () => {

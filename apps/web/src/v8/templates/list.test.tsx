@@ -9,7 +9,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認、使っているものは削除できない窓。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listTemplates = vi.hoisted(() => vi.fn())
@@ -98,6 +98,26 @@ async function renderList() {
     await Promise.resolve()
   })
 }
+
+it.each([
+  ['question', { ...used, id: 'question', name: '予約の質問', question: { type: 'single' } }],
+  ['rich_video', { ...used, id: 'video', name: '予約の動画', messageType: 'imagemap', messageContent: '{"video":{"url":"https://example.com/video"}}' }],
+])('検索語付きの %s タブで一致する行を表示する', async (tab, match) => {
+  window.history.replaceState(null, '', `/templates?q=予約&tab=${tab}`)
+  listTemplates.mockResolvedValue({ success: true, data: [used, match] })
+  await renderList()
+  expect(screen.getByText(match.name)).toBeTruthy()
+  expect(screen.queryByText(used.name)).toBeNull()
+})
+
+it('クーポンの一覧は URL の検索語を表示し、入力を URL に保存する', async () => {
+  window.history.replaceState(null, '', '/templates?q=予約&tab=coupon')
+  await renderList()
+  const search = await screen.findByPlaceholderText('クーポンを探す')
+  expect(search).toHaveProperty('value', '予約')
+  fireEvent.change(search, { target: { value: '誕生日' } })
+  await waitFor(() => expect(new URLSearchParams(currentListLocation().search).get('q')).toBe('誕生日'))
+})
 
 function openMenuAndDelete(name: string) {
   fireEvent.click(screen.getByRole('button', { name: `テンプレート「${name}」の操作` }))

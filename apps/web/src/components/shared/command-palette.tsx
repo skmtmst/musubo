@@ -15,6 +15,11 @@ export type PaletteItem = {
   section?: string
 }
 
+const TEMPLATE_SEARCH_TYPES = [
+  ['message', 'メッセージ'], ['card_message', 'カルーセル'], ['rich_message', 'リッチメッセージ'],
+  ['rich_video', 'リッチビデオ'], ['question', '質問'], ['coupon', 'クーポン'], ['research', 'リサーチ'],
+] as const
+
 /** 左メニューに出ている行き先を拾う（見えている機能だけ出す）。 */
 function collectVisibleItems(): PaletteItem[] {
   if (typeof document === 'undefined') return []
@@ -40,7 +45,7 @@ function menuFallback(): PaletteItem[] {
 /**
  * ② どこからでも探す窓（V8「サクサク感」F）。
  * ⌘K（Ctrl+K）で開く。機能は左メニューに出ているものだけ、
- * 友だちとメッセージのテンプレートは、それぞれの一覧の `?q=` の受け口へ送る。
+ * 友だちとテンプレートは、それぞれの一覧の `?q=` の受け口へ送る。
  * 帯（top-bar）に探す欄は置かない（外枠の決まり）。
  */
 export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
@@ -50,6 +55,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   const [active, setActive] = useState(0)
   const [menuItems, setMenuItems] = useState<PaletteItem[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const hintId = useId()
   /* 閉じたら、開く前にいた場所へフォーカスを戻す（動きの点検 2 番）。 */
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -107,9 +113,13 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
       trimmed === ''
         ? hits
         : [...hits, { href: `/friends?q=${encodeURIComponent(trimmed)}`, label: `友だちを探す「${trimmed}」` },
-          ...(canSearchTemplates ? [{ href: `/templates?q=${encodeURIComponent(trimmed)}`, label: `メッセージのテンプレートを探す「${trimmed}」` }] : [])],
+          ...(canSearchTemplates ? TEMPLATE_SEARCH_TYPES.map(([tab, label]) => ({ href: `/templates?q=${encodeURIComponent(trimmed)}&tab=${tab}`, label: `${label}のテンプレートを探す「${trimmed}」` })) : [])],
     [hits, trimmed, canSearchTemplates],
   )
+
+  useEffect(() => {
+    if (open) listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' })
+  }, [active, open])
 
   if ((!open && !leaving) || typeof document === 'undefined') return null
 
@@ -150,12 +160,12 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
           }
         }}
       >
-        {canSearchTemplates ? <span id={hintId} className="sr-only">メッセージのテンプレートも検索できます。</span> : null}
+        {canSearchTemplates ? <span id={hintId} className="sr-only">種類ごとにテンプレートも検索できます。</span> : null}
         <input
           ref={inputRef}
           aria-describedby={canSearchTemplates ? hintId : undefined}
           aria-label="機能と友だちを探す"
-          placeholder={canSearchTemplates ? '機能・友だち・メッセージのテンプレートを探す' : '機能・友だちの名前で探す'}
+          placeholder={canSearchTemplates ? '機能・友だち・テンプレートを探す' : '機能・友だちの名前で探す'}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)
@@ -163,7 +173,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
           }}
           className={styles.input}
         />
-        <ul className={styles.list} role="listbox" aria-label="探した結果">
+        <ul ref={listRef} className={styles.list} role="listbox" aria-label="探した結果">
           {rows.map((row, index) => (
             <li key={`${row.href}-${row.label}`}>
               <button
