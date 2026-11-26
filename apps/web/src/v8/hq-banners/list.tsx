@@ -179,6 +179,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onCreated }: {
   const [query, setQuery] = useListUrlValue('q', '')
   const [sort, setSort] = useListUrlValue<ProjectSort>('sort', 'updated')
   const [actionError, setActionError] = useState('')
+  const [refreshFailed, setRefreshFailed] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [formBusy, setFormBusy] = useState(false)
@@ -191,6 +192,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onCreated }: {
     const requestId = ++requestRef.current
     requestPending.current = true
     if (!silent) setStatus('loading')
+    setRefreshFailed(false)
     setActionError('')
     try {
       const [projectRes, imageRes] = await Promise.all([
@@ -213,7 +215,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onCreated }: {
       if (requestId !== requestRef.current) return
       saveErrors.capture(caught);
 
-      if (silent) setActionError('一覧を更新できませんでした。もう一度読み込んでください。')
+      if (silent) { setRefreshFailed(true); setActionError('一覧を更新できませんでした。もう一度読み込んでください。') }
       else setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     } finally {
       if (requestId === requestRef.current) requestPending.current = false
@@ -379,7 +381,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onCreated }: {
         <BannerLimitNotice usage={usage} />
         <ListToolbar search={{placeholder:'プロジェクト名・説明で探す',label:'プロジェクト名・説明で探す',value:query,onChange:setQuery}}
           filters={viewFilter} trailing={<SaveErrorField names={["sort"]}><ListToolbarSort aria-label="プロジェクトの並び順" value={sort} onChange={(value) => setSort(value as ProjectSort)} options={PROJECT_SORTS} /></SaveErrorField>} />
-        {actionError ? <Notice tone="danger" message={actionError} action={actionError.startsWith('一覧を更新できませんでした') ? <Button onClick={() => void load(true)}>もう一度読み込む</Button> : undefined} /> : null}
+        {actionError ? <Notice tone="danger" message={actionError} action={refreshFailed ? <Button onClick={() => void load(true, true)}>もう一度読み込む</Button> : undefined} /> : null}
       </>}
     >
       {body}
