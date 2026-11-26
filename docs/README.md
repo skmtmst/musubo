@@ -1406,3 +1406,4 @@
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 - [パスキー一覧とかんたんに送るの読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini8-1127.md) — 反映履歴、確認 2026-11-27。
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/PR-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
+- [認証アプリ確認とマイペット一覧の読み込み失敗時表示・再読み込み](release-log/unreleased/PR-kenta-later-gemini9-1127.md) — 反映履歴、確認 2026-11-27。
