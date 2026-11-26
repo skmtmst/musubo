@@ -59,6 +59,12 @@ const AUDIT_WORD: Record<string, string> = {
   'tenant.status.change': '契約先の停止',
 }
 
+function auditWord(action: string): string {
+  const word = Object.prototype.hasOwnProperty.call(AUDIT_WORD, action) ? AUDIT_WORD[action] : undefined
+  const fallback = Object.prototype.hasOwnProperty.call(AUDIT_ACTION_LABEL, action) ? AUDIT_ACTION_LABEL[action]?.label : undefined
+  return word ?? fallback ?? action
+}
+
 function shortDateTime(value: string | null | undefined): string {
   return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
@@ -254,7 +260,7 @@ function DetailContent() {
                   <GridRow key={row.id}>
                     <GridCell><span className={styles.shortText} title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</span></GridCell>
                     <GridCell><TruncatedText value={String(row.staff_name ?? '')} /></GridCell>
-                    <GridCell><TruncatedText value={AUDIT_WORD[row.action] ?? AUDIT_ACTION_LABEL[row.action]?.label ?? row.action} /></GridCell>
+                    <GridCell><TruncatedText value={auditWord(row.action)} /></GridCell>
                     <GridCell><TruncatedText value={row.reason ?? emptyValue('unknown')} /></GridCell>
                   </GridRow>
                 ))}
