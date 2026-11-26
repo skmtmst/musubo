@@ -47,7 +47,7 @@ async function ready(strict = false) {
   return view
 }
 async function open(trigger: RestaurantFollowupTrigger = 'reservation_created') {
-  fireEvent.click(within(card(trigger)).getByRole('button', { name: '変更する' }))
+  fireEvent.click(within(card(trigger)).getByRole('button', { name: '変える' }))
   await screen.findByRole('dialog', { name: `${FOLLOWUP_NAMES[trigger]}を変える` })
 }
 async function text(value: string) {
@@ -80,7 +80,7 @@ describe('予約フォームの窓とページの未保存変更', () => {
   it.each(matrix)('親%s・窓%sの戻るを一つの確認で守る', async (parent, child) => {
     await ready()
     if (parent) { await open('reservation_24h'); await text('親の変更'); await accept() }
-    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変える' }))
     const dialog = await screen.findByRole('dialog', { name: '予約の回答フォームを変える' })
     if (child) fireEvent.change(within(dialog).getByRole('textbox', { name: /題名/ }), { target: { value: '窓内の題名' } })
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
@@ -97,7 +97,7 @@ describe('予約フォームの窓とページの未保存変更', () => {
   it.each(matrix)('親%s・窓%sのリンクで破棄を選んだときだけ変更を戻す', async (parent, child) => {
     await ready()
     if (parent) { await open('reservation_24h'); await text('親の変更'); await accept() }
-    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変える' }))
     const dialog = await screen.findByRole('dialog', { name: '予約の回答フォームを変える' })
     if (child) fireEvent.change(within(dialog).getByRole('textbox', { name: /題名/ }), { target: { value: '窓内の題名' } })
     const a = document.createElement('a'); a.href = '/templates'; document.body.appendChild(a)
@@ -116,7 +116,7 @@ describe('予約フォームの窓とページの未保存変更', () => {
   })
   it('窓だけ閉じた後は親の未保存変更を保持し、親の確認が戻る', async () => {
     await ready(); await open('reservation_24h'); await text('親の変更'); await accept()
-    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変える' }))
     const dialog = await screen.findByRole('dialog', { name: '予約の回答フォームを変える' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
     expect(within(card('reservation_24h')).queryByText('親の変更')).not.toBeNull()
@@ -126,7 +126,7 @@ describe('予約フォームの窓とページの未保存変更', () => {
   })
   it('両方に変更がある戻るでは明示破棄後に一度だけ戻る', async () => {
     await ready(); await open('reservation_24h'); await text('親の変更'); await accept()
-    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変える' }))
     const dialog = await screen.findByRole('dialog', { name: '予約の回答フォームを変える' })
     fireEvent.change(within(dialog).getByRole('textbox', { name: /題名/ }), { target: { value: '窓内の題名' } })
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => {})
@@ -143,20 +143,20 @@ describe('予約フォームの窓とページの未保存変更', () => {
   it('窓内だけの破棄は親の変更を保ち、開き直しでは保留先を残さない', async () => {
     await ready(); await open('reservation_24h'); await text('親の変更'); await accept()
     const formCard = screen.getByRole('article', { name: '予約の回答フォーム' })
-    fireEvent.click(within(formCard).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(formCard).getByRole('button', { name: '変える' }))
     const dialog = await screen.findByRole('dialog', { name: '予約の回答フォームを変える' })
     fireEvent.change(within(dialog).getByRole('textbox', { name: /題名/ }), { target: { value: '窓内の題名' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
     fireEvent.click(within(screen.getByRole('dialog', { name: '入力を破棄しますか？' })).getByRole('button', { name: '破棄する' }))
     expect(within(card('reservation_24h')).queryByText('親の変更')).not.toBeNull()
-    fireEvent.click(within(formCard).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(formCard).getByRole('button', { name: '変える' }))
     expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
     expect(within(screen.getByRole('dialog', { name: '予約の回答フォームを変える' })).getByRole('textbox', { name: /題名/ })).not.toHaveProperty('value', '窓内の題名')
     assertNoWrites()
   })
   it('窓の破棄確認中に戻るとEscはページの確認だけ閉じる', async () => {
     await ready()
-    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変更する' }))
+    fireEvent.click(within(screen.getByRole('article', { name: '予約の回答フォーム' })).getByRole('button', { name: '変える' }))
     const dialog = await screen.findByRole('dialog', { name: '予約の回答フォームを変える' })
     fireEvent.change(within(dialog).getByRole('textbox', { name: /題名/ }), { target: { value: '窓内の題名' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))

@@ -382,7 +382,7 @@ describe('予約台帳の初期状態', () => {
   it('卓があれば予約0件でも空きマスから選んだ卓と時刻で電話予約へ進む', async () => {
     emptyStore(false)
     render(<ReservationsPage />)
-    const slot=await screen.findByRole('button',{name:'T2 18:00に予約を入れる'})
+    const slot=await screen.findByRole('button',{name:'T2 2名 18:00に予約を入れる'})
     fireEvent.focus(slot)
     fireEvent.click(slot)
     await screen.findByText('何を入れますか',{selector:'h2'})

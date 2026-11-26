@@ -265,7 +265,7 @@ html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--co
   color: var(--color-action); font-size: var(--text-caption); font-weight: var(--tpl-button-weight); line-height: var(--tpl-rs-lh-12);
 }
 
-:root .button.text.textInk { color: var(--color-ink); }
+:root .button.inline.text.textInk { color: var(--color-ink); }
 
 /*
  * 字の色だけを絵へ合わせる指定（`textTone`）。白地・細枠の形はそのままで、字の色だけ変える。

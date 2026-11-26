@@ -116,7 +116,7 @@ it('卓の表示名と定員を分け、空き枠は1時間の升目全体に重
  expect(track.previousElementSibling?.getAttribute('title')).toBe('T1 窓側・2名')
  expect(track.previousElementSibling?.querySelector('.sr-only')?.textContent).toBe('・')
  expect(track.previousElementSibling?.querySelector('small')?.textContent).toBe('2名')
- const slot=within(track).getByRole('button',{name:/T1 17:00に予約を入れる/})
+ const slot=within(track).getByRole('button',{name:/T1 2名 17:00に予約を入れる/})
  expect(slot.getAttribute('data-placement')).toBe('timeline')
  expect(parseFloat((slot.parentElement as HTMLElement).style.width)).toBeCloseTo(100/6)
  fireEvent.click(slot)

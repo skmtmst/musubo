@@ -80,7 +80,7 @@ export function GuideAllocationCard({ value, onChange, allocation, totalSeats, a
           <p className={styles.totalValue}>1つの時間帯の総数 {totalSeats}席</p>
           <p className={styles.totalSub}>有効な卓 {activeTableCount}卓</p>
         </div>
-        <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変更する →</Button>
+        <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
       </div>
       <div className={styles.allocationFields}>
         <Field label={label} optional={false} labelWrap>

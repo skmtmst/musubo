@@ -22,7 +22,7 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { lineAccountConnectionState } from '@/lib/line-account-state'
-import { connectionReasonLine } from '@/v8/hq'
+import { connectionReasonLine } from '@/lib/line-account-connection-reasons'
 import { api } from '@/lib/api'
 import { notifyToast } from '@/components/shared/toast'
 import type { AccountStyle } from '@line-crm/shared'
@@ -195,7 +195,7 @@ export default function HqAttentionV8() {
               <GridCell className={styles.account}>
                 <RowNameButton className={styles.name} title={item.name} onClick={() => router.push(`/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>{item.name}</RowNameButton>
                 {item.style ? <span className={styles.style} title={styleLabel(item.style)}>{styleLabel(item.style)}</span> : null}
-                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts?.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.style} title={state === '要確認' ? connectionReasonLine(account).title : '未確認：接続を確認できていません'}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
+                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts?.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.connectionReason} title={state === '要確認' ? connectionReasonLine(account).title : '未確認：接続を確認できていません'}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
               </GridCell>
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)

@@ -170,8 +170,8 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
         />
         </div>
         <div className={styles.side}>
-          <Card layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--polish-space-card)" aria-label="今日の確認">
-            <div className={styles.sideHeader}><h3>今日の確認</h3>
+          <Card layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--polish-space-card)" aria-labelledby="rs-next-title">
+            <div className={styles.sideHeader}><h3 id="rs-next-title">今日の確認</h3>
               {sideFolded && next ? <StatusBadge tone="danger" size="micro" dot={false}>次の予約 1</StatusBadge> : null}
               {sideFolded && careCount > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`注意 ${careCount}`}</StatusBadge> : null}
               {sideFolded && countedBookings.length > 0 ? <StatusBadge tone="danger" size="micro" dot={false}>{`予約 ${countedBookings.length}`}</StatusBadge> : null}
