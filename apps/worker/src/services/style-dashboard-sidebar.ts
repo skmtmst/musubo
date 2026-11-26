@@ -23,36 +23,49 @@ export async function styleDashboardSidebar(
   );
   const attention = [];
   if (style === 'restaurant') {
-    for (const r of todayRows.filter((r) => r.kind === 'restaurant')) {
-      const detail = await db
-        .prepare(
-          `SELECT allergy_note allergy FROM rt_reservations WHERE id=? AND store_id IN(SELECT id FROM rt_stores WHERE line_account_id=?)`,
-        )
-        .bind(r.id, account)
-        .first<{ allergy: string | null }>();
-      const fields = r.friendId
-        ? (
-            await db
-              .prepare(
-                `SELECT k.fixed_key,COALESCE(v.value,v.value_text,v.value_date) value FROM friend_field_values v JOIN friend_fixed_fields k ON k.field_id=v.field_id JOIN friends f ON f.id=v.friend_id WHERE f.line_account_id=? AND f.id=? AND k.fixed_key IN('allergy','anniversary')`,
-              )
-              .bind(account, r.friendId)
-              .all<{ fixed_key: string; value: string | null }>()
-          ).results
-        : [];
+    const bookings = todayRows.filter((r) => r.kind === 'restaurant');
+    const allergyByReservation = new Map<string, string | null>();
+    const fieldsByFriend = new Map<string, Array<{ fixed_key: string; value: string | null }>>();
+    // D1 の束縛数の上限を守りつつ、対象を権限で絞り込んだ行に限定する。
+    const batches = <T,>(values: T[]) => {
+      const chunks: T[][] = [];
+      for (let i = 0; i < values.length; i += 80) chunks.push(values.slice(i, i + 80));
+      return chunks;
+    };
+    for (const ids of batches([...new Set(bookings.map((r) => r.id))])) {
+      const details = await db.prepare(
+        `SELECT id,allergy_note allergy FROM rt_reservations WHERE store_id IN(SELECT id FROM rt_stores WHERE line_account_id=?) AND id IN(${ids.map(() => '?').join(',')})`,
+      ).bind(account, ...ids).all<{ id: string; allergy: string | null }>();
+      for (const detail of details.results) allergyByReservation.set(detail.id, detail.allergy);
+    }
+    for (const ids of batches([...new Set(bookings.flatMap((r) => r.friendId ? [r.friendId] : []))])) {
+      const fields = await db.prepare(
+        `SELECT v.friend_id,k.fixed_key,COALESCE(v.value,v.value_text,v.value_date) value FROM friend_field_values v JOIN friend_fixed_fields k ON k.field_id=v.field_id JOIN friends f ON f.id=v.friend_id WHERE f.line_account_id=? AND f.id IN(${ids.map(() => '?').join(',')}) AND k.fixed_key IN('allergy','anniversary')`,
+      ).bind(account, ...ids).all<{ friend_id: string; fixed_key: string; value: string | null }>();
+      for (const field of fields.results) {
+        const group = fieldsByFriend.get(field.friend_id) ?? [];
+        group.push(field);
+        fieldsByFriend.set(field.friend_id, group);
+      }
+    }
+    const firstNoShow = new Map<string, number>();
+    for (const row of rows) {
+      if (row.status !== 'no_show') continue;
+      const at = instant(row.startsAt);
+      if (Number.isNaN(at)) continue;
+      firstNoShow.set(row.personKey, Math.min(firstNoShow.get(row.personKey) ?? Infinity, at));
+    }
+    for (const r of bookings) {
+      const fields = r.friendId ? fieldsByFriend.get(r.friendId) ?? [] : [];
       const allergy =
-        detail?.allergy ||
+        allergyByReservation.get(r.id) ||
         fields.find((f) => f.fixed_key === 'allergy')?.value ||
         null;
       const anniversary = fields.find(
         (f) => f.fixed_key === 'anniversary',
       )?.value;
-      const noShowHistory = rows.some(
-        (p) =>
-          p.personKey === r.personKey &&
-          p.status === 'no_show' &&
-          instant(p.startsAt) < instant(r.startsAt),
-      );
+      const noShowAt = firstNoShow.get(r.personKey);
+      const noShowHistory = noShowAt !== undefined && noShowAt < instant(r.startsAt);
       const isAnniversary =
         !!anniversary && anniversary.slice(5, 10) === today.slice(5);
       if (allergy || isAnniversary || noShowHistory)
