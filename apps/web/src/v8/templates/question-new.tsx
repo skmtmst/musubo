@@ -140,16 +140,20 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     return () => { cancelled = true }
   }, [selectedAccountId])
 
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadRetry, setLoadRetry] = useState(0)
   useEffect(() => {
     if (!id || !selectedAccountId) return
     let cancelled = false
     const requestScope = scope.current.generation
     setLoading(true)
+    setLoadFailed(false)
     setError('')
     void api.templates.get(id)
       .then((template) => {
         if (cancelled || requestScope !== scope.current.generation) return
         if (!template.success || !template.data.question || !isEditableQuestion(template.data.question)) {
+          setLoadFailed(true)
           setError('質問テンプレートを読み込めませんでした。')
           return
         }
@@ -165,11 +169,14 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        if (!cancelled && requestScope === scope.current.generation) {
+          setLoadFailed(true)
+          setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        }
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => { if (!cancelled && requestScope === scope.current.generation) setLoading(false) })
     return () => { cancelled = true }
-  }, [id, selectedAccountId])
+  }, [id, selectedAccountId, loadRetry])
 
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
@@ -199,6 +206,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       host.onSave({ kind: 'question', name: name.trim(), question: question as unknown as Record<string, unknown>, messageContent: question.intro?.trim() || question.text }, questionStatus === 'published')
       return false
     }
+    if (loadFailed) { setError('質問テンプレートを読み込めませんでした。もう一度読み込んでください。'); return false }
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
     setSaving(true)
@@ -287,7 +295,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     )
   }
 
-  const inputReason = requiredInputReason([
+  const inputReason = loading || loadFailed ? null : requiredInputReason([
     { label: 'テンプレート名', value: name },
     { label: '質問文', value: question.text },
     ...question.choices.map((choice, index) => ({ label: `選択肢 ${index + 1} のボタンの文字`, value: choice.label })),
@@ -326,13 +334,30 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         footerActions={(
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : requestUnsavedAction(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
-            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || loading || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || loading || loadFailed || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
         {host?.notice}
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Notice
+            tone="danger"
+            message={error}
+            action={loadFailed && id ? (
+              <Button
+                variant="text"
+                size="inline"
+                data-notice-inline-action
+                type="button"
+                disabled={loading}
+                onClick={() => setLoadRetry((value) => value + 1)}
+              >
+                もう一度読み込む
+              </Button>
+            ) : undefined}
+          />
+        ) : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
         <Card variant="form" gap="normal" aria-labelledby="q-name">
