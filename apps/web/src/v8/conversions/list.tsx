@@ -260,9 +260,12 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   const folders = folderState.folders
   const [loadFailed, setLoadFailed] = useState(false)
   const [reportFailed, setReportFailed] = useState(false)
+  const [reportLoading, setReportLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const loadSeq = useRef(0)
+  const reportSeq = useRef(0)
+  const reportLoadingRef = useRef(false)
   const accountIdRef = useRef(accountId)
   accountIdRef.current = accountId
 
@@ -323,7 +326,10 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   /* 一覧は検索・並びを口へ渡し、続く頁をすべて読む（50頁・5000件で止め、切れたら断る）。 */
   const load = useCallback(async () => {
     const seq = ++loadSeq.current
+    reportSeq.current += 1
+    reportLoadingRef.current = false
     setLoading(true)
+    setReportLoading(true)
     setLoadFailed(false)
     setReportFailed(false)
     setDefinitions(null)
@@ -368,16 +374,23 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     } else {
       setReportFailed(true)
     }
-    if (loadSeq.current === seq) setLoading(false)
+    if (loadSeq.current === seq) {
+      setLoading(false)
+      setReportLoading(false)
+    }
   }, [accountId, debouncedQuery, sort])
 
   /* 集計だけを読み直す。一覧は触らない。遅れた応答は世代とアカウントで捨てる。 */
   const reloadReport = useCallback(async () => {
-    const seq = ++loadSeq.current
+    if (reportLoadingRef.current) return
+    const seq = ++reportSeq.current
     const requestAccountId = accountId
+    reportLoadingRef.current = true
+    setReportLoading(true)
+    setReportFailed(false)
     try {
       const response = await api.conversions.definitionReport({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
-      if (loadSeq.current !== seq || accountIdRef.current !== requestAccountId) return
+      if (reportSeq.current !== seq || accountIdRef.current !== requestAccountId) return
       if (response.success && Array.isArray(response.data?.byDefinition)) {
         setSummaryReport(response.data)
         setReportFailed(false)
@@ -385,9 +398,14 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
         setReportFailed(true)
       }
     } catch (saveFailure) {
-      if (loadSeq.current !== seq || accountIdRef.current !== requestAccountId) return
+      if (reportSeq.current !== seq || accountIdRef.current !== requestAccountId) return
       saveErrors.capture(saveFailure)
       setReportFailed(true)
+    } finally {
+      if (reportSeq.current === seq) {
+        reportLoadingRef.current = false
+        setReportLoading(false)
+      }
     }
   }, [accountId, saveErrors])
 
@@ -1025,7 +1043,18 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           onChange={(event) => setStopReason(event.target.value)}
         /></SaveErrorField>
       </Field>
-      {stopError ? <Notice tone="danger" >{stopError}</Notice> : null}
+      {stopError ? (
+        <Notice
+          tone="danger"
+          action={!stopImpact && !stopImpactLoading ? (
+            <Button type="button" onClick={() => void openStop(stopTarget, stopAction)}>
+              影響を読み直す
+            </Button>
+          ) : undefined}
+        >
+          {stopError}
+        </Notice>
+      ) : null}
       <Disclosure title="操作の影響を確認する" size="compact">
         <p className={styles.panelText}>対象：{stopTarget.name}</p>
         <p className={styles.panelText}>止める：これから先は数えません。過去の記録と分析は残します。</p>
@@ -1170,6 +1199,16 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
         />)
   if (editId !== undefined) {
     if (loading) return <ListState kind="loading" />
+    if (loadFailed) {
+      return (
+        <ListState
+          kind="error"
+          title="成果地点を読み込めませんでした"
+          description="通信を確かめて、もう一度お試しください。"
+          onRetry={() => void load()}
+        />
+      )
+    }
     if (!canEdit || !editTarget) return <ListState kind="error" title="この成果地点を編集できません" description="権限と成果地点を確認してください。" />
     return editSurface
   }
@@ -1200,7 +1239,21 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
         {highlightedPoint ? <div className={styles.statsNotice}><Notice tone="success">{`「${highlightedPoint.name}」を保存しました。色の付いた行です。`}</Notice></div> : null}
         {reportFailed && !loadFailed ? (
           <div className={styles.statsNotice}>
-            <Notice tone="info" action={<Button onClick={() => reloadReport()} busyLabel="処理中…">集計を読み直す</Button>}>集計を表示できませんでした。一覧はそのまま使えます。</Notice>
+            <Notice
+              tone="info"
+              action={(
+                <Button
+                  onClick={() => void reloadReport()}
+                  disabled={reportLoading}
+                  busy={reportLoading}
+                  busyLabel="読み込み中…"
+                >
+                  集計を読み直す
+                </Button>
+              )}
+            >
+              集計を表示できませんでした。一覧はそのまま使えます。
+            </Notice>
           </div>
         ) : null}
         <KpiBand>
@@ -1211,6 +1264,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
             help="登録している成果地点の数です。"
             value={listUnavailable ? null : total}
             unit="件"
+            loading={loading}
             detail={stateCounts ? `有効 ${formatNumber(stateCounts.active)}・下書き ${formatNumber(stateCounts.draft)}・停止中 ${formatNumber(stateCounts.stopped)}` : emptyValue('unknown')}
           />
           <KpiCard
@@ -1220,7 +1274,13 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
             help="この30日に数えた成果の件数です（取り消しを引いた数）。"
             value={reportUnavailable ? null : kpi.currentCount}
             unit="件"
-            detail={delta === null || reportUnavailable ? emptyValue('unknown') : <span title={`前の30日 ${formatNumber(kpi.previousCount ?? 0)}件`}>{`その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}</span>}
+            loading={loading || reportLoading}
+            detail={reportFailed && !loadFailed
+              ? '集計を読み込めませんでした'
+              : delta === null || reportUnavailable
+                ? emptyValue('unknown')
+                : <span title={`前の30日 ${formatNumber(kpi.previousCount ?? 0)}件`}>{`その前の30日より ${delta >= 0 ? '+' : ''}${formatNumber(delta)}`}</span>}
+            onRetry={reportFailed && !loadFailed && !reportLoading ? () => void reloadReport() : undefined}
           />
           <KpiCard
             presentation="band"
@@ -1230,7 +1290,11 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
             value={reportUnavailable ? null : kpi.currentValue}
             valueText={reportUnavailable ? undefined : `${formatYen(kpi.currentValue)}`}
             unit=""
-            detail={<span title={listUnavailable ? '金額の内訳を読み込めませんでした' : `${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>{listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}</span>}
+            loading={loading || reportLoading}
+            detail={reportFailed && !loadFailed
+              ? '集計を読み込めませんでした'
+              : <span title={listUnavailable ? '金額の内訳を読み込めませんでした' : `${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>{listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}</span>}
+            onRetry={reportFailed && !loadFailed && !reportLoading ? () => void reloadReport() : undefined}
           />
           <KpiCard
             presentation="band"
@@ -1239,6 +1303,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
             help="配信・流入リンク・アフィリエイトのどこからも使われていない成果地点です。"
             value={listUnavailable ? null : kpi.unusedCount}
             unit="件"
+            loading={loading}
             detail="配信・流入・アフィリエイトで未使用"
           />
         </KpiBand>
