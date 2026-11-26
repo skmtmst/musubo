@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import type { RichMenuDeleteImpact } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 
@@ -79,7 +80,7 @@ const REFERENCE_KIND = {
 } as const
 
 export function referenceKindText(kind: RichMenuDeleteImpact['operationalReferences'][number]['kind']): string {
-  return REFERENCE_KIND[kind]
+  return knownValue<string>(REFERENCE_KIND, kind, '使われている場所')
 }
 
 const BLOCKER_TEXT = {
@@ -102,7 +103,7 @@ export const UNKNOWN_BLOCKER_TEXT = '確認が必要な項目があります。�
  * 知らない種が来たら予備の文言にする (#502中)。
  */
 export function blockerTexts(blockers: RichMenuDeleteImpact['blockers']): string[] {
-  return blockers.map((key) => BLOCKER_TEXT[key as keyof typeof BLOCKER_TEXT] ?? UNKNOWN_BLOCKER_TEXT)
+  return blockers.map((key) => knownValue<string>(BLOCKER_TEXT, key, UNKNOWN_BLOCKER_TEXT))
 }
 
 const ACTION_TEXT = {
@@ -112,7 +113,7 @@ const ACTION_TEXT = {
 } as const
 
 export function recommendedActionText(action: RichMenuDeleteImpact['recommendedAction']): string {
-  return ACTION_TEXT[action]
+  return knownValue<string>(ACTION_TEXT, action, '操作を確認できません。')
 }
 
 /**

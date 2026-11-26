@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import Card from '@/components/shared/card'
 import KpiCard from '@/components/shared/kpi-card'
 
@@ -106,7 +108,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }
       setBusy(false)
     }
   }
-  const metricLine = result ? `勝ちの決め方：${METRIC_WORD[result.metric]}・${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間たっても差が小さく決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
+  const metricLine = result ? `勝ちの決め方：${knownValue(METRIC_WORD, result.metric, '指標を確認できません')}・${result.status === 'undecided' ? `${result.decideAfterMinutes / 60} 時間たっても差が小さく決められない` : `${result.decideAfterMinutes / 60} 時間で決めた`}` : ''
   const winner = result?.winner ? result.variants.find((variant) => variant.key === result.winner) : null
   return (
     <Card as="section" className={styles.resultCard} contentPadding="var(--ab-pad)" aria-labelledby="ab-result-title" data-design-node={result?.status === 'undecided' ? 'Eoi7q' : 'n4kwM'}>
@@ -131,7 +133,7 @@ export default function BroadcastAbResult({ broadcastId, ab, canSend, accounts }
           {result.status === 'decided' || result.status === 'finished' ? (
             winner ? (
                 <Notice tone="success" icon={<Check aria-hidden="true" />}>
-                  {`${result.fallback ? '決められなかったため A 案を送りました' : `${winner.key} 案が勝ちました（${METRIC_WORD[result.metric]}${result.metric === 'click' ? `率 ${pct(winner.clickRate)}` : ''}）`}。残りの ${formatNumber(result.remainder.count)} 人へ ${result.remainder.sentAt ? `${hm(new Date(result.remainder.sentAt))} に送りました` : `${result.remainder.scheduledAt ? hm(new Date(result.remainder.scheduledAt)) : '—'} に送ります`}。`}
+                  {`${result.fallback ? '決められなかったため A 案を送りました' : `${winner.key} 案が勝ちました（${knownValue(METRIC_WORD, result.metric, '指標を確認できません')}${result.metric === 'click' ? `率 ${pct(winner.clickRate)}` : ''}）`}。残りの ${formatNumber(result.remainder.count)} 人へ ${result.remainder.sentAt ? `${hm(new Date(result.remainder.sentAt))} に送りました` : `${result.remainder.scheduledAt ? hm(new Date(result.remainder.scheduledAt)) : '—'} に送ります`}。`}
                 </Notice>
             ) : <p className={styles.note}>送らずに終えました。</p>
           ) : result.status === 'undecided' ? (
