@@ -113,12 +113,23 @@ it('卓の表示名と定員を分け、空き枠は1時間の升目全体に重
  const onAdd=vi.fn()
  const {container}=render(<TodayView {...props} rows={[]} canWrite onAdd={onAdd} tables={[{...tables[0],label:'窓側',max_capacity:2}]}/> )
  const track=container.querySelector('[data-resource-id="t1"]') as HTMLElement
- expect(track.previousElementSibling?.textContent).toContain('窓側（T1）・2名')
+ expect(track.previousElementSibling?.getAttribute('title')).toBe('T1 窓側・2名')
+ expect(track.previousElementSibling?.querySelector('.sr-only')?.textContent).toBe('・')
+ expect(track.previousElementSibling?.querySelector('small')?.textContent).toBe('2名')
  const slot=within(track).getByRole('button',{name:/T1 17:00に予約を入れる/})
  expect(slot.getAttribute('data-placement')).toBe('timeline')
  expect(parseFloat((slot.parentElement as HTMLElement).style.width)).toBeCloseTo(100/6)
  fireEvent.click(slot)
  expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({tableId:'t1',time:'17:00'}))
+})
+
+it('同じ表示名の卓も卓番を先に出して見分けられる',()=>{
+ const list=tables.slice(0,2).map(t=>({...t,label:'窓側'}))
+ const {container}=render(<TodayView {...props} tables={list}/> )
+ for(const table of list){
+  const heading=container.querySelector(`[data-resource-id="${table.id}"]`)?.previousElementSibling
+  expect(heading?.firstChild?.textContent).toBe(`${table.code} 窓側`)
+ }
 })
 
 it('カレンダーをキーボードで操作し、確定した日へ切り替える',()=>{
