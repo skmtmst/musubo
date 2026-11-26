@@ -81,14 +81,18 @@ function sourceName(value: string): string {
   return SOURCE_PRESETS.find((preset) => preset.value === value)?.label ?? (value || 'その他')
 }
 
+function knownLabel(labels: Record<string, string>, key: string, fallback: string): string {
+  return Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : fallback
+}
+
 function identityMatchingLabel(detail: DetailType | null): string {
   if (!detail || detail.identityMatching.methods.length === 0) return '照合しない'
-  return detail.identityMatching.methods.map((method) => ({
+  return detail.identityMatching.methods.map((method) => knownLabel({
     harness_friend_id: 'LINEの友だちIDで探す',
     external_customer_id: '相手の顧客IDで探す',
     verified_email: 'メールアドレスで探す',
     verified_phone: '電話番号で探す',
-  }[method.kind] ?? '決めた値で探す')).join('・')
+  }, method.kind, '決めた値で探す')).join('・')
 }
 
 function notFoundLabel(value: DetailType['identityMatching']['onNotFound'] | undefined): string {
