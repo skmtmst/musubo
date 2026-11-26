@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import { canManageWebhooksNow } from './write-access'
@@ -23,7 +24,7 @@ import { TextField as SharedTextField } from '@/components/shared/text-field'
  */
 function EditWebhookPageInner() {
   const saveErrors = useSaveFormErrors()
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, loading: accountLoading = false } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
@@ -43,6 +44,41 @@ function EditWebhookPageInner() {
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
   const staffRole = useStaffRole()
+  const [roleRetrying, setRoleRetrying] = useState(false)
+  const [roleRetryError, setRoleRetryError] = useState('')
+  const roleRetryInFlightRef = useRef(false)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      roleRetryInFlightRef.current = false
+    }
+  }, [])
+  useEffect(() => {
+    if (staffRole !== null) setRoleRetryError('')
+  }, [staffRole])
+
+  const retryStaffRole = async () => {
+    if (roleRetryInFlightRef.current) return
+    roleRetryInFlightRef.current = true
+    setRoleRetrying(true)
+    setRoleRetryError('')
+    try {
+      const res = await loadStaffIdentity()
+      if (!mountedRef.current) return
+      if (!res?.success) {
+        setRoleRetryError('権限を確認できませんでした。通信状態を確認して、もう一度お試しください。')
+      }
+    } catch {
+      if (mountedRef.current) {
+        setRoleRetryError('権限を確認できませんでした。通信状態を確認して、もう一度お試しください。')
+      }
+    } finally {
+      roleRetryInFlightRef.current = false
+      if (mountedRef.current) setRoleRetrying(false)
+    }
+  }
 
 
   useEffect(() => {
@@ -107,14 +143,37 @@ function EditWebhookPageInner() {
     )
   }
 
+  if (!selectedAccountId && !accountLoading) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINEアカウントを選択してください"
+        description="画面上部でLINEアカウントを選ぶと、送り先の設定を確認できます。"
+      />
+    )
+  }
+
   if (!canManageRole(staffRole)) {
     return (
       <div className="flex flex-col gap-4">
         <Notice tone="info">
           {staffRole === null ? '権限の確認が終わるまで編集できません。確認できないときは、もう一度読み込んでください。' : '送り先の変更はオーナーか管理者だけができます。必要なときは依頼してください。'}
         </Notice>
-        <div>
-          {staffRole === null ? <Button variant="secondary" onClick={() => { void loadStaffIdentity().catch(() => {}) }}>もう一度読み込む</Button> : null}
+        {staffRole === null && roleRetryError ? (
+          <Notice tone="danger" message={roleRetryError} />
+        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          {staffRole === null ? (
+            <Button
+              variant="secondary"
+              onClick={() => void retryStaffRole()}
+              disabled={roleRetrying}
+              busy={roleRetrying}
+              busyLabel="確認しています"
+            >
+              もう一度読み込む
+            </Button>
+          ) : null}
           <Button variant="secondary" href="/webhooks">外部連携の一覧へ戻る</Button>
         </div>
       </div>
@@ -175,7 +234,7 @@ function EditWebhookPageInner() {
       }}
     >
       {loadState === 'loading' ? (
-        <p className="text-ink-faint text-sm">現在の設定を読み込んでいます…</p>
+        <ListState kind="loading" title="送り先の設定を読み込んでいます" />
       ) : (
         <>
           <p className="text-ink text-sm font-semibold">基本の設定</p>

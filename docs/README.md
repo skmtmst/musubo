@@ -1407,6 +1407,7 @@
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 
 - [来店スタンプと友だち移行の履歴表示](release-log/unreleased/PR-kenta-later-codex24.md) — 反映履歴。確認 2026-11-27。
+- [友だち追加時の配信一覧と送り先編集の読み込み状態・再読み込み表示](release-log/unreleased/PR-kenta-later-gemini21-1127.md) — 反映履歴、確認 2026-11-27。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
