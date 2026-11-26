@@ -60,6 +60,7 @@ export default function HealthV8({
 }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const [kpis, setKpis] = useState<NenHealthKpis | null>(null)
+  const [kpisFailed, setKpisFailed] = useState(false)
   const [filters, setFilters] = useListUrlJsonValue<HealthFilters>('filters', EMPTY_FILTERS)
 
   /*
@@ -84,6 +85,7 @@ export default function HealthV8({
     setSummary(null)
     setSummaryError(null)
     setKpis(null)
+    setKpisFailed(false)
     setFilters(EMPTY_FILTERS)
   }
 
@@ -116,9 +118,12 @@ export default function HealthV8({
   useEffect(() => {
     if (!accountId || tab !== 'items') return
     let active = true
+    setKpisFailed(false)
     void nenPetsApi.health(accountId, { pageSize: 1 }).then((res) => {
-      if (active && res.success) setKpis(res.data.kpis)
-    }).catch(() => undefined)
+      if (!active) return
+      if (res.success) setKpis(res.data.kpis)
+      else setKpisFailed(true)
+    }).catch(() => { if (active) setKpisFailed(true) })
     return () => { active = false }
   }, [accountId, tab])
 
@@ -165,12 +170,13 @@ export default function HealthV8({
   )
 
   const pending = kpis === null
+  const missing = kpisFailed ? '読み込めませんでした' : '読み込んでいます'
   const stats = accountId ? (
     <KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
-      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={16} aria-hidden="true" />} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending} detail={pending ? '読み込んでいます' : `登録 ${kpis.petsTotal} 匹のうち`} />
-      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={16} aria-hidden="true" />} value={pending ? null : kpis.concerning} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
-      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={16} aria-hidden="true" />} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending} detail="直近7日に付いた記録" />
-      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={16} aria-hidden="true" />} value={pending ? null : kpis.silent30} unit="匹" loading={pending} detail="声をかけられます" />
+      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={16} aria-hidden="true" />} value={pending ? null : kpis.petsWithRecords} unit="匹" loading={pending && !kpisFailed} detail={pending ? missing : `登録 ${kpis.petsTotal} 匹のうち`} />
+      <KpiCard presentation="band" title="気になる変化" icon={<Activity size={16} aria-hidden="true" />} value={pending ? null : kpis.concerning} unit="匹" loading={pending && !kpisFailed} detail="体重 ±10%（8週）など" />
+      <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={16} aria-hidden="true" />} value={pending ? null : kpis.recordsThisWeek} unit="件" loading={pending && !kpisFailed} detail="直近7日に付いた記録" />
+      <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={16} aria-hidden="true" />} value={pending ? null : kpis.silent30} unit="匹" loading={pending && !kpisFailed} detail="声をかけられます" />
     </KpiBand>
   ) : undefined
 
@@ -205,6 +211,7 @@ export default function HealthV8({
           filters={filters}
           onFiltersChange={setFilters}
           onKpis={setKpis}
+          onKpisFailed={setKpisFailed}
           onOpenSummary={(petId, weightWarn) => { setSummaryWeightWarn(weightWarn); setSummaryPetId(petId) }}
           onOpenPdf={(petId, weightWarn) => { setSummaryWeightWarn(weightWarn); setPrintPetId(petId); setSummaryPetId(petId) }}
         />
@@ -224,6 +231,7 @@ function HealthListV8({
   filters,
   onFiltersChange,
   onKpis,
+  onKpisFailed,
   onOpenSummary,
   onOpenPdf,
 }: {
@@ -232,6 +240,7 @@ function HealthListV8({
   filters: HealthFilters
   onFiltersChange: (next: HealthFilters) => void
   onKpis: (kpis: NenHealthKpis) => void
+  onKpisFailed: (failed: boolean) => void
   onOpenSummary: (petId: string, weightWarn: boolean) => void
   /** 「獣医師向け PDF」：まとめを開き、読めたら印刷の窓を出す。 */
   onOpenPdf: (petId: string, weightWarn: boolean) => void
@@ -249,18 +258,21 @@ function HealthListV8({
   const load = useCallback(async () => {
     const request = ++requestRef.current
     setStatus('loading')
+    onKpisFailed(false)
     try {
       const res = await nenPetsApi.health(accountId, { q: filters.q, change, last: filters.last, sort: filters.sort, page, pageSize })
       if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       setData(res.data)
+      onKpisFailed(false)
       onKpis(res.data.kpis)
       setStatus('ready')
     } catch (caught) {
       if (request !== requestRef.current) return
+      onKpisFailed(true)
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, filters.q, change, filters.last, filters.sort, page, pageSize, onKpis])
+  }, [accountId, filters.q, change, filters.last, filters.sort, page, pageSize, onKpis, onKpisFailed])
 
   useEffect(() => {
     void load()
@@ -337,7 +349,7 @@ function HealthListV8({
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="健康日記を読み込んでいます" />
       ) : status === 'forbidden' ? (
-        <ListState kind="forbidden" />
+        <ListState kind="forbidden" onRetry={() => void load()} />
       ) : status === 'error' ? (
         <ListState kind="error" title="健康日記を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
       ) : data && data.items.length === 0 ? (
