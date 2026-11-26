@@ -97,7 +97,7 @@ export function TagEditForm({
   /* IDEA-04：同名のタグがすでにあるとき、保存する前に知らせる。 */
   const duplicateSkip = Boolean(host) || readOnly
   const duplicateScope = useMemo(() => ({ accountId, skip: duplicateSkip }), [accountId, duplicateSkip])
-  const [siblings, setSiblings] = useState<{ scope: typeof duplicateScope; state: 'ready' | 'error'; names: Array<{ id: string; name: string }> } | null>(null)
+  const [siblings, setSiblings] = useState<{ scope: typeof duplicateScope } & ({ state: 'ready'; names: Array<{ id: string; name: string }> } | { state: 'error' }) | null>(null)
   const [siblingsRetry, setSiblingsRetry] = useState(0)
   useEffect(() => {
     if (host) return
@@ -108,9 +108,9 @@ export function TagEditForm({
       .then((res) => {
         if (cancelled) return
         if (res.success) setSiblings({ scope: duplicateScope, state: 'ready', names: res.data.map(item => ({ id: item.id, name: item.name })) })
-        else setSiblings({ scope: duplicateScope, state: 'error', names: [] })
+        else setSiblings({ scope: duplicateScope, state: 'error' })
       })
-      .catch(() => { if (!cancelled) setSiblings({ scope: duplicateScope, state: 'error', names: [] }) })
+      .catch(() => { if (!cancelled) setSiblings({ scope: duplicateScope, state: 'error' }) })
     return () => { cancelled = true }
   }, [duplicateScope, siblingsRetry, host])
   const visibleSiblings = siblings?.scope === duplicateScope && siblings.state === 'ready' ? siblings.names : []
