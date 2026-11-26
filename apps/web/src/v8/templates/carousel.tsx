@@ -239,6 +239,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     let cancelled = false
     setLoading(true)
     setLoadFailed(false)
+    setSnapshotTaken(false)
+    setSavedSnapshot(null)
     setError('')
     const markLoadFailed = (caught?: unknown) => {
       if (cancelled) return
@@ -273,10 +275,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   }, [id, saveErrors, loadRetry])
 
   useEffect(() => {
-    if (loading || snapshotTaken) return
+    if (loading || loadFailed || snapshotTaken) return
     setSavedSnapshot(carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
     setSnapshotTaken(true)
-  }, [loading, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
+  }, [loading, loadFailed, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
   const dirty = uploading || (savedSnapshot !== null && savedSnapshot !== carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, subject: 'カルーセルの作成内容', busy: saving || publishing || uploading || Boolean(host?.busy) })
 

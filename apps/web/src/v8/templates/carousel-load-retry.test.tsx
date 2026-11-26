@@ -82,5 +82,15 @@ describe('カルーセル編集の読み込み失敗時再読み込み', () => {
     expect(screen.queryByText(/読み込めませんでした/)).toBeNull()
     expect(draftBtn.disabled).toBe(false)
     expect(calls.get).toHaveBeenCalledTimes(2)
+
+    const unchanged = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(unchanged)
+    expect(unchanged.defaultPrevented).toBe(false)
+    fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '変更したカルーセル' } })
+    await waitFor(() => {
+      const edited = new Event('beforeunload', { cancelable: true })
+      window.dispatchEvent(edited)
+      expect(edited.defaultPrevented).toBe(true)
+    })
   })
 })
