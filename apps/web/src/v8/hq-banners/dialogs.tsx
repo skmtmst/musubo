@@ -175,6 +175,8 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
     let cancelled = false
     setLoading(true)
     setLoadError('')
+    setProjects([])
+    setProjectId('')
     void api.hqBanners.projects.list()
       .then((res) => {
         if (cancelled) return
@@ -183,11 +185,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
         setProjectId(initialProjectId && res.data.some((p) => p.id === initialProjectId) ? initialProjectId : res.data[0]?.id ?? '')
       })
       .catch(() => {
-        if (!cancelled) {
-          setProjects([])
-          setProjectId('')
-          setLoadError('プロジェクトを読み込めませんでした。')
-        }
+        if (!cancelled) setLoadError('プロジェクトを読み込めませんでした。')
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
