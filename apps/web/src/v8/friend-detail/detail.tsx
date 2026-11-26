@@ -23,6 +23,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { formatDay } from '@/lib/format'
+import { knownValue } from '@/lib/known-value'
 import { useFriendDetail } from './use-friend-detail'
 import { useFriendDetailPermissions } from './permissions'
 import { useScenarioPicker, useSupportEditor } from './dialogs'
@@ -182,7 +183,7 @@ function FriendDetailV8Inner() {
       <PageHeading title={friend?.displayName ?? '友だち詳細'}
         help={<>{subtitle}</>}
         leading={<Avatar name={friend?.displayName} src={friend?.pictureUrl} size={52} />}
-        titleAccessory={status ? <StatusBadge tone={SUPPORT_TONES[status]}>{SUPPORT_LABELS[status]}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
+        titleAccessory={status ? <StatusBadge tone={knownValue(SUPPORT_TONES, status, 'neutral')}>{knownValue(SUPPORT_LABELS, status, '状態を確認できません')}</StatusBadge> : friend ? <span className={styles.faint}>やり取りなし</span> : null}
         actions={<><span className={styles.menuAnchor}>
           <RowMenu
             label="その他の操作"

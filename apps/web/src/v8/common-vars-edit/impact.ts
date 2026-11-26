@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 /*
  * 共通情報の編集で使う「変える前に影響を見る」の言葉と判定。
@@ -351,7 +352,7 @@ const KIND_LABELS: Record<string, string> = {
 export function impactBreakdown(impact: CommonVarChangeImpact): string {
   const values = Object.entries(impact.byKind)
     .filter(([, count]) => count > 0)
-    .map(([kind, count]) => `${KIND_LABELS[kind] ?? kind}${formatNumber(count)}`)
+    .map(([kind, count]) => `${knownValue(KIND_LABELS, kind, kind)}${formatNumber(count)}`)
   return values.length > 0 ? values.join('・') : '種類別の内訳はありません'
 }
 
