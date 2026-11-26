@@ -62,7 +62,7 @@ const MESSAGE_TYPE_LABELS: Record<string, string> = {
   question: '質問',
 }
 export function messageTypeText(type: string): string {
-  return MESSAGE_TYPE_LABELS[type] ?? 'その他'
+  return Object.prototype.hasOwnProperty.call(MESSAGE_TYPE_LABELS, type) ? MESSAGE_TYPE_LABELS[type] : 'その他'
 }
 
 /** 使っていないテンプレートを消す前の説明（今の画面と同じ言い回し）。 */
