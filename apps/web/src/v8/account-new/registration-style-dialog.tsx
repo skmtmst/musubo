@@ -6,12 +6,11 @@ import { ArrowRight, Info } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
+import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding/style-experience-player'
 import { ProgressBar } from '@/components/shared/progress'
 import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus, StyleChooseAction } from '@/v8/onboarding/public/style-choice'
 import { readRegistrationPresentation, rememberRegistrationPresentation } from './registration-storage'
 import styles from '@/v8/onboarding/wizard.module.css'
-
-const REGISTRATION_STYLES = ['restaurant'] as const
 
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
 export default function RegistrationStyleDialog({ open, accountName, choice, busy, ready, error, onChoose, onSave, onClose, presentationKey = null }: {
@@ -23,17 +22,18 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
   ready: boolean
   error: string
   onChoose: (style: AccountStyle) => void
-  onSave: () => void
+  onSave: (style: AccountStyle) => void
   onClose: () => void
 }) {
   const [initial] = useState(() => readRegistrationPresentation(presentationKey))
   const [demoOpen, setDemoOpen] = useState(initial.demoOpen === true)
   const [demoPage, setDemoPage] = useState(initial.demoPage ?? 0)
-  const [viewing, setViewing] = useState<AccountStyle>('restaurant')
+  const [viewing, setViewing] = useState<AccountStyle>(choice || initial.viewing || 'restaurant')
   useEffect(() => { if (!open) { setDemoOpen(false); setDemoPage(0) } }, [open])
   useEffect(() => {
     rememberRegistrationPresentation(presentationKey, { viewing, demoOpen, demoPage })
   }, [presentationKey, viewing, demoOpen, demoPage])
+  const viewStyle = (style: AccountStyle) => { setViewing(style); onChoose(style) }
   if (!open) return null
   return <Dialog
     open
@@ -44,7 +44,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
     designTop={60}
     fitViewport
     contentLayout="form"
-    steps={<StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} allowedStyles={REGISTRATION_STYLES} />}
+    steps={<StyleChoiceSwitcher viewing={viewing} onView={viewStyle} chosen={choice || null} disabled={busy} />}
     designNode="xxpM9"
     onCancel={demoOpen ? () => setDemoOpen(false) : onClose}
     busy={busy}
@@ -56,7 +56,7 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
       <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : <DialogActions>
-      <Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? '「このスタイルにする」を押して選んでください' : null}>{error ? 'もう一度保存する' : '次へ'}<ArrowRight size={16} aria-hidden="true" /></Button>
+      <Button type="button" variant="primary" onClick={() => onSave(viewing)} disabled={busy || !ready} busy={busy} busyLabel="保存しています…">{error ? 'もう一度保存する' : `${STYLE_EXPERIENCE_SCRIPT.styles[viewing].label}で次へ`}<ArrowRight size={16} aria-hidden="true" /></Button>
     </DialogActions>}
   >
     <div className={styles.body}>
@@ -65,8 +65,8 @@ export default function RegistrationStyleDialog({ open, accountName, choice, bus
         <ProgressBar appearance="quota" className={styles.track} value={4} max={5} label="登録の進み" />
         <span className={styles.progressName}>使い方のスタイル</span>
       </div>
-      <StyleChoiceStatus chosen={choice || null} />
-      <StyleChoiceStep accountName={accountName} viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
+      <StyleChoiceStatus chosen={choice || null} emptyText={`次へで選ぶスタイル：${STYLE_EXPERIENCE_SCRIPT.styles[viewing].label}`} />
+      <StyleChoiceStep videoPreview accountName={accountName} viewing={viewing} onView={viewStyle} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
       <p className={styles.where}><Info aria-hidden="true" className={styles.whereIcon} />あとから変えられます（設定 › アカウント）。</p>
     </div>
   </Dialog>

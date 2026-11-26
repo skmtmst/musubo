@@ -205,16 +205,14 @@ it('基本の段の進みだけを示し、畳む・開くで一覧だけが切�
   expect(window.localStorage.getItem('lh:v8:first-steps-folded:A')).toBe('0')
 })
 
-it('基本が全完了で後回しの設定行が無ければ済みの1行へ畳む', async () => {
+it('基本が全完了で後回しの設定行が無ければカードを隠す', async () => {
   net.googleHoursComplete = true
   net.progress.mockResolvedValue(basic(true)); net.style.mockResolvedValue(style(false))
   render(<DashboardV8 />)
   await waitFor(() => { expect(net.progress).toHaveBeenCalledTimes(1); expect(net.style).toHaveBeenCalledTimes(1) })
   await act(async () => { await Promise.resolve() })
-  expect(screen.getByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
-  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
-  expect(within(guide()).queryByRole('list')).toBeNull()
-  expect(screen.getByRole('progressbar', {name:'はじめにやることの進み'})).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: 'はじめにやること', exact: true })).toBeNull()
+  expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
 })
 
 it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み、使い方の変更を許可しない', async role => {
@@ -293,4 +291,13 @@ it.each(['standard', 'ec'] as const)('%sは友だち追加のカードを隠し�
   expect(net.routes).toHaveBeenCalledWith('A')
   expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
   expect(net.save).not.toHaveBeenCalled()
+})
+
+it('標準の案内、集計期間、数の帯はこの順に並ぶ', async () => {
+  const view = render(<DashboardV8 />)
+  const card = (await screen.findByRole('heading', { name: 'はじめにやること', exact: true })).closest('section')!
+  const controls = screen.getByLabelText('集計期間')
+  const band = view.container.querySelector('[data-design="TodayTasks"]')!
+  expect(card.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(controls.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })

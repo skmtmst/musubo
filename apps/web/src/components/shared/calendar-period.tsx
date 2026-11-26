@@ -7,7 +7,7 @@ import { motionEasing } from './overlay-utils'
 const CalendarMotion = createContext(false)
 
 /** 日付の順で移動方向を決める。再取得・表示方式の変更では動かさない。 */
-export default function CalendarPeriod({ period, scope = '', children }: { period: string; scope?: string; children: ReactNode }) {
+export default function CalendarPeriod({ period, scope = '', bleed = true, children }: { period: string; scope?: string; bleed?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const previous = useRef({ period, scope })
   const nested = useContext(CalendarMotion)
@@ -33,5 +33,5 @@ export default function CalendarPeriod({ period, scope = '', children }: { perio
     return () => { animation.cancel(); preference.removeEventListener('change', stop) }
   }, [period, scope, nested])
   if (nested) return children
-  return <CalendarMotion.Provider value><div className={styles.viewport}><div ref={ref}>{children}</div></div></CalendarMotion.Provider>
+  return <CalendarMotion.Provider value><div className={styles.viewport} data-bleed={bleed}><div ref={ref}>{children}</div></div></CalendarMotion.Provider>
 }
