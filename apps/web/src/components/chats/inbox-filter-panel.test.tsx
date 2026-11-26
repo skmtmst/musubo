@@ -44,6 +44,12 @@ function chooseDeadline(label: string) {
 }
 
 describe('受信箱の期限と補助操作', () => {
+  it('対応状況は正本の4状態を順に表示する', () => {
+    render(<Panel />)
+    fireEvent.click(screen.getByRole('button', { name: '対応状況で絞り込む' }))
+    expect(screen.getAllByRole('option').map(option => option.textContent?.trim())).toEqual(['すべて', '未対応', '対応中', '保留', '対応済み'])
+  })
+
   it.each([false, true])('期限を変えてもほかの条件を保持し、リセットは期限も解除する（期限あり=%s）', (slaEnabled) => {
     render(<Panel slaEnabled={slaEnabled} />)
     chooseDeadline('要返信')
