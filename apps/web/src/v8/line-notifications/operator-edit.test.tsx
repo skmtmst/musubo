@@ -168,7 +168,7 @@ describe('公開前の確認の窓（sDXNy）', () => {
     expect(calls).toBe(2)
     expect(screen.queryByRole('button', { name: '役割を読み直す' })).toBeNull()
   })
-  test('閉じた確認窓の遅い失敗を開き直した窓に出さない', async () => {
+  test('閉じた確認窓の遅い失敗を次の確認窓に出さない', async () => {
     search.value = ''
     const mock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
     const original = mock.getMockImplementation()!
