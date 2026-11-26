@@ -1408,3 +1408,4 @@
 - [受け取り口と健康日記の表示](release-log/unreleased/PR-kenta-later-codex16.md) — 未対応の種類があるときの表示を直した反映履歴。確認 2026-11-27。
 - [回答フォームの項目表示](release-log/unreleased/PR-kenta-later-codex17.md) — 回答の項目名と未回答の表示を直した反映履歴。確認 2026-11-27。
 - [外部連携の記録の表示](release-log/unreleased/PR-kenta-later-codex18.md) — 状態や送受信の方向が分からない記録の表示を直した反映履歴。確認 2026-11-27。
+- [共通アクションと写真審査の表示](release-log/unreleased/PR-kenta-later-codex19.md) — 未対応の値があるときの表示を直した反映履歴。確認 2026-11-27。
