@@ -79,6 +79,19 @@ export function useMergedUsers(memberAccountId: string | null) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [accountOptions, setAccountOptions] = useState<UsersAccountOption[]>([])
+  const [accountOptionsLoading, setAccountOptionsLoading] = useState(true)
+  const [accountOptionsError, setAccountOptionsError] = useState(false)
+  const accountOptionsSeqRef = useRef(0)
+  const accountOptionsInFlightRef = useRef<number | null>(null)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      accountOptionsSeqRef.current += 1
+      accountOptionsInFlightRef.current = null
+    }
+  }, [])
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [debouncedQ, setDebouncedQ] = useState('')
@@ -106,18 +119,39 @@ export function useMergedUsers(memberAccountId: string | null) {
 
   // アカウント候補は LINE アカウント API から取得（ページ依存させない）。
   // /api/users-grouped は inactive を除外して集計するので、候補も active のみ。
-  useEffect(() => {
-    api.lineAccounts.list().then((res) => {
-      if (res.success) {
+  const loadAccountOptions = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && accountOptionsInFlightRef.current !== null) return
+    const seq = ++accountOptionsSeqRef.current
+    accountOptionsInFlightRef.current = seq
+    setAccountOptionsLoading(true)
+    setAccountOptionsError(false)
+    try {
+      const res = await api.lineAccounts.list()
+      if (!mountedRef.current || seq !== accountOptionsSeqRef.current) return
+      if (res.success && Array.isArray(res.data)) {
         setAccountOptions(
           res.data
             .filter((a) => a.isActive)
             .map((a) => ({ id: a.id, name: a.name }))
             .sort((x, y) => x.name.localeCompare(y.name)),
         )
+        setAccountOptionsError(false)
+      } else {
+        setAccountOptionsError(true)
       }
-    })
+    } catch {
+      if (mountedRef.current && seq === accountOptionsSeqRef.current) {
+        setAccountOptionsError(true)
+      }
+    } finally {
+      if (accountOptionsInFlightRef.current === seq) accountOptionsInFlightRef.current = null
+      if (mountedRef.current && seq === accountOptionsSeqRef.current) setAccountOptionsLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadAccountOptions({ force: true })
+  }, [loadAccountOptions])
 
   const load = useCallback(async () => {
     if (currentScope.current !== scope) return
@@ -254,6 +288,9 @@ export function useMergedUsers(memberAccountId: string | null) {
     loading: loadedScope === scope ? loading : Boolean(memberAccountId),
     error: loadedScope === scope ? error : '',
     accountOptions,
+    accountOptionsLoading,
+    accountOptionsError,
+    loadAccountOptions,
     refreshing,
     setPendingForceRefresh,
     load,
