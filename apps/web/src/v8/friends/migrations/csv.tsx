@@ -46,6 +46,10 @@ const COLUMN_CHOICES = [
   ['support', '対応状況・対応マーク・担当者（まだ書き出せません）', true],
 ] as const
 
+function jobStatusLabel(status: string): string {
+  return Object.prototype.hasOwnProperty.call(JOB_STATUS_LABELS, status) ? JOB_STATUS_LABELS[status] : '確認中'
+}
+
 export default function CsvMigrationsV8() {
   usePageTitle('友だち')
   const m = useFriendMigrations()
@@ -62,7 +66,7 @@ export default function CsvMigrationsV8() {
       m.accounts.find((account) => account.id === job.line_account_id)?.name ?? '',
       String(job.row_count ?? job.total_count ?? ''),
       job.created_by_name,
-      JOB_STATUS_LABELS[job.status] ?? '確認中',
+      jobStatusLabel(job.status),
     ])
     const csv = [header, ...rows].map((row) => csvExportLine(row)).join('\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
@@ -226,7 +230,7 @@ export default function CsvMigrationsV8() {
                     <Td>
                       <span className={styles.stateCell}>
                         <StatusBadge tone={job.status === 'completed' ? 'success' : job.status === 'previewed' ? 'warning' : 'neutral'} size="compact">
-                          {JOB_STATUS_LABELS[job.status] ?? '確認中'}
+                          {jobStatusLabel(job.status)}
                         </StatusBadge>
                         {downloadable ? (
                           <Button variant="text" size="inline" lockedReason={manageLockedReason} disabled={m.manageLocked || m.busy} busy={m.downloadId === job.id} busyLabel="保存しています…" onClick={() => void m.downloadExport(job.id)}>CSVで書き出す</Button>
