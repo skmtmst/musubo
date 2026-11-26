@@ -70,26 +70,26 @@ export function describeConditionRule(
     }
     case 'scenario_state': {
       const id = typeof v?.scenarioId === 'string' ? v.scenarioId : ''
-      const states: Record<string, string> = {
+      const states: Record<string, string> = Object.assign(Object.create(null), {
         subscribed: 'を購読中',
         not_subscribed: 'を購読していない',
         completed: 'を読み終えた',
         ever: 'を1度でも購読した',
-      }
-      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'を購読中'}の人`
+      })
+      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'の購読状態が不明'}の人`
     }
     case 'form_answered':
       return typeof rule.value === 'string' && rule.value
         ? '選んだフォームに回答した人'
         : 'いずれかのフォームに回答した人'
     case 'reaction_state': {
-      const labels: Record<string, string> = {
+      const labels: Record<string, string> = Object.assign(Object.create(null), {
         reply_or_postback: '返信・応答のある人',
         reply: '返信のある人',
         postback: 'ボタン応答のみの人',
         none: '返信・応答の無い人',
-      }
-      return labels[String(rule.value)] ?? '反応状態で絞る人'
+      })
+      return labels[String(rule.value)] ?? '反応状態を確認できない人'
     }
     case 'score_range': {
       const min = typeof v?.min === 'number' ? v.min : null
