@@ -29,3 +29,5 @@
 
 ## 見た目の決まり
 - 外側は `sb-frame/settings-screen.tsx`（型 SettingsPage＋中のメニュー inline）。数字は `--tpl-sb-*`。
+
+- AI設定の保存が項目ごとの理由で失敗したときは、対象の設定や同意欄のそばに理由を出す。

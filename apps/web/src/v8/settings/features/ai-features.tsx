@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import IconButton from '@/components/shared/icon-button'
 import type { AccountAiFeature, AccountAiSetting } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import { readPermissionSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
@@ -13,6 +14,7 @@ import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import styles from './screen.module.css'
 
@@ -32,6 +34,7 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
   const impersonating = Boolean(session?.impersonation)
   const reason = impersonating ? IMPERSONATION_REASON : lockedReason
   const canEdit = canManage && !impersonating
+  const saveErrors = useSaveFormErrors()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(canManage)
   const [open, setOpen] = useState(true)
@@ -40,6 +43,7 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
   const [pending, setPending] = useState<AccountAiSetting | null>(null)
   const [agreed, setAgreed] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingFeature, setSavingFeature] = useState<AccountAiFeature | null>(null)
   const savingRef = useRef(false)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const load = useCallback(async () => {
@@ -61,6 +65,8 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
   const save = async (item: AccountAiSetting, enabled: boolean, token?: string) => {
     if (!canEdit || readPermissionSessionSnapshot()?.impersonation || !settings || savingRef.current) return
     savingRef.current = true
+    saveErrors.reset()
+    setSavingFeature(item.feature)
     setSaving(true); setError(''); setInfo('')
     try {
       const result = await accountAiFeaturesApi.save(accountId, item.feature, { enabled, expectedVersion: item.version, ...(enabled ? { consent: true, disclosureVersion: settings.disclosureVersion } : {}) }, token)
@@ -82,7 +88,10 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
             setPending(null)
             setInfo('ほかの人が先に変更しました。最新の状態を表示しています。')
           }
-        } catch { setPending(null); setError('最新の設定を読み込めませんでした。もう一度お試しください。') }
+        } catch (failure) { if (!saveErrors.capture(failure)) { setPending(null); setError('最新の設定を読み込めませんでした。もう一度お試しください。') } }
+      } else if (saveErrors.capture(cause)) {
+        // 同意の窓からは、窓の外のスイッチにある理由が見えない。
+        if (enabled) setError('入力内容を確認してください。')
       } else if (cause instanceof ApiError && cause.status === 403) {
         setPending(null); setAgreed(false)
         setError(cause.code === 'IMPERSONATION_WRITE_BLOCKED' ? IMPERSONATION_REASON : 'AI の機能を変更する権限がありません。オーナーまたは管理者に依頼してください。')
@@ -91,9 +100,9 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
   }
   const enabledCount = settings?.items.filter(item => FEATURES.some(feature => feature.id === item.feature) && item.enabled).length
   const Chevron = open ? ChevronDown : ChevronRight
-  return <Card as="section" id="ai-features" overflow="hidden" aria-label="AI の機能">
+  return <SaveErrorScope errors={saveErrors}><Card as="section" id="ai-features" overflow="hidden" aria-label="AI の機能">
     <div className={styles.groupHead}>
-      <button type="button" className={styles.groupToggle} aria-expanded={open} aria-label={`AI の機能を${open ? '畳む' : '開く'}`} onClick={() => setOpen(!open)}><Chevron className={styles.chevron} aria-hidden="true" /></button>
+      <IconButton size="small" variant="plain" aria-expanded={open} aria-label={`AI の機能を${open ? '畳む' : '開く'}`} onClick={() => setOpen(!open)}><Chevron className={styles.chevron} aria-hidden="true" /></IconButton>
       <h2 className={styles.groupTitle}>AI の機能</h2><span className={styles.spacer} />
       <span className={styles.groupMeta}>{enabledCount === undefined ? '状態を確認できません' : `${FEATURES.length}件中${enabledCount}件オン`}</span>
     </div>
@@ -107,14 +116,14 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
         const item = settings?.items.find(row => row.feature === feature.id)
         return <li className={styles.row} key={feature.id}>
           <div className={styles.rowText}><p className={styles.rowName}><span className={styles.rowLabel}>{feature.label}</span></p><p className={styles.rowNote}>{feature.note}</p></div>
-          <Toggle label={feature.label} checked={item?.enabled ?? false} disabled={loading || saving || (canManage && !item) || (!canEdit && !reason)} lockedReason={!canEdit ? reason : undefined} onChange={next => { if (!item || !canEdit) return; if (next) { setPending(item); setAgreed(false) } else void save(item, false) }} />
+          <SaveErrorField names={[feature.id, ...(savingFeature === feature.id ? ['enabled'] : [])]}><Toggle label={feature.label} checked={item?.enabled ?? false} disabled={loading || saving || (canManage && !item) || (!canEdit && !reason)} lockedReason={!canEdit ? reason : undefined} onChange={next => { if (!item || !canEdit) return; if (next) { setPending(item); setAgreed(false) } else void save(item, false) }} /></SaveErrorField>
         </li>
       })}</ul>
     </> : null}
     {pending && settings && !stepUp ? <Dialog open title={`${FEATURES.find(row => row.id === pending.feature)?.label}をオンにする`} onCancel={() => { if (!saving) { setPending(null); setAgreed(false) } }} footer={<DialogActions><Button onClick={() => { setPending(null); setAgreed(false) }} disabled={saving}>キャンセル</Button><Button variant="primary" disabled={!agreed || saving} onClick={() => void save(pending, true)}>同意してオンにする</Button></DialogActions>}>
       {error ? <Notice tone="danger" action={<Button size="compact" onClick={() => void load()} disabled={saving}>読み直す</Button>}>{error}</Notice> : null}
-      <p>{settings.disclosure}</p><Checkbox checked={agreed} onCheckedChange={setAgreed}>内容に同意します</Checkbox>
+      <p>{settings.disclosure}</p><SaveErrorField names={['consent', 'disclosureVersion']}><Checkbox checked={agreed} onCheckedChange={setAgreed}>内容に同意します</Checkbox></SaveErrorField>
     </Dialog> : null}
     {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
-  </Card>
+  </Card></SaveErrorScope>
 }

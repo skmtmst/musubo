@@ -104,3 +104,24 @@ it('権限エラーは読み直しではなく権限の不足を伝える', asyn
   fireEvent.click(screen.getByRole('button', { name: '同意してオンにする' }))
   expect(await screen.findByText('AI の機能を変更する権限がありません。オーナーまたは管理者に依頼してください。')).toBeTruthy()
 })
+
+it('同意欄の入力エラーは欄のそばに表示する', async () => {
+  api.save.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { consent: '同意を確認してください' }))
+  render(<AiFeatures accountId="a" canManage />)
+  fireEvent.click(await screen.findByRole('switch', { name: 'バナー生成' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: '内容に同意します' }))
+  fireEvent.click(screen.getByRole('button', { name: '同意してオンにする' }))
+  expect(await screen.findByText('同意を確認してください')).toBeTruthy()
+  expect(screen.getByRole('dialog')).toBeTruthy()
+})
+
+it('オフにする保存の入力エラーは対象のスイッチに表示する', async () => {
+  api.get.mockResolvedValueOnce({ success: true, data: { items: [item('banner', true), item('google_review')], disclosure: '同意文', disclosureVersion: 'v1' } })
+  api.save.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { enabled: '設定を確認してください' }))
+  render(<AiFeatures accountId="a" canManage />)
+  const control = await screen.findByRole('switch', { name: 'バナー生成' })
+  await waitFor(() => expect(control.getAttribute('aria-checked')).toBe('true'))
+  fireEvent.click(control)
+  expect(await screen.findByText('設定を確認してください')).toBeTruthy()
+  expect(control.getAttribute('aria-invalid')).toBe('true')
+})

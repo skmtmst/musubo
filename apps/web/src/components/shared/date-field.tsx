@@ -33,6 +33,7 @@ export default function DateField({
   size = 'standard',
   displayFormat = 'full',
   clearable = true,
+  flat = false,
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -54,6 +55,8 @@ export default function DateField({
   displayFormat?: 'full' | 'short' | 'day'
   /** false で「日付を消す」の×を出さない（日付が必ず要る欄。業種ダッシュボードの日付の段）。既定は出す。 */
   clearable?: boolean
+  /** 道具の段で文字入力欄と見た目を揃える。 */
+  flat?: boolean
   placeholder?: string
   id?: string
   name?: string
@@ -273,9 +276,9 @@ export default function DateField({
         ref={triggerRef}
         id={fieldId}
         type="button"
-        className={clearable ? styles.field : `${styles.field} ${choiceStyles.frame}`}
-        data-choice-field={!clearable || undefined}
-        data-choice-surface={!clearable ? 'select' : undefined}
+        className={clearable || flat ? styles.field : `${styles.field} ${choiceStyles.frame}`}
+        data-choice-field={!clearable && !flat || undefined}
+        data-choice-surface={!clearable && !flat ? 'select' : undefined}
         data-choice-invalid={!clearable && invalid || undefined}
         data-choice-disabled={!clearable && disabled || undefined}
         data-input-field

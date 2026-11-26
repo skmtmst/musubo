@@ -38,6 +38,7 @@ vi.mock('@/lib/api', async (original) => {
     },
   }
 })
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: vi.fn() }) }))
 vi.mock('@/lib/api/helpers/gap3', () => ({ accountAiFeaturesApi: { get: mocks.aiSettings } }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
 vi.mock('next/navigation', () => ({
@@ -186,7 +187,7 @@ describe('バナー生成のプロジェクトの中', () => {
   it('利用できるアカウントがないと生成できず理由を表示する', async () => {
     mocks.aiSettings.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
     render(<HqBannerProjectV8 />)
-    expect((await screen.findAllByText('AI を使えるアカウントがありません')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText(/AI を使えるアカウントがありません/)).length).toBeGreaterThan(0)
     const start = screen.getByRole('button', { name: /^生成する（\d+ 枚）$/ }) as HTMLButtonElement
     expect(start.disabled).toBe(true)
     fireEvent.click(start)

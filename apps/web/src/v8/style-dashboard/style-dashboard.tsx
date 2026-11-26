@@ -138,7 +138,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const filters = tab === 'analytics' ? (
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={days} onChange={(v) => setParam({ days: v })} options={ANALYTICS_DAYS} />
-      <div className={styles.dateBox} data-short><DateField value={date} onChange={setDate} displayFormat="short" clearable={false} /></div>
+      <div className={styles.dateBox} data-short><DateField value={date} onChange={setDate} displayFormat="short" clearable={false} flat /></div>
       <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
       <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
@@ -147,7 +147,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   ) : (
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={range} onChange={(v) => setParam({ range: v === 'today' ? null : v })} options={RANGES} />
-      <div className={styles.dateBox}><DateField value={date} onChange={setDate} displayFormat="day" clearable={false} /></div>
+      <div className={styles.dateBox}><DateField value={date} onChange={setDate} displayFormat="day" clearable={false} flat /></div>
       <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
       <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
