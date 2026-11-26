@@ -73,6 +73,8 @@ function TagCreate() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [siblings, setSiblings] = useState<Array<{ id: string; name: string }>>([])
+  const [siblingsState, setSiblingsState] = useState<{ account: string; status: 'loading' | 'ready' | 'error' } | null>(null)
+  const [siblingsRetry, setSiblingsRetry] = useState(0)
 
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState('')
@@ -100,16 +102,22 @@ function TagCreate() {
     return () => { cancelled = true }
   }, [selectedAccountId, foldersReloadKey])
 
-  /* 同じ名前のタグがすでにあるとき、保存する前に知らせる（IDEA-04）。失敗しても注意が出ないだけ。 */
+  /* 同じ名前のタグがすでにあるとき、保存する前に知らせる。 */
   useEffect(() => {
     if (!selectedAccountId) return
     let cancelled = false
-    void api.tags.list({ accountId: selectedAccountId })
-      .then((res) => { if (!cancelled && res.success) setSiblings(res.data.map((item) => ({ id: item.id, name: item.name }))) })
-      .catch(() => {})
+    setSiblings([])
+    setSiblingsState({ account: selectedAccountId, status: 'loading' })
+    void api.tags.list({ accountId: selectedAccountId }).then(res => {
+      if (cancelled) return
+      if (!res.success) throw new Error('tags unavailable')
+      setSiblings(res.data.map(item => ({ id: item.id, name: item.name })))
+      setSiblingsState({ account: selectedAccountId, status: 'ready' })
+    }).catch(() => { if (!cancelled) setSiblingsState({ account: selectedAccountId, status: 'error' }) })
     return () => { cancelled = true }
-  }, [selectedAccountId])
-  const duplicates = useMemo(() => findDuplicateNames(siblings, name, null), [siblings, name])
+  }, [selectedAccountId, siblingsRetry])
+  const visibleSiblings = siblingsState?.account === selectedAccountId && siblingsState.status === 'ready' ? siblings : []
+  const duplicates = useMemo(() => findDuplicateNames(visibleSiblings, name, null), [visibleSiblings, name])
 
   useEffect(() => {
     let cancelled = false
@@ -261,7 +269,8 @@ function TagCreate() {
               onChange={(event) => { setName(event.target.value); setNameError('') }}
             /></SaveErrorField>
 {nameError ? <p id="tag-name-error" className={styles.fieldError} role="alert">{nameError}</p> : null}
-<DuplicateNameNote duplicates={duplicates} kindLabel="タグ" /></Field>
+<DuplicateNameNote duplicates={duplicates} kindLabel="タグ" />
+{siblingsState?.account === selectedAccountId && siblingsState.status === 'error' ? <Notice tone="warn">同じ名前のタグを確認できませんでした。 <Button variant="text" size="inline" onClick={() => setSiblingsRetry(value => value + 1)}>重複を確認し直す</Button></Notice> : null}</Field>
           <Field label="所属フォルダ">
             <span className={styles.selectBox}>
               <SaveErrorField names={["groupId","group_id"]}><FolderSelect draftGuardRef={folderDraftGuard} onCreatingChange={setFolderCreating} size="full" aria-label="所属フォルダ" value={groupId} onChange={setGroupId} folders={groupFolders} onCreate={canEditFolders && selectedAccountId ? createGroup : undefined} /></SaveErrorField>

@@ -24,6 +24,8 @@ const calls = vi.hoisted(() => ({
   forms: vi.fn(),
   overview: vi.fn(),
   loginUsers: vi.fn(),
+  friends: vi.fn(),
+  testSend: vi.fn(),
   updateSetting: vi.fn(),
   tags: vi.fn(),
   audience: vi.fn(),
@@ -37,8 +39,9 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      nenCampaigns: { ...actual.api.nenCampaigns, settings: calls.settings, overview: calls.overview, updateSetting: calls.updateSetting, columnAudience: calls.audience, createColumn: calls.createColumn },
+      nenCampaigns: { ...actual.api.nenCampaigns, settings: calls.settings, overview: calls.overview, updateSetting: calls.updateSetting, testSend: calls.testSend, columnAudience: calls.audience, createColumn: calls.createColumn },
       forms: { ...actual.api.forms, list: calls.forms },
+      friends: { ...actual.api.friends, list: calls.friends },
       accountSettings: { ...actual.api.accountSettings, getTestRecipientLoginUsers: calls.loginUsers },
       tags: { ...actual.api.tags, list: calls.tags },
     },
@@ -90,6 +93,8 @@ beforeEach(() => { clearToastsForTest();
   calls.forms.mockResolvedValue({ success: true, data: [{ id: 'form-review', name: '口コミ', description: null, isActive: true }] })
   calls.overview.mockResolvedValue({ success: true, data: { jobs: { pendingByCampaign: { review_request: 0 } } } })
   calls.loginUsers.mockResolvedValue({ success: true, data: [{ id: 'f-1', staffName: 'Kenta', sameAccount: true }] })
+  calls.friends.mockResolvedValue({ success: true, data: { items: [] } })
+  calls.testSend.mockResolvedValue({ success: true })
   calls.updateSetting.mockResolvedValue({ success: true, data: { updatedAt: '2026-08-26T10:00:00+09:00' } })
   calls.tags.mockResolvedValue({ success: true, data: [{ id: 'tag-pet', name: 'ペット登録あり', lineAccountId: 'account-a' }] })
   calls.audience.mockResolvedValue({ success: true, data: { count: 1240 } })
@@ -135,6 +140,158 @@ describe('狭い板の配信プレビュー', () => {
 })
 
 describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
+  it('配信待ち件数の失敗は入力を残して読み直せる', async () => {
+    calls.overview.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: { jobs: { pendingByCampaign: { review_request: 7 } } } })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('配信待ちの件数を読み込めませんでした')
+    expect(host.textContent).toContain('動いています・配信待ちの件数は不明')
+    const input = document.getElementById('nen-edit-body') as HTMLElement
+    await act(async () => { input.textContent = '編集した本文'; fireEvent.input(input) })
+    await act(async () => { fireEvent.click(button('件数を読み直す')!) }); await flush()
+    expect(host.textContent).toContain('配信待ち 7 通')
+    expect(host.textContent).not.toContain('配信待ちの件数を読み込めませんでした')
+    expect(input.textContent).toBe('編集した本文')
+  })
+  it('切替前の配信待ち件数の遅い失敗を新しい画面に出さない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.overview.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValueOnce({ success: true, data: { jobs: { pendingByCampaign: { review_request: 4 } } } })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('配信待ち 4 通')
+    await act(async () => { resolve({ success: false }) }); await flush()
+    expect(host.textContent).toContain('配信待ち 4 通')
+    expect(host.textContent).not.toContain('配信待ちの件数を読み込めませんでした')
+  })
+  it('送信先の取得失敗後に検索しても読み直しの道を残す', async () => {
+    calls.loginUsers.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [{ id: 'f-1', staffName: 'Kenta', sameAccount: true }] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    const search = host.querySelector('input[aria-label="テスト送信の相手を名前で探す"]')!
+    await act(async () => { fireEvent.keyDown(search, { key: 'Enter' }) }); await flush()
+    expect(host.textContent).toContain('テスト送信先を読み込めませんでした')
+    await act(async () => { fireEvent.click(button('もう一度読み込む')!) }); await flush()
+    expect(button('Kentaへテストを送る')).toBeTruthy()
+  })
+  it('テスト送信先の取得に失敗したら読み直せる', async () => {
+    calls.loginUsers.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [{ id: 'f-1', staffName: 'Kenta', sameAccount: true }] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('テスト送信先を読み込めませんでした')
+    expect((button('テストを送る') as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { fireEvent.click(button('もう一度読み込む')!) }); await flush()
+    expect(host.textContent).not.toContain('テスト送信先を読み込めませんでした')
+    expect(button('Kentaへテストを送る')).toBeTruthy()
+  })
+  it('切替前の送信操作を保持しても前のアカウントに送れない', async () => {
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    const send = button('Kentaへテストを送る')!
+    const propKey = Object.keys(send).find(key => key.startsWith('__reactProps$'))!
+    const held = (send as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[propKey].onClick
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { await held({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: send, target: send }) })
+    expect(calls.testSend).not.toHaveBeenCalled()
+  })
+  it('送信中にアカウントを切り替えた後、古い結果を表示しない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.testSend.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { fireEvent.click(button('Kentaへテストを送る')!) }); await flush()
+    expect(calls.testSend).toHaveBeenCalledTimes(1)
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { resolve({ success: true }) }); await flush()
+    expect(host.textContent).not.toContain('テスト送信しました')
+  })
+  it('検索に失敗しても元の送信先を維持する', async () => {
+    calls.friends.mockResolvedValueOnce({ success: false })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    const search = host.querySelector('input[aria-label="テスト送信の相手を名前で探す"]')!
+    await act(async () => { fireEvent.keyDown(search, { key: 'Enter' }) }); await flush()
+    expect(host.textContent).toContain('相手を探せませんでした')
+    expect((button('Kentaへテストを送る') as HTMLButtonElement).disabled).toBe(false)
+  })
+  it('初めの候補取得中に検索しても、後から取得した登録先を次の検索で使える', async () => {
+    let resolve!: (value: unknown) => void
+    calls.loginUsers.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    const search = host.querySelector('input[aria-label="テスト送信の相手を名前で探す"]')!
+    await act(async () => { fireEvent.keyDown(search, { key: 'Enter' }) }); await flush()
+    await act(async () => { resolve({ success: true, data: [{ id: 'f-1', staffName: 'Kenta', sameAccount: true }] }) }); await flush()
+    await act(async () => { fireEvent.keyDown(search, { key: 'Enter' }) }); await flush()
+    expect(button('Kentaへテストを送る')).toBeTruthy()
+  })
+  it('テスト送信の二重押しを止め、成功でない応答は失敗を知らせる', async () => {
+    let resolve!: (value: unknown) => void
+    calls.testSend.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { const send = button('Kentaへテストを送る')!; fireEvent.click(send); fireEvent.click(send) })
+    expect(calls.testSend).toHaveBeenCalledTimes(1)
+    await act(async () => { resolve({ success: false }) }); await flush()
+    expect(host.textContent).toContain('テスト送信できませんでした')
+    expect(host.textContent).not.toContain('テスト送信しました')
+  })
+  it('切替前の検索結果を新しいアカウントの送信先にしない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.friends.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    const search = host.querySelector('input[aria-label="テスト送信の相手を名前で探す"]')!
+    await act(async () => { fireEvent.change(search, { target: { value: '前の店' } }); fireEvent.keyDown(search, { key: 'Enter' }) }); await flush()
+    expect(calls.friends).toHaveBeenCalledTimes(1)
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { resolve({ success: true, data: { items: [{ id: 'old', displayName: '前の店の人' }] } }) }); await flush()
+    expect(host.textContent).not.toContain('前の店の人へテストを送る')
+    expect(button('Kentaへテストを送る')).toBeTruthy()
+    expect(calls.testSend).not.toHaveBeenCalled()
+  })
+  it('配信設定やフォームを読めなければ編集を止め、読み直せる', async () => {
+    calls.forms.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('読み込みに失敗しました')
+    expect(host.querySelector('textarea')).toBeNull()
+    await act(async () => { fireEvent.click(button('もう一度読み込む')!) }); await flush()
+    expect(host.textContent).not.toContain('読み込みに失敗しました')
+    expect(host.textContent).toContain('口コミのお願い')
+  })
+  it('切替先で取得に失敗しても前の編集内容を出さない', async () => {
+    calls.settings.mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '前の店の文' }] }).mockResolvedValueOnce({ success: false, error: 'failed' })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('前の店の文')
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).not.toContain('前の店の文')
+    expect(host.textContent).toContain('読み込みに失敗しました')
+  })
+  it.each(['success', 'failure', 'conflict'])('切替前の保存%sが新しい編集画面を上書きしない', async outcome => {
+    const { ApiError } = await import('@/lib/api')
+    let resolve!: (value: unknown) => void
+    let reject!: (error: unknown) => void
+    calls.updateSetting.mockReturnValueOnce(new Promise((done, fail) => { resolve = done; reject = fail }))
+    calls.settings.mockImplementation(async (id: string) => ({ success: true, data: [{ ...REVIEW, bodyText: id === 'account-a' ? '前の店の文' : '新しい店の文' }] }))
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    await act(async () => { fireEvent.click(button('配信内容を保存する')!) }); await flush()
+    expect(calls.updateSetting).toHaveBeenCalledTimes(1)
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('新しい店の文')
+    await act(async () => { if (outcome === 'conflict') reject(new ApiError(409, '競合', 'VERSION_CONFLICT')); else resolve(outcome === 'success' ? { success: true, data: { updatedAt: 'new' } } : { success: false }) }); await flush()
+    expect(host.textContent).toContain('新しい店の文')
+    expect(host.textContent).not.toContain('前の店の文')
+    expect(host.textContent).not.toContain('保存に失敗しました')
+    expect(host.textContent).not.toContain('ほかの担当者が先に保存しました')
+  })
+  it('切替前の遅い配信設定を新しいアカウントに表示しない', async () => {
+    let resolve!: (value: unknown) => void
+    calls.settings.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '新しい店の文' }] })
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    account.id = 'account-b'
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(host.textContent).toContain('新しい店の文')
+    await act(async () => { resolve({ success: true, data: [{ ...REVIEW, bodyText: '前の店の文' }] }) }); await flush()
+    expect(host.textContent).not.toContain('前の店の文')
+    expect(host.textContent).toContain('新しい店の文')
+  })
+
   it('V8 のテーマで節が並び、選んだ日数・時刻・マイルが保存に乗る', async () => {
     await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
@@ -341,3 +498,44 @@ it('押された後の説明に設定のボタン名を出し、式を文字と�
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('競合の読み直し中にアカウントを往復しても古い結果を出さない', async () => {
+  const { ApiError } = await import('@/lib/api')
+  let resolve!: (value: unknown) => void
+  const pending = new Promise(done => { resolve = done })
+  calls.settings.mockResolvedValueOnce({ success: true, data: [REVIEW] })
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '比較の文' }] })
+    .mockReturnValueOnce(pending)
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: 'Bの文' }] })
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '新しいAの文' }] })
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) }); await flush()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) }); await flush()
+  const reload = [...document.querySelectorAll('button')].find(item => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) }); await flush()
+  account.id = 'account-b'; await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  account.id = 'account-a'; await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  expect(host.textContent).toContain('新しいAの文')
+  await act(async () => { resolve({ success: true, data: [{ ...REVIEW, bodyText: '前の読み直しの文' }] }) }); await flush()
+  expect(host.textContent).toContain('新しいAの文')
+  expect(host.textContent).not.toContain('前の読み直しの文')
+  expect(host.textContent).not.toContain('最新の内容を読み込めませんでした')
+})
+
+it('競合後の読み直し通信が失敗したら入力を残して知らせる', async () => {
+  const { ApiError } = await import('@/lib/api')
+  calls.settings.mockResolvedValueOnce({ success: true, data: [REVIEW] })
+    .mockResolvedValueOnce({ success: true, data: [{ ...REVIEW, bodyText: '比較の文' }] })
+    .mockRejectedValueOnce(new Error('network'))
+  await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+  const input = document.getElementById('nen-edit-body') as HTMLElement
+  await act(async () => { input.textContent = '編集中の本文'; fireEvent.input(input) })
+  calls.updateSetting.mockRejectedValueOnce(new ApiError(409, '競合', 'VERSION_CONFLICT'))
+  await act(async () => { fireEvent.click(button('配信内容を保存する')!) }); await flush()
+  await act(async () => { fireEvent.click(button('違いを比べる')!) }); await flush()
+  const reload = [...document.querySelectorAll('button')].find(item => item.textContent?.includes('最新を読み込んで続ける'))!
+  await act(async () => { fireEvent.click(reload) }); await flush()
+  expect(host.textContent).toContain('最新の内容を読み込めませんでした')
+  expect(input.textContent).toBe('編集中の本文')
+})

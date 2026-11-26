@@ -113,6 +113,8 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
   const [forms, setForms] = useState<FormOption[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadRetry, setLoadRetry] = useState(0)
+  const [loadedScope, setLoadedScope] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [validationSubmitted, setValidationSubmitted] = useState(false)
@@ -122,15 +124,25 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [testLoginUsers, setTestLoginUsers] = useState<Array<{ id: string; displayName: string }>>([])
   const [testTarget, setTestTarget] = useState('')
   const [testing, setTesting] = useState(false)
-  const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [candidateScope, setCandidateScope] = useState<string | null>(null)
+  const [candidateError, setCandidateError] = useState<string | null>(null)
+  const [candidateRetry, setCandidateRetry] = useState(0)
+  const loginUsersRequest = useRef(0)
+  const searchRequest = useRef(0)
+  const testSendLock = useRef<{ generation: number } | null>(null)
+  const [pending, setPending] = useState<{ scope: string; status: 'loading' | 'ready' | 'error'; count: number | null } | null>(null)
+  const [pendingRetry, setPendingRetry] = useState(0)
   const [customMileageOpen, setCustomMileageOpen] = useState(false)
   const [customMileage, setCustomMileage] = useState('')
   const [customMileageError, setCustomMileageError] = useState('')
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
+  const loadScope = JSON.stringify([selectedAccountId, campaignKey])
   const tokenNames = useInsertTokenNames(selectedAccountId)
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
+  const canEditRef = useRef(canEdit)
+  canEditRef.current = canEdit
 
   useEffect(() => { setCustomMileageOpen(false) }, [campaignKey, selectedAccountId, canEdit])
 
@@ -138,15 +150,20 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     if (!selectedAccountId) {
       setLoading(false)
       setError('LINEアカウントを選んでください')
+      setLoadedScope(loadScope)
       return
     }
     let cancelled = false
     setLoading(true)
+    setSetting(null)
+    setForms([])
+    setError('')
     void Promise.all([
       api.nenCampaigns.settings(selectedAccountId),
       api.forms.list(selectedAccountId),
     ]).then(([settingsResponse, formsResponse]) => {
       if (cancelled) return
+      if (!settingsResponse.success || !formsResponse.success) throw new Error('settings unavailable')
       if (settingsResponse.success) {
         const found = settingsResponse.data.find((item) => item.campaignKey === campaignKey) ?? null
         setSetting(found)
@@ -155,54 +172,70 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       }
       if (formsResponse.success) setForms(formsResponse.data)
     }).catch(() => {
-      if (!cancelled) setError('読み込みに失敗しました。もう一度読み込んでください。')
+      if (!cancelled) { setSetting(null); setError('読み込みに失敗しました。もう一度読み込んでください。') }
     }).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled) { setLoadedScope(loadScope); setLoading(false) }
     })
-    void api.nenCampaigns.overview(selectedAccountId)
-      .then((res) => {
-        if (!cancelled && res.success) setPendingCount(res.data.jobs.pendingByCampaign?.[campaignKey] ?? 0)
-      })
-      .catch(() => undefined)
     return () => { cancelled = true }
-  }, [campaignKey, selectedAccountId])
+  }, [campaignKey, selectedAccountId, loadScope, loadRetry])
 
-  // テスト送信の相手の候補。はじめは、このアカウントのテスト送信先に登録したログインユーザー。
+  const contextRef = useRef({ accountId: selectedAccountId, campaignKey, generation: 0 })
+  if (contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey) {
+    contextRef.current = { accountId: selectedAccountId, campaignKey, generation: contextRef.current.generation + 1 }
+  }
+  useEffect(() => { setSaving(false); setTesting(false) }, [selectedAccountId, campaignKey])
+
   useEffect(() => {
-    setTestLoginUsers([])
-    setTestCandidates([])
-    setTestTarget('')
     if (!selectedAccountId) return
-    let cancelled = false
-    void api.accountSettings.getTestRecipientLoginUsers(selectedAccountId)
-      .then((response) => {
-        if (cancelled || !response.success) return
-        const candidates = response.data
-          .filter((candidate) => candidate.sameAccount)
-          .map((candidate) => ({ id: candidate.id, displayName: candidate.staffName }))
-        setTestLoginUsers(candidates)
-        setTestCandidates(candidates)
-        setTestTarget(candidates[0]?.id ?? '')
-      })
-      .catch(() => undefined)
-    return () => { cancelled = true }
-  }, [selectedAccountId])
+    let active = true
+    setPending({ scope: loadScope, status: 'loading', count: null })
+    void api.nenCampaigns.overview(selectedAccountId).then(response => {
+      if (!active) return
+      if (!response.success) throw new Error('pending unavailable')
+      setPending({ scope: loadScope, status: 'ready', count: response.data.jobs.pendingByCampaign?.[campaignKey] ?? 0 })
+    }).catch(() => { if (active) setPending({ scope: loadScope, status: 'error', count: null }) })
+    return () => { active = false }
+  }, [selectedAccountId, campaignKey, loadScope, pendingRetry])
 
-  const contextRef = useRef({ accountId: selectedAccountId, campaignKey })
-  contextRef.current = { accountId: selectedAccountId, campaignKey }
+  // このアカウントのテスト先を読み、切替後や新しい検索の後は古い返事を捨てる。
+  useEffect(() => {
+    setTestLoginUsers([]); setTestCandidates([]); setTestTarget(''); setTestSearch('')
+    setCandidateScope(null); setCandidateError(null)
+    const request = ++loginUsersRequest.current
+    const searchAtStart = ++searchRequest.current
+    if (!selectedAccountId) return
+    let active = true
+    void api.accountSettings.getTestRecipientLoginUsers(selectedAccountId).then(response => {
+      if (!active || request !== loginUsersRequest.current) return
+      if (!response.success) throw new Error('test recipients unavailable')
+      const candidates = response.data.filter(candidate => candidate.sameAccount).map(candidate => ({ id: candidate.id, displayName: candidate.staffName }))
+      setTestLoginUsers(candidates)
+      if (searchAtStart === searchRequest.current) {
+        setTestCandidates(candidates); setTestTarget(candidates[0]?.id ?? ''); setCandidateScope(loadScope)
+      }
+    }).catch(() => { if (active && request === loginUsersRequest.current) setCandidateError(loadScope) })
+    return () => { active = false }
+  }, [selectedAccountId, campaignKey, loadScope, candidateRetry])
   const latestSetting = async () => {
     const context = contextRef.current
     if (!context.accountId) return null
     const response = await api.nenCampaigns.settings(context.accountId)
-    if (context !== contextRef.current && (context.accountId !== contextRef.current.accountId || context.campaignKey !== contextRef.current.campaignKey)) return null
+    if (context.generation !== contextRef.current.generation) return null
     return response.success ? response.data.find((item) => item.campaignKey === context.campaignKey) ?? null : null
   }
   const saveConflict = useSaveConflict<NenCampaignSetting>({
+    contextKey: `${loadScope}:${contextRef.current.generation}`,
     fetchLatest: latestSetting,
     reload: async () => {
-      const latest = await latestSetting()
-      if (!latest) { setError('最新の内容を読み込めませんでした。もう一度お試しください。'); return }
-      setSetting(latest); setDraft(latest); setError(''); saveConflict.clear()
+      const generation = contextRef.current.generation
+      try {
+        const latest = await latestSetting()
+        if (generation !== contextRef.current.generation) return
+        if (!latest) throw new Error('latest unavailable')
+        setSetting(latest); setDraft(latest); setError(''); saveConflict.clear()
+      } catch {
+        if (generation === contextRef.current.generation) setError('最新の内容を読み込めませんでした。もう一度お試しください。')
+      }
     },
   })
   useEffect(() => { saveConflict.clear() }, [campaignKey, selectedAccountId, saveConflict.clear])
@@ -263,50 +296,46 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   }
 
   const searchFriends = async () => {
+    if (!selectedAccountId || !canEditRef.current || contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey) return
     const query = testSearch.trim()
+    const request = ++searchRequest.current
+    const generation = contextRef.current.generation
     setNotice('')
     try {
-      const response = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
+      const response = await api.friends.list({ search: query, accountId: selectedAccountId, limit: 5 })
+      if (request !== searchRequest.current || generation !== contextRef.current.generation) return
       if (!response.success) throw new Error('failed')
-      const loginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-      const friends = response.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
-      const next = [...new Map([...loginUsers, ...friends].map((candidate) => [candidate.id, candidate])).values()]
-      setTestCandidates(next)
-      setTestTarget(next[0]?.id ?? '')
+      const loginUsers = testLoginUsers.filter(candidate => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      const friends = response.data.items.map(friend => ({ id: friend.id, displayName: friend.displayName }))
+      const next = [...new Map([...loginUsers, ...friends].map(candidate => [candidate.id, candidate])).values()]
+      setTestCandidates(next); setTestTarget(next[0]?.id ?? ''); setCandidateScope(loadScope)
       if (next.length === 0) setNotice('その名前の相手は見つかりませんでした。')
     } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。') }
+      if (request !== searchRequest.current || generation !== contextRef.current.generation) return
+      if (!saveErrors.capture(saveFailure)) setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。')
     }
   }
 
   const sendTest = async () => {
-    if (!selectedAccountId || !testTarget)
-
-
- return
-    setTesting(true)
-    setError('')
-    setNotice('')
+    if (!selectedAccountId || !canEditRef.current || contextRef.current.accountId !== selectedAccountId || contextRef.current.campaignKey !== campaignKey || candidateScope !== loadScope || !testCandidates.some(candidate => candidate.id === testTarget) || testSendLock.current?.generation === contextRef.current.generation) return
+    const generation = contextRef.current.generation
+    const lock = { generation }
+    testSendLock.current = lock
+    setTesting(true); setError(''); setNotice('')
     try {
-      await api.nenCampaigns.testSend({
+      const response = await api.nenCampaigns.testSend({
         campaignKey, accountId: selectedAccountId, friendId: testTarget,
-        draft: {
-          title: merged.title, bodyText: merged.bodyText,
-          buttonLabel: merged.buttonLabel ?? '', buttonUrl: merged.buttonUrl ?? '', imageUrl: merged.imageUrl ?? '',
-        },
+        draft: { title: merged.title, bodyText: merged.bodyText, buttonLabel: merged.buttonLabel ?? '', buttonUrl: merged.buttonUrl ?? '', imageUrl: merged.imageUrl ?? '' },
       })
+      if (generation !== contextRef.current.generation) return
+      if (!response.success) throw new Error('test send failed')
       setNotice('テスト送信しました')
     } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-
-      setError('テスト送信できませんでした。時間をおいて、もう一度お試しください。') }
+      if (generation !== contextRef.current.generation) return
+      if (!saveErrors.capture(saveFailure)) setError('テスト送信できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
-      setTesting(false)
+      if (testSendLock.current === lock) testSendLock.current = null
+      if (generation === contextRef.current.generation) setTesting(false)
     }
   }
 
@@ -329,6 +358,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     setError('')
     setValidationSubmitted(true)
     if (!fields.submit()) return
+    const requestGeneration = contextRef.current.generation
     setSaving(true)
     setError('')
     setNotice('')
@@ -347,6 +377,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
         afterActions: actions,
         expectedUpdatedAt: setting.updatedAt,
       })
+      if (requestGeneration !== contextRef.current.generation) return
       if (!response.success) {
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
@@ -355,6 +386,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       notifySaved('配信内容を保存しました')
       setSetting({ ...merged, updatedAt: response.data?.updatedAt ?? merged.updatedAt })
     } catch (caught) {
+      if (requestGeneration !== contextRef.current.generation) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
@@ -367,12 +399,12 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
       { if (!fieldFailure)
       setError(withPermissionFailure(caught, describeSaveFailure(caught), 'store')) }
     } finally {
-      setSaving(false)
+      if (requestGeneration === contextRef.current.generation) setSaving(false)
     }
   }
 
-  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="NEN配信を読み込んでいます" /></SaveErrorScope>
-  if (!setting) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={error || 'この配信が見つかりませんでした'} /></SaveErrorScope>
+  if (loading || loadedScope !== loadScope) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="NEN配信を読み込んでいます" /></SaveErrorScope>
+  if (!setting) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title={error || 'この配信が見つかりませんでした'} onRetry={selectedAccountId ? () => setLoadRetry(value => value + 1) : undefined} /></SaveErrorScope>
 
   const time = merged.deliveryTime.slice(0, 5)
   const timing = `${formatCampaignTiming({ campaignKey, delayDays: merged.delayDays, deliveryTime: time })} に届きます`
@@ -380,8 +412,9 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const accountName = selectedAccount?.displayName || selectedAccount?.name || '公式アカウント'
   const kindIsRich = Boolean(merged.imageUrl)
   // 下の帯の左は短く（長いと折り返して帯が高くなる）。くわしい決めごとは見出しの説明に書く。
+  const pendingCount = pending?.scope === loadScope && pending.status === 'ready' ? pending.count : null
   const status = merged.isEnabled
-    ? pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)} 通は前の中身のまま` : '動いています'
+    ? pending?.scope === loadScope && pending.status === 'error' ? '動いています・配信待ちの件数は不明' : pendingCount !== null && pendingCount > 0 ? `動いています・配信待ち ${formatNumber(pendingCount)} 通は前の中身のまま` : '動いています'
     : '停止中です（保存しても送り始めません）'
 
   const preview = (
@@ -414,13 +447,14 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
             onClear={() => setTestSearch('')}
             onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }}
           />
+          {candidateError === loadScope ? <Notice tone="danger">テスト送信先を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setCandidateRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}
           <span className={styles.fullButton}>
-            <Button type="button" disabled={testing || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'}  onClick={() => void sendTest()}>
-              <Send size={16} aria-hidden="true" />{testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
+            <Button type="button" disabled={testing || candidateScope !== loadScope || !testTarget} busy={testing} busyLabel="送っています…" title={testTarget ? undefined : '先に相手を名前で探してください'}  onClick={() => void sendTest()}>
+              <Send size={16} aria-hidden="true" />{candidateScope === loadScope && testCandidates.length === 1 ? `${testCandidates[0].displayName ?? '名前なし'}へテストを送る` : 'テストを送る'}
             </Button>
           </span>
           {/* 相手が2人以上いるときだけ、送る相手を選ぶ欄を出す（ボタンの下：上の並びを動かさない）。 */}
-          {testCandidates.length > 1 ? (
+          {candidateScope === loadScope && testCandidates.length > 1 ? (
             <SaveErrorField names={["testTarget","friendId","test_target"]}><EntitySelect aria-label="テスト送信の相手" size="full" value={testTarget} onChange={setTestTarget} options={testCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `送る相手：${candidate.displayName ?? '名前なし'}` }))} /></SaveErrorField>
           ) : null}
         </Card>
@@ -447,6 +481,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
     >
       {saveConflict.conflict ? <SaveConflictBand title="ほかの担当者が先に保存しました" onCompare={() => void saveConflict.compare()} compareBusy={saveConflict.compareBusy} onReload={() => void saveConflict.reloadLatest()} /> : null}
       <SaveConflictCompareDialog open={saveConflict.compareOpen} busy={saveConflict.compareBusy} error={saveConflict.compareError} onCancel={saveConflict.closeCompare} onReload={() => void saveConflict.reloadLatest()} lines={saveConflict.latest ? Object.entries(withoutVersion(merged) ?? {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])).map(([key, value]) => ({ text: `${key === 'bodyText' ? '本文' : key === 'title' ? 'タイトル' : key === 'deliveryTime' ? '配信時刻' : '設定'}：入力 ${typeof value === 'string' ? value : JSON.stringify(value)} ／ 最新 ${JSON.stringify((saveConflict.latest as unknown as Record<string, unknown>)[key])}`, kind: 'change' as const })) : null} />
+      {pending?.scope === loadScope && pending.status === 'error' ? <Notice tone="danger">配信待ちの件数を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setPendingRetry(value => value + 1)}>件数を読み直す</Button></Notice> : null}
       {error ? <Notice tone="danger" message={error} /> : null}
       {notice ? <Notice tone="success" message={notice} /> : null}
 
