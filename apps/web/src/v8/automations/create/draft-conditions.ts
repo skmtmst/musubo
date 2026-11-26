@@ -138,6 +138,28 @@ export const storedConditionToForm = (
   return { condition: candidate as SegmentCondition, unreadable: false }
 }
 
+/** 画面で意味を確かめられない条件は、公開前に選び直してもらう。 */
+const EDITABLE_CONDITION_TYPES = new Set(['name', 'private_memo', 'status_message', 'registered_at', 'support_mark', 'tag_exists', 'tag_not_exists', 'tag_all', 'tag_not_all', 'friend_field', 'scenario_subscribed', 'scenario_state', 'form_answered', 'last_reaction_at', 'reaction_state', 'score_range', 'visit_count', 'purchase_amount', 'last_activity_at', 'member_tier', 'is_following', 'is_hidden', 'analytics_audience', 'broadcast_link_clicked'])
+const SCENARIO_CONDITION_STATES = new Set(['subscribed', 'not_subscribed', 'completed', 'ever'])
+const REACTION_CONDITION_STATES = new Set(['reply_or_postback', 'reply', 'postback', 'none'])
+const FIELD_OPERATORS = new Set(['equals', 'contains', 'exists', 'not_exists', 'not_equals', 'not_contains', 'gte', 'gt', 'lte', 'lt'])
+export const UNKNOWN_CONDITION_REASON = '確認できない条件があります。条件を選び直してから公開してください。'
+export function hasUnknownCondition(condition: SegmentCondition | null | undefined): boolean {
+  if (!condition) return false
+  if (condition.operator !== 'AND' && condition.operator !== 'OR') return true
+  return condition.rules.some((rule) => {
+    if (!EDITABLE_CONDITION_TYPES.has(rule.type)) return true
+    if (rule.type === 'is_following' || rule.type === 'is_hidden') return typeof rule.value !== 'boolean'
+    if (rule.type === 'scenario_state' || rule.type === 'friend_field') {
+      if (!rule.value || typeof rule.value !== 'object' || Array.isArray(rule.value)) return true
+      const value = rule.value as Record<string, unknown>
+      if (rule.type === 'scenario_state') return !SCENARIO_CONDITION_STATES.has(String(value.state ?? 'subscribed'))
+      return !FIELD_OPERATORS.has(String(value.op ?? 'contains'))
+    }
+    return rule.type === 'reaction_state' && !REACTION_CONDITION_STATES.has(String(rule.value))
+  }) || (condition.groups ?? []).some(hasUnknownCondition)
+}
+
 /**
  * 「だれに」の条件を、保存で送る形へ直す（AUTOMATION-04）。
  *
