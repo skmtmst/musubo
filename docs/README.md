@@ -3,6 +3,7 @@
 
 - [プールとメディアの保存通知](release-log/unreleased/PR-kenta-later-codex6.md)（説明・2026-11-27確認）
 - [検索条件と共通情報の保存通知](release-log/unreleased/PR-kenta-later-codex7.md)（説明・2026-11-27確認）
+- [流入リンクと共通アクションの保存通知](release-log/unreleased/PR-kenta-later-codex8.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
