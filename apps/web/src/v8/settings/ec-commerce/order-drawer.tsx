@@ -294,7 +294,7 @@ menuItems: []}}
                   <ul className={styles.timeline}>
                     {detail.followUps.map((job) => {
                       const info = FOLLOWUP_STATUS_TEXT[job.status]
-                      const reasonText = job.reason ? FOLLOWUP_REASON_TEXT[job.reason] ?? job.reason : null
+                      const reasonText = job.reason ? (Object.prototype.hasOwnProperty.call(FOLLOWUP_REASON_TEXT, job.reason) ? FOLLOWUP_REASON_TEXT[job.reason] : job.reason) : null
                       const notes = [
                         job.sentAt ? `${shortTime(job.sentAt)} に送信` : null,
                         info && ['skipped', 'failed', 'cancelled'].includes(job.status) ? info.label : null,

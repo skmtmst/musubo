@@ -31,7 +31,7 @@ import type { StartCheckItem } from './start-checklist'
 
 export function ScenarioDetailDialogs({
   renameOpen, saving, scenario, setEditForm,
-  setRenameOpen, handleSaveScenario, editForm, folderState,
+  setRenameOpen, handleSaveScenario, editForm, folderState, onReloadFolders,
   folders, canEdit, setFolders, editFolderMissing,
   compareOpen, setCompareOpen, acceptLatestAndContinue, latestSummary,
   currentSummary, leaveTarget, confirmLeave, cancelLeave,
@@ -63,6 +63,7 @@ export function ScenarioDetailDialogs({
   handleSaveScenario: () => Promise<void>
   editForm: { name: string; description: string; triggerType: ScenarioTriggerType; isActive: boolean; allowConcurrent: boolean; folderId: string; }
   folderState: "error" | "loading" | "ready"
+  onReloadFolders?: () => void
   folders: Folder[]
   canEdit: boolean
   setFolders: Dispatch<SetStateAction<Folder[]>>
@@ -228,7 +229,22 @@ export function ScenarioDetailDialogs({
                 : undefined}
             /></SaveErrorField>
             {folderState === 'error' && (
-              <p className="text-status-danger text-xs">フォルダ一覧を読み込めませんでした。</p>
+              <Notice
+                tone="danger"
+                action={onReloadFolders ? (
+                  <Button
+                    variant="text"
+                    size="inline"
+                    data-notice-inline-action
+                    type="button"
+                    onClick={onReloadFolders}
+                  >
+                    もう一度読み込む
+                  </Button>
+                ) : undefined}
+              >
+                フォルダ一覧を読み込めませんでした。
+              </Notice>
             )}
             {editFolderMissing && (
               <p className="text-warning text-xs">

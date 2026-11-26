@@ -192,7 +192,7 @@ export default function RefOrdersPanel({
                     </Link>
                   </td>
                   <td className="px-3 py-2 text-ink-secondary">
-                    {ORDER_STATUS_TEXT[order.status] ?? order.status}
+                    {Object.prototype.hasOwnProperty.call(ORDER_STATUS_TEXT, order.status) ? ORDER_STATUS_TEXT[order.status] : order.status}
                     {order.status === 'refunded' && order.refundedAmount !== null
                       ? `（−${formatMoney(order.currency, order.refundedAmount)}）`
                       : ''}
