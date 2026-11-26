@@ -567,7 +567,7 @@ export default function ScenarioCreateV8() {
             {folderState === 'error' ? (
               <Notice tone="danger">
                 フォルダを確認できないため、いまは変更できません。
-                <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setFolderReloadKey((key) => key + 1)}>
+                <Button variant="text" size="inline" data-notice-inline-action type="button" onPointerDown={(event) => event.preventDefault()} onClick={() => setFolderReloadKey((key) => key + 1)}>
                   もう一度読み込む
                 </Button>
               </Notice>

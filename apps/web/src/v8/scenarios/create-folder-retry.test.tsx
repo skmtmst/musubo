@@ -87,7 +87,13 @@ describe('ScenarioCreateV8 のフォルダ読み込み失敗と再読み込み',
     const nameInput = screen.getByRole('textbox', { name: 'シナリオ名' }) as HTMLInputElement
     fireEvent.change(nameInput, { target: { value: '秋のフォロー配信' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    nameInput.focus()
+    const retry = screen.getByRole('button', { name: 'もう一度読み込む' })
+    // フォーカスが外れると文字数表示が消え、狭い幅でボタンが押下中に動く。
+    const pointerDown = new Event('pointerdown', { bubbles: true, cancelable: true })
+    expect(retry.dispatchEvent(pointerDown)).toBe(false)
+    expect(document.activeElement).toBe(nameInput)
+    fireEvent.click(retry)
 
     await waitFor(() => {
       expect((screen.getByRole('button', { name: 'シナリオのフォルダ' }) as HTMLButtonElement).disabled).toBe(false)
