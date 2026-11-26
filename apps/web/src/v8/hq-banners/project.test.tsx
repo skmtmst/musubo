@@ -22,6 +22,8 @@ const runGeneration = vi.hoisted(() => vi.fn())
 const listAccounts = vi.hoisted(() => vi.fn())
 // AI を使ってよいかはアカウントごとに確かめる。既定はバナーの AI が使える1アカウント。
 const getAiFeatures = vi.hoisted(() => vi.fn())
+const selectAccount = vi.hoisted(() => vi.fn())
+vi.mock('@/contexts/account-context', async original => ({ ...(await original<typeof import('@/contexts/account-context')>()), useAccount: () => ({ setSelectedAccountId: selectAccount }) }))
 vi.mock('@/lib/api/helpers/gap3', async (importOriginal: () => Promise<typeof import('@/lib/api/helpers/gap3')>) => ({ ...(await importOriginal()), accountAiFeaturesApi: { get: getAiFeatures } }))
 const deliverImage = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
@@ -105,6 +107,7 @@ beforeEach(() => {
   listFolders.mockResolvedValue({ success: true, data: { folders: [] } })
   deliverImage.mockReset()
   push.mockReset()
+  selectAccount.mockReset()
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -403,4 +406,66 @@ it('生成条件と名前を同時に変更して移るときは確認を一つ�
   expect(line.value).toBe('')
   expect(push).toHaveBeenCalledWith('/templates')
   link.remove()
+})
+
+it('利用できる店舗がない時は案内から店舗の機能設定を開く', async () => {
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
+  act(() => { root.render(<HqBannerProjectV8 />) })
+  await flush()
+  expect(host.textContent).toContain('店舗の 設定 › 機能設定 で「バナー生成」をオンにしてください')
+  const open = buttonNamed('機能設定を開く')
+  expect(open).toBeTruthy()
+  act(() => { open!.click() })
+  expect(selectAccount).toHaveBeenCalledWith('ai1')
+  expect(push).toHaveBeenCalledWith('/settings#ai-features')
+})
+
+it('入力した生成条件を残して設定へ移る前に確認する', async () => {
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const input = host.querySelector('[aria-label="テキスト 1行目"]') as HTMLInputElement
+  await act(async () => { Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')!.set!.call(input, '春の企画'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+  act(() => { buttonNamed('機能設定を開く')!.click() }); await flush()
+  expect(selectAccount).not.toHaveBeenCalled()
+  expect(push).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('入力した内容')
+})
+
+it('複数店舗では選ぶまで機能設定へ移らず、選んだ店舗を開く', async () => {
+  listAccounts.mockResolvedValue({ success: true, data: [{ id: 'a1', name: '東京店', isActive: true }, { id: 'a2', name: '大阪店', isActive: true }] })
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: false }] } })
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  expect(buttonNamed('機能設定を開く')?.disabled).toBe(true)
+  expect(buttonNamed('機能設定を開く')?.getAttribute('aria-description')).toBe('店舗を選んでください')
+  expect(buttonNamed('機能設定を開く')?.getAttribute('data-variant')).toBe('secondary')
+  act(() => { (document.querySelector('[aria-label="設定する店舗"]') as HTMLButtonElement).click() }); await flush()
+  const choice = document.querySelector<HTMLInputElement>('[role=dialog] input[aria-label="大阪店"]')
+  expect(choice).toBeTruthy()
+  act(() => { choice!.click() }); await flush()
+  act(() => { buttonNamed('選ぶ')!.click() }); await flush()
+  act(() => { buttonNamed('機能設定を開く')!.click() }); await flush()
+  expect(selectAccount).toHaveBeenCalledWith('a2')
+  expect(push).toHaveBeenCalledWith('/settings#ai-features')
+})
+
+
+it('利用可能な店舗が複数あり未選択なら生成できない理由を１行表示する', async () => {
+  localStorage.removeItem('lh_hq_banner_ai_account')
+  listAccounts.mockResolvedValue({ success: true, data: [{ id: 'a1', name: '東京店', isActive: true }, { id: 'a2', name: '大阪店', isActive: true }] })
+  getAiFeatures.mockResolvedValue({ success: true, data: { items: [{ feature: 'banner', enabled: true }] } })
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const button = buttonNamed('生成する（1 枚）')!
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-description')).toBe('AI を使うアカウントを選んでください')
+  expect(host.textContent).toContain('AI を使うアカウントを選んでください')
+})
+
+it('AI設定の確認中・確認失敗でも生成できない理由を示す', async () => {
+  let reject!: (error: Error) => void
+  getAiFeatures.mockReturnValue(new Promise((_resolve, fail) => { reject = fail }))
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const generate = buttonNamed('生成する（1 枚）')!
+  expect(generate.getAttribute('aria-description')).toBe('AI を使うアカウントを確認しています')
+  await act(async () => { reject(new Error('failed')); await Promise.resolve() }); await flush()
+  expect(generate.getAttribute('aria-description')).toBe('AI を使うアカウントを確認できませんでした。ページを再読み込みしてください')
 })

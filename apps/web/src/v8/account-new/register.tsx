@@ -1,5 +1,7 @@
 'use client'
 
+import type { AccountStyle } from '@line-crm/shared'
+import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding/style-experience-player/script'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
@@ -120,6 +122,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
   const [connection, setConnection] = useState<LineAccountConnectData | null>(null)
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [focusErrorRequest, setFocusErrorRequest] = useState(0)
   const [touchedFields, setTouchedFields] = useState<Partial<Record<Step2Field, boolean>>>({})
   const [reviewedLengthStep, setReviewedLengthStep] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -185,8 +188,9 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     setStyleDialogOpen(open)
     rememberRegistrationPresentation(presentationKey, { styleOpen: open })
   }
-  const finishStyle = async () => {
-    const succeeded = await registrationStyle.save()
+  const finishStyle = async (style: AccountStyle) => {
+    rememberRegistrationPresentation(presentationKey, { choice: style })
+    const succeeded = await registrationStyle.save(style)
     if (succeeded) { setStyleDialogOpen(false); setCurrentStep(5); setSub(1) }
   }
   const basicId = connection?.basicId ?? resumedAccount?.basicId ?? ''
@@ -208,7 +212,9 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
     invalid?.focus()
     invalid?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
-  }, [fieldErrors, currentStep, sub])
+  // 入力やblurではなく、送信失敗の要求ごとに一度だけ焦点を移す。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusErrorRequest])
 
   // 本人の手順と入力を復元する。秘密値と接続確認の結果は保存しない。
   useEffect(() => {
@@ -454,6 +460,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     const nextErrors = channelErrors(form)
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
+      setFocusErrorRequest(n => n + 1)
       setCurrentStep(2)
       setSub(nextErrors.channelId || nextErrors.channelSecret ? 1 : nextErrors.providerId ? 2 : 4)
       setError('')
@@ -574,14 +581,14 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     if (currentStep === 2) {
       if (sub === 1) {
         const nextErrors = messagingApiErrors(form)
-        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
+        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); setFocusErrorRequest(n => n + 1); return }
         if (reviewLengthWarnings(['channelId', 'channelSecret'])) return
         setSub(2)
         return
       }
       if (sub === 2) {
         const nextErrors = providerIdErrors(form)
-        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
+        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); setFocusErrorRequest(n => n + 1); return }
         if (reviewLengthWarnings(['providerId'])) return
         setSub(3)
         return
@@ -592,7 +599,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
         return
       }
       const loginErrors = loginChannelErrors(form)
-      if (Object.keys(loginErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...loginErrors })); return }
+      if (Object.keys(loginErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...loginErrors })); setFocusErrorRequest(n => n + 1); return }
       if (reviewLengthWarnings(['loginChannelId', 'loginChannelSecret'])) return
       if (!allAcked(LOGIN_ACKS, acks)) return
       setCurrentStep(3)
@@ -633,7 +640,6 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
     : sub === 4 && (!form.loginChannelId.trim() || !form.loginChannelSecret.trim()) ? 'LINEログインのチャネルIDとチャネルシークレットを入力してください。'
     : null
   const nextBlocked = (currentStep === 1 && precheckBlocked(precheckAt, precheck, acks))
-    || Boolean(missingConnectionReason)
     || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
@@ -673,7 +679,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
             label="登録の進捗"
             summaryLayout="aligned"
             hideSummaryChangeKeys={['1']}
-            summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
+            summaries={{ '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? STYLE_EXPERIENCE_SCRIPT.styles[templateKey].label : '' }}
             /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
             steps={V8_STEPS.map((step) => ({
@@ -845,7 +851,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
 
         </StepContent>
       </form>
-        {!(currentStep === 3 && sub === 2) && <PageFooter shadowInset actions={currentStep === 5 ? <>
+        {!(currentStep === 3 && sub === 2) && <PageFooter shadowInset status={missingConnectionReason} actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
             <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'} onClick={event => {
               if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
@@ -862,7 +868,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
             {currentStep === 2 && <Button href="/hq">途中保存して閉じる</Button>}
-            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" form="account-registration" variant="primary" disabled={busy || nextBlocked} disabledReason={missingConnectionReason} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
+            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" form="account-registration" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
 
           </>} />}
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => {

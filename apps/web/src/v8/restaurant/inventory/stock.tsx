@@ -484,12 +484,12 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                 <thead>
                   <TableHeadRow>
                     <Th truncate className={styles.colTime}>時間</Th>
-                    <Th className={styles.colAllocation}>LINE</Th>
-                    <Th className={styles.colAllocation}>予約サイト</Th>
-                    <Th className={styles.colAllocation}>当日</Th>
+                    <Th className={styles.colAllocation} align="right">LINE</Th>
+                    <Th className={styles.colAllocation} align="right">予約サイト</Th>
+                    <Th className={styles.colAllocation} align="right">当日</Th>
                     <Th truncate className={styles.colUse}>利用状況</Th>
                     <Th truncate className={styles.colSeats} align="right">席数</Th>
-                    <Th truncate className={styles.colTables}>埋まっている卓</Th>
+                    <Th truncate className={styles.colTables} title="埋まっている卓" aria-label="埋まっている卓">埋まり</Th>
                     <Th truncate className={styles.colFree} align="right">空き</Th>
                   </TableHeadRow>
                 </thead>
@@ -499,17 +499,18 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                       key={slot.row.id}
                       selected={selected?.row.id === slot.row.id}
                       interactive
+                      density="comfortable"
                       onClick={() => setSelectedId(slot.row.id)}
                     >
                       <Td>
                         <Button variant="text" size="compact" fullWidth presentation="row-action" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id) }}>{slot.time}</Button>
                       </Td>
-                      <Td className={styles.colAllocation}>
+                      <Td className={styles.colAllocation} align="right">
                         <strong>{slot.row.line_capacity}席</strong>
                         <span className={styles.allocationSource}>{slot.row.auto_line_original != null ? '自動停止中' : allocationLabels[slot.row.allocationSource ?? 'legacy']}</span>
                       </Td>
-                      <Td className={styles.colAllocation}>{slot.row.ota_capacity}席</Td>
-                      <Td className={styles.colAllocation}>{slot.row.walk_in_capacity}席</Td>
+                      <Td className={styles.colAllocation} align="right">{slot.row.ota_capacity}席</Td>
+                      <Td className={styles.colAllocation} align="right">{slot.row.walk_in_capacity}席</Td>
                       <Td className={styles.colUse}>
                         <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
                           <rect className={styles.useTrack} x="0" y="0" width="120" height="8" rx="4" />

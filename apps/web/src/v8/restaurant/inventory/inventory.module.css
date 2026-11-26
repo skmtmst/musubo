@@ -237,7 +237,8 @@
 
 .useBar {
   display: block;
-  width: var(--tpl-rs-inv-col-use-bar);
+  width: 100%;
+  max-width: var(--tpl-rs-inv-col-use-bar);
   height: var(--tpl-rs-inv-bar-h);
 }
 

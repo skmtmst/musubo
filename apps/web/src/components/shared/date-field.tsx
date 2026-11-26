@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type Keyboard
 import MenuPortal from './menu-portal'
 import Button from './button'
 import selectStyles from './select-menu.module.css'
+import choiceStyles from './choice-field.module.css'
 import styles from './date-field.module.css'
 import { joinDescribedBy, useFieldContext } from './field-context'
 
@@ -32,6 +33,7 @@ export default function DateField({
   size = 'standard',
   displayFormat = 'full',
   clearable = true,
+  flat = false,
   placeholder = '日付を選ぶ',
   id,
   name,
@@ -53,6 +55,8 @@ export default function DateField({
   displayFormat?: 'full' | 'short' | 'day'
   /** false で「日付を消す」の×を出さない（日付が必ず要る欄。業種ダッシュボードの日付の段）。既定は出す。 */
   clearable?: boolean
+  /** 道具の段で文字入力欄と見た目を揃える。 */
+  flat?: boolean
   placeholder?: string
   id?: string
   name?: string
@@ -272,7 +276,11 @@ export default function DateField({
         ref={triggerRef}
         id={fieldId}
         type="button"
-        className={styles.field}
+        className={clearable || flat ? styles.field : `${styles.field} ${choiceStyles.frame}`}
+        data-choice-field={!clearable && !flat || undefined}
+        data-choice-surface={!clearable && !flat ? 'select' : undefined}
+        data-choice-invalid={!clearable && invalid || undefined}
+        data-choice-disabled={!clearable && disabled || undefined}
         data-input-field
         data-size={size}
         data-clearable={selected && !disabled && clearable || undefined}
@@ -298,7 +306,7 @@ export default function DateField({
       >
         <Calendar aria-hidden="true" className={styles.icon} />
         <span className={selected ? styles.value : styles.placeholder}>{selected ? displayFormat === 'short' ? `${selected.getMonth() + 1}/${selected.getDate()}（${WEEKDAYS[selected.getDay()]}）` : displayFormat === 'day' ? `${selected.getMonth() + 1}月${selected.getDate()}日（${WEEKDAYS[selected.getDay()]}）` : formatLabel(selected) : placeholder}</span>
-        <ChevronDown aria-hidden="true" className={styles.chevron} />
+        <ChevronDown aria-hidden="true" data-choice-chevron={!clearable || undefined} className={styles.chevron} />
       </button>
       {selected && !disabled && clearable ? (
         <button type="button" className={styles.clear} aria-label="日付を消す" onClick={() => onChange('')}>

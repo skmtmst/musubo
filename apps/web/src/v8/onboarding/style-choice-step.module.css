@@ -86,11 +86,6 @@
   min-width: 0;
 }
 
-.choose {
-  display: flex;
-  justify-content: center;
-}
-
 .status {
   overflow: hidden;
   color: var(--color-ink-secondary);

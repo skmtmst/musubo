@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ReorderDialog } from './reorder-dialog'
+import AiFeatures from './ai-features'
 export { ReorderDialog } from './reorder-dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle, { ToggleGroupActions } from '@/components/shared/toggle'
@@ -498,6 +499,8 @@ export default function FeatureSettingsScreen() {
               ))}
             </div>
           )}
+
+          <AiFeatures key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} lockedReason={permissionReason} />
 
           {/* N-444：変更があるときだけ理由の欄を出す。 */}
           {canManage && dirty && (

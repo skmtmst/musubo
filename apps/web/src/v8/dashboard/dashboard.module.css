@@ -13,8 +13,10 @@
 /* 数の帯の寸法はKpiBandとKpiCardの共通値を使う。左右はカードと同じ内側へそろえる。 */
 .todayBand { margin: 0 var(--tpl-list-inset) var(--space-16); }
 /* 帯の上の「いつ時点か」の1行。文字は段の下の「更新」と同じ。 */
+.periodRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); margin: 0 var(--tpl-list-inset) var(--space-8); }
+.periodRow > :last-child { margin-inline-start: auto; }
 .asOf {
-  margin: 0 var(--tpl-list-inset) var(--space-8); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh);
+  margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .cellDetail {

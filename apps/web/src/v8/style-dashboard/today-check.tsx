@@ -5,11 +5,12 @@ import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
-import { DisclosureItem } from '@/components/shared/disclosure'
+import { DisclosureItem, DisclosureToggle } from '@/components/shared/disclosure'
+import StatusBadge from '@/components/shared/status-badge'
 import { ReservationSource } from '@/components/shared/booking-presentation'
 import { formatCount } from '@/lib/format'
 import type { IndustryStyle, StyleSideCard } from './model'
-import { useTodayCheckOpen } from './use-today-check-open'
+import { useTodayCheckFolded, useTodayCheckOpen } from './use-today-check-open'
 import styles from './style-dashboard.module.css'
 
 /*
@@ -29,6 +30,8 @@ export function TodayCheck({ cards, accountId, style, canWrite, onAction, extra 
   extra?: Partial<Record<string, ReactNode>>
 }) {
   const titleId = useId()
+  const contentId = useId()
+  const { folded, toggle } = useTodayCheckFolded(accountId, style)
   const { isOpen, setOpen } = useTodayCheckOpen(accountId, style, cards)
   const actionOf = (card: StyleSideCard): ReactNode => {
     if (card.link) return <TextLink href={card.link.href}>{card.link.label}</TextLink>
@@ -42,8 +45,15 @@ export function TodayCheck({ cards, accountId, style, canWrite, onAction, extra 
   }
   return (
     <Card layout="vertical" className={styles.sideCard} contentPadding="var(--polish-space-card)" gap="var(--polish-space-card)" aria-labelledby={titleId} data-today-check>
-      <h3 id={titleId} className={styles.todayTitle}>今日の確認</h3>
-      <div>
+      <div className={styles.todayHeader}>
+        <h3 id={titleId} className={styles.todayTitle}>今日の確認</h3>
+        {folded ? cards.map(card => {
+          const badge = todayCheckSummary(card)
+          return badge ? <StatusBadge key={card.id} tone="danger" size="micro" dot={false}>{badge}</StatusBadge> : null
+        }) : null}
+        <DisclosureToggle open={!folded} controls={contentId} onToggle={toggle} />
+      </div>
+      <div id={contentId} hidden={folded}>
         {cards.map((card) => (
           <DisclosureItem key={card.id} id={`today-check-${card.id}`} title={card.title}
             summary={card.summary?.text} tone={card.summary?.tone} empty={card.summary?.empty}
@@ -56,6 +66,22 @@ export function TodayCheck({ cards, accountId, style, canWrite, onAction, extra 
       </div>
     </Card>
   )
+}
+
+/** 要約が明確な件数を持つ時だけ表示し、未取得・金額・曖昧な複数の数は数えない。 */
+export function todayCheckSummary(card: StyleSideCard): string | null {
+  const names: Record<string, string> = { new: '新着', pay: 'お支払い', care: '注意', waitlist: 'キャンセル待ち' }
+  const label = names[card.id]
+  if (!label || card.summary?.empty) return null
+  let count = card.count
+  if (count === undefined) {
+    const text = card.summary?.text ?? ''
+    if (/[—―−]/.test(text)) return null
+    const matches = [...text.matchAll(/(?:^|[^\d,])(\d[\d,]*)\s*(?:件|人|名|組)/g)]
+    if (matches.length !== 1) return null
+    count = Number(matches[0][1].replaceAll(',', ''))
+  }
+  return Number.isSafeInteger(count) && (count ?? 0) > 0 ? `${label} ${count!.toLocaleString('ja-JP')}` : null
 }
 
 /** 新着予約の代表の行（入った新しい順）。名前と人数・予約の経路の札・来店の日時。総数より少なければ残りの件数を添える。 */

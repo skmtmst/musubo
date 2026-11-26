@@ -1,6 +1,13 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useId, type FocusEventHandler, type ReactNode, type Ref } from 'react'
 import styles from './disclosure.module.css'
+
+/** カード全体を開閉する共通の操作。 */
+export function DisclosureToggle({ open, controls, onToggle }: { open: boolean; controls: string; onToggle: () => void }) {
+  return <button type="button" className={styles.foldToggle} onClick={onToggle} aria-expanded={open} aria-controls={controls}>
+    {open ? '畳む' : '開く'}{open ? <ChevronUp className={styles.foldToggleIcon} aria-hidden="true" /> : <ChevronDown className={styles.foldToggleIcon} aria-hidden="true" />}
+  </button>
+}
 
 /**
  * 開閉する欄。Pencil ★V8（V8.pen）「開け閉めする段」。
