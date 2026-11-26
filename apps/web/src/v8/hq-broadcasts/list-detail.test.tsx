@@ -10,7 +10,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const hq = vi.hoisted(() => ({
-  list: vi.fn(), get: vi.fn(),
+  list: vi.fn(), get: vi.fn(), activity: vi.fn(),
   folders: vi.fn(async () => ({ success: true, data: [] })),
   approvalCandidates: vi.fn(async () => ({ success: true, data: [] })),
   approval: vi.fn(), updateFolder: vi.fn(), createFolder: vi.fn(), deleteFolder: vi.fn(async () => ({ success: true })),
@@ -231,4 +231,15 @@ it('統括のフォルダ窓をキャンセルすると確認は1回だけで閉
   fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
   expect(screen.queryByRole('dialog', { name: '入力を破棄しますか？' })).toBeNull()
   expect(screen.queryByRole('dialog', { name: 'フォルダを追加' })).toBeNull()
+})
+
+
+it('操作記録は未知の種類でも画面を開き、案内と既知の記録を表示する', async () => {
+  params.value = new URLSearchParams('id=r1&tab=activity')
+  hq.get.mockResolvedValue({ data: run('r1', '送った配信', [target('a', 'sent', 100, 50)]) })
+  hq.activity.mockResolvedValue({ data: { rows: ['scheduled', 'constructor', 'toString', '__proto__', 'future'].map((action, index) => ({ id: String(index), accountId: 'a', actorId: 'staff', action, createdAt: '2026-11-26T00:00:00Z' })), nextCursor: null } })
+  render(<HqBroadcastDetail />)
+  const section = await screen.findByRole('region', { name: '記録' })
+  await within(section).findByText('送信を予約した')
+  expect(within(section).getAllByText('操作')).toHaveLength(4)
 })
