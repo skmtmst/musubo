@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -72,21 +72,29 @@ export default function HqAttentionV8() {
   const [folder, setFolder] = useState('all')
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
 
+  const requestSeq = useRef(0)
+
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current
     setLoading(true)
     setError('')
     try {
       const res = await hqStyleApi.attention()
+      if (seq !== requestSeq.current) return
       if (!res.success) throw new Error('attention failed')
       setItems(res.data.items)
     } catch (caught) {
+      if (seq !== requestSeq.current) return
       setError(describeApiFailure(caught, '読み込み', { scope: 'hq' }))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { requestSeq.current += 1 }
+  }, [load])
   useEffect(() => {
     void api.lineAccountFolders.list().then((res) => { if (res.success) setFolders(res.data.folders.map((item) => ({ id: item.id, name: item.name }))) }).catch(() => { /* フォルダが読めなくても全部は出す */ })
   }, [])
@@ -122,8 +130,8 @@ export default function HqAttentionV8() {
             value={sum(item.key)}
             unit="件"
             icon={null}
-            loading={items === null}
-            detail={withCount.length === 1 && item.key === 'connections' ? withCount[0].name : `${withCount.length} アカウント`}
+            loading={items === null && !error}
+            detail={items === null ? (error ? '読み込めませんでした' : '読み込んでいます') : withCount.length === 1 && item.key === 'connections' ? withCount[0].name : `${withCount.length} アカウント`}
           />
         )
       })}
