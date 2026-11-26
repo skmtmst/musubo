@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { CalendarDays, ClipboardCheck, Ellipsis, MessageCircle } from 'lucide-react'
+import { CalendarDays, ClipboardCheck, Menu, MessageCircle } from 'lucide-react'
 import AuthGuard from '@/components/auth-guard'
 import SessionLostNotice from '@/components/session-lost-notice'
 import ImpersonationNotice from '@/components/ops/impersonation-notice'
@@ -29,7 +29,7 @@ const TAB_ICONS: Record<MobileTabId, ReactNode> = {
   today: <CalendarDays aria-hidden="true" />,
   talk: <MessageCircle aria-hidden="true" />,
   todo: <ClipboardCheck aria-hidden="true" />,
-  more: <Ellipsis aria-hidden="true" />,
+  more: <Menu aria-hidden="true" />,
 }
 
 export type MobileShellParts = {
