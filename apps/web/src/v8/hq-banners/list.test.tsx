@@ -127,6 +127,8 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
   })
 
   it('作る窓は名前が空のあいだ押せず、作ると新しいプロジェクトを開く', async () => {
+    stats.mockResolvedValueOnce({ success: true, data: { projects: { active: 2, archived: 1 }, deliveredImages: 9, deliveredAccounts: 3 } })
+    stats.mockResolvedValue({ success: true, data: { projects: { active: 3, archived: 1 }, deliveredImages: 9, deliveredAccounts: 3 } })
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
     const projectCount = () => within(host).getByText('プロジェクト').closest('[data-kpi-presentation]')!.querySelector('[data-kpi-number]')?.textContent
@@ -146,6 +148,9 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
+    expect(host.textContent).toContain('新しい案件')
+    const projectKpi = [...host.querySelectorAll('[data-kpi-presentation]')].find(item => item.textContent?.includes('プロジェクト'))
+    expect(projectKpi?.textContent).toMatch(/3\s*件/)
     expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
     expect(host.textContent).toContain('新しい案件')
     expect(projectCount()).toBe('3')
@@ -204,6 +209,26 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(document.querySelector('[role="dialog"]')).toBeTruthy()
     expect(listProjects).toHaveBeenCalledTimes(1)
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it.each(['loading', 'error'])('一覧が%sでも作成後に一覧を再取得し、既存の案件を隠さない', async initial => {
+    let resolveOld: ((value: unknown) => void) | undefined
+    if (initial === 'loading') listProjects.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    else listProjects.mockRejectedValueOnce(new Error('offline'))
+    listProjects.mockResolvedValue({ success: true, data: [project('p1', '既存の案件'), project('p9', '新しい案件')] })
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    act(() => { buttonNamed('プロジェクトを作る')!.click() })
+    await flush()
+    fireEvent.change(document.querySelector('input[placeholder="例：春の感謝祭 2周年"]')!, { target: { value: '新しい案件' } })
+    await flush()
+    act(() => { buttonNamed('作って開く')!.click() })
+    await flush()
+    if (resolveOld) await act(async () => { resolveOld!({ success: true, data: [project('old', '古い結果')] }) })
+    await flush()
+    expect(host.textContent).toContain('既存の案件')
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).not.toContain('古い結果')
   })
 
   it('星を押すとお気に入りを切り替える', async () => {

@@ -102,14 +102,14 @@ function BannersInner() {
   const [presets, setPresets] = useState<BannerPreset[]>([])
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
-  const summaryRequestRef = useRef(0)
+  const summaryRequest = useRef(0)
 
-  const loadSummary = useCallback(async () => {
+  const loadSummary = useCallback(async (silent = false) => {
+    const requestId = ++summaryRequest.current
     /* 形の違う応答は置かない（`stats.projects.active` で画面ごと落ちる。全ルート監査 A1）。数は「—」になる。 */
-    const requestId = ++summaryRequestRef.current
-    setSummaryLoading(true)
+    if (!silent) setSummaryLoading(true)
     const [presetRes, statsRes] = await Promise.allSettled([api.hqBanners.presets(), api.hqBanners.stats()])
-    if (requestId !== summaryRequestRef.current) return
+    if (requestId !== summaryRequest.current) return
     if (presetRes.status === 'fulfilled' && presetRes.value.success) {
       const data = presetRes.value.data as { presets?: unknown; usage?: BannerUsage | null }
       if (Array.isArray(data?.presets)) setPresets(data.presets as BannerPreset[])
@@ -154,7 +154,7 @@ function BannersInner() {
   }
 
   return tab === 'projects'
-    ? <ProjectsView head={head} canManage={canManage} usage={usage} archivedCount={stats?.projects.archived ?? null} onChanged={() => void loadSummary()} />
+    ? <ProjectsView head={head} canManage={canManage} usage={usage} archivedCount={stats?.projects.archived ?? null} onCreated={() => { setStats(current => current ? { ...current, projects: { ...current.projects, active: current.projects.active + 1 } } : current); void loadSummary(true) }} />
     : <LibraryView head={head} canManage={canManage} presets={presets} accounts={accounts} onChanged={() => void loadSummary()} />
 }
 
@@ -162,12 +162,12 @@ function BannersInner() {
 
 type BannerHead = { stats: React.ReactNode; tabs: React.ReactNode; explanation: string }
 
-function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
+function ProjectsView({ head, canManage, usage, archivedCount, onCreated }: {
   head: BannerHead
   canManage: boolean
   usage: BannerUsage | null
   archivedCount: number | null
-  onChanged: () => void
+  onCreated: () => void
 }) {
   const saveErrors = useSaveFormErrors()
 
@@ -184,10 +184,12 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
   const [formBusy, setFormBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const requestRef = useRef(0)
+  const requestPending = useRef(false)
   const archivedMode = view === 'archived'
 
   const load = useCallback(async (activeOnly = false) => {
     const requestId = ++requestRef.current
+    requestPending.current = true
     setStatus('loading')
     setActionError('')
     try {
@@ -212,6 +214,8 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
       saveErrors.capture(caught);
 
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
+    } finally {
+      if (requestId === requestRef.current) requestPending.current = false
     }
   }, [archivedMode, saveErrors])
 
@@ -227,11 +231,18 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
     try {
       const res = await api.hqBanners.projects.create({ name: input.name, description: input.description || null })
       if (!res.success) throw new Error(res.error)
-      setFormOpen(false)
+      const wasLoading = requestPending.current
+      requestRef.current += 1
+      requestPending.current = false
+      if (status === 'ready' && !wasLoading && !archivedMode) {
+        setProjects(previous => [res.data, ...previous.filter(item => item.id !== res.data.id)])
+      } else if (!archivedMode) {
+        void load()
+      }
       setView('all')
       setQuery('')
-      onChanged()
-      void load(true)
+      setFormOpen(false)
+      onCreated()
       router.push(createPageReturnHref('/hq/banners', res.data.id))
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
