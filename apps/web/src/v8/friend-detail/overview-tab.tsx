@@ -231,8 +231,8 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
           </span>
         </div>
       )}{mileageStatus === 'ready' && mileage?.balanceSource === 'ec' ? <p className={styles.memo}>会員ランク：{mileage.ecRank ?? '未設定'}（ECと同期）</p> : mileageStatus === 'ready' && mileage?.balanceSource !== 'ec' && rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
-        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
-        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変える</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変える</Button>, content: <>{richMenuStatus === 'error' ? (
+        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変更する' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
+        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変更する</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変更する</Button>, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
           <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>

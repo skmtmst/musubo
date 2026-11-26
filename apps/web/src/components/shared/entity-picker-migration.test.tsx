@@ -22,7 +22,7 @@ test('選ぶ欄は独立したボタンで開き、空の値も確定できる�
   fireEvent.click(field)
   dialog = screen.getByRole('dialog')
   fireEvent.click(within(dialog).getByRole('radio', { name: '指定なし' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
   expect(change).toHaveBeenCalledWith('')
 })
 
@@ -36,18 +36,18 @@ test('札の×は窓を開かずその項目だけ外す。必須の選択は札
   fireEvent.click(screen.getByRole('button', { name: '支店を外す' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(screen.queryByText('支店')).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '配信先：変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '配信先：変更する' }))
   const dialog = screen.getByRole('dialog')
   expect((within(dialog).getByRole('checkbox', { name: '本店' }) as HTMLInputElement).disabled).toBe(true)
   fireEvent.click(within(dialog).getByRole('checkbox', { name: 'すべてをまとめて選ぶ' }))
   fireEvent.click(within(dialog).getByRole('checkbox', { name: 'すべてをまとめて選ぶ' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する（1件）' }))
   expect(screen.getByText('本店')).toBeTruthy()
 })
 
 test('読み込み失敗中は古い候補を確定できない', () => {
   render(<EntityPickerField defaultOpen label="フォーム" noun="フォーム" value="a" onChange={() => {}} items={[{ id: 'a', name: 'アンケート' }]} state={<p role="alert">読み込めませんでした</p>} />)
-  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '選ぶ' }) as HTMLButtonElement
+  const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: '選択する' }) as HTMLButtonElement
   expect(confirm.disabled).toBe(true)
 })
 

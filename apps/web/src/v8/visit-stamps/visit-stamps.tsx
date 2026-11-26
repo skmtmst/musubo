@@ -505,7 +505,7 @@ function VisitStampsScreen() {
               {/* ① カードの設定 */}
               <section className={styles.card} aria-label="① カードの設定">
                 <SectionTitle extra={canManage ? <RowActions subjectName="カードの設定" menuItems={[
-                  { id: 'stores', label: '押せる店を選ぶ', onSelect: () => setStoresOpen(true) },
+                  { id: 'stores', label: '押せる店を選択する', onSelect: () => setStoresOpen(true) },
                   { id: 'pin', label: '店員の暗証番号', onSelect: () => { setDialogError(''); setPinOpen(true) } },
                 ]} /> : undefined} help="カードの名前・マスの数・期限と、何個で何を渡すか（特典）を決めます。マスの数と特典の個数は別々に決めます（特典はマスの数以下）。特典を使うと、その個数だけスタンプが減ります。">① カードの設定</SectionTitle>
                 <Field label="カードの名前"><SaveErrorField names={["name","issue"]}><TextField {...fieldProps('name')} value={name} onChange={(e) => { setIssue(null); setName(e.target.value) }} readOnly={ro} maxLength={100} /></SaveErrorField>
@@ -567,7 +567,7 @@ function VisitStampsScreen() {
                         <span className={styles.sub}>{rewardNote(reward, settings)}</span>
                       </span>
                       {ro ? null : (
-                        <RowActions subjectName={reward.name} menuItems={[{ id: 'edit', label: '特典を変える', onSelect: () => setRewardEdit(reward) }]}
+                        <RowActions subjectName={reward.name} menuItems={[{ id: 'edit', label: '特典を変更する', onSelect: () => setRewardEdit(reward) }]}
                           destructiveItem={settings.rewards.length > 1 ? { id: 'delete', label: '特典を消す', onSelect: () => set({ rewards: settings.rewards.filter((r) => r.id !== reward.id) }) } : undefined} />
                       )}
                     </div>
@@ -639,7 +639,7 @@ function VisitStampsScreen() {
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています・${multiplierDetail(m)}` : multiplierDetail(m)}</span>
                     </span>
-                    {ro ? null : <RowActions subjectName={multiplierName(m)} menuItems={[{ id: 'edit', label: '倍率を変える', onSelect: () => setMultEdit(i) }]}
+                    {ro ? null : <RowActions subjectName={multiplierName(m)} menuItems={[{ id: 'edit', label: '倍率を変更する', onSelect: () => setMultEdit(i) }]}
                       destructiveItem={{ id: 'delete', label: '倍率を消す', onSelect: () => set({ multipliers: settings.multipliers.filter((_, k) => k !== i) }) }} />}
                   </div>
                 ))}
@@ -649,7 +649,7 @@ function VisitStampsScreen() {
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus} 個` : 'はじめての来店で多めに押します'}</span>
                   </span>
-                  {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
+                  {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変更する', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
                   <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" disabled={ro} onChange={ro ? () => {} : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
@@ -657,7 +657,7 @@ function VisitStampsScreen() {
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>
                   </span>
-                  {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変える', onSelect: () => setRankOpen(true) }]} />}
+                  {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変更する', onSelect: () => setRankOpen(true) }]} />}
                 </div>
                 <div className={styles.receiptRow}>
                   <span className={styles.texts}>

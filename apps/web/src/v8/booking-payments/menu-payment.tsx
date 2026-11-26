@@ -190,7 +190,7 @@ export function MenuPaymentFields({ state, name, price, people, unit, readOnly =
       <SaveErrorField names={['mode', 'payment_mode', 'provider']}><RadioCardGroup legend={`${name}のお支払い`} columns={2}>
         <RadioCard name={`${name}-payment-source`} value="default" title="いつもの方法を使う" note={`今は：${MODE_LABEL[state.defaultMode]}（予約設定 › お支払い）`}
           icon={<Settings size={16} aria-hidden="true" />} checked={!own} disabled={locked} onChange={() => state.setValue(null)} />
-        <RadioCard name={`${name}-payment-source`} value="own" title="このメニューだけ変える" note="下で選んだ方法にします"
+        <RadioCard name={`${name}-payment-source`} value="own" title="このメニューだけ変更する" note="下で選んだ方法にします"
           icon={<Pencil size={16} aria-hidden="true" />} checked={own} disabled={locked}
           onChange={() => state.setValue(state.value ?? (state.defaultMode === 'online' ? 'onsite' : 'online'))} />
       </RadioCardGroup></SaveErrorField>

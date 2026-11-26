@@ -23,6 +23,6 @@ const PUBLICATION_RULES: readonly ReactNode[] = [
 
 export function PublicationRules({ canEdit, busy, onOrder }: { canEdit: boolean; busy: boolean; onOrder: () => void }) {
   return <CreateSummaryCard title="出すときの決めごと" rows={[]} descriptionItems={PUBLICATION_RULES}>
-    {<PermissionGatedButton allowed={canEdit} variant="secondary" disabled={busy} onClick={onOrder} busy={busy} busyLabel="処理中…"><ArrowUpDown size={16} aria-hidden="true" />並び順を変える</PermissionGatedButton>}
+    {<PermissionGatedButton allowed={canEdit} variant="secondary" disabled={busy} onClick={onOrder} busy={busy} busyLabel="処理中…"><ArrowUpDown size={16} aria-hidden="true" />並び順を変更する</PermissionGatedButton>}
   </CreateSummaryCard>
 }

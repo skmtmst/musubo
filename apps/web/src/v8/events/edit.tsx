@@ -134,7 +134,7 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
     {lifecycle === null ? loadFailed ? <><Notice tone="danger" message="公開の状態を読み込めませんでした。" /><Button onClick={() => setLoadSeq((value) => value + 1)}>読み直す</Button></> : <span role="status">状態を読み込んでいます…</span> : null}
     <ConfirmDialog open={pending !== null} title={`このイベントを${pending?.label ?? '変える'}？`}
       description={pending?.to === 'cancelled' ? '中止にすると申込の受付は止まり、申込の履歴は残ります。元に戻すことはできません。' : pending?.to === 'paused' ? '一時停止中はお客様の画面から申込ができなくなります。申込の履歴は残ります。' : '状態を変えます。'}
-      destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変える'} busy={busy} error={error}
+      destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変更する'} busy={busy} error={error}
       confirmDisabled={Boolean(pending?.needsReason && reason.trim() === '')} onConfirm={runSwitch}
       onCancel={() => { if (!busy) { setPending(null); setReason(''); setError('') } }}>
       <OperationTargetSummary accounts={[{ id: accountId }]} />

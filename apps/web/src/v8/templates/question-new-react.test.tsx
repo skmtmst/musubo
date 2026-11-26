@@ -87,7 +87,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     const extra = screen.getAllByRole('button', { name: '押されたときにあわせて行うことを足す' })[0]
     const reply = screen.getAllByLabelText('押したときの返信')[0]
     expect(extra.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '選択肢 1 の押されたら：変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選択肢 1 の押されたら：変更する' })).toBeNull()
   })
 
   it('閉じた動きの欄に保存エラーが返ると、その選択肢だけ開いて理由を出す', async () => {
@@ -127,7 +127,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     expect(screen.getAllByLabelText('ボタンの文字（20文字まで）')).toHaveLength(1)
     expect(name.value).toBe('継続を確認する')
     // 押したときの動きは「押されたら」の欄から窓で開いて決める。
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変更する' })) })
     const message = screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement
     await act(async () => { fireEvent.change(message, { target: { value: '入力を保つ' } }) })
     const hideMessage = screen.getByRole('checkbox', { name: 'ユーザーメッセージを使用しない' })
@@ -140,7 +140,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     expect(message.value).toBe('入力を保つ')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '決める' })) })
     expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変更する' })) })
     expect((screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement).value).toBe('入力を保つ')
     expect(templatesApi.create).not.toHaveBeenCalled()
   })

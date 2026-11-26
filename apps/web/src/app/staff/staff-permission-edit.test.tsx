@@ -109,7 +109,7 @@ async function openEdit(expectOp = true) {
     // : 変更するは「…」から開く。
     fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
   })
-  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変更する' })) })
   await waitFor(() => {
     expect(screen.getByRole('textbox', { name: 'メールアドレス' })).toBeTruthy()
   })
@@ -193,10 +193,10 @@ test('本人確認が失効したら、古い本人データが残っていて�
   await act(async () => { render(<StaffPage />) })
   const menu = await screen.findByRole('button', { name: /の操作$/ })
   fireEvent.click(menu)
-  expect(screen.getByRole('menuitem', { name: '役割を変える' })).toBeTruthy()
+  expect(screen.getByRole('menuitem', { name: '役割を変更する' })).toBeTruthy()
   const { forgetStaffIdentity } = await import('@/lib/staff-identity-state')
   await act(async () => { forgetStaffIdentity() })
-  expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: '役割を変更する' })).toBeNull()
   expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
   expect(fixture.updated).toHaveLength(0)
 })
@@ -205,7 +205,7 @@ test('閲覧のみのスタッフは自分の行でも編集と2段階の変更�
   fixture.meRole = 'staff'; fixture.meId = 'staff-1'; fixture.meReadOnly = true
   await act(async () => { render(<StaffPage />) })
   fireEvent.click(await screen.findByRole('button', { name: /の操作$/ }))
-  expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: '役割を変更する' })).toBeNull()
   expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
   expect(fixture.updated).toHaveLength(0)
 })

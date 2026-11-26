@@ -28,7 +28,7 @@ it.each([
  expect(screen.queryByRole('tab')).toBeNull()
  fireEvent.click(option)
  expect(screen.getAllByText(type==='carousel'||type==='card_message'?'お席のご案内':name).length).toBeGreaterThan(0)
- fireEvent.click(screen.getByRole('button',{name:'選ぶ'}))
+ fireEvent.click(screen.getByRole('button',{name:'選択する'}))
  await waitFor(()=>expect(onPick).toHaveBeenCalledWith([expect.objectContaining({type,content:expect.objectContaining(expected)})]))
  expect(calls.messages).toHaveBeenCalledWith(expect.objectContaining({accountId:'account-a'}))
 })

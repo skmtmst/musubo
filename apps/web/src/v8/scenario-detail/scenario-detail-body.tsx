@@ -184,7 +184,7 @@ export function ScenarioDetailBody({
                 <div className={styles.stageAction}>
                   <Button variant="secondary" onClick={() => setTriggerOpen(true)}>
                     <SlidersHorizontal aria-hidden />
-                    設定を変える
+                    設定を変更する
                   </Button>
                 </div>
               ) : null}
@@ -253,7 +253,7 @@ export function ScenarioDetailBody({
             {canEdit ? (
               <Button variant="text" onClick={() => setOnCompleteOpen(true)}>
                 <Pencil aria-hidden />
-                変える
+                変更する
               </Button>
             ) : null}
           </div>

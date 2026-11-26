@@ -105,7 +105,7 @@ export default function RichMenuSampleV8() {
       leading={<Link href="/rich-menus" className={styles.parent}>リッチメニュー ›</Link>}
       help="スタイルを選んだときに入った見本のリッチメニューです。見本のまま使えます。"
       actions={canEdit && editHref ? <>
-        <Button href={editHref}><ImageIcon aria-hidden="true" className={styles.buttonIcon} />画像を変える</Button>
+        <Button href={editHref}><ImageIcon aria-hidden="true" className={styles.buttonIcon} />画像を変更する</Button>
         <Button variant="primary" href={editHref}>見本を編集する</Button>
       </> : null}
     >
@@ -139,7 +139,7 @@ export default function RichMenuSampleV8() {
                   <GridCell><StatusBadge tone={open ? 'warning' : 'success'} dot>{open ? '中身が未設定' : '使える'}</StatusBadge></GridCell>
                   <GridCell>
                     {canEdit && (editHref || open) ? <RowMenu appearance="box" size="row" label={`${tile.label}の操作`} items={[
-                      ...(editHref ? [{ id: 'change', label: '押したときを変える', href: editHref }] : []),
+                      ...(editHref ? [{ id: 'change', label: '押したときを変更する', href: editHref }] : []),
                       ...(open ? [FEATURES[tile.feature]?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(FEATURES[tile.feature]!.preparing!) } : { id: 'configure', label: '決まりを入れる', href:tile.formId?`/form-submissions/edit?id=${encodeURIComponent(tile.formId)}&tab=basic`:tile.target==='history'?'/getting-started/rich-menu':hrefOf(tile.feature) }] : []),
                     ]} /> : null}
                   </GridCell>

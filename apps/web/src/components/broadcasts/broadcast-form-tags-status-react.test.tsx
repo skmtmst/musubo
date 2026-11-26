@@ -204,7 +204,7 @@ describe('タグ候補の失敗と0件の分け方（R581）', () => {
         (option as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       await flush()
-      await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!.click() })
+      await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選択する')!.click() })
       expect(input!.parentElement?.textContent).toContain('VIP')
     } finally {
       unmount()

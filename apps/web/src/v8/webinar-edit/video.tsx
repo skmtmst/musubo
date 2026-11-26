@@ -308,7 +308,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
           <span className={styles.videoText}>
             <VideoMetadata webinar={webinar} />
           </span>
-          {<PermissionGatedButton allowed={!readOnly} onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</PermissionGatedButton>}
+          {<PermissionGatedButton allowed={!readOnly} onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選択する'}</PermissionGatedButton>}
         </div>
         {showStages && asset ? <>
           <ol className={styles.stages} aria-label="動画の準備の段">
@@ -361,7 +361,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
               readOnly={readOnly}
               editing={capacityEdit === index}
               onEdit={(on) => setCapacityEdit(on ? index : null)}
-              menu={(openEdit) => ruleMenu(index, `${shortJst(rule.at as string)}の開催回`, [{ id: 'capacity', label: '定員を変える', onSelect: () => { setMenuOpen(null); openEdit() } }])}
+              menu={(openEdit) => ruleMenu(index, `${shortJst(rule.at as string)}の開催回`, [{ id: 'capacity', label: '定員を変更する', onSelect: () => { setMenuOpen(null); openEdit() } }])}
             />
           ))}
           {sessions.length === 0 ? <p className={form.cardNote}>まだ開催回がありません。</p> : null}

@@ -267,7 +267,7 @@ export default function AccountDetailV8() {
               </Row>
               <Row label="タイムゾーン">{account.timezone ?? 'Asia/Tokyo'}</Row>
               <Row label="テスト送信先">
-                <ActionValue value={recipientValue} action={canManage ? <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button> : <Button type="button" variant="text" presentation="account-inline" lockedReason={manageLockReason} disabled={!manageLockReason}>変える</Button>} />
+                <ActionValue value={recipientValue} action={canManage ? <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変更する</Button> : <Button type="button" variant="text" presentation="account-inline" lockedReason={manageLockReason} disabled={!manageLockReason}>変更する</Button>} />
               </Row>
               {/* 登録の内容は1枚のカードにまとめる（つづきで割らない）。 */}
               <Row label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Row>

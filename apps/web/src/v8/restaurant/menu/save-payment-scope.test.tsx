@@ -62,7 +62,7 @@ it('店舗を替えても元のメニューと支払いを全部保存し、新�
  fixture.updateMenu.mockImplementationOnce(() => new Promise(resolve => { old = resolve })).mockImplementationOnce(() => new Promise(resolve => { fresh = resolve }))
  const view = render(<><MenuEditPage /><ToastHost /></>)
  fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '前の店の名前' } })
- fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変える/ }))
+ fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
  fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
  await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledTimes(1))
  fixture.account = 'account-2'

@@ -152,7 +152,7 @@ it('スタイルが未選択の登録再開では、窓を閉じても保留を�
   expect(net.save).not.toHaveBeenCalled()
   expect(sessionStorage.getItem(REGISTRATION_STYLE_KEY)).toBe('created-account')
   const stickyBar = document.querySelector<HTMLElement>('[data-shared-part="sticky-bar"]')!
-  fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選ぶ' }))
+  fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選択する' }))
   expect(screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeTruthy()
 })
 

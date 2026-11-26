@@ -60,7 +60,7 @@ export function GuideMenuPicker({ accountId, version, step, total, onLater, onSa
       <span className={styles.step}>{step}/{total}</span>
       <span><strong>{title}</strong><span className={styles.description}>管理画面の「デザインの型」と同じ5つの型から。行き先URLは自動設定、あとからいつでも変更できます。</span></span>
     </span>} designNode="U1JI3i" designLayout="stacked-picker" designWidth={860} exactDesignWidth
-      designMinHeight={726} headerIcon={false} busy={saving !== null} onCancel={onLater} footerDivider={false}
+      designMinHeight={726} headerIcon={false} showCloseButton plainCloseButton busy={saving !== null} onCancel={onLater} footerDivider={false}
       footer={<div className={styles.footer}>
         <DialogActions>
           <Button size="inline" variant="text" onClick={onLater} disabled={saving !== null}>あとで</Button>

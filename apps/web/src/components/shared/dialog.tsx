@@ -53,6 +53,8 @@ export type DialogProps = {
   headerAction?: ReactNode
   /** 既定は窓の形で決まる。ガイドの窓にも閉じる操作が必要なら true。 */
   showCloseButton?: boolean
+  /** ガイドなどで、通常時の閉じるボタンの枠を省く。 */
+  plainCloseButton?: boolean
   /** 題と説明の左に置く、線のアイコン。false なら印を省く。 */
   headerIcon?: ReactNode
   /** 指定した窓だけ本文の余白を変える（フォルダ付きの選択窓など）。 */
@@ -164,6 +166,7 @@ export default function Dialog({
   designHeaderHeight,
   headerAction,
   showCloseButton,
+  plainCloseButton = false,
   headerIcon,
   designContentPadding,
   designFooterPadding,
@@ -318,6 +321,7 @@ export default function Dialog({
       data-closing={leaving || undefined}
       data-size={size}
       data-design-layout={designLayout}
+      data-plain-close={plainCloseButton || undefined}
       data-confirm-first={confirmFirst || undefined}
       data-confirm-placement={confirmPlacement}
       data-layout={layout}

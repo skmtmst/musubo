@@ -334,7 +334,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
             </SettingsFormRow>
           ) : (
             <div className={styles.linkRow}>
-              <Button variant="text" size="inline" onClick={() => setVenueOpen(true)}>会場・オンラインの URL も変える</Button>
+              <Button variant="text" size="inline" onClick={() => setVenueOpen(true)}>会場・オンラインの URL も変更する</Button>
             </div>
           )}
         </section>

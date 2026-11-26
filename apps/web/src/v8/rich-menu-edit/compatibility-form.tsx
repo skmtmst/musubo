@@ -201,7 +201,7 @@ export default function RichMenuCreateForm({
       <SectionHeader title="トークを開いたとき" />
       <p>メニューを開いた状態・閉じた状態の指定は、下書き保存後の編集画面で設定します。</p>
       <SectionHeader title="画像" />
-      {imageAction ?? <Button href="/contents">登録メディアから選ぶ</Button>}
+      {imageAction ?? <Button href="/contents">登録メディアから選択する</Button>}
       <p>{SIZE_DIMENSIONS.large.width} × {SIZE_DIMENSIONS.large.height}px ／ 1MBまで・JPG・PNG</p>
       <p>選んだ画像は下書きの最初に見せるページへ登録します。</p>
     </Card>

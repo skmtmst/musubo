@@ -496,7 +496,7 @@ describe('まとめて削除の確認', () => {
     listVars.mockResolvedValue({ success: true, data: many })
     await render()
     await click(byLabel('このページの共通情報をすべて選ぶ'))
-    await click(button('条件に合う21件すべてを選ぶ'))
+    await click(button('条件に合う21件すべてを選択する'))
     await click(button('選択した共通情報を削除'))
     expect(deleteImpact).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('一度に削除できるのは20 件までです。フォルダや検索で絞り込んで分けて削除してください。')

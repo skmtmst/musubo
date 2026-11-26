@@ -113,7 +113,7 @@ describe('V8の5手順で送信を確定する', () => {
     await render(); const dialog = await confirm()
     await act(async () => { fireEvent.click(dialog.querySelector('button[aria-label="承認をお願いする人"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('確認担当'))!) }); await flush()
-    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
+    await click('選択する', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
     await acknowledge(dialog)
     await click('承認を依頼する', dialog)
     expect(mocks.request).toHaveBeenCalledWith('draft', { approverStaffId: 'reviewer', note: undefined })
@@ -143,7 +143,7 @@ describe('V8の5手順で送信を確定する', () => {
     await render('audience')
     await act(async () => { fireEvent.click(container.querySelector('button[aria-label="除くタグ"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('配信不要'))!) }); await flush()
-    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
+    await click('選択する', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
     await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
     const counted = mocks.preflight.mock.calls.at(-1)![0].segmentConditions
     expect(counted).toMatchObject({ operator: 'AND', rules: [{ type: 'tag_not_exists', value: 'exclude' }], groups: [{ operator: 'AND', rules: [{ type: 'is_following', value: true }], groups: [{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }, { type: 'tag_exists', value: 'member' }] }] }] })

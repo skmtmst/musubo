@@ -200,7 +200,7 @@ export function AutomationFields({
                 label="動かす相手"
                 noun="動かす相手"
                 name={conditionSummaries.length > 0 ? conditionSummaries.join('・') : 'すべての友だち'}
-                ariaLabel="動かす相手を変える"
+                ariaLabel="動かす相手を変更する"
                 aria-describedby="v8-target-label"
                 onOpen={() => setConditionOpen(true)}
               />

@@ -163,7 +163,7 @@ describe('フォルダ', () => {
     await start()
     await act(async () => { fireEvent.click(folderRow('セミナー')) })
     await act(async () => { fireEvent.click(screen.getAllByRole('button', { name: 'フォルダ「セミナー」の操作' })[0]) })
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /名前を変える/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /名前を変更する/ })) })
     const dialog = screen.getByRole('dialog')
     fireEvent.change(dialog.querySelector('[data-folder-name-color] input')!, { target: { value: '説明会' } })
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /保存する/ })) })

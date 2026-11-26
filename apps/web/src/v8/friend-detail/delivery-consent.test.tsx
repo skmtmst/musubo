@@ -33,7 +33,7 @@ describe('配信の受け取り', () => {
 
   it('理由が空なら保存せず、欄の下に理由を出す', async () => {
     open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
     expect(await screen.findByText('理由を入れてください。')).toBeTruthy()
     expect(api.save).not.toHaveBeenCalled()
@@ -41,7 +41,7 @@ describe('配信の受け取り', () => {
 
   it('目的を変えるときは、版（なければ 0）と理由を添えて保存する', async () => {
     open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
     fireEvent.click(screen.getByLabelText('止めている', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '電話でご連絡' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
@@ -50,7 +50,7 @@ describe('配信の受け取り', () => {
 
   it('本人が止めた宣伝を「受け取る」に戻すときは、注意の窓を挟み、確かめてから保存する', async () => {
     open()
-    const buttons = await screen.findAllByRole('button', { name: '変える' })
+    const buttons = await screen.findAllByRole('button', { name: '変更する' })
     fireEvent.click(buttons[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承を得た' } })
@@ -64,7 +64,7 @@ describe('配信の受け取り', () => {
 
   it('注意を開いてから版が変われば新しい版で勝手に上書きしない', async () => {
     const view = open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -76,7 +76,7 @@ describe('配信の受け取り', () => {
 
   it('注意を開いてから友だちが変われば別の友だちへ送らない', async () => {
     const view = open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -89,7 +89,7 @@ describe('配信の受け取り', () => {
 
   it('本人のアカウントが不明なときに選択中の別アカウントを代わりに使わない', async () => {
     render(<Drawer open friendId="f1" friendName="山田 花子" friendAccountId={null} selectedAccountId="other" rows={ROWS as never} canEdit onClose={() => {}} onSaved={() => {}} />)
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -103,7 +103,7 @@ describe('配信の受け取り', () => {
   it('選択アカウントを変えて戻しても古い確認は復活しない', async () => {
     const props = { open: true, friendId: 'f1', friendName: '山田 花子', friendAccountId: 'owner', rows: ROWS as never, canEdit: true, onClose: () => {}, onSaved: () => {} }
     const view = render(<Drawer {...props} selectedAccountId="a" />)
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -117,7 +117,7 @@ describe('配信の受け取り', () => {
   it('閲覧のみの人には、［変える］を灰色で出し押せない', async () => {
     open(false)
     await screen.findAllByText('予約の連絡')
-    const change = screen.queryAllByRole('button', { name: '変える' })
+    const change = screen.queryAllByRole('button', { name: '変更する' })
     expect(change.length).toBeGreaterThan(0)
     for (const el of change) { expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true); fireEvent.click(el) }
     expect(screen.queryByRole('alertdialog')).toBeNull()

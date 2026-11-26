@@ -581,7 +581,7 @@ describe('BERxg 座席・卓管理', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: '階・エリア' }))
     const floorPicker = screen.getByRole('dialog', { name: '階・エリアを選ぶ' })
     fireEvent.click(within(floorPicker).getByRole('radio', { name: '2階' }))
-    fireEvent.click(within(floorPicker).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(floorPicker).getByRole('button', { name: '選択する' }))
     fireEvent.click(within(screen.getByRole('dialog', { name: '卓を作る' })).getByRole('button', { name: /^卓を作る$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ floorId: 'floor-2', expectedTargetVersion: 7 })))
     expect(fixture.createTable.mock.calls[0][1]).toMatchObject({floorX:30,floorY:168,width:80,height:80})

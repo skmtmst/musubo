@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/restaurant-test/reservations',
   useSearchParams: () => new URLSearchParams(),
 }))
-vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>'owner',canManageRole:(role:string)=>role==='owner'}))
+vi.mock('@/lib/staff-role',()=>({useStaffIdentity:()=>({id:'staff-1'}),useStaffRole:()=>'owner',canManageRole:(role:string)=>role==='owner'}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   selectedAccountId: 'account-a', selectedAccount: null, accounts: [], loading: false,
 }) }))

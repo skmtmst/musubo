@@ -161,7 +161,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     for (const row of ['見本 120さんの権限を変えますか？', '役割', '管理者 → 閲覧のみ', '変わる']) {
       expect((confirm?.textContent ?? '').replace(/\s/g, ''), `「${row}」がない`).toContain(row.replace(/\s/g, ''))
     }
-    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変える'))
+    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変更する'))
     await act(async () => { (go as HTMLButtonElement).click() })
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)
@@ -186,7 +186,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     await flush()
     // 確認を挟んでから送る。
     const confirm = document.body.querySelector('[data-design-node="M4jS9"]')
-    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変える'))
+    const go = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => (b.textContent ?? '').trim().endsWith('変更する'))
     await act(async () => { (go as HTMLButtonElement).click() })
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)

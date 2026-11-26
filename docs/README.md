@@ -1405,3 +1405,5 @@
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 - [口コミ一覧の列幅と受信日時の揃え](release-log/unreleased/PR-kenta-google-top.md) — 投稿者名や年付き日時で列がずれないように直した反映履歴。確認 2026-11-26。
+- [今日の確認の開閉と開店準備ガイドの閉じる操作](release-log/unreleased/PR-kenta-today-fold.md) — 反映履歴、確認 2026-11-26。
+- [操作の言葉と予約台帳の見やすさ](release-log/unreleased/PR-kenta-label-board.md) — 反映履歴、確認 2026-11-26。

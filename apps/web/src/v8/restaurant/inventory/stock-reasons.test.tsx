@@ -140,7 +140,7 @@ describe('在庫を直すための案内', () => {
     render(draw(context(true)))
     await screen.findByText(noTables)
     expect(screen.getAllByText(noTables)).toHaveLength(1)
-    expect(screen.getByRole('link', { name: '座席・卓管理で変える →' }).getAttribute('href')).toBe('/restaurant-test/tables')
+    expect(screen.getByRole('link', { name: '座席・卓管理で変更する →' }).getAttribute('href')).toBe('/restaurant-test/tables')
     expect(screen.getByText('1枠の総数 0席')).not.toBeNull()
     expect(changeStandard().disabled).toBe(true)
   })

@@ -154,7 +154,7 @@ describe('役割はサーバーで決める', () => {
   test('実入口の担当者を読み、作る型の本文へ勤務の入力を描く', async () => {
     fixture.query = 'staff_id=bs-1'
     render(<StaffShiftsPage />)
-    const weekday = await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
+    const weekday = await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選択する' })
     expect(weekday.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     expect(fixture.getBreaks).toHaveBeenCalledWith('account-a', 'bs-1')
   })
@@ -243,7 +243,7 @@ describe('勤務とシフト（管理者）', () => {
   })
   test('休憩は月〜金の1行で出し、保存のときは曜日ごとに広げて今のIDを付けて送る', async () => {
     render(<StaffShiftsV8 staffId="bs-1" />)
-    expect(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選択する' })).toBeTruthy()
     const saveButtons = screen.getAllByRole('button', { name: '保存する' })
     fireEvent.click(saveButtons[1])
     await waitFor(() => { expect(fixture.putBreaks).toHaveBeenCalled() })
@@ -253,9 +253,9 @@ describe('勤務とシフト（管理者）', () => {
 
   test('曜日を外すと、その曜日は送らない', async () => {
     render(<StaffShiftsV8 staffId="bs-1" />)
-    fireEvent.click(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選択する' }))
     fireEvent.click(screen.getByRole('checkbox', { name: '水' }))
-    expect(screen.getByRole('button', { name: '休憩の曜日（月・火・木・金）を選ぶ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '休憩の曜日（月・火・木・金）を選択する' })).toBeTruthy()
     fireEvent.click(screen.getAllByRole('button', { name: '保存する' })[1])
     await waitFor(() => { expect(fixture.putBreaks).toHaveBeenCalled() })
     const rows = fixture.putBreaks.mock.calls[0][3] as Array<{ weekday: number }>
@@ -265,7 +265,7 @@ describe('勤務とシフト（管理者）', () => {
   test('曜日の時間が逆さまのまま保存すると、送らずその曜日の時刻の欄を赤くし、終わりの欄へ移る', async () => {
     fixture.rules = [{ weekday: 1, start_time: '19:00', end_time: '10:00' }]
     render(<StaffShiftsV8 staffId="bs-1" />)
-    await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
+    await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選択する' })
     fireEvent.click(screen.getAllByRole('button', { name: '保存する' })[0])
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(fixture.putRules).not.toHaveBeenCalled()
@@ -336,7 +336,7 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
     setTime('月曜日の始まり', '11:00')
     setTime('休憩の始まり', '12:00')
     setTime('休憩の終わり', '12:45')
-    fireEvent.click(screen.getByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '休憩の曜日（月〜金）を選択する' }))
     fireEvent.click(screen.getByRole('checkbox', { name: '水' }))
 
     fixture.getRules.mockImplementationOnce(() => timing === 'すぐ返る'
@@ -364,7 +364,7 @@ test.each(['すぐ返る', '入力後に返る'] as const)(
     expect(input('休憩の始まり').value).toBe('12 : 00')
     const end = timing === '入力後に返る' ? '12:30' : '12:45'
     expect(input('休憩の終わり').value).toBe(end.replace(':', ' : '))
-    expect(screen.getByRole('button', { name: '休憩の曜日（月・火・木・金）を選ぶ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '休憩の曜日（月・火・木・金）を選択する' })).toBeTruthy()
     expect(fixture.getBreaks).toHaveBeenCalledTimes(1)
     expect(fixture.putBreaks).not.toHaveBeenCalled()
 

@@ -538,7 +538,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       onClick={() => void startEdit()}
                       disabled={acting}
                     >
-                      内容を変える
+                      内容を変更する
                     </Button>
                     <button
                       onClick={() => setDecideTarget('reject')}
@@ -562,7 +562,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       onClick={() => void startEdit()}
                       disabled={acting}
                     >
-                      内容を変える
+                      内容を変更する
                     </Button>
                     <Button
                       onClick={() => setDecideTarget('no_show')}

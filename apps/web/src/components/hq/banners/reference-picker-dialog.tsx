@@ -205,7 +205,7 @@ export default function ReferencePickerDialog({
         <div className={Frame === Dialog ? 'flex w-full flex-wrap items-center gap-2 border-t border-hairline px-6 py-3.5' : 'flex w-full flex-wrap items-center gap-2'}>
           <Button onClick={() => fileRef.current?.click()}>
             <Upload aria-hidden="true" className="h-4 w-4" />
-            ファイルを選ぶ
+            ファイルを選択する
           </Button>
           <input
             ref={fileRef}

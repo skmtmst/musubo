@@ -14,7 +14,7 @@ export function BookingBlock({ tone = 'confirmed', state, placement, source, chi
 }
 
 /** 空いている枠に予約を追加する。セルに指を乗せるかキーボードで選ぶと表示する。 */
-export function BookingSlot({ children, placement, ...props }: ControlProps & { placement?: 'cell' }) {
+export function BookingSlot({ children, placement, ...props }: ControlProps & { placement?: 'cell' | 'timeline' }) {
   return <button type="button" {...props} className={styles.slotAdd} data-placement={placement} data-booking-add>{children}</button>
 }
 

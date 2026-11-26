@@ -136,11 +136,11 @@ afterEach(async () => {
 })
 
 describe('投稿画像の端末アップロード', () => {
-  it('画像を選ぶボタンと隠しファイル入力がある', async () => {
+  it('画像を選択するボタンと隠しファイル入力がある', async () => {
     await render()
     const text = container.textContent ?? ''
-    expect(text).toContain('画像を選ぶ')
-    expect(text).toContain('登録メディアから選ぶ')
+    expect(text).toContain('画像を選択する')
+    expect(text).toContain('登録メディアから選択する')
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')
     expect(input).not.toBeNull()
     expect(input?.accept).toContain('image/png')

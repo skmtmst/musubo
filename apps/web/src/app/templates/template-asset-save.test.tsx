@@ -282,7 +282,7 @@ describe('NEXT-18: リッチメッセージの面数と保存値が一致する'
     const dialog = document.body.querySelector<HTMLElement>('[role="alertdialog"], [role="dialog"]')!
     expect(dialog.textContent).toContain('C')
     expect(within(areaList()).getAllByRole('button')).toHaveLength(3)
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '変える' })); await settle() })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '変更する' })); await settle() })
     expect(within(areaList()).getAllByRole('button')).toHaveLength(2)
     expect(screen.queryByLabelText('面 C のURL')).toBeNull()
     await act(async () => { fireEvent.change(screen.getByLabelText('画像のURL'), { target: { value: 'https://cdn.example.test/rich.png' } }) })

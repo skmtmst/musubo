@@ -66,7 +66,7 @@ export function ViewDrawer({ open, layout, industry, defaultMetrics = [], busy, 
             <Scissors size={16} aria-hidden="true" />
             <span className={styles.drawerBaseText}><strong>いまの型：{layout.base}</strong><span className={styles.cellMuted}>{layout.changed + metricChanges}か所を変えています</span></span>
             <span className={styles.grow} />
-            <Button size="compact" onClick={() => setPicking(!picking)} aria-expanded={picking}><Shapes size={16} aria-hidden="true" />型を変える</Button>
+            <Button size="compact" onClick={() => setPicking(!picking)} aria-expanded={picking}><Shapes size={16} aria-hidden="true" />型を変更する</Button>
             <Button size="compact" onClick={onReset} disabled={busy}><RotateCcw size={16} aria-hidden="true" />型に戻す</Button>
           </div>
           {picking ? (

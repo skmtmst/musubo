@@ -635,7 +635,7 @@ describe('定期レポートの行', () => {
     const row = Array.from(host.querySelectorAll('[aria-label="定期レポート"] tbody tr')).find((item) => item.textContent?.includes('週次まとめ'))
     expect(row?.textContent).toContain('有効')
     await click(host.querySelector('button[aria-label="定期レポート「週次まとめ」の操作"]') as HTMLButtonElement)
-    const edit = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) => item.textContent?.trim() === '内容を変える')
+    const edit = Array.from(document.body.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) => item.textContent?.trim() === '内容を変更する')
     await click(edit as HTMLElement)
     expect(push).toHaveBeenCalledWith(expect.stringContaining('/analytics/reports/new?id=report-1'))
   })

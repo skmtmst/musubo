@@ -30,8 +30,8 @@ const items = [{ id: 'a', name: '案内A', folderId: 'folder' }, { id: 'b', name
 const folders = [{ id: 'folder', name: '公開中' }]
 const reason = '閲覧のみのため選び直せません。'
 const field = () => ({ label: '案内', noun: 'テンプレート', items, folders, value: 'a', onChange: vi.fn() })
-const confirm = () => screen.getByRole('button', { name: '選ぶ', exact: true }) as HTMLButtonElement
-const open = () => fireEvent.click(screen.getByRole('button', { name: '案内：変える' }))
+const confirm = () => screen.getByRole('button', { name: '選択する', exact: true }) as HTMLButtonElement
+const open = () => fireEvent.click(screen.getByRole('button', { name: '案内：変更する' }))
 function deferred<T>() { let resolve!: (v: T) => void; let reject!: (e: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 beforeEach(() => { held.buttons.clear(); held.checks.clear(); held.remove.clear(); held.busy.clear() })
 afterEach(cleanup)
@@ -40,7 +40,7 @@ it('任意lease付きは開いた窓を残し、理由付き確定と作成を�
   const p = field(); const preview = vi.fn()
   const view = render(<EntityPickerField {...p} canChangeNow={() => true} createHref="/templates/new" createLabel="テンプレート" onSelect={preview} preview={item => <span>見本：{item?.name}</span>} />)
   open()
-  const heldConfirm = held.buttons.get('選ぶ')!
+  const heldConfirm = held.buttons.get('選択する')!
   view.rerender(<EntityPickerField {...p} canChangeNow={() => true} lockedReason={reason} createHref="/templates/new" createLabel="テンプレート" onSelect={preview} preview={item => <span>見本：{item?.name}</span>} />)
   expect(screen.getByRole('dialog')).toBeTruthy()
   expect(confirm().getAttribute('aria-disabled')).toBe('true'); expect(confirm().disabled).toBe(false); expect(confirm().tabIndex).toBe(0)
@@ -57,9 +57,9 @@ it('任意lease付きは開いた窓を残し、理由付き確定と作成を�
 
 it('未確定disabledだけでも開いた窓と値を残し、理由0、旧許可と旧拒否の確定は復活しない', () => {
   const p = field(); const view = render(<EntityPickerField {...p} canChangeNow={() => true} />)
-  open(); const oldAllowed = held.buttons.get('選ぶ')!
+  open(); const oldAllowed = held.buttons.get('選択する')!
   view.rerender(<EntityPickerField {...p} disabled canChangeNow={() => true} />)
-  const oldDenied = held.buttons.get('選ぶ')!
+  const oldDenied = held.buttons.get('選択する')!
   expect(screen.getByRole('dialog')).toBeTruthy(); expect(confirm().disabled).toBe(true)
   expect(document.querySelector('[data-permission-locked]')).toBeNull()
   act(() => { oldAllowed() }); expect(p.onChange).not.toHaveBeenCalled()
@@ -73,7 +73,7 @@ it('再描画前の失効は開く・外す・保持した確定で新鮮なleas
   render(<EntityPickerField {...p} clearable canChangeNow={() => allowed} />)
   allowed = false; open(); expect(screen.queryByRole('dialog')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '案内を外す' })); expect(p.onChange).not.toHaveBeenCalled()
-  allowed = true; open(); const saved = held.buttons.get('選ぶ')!
+  allowed = true; open(); const saved = held.buttons.get('選択する')!
   allowed = false; act(() => { saved() }); expect(p.onChange).not.toHaveBeenCalled()
 })
 
@@ -82,14 +82,14 @@ it('multiの理由付きは札の×・候補チェック・全体選択・確定
   const view = render(<EntityPickerField {...p} multiple canChangeNow={() => true} />)
   open(); const remove = held.remove.get('案内A')!
   const oldCheck = held.checks.get('案内B')!
-  const oldConfirm = held.buttons.get('選ぶ（1件）')!
+  const oldConfirm = held.buttons.get('選択する（1件）')!
   view.rerender(<EntityPickerField {...p} multiple canChangeNow={() => true} lockedReason={reason} />)
   expect(screen.getByRole('dialog')).toBeTruthy()
   const button = screen.getByRole('button', { name: '案内Aを外す' }) as HTMLButtonElement
   expect(button.getAttribute('aria-disabled')).toBe('true'); expect(button.tabIndex).toBe(0)
   expect(screen.getByRole('checkbox', { name: '案内B' }).getAttribute('aria-disabled')).toBe('true')
   expect(screen.getByRole('checkbox', { name: 'すべてをまとめて選ぶ' }).getAttribute('aria-disabled')).toBe('true')
-  expect(screen.getByRole('button', { name: '選ぶ（1件）' }).getAttribute('aria-disabled')).toBe('true')
+  expect(screen.getByRole('button', { name: '選択する（1件）' }).getAttribute('aria-disabled')).toBe('true')
   expect(screen.queryByRole('link', { name: /作る画面へ/ })).toBeNull()
   expect(screen.getByRole('button', { name: /作る画面へ/ }).getAttribute('aria-disabled')).toBe('true')
   act(() => { remove(); oldCheck(true); oldConfirm() })
@@ -102,7 +102,7 @@ it('multi本人未確定は札の×を消さずnative fieldsetで止め、理由
   const view = render(<EntityPickerField {...p} multiple canChangeNow={() => true} />)
   const remove = held.remove.get('案内A')!
   view.rerender(<EntityPickerField {...p} multiple canChangeNow={() => false} />)
-  expect((screen.getByRole('button', { name: '案内：変える' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '案内：変更する' }) as HTMLButtonElement).disabled).toBe(true)
   const button = screen.getByRole('button', { name: '案内Aを外す' })
   expect((button.closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true)
   expect(document.querySelector('[data-permission-locked]')).toBeNull()
@@ -137,7 +137,7 @@ it('multi作成中に失効したら、返った保存済み候補を選択へ�
   const pending = deferred<{ id: string; name: string }>(); const create = vi.fn(() => pending.promise); const confirm = vi.fn()
   const p = { title: '案内を選ぶ', items, initialIds: ['a'], onConfirm: confirm, onCancel: vi.fn(), createAction: { label: '案内を作る', onCreate: create } }
   const view = render(<EntityMultiPickerDialog {...p} canChangeNow={() => true} />)
-  const oldConfirm = held.buttons.get('選ぶ（1件）')!
+  const oldConfirm = held.buttons.get('選択する（1件）')!
   fireEvent.click(screen.getByRole('button', { name: '案内を作る' }))
   fireEvent.change(screen.getByRole('textbox', { name: '新しい名前' }), { target: { value: '新しい案内' } })
   fireEvent.click(screen.getByRole('button', { name: '作る', exact: true }))
@@ -147,7 +147,7 @@ it('multi作成中に失効したら、返った保存済み候補を選択へ�
   expect(screen.getByRole('button', { name: '案内を作る' }).getAttribute('aria-disabled')).toBe('true')
   expect(screen.getByRole('button', { name: '作る', exact: true }).getAttribute('aria-disabled')).toBe('true')
   expect(screen.queryByRole('checkbox', { name: '作成済みの案内' })).toBeNull()
-  expect(screen.getByRole('button', { name: '選ぶ（1件）' }).getAttribute('aria-disabled')).toBe('true')
+  expect(screen.getByRole('button', { name: '選択する（1件）' }).getAttribute('aria-disabled')).toBe('true')
   expect((screen.getByRole('textbox', { name: '新しい名前' }) as HTMLInputElement).value).toBe('新しい案内')
   act(() => { oldConfirm() })
   expect(confirm).not.toHaveBeenCalled()
@@ -205,10 +205,10 @@ it('未指定の既存lockedReasonは従来どおり窓を閉じ、新しい形�
 it('multiの開いた窓へunknown disabledを伝え、候補と確定を理由なしnativeで止める', () => {
   const change = vi.fn(); const p = { label: '案内', noun: 'テンプレート', items, value: ['a'], onChange: change }
   const view = render(<EntityPickerField {...p} multiple canChangeNow={() => true} />)
-  open(); const oldConfirm = held.buttons.get('選ぶ（1件）')!
+  open(); const oldConfirm = held.buttons.get('選択する（1件）')!
   view.rerender(<EntityPickerField {...p} multiple disabled canChangeNow={() => true} />)
   expect(screen.getByRole('dialog')).toBeTruthy()
-  expect((screen.getByRole('button', { name: '選ぶ（1件）' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '選択する（1件）' }) as HTMLButtonElement).disabled).toBe(true)
   expect((screen.getByRole('checkbox', { name: '案内B' }) as HTMLInputElement).disabled).toBe(true)
   expect(document.querySelector('[data-permission-locked]')).toBeNull()
   act(() => oldConfirm()); expect(change).not.toHaveBeenCalled()
@@ -220,7 +220,7 @@ it('singleのその場作成は再描画前のlease失効をAPI直前で拒む',
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '新しい案内' } })
   const button = await screen.findByRole('button', { name: '「新しい案内」を作る' })
   allowed = false; fireEvent.click(button)
-  act(() => { held.buttons.get('選ぶ')!() })
+  act(() => { held.buttons.get('選択する')!() })
   expect(confirm).not.toHaveBeenCalled()
   expect(create).not.toHaveBeenCalled()
 })
@@ -269,7 +269,7 @@ it.each([false, true])('理由とfalse leaseがそろっても欄/外す/候補�
   const view = render(multiple ? <EntityPickerField {...common} multiple value={['a']} /> : <EntityPickerField {...common} value="a" clearable />)
   open()
   view.rerender(multiple ? <EntityPickerField {...common} multiple value={['a']} disabled canChangeNow={() => false} lockedReason={reason} /> : <EntityPickerField {...common} value="a" clearable disabled canChangeNow={() => false} lockedReason={reason} />)
-  const opener = screen.getByRole('button', { name: '案内：変える' }) as HTMLButtonElement
+  const opener = screen.getByRole('button', { name: '案内：変更する' }) as HTMLButtonElement
   const remove = screen.getByRole('button', { name: multiple ? '案内Aを外す' : '案内を外す' }) as HTMLButtonElement
   for (const button of [opener, remove]) {
     expect(button.disabled).toBe(false); expect(button.matches(':disabled')).toBe(false)

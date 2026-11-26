@@ -1431,7 +1431,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                     <td>
                       {on ? <span className={styles.cellLine}>
                         <span className={styles.cell}>{type === 'tag' ? <TagPill name={name} color={tagColor} size="sm" /> : `${summary}（${textOverrides[account.id] !== undefined || store?.textOverride !== undefined ? '個別の本文' : '一括と同じ'}）`}</span>
-                        {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変える</Button> : null}
+                        {textMessage && stage === 'accounts' ? <Button size="compact" variant="text" disabled={busy} onClick={() => setOverrideOpen(overrideOpen === account.id ? null : account.id)}>本文を変更する</Button> : null}
                       </span> : <span className={`${styles.cell} ${styles.cellEmpty}`}>—</span>}
                     </td>
                     <td><span className={on ? styles.cell : `${styles.cell} ${styles.cellEmpty}`}>{on ? storeVersion(account.id) : '—'}</span></td>

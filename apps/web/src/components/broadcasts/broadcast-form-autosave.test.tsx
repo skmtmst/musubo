@@ -246,7 +246,7 @@ describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', 
     expect(container.textContent).toContain('B案は今は文字だけ送れます')
     const bSection = Array.from(container.querySelectorAll('[data-message-composer]'))[0]
     expect(bSection.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-disabled')).toBe('true')
-    expect((Array.from(bSection.querySelectorAll('button')).find(button => button.textContent?.trim() === 'テンプレートから選ぶ') as HTMLButtonElement).disabled).toBe(true)
+    expect((Array.from(bSection.querySelectorAll('button')).find(button => button.textContent?.trim() === 'テンプレートから選択する') as HTMLButtonElement).disabled).toBe(true)
     await act(async () => { clickButton('下書きを保存する') })
     expect(document.body.textContent).toContain('B案の文字以外は保存されません。文字だけにしてから保存してください')
     expect(createApi).not.toHaveBeenCalled()

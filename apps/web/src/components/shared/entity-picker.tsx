@@ -93,7 +93,7 @@ export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps)
 
 /** 行を選ぶ間は仮の選択。確定したときだけ呼ぶ側の値を変える。 */
 function SingleEntityPickerDialog({
-  title, description, scrollBody = false, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
+  title, description, scrollBody = false, confirmLabel = '選択する', items, folders = [], foldersFailed = false, categories = [], initialId = '',
   state, listFooter, preview, error, busy = false, confirmDisabled = false, confirmLockedReason, readOnly = false, createHref, createLabel,
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel, canChangeNow,
 }: SingleProps) {
@@ -302,7 +302,7 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
       </div>
       <div className={styles.tpFootActions}>
         <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || changeDisabled || Boolean(state) || (maxSelected !== undefined && selected.length > maxSelected) || (!allowEmpty && selected.length === 0)} lockedReason={confirmLockedReason} onClick={() => { if (canConfirmNow()) onConfirm(selected) }}>{`選ぶ（${countText}）`}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || changeDisabled || Boolean(state) || (maxSelected !== undefined && selected.length > maxSelected) || (!allowEmpty && selected.length === 0)} lockedReason={confirmLockedReason} onClick={() => { if (canConfirmNow()) onConfirm(selected) }}>{`選択する（${countText}）`}</Button>}
     </div>
     </>}
   >
@@ -351,7 +351,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
     if (buttonRef) buttonRef.current = element
   }
   const empty = !name
-  const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
+  const actionLabel = readOnly ? '見る' : empty ? '選択する' : '変更する'
   const isInvalid = invalid || Boolean(field?.invalid)
   return <div className={`${styles.field} ${choiceStyles.frame}`} data-choice-field data-choice-surface="select" data-choice-active={prefixedValue?.filterState === 'active' || undefined} data-choice-invalid={isInvalid || undefined} data-choice-disabled={disabled || Boolean(lockedReason && !readOnly) || undefined} data-entity-picker-field data-value-prefix={valuePrefix ? '' : undefined} data-filter-active={prefixedValue?.filterState === 'active' || undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || Boolean(lockedReason && !readOnly) || undefined} data-multiple={selection ? '' : undefined}>
     {readOnly && empty ? null : <button type="button" data-choice-trigger className={styles.fieldTrigger} ref={lockedReason ? setButtonRef : buttonRef} id={id ?? field?.controlId}

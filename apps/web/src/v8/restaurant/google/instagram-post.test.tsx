@@ -173,7 +173,7 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
 
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
     await screen.findByRole('switch', { name: 'Instagram にも投稿する' })
-    const picks = screen.getAllByRole('button', { name: '登録メディアから選ぶ' })
+    const picks = screen.getAllByRole('button', { name: '登録メディアから選択する' })
     fireEvent.click(picks[target === 'Google' ? 0 : 1])
     await screen.findByRole('dialog', { name: `${target}用画像を登録メディアから選ぶ` })
     fireEvent.click(await screen.findByRole('radio', { name: /料理写真.jpg/ }))

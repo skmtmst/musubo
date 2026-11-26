@@ -34,7 +34,7 @@ export default function HeadingBandGuardPage() {
         description="帯の左右を見るための見本です"
         readOnly
         readOnlyNeed="manager"
-        headAfter={() => <><Button>店舗を選ぶ</Button><Button variant="primary" lockedReason={PERMISSION_LOCK_REASON.viewer}>保存する</Button></>}
+        headAfter={() => <><Button>店舗を選択する</Button><Button variant="primary" lockedReason={PERMISSION_LOCK_REASON.viewer}>保存する</Button></>}
       />
     </>
   )

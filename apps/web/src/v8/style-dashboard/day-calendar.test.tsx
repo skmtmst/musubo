@@ -267,7 +267,7 @@ it.each(['restaurant', 'lesson'] as const)('%sの頭は閲覧のみを灰色と�
     const view = render(<StyleDashboard style={style} />)
     await screen.findByRole('region', { name: '1日のカレンダー' })
     fireEvent.click(screen.getByRole('button', { name: 'その他の操作', exact: true }))
-    for (const name of ['LINE を送る', '休みを入れる', '表示を変える', STYLE_CONFIG[style].primary]) {
+    for (const name of ['LINE を送る', '休みを入れる', '表示を変更する', STYLE_CONFIG[style].primary]) {
       const button = screen.queryByRole('button', { name, exact: true }) ?? screen.getByRole('menuitem', { name, exact: true })
       const reasonId = button.getAttribute('aria-describedby')
       if (role === 'viewer') {

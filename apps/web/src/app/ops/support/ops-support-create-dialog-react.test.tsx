@@ -108,8 +108,8 @@ describe('チケット作成の小窓', () => {
     await flush()
     await act(async () => { dialog()!.querySelector<HTMLButtonElement>('button[aria-label="契約先"]')!.click() })
     await act(async () => { screen.getByRole('radio', { name: /検証商事/ }).click() })
-    await act(async () => { screen.getByRole('button', { name: '選ぶ', exact: true }).click() })
-    await waitFor(() => expect(screen.queryByRole('button', { name: '選ぶ', exact: true })).toBeNull())
+    await act(async () => { screen.getByRole('button', { name: '選択する', exact: true }).click() })
+    await waitFor(() => expect(screen.queryByRole('button', { name: '選択する', exact: true })).toBeNull())
     const subject = dialog()?.querySelector('input[aria-label="件名"]') as HTMLInputElement | null
     const body = dialog()?.querySelector('textarea[aria-label="内容"]') as HTMLTextAreaElement | null
     expect(subject, '件名の欄がない').not.toBeNull()

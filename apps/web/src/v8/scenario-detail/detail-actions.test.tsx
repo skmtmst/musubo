@@ -615,7 +615,7 @@ describe('置き場（フォルダ）はシナリオの所属アカウントの�
     stubScenario({ folderId: 'folder-other-account' })
     await render()
     expect(host.textContent).toContain('フォルダ：名前を確認できません')
-    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変更する' }))
     const dialog = screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })
     expect(dialog.textContent).toContain('いま入っているフォルダが見つかりません（削除されたか、別アカウントのものです）。')
     fireEvent.click(within(dialog).getByRole('button', { name: 'この内容で保存する' }))
@@ -628,7 +628,7 @@ describe('置き場（フォルダ）はシナリオの所属アカウントの�
     stubScenario({ folderId: 'folder-a' })
     await render()
     expect(host.textContent).toContain('フォルダ：確認できません')
-    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変更する' }))
     const dialog = screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })
     expect(dialog.textContent).toContain('フォルダ一覧を読み込めませんでした。')
     const select = dialog.querySelector<HTMLButtonElement>('[aria-label="置き場（フォルダ）"]')!
@@ -650,7 +650,7 @@ describe('保存・開始のきっかけ・配信の3つの段', () => {
   it('開始のきっかけの段の「設定を変える」で開始条件の窓を開き、保存したら試算を取り直す', async () => {
     await render()
     const before = calls.simulate.mock.calls.length
-    fireEvent.click(screen.getByRole('button', { name: /設定を変える/ }))
+    fireEvent.click(screen.getByRole('button', { name: /設定を変更する/ }))
     fireEvent.click(await screen.findByRole('button', { name: 'きっかけを保存（試験）' }))
     await settle()
     expect(calls.simulate.mock.calls.length).toBeGreaterThan(before)

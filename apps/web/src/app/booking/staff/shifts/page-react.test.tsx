@@ -730,9 +730,9 @@ describe('日時を指定して空きを確認 (IDEA-28)', () => {
   test('日時を入れて確かめるとAPIを呼び、取れる旨と残数を表示する', async () => {
     await renderEditor()
     await fillCheckForm()
-    fireEvent.click(await screen.findByRole('button', { name: '確かめる担当：選ぶ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '確かめる担当：選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '担当A' }))
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '確かめる' }))
 
     await waitFor(() => expect(fixture.checkAvailability).toHaveBeenCalledWith('account-a', {

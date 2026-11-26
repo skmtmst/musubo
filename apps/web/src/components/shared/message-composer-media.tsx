@@ -95,7 +95,7 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
   return <>
     {audio ? <>
       <div className={styles.mediaChoices}>
-        {accountId ? <Button className={styles.mediaPick} disabled={busy || disabled} onClick={() => setPicker(true)}><FolderOpen size={20} aria-hidden /><strong>登録メディアから選ぶ</strong><small>登録メディア一覧の音声から</small></Button> : null}
+        {accountId ? <Button className={styles.mediaPick} disabled={busy || disabled} onClick={() => setPicker(true)}><FolderOpen size={20} aria-hidden /><strong>登録メディアから選択する</strong><small>登録メディア一覧の音声から</small></Button> : null}
         <FileDropzone variant="composer" icon={<Upload size={20} aria-hidden />} className={styles.mediaPick} title="ファイルを選ぶ・ここへドラッグ" hint={accountId ? 'm4a・mp3 ／ 200MB まで ／ 長さは自動で入ります' : 'm4a ／ 200MB まで ／ 長さは自動で入ります'} accept={accountId ? 'audio/mp4,audio/mpeg' : 'audio/mp4'} busy={busy} disabled={disabled} onFiles={(files) => void upload(files[0])} />
       </div>
       {url ? <div className={styles.attachment}><AudioPreview key={url} url={url} duration={state.audio.duration} name={String(bubble.content.fileName ?? '選んだ音声')} disabled={busy || disabled} /><Button size="composer-small" disabled={busy || disabled} onClick={() => onChange({ state: { ...state, audio: { originalContentUrl: '', duration: '' } } })}>外す</Button></div> : null}

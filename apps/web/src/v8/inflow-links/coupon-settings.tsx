@@ -59,7 +59,7 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
       <Field label="渡すクーポン" required note={selected ? undefined : '公開中で、利用期間内のクーポンを選んでください。'}>
         <EntityPickerSummary label="渡すクーポン" noun="クーポン" icon={Ticket} valuePrefix="クーポン"
           name={selected?.name} meta={selected ? `${String(payload?.description ?? '')}・期限 ${String(payload?.endsAt ?? '')}` : undefined}
-          ariaLabel={selected ? 'クーポンを変える' : 'クーポンを選ぶ'} disabled={disabled || !accountId} onOpen={() => setOpen(true)} />
+          ariaLabel={selected ? 'クーポンを変更する' : 'クーポンを選択する'} disabled={disabled || !accountId} onOpen={() => setOpen(true)} />
       </Field>
       <Field label="渡す相手">
         <RadioCardGroup className={styles.couponAudience} legend="渡す相手">

@@ -37,7 +37,7 @@ export default function FileDropzone({
   busyNote,
   rejectTitle = 'このファイルは追加できません',
   rejectHint,
-  chooseLabel = 'ファイルを選ぶ',
+  chooseLabel = 'ファイルを選択する',
   secondary,
   onFiles,
   onPaste,

@@ -9,7 +9,7 @@ import StyleEntry from './style-entry'
 afterEach(cleanup)
 it('設定の入口は閉じた後の戻り先を渡す', async () => {
   render(<StyleEntry />)
-  const link = await screen.findByRole('link', { name: 'スタイルを変える' })
+  const link = await screen.findByRole('link', { name: 'スタイルを変更する' })
   const url = new URL(link.getAttribute('href')!, 'http://localhost')
   expect(url.pathname).toBe('/')
   expect(url.searchParams.get('setup')).toBe('0')

@@ -459,7 +459,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
             <StandardAllocationCard allocation={standard} totalSeats={totalSeats} canEdit={canWriteAllocation && !showHoursLink}
               lockedReason={lockedReason} onEdit={() => openEditor('standard')} />
           )}
-          {noActiveTablesReason ? <DialogNote>{noActiveTablesReason} {!guidingReception ? <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button> : null}</DialogNote> : null}
+          {noActiveTablesReason ? <DialogNote>{noActiveTablesReason} {!guidingReception ? <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変更する →</Button> : null}</DialogNote> : null}
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
             <StockListHeading date={date} busy={busy} onChange={changeDate} />
             {missingHoursReason && !guidingReception ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href={googleStatus !== null ? '/restaurant-test/google?tab=hours' : '#rs-hours-title'}>開ける時間を設定する</Button></DialogNote> : null}

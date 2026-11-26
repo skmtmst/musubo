@@ -1197,7 +1197,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('この操作はオーナーか管理者だけができます。')
     act(() => fireEvent.click(add)); expect(document.querySelector('[role="dialog"]')).toBeNull()
     act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
-    for (const label of ['名前を変える', '色を変える', '並べ替える（下へ）', '消す']) {
+    for (const label of ['名前を変更する', '色を変更する', '並べ替える（下へ）', '消す']) {
       expect(menuItem(label).getAttribute('aria-disabled')).toBe('true')
       act(() => fireEvent.click(menuItem(label)))
     }
@@ -1222,7 +1222,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     act(() => root.render(<BroadcastListV8 />)); await flush()
     if (editing) {
       act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
-      act(() => fireEvent.click(menuItem('名前を変える')))
+      act(() => fireEvent.click(menuItem('名前を変更する')))
     } else act(() => buttonByText('フォルダを追加')!.click())
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!
@@ -1250,7 +1250,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect(createFolder).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'broadcast', name: '新しい分類', accountId: 'account-a' }))
     expect(dialog.isConnected).toBe(false)
     act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
-    act(() => fireEvent.click(menuItem('名前を変える'))); await flush()
+    act(() => fireEvent.click(menuItem('名前を変更する'))); await flush()
     dialog = document.querySelector('[role="dialog"]')!
     act(() => fireEvent.change(dialog.querySelector('input')!, { target: { value: '変更した分類' } }))
     confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.trim() === '保存する')!

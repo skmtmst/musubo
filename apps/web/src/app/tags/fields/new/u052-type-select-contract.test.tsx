@@ -27,7 +27,7 @@ it('フォルダ作成中は host から直接送信しても情報欄を保存�
   fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
   fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
   fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成中' } })
-  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '作って選択する' }))
   act(() => { submitFromHost() })
   expect(submit).not.toHaveBeenCalled()
   expect(screen.queryByText('項目名を入力してください')).toBeNull()

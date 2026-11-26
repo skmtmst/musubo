@@ -372,7 +372,7 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: /承認/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '却下' })).toBeNull()
     expect(screen.queryByRole('button', { name: '押印を足す' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'ファイルを選択する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /色を選ぶ/ })).toBeNull()
     expect((screen.getByRole('textbox', { name: '使い方の説明' }) as HTMLTextAreaElement).readOnly).toBe(true)
   })

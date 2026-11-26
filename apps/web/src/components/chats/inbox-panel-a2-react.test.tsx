@@ -161,7 +161,7 @@ describe('受信箱A-2 右の欄でその場で直す', () => {
     const dialog = await screen.findByRole('dialog', { name: 'タグを選ぶ' })
     await eventually(() => { expect(within(dialog).getByRole('checkbox', { name: 'VIP' })).toBeTruthy() })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'VIP' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: /^選ぶ（\d+件）$/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /^選択する（\d+件）$/ }))
     await eventually(() => { expect(mocks.addTag).toHaveBeenCalledWith('friend-0', 'tag-b') })
     expect(mocks.addTag).toHaveBeenCalledTimes(1)
     expect(mocks.removeTag).not.toHaveBeenCalled()
@@ -181,7 +181,7 @@ describe('受信箱A-2 右の欄でその場で直す', () => {
     fireEvent.change(within(dialog).getByRole('textbox', { name: '新しいタグの名前' }), { target: { value: '新規客' } })
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '作る' })) })
     expect(mocks.createTag).toHaveBeenCalledExactlyOnceWith({ name: '新規客' })
-    fireEvent.click(within(dialog).getByRole('button', { name: /^選ぶ（\d+件）$/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: /^選択する（\d+件）$/ }))
     await eventually(() => { expect(mocks.addTag).toHaveBeenCalledWith('friend-0', 'tag-new') })
   })
 

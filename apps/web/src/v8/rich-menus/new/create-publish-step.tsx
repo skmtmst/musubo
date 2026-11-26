@@ -124,7 +124,7 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                   <p className={styles.checkNote}>画像が無いと、配った先で公開できません。①で選びます</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選択する</Button>
                 </span>
               </li>
             ) : (
@@ -308,7 +308,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
               </div>
               {missingImages.length > 0 ? (
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選択する</Button>
                 </span>
               ) : null}
             </li>

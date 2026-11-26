@@ -72,7 +72,7 @@ afterEach(async () => {
 describe('references-panel', () => {
   it('未設定のブロックに固定版を選ぶと参照が足される', async () => {
     const { onChange } = await renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: '固定版を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '固定版を選択する' }))
     fireEvent.click(screen.getByRole('button', { name: '見本画像を選ぶ' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '固定する版' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '固定する版' }))
@@ -84,7 +84,7 @@ describe('references-panel', () => {
 
   it('本文に共通情報を選ぶと参照が足される', async () => {
     const { onChange } = await renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: '共通情報を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '共通情報を選択する' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '店名' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '店名' }))
     fireEvent.click(within(screen.getByRole('option', { name: '電話番号（phone）' })).getByRole('button'))
@@ -105,8 +105,8 @@ describe('references-panel', () => {
 
   it('閲覧のみの人には変える操作を出さない', async () => {
     await renderPanel({ readOnly: true })
-    expect(screen.queryByRole('button', { name: '固定版を選ぶ' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '共通情報を選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '固定版を選択する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '共通情報を選択する' })).toBeNull()
   })
 
   it('公開済みで状態をまだ読めないときは、未公開とは区別して伝える', async () => {

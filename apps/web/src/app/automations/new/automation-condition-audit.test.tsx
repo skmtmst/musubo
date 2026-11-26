@@ -184,9 +184,9 @@ async function fillMinimum(el: HTMLElement): Promise<void> {
 
 /** 条件部品で「名前に『田中』を含む」を組み立てる。 */
 async function addNameCondition(el: HTMLElement): Promise<void> {
-  await act(async () => { el.querySelector<HTMLButtonElement>('[aria-label="動かす相手を変える"]')!.click() })
+  await act(async () => { el.querySelector<HTMLButtonElement>('[aria-label="動かす相手を変更する"]')!.click() })
   // 現役の条件の窓で、共通の検索できる足し口を操作する。
-  const picker = document.querySelector('button[aria-label="追加する条件を選ぶ"]') as HTMLButtonElement
+  const picker = document.querySelector('button[aria-label="追加する条件を選択する"]') as HTMLButtonElement
   expect(picker, '条件の足し口が出ていない').toBeTruthy()
   await act(async () => { picker.click() })
   await act(async () => { screen.getByRole('radio', { name: '名前' }).click() })

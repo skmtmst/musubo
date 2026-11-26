@@ -633,7 +633,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         open={pendingShape !== null}
         title="面の分け方を変えますか？"
         description={`${droppingLabels.map((label) => `面 ${label}`).join('・')}の動きは消えます。`}
-        confirmLabel="変える"
+        confirmLabel="変更する"
         onConfirm={confirmShapeChange}
         onCancel={() => setPendingShape(null)}
       />

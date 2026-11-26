@@ -99,7 +99,7 @@ export default function TapAreaEditor({
                       className={styles.area}
                       data-selected={selected ? '' : undefined}
                       aria-pressed={selected}
-                      aria-label={`面 ${tapAreaLetter(index)}「${item.name}」を選ぶ`}
+                      aria-label={`面 ${tapAreaLetter(index)}「${item.name}」を選択する`}
                       onClick={() => onSelect(item.id)}
                       style={{ left: `${item.x ?? 0}%`, top: `${item.y ?? 0}%`, width: `${item.width ?? 100}%`, height: `${item.height ?? 100}%` }}
                     >

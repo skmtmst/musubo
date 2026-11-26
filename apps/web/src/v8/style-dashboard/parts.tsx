@@ -84,8 +84,8 @@ export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: bool
   const cancel = row.live === false ? [] : [cancelItem]
   if (style === 'restaurant') return [
     detail,
-    { id: 'seat', label: '卓を変える', icon: <Armchair size={16} />, onSelect: () => h.open(row) },
-    { id: 'time', label: '時間を変える', icon: <Timer size={16} />, onSelect: () => h.open(row) },
+    { id: 'seat', label: '卓を変更する', icon: <Armchair size={16} />, onSelect: () => h.open(row) },
+    { id: 'time', label: '時間を変更する', icon: <Timer size={16} />, onSelect: () => h.open(row) },
     payLink, refund, line,
     { id: 'remind', label: '前日の確認をもう一度送る', icon: <Send size={16} />, onSelect: () => h.open(row) },
     ...noShowItems, ...cancel,
@@ -93,14 +93,14 @@ export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: bool
   if (style === 'salon') return [
     detail,
     { id: 'visit', label: '来店にする', icon: <Check size={16} />, onSelect: () => h.visit(row) },
-    { id: 'time', label: '時間を変える', icon: <Timer size={16} />, onSelect: () => h.open(row) },
+    { id: 'time', label: '時間を変更する', icon: <Timer size={16} />, onSelect: () => h.open(row) },
     { id: 'staff', label: '担当を移す', icon: <UserRoundCog size={16} />, onSelect: () => h.open(row) },
     payLink, { ...line, dividerBefore: false }, ...noShowItems, ...cancel,
   ]
   if (style === 'consult') return [
     detail,
-    { id: 'time', label: '日程を変える', icon: <CalendarClock size={16} />, onSelect: () => h.open(row) },
-    { id: 'staff', label: '担当を変える', icon: <UserRoundCog size={16} />, onSelect: () => h.open(row) },
+    { id: 'time', label: '日程を変更する', icon: <CalendarClock size={16} />, onSelect: () => h.open(row) },
+    { id: 'staff', label: '担当を変更する', icon: <UserRoundCog size={16} />, onSelect: () => h.open(row) },
     payLink, refund, line,
     { id: 'copy', label: '予約 URL をコピー', icon: <Copy size={16} />, onSelect: () => h.copy(row) },
     ...noShowItems, ...cancel,

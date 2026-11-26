@@ -44,7 +44,7 @@ it.each([false,true])('任意leaseは開いた候補を理由付きで残し、�
   fireEvent.click(button('行うことを足す')); fireEvent.click(screen.getByRole(multiple ? 'checkbox' : 'radio', { name: '候補A', exact: true }))
   const confirm = multiple ? () => held.multi!(['a']) : () => held.single!('a'); const old = multiple ? held.multi! : held.single!
   view.rerender(<ActionAddButton direct choices={c.choices} onAdd={onAdd} canChangeNow={() => false} lockedReason={reason} />)
-  expect(screen.getByRole('dialog')).toBeTruthy(); const target = button(multiple ? '選ぶ（1件）' : '選ぶ')
+  expect(screen.getByRole('dialog')).toBeTruthy(); const target = button(multiple ? '選択する（1件）' : '選択する')
   expect(target.disabled).toBe(false); expect(target.matches(':disabled')).toBe(false); expect(target.tabIndex).toBe(0)
   fireEvent.focus(target); expect(screen.getByRole('tooltip').textContent).toBe(reason)
   act(() => { if (multiple) (old as (ids: string[]) => void)(['a']); else (old as (id: string) => void)('a'); confirm() })
@@ -57,11 +57,11 @@ it.each([false,true])('理由なしfalseも候補を保ち、古い許可と拒�
   fireEvent.click(button('行うことを足す')); fireEvent.click(screen.getByRole(multiple ? 'checkbox' : 'radio', { name: '候補A', exact: true }))
   const oldYes = multiple ? held.multi! : held.single!
   view.rerender(<ActionAddButton direct choices={c.choices} onAdd={onAdd} canChangeNow={() => false} />); const oldNo = multiple ? held.multi! : held.single!
-  expect(button(multiple ? '選ぶ（1件）' : '選ぶ').disabled).toBe(true); expect(document.querySelector('[data-permission-locked]')).toBeNull()
+  expect(button(multiple ? '選択する（1件）' : '選択する').disabled).toBe(true); expect(document.querySelector('[data-permission-locked]')).toBeNull()
   act(() => { if (multiple) (oldYes as (ids: string[]) => void)(['a']); else (oldYes as (id: string) => void)('a') }); expect(onAdd).not.toHaveBeenCalled()
   view.rerender(<ActionAddButton direct choices={c.choices} onAdd={onAdd} canChangeNow={() => true} />)
   act(() => { if (multiple) (oldNo as (ids: string[]) => void)(['a']); else (oldNo as (id: string) => void)('a') }); expect(onAdd).not.toHaveBeenCalled()
-  fireEvent.click(button(multiple ? '選ぶ（1件）' : '選ぶ')); expect(onAdd).toHaveBeenCalledExactlyOnceWith({ id: 'pick', text: 'a' })
+  fireEvent.click(button(multiple ? '選択する（1件）' : '選択する')); expect(onAdd).toHaveBeenCalledExactlyOnceWith({ id: 'pick', text: 'a' })
 })
 
 it('開いた種類menuも理由付きで残し、保持した選択はmakeもaddも0', () => {
@@ -127,7 +127,7 @@ it('custom pickerにも理由/未知/leaseの任意contextを渡し、GET/プレ
   const choices: ActionChoice<Item>[] = [{ ...c.choices[0], picker: { ...c.choices[0].picker!, render: ({ onConfirm, onCancel, permission }) => <EntityPickerDialog title="custom対象" items={items} initialId="a" onConfirm={id => onConfirm([id])} onCancel={() => { cancel(); onCancel() }} confirmDisabled={permission?.disabled} confirmLockedReason={permission?.lockedReason} canChangeNow={permission?.canChangeNow} preview={item => <p>読む：{item?.name}</p>} /> } }]
   const view = render(<ActionAddButton direct choices={choices} onAdd={onAdd} canChangeNow={() => true} />); fireEvent.click(button('行うことを足す')); const old = held.single!
   view.rerender(<ActionAddButton direct choices={choices} onAdd={onAdd} canChangeNow={() => false} lockedReason={reason} />)
-  expect(screen.getByRole('dialog')).toBeTruthy(); expect(button('選ぶ').getAttribute('aria-disabled')).toBe('true'); fireEvent.click(screen.getByRole('radio', { name: '候補B', exact: true })); expect(screen.getByText('読む：候補B')).toBeTruthy()
+  expect(screen.getByRole('dialog')).toBeTruthy(); expect(button('選択する').getAttribute('aria-disabled')).toBe('true'); fireEvent.click(screen.getByRole('radio', { name: '候補B', exact: true })); expect(screen.getByText('読む：候補B')).toBeTruthy()
   act(() => old('a')); expect(onAdd).not.toHaveBeenCalled(); fireEvent.click(button('キャンセル')); expect(cancel).toHaveBeenCalledOnce()
 })
 
@@ -173,7 +173,7 @@ it.each(['add', 'editor'] as const)('理由付きの描画で保持したhandler
     view.rerender(<ActionAddButton direct choices={c.choices} onAdd={onAdd} canChangeNow={() => true} lockedReason={reason} />); const old = held.single!
     view.rerender(<ActionAddButton direct choices={c.choices} onAdd={onAdd} canChangeNow={() => true} />)
     act(() => old('a')); expect(c.make).not.toHaveBeenCalled(); expect(c.apply).not.toHaveBeenCalled(); expect(onAdd).not.toHaveBeenCalled(); expect(screen.getByRole('dialog')).toBeTruthy()
-    fireEvent.click(button('選ぶ')); expect(onAdd).toHaveBeenCalledOnce()
+    fireEvent.click(button('選択する')); expect(onAdd).toHaveBeenCalledOnce()
   } else {
     const p = list({ canChangeNow: () => true, lockedReason: reason }); const view = render(p.ui); openEditor(); const old = held.edit.get('a')!
     view.rerender(list({ onChange: p.change, canChangeNow: () => true }).ui)

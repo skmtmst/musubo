@@ -175,7 +175,7 @@ export function Steps({
         {summaryItems.map((step) => <div role="listitem" key={step.key} className={styles.sectionHead}>
           <span className={styles.sectionTitle}>{step.label}</span>
           <span className={styles.sectionSummary} title={summaries[step.key]}>{summaries[step.key]}</span>
-          {step.onSelect && !readOnly && !hideSummaryChangeKeys.includes(step.key) ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変える`} onClick={step.onSelect}>変える</Button> : null}
+          {step.onSelect && !readOnly && !hideSummaryChangeKeys.includes(step.key) ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変更する`} onClick={step.onSelect}>変更する</Button> : null}
         </div>)}
       </div> : null}
     </nav>
@@ -212,7 +212,7 @@ export function StepSection({ order, title, summary, open, onChange, children, r
       <span className={styles.sectionNumber}>{order}</span>
       <span className={styles.sectionTitle}>{title}</span>
       <span className={styles.sectionSummary} title={open ? undefined : summary}>{open ? null : summary}</span>
-      {open || readOnly ? null : <Button variant="secondary" onClick={onChange}>変える</Button>}
+      {open || readOnly ? null : <Button variant="secondary" onClick={onChange}>変更する</Button>}
     </div>
     {open ? <div className={styles.sectionBody}>{children}</div> : null}
   </Card>

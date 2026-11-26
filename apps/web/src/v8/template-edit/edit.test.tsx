@@ -547,13 +547,13 @@ describe('V8 クーポン・リサーチを作る', () => {
       root = createRoot(host)
       await mount('kind=research')
       // 質問が1つのときは、つまみを出さず理由を言う。
-      expect(screen.queryByRole('button', { name: /問 1 の並びを変える/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /問 1 の並びを変更する/ })).toBeNull()
       expect(document.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('質問が1つのときは並び替えできません')
       fireEvent.click(screen.getByRole('button', { name: /質問を足す/ }))
       await flush()
       type(screen.getAllByLabelText('質問文')[0], '一問目')
       type(screen.getAllByLabelText('質問文')[1], '二問目')
-      const grip = screen.getByRole('button', { name: /問 1 の並びを変える/ })
+      const grip = screen.getByRole('button', { name: /問 1 の並びを変更する/ })
       if (how === 'key') fireEvent.keyDown(grip, { key: 'ArrowDown' })
       if (how === 'menu') {
         fireEvent.click(grip)
@@ -873,7 +873,7 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
     role.value = verifiedStaffRole('viewer')
     assetsList.mockResolvedValue({success:true,data:[{...asset,payload:{...payload,couponType:'discount',discount:{mode:'price',beforeYen:1000,afterYen:500}}}]})
     await mount('kind=coupon&id=coupon-old')
-    for(const name of ['差し替える','消す','URL で入れる','登録メディアから選ぶ']){
+    for(const name of ['差し替える','消す','URL で入れる','登録メディアから選択する']){
       const button=screen.getByRole('button',{name}) as HTMLButtonElement
       expect(button.disabled).toBe(false)
       expect(button.closest('fieldset[disabled]')).toBeNull()

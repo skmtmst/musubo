@@ -95,7 +95,7 @@ export default function EntitySelect(props: EntitySelectProps) {
   const localFolders: EntityPickerFolder[] = [...new Map(options.filter((option) => option.folderId && option.folderName)
     .map((option) => [option.folderId!, { id: option.folderId!, name: option.folderName!, color: option.folderColor }])).values()]
   const hasFolderInfo = items.some((item) => item.folderId !== undefined)
-  const noun = props.noun ?? (kind ? ENTITY_KINDS[kind].noun : props.label ?? label.replace(/で絞り込む.*$|を変える$|を選ぶ$/, ''))
+  const noun = props.noun ?? (kind ? ENTITY_KINDS[kind].noun : props.label ?? label.replace(/で絞り込む.*$|(?:を変更する|を変える)$|を選ぶ$/, ''))
   const common = {
     compact: props.compact, label, ariaLabel: label, noun, items, candidatesStatus: props.candidatesStatus, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
     onOpen: hasFolderInfo && kind ? load : undefined, disabled, disabledReason: props.disabledReason, lockedReason: props.lockedReason, readOnly, invalid: Boolean(error) || invalid, id,

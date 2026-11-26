@@ -37,7 +37,7 @@ describe('一括バー（★管理画面 z97zZN §2）', () => {
 
   it.each(['人', '枚', '件'])('全件を選ぶ操作にも単位「%s」を使う', (unit) => {
     const view = render(<BulkBar count={3} total={12} unit={unit} onSelectAll={() => {}} />)
-    expect(view.getByRole('button', { name: `条件に合う12${unit}すべてを選ぶ` })).toBeTruthy()
+    expect(view.getByRole('button', { name: `条件に合う12${unit}すべてを選択する` })).toBeTruthy()
   })
 
   it('0件へ戻ると少し待ってから消える（下がって消える）', () => {
@@ -57,19 +57,19 @@ describe('一括バー（★管理画面 z97zZN §2）', () => {
 it('このページを選んだ後に、条件に合う全件を選べる', async () => {
   const selectAll = vi.fn()
   const view = render(<BulkBar count={20} total={78} onSelectAll={selectAll} />)
-  const button = view.getByRole('button', { name: '条件に合う78件すべてを選ぶ' })
+  const button = view.getByRole('button', { name: '条件に合う78件すべてを選択する' })
   await act(async () => { button.click() })
   expect(selectAll).toHaveBeenCalledTimes(1)
   view.rerender(<BulkBar count={78} total={78} onSelectAll={selectAll} />)
-  expect(view.queryByRole('button', { name: '条件に合う78件すべてを選ぶ' })).toBeNull()
+  expect(view.queryByRole('button', { name: '条件に合う78件すべてを選択する' })).toBeNull()
 })
 
 it('条件に合う全件の選択と選択解除を明示し、それぞれの操作を呼ぶ', async () => {
   const selectAll = vi.fn()
   const clear = vi.fn()
   const view = render(<BulkBar count={2} total={10} unit="人" onSelectAll={selectAll} onClear={clear} />)
-  await act(async () => { fireEvent.click(view.getByRole('button', { name: '条件に合う10人すべてを選ぶ' })) })
-  fireEvent.click(view.getByRole('button', { name: '選ぶのをやめる' }))
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '条件に合う10人すべてを選択する' })) })
+  fireEvent.click(view.getByRole('button', { name: '選択するのをやめる' }))
   expect(selectAll).toHaveBeenCalledTimes(1)
   expect(clear).toHaveBeenCalledTimes(1)
 })

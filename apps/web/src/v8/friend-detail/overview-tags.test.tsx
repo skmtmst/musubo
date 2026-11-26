@@ -126,18 +126,18 @@ describe('要点の行の文字操作', () => {
     verifiedStaffRole('owner')
     render(rail('A', vi.fn(async () => {})))
     const section = screen.getByRole('region', { name: 'リッチメニュー' })
-    const link = within(section).getByRole('link', { name: '変える' })
+    const link = within(section).getByRole('link', { name: '変更する' })
     expect(link.getAttribute('href')).toBe('/rich-menus')
     expect(link.getAttribute('data-variant')).toBe('text')
     expect(link.getAttribute('aria-disabled')).toBeNull()
-    expect(within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変える' }).getAttribute('data-variant')).toBe('text')
+    expect(within(screen.getByRole('region', { name: '配信の受け取り' })).getByRole('button', { name: '変更する' }).getAttribute('data-variant')).toBe('text')
   })
 
   it('役割が未確認の間はリンクを出さず変更を止める', () => {
     verifiedStaffRole(null)
     render(rail('A', vi.fn(async () => {}), false))
     const region = screen.getByRole('region', { name: 'リッチメニュー' })
-    const action = within(region).getByRole('button', { name: '変える' }) as HTMLButtonElement
+    const action = within(region).getByRole('button', { name: '変更する' }) as HTMLButtonElement
     expect(action.disabled).toBe(true)
     expect(within(region).queryByRole('link')).toBeNull()
   })
@@ -145,7 +145,7 @@ describe('要点の行の文字操作', () => {
   it('閲覧のみでは変更を灰色の理由つきにし、押しても移動しない', async () => {
     verifiedStaffRole('viewer')
     render(rail('A', vi.fn(async () => {}), false))
-    const action = within(screen.getByRole('region', { name: 'リッチメニュー' })).getByRole('button', { name: '変える' })
+    const action = within(screen.getByRole('region', { name: 'リッチメニュー' })).getByRole('button', { name: '変更する' })
     expect(action.getAttribute('aria-disabled')).toBe('true')
     expect(action.getAttribute('data-variant')).toBe('text')
     expect(action.getAttribute('href')).toBeNull()
