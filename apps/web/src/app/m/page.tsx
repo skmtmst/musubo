@@ -19,10 +19,10 @@ export default function MobileHomePage() {
 
 function MobileHomeRedirect() {
   const router = useRouter()
-  const { tabs, ready } = useMobileShell()
+  const { tabs, ready, stylePending } = useMobileShell()
   const { selectedAccountId } = useAccount()
   const style = useAccountStyle(selectedAccountId)
-  const waitingForStyle = Boolean(selectedAccountId) && (style.status === 'idle' || style.status === 'loading')
+  const waitingForStyle = stylePending || (Boolean(selectedAccountId) && (style.status === 'idle' || style.status === 'loading'))
   const preferred = style.status === 'ready' && !style.stale && style.data?.style === 'restaurant' ? '/m/today' : '/m/chats'
   const first = waitingForStyle ? null : (tabs.find(tab => tab.href === preferred) ?? tabs[0])?.href ?? null
   useEffect(() => { if (first) router.replace(first) }, [first, router])

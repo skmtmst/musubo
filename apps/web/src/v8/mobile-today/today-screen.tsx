@@ -11,6 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { bookingApi } from '@/lib/api'
 import { formatTime } from '@/lib/format'
+import { mobileTodayPermission } from '@/lib/mobile-shell'
 import { jstDate } from '@/lib/jst-datetime'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
@@ -30,7 +31,7 @@ function stateOf(row: Item): { label: string; tone: 'neutral' | 'success' | 'cau
   return { label: '状況を確認', tone: 'neutral' }
 }
 export default function MobileTodayScreen() {
-  return <MobileScreen title="今日" permission="/booking/bookings"><TodayBody /></MobileScreen>
+  return <MobileScreen title="今日"><TodayBody /></MobileScreen>
 }
 function TodayBody() {
   const { selectedAccountId } = useAccount()
@@ -41,7 +42,8 @@ function TodayBody() {
   const featureEnabled = styleKind === 'restaurant' ? features.enabled('restaurant_test') : features.enabled('booking')
   const [result, setResult] = useState<Result | null>(null)
   const sequence = useRef(0)
-  const allowed = shell.ready && shell.canView('/booking/bookings')
+  const permission = style.status === 'ready' && !style.stale ? mobileTodayPermission(styleKind) : null
+  const allowed = shell.ready && permission !== null && shell.canView(permission)
   const load = useCallback(async () => {
     if (!selectedAccountId || !allowed || !styleKind || style.stale || features.status !== 'ready' || !featureEnabled) return
     const id = selectedAccountId, request = ++sequence.current, date = jstDate(new Date())
@@ -84,6 +86,7 @@ function TodayBody() {
   if (style.status === 'error' || style.stale) return <ListState kind="error" title="表示の設定を読み込めませんでした" onRetry={style.reload} />
   if (features.status === 'error') return <ListState kind="error" title="利用できる機能を読み込めませんでした" description="画面を開き直してください。" />
   if (style.status !== 'ready' || features.status !== 'ready') return <ListState kind="loading" title="表示の設定を読み込んでいます" />
+  if (!allowed) return <ListState kind="forbidden" />
   if (!featureEnabled) return <ListState kind="empty" title="このアカウントでは予約機能を利用できません" description="利用できる機能を確認してください。" />
   const current = result?.accountId === selectedAccountId ? result : null
   if (!current) return <ListState kind="loading" title="今日の予約を読み込んでいます" />

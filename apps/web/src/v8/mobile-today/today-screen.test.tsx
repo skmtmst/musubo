@@ -3,9 +3,9 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ account: 'a', allowed: true, style: 'salon', enabled: true, getToday: vi.fn(), listStores: vi.fn(), reservationsDay: vi.fn() }))
+const fixture = vi.hoisted(() => ({ account: 'a', allowed: true, key: null as string | null, style: 'salon', enabled: true, getToday: vi.fn(), listStores: vi.fn(), reservationsDay: vi.fn() }))
 vi.mock('@/components/mobile/mobile-screen', () => ({ default: ({ children }: { children: React.ReactNode }) => <main>{children}</main> }))
-vi.mock('@/components/mobile/mobile-shell', () => ({ useMobileShell: () => ({ ready: true, canView: () => fixture.allowed }) }))
+vi.mock('@/components/mobile/mobile-shell', () => ({ useMobileShell: () => ({ ready: true, canView: (key: string) => fixture.allowed && (!fixture.key || fixture.key === key) }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account }) }))
 vi.mock('@/lib/api', () => ({ bookingApi: { getToday: fixture.getToday } }))
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ status: 'ready', data: { style: fixture.style }, reload: vi.fn() }) }))
@@ -14,7 +14,7 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { listStores: f
 import MobileTodayScreen from './today-screen'
 
 const row = { kind: 'seat', id: 'r1', starts_at: '2026-11-26T10:00:00Z', status: 'confirmed', customer_name: '見本 太郎', store_name: '本店', guest_count: 2, course_name: 'コース' }
-beforeEach(() => { fixture.account = 'a'; fixture.allowed = true; fixture.style = 'salon'; fixture.enabled = true; fixture.getToday.mockResolvedValue({ timeline: [row] }) })
+beforeEach(() => { fixture.account = 'a'; fixture.allowed = true; fixture.key = null; fixture.style = 'salon'; fixture.enabled = true; fixture.getToday.mockResolvedValue({ timeline: [row] }) })
 afterEach(() => { cleanup(); vi.resetAllMocks(); vi.useRealTimers() })
 
 it('アカウントの今日の席・人を読み取り、金額や更新操作を出さない', async () => {
@@ -104,4 +104,27 @@ it('選択アカウントに店舗がなければ失敗でなく店舗未登録�
  render(<MobileTodayScreen />)
  expect(await screen.findByText('このアカウントの店舗はまだありません')).toBeTruthy()
  expect(fixture.reservationsDay).not.toHaveBeenCalled()
+})
+
+it('飲食店の予約は飲食店の権限だけで読み、一般予約の権限だけなら読まない', async () => {
+ fixture.style = 'restaurant'; fixture.key = '/booking/bookings'
+ const view = render(<MobileTodayScreen />)
+ await waitFor(() => expect(fixture.listStores).not.toHaveBeenCalled())
+ expect(fixture.reservationsDay).not.toHaveBeenCalled()
+ fixture.key = '/restaurant-test/reservations'
+ fixture.listStores.mockResolvedValue({ success: true, data: { stores: [] } })
+ view.rerender(<MobileTodayScreen />)
+ expect(await screen.findByText('このアカウントの店舗はまだありません')).toBeTruthy()
+ expect(fixture.listStores).toHaveBeenCalledWith('a')
+})
+
+it('取得中に権限を失うと、遅れて返った予約は表示しない', async () => {
+ let complete!: (value: unknown) => void
+ fixture.getToday.mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+ const view = render(<MobileTodayScreen />)
+ await waitFor(() => expect(fixture.getToday).toHaveBeenCalledTimes(1))
+ fixture.allowed = false; view.rerender(<MobileTodayScreen />)
+ expect(screen.getByText('表示する権限がありません')).toBeTruthy()
+ await act(async () => { complete({ timeline: [row] }) })
+ expect(screen.queryByText('見本 太郎')).toBeNull()
 })

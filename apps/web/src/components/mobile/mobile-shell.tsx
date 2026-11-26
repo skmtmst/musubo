@@ -15,6 +15,7 @@ import type { MobileFrameTab } from '@/components/templates'
 import { AccountProvider, useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { MOBILE_TABS, mobileTabForPath, visibleMobileTabs, type MobileTabId } from '@/lib/mobile-shell'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { canViewFeature } from '@/lib/staff-capability'
 import { useStaffRole } from '@/lib/staff-role'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -37,6 +38,8 @@ export type MobileShellParts = {
   tabs: MobileFrameTab[]
   /** 権限の確認が済んだか。済むまで画面は中身を出さない。 */
   ready: boolean
+  /** 今日のタブの権限を決める業種の読み込み中。 */
+  stylePending: boolean
   /** 見る権限（PC の画面の鍵）。確認が済むまでは false。 */
   canView: (permission: string) => boolean
   /** 閲覧のみ。返信欄など変える操作を隠す。 */
@@ -77,7 +80,9 @@ function MobileShellState({ children }: { children: ReactNode }) {
   const chipRef = useRef<HTMLDivElement>(null)
 
   const canView = useMemo(() => (permission: string) => (role ? canViewFeature(permission, role) : false), [role])
-  const visible = useMemo(() => visibleMobileTabs(role ? canView : null), [role, canView])
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const styleKind = accountStyle.status === 'ready' && !accountStyle.stale ? accountStyle.data?.style : null
+  const visible = useMemo(() => visibleMobileTabs(role ? canView : null, styleKind), [role, canView, styleKind])
   const talkVisible = visible.some((tab) => tab.id === 'talk')
 
   /* トークの数の丸。PC の左メニューの「受信箱」と同じ数（未対応）。店を選んでいない・見られない時は出さない。 */
@@ -151,6 +156,7 @@ function MobileShellState({ children }: { children: ReactNode }) {
   const parts: MobileShellParts = {
     tabs,
     ready: role !== null,
+    stylePending: Boolean(selectedAccountId) && (accountStyle.status === 'idle' || accountStyle.status === 'loading'),
     canView,
     readOnly,
     banner: <><SessionLostNotice /><ImpersonationNotice /><UnfamiliarLoginNotice /></>,
