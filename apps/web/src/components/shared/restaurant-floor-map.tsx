@@ -54,7 +54,7 @@ export default function RestaurantFloorMap({floor,labels,onSelect,onChange,onFlo
  if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelect(t.id)}
  if(canEdit&&e.key.startsWith('Arrow')){e.preventDefault();move(t.id,false,t.x+(e.key==='ArrowLeft'?-10:e.key==='ArrowRight'?10:0),t.y+(e.key==='ArrowUp'?-10:e.key==='ArrowDown'?10:0))}
  }}>
- {chairs.map((chair,index)=>{const horizontal=chair.side==='top'||chair.side==='bottom';const x=horizontal?chair.offset*t.width-10:chair.side==='left'?-10:t.width+4;const y=horizontal?chair.side==='top'?-10:t.height+4:chair.offset*t.height-10;return <rect key={index} className={styles.chair} x={x} y={y} width={horizontal?20:6} height={horizontal?6:20} rx="3"/>})}
+ {chairs.map((chair,index)=>{if(chair.angle!==undefined){const radians=chair.angle*Math.PI/180;const radius=Math.min(t.width,t.height)/2+8;const cx=t.width/2+Math.cos(radians)*radius;const cy=t.height/2+Math.sin(radians)*radius;const chairWidth=20*(chair.scale??1)*Math.min(1,radius/38);return <rect key={index} className={styles.chair} x={cx-chairWidth/2} y={cy-3} width={chairWidth} height={6} rx="3" transform={`rotate(${chair.angle+90} ${cx} ${cy})`}/>};const horizontal=chair.side==='top'||chair.side==='bottom';const x=horizontal?chair.offset*t.width-10:chair.side==='left'?-10:t.width+4;const y=horizontal?chair.side==='top'?-10:t.height+4:chair.offset*t.height-10;return <rect key={index} className={styles.chair} x={x} y={y} width={horizontal?20:6} height={horizontal?6:20} rx="3"/>})}
  {t.shape==='circle'?<circle cx={t.width/2} cy={t.height/2} r={Math.min(t.width,t.height)/2}/>:<rect width={t.width} height={t.height} rx={penTableStyle?10:t.shape==='counter'?t.height/2:8}/>}
  <title>{r?.label??t.id}</title>
  {penTableStyle?<>
