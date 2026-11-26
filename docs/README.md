@@ -1403,3 +1403,4 @@
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 - [自動応答とリマインダのフォルダ作成通知](release-log/unreleased/PR-kenta-later-codex13.md) — フォルダ作成の完了を知らせる修正の履歴。確認 2026-11-27。
+- [セキュリティの見張りの表示と操作](release-log/unreleased/PR-kenta-later-codex14.md) — 異常の操作と表示に関する修正の履歴。確認 2026-11-27。
