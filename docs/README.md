@@ -13,6 +13,7 @@
 - [空の一斉配信一覧からの作成画面を修正](release-log/unreleased/PR-kenta-empty-create.md)
 - [接続確認と配信作成の修正履歴](release-log/unreleased/PR-kenta-hq-attention.md)
 - [バナー生成の一覧更新の修正履歴](release-log/unreleased/PR-kenta-banner-refresh.md)
+- [バナー生成の利用設定の反映履歴](release-log/unreleased/PR-kenta-banner-ai-setting.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
