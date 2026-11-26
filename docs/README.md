@@ -1410,3 +1410,5 @@
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
 - [リッチメニューとお知らせの読み直し](release-log/unreleased/PR-kenta-later-bottom3.md) — 対象人数・タップ数と役割の取得を直した履歴。確認 2026-11-26。
+
+- [かんたん配信とウェビナーの読み直し](release-log/unreleased/PR-kenta-later-bottom4.md) — 人数と動画情報の取得失敗からの復帰。確認 2026-11-26。
