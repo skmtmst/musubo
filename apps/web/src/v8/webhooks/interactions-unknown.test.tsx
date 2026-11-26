@@ -121,3 +121,13 @@ it('未対応の状態は処理中と決めつけず、送り直しを出さな�
   expect(box.textContent).toContain('状態を確認できません。')
   expect(buttonByText('届いたか確かめてから送り直す', box)).toBeUndefined()
 })
+it('未対応の送受信方向は受け取りと決めつけず、送り直しを出さない', async () => {
+  items = [interaction({ direction: 'future' as WebhookInteraction['direction'] })]
+  await render()
+  expect(host.textContent).toContain('方向不明')
+  await openContents()
+  const box = designDialog()!
+  expect(box.textContent).toContain('方向不明')
+  expect(box.textContent).toContain('送受信の方向を確認できません。')
+  expect(buttonByText('届いたか確かめてから送り直す', box)).toBeUndefined()
+})
