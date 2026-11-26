@@ -17,7 +17,7 @@ import { TextField } from '@/components/shared/text-field'
 import TextLink from '@/components/shared/text-link'
 import { ListPage } from '@/components/templates'
 import { LayoutTemplate,RefreshCw,Sheet } from 'lucide-react'
-import { RUN_KIND_LABEL,RUN_STATUS_LABEL } from './sheets-runs'
+import { runKindLabel,runStatusLabel } from './sheets-runs'
 import styles from './sheets.module.css'
 import {
 ViewerBand,
@@ -201,10 +201,10 @@ export default function WebhooksSheetsV8() {
                 {groups.map((group) => (
                   <Tr key={group.key}>
                     <Td>{shortDateTime(group.startedAt)}</Td>
-                    <Td>{RUN_KIND_LABEL[group.kind] ?? group.kind}</Td>
+                    <Td>{runKindLabel(group.kind)}</Td>
                     <Td grow title={group.parts.join('・')}><TruncatedText value={group.parts.join('・') || emptyValue('unknown')} /></Td>
                     <Td>
-                      <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'running' ? 'neutral' : 'danger'}>{RUN_STATUS_LABEL[group.status] ?? group.status}</StatusBadge>
+                      <StatusBadge tone={group.status === 'ok' ? 'success' : group.status === 'partial' ? 'warning' : group.status === 'error' ? 'danger' : 'neutral'}>{runStatusLabel(group.status)}</StatusBadge>
                     </Td>
                   </Tr>
                 ))}
