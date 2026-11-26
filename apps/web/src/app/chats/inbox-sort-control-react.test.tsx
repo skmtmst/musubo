@@ -170,7 +170,7 @@ test('受信箱を開いたまま時間が進むと時刻だけを更新し、�
   }
 })
 
-test('時計の更新前に新着が届いて描き直した時は現在の時刻で表示する', async () => {
+test('時計の更新前に新着が届いて再描画される時は現在の時刻で表示する', async () => {
   let now = Date.parse('2026-09-02T23:59:30Z')
   vi.spyOn(Date, 'now').mockImplementation(() => now)
   const list = await renderList()
