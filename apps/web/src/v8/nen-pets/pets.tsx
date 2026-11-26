@@ -73,6 +73,7 @@ export default function PetsV8({
   if (kpiAccount !== accountId) {
     setKpiAccount(accountId)
     setKpis(null)
+    setKpisFailed(false)
     setQuery(EMPTY_QUERY)
   }
 
@@ -145,7 +146,7 @@ export default function PetsV8({
       ) : tab === 'feeding' ? (
         <FeedingV8 accountId={accountId} canEdit={canEdit} />
       ) : (
-        <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} />
+        <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} onKpisFailed={setKpisFailed} />
       )}
     </ListPage>
   )

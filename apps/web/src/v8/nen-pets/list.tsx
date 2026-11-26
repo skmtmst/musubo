@@ -39,6 +39,7 @@ export default function PetsListV8({
   query,
   onQueryChange,
   onKpis,
+  onKpisFailed,
 }: {
   accountId: string
   canEdit: boolean
@@ -46,6 +47,8 @@ export default function PetsListV8({
   onQueryChange: (next: PetsQuery) => void
   /** 数の帯へ渡す。setState をそのまま渡す（毎回作り直さない）。 */
   onKpis: (kpis: NenPetKpis) => void
+  /** 数の帯の読み込み失敗を伝える。setState をそのまま渡す。 */
+  onKpisFailed?: (failed: boolean) => void
 }) {
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenPetListData | null>(null)
@@ -58,6 +61,7 @@ export default function PetsListV8({
   const load = useCallback(async () => {
     const request = ++requestRef.current
     setStatus('loading')
+    onKpisFailed?.(false)
     try {
       const res = await nenPetsApi.pets(accountId, { ...query, page, pageSize })
       if (request !== requestRef.current) return
@@ -66,13 +70,15 @@ export default function PetsListV8({
         throw new Error('ペット一覧の内容を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
       setData(res.data)
+      onKpisFailed?.(false)
       onKpis(res.data.kpis)
       setStatus('ready')
     } catch (caught) {
       if (request !== requestRef.current) return
+      onKpisFailed?.(true)
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, page, pageSize, onKpis])
+  }, [accountId, query, page, pageSize, onKpis, onKpisFailed])
 
   useEffect(() => {
     void load()
@@ -139,7 +145,7 @@ export default function PetsListV8({
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="ペットを読み込んでいます" />
       ) : status === 'forbidden' ? (
-        <ListState kind="forbidden" />
+        <ListState kind="forbidden" onRetry={() => void load()} />
       ) : status === 'error' ? (
         <ListState kind="error" title="ペットを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
       ) : data && data.items.length === 0 ? (
