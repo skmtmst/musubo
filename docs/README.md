@@ -33,6 +33,7 @@
 
 
 - [時刻・日付の範囲表示の修正履歴](release-log/unreleased/PR-kenta-time-range.md)
+- [閲覧のみの作成操作の修正履歴](release-log/unreleased/PR-kenta-viewer-actions.md)
 
 ## 使う人の手引き
 
