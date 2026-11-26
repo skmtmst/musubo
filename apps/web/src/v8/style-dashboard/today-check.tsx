@@ -48,7 +48,7 @@ export function TodayCheck({ cards, accountId, style, canWrite, onAction, extra 
       <div className={styles.todayHeader}>
         <h3 id={titleId} className={styles.todayTitle}>今日の確認</h3>
         {folded ? cards.map(card => {
-          const badge = todayCheckBadge(card)
+          const badge = todayCheckBadgeText(card)
           return badge ? <StatusBadge key={card.id} tone="danger" size="micro" dot={false}>{badge}</StatusBadge> : null
         }) : null}
         <DisclosureToggle open={!folded} controls={contentId} onToggle={toggle} subject="今日の確認" />
@@ -69,7 +69,7 @@ export function TodayCheck({ cards, accountId, style, canWrite, onAction, extra 
 }
 
 /** 要約が明確な件数を持つ時だけ表示し、未取得・金額・曖昧な複数の数は数えない。 */
-export function todayCheckBadge(card: StyleSideCard): string | null {
+export function todayCheckBadgeText(card: StyleSideCard): string | null {
   const names: Record<string, string> = { new: '新着', pay: 'お支払い', care: '注意', waitlist: 'キャンセル待ち' }
   const label = names[card.id]
   if (!label || card.summary?.empty) return null

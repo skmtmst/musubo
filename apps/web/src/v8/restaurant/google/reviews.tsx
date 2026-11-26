@@ -207,7 +207,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
                   <GridCell>
                     <span className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span>
                   </GridCell>
-                  <GridCell align="right" className={styles.reviewDate}>{formatShortStamp(reviewReceivedAt(review))}</GridCell>
+                  <GridCell align="right"><span className={styles.reviewDate}>{formatShortStamp(reviewReceivedAt(review))}</span></GridCell>
                   <GridCell><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></GridCell>
                   <GridCell data-list-action-cell="">
                     <Button disabled={actionable && !review.replyDraft && !canEdit} lockedReason={actionable && !review.replyDraft ? lockedReason : undefined} onClick={() => { if (canEdit || !actionable || review.replyDraft) go({ tab: 'reviews', view: 'draft', id: review.id }) }}>{actionable && !review.replyDraft ? '下書きを作る' : '返信を見る'}</Button>

@@ -31,7 +31,9 @@ for (const width of [390, 430, 1152]) {
       if (width < 640) {
         const before = await frame.evaluate(el => ({ client: el.clientWidth, scroll: el.scrollWidth }))
         assert.ok(before.scroll > before.client, '残りの列へ横に送れる')
+        assert.equal(await frame.evaluate(el => getComputedStyle(el).overflowX), 'auto', '表内の横送りが有効')
         await frame.evaluate(el => { el.scrollLeft = el.scrollWidth })
+        assert.ok(await frame.evaluate(el => el.scrollLeft > 0), '表を実際に横へ送れる')
         const menu = row.getByRole('button', { name: /の操作/ })
         const [box, frameBox] = await Promise.all([menu.boundingBox(), frame.boundingBox()])
         assert.ok(box && frameBox && box.x >= frameBox.x && box.x + box.width <= frameBox.x + frameBox.width + 1, '最後の操作にも届く')
