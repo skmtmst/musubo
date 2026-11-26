@@ -1,4 +1,5 @@
 'use client'
+import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -250,6 +251,7 @@ export default function QuickCreateV8({
       completed = true
       publishKeyRef.current = crypto.randomUUID()
       guard.disarm()
+      notifySaved('自動応答を有効にしました。')
       onCreated()
       onClose()
     } catch (cause) {
