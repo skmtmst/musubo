@@ -164,6 +164,26 @@ afterEach(async () => {
   host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals()
 })
 
+test('URL の検索語を受信箱に渡し、同じ画面で別の検索を開いても更新する', async () => {
+  fixture.params = new URLSearchParams('q=山田')
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(calls.filter(url => url.pathname === '/api/chats').at(-1)?.searchParams.get('q')).toBe('山田'))
+  fixture.params = new URLSearchParams('q=佐藤')
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(calls.filter(url => url.pathname === '/api/chats').at(-1)?.searchParams.get('q')).toBe('佐藤'))
+  const input = document.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(input.value).toBe('')
+  await eventually(() => expect(calls.filter(url => url.pathname === '/api/chats').at(-1)?.searchParams.get('q')).toBeNull())
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent('musubo:command-palette-chat-search', { detail: '佐藤' }))
+  })
+  await eventually(() => expect(document.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')?.value).toBe('佐藤'))
+})
+
 test('all は双方の取得完了後だけ通常0件を一覧内に表示する', async () => {
   const email = hold()
   handler = (url) => url.pathname === '/api/support/inbox' ? email.promise : base(url)

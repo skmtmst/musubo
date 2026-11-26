@@ -73,6 +73,7 @@ vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-s
 
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import FriendInfoSidebar from './friend-info-sidebar'
+import CommandPalette from '@/components/shared/command-palette'
 
 let host: HTMLDivElement
 let root: Root
@@ -89,7 +90,7 @@ const button = (text: string) => Array.from(document.querySelectorAll('button'))
 const memoArea = () => document.getElementById('inbox-panel-memo') as HTMLTextAreaElement | null
 const tagPicker = () => document.getElementById('inbox-panel-tag-picker')!
 
-async function renderPanel(accountId: string | undefined = 'account-a') {
+async function renderPanel(accountId: string | undefined = 'account-a', withPalette = false) {
   await act(async () => {
     root.render(
       <>
@@ -103,6 +104,7 @@ async function renderPanel(accountId: string | undefined = 'account-a') {
           operatorId="op-k"
         />
         <ToastHost />
+        {withPalette ? <CommandPalette items={[{ href: '/friends', label: '友だち' }]} /> : null}
       </>,
     )
   })
@@ -244,6 +246,18 @@ describe('受信箱A-2 右の欄でその場で直す', () => {
     expect(document.querySelector('[aria-label="対応状況を変える"]')).toBeTruthy()
     await press('t')
     expect(tagPicker().hidden).toBe(false)
+  })
+
+  it('⌘K の候補で S を押しても受信箱の対応状況を開かず、閉じると S が使える', async () => {
+    await renderPanel('account-a', true)
+    await act(async () => { fireEvent.keyDown(document, { key: 'k', metaKey: true }) })
+    const option = screen.getByRole('option', { name: '友だち' })
+    option.focus()
+    await press('s', option)
+    expect(document.querySelector('[aria-label="対応状況を変える"]')).toBeNull()
+    await press('Escape', option)
+    await press('s')
+    expect(document.querySelector('[aria-label="対応状況を変える"]')).toBeTruthy()
   })
 
   it('前払いのみの印へアカウントと相手を渡し、解除できるのは管理者だけ', async () => {
