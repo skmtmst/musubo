@@ -16,6 +16,8 @@ const serverSession = () => null
 export const READ_ONLY_MESSAGE = '閲覧のみで見ています。変えたい時はオーナーか管理者に頼んでください。'
 /** 統括の画面の閲覧のみの帯の言い方。 */
 export const READ_ONLY_MESSAGE_HQ = '閲覧のみで見ています。変えたい時は統括の管理者に頼んでください。'
+/** 管理者が店の画面の変更権限を持たないときの帯の言い方（管理者に「管理者へ頼んで」と出さない）。 */
+export const ADMIN_LOCK_SUMMARY = 'この画面を変える権限がありません。変えたい時はオーナーに頼んでください。'
 
 /**
  * 権限の帯。画面の上に1回だけ、ボタンが押せない理由を短く出す。形・印・言い方はここが持ち、画面で文を書き足さない。
@@ -31,7 +33,8 @@ export default function ReadOnlyNotice({ scope = 'store', need = 'feature', chil
   const readingImpersonation = session?.impersonation?.mode === 'read'
   const text = readingImpersonation ? PERMISSION_LOCK_SUMMARY.impersonation
     : staffRole === 'viewer' ? (scope === 'hq' ? READ_ONLY_MESSAGE_HQ : READ_ONLY_MESSAGE)
-      : PERMISSION_LOCK_SUMMARY[scope === 'hq' && need === 'feature' ? 'tenantWide' : need]
+      : staffRole === 'admin' && scope === 'store' && need === 'feature' ? ADMIN_LOCK_SUMMARY
+        : PERMISSION_LOCK_SUMMARY[scope === 'hq' && need === 'feature' ? 'tenantWide' : need]
   // 既存の店向け補足は維持し、代理閲覧の理由と明示された必要権限を優先する。
   return <Notice {...props} tone="info" role={role} data-read-only-notice>{!readingImpersonation && need === 'feature' && scope === 'store' && children ? children : text}</Notice>
 }

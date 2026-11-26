@@ -141,3 +141,27 @@ for (const width of [1152, 1440, 1920]) {
     }
   })
 }
+
+for (const width of [390, 1024, 1152, 1440]) {
+  test(`リマインダの名前と操作が見える ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.addInitScript(() => {
+      sessionStorage.setItem('lh_auth_selection_cleared', '1')
+      localStorage.setItem('lh_auth_selection_cleared', '1')
+      localStorage.setItem('lh_selected_account', 'visual-qa-account')
+    })
+    await page.goto(`${base}/reminders`)
+    const row = page.locator('tbody tr').first()
+    const name = row.locator('td').nth(2).locator('a')
+    await expect(name).toBeVisible()
+    const bounds = await name.boundingBox()
+    expect(bounds.width).toBeGreaterThan(40)
+    const menu = row.getByRole('button', { name: /リマインダ.*操作/ })
+    await expect(menu).toBeVisible()
+    const table = await row.locator('xpath=ancestor::table').boundingBox()
+    expect(table.x + table.width).toBeLessThanOrEqual(width + 1)
+    const heading = page.getByRole('columnheader', { name: 'リマインダ（基準日・いつ送るか）' })
+    await expect(heading.locator('span').first()).toHaveCSS('overflow', 'hidden')
+    if (width > 600) await expect(page.getByRole('columnheader', { name: '次に送る' })).toBeVisible()
+  })
+}

@@ -7,6 +7,7 @@ import { Archive, Plus, Upload } from 'lucide-react'
 import { useContext, useEffect, useId, useLayoutEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
@@ -142,7 +143,9 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [projectId, setProjectId] = useState('')
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
   // 選んだファイル。選んでから「取り込む」を押すまで送らない。
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -162,11 +165,18 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
 
   useEffect(() => {
     if (!open) return
-    let cancelled = false
-    setLoading(true)
     setError('')
     setFile(null)
     setUploading(false)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setLoading(true)
+    setLoadError('')
+    setProjects([])
+    setProjectId('')
     void api.hqBanners.projects.list()
       .then((res) => {
         if (cancelled) return
@@ -174,10 +184,12 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
         setProjects(res.data)
         setProjectId(initialProjectId && res.data.some((p) => p.id === initialProjectId) ? initialProjectId : res.data[0]?.id ?? '')
       })
-      .catch(() => { if (!cancelled) setError('プロジェクトを読み込めませんでした。') })
+      .catch(() => {
+        if (!cancelled) setLoadError('プロジェクトを読み込めませんでした。')
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [open, initialProjectId])
+  }, [open, initialProjectId, retryCount])
 
   const pickFile = (next: File | undefined) => {
     if (!next) return
@@ -188,7 +200,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
   }
 
   const takeIn = async () => {
-    if (!file || uploadProjectRequirement.check(projectId) || uploading) return
+    if (!file || loadError || uploadProjectRequirement.check(projectId) || uploading) return
     setUploading(true)
     setError('')
     try {
@@ -203,7 +215,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
     }
   }
 
-  const noProject = projects.length === 0 && !loading
+  const noProject = !loading && !loadError && projects.length === 0
   return (<>
     <BannerDialogFrame
       open={open}
@@ -218,13 +230,31 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
       actions={(
           <>
             <Button onClick={close} disabled={uploading}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void takeIn()} disabled={!file || Boolean(uploadProjectRequirement.check(projectId)) || loading || uploading} title={loading ? 'プロジェクトを読み込んでいます。' : uploadProjectRequirement.check(projectId) ?? (!file ? '取り込む画像を選んでください。' : undefined)} busy={uploading} busyLabel="取り込み中…">
+            <Button variant="primary" onClick={() => void takeIn()} disabled={!file || Boolean(loadError) || Boolean(uploadProjectRequirement.check(projectId)) || loading || uploading} title={loading ? 'プロジェクトを読み込んでいます。' : loadError ? 'プロジェクトを読み込んでから取り込んでください。' : uploadProjectRequirement.check(projectId) ?? (!file ? '取り込む画像を選んでください。' : undefined)} busy={uploading} busyLabel="取り込み中…">
               <Upload aria-hidden="true" className={styles.icon} />取り込む
             </Button>
         </>
       )}
     >
-        {noProject ? (
+        {loadError ? (
+          <Notice
+            tone="danger"
+            action={
+              <Button
+                variant="text"
+                size="inline"
+                data-notice-inline-action
+                type="button"
+                disabled={loading}
+                onClick={() => setRetryCount((value) => value + 1)}
+              >
+                もう一度読み込む
+              </Button>
+            }
+          >
+            {loadError}
+          </Notice>
+        ) : noProject ? (
           <p className={styles.note}>まずプロジェクトを作ってください。画像はプロジェクトの中に入ります。</p>
         ) : (
           <>

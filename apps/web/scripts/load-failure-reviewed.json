@@ -224,20 +224,6 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/hq-deliveries/console.tsx",
-    "fingerprint": "043cc8fc12a0ffbf",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/v8/hq-deliveries/console.tsx",
-    "fingerprint": "7964f9735595ec4b",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/v8/hq/support.tsx",
     "fingerprint": "42501536277d6ab2",
     "disposition": "error-visible",
