@@ -23,6 +23,13 @@ import { manualLinkStatusLabel } from '@/v8/settings/manual-links/manual-link-vi
 import { supportKindWord, supportStatusTone, supportStatusWord } from '@/v8/hq/support-words'
 
 describe('知らない状態の表示', () => {
+  it('通知の種類と状態は既知の値を表示する', () => {
+    expect(bookingReminderKindWord('day_before')).toBe('前日のお知らせ')
+    expect(bookingReminderKindWord('hours_before')).toBe('開始前のお知らせ')
+    expect(bookingReminderStatusWord('sent')).toBe('送信済み')
+    expect(bookingReminderStatusWord('cancelled')).toBe('停止済み')
+    expect(bookingReminderStatusWord('failed_permanent')).toBe('失敗')
+  })
   it.each(['constructor', 'toString', '__proto__', 'future'])('%s は自分で定めた項目だけを表示する', value => {
     expect(knownValue({ known: '既知' }, value, '不明')).toBe('不明')
     expect(eventWord(value)).toBe(value)
