@@ -1416,3 +1416,4 @@
 - [予約スタッフ登録とシナリオ作成の読み込み失敗表示・再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini12-1127.md) — 反映履歴、確認 2026-11-27。
 - [自動応答と休業日の保存通知](release-log/unreleased/PR-kenta-later-codex11.md) — 操作の完了を知らせる修正の履歴。確認 2026-11-27。
 - [成果地点作成と外部連携の読み込み失敗表示・再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini13-1127.md) — 反映履歴、確認 2026-11-27。
+- [見本からの下書きと Google 連携先の保存通知](release-log/unreleased/PR-kenta-later-codex12.md) — 操作の完了を知らせる修正の履歴。確認 2026-11-27。
