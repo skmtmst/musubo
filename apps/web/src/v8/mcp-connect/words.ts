@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * G9 の言葉と権限（要件 G9 §2-2・§2-5・§2-6）。
  * 権限の言い方は 3 段にそろえる：読むだけ／読む＋下書きを作る／読む＋下書き＋送る依頼。
@@ -11,6 +12,8 @@ export const LEVEL_LABEL: Record<McpLevel, string> = {
   draft: '読む＋下書きを作る',
   send_request: '読む＋下書き＋送る依頼',
 }
+
+export const mcpLevelLabel = (level: string): string => knownValue(LEVEL_LABEL, level, '権限を確認できません')
 
 export const LEVEL_NOTE: Record<McpLevel, string> = {
   read: '数・配信の結果・予約の件数を読む',
@@ -28,6 +31,7 @@ export const EXPIRY_OPTIONS = [
 export function connectionState(connection: McpConnection): { label: string; tone: StatusBadgeTone } {
   if (connection.status === 'stopped') return { label: '止めた', tone: 'neutral' }
   if (connection.status === 'expired') return { label: '期限切れ', tone: 'danger' }
+  if (connection.status !== 'active') return { label: '状態を確認できません', tone: 'neutral' }
   if (connection.previousKeyExpiresAt) return { label: '鍵の作り直し中', tone: 'warning' }
   return { label: '使える', tone: 'success' }
 }
@@ -37,9 +41,11 @@ export function callLabel(kind: McpCallKind, result: McpCallResult): { label: st
   if (result === 'refused') return { label: '断った', tone: 'warning' }
   if (result === 'rate_limited') return { label: '回数の上限', tone: 'warning' }
   if (result === 'error') return { label: '失敗', tone: 'danger' }
+  if (result !== 'ok') return { label: '結果を確認できません', tone: 'neutral' }
   if (kind === 'draft') return { label: '下書きを作った', tone: 'info' }
   if (kind === 'send_request') return { label: '送る依頼（承認待ち）', tone: 'info' }
-  return { label: '読んだ', tone: 'neutral' }
+  if (kind === 'read') return { label: '読んだ', tone: 'neutral' }
+  return { label: '内容を確認できません', tone: 'neutral' }
 }
 
 export const CALL_FILTER_OPTIONS = [

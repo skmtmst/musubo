@@ -1,6 +1,7 @@
 import { fetchApi } from './api'
 import type { ApiResponse } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
+import { knownValue } from '@/lib/known-value'
 
 /**
  * 然-NEN- マイペット（★管理画面 37-3）／健康日記（★管理画面 37-4）。
@@ -18,7 +19,7 @@ export type PetActivity = 'low' | 'normal' | 'high'
 export type PetAnimalType = 'dog' | 'cat' | 'other'
 export const PET_ANIMAL_TYPE_LABELS: Record<PetAnimalType, string> = { dog: '犬', cat: '猫', other: 'その他' }
 export function petAnimalTypeLabel(animalType: string): string {
-  return PET_ANIMAL_TYPE_LABELS[animalType as PetAnimalType] ?? (animalType || 'その他')
+  return knownValue(PET_ANIMAL_TYPE_LABELS, animalType, animalType || 'その他')
 }
 
 export interface NenPetRow {

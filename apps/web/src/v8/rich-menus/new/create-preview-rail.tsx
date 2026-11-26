@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import type { AccountWithStats } from '@/contexts/account-context'
 
 
@@ -122,7 +124,7 @@ export function renderPreviewRail({ activePage, audience, conditionEmpty, condit
               ? [{ key: 'accounts', label: '配るアカウント', value: 'まだ選んでいません' }]
               : (hqPreview && hqPreview.references.length === 0 ? [{ key: 'none', label: '配った先で探すもの', value: emptyValue('none') }] : hqPreview?.references ?? []).map((ref) => 'sourceId' in ref ? ({
                 key: `${ref.kind}:${ref.sourceId}`,
-                label: `${HQ_REFERENCE_LABEL[ref.kind] ?? '参照'}「${ref.name ?? '名前なし'}」`,
+                label: `${knownValue(HQ_REFERENCE_LABEL, ref.kind, '参照')}「${ref.name ?? '名前なし'}」`,
                 value: <span className={ref.availableAccountCount < ref.totalAccountCount ? styles.summaryValueWarn : undefined}>{`${ref.availableAccountCount} / ${ref.totalAccountCount}`}</span>,
               }) : ref)}
           >

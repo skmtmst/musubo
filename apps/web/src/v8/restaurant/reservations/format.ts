@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * 予約台帳（l9NlC0・Z3FoM・・xzCK6）の表示の形。今の画面
@@ -10,11 +11,11 @@ export type LedgerView = 'today' | 'week' | 'month' | 'list'
 
 export const INACTIVE_STATUSES = ['cancelled', 'no_show']
 
-export const SOURCE_LABEL: Record<string, string> = {
+export const SOURCE_LABEL: Record<string, string> = Object.assign(Object.create(null) as Record<string, string>, {
   restaurant_board: 'レストランボード', reszaiko: 'RESZAIKO', hotpepper: 'Hot Pepper',
   tabelog: '食べログ', gurunavi: 'ぐるなび', ikyu: '一休', retty: 'Retty',
   line: 'LINE', phone: '電話', manual: '手動', google_business_profile: 'Google',
-}
+})
 
 /** 予約元の色の組。LINE・レストランボード＝緑、予約媒体＝赤、電話・手動＝灰。 */
 export function sourceKind(source: string): 'line' | 'media' | 'phone' {
@@ -24,7 +25,7 @@ export function sourceKind(source: string): 'line' | 'media' | 'phone' {
 }
 
 export function sourceName(source: string): string {
-  return SOURCE_LABEL[source] ?? source
+  return knownValue(SOURCE_LABEL, source, source)
 }
 
 /** 押さえ（期限付きの仮押さえ）か。 */

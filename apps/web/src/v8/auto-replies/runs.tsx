@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import { isConflictResponse } from '@/components/shared/save-conflict'
 import Card from '@/components/shared/card'
@@ -85,8 +86,7 @@ const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone 
 }
 
 export function statusView(status: string): { label: string; tone: StatusBadgeTone } {
-  return (STATUS as Record<string, { label: string; tone: StatusBadgeTone }>)[status]
-    ?? { label: '確認中', tone: 'neutral' }
+  return knownValue(STATUS, status, { label: '確認中', tone: 'neutral' as const })
 }
 
 export function isDeliveryUnconfirmed(run: AutoReplyRun): boolean {

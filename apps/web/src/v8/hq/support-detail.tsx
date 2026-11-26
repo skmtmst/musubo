@@ -22,7 +22,7 @@ import { api, ApiError } from '@/lib/api'
 import { readFileAsBase64 } from '@/lib/hq-banners'
 import { SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, validateSupportAttachment, type HqSupportDetail, type HqSupportRequest } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
-import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
+import { supportStatusWord, supportStatusTone, supportKindWord, supportTime } from './support-words'
 import styles from './support-detail.module.css'
 import ImageFrame from '@/components/shared/image-frame'
 import { Field } from '@/components/shared/form-controls'
@@ -48,7 +48,8 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
 function statusNote(status: HqSupportRequest['status'], hasEmail: boolean): string {
   if (status === 'open') return hasEmail ? '運営が確認しています。返事は登録メールにも届きます' : '運営が確認しています。返事はこの画面に届きます'
   if (status === 'answered') return hasEmail ? '運営から返事が届いています。登録メールにも同じ内容が届きます' : '運営から返事が届いています'
-  return '解決済みです。続きを送ると、運営がもう一度確認します'
+  if (status === 'closed') return '解決済みです。続きを送ると、運営がもう一度確認します'
+  return '問い合わせの状態を確認できません'
 }
 
 /** 送るボタンの横の一言（管理画面 の supportSendStatus を短くした絵の言葉）。 */
@@ -211,7 +212,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           ) : (
             <>
               <div className={styles.statusRow}>
-                <StatusBadge tone={detail.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[detail.status]}</StatusBadge>
+                <StatusBadge tone={supportStatusTone(detail.status)}>{supportStatusWord(detail.status)}</StatusBadge>
                 <span className={styles.statusNote}>{statusNote(detail.status, hasSenderEmail)}</span>
               </div>
 
@@ -282,7 +283,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
           <CreateSummaryCard title="これまでの問い合わせ" variant="record" rows={Array.isArray(history) ? history.slice(0, 10).map(item => ({
             key: item.id,
             label: <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} aria-current={item.id === id ? 'page' : undefined} title={item.subject}>{[item.ticketLabel, item.subject].filter(Boolean).join(' ')}</Link>,
-            value: <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>,
+            value: <StatusBadge tone={supportStatusTone(item.status)}>{supportStatusWord(item.status)}</StatusBadge>,
           })) : []}>
             {history === null ? <DetailLoading /> : !Array.isArray(history) ? <p>これまでの問い合わせを読み込めませんでした。</p> : history.length === 0 ? <p>まだ問い合わせはありません。</p> : null}
           </CreateSummaryCard>

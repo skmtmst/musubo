@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * 統括の一括配信の吹き出し（③ メッセージを作成・絵 lLyFR）。
  *
@@ -38,7 +39,7 @@ export const HQ_KIND_LABEL: Record<HqKind, string> = {
 
 /** 統括の口がまだ受けない種類。 */
 export const HQ_NOT_YET: ReadonlySet<HqKind> = new Set<HqKind>(['question', 'intro'])
-export const notYetText = (kind: HqKind) => `${HQ_KIND_LABEL[kind]}は、まだ統括からは送れません。送るときは店の一斉配信で作ってください`
+export const notYetText = (kind: HqKind) => `${knownValue(HQ_KIND_LABEL, kind, '種類を確認できません')}は、まだ統括からは送れません。送るときは店の一斉配信で作ってください`
 
 const KIND_FIELDS: ReadonlySet<HqKind> = new Set<HqKind>(['audio', 'sticker', 'location'])
 
@@ -121,12 +122,12 @@ export function hqBubbleProblem(item: HqBubble): string | null {
   if (HQ_NOT_YET.has(item.kind)) return notYetText(item.kind)
   if (item.kind === 'text') return item.body.trim() ? null : '本文を入れてください'
   if (item.kind === 'image' || item.kind === 'video') {
-    if (!item.content.originalContentUrl) return `${HQ_KIND_LABEL[item.kind]}のファイルをアップロードしてください`
+    if (!item.content.originalContentUrl) return `${knownValue(HQ_KIND_LABEL, item.kind, '種類を確認できません')}のファイルをアップロードしてください`
     return item.kind === 'video' ? videoPreviewProblem(item.content.previewImageUrl) : null
   }
   if (KIND_FIELDS.has(item.kind)) {
     const state = item.content.state as MessageKindState | undefined
-    return state ? messageKindProblem(item.kind as MessageKind, state) : `${HQ_KIND_LABEL[item.kind]}を入力してください`
+    return state ? messageKindProblem(item.kind as MessageKind, state) : `${knownValue(HQ_KIND_LABEL, item.kind, '種類を確認できません')}を入力してください`
   }
   if (item.kind === 'carousel') {
     if (!item.content.templateName && !item.content.assetName) return 'カルーセルを選んでください'
@@ -135,7 +136,7 @@ export function hqBubbleProblem(item: HqBubble): string | null {
   }
   if (item.kind === 'flex') return flexContentProblem(item.content.flexJson) ?? flexPostbackProblem(item)
   if (item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research') {
-    if (!item.content.assetId) return `${HQ_KIND_LABEL[item.kind]}を選んでください`
+    if (!item.content.assetId) return `${knownValue(HQ_KIND_LABEL, item.kind, '種類を確認できません')}を選んでください`
     return assetBubbleError({ id: 'check', type: item.kind === 'rich' ? 'rich_message' : item.kind === 'research' ? 'research' : 'coupon', content: item.content }) || null
   }
   return null
@@ -143,7 +144,7 @@ export function hqBubbleProblem(item: HqBubble): string | null {
 
 /** 1行の要約（開いていない吹き出しの見出し。絵：「カルーセル ・ 秋の新商品 3種（カード1枚）」）。 */
 export function hqBubbleSummary(item: HqBubble): string {
-  const label = HQ_KIND_LABEL[item.kind]
+  const label = knownValue(HQ_KIND_LABEL, item.kind, '種類を確認できません')
   if (item.kind === 'text') return item.body.trim() ? `テキスト・${item.body.trim().slice(0, 40)}` : 'テキスト・本文がまだありません'
   if (HQ_NOT_YET.has(item.kind)) return `${label}・統括からは送れません`
   if (item.kind === 'carousel') {
@@ -159,14 +160,14 @@ export function hqBubblePreview(item: HqBubble): string {
   if (item.kind === 'carousel' || item.kind === 'rich' || item.kind === 'coupon' || item.kind === 'research') {
     const name = String(item.content.templateName ?? item.content.assetName ?? '')
     if (!name) return ''
-    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${formatNumber(carouselColumns(item).length)} 枚）` : `［${HQ_KIND_LABEL[item.kind]}］${name}`
+    return item.kind === 'carousel' ? `［カルーセル］${name}（カード${formatNumber(carouselColumns(item).length)} 枚）` : `［${knownValue(HQ_KIND_LABEL, item.kind, '種類を確認できません')}］${name}`
   }
   if (item.kind === 'location') {
     const state = item.content.state as MessageKindState | undefined
     return state?.location.title ? `［位置情報］${state.location.title}` : '［位置情報］'
   }
   if (HQ_NOT_YET.has(item.kind)) return ''
-  return `［${HQ_KIND_LABEL[item.kind]}］`
+  return `［${knownValue(HQ_KIND_LABEL, item.kind, '種類を確認できません')}］`
 }
 
 /** 統括のひな形を吹き出しへ読む。読めない種類は理由。 */
@@ -252,7 +253,7 @@ export function templateContentOfBubble(item: HqBubble, name: string): { content
     const host = hostContentOfBubble(item)
     if (host && host.kind === 'rich_message') return { content: { ...host, name } }
   }
-  return { error: `${HQ_KIND_LABEL[item.kind]}は、まだ統括のテンプレートとして保存できません` }
+  return { error: `${knownValue(HQ_KIND_LABEL, item.kind, 'この吹き出し')}は、まだ統括のテンプレートとして保存できません` }
 }
 
 /** LINE の見え方に出す吹き出し（店の一斉配信の BubblePreview に渡す形）。カルーセルはカードの中身を見せる。 */

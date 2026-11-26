@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import TextLink from '@/components/shared/text-link'
 import { LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared'
 import { useRunningVersion } from '@/lib/use-running-version'
@@ -206,7 +208,7 @@ export function OpenAlerts({
           const response = ALERT_RESPONSE_FIRST[alert.checkKey]
           const checkTitle = CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.sub ?? alert.checkKey
           const detail = [
-            lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt),
+            lastEvent ? `${knownValue(ALERT_ACTION_LABEL, lastEvent.action, '状態を確認できません')}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt),
             notification,
             alert.status !== 'resolved' && response ? `お客さまへの影響：${alert.severity === 'unknown' ? 'この項目はまだ確認できていないため、影響の有無も未確認です。' : response.impact}` : null,
             `担当：${alert.acknowledgedById ?? 'まだ受領されていません'}`,

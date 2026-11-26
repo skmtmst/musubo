@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import { Pencil, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -34,6 +35,7 @@ import { emptyValue } from '@/components/shared/empty-value'
  */
 
 const STATUS_TONE: Record<OpsAnnouncement['status'], StatusBadgeTone> = { draft: 'neutral', scheduled: 'info', sending: 'warning', sent: 'success', failed: 'danger' }
+export const announcementTone = (status: string) => knownValue(STATUS_TONE, status, 'neutral')
 
 /** 一覧の小さい日時（9/18 10:00）。 */
 function shortDateTime(value: string | null): string {
@@ -165,7 +167,7 @@ export default function OpsAnnouncementsV8() {
                     </span>
                   </span>
                   <span className={`${parts.fixed} ${styles.colTo}`} role="cell" title={a.audienceLabel}>{a.audienceKind === 'all' ? 'すべて' : a.audienceLabel}</span>
-                  <span className={`${parts.fixed} ${styles.colState}`} role="cell"><StatusBadge tone={STATUS_TONE[a.status]}>{a.statusLabel}</StatusBadge></span>
+                  <span className={`${parts.fixed} ${styles.colState}`} role="cell"><StatusBadge tone={announcementTone(a.status)}>{a.statusLabel}</StatusBadge></span>
                   <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">

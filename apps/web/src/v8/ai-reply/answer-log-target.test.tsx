@@ -11,9 +11,9 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 vi.mock('@/components/shared/list-url-state', () => ({ useListUrlState: () => [{ action: '', days: '30', page: '1', size: '20', log: fx.log }, vi.fn()] }))
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: vi.fn(async () => ({ success: true, data: [{ id: 'acc-a', name: '元のアカウント' }, { id: 'acc-b', name: '別のアカウント' }] })) }))
 vi.mock('./use-ai-settings', () => ({ useAiSettings: () => ({ permissions: { publishQa: true, editQa: true } }) }))
-vi.mock('@/components/shared/drawer', () => ({ default: ({ open, actions, children }: { open: boolean; actions?: { menuItems?: Array<{ label: string; onSelect?: () => void }> }; children: React.ReactNode }) => {
+vi.mock('@/components/shared/drawer', () => ({ default: ({ open, actions, children, status }: { open: boolean; status?: React.ReactNode; actions?: { menuItems?: Array<{ label: string; onSelect?: () => void }> }; children: React.ReactNode }) => {
   if (open && fx.account === 'acc-a') fx.heldSelect = actions?.menuItems?.find(item => item.label === 'この答えを止める')?.onSelect ?? fx.heldSelect
-  return open ? <div>{children}{actions?.menuItems?.filter(item => item.onSelect).map(item => <button key={item.label} onClick={item.onSelect}>{item.label}</button>)}</div> : null
+  return open ? <div>{status}{children}{actions?.menuItems?.filter(item => item.onSelect).map(item => <button key={item.label} onClick={item.onSelect}>{item.label}</button>)}</div> : null
 } }))
 vi.mock('@/components/shared/confirm-dialog', async original => {
   const actual = await original<typeof import('@/components/shared/confirm-dialog')>()
@@ -123,4 +123,12 @@ it('閉じた詳細の遅い応答では窓を開き直さない', async () => {
   view.rerender(<AnswerLogV8 />)
   await act(async () => { finish({ data: detail }) })
   expect(screen.queryByRole('button', { name: 'この答えを止める' })).toBeNull()
+})
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の回答結果とQ&Aの状態 %s は確認中と表示する', async value => {
+  fx.detail.mockResolvedValue({ data: { ...detail, action: value, qa: { ...detail.qa, status: value } } })
+  render(<AnswerLogV8 />)
+  expect(await screen.findByText('内容を確認できません')).toBeTruthy()
+  expect(screen.getByText(/状態を確認できません/)).toBeTruthy()
 })

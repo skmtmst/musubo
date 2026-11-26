@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import { loadStaffIdentity, useTenantAdministratorAccess } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
@@ -47,6 +48,9 @@ const ROLE_WORDS: Record<StaffMember['role'], string> = {
   staff: '担当者',
   viewer: '閲覧のみ',
 }
+
+export const memberRoleWord = (role: string) => knownValue(ROLE_WORDS, role, '役割を確認できません')
+export const memberRoleTone = (role: string) => role === 'staff' ? 'info' : role === 'owner' || role === 'admin' ? 'success' : 'neutral'
 
 const VIEWER_NOTE = '閲覧のみで見ています。権限者の招待・変更は統括の管理者に頼んでください。'
 
@@ -250,7 +254,7 @@ function MembersInner() {
                 return (
                   <GridRow key={member.id}>
                     <GridNameCell folder={false} name={<span className={styles.identity}><span className={styles.identityLine}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong></span><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
-                    <GridCell stack><StatusBadge tone={member.role === 'viewer' ? 'neutral' : member.role === 'staff' ? 'info' : 'success'}>{ROLE_WORDS[member.role] ?? member.role}</StatusBadge>{memberStatus(member) === 'active' && member.twoFactorEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</GridCell>
+                    <GridCell stack><StatusBadge tone={memberRoleTone(member.role)}>{memberRoleWord(member.role)}</StatusBadge>{memberStatus(member) === 'active' && member.twoFactorEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</GridCell>
                     <GridCell><span className={styles.shortText}>{lastLoginShort(lastLogins[member.id])}</span></GridCell>
                     <GridCell align="right">
                       {canManage ? <RowActions subjectName={member.name} edit={{ label: '権限を変更する', onClick: () => openChange(member) }} menuItems={canResendInvite(member) ? [{ id: 'resend', label: '招待を再送する', disabled: resendingId === member.id, disabledReason: resendingId === member.id ? '招待を送信しています' : undefined, onSelect: () => { void resend(member) } }] : []} /> : null}

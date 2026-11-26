@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /**
  * ダッシュボードの「読み込めなかった部品」の名前（API の partialFailures のキー → 日本語）。
  * 画面に英語の内部の名前（quota など）を出さないため、対応はここ1か所に置く。
@@ -15,7 +16,7 @@ export const PARTIAL_FAILURE_LABEL: Record<string, string> = {
 }
 
 export function partialFailureLabel(name: string): string {
-  return PARTIAL_FAILURE_LABEL[name] ?? 'その他'
+  return knownValue(PARTIAL_FAILURE_LABEL, name, 'その他')
 }
 
 /** 「送信枠、友だちの状態」のように重ねずに並べる。 */

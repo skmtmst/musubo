@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -290,7 +292,7 @@ export default function TagCsvImportDialog({
                   <td>{row.line}</td>
                   <td className={styles.truncate} title={row.name}>{row.name || '（空欄）'}</td>
                   <td className={styles.truncate} title={row.folderName}>{row.folderName || '未分類'}</td>
-                  <td><span className={`${styles.badge} ${styles[row.status]}`}>{STATUS_LABEL[row.status]}</span></td>
+                  <td><span className={`${styles.badge} ${knownValue(styles, row.status, '')}`}>{knownValue(STATUS_LABEL, row.status, '状態を確認できません')}</span></td>
                   <td>{row.message ?? '登録できます'}</td>
                 </tr>)}</tbody>
               </table>

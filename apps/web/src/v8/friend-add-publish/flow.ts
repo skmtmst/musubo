@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * 友だち追加時の配信の公開（確認）で使う小さな決まり。
  * 管理画面（app/friend-add-settings/publish/publish-flow.ts）と同じ中身を写した（src/v8 は @/app を読めない）。
@@ -67,6 +68,6 @@ export function firstSendText(rule: FriendAddRule): string {
   if (rule.friendKind === 'returning' && d.returningMode === 'none') return '配信なし（あわせて行うことだけ）'
   const what = d.messageType === 'text' && d.messageText
     ? `テキスト ${d.messageText.length}字`
-    : MESSAGE_TYPE_LABEL[d.messageType] ?? '未設定'
+    : knownValue(MESSAGE_TYPE_LABEL, d.messageType, '種類を確認できません')
   return `${what}${d.timing === 'immediate' ? '・追加してすぐ' : '・シナリオの時刻に'}`
 }

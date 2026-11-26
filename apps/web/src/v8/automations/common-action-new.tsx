@@ -1,6 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
+import { knownValue } from '@/lib/known-value'
 const FIELD_REQUIREMENTS = {
   name: requiredText("共通アクション名を入力してください"),
 }
@@ -232,7 +233,7 @@ export function CommonActionNew() {
           <Notice tone="danger" ><p>{`${resourcesError} 入力した名前や処理はそのままです。`}</p><Button onClick={() => setResourcesReloadKey((key) => key + 1)}>選択肢をもう一度読み込む</Button></Notice>
         ) : null}
         <ActionList value={actions} onChange={setActions} choices={[]} appearance="numbered" idOf={step => step.id}
-          kindOf={step => ACTION_LABELS[step.type] ?? '処理'} titleOf={step => stepSummary(step, resources)}
+          kindOf={step => knownValue(ACTION_LABELS, step.type, '処理')} titleOf={step => stepSummary(step, resources)}
           addActions={<CommonActionAddActions actions={actions} onChange={next => { setActions(next); if (inputError?.target === 'ca-add-step') setInputError(null) }} resources={resources} resourcesFailed={resourcesFailed} />}
           renderEditor={(step, _update, index) => <CommonActionStepEditor step={step} index={index} actions={actions} onChange={setActions} resources={resources} resourcesFailed={resourcesFailed} />}
         />

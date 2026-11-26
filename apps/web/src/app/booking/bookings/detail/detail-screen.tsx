@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { formatYen } from '@line-crm/shared';
 
 import { notificationResultUnknown } from './detail-model'
@@ -172,7 +174,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                 <span
                   className={`rounded-pill px-2 py-0.5 text-xs ${STATUS_BADGE[status] ?? 'bg-canvas-sunken text-ink-secondary'}`}
                 >
-                  {STATUS_LABELS[status] ?? status}
+                  {knownValue(STATUS_LABELS, status, status)}
                 </span>
                 <span className="text-ink-faint font-mono text-xs">
                   予約番号 {bookingNumber(detail.id)}
@@ -411,7 +413,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                   {detail.previousHandoverBooking ? (
                     <span className="text-ink-faint mt-1 block text-xs">
                       {jpStamp(detail.previousHandoverBooking.startsAt)}の来店
-                      （{STATUS_LABELS[detail.previousHandoverBooking.status] ?? detail.previousHandoverBooking.status}）
+                      （{knownValue(STATUS_LABELS, detail.previousHandoverBooking.status, detail.previousHandoverBooking.status)}）
                       <Link
                         href={`/booking/bookings/detail?id=${encodeURIComponent(detail.previousHandoverBooking.id)}`}
                         className="text-action ml-1 underline"
@@ -470,7 +472,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                       <span className="min-w-0">
                         {item.menuName}／{item.staffName}
                       </span>
-                      <span>{STATUS_LABELS[item.status] ?? item.status}</span>
+                      <span>{knownValue(STATUS_LABELS, item.status, item.status)}</span>
                     </li>
                   ))}
                 </ol>
@@ -595,7 +597,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                   {failedNotificationOps.map((op) => (
                     <li key={op.id} className="text-sm">
                       <p className="text-ink">
-                        LINEのお知らせ（{notificationResultUnknown(op) ? '送達不明・要確認（自動では送り直しません）' : OPERATION_STATUS_LABELS[op.status] ?? op.status}）
+                        LINEのお知らせ（{notificationResultUnknown(op) ? '送達不明・要確認（自動では送り直しません）' : knownValue(OPERATION_STATUS_LABELS, op.status, op.status)}）
                       </p>
                       {op.errorCode ? (
                         <p className="text-ink-faint text-xs">原因: {op.errorCode}</p>
@@ -615,7 +617,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                   {failedCalendarOps.map((op) => (
                     <li key={op.id} className="text-sm">
                       <p className="text-ink">
-                        Googleカレンダーへの反映（{notificationResultUnknown(op) ? '送達不明・要確認（自動では送り直しません）' : OPERATION_STATUS_LABELS[op.status] ?? op.status}）
+                        Googleカレンダーへの反映（{notificationResultUnknown(op) ? '送達不明・要確認（自動では送り直しません）' : knownValue(OPERATION_STATUS_LABELS, op.status, op.status)}）
                       </p>
                       {op.errorCode ? (
                         <p className="text-ink-faint text-xs">原因: {op.errorCode}</p>
@@ -667,7 +669,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                     {detail.reminders.map((reminder) => (
                       <li key={reminder.id} className="flex items-center justify-between gap-2 text-xs">
                         <span className="text-ink">
-                          {POLICY_FIELD_LABELS[reminder.kind] ?? reminder.kind}　{jpStamp(reminder.scheduledAt)}
+                          {knownValue(POLICY_FIELD_LABELS, reminder.kind, reminder.kind)}　{jpStamp(reminder.scheduledAt)}
                         </span>
                         <span className="text-ink-faint">
                           {reminder.status === 'pending' ? '送信予定'

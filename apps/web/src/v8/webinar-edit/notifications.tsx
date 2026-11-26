@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import Card, { CardHeader } from '@/components/shared/card'
 
 import { api, type CommonActionResources } from '@/lib/api';
@@ -413,8 +415,8 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
                 idOf={(action, index) => action.id ?? String(index)} titleOf={action =>{
                   const items = webinarActionItems(action.actionType, actionResources)
                   const key = referenceKey(action.actionType)
-                  return key ? items.find(item => item. id === action.config[key])?.name ?? '未設定': ACTION_LABEL[action.actionType]
-                }} kindOf={action => ACTION_LABEL[action.actionType]}
+                  return key ? items.find(item => item. id === action.config[key])?.name ?? '未設定': knownValue(ACTION_LABEL, action.actionType, '処理')
+                }} kindOf={action => knownValue(ACTION_LABEL, action.actionType, '処理')}
                 choices={Object.entries(ACTION_LABEL).map(([id, label]) => {
                   const type = id as WebinarAction['actionType']
                   const key = referenceKey(type)

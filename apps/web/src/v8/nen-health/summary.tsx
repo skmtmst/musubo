@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { DetailContent, DetailField, DetailNumber, DetailSection, DetailSectionTitle } from '@/components/shared/detail-content'
 
 import { jstDateOffset } from '@/lib/jst-datetime'
@@ -131,7 +133,7 @@ export default function SummaryDrawerV8({
                     <Td><TruncatedText value={log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`} /></Td>
                     <Td><TruncatedText tone={STOOL_OK.has(log.stool) ? undefined : 'warning'} value={summary.labels.stool[log.stool] ?? log.stool} /></Td>
                     <Td><TruncatedText tone={APPETITE_OK.has(log.appetite) ? undefined : 'warning'} value={summary.labels.appetite[log.appetite] ?? log.appetite} /></Td>
-                    <Td><TruncatedText value={log.skin ? SKIN_LABELS[log.skin] ?? log.skin : emptyValue('unknown')} /></Td>
+                    <Td><TruncatedText value={log.skin ? knownValue(SKIN_LABELS, log.skin, log.skin) : emptyValue('unknown')} /></Td>
                     <Td><TruncatedText value={log.tearStain ? TEAR_SHORT[log.tearStain] ?? log.tearStain : emptyValue('unknown')} /></Td>
                     <Td><TruncatedText value={notes.get(log.loggedOn) ?? emptyValue('unknown')} /></Td>
                   </Tr>
@@ -207,8 +209,8 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
               <td>{log.respiratoryRateBpm ?? ''}</td>
               <td>{summary.labels.stool[log.stool] ?? log.stool}</td>
               <td>{summary.labels.appetite[log.appetite] ?? log.appetite}</td>
-              <td>{log.skin ? SKIN_LABELS[log.skin] ?? log.skin : ''}</td>
-              <td>{log.tearStain ? TEAR_LABELS[log.tearStain] ?? log.tearStain : ''}</td>
+              <td>{log.skin ? knownValue(SKIN_LABELS, log.skin, log.skin) : ''}</td>
+              <td>{log.tearStain ? knownValue(TEAR_LABELS, log.tearStain, log.tearStain) : ''}</td>
             </tr>
           ))}
         </tbody>

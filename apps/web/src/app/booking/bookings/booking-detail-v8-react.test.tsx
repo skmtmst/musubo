@@ -58,7 +58,7 @@ const BOOKING = {
 
 const mounted: Array<{ root: Root; host: HTMLElement }> = []
 
-function render(onCancel = vi.fn()): { host: HTMLElement; onCancel: ReturnType<typeof vi.fn> } {
+function render(onCancel = vi.fn(), booking = BOOKING): { host: HTMLElement; onCancel: ReturnType<typeof vi.fn> } {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
@@ -66,7 +66,7 @@ function render(onCancel = vi.fn()): { host: HTMLElement; onCancel: ReturnType<t
   act(() => {
     root.render(
       <BookingDetailV8
-        booking={BOOKING}
+        booking={booking}
         accountId="account-1"
         canOperate
         onClose={() => undefined}
@@ -90,6 +90,13 @@ describe('予約の詳細のV8（AjZhH）', () => {
     for (const { host } of mounted) host.remove()
     mounted.length = 0
     vi.clearAllMocks()
+  })
+
+  it('未知の予約元でも詳細を表示する', async () => {
+    render(vi.fn(), { ...BOOKING, source: '__proto__' } as typeof BOOKING)
+    await act(async () => undefined)
+    expect(document.body.textContent).toContain('__proto__から')
+    expect(document.body.textContent).not.toContain('[object Object]')
   })
 
   it('板IDと中身・3つのボタンを出す', async () => {
