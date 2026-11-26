@@ -19,9 +19,9 @@ import { parseFriendCsv, type FriendImportRow } from './friend-csv'
 
 export type ImportSummary = { add: number; update: number; unchanged: number; conflict: number; error: number }
 
-export const JOB_STATUS_LABELS: Record<string, string> = {
+export const JOB_STATUS_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   completed: '反映ずみ', previewed: '確認まで', expired: '期限切れ', failed: '失敗',
-}
+})
 
 // 取り込みファイルの上限（#496-22）。全文を画面のメモリへ読むため、
 // 大きすぎるファイルは固まる前に断る。5000行の取り込み上限に対し十分な大きさ。
