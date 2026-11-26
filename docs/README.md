@@ -1402,14 +1402,4 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-- [自動応答とリマインダのフォルダ作成通知](release-log/unreleased/PR-kenta-later-codex13.md) — フォルダ作成の完了を知らせる修正の履歴。確認 2026-11-27。
-- [セキュリティの見張りの表示と操作](release-log/unreleased/PR-kenta-later-codex14.md) — 異常の操作と表示に関する修正の履歴。確認 2026-11-27。
-- [統括の配信候補の表示](release-log/unreleased/PR-kenta-later-codex15.md) — 配信候補の表示を直した反映履歴。確認 2026-11-27。
-- [受け取り口と健康日記の表示](release-log/unreleased/PR-kenta-later-codex16.md) — 未対応の種類があるときの表示を直した反映履歴。確認 2026-11-27。
-- [回答フォームの項目表示](release-log/unreleased/PR-kenta-later-codex17.md) — 回答の項目名と未回答の表示を直した反映履歴。確認 2026-11-27。
-- [外部連携の記録の表示](release-log/unreleased/PR-kenta-later-codex18.md) — 状態や送受信の方向が分からない記録の表示を直した反映履歴。確認 2026-11-27。
-- [共通アクションと写真審査の表示](release-log/unreleased/PR-kenta-later-codex19.md) — 未対応の値があるときの表示を直した反映履歴。確認 2026-11-27。
-- [オートメーション一覧・自動応答一覧の集計再読み込みと読み込み表示の修正](release-log/unreleased/PR-kenta-later-gemini14-1127.md) — 反映履歴、確認 2026-11-27。
-- [ウェビナー一覧・コンバージョン一覧の集計再読み込みと読み込み表示の修正](release-log/unreleased/PR-kenta-later-gemini15-1127.md) — 反映履歴、確認 2026-11-27。
-- [マイル残高一覧・広告連携の集計失敗分離と再読み込みの修正](release-log/unreleased/PR-kenta-later-gemini16-1127.md) — 反映履歴、確認 2026-11-27。
-- [マイル履歴の直近30日集計と会員ランクの人数見込みの再読み込み](release-log/unreleased/PR-kenta-later-gemini17-1127.md) — 反映履歴、確認 2026-11-27。
+- [夜の画面修正をまとめて取り込み](release-log/unreleased/PR-kenta-train-night5-1127.md) — 反映履歴、確認 2026-11-27。
