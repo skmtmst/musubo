@@ -29,6 +29,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { notifySaved } from '@/components/shared/toast'
 
 /*
  * ★V8-B プール管理「プールを作る」（Pencil ・/pools/new）。
@@ -135,6 +136,7 @@ function PoolCreateBody() {
       const res = await api.pools.create({ name: name.trim(), slug: slug.trim(), activeAccountId: accountIds[0], accountIds })
       if (!res.success) throw new Error(res.error)
       guard.disarm()
+      notifySaved('プールを作成しました。')
       router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (e) {
       const fieldFailure = saveErrors.capture(e)
