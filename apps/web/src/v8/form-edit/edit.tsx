@@ -108,7 +108,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
-  const [bookingMenusRead, setBookingMenusRead] = useState<{ accountId: string; status: 'loading' | 'ready' | 'error'; items: NonNullable<FormRefs['bookingMenus']> } | null>(null)
+  const [bookingMenusRead, setBookingMenusRead] = useState<({ accountId: string } & ({ status: 'loading' | 'error' } | { status: 'ready'; items: NonNullable<FormRefs['bookingMenus']> })) | null>(null)
   const [bookingMenusAttempt, setBookingMenusAttempt] = useState(0)
   const [loading, setLoading] = useState(!host)
   const [saving, setSaving] = useState(false)
@@ -347,17 +347,17 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (hostRef.current || !selectedAccountId) return
     let cancelled = false
     const accountId = selectedAccountId
-    setBookingMenusRead({ accountId, status: 'loading', items: [] })
+    setBookingMenusRead({ accountId, status: 'loading' })
     void bookingApi.listMenus(accountId).then((result) => {
       if (cancelled) return
       if (!Array.isArray(result.menus)) throw new Error('booking_menus_unavailable')
       setBookingMenusRead({ accountId, status: 'ready', items: result.menus.filter((menu) => menu.is_active === 1).map((menu) => ({ id: menu.id, name: menu.name, durationMinutes: menu.duration_minutes })) })
-    }).catch(() => { if (!cancelled) setBookingMenusRead({ accountId, status: 'error', items: [] }) })
+    }).catch(() => { if (!cancelled) setBookingMenusRead({ accountId, status: 'error' }) })
     return () => { cancelled = true }
   }, [selectedAccountId, bookingMenusAttempt])
 
   const currentBookingMenus = bookingMenusRead?.accountId === selectedAccountId ? bookingMenusRead : null
-  const visibleRefs = host ? refs : { ...refs, bookingMenus: currentBookingMenus?.items ?? [] }
+  const visibleRefs = host ? refs : { ...refs, bookingMenus: currentBookingMenus?.status === 'ready' ? currentBookingMenus.items : [] }
 
   useEffect(() => {
     if (bookingStaffAccount.current !== selectedAccountId) {
