@@ -159,7 +159,7 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
         {state && !state.linked ? <Notice tone="warn" message={state.linkGuidance ?? 'テスト適用にはLINE連携が必要です。'} /> : null}
         {state?.linked ? <>
           {destination ? <p className={styles.cardNote}>{destination}</p> : null}
-          {active ? <p className={styles.cardNote} title={active.status === 'failed' ? active.lastErrorCode?.slice(0, 60) : undefined}>いまの状態: {APPLY_STATUS_LABEL[active.status] ?? '状態を確認しています'}</p> : null}
+          {active ? <p className={styles.cardNote} title={active.status === 'failed' ? active.lastErrorCode?.slice(0, 60) : undefined}>いまの状態: {Object.prototype.hasOwnProperty.call(APPLY_STATUS_LABEL, active.status) ? APPLY_STATUS_LABEL[active.status] : '状態を確認しています'}</p> : null}
           {canRevert
             ? <Button type="button" onClick={() => openConfirm('revert')} disabled={busy}>元のメニューに戻す</Button>
             : <Button type="button" variant="primary" onClick={() => openConfirm('apply')} disabled={busy || Boolean(active && active.status !== 'reverted' && active.status !== 'failed')}>自分のLINEに適用して試す</Button>}
