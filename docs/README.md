@@ -1410,3 +1410,4 @@
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/PR-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [認証アプリ確認とマイペット一覧の読み込み失敗時表示・再読み込み](release-log/unreleased/PR-kenta-later-gemini9-1127.md) — 反映履歴、確認 2026-11-27。
 - [対応が要るものと健康日記の読み込み失敗時KPI表示](release-log/unreleased/PR-kenta-later-gemini10-1127.md) — 反映履歴、確認 2026-11-27。
+- [流入フォルダと友だち情報欄の保存通知](release-log/unreleased/PR-kenta-later-codex9.md) — 保存の完了を知らせる修正の履歴。確認 2026-11-27。
