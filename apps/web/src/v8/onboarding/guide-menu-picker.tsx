@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { Plus } from 'lucide-react'
 import { RESTAURANT_GUIDE_MENU_IDS, RESTAURANT_GUIDE_MENUS, type RestaurantGuideMenu } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -63,7 +64,6 @@ export function GuideMenuPicker({ accountId, version, step, total, onLater, onSa
       footer={<div className={styles.footer}>
         <DialogActions>
           <Button size="inline" variant="text" onClick={onLater} disabled={saving !== null}>あとで</Button>
-          <Button presentation="step-action" onClick={onCreate} disabled={saving !== null}>0から自分で作る</Button>
         </DialogActions>
         <small>クーポン等の強調色も各型のパレット内で統一</small>
       </div>}
@@ -89,6 +89,11 @@ export function GuideMenuPicker({ accountId, version, step, total, onLater, onSa
                   busy={saving === id} disabled={versionConflict || (saving !== null && saving !== id)}>これにする</Button>
               </Card>
             })}
+            <Card as="article" aria-label="0から自分で作る" edge="hairline" contentPadding="var(--space-8) var(--space-8)" className={styles.preset}>
+              <div className={styles.scratchArtwork}><Plus aria-hidden="true" /></div>
+              <div className={styles.details}><span><strong>0から自分で作る</strong><small>空のメニューから自分でボタンを決めます</small></span></div>
+              <Button fullWidth size="compact" onClick={onCreate} disabled={saving !== null}>自分で作る</Button>
+            </Card>
           </div>
         </SaveErrorField>
       </SaveErrorScope>
