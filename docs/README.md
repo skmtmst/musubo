@@ -1405,6 +1405,7 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
+- [友だち追加時の配信一覧と送り先編集の読み込み状態・再読み込み表示](release-log/unreleased/PR-kenta-later-gemini21-1127.md) — 反映履歴、確認 2026-11-27。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
