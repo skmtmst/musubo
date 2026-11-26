@@ -145,6 +145,8 @@ export default function AdsV8() {
   const cancelContext = useRef({ accountId: selectedAccountId, generation: 0 })
   if (cancelContext.current.accountId !== selectedAccountId) cancelContext.current = { accountId: selectedAccountId, generation: cancelContext.current.generation + 1 }
   const loadGenerationRef = useRef(0)
+  const costGenerationRef = useRef(0)
+  const costLoadingRef = useRef(false)
   const loadedCostContext = useRef<number | null>(null)
   const latestAccountRef = useRef(selectedAccountId)
   latestAccountRef.current = selectedAccountId
@@ -155,6 +157,7 @@ export default function AdsV8() {
   const [costPlatforms, setCostPlatforms] = useState<AdCostPlatformStatus[]>([])
   const [conversionCost, setConversionCost] = useState<ConversionCost | null>(null)
   const [costFailed, setCostFailed] = useState(false)
+  const [costLoading, setCostLoading] = useState(false)
   const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
   const [entryRoutes, setEntryRoutes] = useState<EntryRoute[]>([])
   const canManage = canManageRole(role)
@@ -191,24 +194,37 @@ export default function AdsV8() {
 
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
+    costGenerationRef.current += 1
+    costLoadingRef.current = false
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
       setPlatforms([])
       setCostRows([])
       setCostPlatforms([])
       setFailed(false)
+      setCostFailed(false)
+      setCostLoading(false)
       setLoading(false)
       return
     }
     const isCurrent = () => generation === loadGenerationRef.current && accountAtRequest === latestAccountRef.current
     setLoading(true)
     setFailed(false)
+    setCostLoading(false)
     try {
-      const [platformResponse, costResponse, routeResponse] = await Promise.all([
+      const [platformSettled, costSettled, routeSettled] = await Promise.allSettled([
         api.adPlatforms.list(accountAtRequest),
         api.adCosts.list({ accountId: accountAtRequest }),
         api.entryRoutes.list(accountAtRequest),
       ])
+      if (platformSettled.status === 'rejected') throw platformSettled.reason
+      const platformResponse = platformSettled.value
+      const costResponse = costSettled.status === 'fulfilled'
+        ? costSettled.value
+        : { success: false as const, error: 'ad_costs_failed' }
+      const routeResponse = routeSettled.status === 'fulfilled'
+        ? routeSettled.value
+        : { success: false as const, error: 'entry_routes_failed' }
       if (!isCurrent()) return
       if (!platformResponse.success) {
         setFailed(true)
@@ -239,12 +255,49 @@ export default function AdsV8() {
     }
   }, [selectedAccountId, saveErrors])
 
+  const reloadCosts = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest || costLoadingRef.current) return
+    const generation = ++costGenerationRef.current
+    costLoadingRef.current = true
+    setCostLoading(true)
+    setCostFailed(false)
+    setCostRows([])
+    setCostPlatforms([])
+    setManualEntries([])
+    setConversionCost(null)
+    const isCurrent = () => generation === costGenerationRef.current && accountAtRequest === latestAccountRef.current
+    try {
+      const costResponse = await api.adCosts.list({ accountId: accountAtRequest })
+      if (!isCurrent()) return
+      if (costResponse.success) {
+        loadedCostContext.current = cancelContext.current.generation
+        setCostRows((costResponse.data.rows ?? []) as AdCostRow[])
+        setCostPlatforms((costResponse.data.platforms ?? []) as AdCostPlatformStatus[])
+        setManualEntries((costResponse.data.manualEntries ?? []) as ManualCostEntry[])
+        setConversionCost(costResponse.data.conversionCost ?? null)
+        setCostFailed(false)
+      } else {
+        setCostFailed(true)
+      }
+    } catch {
+      if (isCurrent()) setCostFailed(true)
+    } finally {
+      if (costGenerationRef.current === generation) {
+        costLoadingRef.current = false
+        setCostLoading(false)
+      }
+    }
+  }, [selectedAccountId])
+
   useEffect(() => {
     setPlatforms([])
     setManualEntries([])
     void load()
     return () => {
       loadGenerationRef.current += 1
+      costGenerationRef.current += 1
+      costLoadingRef.current = false
     }
   }, [load])
 
@@ -408,17 +461,24 @@ export default function AdsV8() {
           <KpiBand aria-label="広告連携の概要">
               <KpiCard icon={<Wallet size={16} aria-hidden="true" />} title="この30日の広告費"
                 value={null} unit=""
-                valueText={jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : emptyValue('unknown')}
-                detail="選んだ LINE アカウントの分だけ" />
+                loading={costLoading}
+                valueText={costFailed ? emptyValue('unknown') : jpyTotal != null ? `¥${formatNumber(jpyTotal)}` : otherTotal ? formatMinor(otherTotal[1], otherTotal[0]) : emptyValue('unknown')}
+                detail={costFailed ? '広告費を読み込めませんでした' : '選んだ LINE アカウントの分だけ'}
+                onRetry={costFailed && !costLoading ? () => void reloadCosts() : undefined} />
               <KpiCard icon={<Plug size={16} aria-hidden="true" />} title="つないだ広告" value={connected.length} unit="件"
                 detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
               <KpiCard icon={<UserPlus size={16} aria-hidden="true" />} title="友だち1人あたり"
-                value={null} unit="" valueText={avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : emptyValue('unknown')}
-                detail={`友だち追加 ${formatNumber(linkedFriendAdds)} 人`} />
+                value={null} unit=""
+                loading={costLoading}
+                valueText={costFailed ? emptyValue('unknown') : avgCostPerFriend != null ? `¥${formatNumber(avgCostPerFriend)}` : emptyValue('unknown')}
+                detail={costFailed ? '広告費を読み込めませんでした' : `友だち追加 ${formatNumber(linkedFriendAdds)} 人`}
+                onRetry={costFailed && !costLoading ? () => void reloadCosts() : undefined} />
               <KpiCard icon={<Target size={16} aria-hidden="true" />} title="成果1件あたり"
                 value={null} unit=""
-                valueText={conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : emptyValue('unknown')}
-                detail={conversionCost ? `成果 ${formatNumber(conversionCost.confirmedConversionCount)} 件` : '成果の件数を読み込めませんでした'} />
+                loading={costLoading}
+                valueText={costFailed ? emptyValue('unknown') : conversionCost?.costPerConversionMinor != null && conversionCost.currency ? formatMinor(conversionCost.costPerConversionMinor, conversionCost.currency) : emptyValue('unknown')}
+                detail={costFailed ? '広告費を読み込めませんでした' : conversionCost ? `成果 ${formatNumber(conversionCost.confirmedConversionCount)} 件` : '成果の件数を読み込めませんでした'}
+                onRetry={costFailed && !costLoading ? () => void reloadCosts() : undefined} />
           </KpiBand>
 
           <div className={styles.providers} role="list" aria-label="媒体ごとの接続">
@@ -466,12 +526,15 @@ export default function AdsV8() {
           {importError ? <Notice tone="danger" >{importError}</Notice> : null}
 
           <h2 className={styles.sectionTitle} id="ads-costs">流入元ごとの費用</h2>
-          {costFailed ? (
+          {costLoading ? (
+            <ListState kind="loading" title="広告費を読み込んでいます" />
+          ) : costFailed ? (
             <ListState
               kind="error"
               title="広告費を読み込めませんでした"
               description="記録は消えていません。もう一度読み込んでください。"
-              onRetry={() => void load()}
+              onRetry={() => void reloadCosts()}
+              retrying={costLoading}
             />
           ) : costRows.length === 0 ? (
             <ListState
