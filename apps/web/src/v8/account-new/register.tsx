@@ -15,7 +15,7 @@ import {
   ArrowLeft, ArrowRight, Check, CircleAlert, CircleDashed, Copy, Plug,
 } from 'lucide-react'
 import { api, ApiError, type LineAccountConnectData } from '@/lib/api'
-import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared'
+import { ACCOUNT_STYLES } from '@line-crm/shared'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageContent, PageFooter, PageFrame, PageHeading } from '@/components/templates/page-frame'
