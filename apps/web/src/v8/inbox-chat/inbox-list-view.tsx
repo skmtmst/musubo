@@ -110,6 +110,14 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
   const savedSearchRef = useRef<HTMLDivElement>(null)
+  const [, setClock] = useState(() => Date.now())
+  const clock = Date.now()
+  useEffect(() => {
+    const refreshClock = () => { if (document.visibilityState === 'visible') setClock(Date.now()) }
+    const timer = window.setInterval(refreshClock, 60_000)
+    document.addEventListener('visibilitychange', refreshClock)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refreshClock) }
+  }, [])
   useEffect(() => {
     if (!savedViewsOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -460,7 +468,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           </div>
                         </div>
                         <div className={styles.rowAside}>
-                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
+                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt, { now: clock }) || undefined}>{formatListRecent(item.lastIncomingAt, { now: clock })}</span>
                         </div>
                       </div>
                     </div>
@@ -545,7 +553,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                             </div>
                           </div>
                           <div className={styles.rowAside}>
-                            <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
+                            <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt, { now: clock }), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt, { now: clock })}</span>
                             <StatusBadge data-status-pill="" tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusBadge>
                             <SlaBadge fields={chat as ChatSlaFields} now={Date.now()} />
                           </div>

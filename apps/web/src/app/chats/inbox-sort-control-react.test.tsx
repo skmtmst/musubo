@@ -132,6 +132,55 @@ const order = (list: HTMLElement) => {
   return ['LINE未読古', 'メール未読古', 'LINE新', 'メール中', 'LINE古'].sort((a, b) => rendered.indexOf(a) - rendered.indexOf(b))
 }
 
+test('受信箱を開いたまま時間が進むと時刻だけを更新し、復帰時も現在に追いつく', async () => {
+  let now = Date.parse('2026-09-03T00:00:30Z')
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+  try {
+    const list = await renderList()
+    const lineRow = list.querySelector('#chat-row-name-chat-new')?.closest('button')!
+    expect(lineRow.textContent).toContain('たった今')
+    const calls = fixture.chatQueries.length
+    now += 60_000
+    await act(async () => { vi.advanceTimersByTime(60_000) })
+    expect(lineRow.textContent).toContain('1分前')
+    expect(lineRow.querySelector('[title*="1分前"]')).toBeTruthy()
+    expect(fixture.chatQueries).toHaveLength(calls)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    now += 120_000
+    await act(async () => { vi.advanceTimersByTime(120_000) })
+    expect(lineRow.textContent).toContain('1分前')
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    expect(lineRow.textContent).toContain('3分前')
+    now = Date.parse('2026-09-02T00:00:30Z')
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+    const emailName = [...list.querySelectorAll('p')].find(element => element.textContent === 'メール中')!
+    const emailRow = emailName.closest('button')!
+    expect(emailRow.textContent).toContain('たった今')
+    now += 60_000
+    await act(async () => { vi.advanceTimersByTime(60_000) })
+    expect(emailRow.textContent).toContain('1分前')
+    expect(fixture.chatQueries).toHaveLength(calls)
+  } finally {
+    if (visibility) Object.defineProperty(document, 'visibilityState', visibility)
+    else Reflect.deleteProperty(document, 'visibilityState')
+    vi.useRealTimers()
+  }
+})
+
+test('時計の更新前に新着が届いて描き直した時は現在の時刻で表示する', async () => {
+  let now = Date.parse('2026-09-02T23:59:30Z')
+  vi.spyOn(Date, 'now').mockImplementation(() => now)
+  const list = await renderList()
+  const lineRow = list.querySelector('#chat-row-name-chat-new')?.closest('button')!
+  expect(lineRow.textContent).not.toContain('たった今')
+  now += 35_000
+  await act(async () => root.render(<ChatsPage />))
+  expect(lineRow.textContent).toContain('たった今')
+})
+
 test('既定は未読が先・新しい順で、LINEとメールを統合する。口へは並びを送らない', async () => {
   const list = await renderList()
   // 並びの1段は無い。選んだ並びは題の横の印の吹き出しで分かる。
