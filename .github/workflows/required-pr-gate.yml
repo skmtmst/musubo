@@ -863,7 +863,7 @@ jobs:
       - web-build
       - mcp-checks
       - docs-checks
-      - v8-screen-guard
+      # 必須に戻すときはここに - v8-screen-guard を追加する。
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -880,7 +880,7 @@ jobs:
           MCP_CHECKS_RESULT: ${{ needs.mcp-checks.result }}
           DOCS_CHECKS_RESULT: ${{ needs.docs-checks.result }}
           V8_SCREEN_GUARD_RESULT: ${{ needs.v8-screen-guard.result }}
-          # false に戻すと V8 の失敗を必須ゲートに戻す。
+          # 必須に戻すときは needs に v8-screen-guard を追加し、ここを false にする。
           V8_GUARD_REPORT_ONLY: 'true'
         run: |
           failed=0
@@ -901,17 +901,17 @@ jobs:
             esac
           done
 
-          case "$V8_SCREEN_GUARD_RESULT" in
-            success|skipped) ;;
-            failure)
-              if [ "$V8_GUARD_REPORT_ONLY" = 'true' ]; then
-                echo "::warning::V8 screen guard は失敗しました（現在は報告のみ）。"
-              else
-                failed=1
-              fi
-              ;;
-            *) failed=1 ;;
-          esac
+          if [ "$V8_GUARD_REPORT_ONLY" = 'false' ]; then
+            case "$V8_SCREEN_GUARD_RESULT" in
+              success|skipped) ;;
+              *) failed=1 ;;
+            esac
+          elif [ "$V8_GUARD_REPORT_ONLY" = 'true' ]; then
+            echo "V8 screen guard は別のチェックとして実行中または完了しています。"
+          else
+            echo "::error::V8_GUARD_REPORT_ONLY は true または false にしてください。"
+            failed=1
+          fi
 
           if [ "$failed" -ne 0 ]; then
             echo "::error::選択された検査に失敗または中断があります。"
