@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import { api } from '@/lib/api'
 import { readSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
@@ -11,7 +12,7 @@ export default function TrustCurrentLogin({ onSuccess }: { onSuccess?: () => voi
   const [error, setError] = useState('')
   const stepUp = useStepUpGate()
   const enabled = readSessionSnapshot()?.stepUpMethod === 'totp'
-  const confirm = async () => {
+  const trustLogin = async () => {
     setError('')
     const token = await stepUp.gate('auth.login.trust', '自分のログインとして確認する')
     if (!token) return
@@ -28,9 +29,9 @@ export default function TrustCurrentLogin({ onSuccess }: { onSuccess?: () => voi
     finally { setBusy(false) }
   }
   return <>
-    <Button variant="secondary" lockedReason={!enabled ? '二段階認証を設定すると使えます' : undefined} busy={busy} onClick={() => void confirm()}>自分のログインです</Button>
+    <Button variant="secondary" lockedReason={!enabled ? '二段階認証を設定すると使えます' : undefined} busy={busy} onClick={() => void trustLogin()}>自分のログインです</Button>
     {!enabled && <Button variant="text" href="/staff#self-security">二段階認証を設定する</Button>}
-    {error && <span role="alert">{error}</span>}
+    {error && <Notice tone="danger" message={error} />}
     {stepUp.prompt}
   </>
 }
