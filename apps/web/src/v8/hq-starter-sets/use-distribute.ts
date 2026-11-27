@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { notifySaved } from '@/components/shared/toast'
@@ -26,6 +26,7 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
   const [preview, setPreview] = useState<{ key: string; data: StarterDistributionPreview } | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const running = useRef(false)
   const [tick,setTick]=useState(0)
   const target = draft && version !== null ? targetOf(style, draft) : null
   const key = target ? JSON.stringify({ style, version, target }) : null
@@ -36,6 +37,7 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
     let cancelled = false
     void hqStyleApi.preflight(style, { expectedVersion: version, target }).then((res) => {
       if (!res.success) throw new Error('preflight failed')
+      if (typeof res.data?.token !== 'string' || !res.data.token.trim() || !Number.isSafeInteger(res.data.accountCount) || res.data.accountCount < 0 || !Number.isSafeInteger(res.data.editedCount) || res.data.editedCount < 0) throw new Error('preflight failed')
       if (!cancelled) setPreview({ key, data: res.data })
     }).catch((caught: unknown) => { if (!cancelled) setError(describeApiFailure(caught, '読み込み', { scope: 'hq' })) })
     return () => { cancelled = true }
@@ -45,7 +47,8 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
 
   const ready = preview !== null && preview.key === key
   const run = async () => {
-    if (!draft || !target || !ready || version === null || busy) return
+    if (!draft || !target || !ready || preview.data.accountCount === 0 || version === null || running.current) return
+    running.current = true
     setBusy(true)
     setError('')
     try {
@@ -59,6 +62,7 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
     } catch (caught) {
       setError(describeApiFailure(caught, '配る操作', { scope: 'hq' }))
     } finally {
+      running.current = false
       setBusy(false)
     }
   }
