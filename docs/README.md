@@ -1530,3 +1530,4 @@
 - [リッチメニュー複製エラー案内と予約確認窓のスクロール案内修正の反映履歴](release-log/unreleased/PR-kenta-later-gemini102-1127.md) — 反映履歴、確認 2026-11-28。
 - [案内オーバーレイ暗幕のはみ出し防止とリマインダ基準日時補正の反映履歴](release-log/unreleased/PR-kenta-later-gemini103-1127.md) — 反映履歴、確認 2026-11-28。
 - [デリバリー時刻・番号整形と健康日記まとめ異常値表示の修正履歴](release-log/unreleased/PR-kenta-later-gemini104-1127.md) — 反映履歴、確認 2026-11-28。
+- [予約台帳の時刻・コース表示とリッチメニュー削除影響確認の異常値対策の反映履歴](release-log/unreleased/PR-kenta-later-gemini105-1127.md) — 反映履歴、確認 2026-11-28。
