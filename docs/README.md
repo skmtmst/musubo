@@ -1420,3 +1420,4 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 
 - [自動応答と開店準備ガイドの入力案内](release-log/unreleased/PR-kenta-later-codex28.md) — 反映履歴。確認 2026-11-27。
+- [統括の配布先を選ぶ案内の反映履歴](release-log/unreleased/PR-kenta-later-codex29.md)
