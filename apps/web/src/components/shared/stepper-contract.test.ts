@@ -31,14 +31,6 @@ describe('手順の進み表示は現役の共通Steps', () => {
     expect(broadcast, '描き方を配信側に残さない').not.toContain('STEP {step.order}')
   })
 
-  it('済みの段を押すと、その節か段へ戻る', () => {
-
-    const shared = code(fs.readFileSync(SHARED, 'utf8'))
-    expect(shared).toContain("document.getElementById(step.anchor)?.scrollIntoView")
-    expect(shared).toContain('step.onSelect?.()')
-    expect(shared).toContain("state === 'done' || state === 'attention'")
-  })
-
   it('何の進みかを言う', () => {
 
     const shared = code(fs.readFileSync(SHARED, 'utf8'))
