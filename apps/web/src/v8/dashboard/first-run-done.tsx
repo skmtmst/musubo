@@ -41,6 +41,9 @@ export function doneRows(definition: ReadonlyArray<Pick<StarterSetItem, 'kind'>>
     if (inserted.length === 0) return [{ kind, label, badge: { tone: 'neutral', text: '入れなかった（あとで）' } }]
     if (kind === 'template') return [{ kind, label, badge: { tone: 'neutral', text: '入っています' } }]
     const running = inserted.some((item) => item.status !== null && RUNNING.has(item.status))
+    if (!running && inserted.some((item) => item.status === null || item.status === 'missing')) {
+      return [{ kind, label, badge: { tone: 'warning', text: '状態を確認できません' } }]
+    }
     return [{ kind, label, badge: running ? { tone: 'success', text: '動いています' } : { tone: 'warning', text: '止めています' } }]
   })
 }
