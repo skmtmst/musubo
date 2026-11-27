@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, screen, within } from '@testing-library/react'
 
 /*
  * R492・R493・R494・R495 の回帰テスト。
@@ -290,5 +291,56 @@ describe('R493直リンク: ?runの詳細取得失敗も見せて再試行でき
     } finally {
       window.history.replaceState({}, '', '/automations/runs')
     }
+  })
+})
+
+
+describe('一覧の取得状態と絞り込み', () => {
+  it('読込中と失敗を空の記録と区別し、再読込で表示する', async () => {
+    let reject!: (reason: unknown) => void
+    mockFetch.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    const el = await mountPage()
+    expect(el.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('動いた記録を読み込んでいます')
+    expect(el.textContent).not.toContain('動いた記録はまだありません')
+    await act(async () => { reject(new Error('private error')); await drainMicrotasks() })
+    expect(el.textContent).toContain('動いた記録を読み込めませんでした')
+    expect(el.textContent).not.toContain('private error')
+    expect(el.textContent).not.toContain('動いた記録はまだありません')
+    const retry = [...el.querySelectorAll('button')].find(button => button.textContent?.includes('もう一度読み込む'))!
+    await act(async () => { retry.click(); await drainMicrotasks() })
+    expect(el.textContent).toContain('田中さん')
+  })
+
+  it('記録なしと検索による0件を分け、店舗と検索語を送る', async () => {
+    mockFetch.mockResolvedValue(listResponse([], 0))
+    const el = await mountPage()
+    expect(el.textContent).toContain('動いた記録はまだありません')
+    const initial = new URL(String(mockFetch.mock.calls.at(-1)![0]), 'http://localhost')
+    expect(initial.pathname).toBe('/api/automation-runs')
+    expect(initial.searchParams.get('lineAccountId')).toBe('account-1')
+    const search = screen.getByRole('searchbox', { name: '友だちの名前・オートメーションの名前で探す' })
+    await act(async () => { fireEvent.change(search, { target: { value: '  予約案内  ' } }) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(450); await drainMicrotasks() })
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); await drainMicrotasks() })
+    expect(el.textContent).toContain('条件に合う記録はありません')
+    expect(el.textContent).not.toContain('動いた記録はまだありません')
+    const filtered = new URL(String(mockFetch.mock.calls.at(-1)![0]), 'http://localhost')
+    expect(filtered.searchParams.get('search')).toBe('予約案内')
+  })
+
+  it('結果とテスト実行の選択を取得へ反映する', async () => {
+    await mountPage()
+    const before = new URL(String(mockFetch.mock.calls.at(-1)![0]), 'http://localhost')
+    expect(before.searchParams.has('include_test')).toBe(false)
+    const tabs = screen.getByRole('tablist', { name: '結果で絞り込む' })
+    await act(async () => { fireEvent.click(within(tabs).getByRole('tab', { name: /失敗/ })); await vi.advanceTimersByTimeAsync(450); await drainMicrotasks() })
+    let current = new URL(String(mockFetch.mock.calls.at(-1)![0]), 'http://localhost')
+    expect(current.searchParams.get('status')).toBe('problems')
+    await act(async () => { fireEvent.click(screen.getByLabelText('よく使う絞り込み')) })
+    const option = screen.getByRole('option', { name: 'テスト実行も見る' })
+    await act(async () => { fireEvent.click(within(option).getByRole('button')); await vi.advanceTimersByTimeAsync(450); await drainMicrotasks() })
+    current = new URL(String(mockFetch.mock.calls.at(-1)![0]), 'http://localhost')
+    expect(current.searchParams.get('include_test')).toBe('1')
+    expect(current.searchParams.get('status')).toBe('problems')
   })
 })
