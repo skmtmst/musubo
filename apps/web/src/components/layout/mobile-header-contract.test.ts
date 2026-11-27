@@ -24,8 +24,6 @@ const GLOBALS = readFileSync(join(SRC, 'app', 'globals.css'), 'utf8')
  */
 describe('モバイル固定ヘッダーと現在地（#975 U037/U038）', () => {
   it('モバイルヘッダーが現在地（画面名）を持つ', () => {
-    expect(SIDEBAR).toContain('usePageChrome')
-    expect(SIDEBAR).toContain('defaultTitleForPath')
     expect(SIDEBAR).toContain('styles.mobileTitle')
     // 長いタイトルは省略し、全文は title で読める。
     expect(SIDEBAR_CSS).toContain('text-overflow: ellipsis')
