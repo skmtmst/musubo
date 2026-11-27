@@ -311,3 +311,28 @@ test('送る時間を切り替えると、案内もその送信条件へ切り�
       && ((init as RequestInit | undefined)?.method ?? 'GET') !== 'GET'
   })).toBe(false)
 })
+
+test('チーム一覧が不正なときは読み直しを案内する', async () => {
+  const previousFetch = globalThis.fetch
+  let calls = 0
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => String(input).includes('/api/notifications/teams')
+    ? Promise.resolve(json({ success: true, data: ++calls === 1 ? {} : [] })) : previousFetch(input, init))
+  await render()
+  expect(host?.textContent).toContain('チームを読み込めませんでした')
+  await act(async () => { screen.getByRole('button', { name: 'チームをもう一度読み込む' }).click() })
+  expect(host?.textContent).not.toContain('チームを読み込めませんでした')
+  expect(calls).toBe(2)
+})
+
+test('受け取る人の一覧が不正なときは空と見せずに読み直せる', async () => {
+  const previousFetch = globalThis.fetch
+  let calls = 0
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => String(input).includes('recipients-preview')
+    ? Promise.resolve(json({ success: true, data: ++calls === 1 ? { items: null } : recipients })) : previousFetch(input, init))
+  await render()
+  expect(host?.textContent).toContain('受け取る人を読み込めませんでした')
+  expect(host?.textContent).not.toContain('受け取る人がいません')
+  await act(async () => { screen.getByRole('button', { name: 'もう一度読み込む' }).click() })
+  expect(host?.textContent).not.toContain('受け取る人を読み込めませんでした')
+  expect(calls).toBe(2)
+})
