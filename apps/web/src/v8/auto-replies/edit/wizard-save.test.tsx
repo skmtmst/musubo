@@ -393,9 +393,13 @@ it('保存結果に版番号がないときは成功と見せず、入力と以�
   expect(net.saveDraft.mock.calls.map(call => call[1].expectedVersion)).toEqual([1, 1])
 })
 
-it('新規保存の応答に下書き番号がないときは画面を移さず、同じ作成キーで確認できる', async () => {
+it.each([
+  { ...DRAFT, autoReplyId: '' },
+  { ...DRAFT, versionNumber: undefined },
+  { ...DRAFT, settings: null },
+])('新規保存の応答が不完全なときは画面を移さず、同じ作成キーで確認できる %#', async (data) => {
   net.query = 'step=basic'
-  net.createDraft.mockResolvedValueOnce({ success: true, data: { ...DRAFT, autoReplyId: '' } })
+  net.createDraft.mockResolvedValueOnce({ success: true, data })
   const view = render(<Page />); await act(async () => {})
   fireEvent.click(screen.getAllByRole('button', { name: /使う/ })[0]); view.rerender(<Page />); await act(async () => {})
   const before = net.query
