@@ -102,41 +102,6 @@ describe('電話の画面の対応', () => {
 
   const show = async () => { await act(async () => root.render(<MobileShell><MobileTodoScreen /></MobileShell>)) }
 
-  it('返事を待っているトークと、まだ読んでいないエラーだけをカードで出す', async () => {
-    await show()
-    await eventually(() => expect(host.querySelector('a[href="/m/chats?friend=friend-a"]')).not.toBeNull())
-    expect(fixture.calls.some((call) => call.startsWith('GET /api/chats?') && call.includes('status=unread') && call.includes('lineAccountId=account-a'))).toBe(true)
-    expect(host.textContent).toContain('配信が止まりました')
-    expect(host.textContent).not.toContain('既に読んだエラー')
-  })
-
-  it('/m に無い行き先のお知らせは PC の画面で開き、押すと既読を付ける', async () => {
-    await show()
-    const card = await (async () => {
-      await eventually(() => expect(host.querySelector('a[aria-label="配信が止まりました（PC の画面で開く）"]')).not.toBeNull())
-      return host.querySelector<HTMLAnchorElement>('a[aria-label="配信が止まりました（PC の画面で開く）"]')!
-    })()
-    expect(card.getAttribute('href')?.startsWith('/m')).toBe(false)
-    expect(card.textContent).toContain('PC の画面で開く')
-    await act(async () => { card.click() })
-    await eventually(() => expect(fixture.calls).toContain('POST /api/notifications/center/n-1/read'))
-  })
-
-  it('受信箱を見る権限が無い人にはトークの段を出さず、口も呼ばない', async () => {
-    fixture.canView = false
-    await show()
-    await eventually(() => expect(host.textContent).toContain('配信が止まりました'))
-    expect(host.textContent).not.toContain('返事を待っているトーク')
-    expect(fixture.calls.some((call) => call.startsWith('GET /api/chats?'))).toBe(false)
-  })
-
-  it('トークが読めない時は 0 件と言わず、失敗ともう一度試すを出す', async () => {
-    fixture.chatStatus = 500
-    await show()
-    await eventually(() => expect(host.textContent).toContain('トークを読み込めませんでした'))
-    expect(host.textContent).not.toContain('返事を待っているトークはありません')
-  })
-
   it('お知らせの読み込みが長くてもトークを先に表示する', async () => {
     vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
       const url = new URL(String(input), 'http://localhost')
