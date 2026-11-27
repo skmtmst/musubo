@@ -137,6 +137,7 @@ export default function MyPage() {
   // キャンセル待ち：待っている・空きの知らせが来ている物だけ数える。
   useEffect(() => {
     api.bookingWaitlists().then((r) => {
+      if (!Array.isArray(r.waitlist) || r.waitlist.some((w) => !w || !['waiting', 'invited', 'converted', 'cancelled', 'finished'].includes(w.status))) throw new Error('invalid_waitlist');
       const count = r.waitlist.filter((w) => w.status === 'waiting' || w.status === 'invited').length;
       setWaitlist(count > 0 ? { kind: 'value', text: `${count} 件` } : { kind: 'hidden' });
     }).catch((e) => {
@@ -183,6 +184,7 @@ export default function MyPage() {
       const entry = r.data.find((c) => c.card.active) ?? r.data[0];
       if (!entry) { setStamps({ kind: 'hidden' }); return; }
       const balance = entry.wallet.balance;
+      if (!Number.isSafeInteger(balance) || balance < 0 || !Array.isArray(entry.card.settings.rewards) || entry.card.settings.rewards.some((reward) => !Number.isSafeInteger(reward.stamps) || reward.stamps < 1)) throw new Error('invalid_stamps');
       const next = [...entry.card.settings.rewards].map((x) => x.stamps).sort((a, b) => a - b).find((n) => n > balance);
       setStamps({ kind: 'value', text: next ? `あと ${next - balance} 個` : `${balance} 個` });
     }).catch((e) => {
