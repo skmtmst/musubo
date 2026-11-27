@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, expect, it } from 'vitest';
@@ -30,19 +28,23 @@ it.each([
   if (theme === 'modern') expect(await view.page.locator('h1').evaluate(el => getComputedStyle(el).fontWeight)).toBe('800');
 });
 
-it('型の禁止の見張りを保つ', () => {
-  const root = join(import.meta.dirname, '../..');
-  const css = readFileSync(join(root, 'index.css'), 'utf8') + readFileSync(join(root, 'components/ui/liff-skin.css'), 'utf8') + readFileSync(join(root, 'tokens.css'), 'utf8');
-  for (const theme of ['modern', 'night']) {
-    const block = css.match(new RegExp(`\\[data-liff-theme="${theme}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? '';
-    expect(block).not.toMatch(/#000\b/);
-    expect(block).not.toContain('#000000');
-  }
-  expect(css).not.toMatch(/\[data-liff-theme="line"\]\s*\{/);
-  for (const theme of ['natural', 'modern', 'gentle', 'night']) {
-    const block = css.match(new RegExp(`\\[data-liff-theme="${theme}"\\]\\s*\\{([^}]*)\\}`))?.[1] ?? '';
-    expect(block).not.toContain('--color-liff-note');
-  }
+it.each(['modern', 'night'])('%s の画面で主ボタンと文字を真っ黒にしない', async theme => {
+  await view.show(`<main data-liff-theme="${theme}" class="bg-canvas text-ink"><p>本文</p>${renderToStaticMarkup(createElement(Button, {}, '次へ'))}</main>`);
+  const colors = await view.page.locator('main, main p, main button').evaluateAll(nodes => nodes.flatMap(el => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor]));
+  expect(colors).not.toContain('rgb(0, 0, 0)');
+});
+
+it('LINEの画面は型指定がない画面と同じ色を表示する', async () => {
+  const button = renderToStaticMarkup(createElement(Button, {}, '次へ'));
+  await view.show(`<main id="default" class="bg-canvas text-ink">${button}<aside class="bg-liff-note">お知らせ</aside></main><main id="line" data-liff-theme="line" class="bg-canvas text-ink">${button}<aside class="bg-liff-note">お知らせ</aside></main>`);
+  const colors = (selector: string) => view.page.locator(selector).evaluateAll(nodes => nodes.flatMap(el => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor]));
+  expect(await colors('#line, #line button, #line aside')).toEqual(await colors('#default, #default button, #default aside'));
+});
+
+it.each(['natural', 'modern', 'gentle', 'night'])('%s のお知らせは共通の背景色を保つ', async theme => {
+  await view.show(`<main><aside id="default" class="bg-liff-note">お知らせ</aside><div data-liff-theme="${theme}"><aside id="themed" class="bg-liff-note">お知らせ</aside></div></main>`);
+  const background = (selector: string) => view.page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(await background('#themed')).toBe(await background('#default'));
 });
 
 it.each([375, 414])('幅%sでも主ボタンを画面内に収める', async width => {
