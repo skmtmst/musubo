@@ -1459,3 +1459,4 @@
 - [保存した検索の読み込み失敗と再読み込みの案内](release-log/unreleased/PR-kenta-inbox-saved-views-failure.md) — 反映履歴、確認 2026-11-27。
 - [記録の JSON 表示を直した反映履歴](release-log/unreleased/PR-kenta-later-codex46.md) — 反映履歴、確認 2026-11-27。
 - [長い記録の表示を直した反映履歴](release-log/unreleased/PR-kenta-log-record-long.md) — 反映履歴、確認 2026-11-27。
+- [一覧の列幅を整える処理の高速化](release-log/unreleased/PR-kenta-list-column-sizing-speed.md) — 反映履歴、確認 2026-11-27。
