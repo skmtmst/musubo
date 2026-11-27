@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { notifySaved } from '@/components/shared/toast'
@@ -26,6 +26,7 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
   const [preview, setPreview] = useState<{ key: string; data: StarterDistributionPreview } | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const running = useRef(false)
   const [tick,setTick]=useState(0)
   const target = draft && version !== null ? targetOf(style, draft) : null
   const key = target ? JSON.stringify({ style, version, target }) : null
@@ -46,7 +47,8 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
 
   const ready = preview !== null && preview.key === key
   const run = async () => {
-    if (!draft || !target || !ready || preview.data.accountCount === 0 || version === null || busy) return
+    if (!draft || !target || !ready || preview.data.accountCount === 0 || version === null || running.current) return
+    running.current = true
     setBusy(true)
     setError('')
     try {
@@ -60,6 +62,7 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
     } catch (caught) {
       setError(describeApiFailure(caught, '配る操作', { scope: 'hq' }))
     } finally {
+      running.current = false
       setBusy(false)
     }
   }

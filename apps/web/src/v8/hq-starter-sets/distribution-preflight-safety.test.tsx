@@ -21,3 +21,12 @@ it('事前確認のトークンが欠けているときは配る操作を許さ�
   fireEvent.click(button)
   expect(net.distribute).not.toHaveBeenCalled()
 })
+it('配るボタンの同時連打は1回だけ送る', async () => {
+  net.preflight.mockResolvedValue({ success: true, data: { token: 'fixture', accountCount: 1, editedCount: 0, accounts: [] } })
+  net.distribute.mockReturnValue(new Promise(() => {}))
+  render(<View />)
+  fireEvent.click(screen.getByRole('button', { name: '窓を開く' }))
+  const button = await screen.findByRole('button', { name: '1 アカウントへ配る' })
+  act(() => { fireEvent.click(button); fireEvent.click(button) })
+  expect(net.distribute).toHaveBeenCalledTimes(1)
+})
