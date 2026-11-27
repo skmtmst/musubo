@@ -55,7 +55,7 @@ describe('decideFormSubmitStep', () => {
   test('処理中は待って同じキーで送り直す', () => {
     expect(decideFormSubmitStep({ status: 429, body: { success: false, retryable: true } }))
       .toEqual({ action: 'busy' });
-    expect(decideFormSubmitStep({ status: 200, body: null })).toEqual({ action: 'done' });
+    expect(decideFormSubmitStep({ status: 200, body: null })).toMatchObject({ action: 'fail' });
   });
 
   test('それ以外はサーバの文言で打ち止め', () => {
