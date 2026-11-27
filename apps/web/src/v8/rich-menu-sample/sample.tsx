@@ -32,6 +32,9 @@ import styles from './sample.module.css'
  */
 
 const AREAS = ['A', 'B', 'C', 'D', 'E', 'F']
+const areaLabel = (index: number) => AREAS[index] ?? String(index + 1)
+const featureMeta = (feature: string) =>
+  Object.prototype.hasOwnProperty.call(FEATURES, feature) ? FEATURES[feature] : undefined
 
 export default function RichMenuSampleV8() {
   const { selectedAccountId } = useAccount()
@@ -47,7 +50,7 @@ export default function RichMenuSampleV8() {
   const [asideOpen, setAsideOpen] = useState(false)
 
   useEffect(() => {
-    setSavedMenu(null); setWarnings([])
+    setSavedMenu(null); setWarnings([]); setSelected(null)
     if (!selectedAccountId || !style) return
     let cancelled = false
     void Promise.all([styleApi.starterSet(selectedAccountId, style), styleApi.starterItems(selectedAccountId)]).then(([res, items]) => {
@@ -64,13 +67,17 @@ export default function RichMenuSampleV8() {
   const warned = useMemo(() => new Set(warnings.map((warning) => warning.feature)), [warnings])
   const notReady=(tile:typeof menu.tiles[number])=>tile.ready===undefined?warned.has(tile.feature):!tile.ready
   const firstWarned = menu.tiles.findIndex(notReady)
-  const shown = selected ?? (firstWarned >= 0 ? firstWarned : 0)
+  const validSelected = selected !== null && selected >= 0 && selected < menu.tiles.length ? selected : null
+  const shown = validSelected ?? (firstWarned >= 0 ? firstWarned : 0)
   const shownTile = menu.tiles[shown]
   const hrefOf = (feature: string) => featureHref(feature, warnings.find((warning) => warning.feature === feature)?.href ?? '/rich-menus', style ?? undefined)
   /* 設定の画面がまだ無い機能（クーポン・回数券）は、［決まりを入れる］で準備中の窓。 */
-  const configure = (feature: string) => FEATURES[feature]?.preparing
-    ? <Button onClick={() => preparing.open(FEATURES[feature]!.preparing!)}>決まりを入れる</Button>
-    : <Button href={hrefOf(feature)}>決まりを入れる</Button>
+  const configure = (feature: string) => {
+    const preparingInfo = featureMeta(feature)?.preparing
+    return preparingInfo
+      ? <Button onClick={() => preparing.open(preparingInfo)}>決まりを入れる</Button>
+      : <Button href={hrefOf(feature)}>決まりを入れる</Button>
+  }
   const currentMenu = savedMenu?.accountId === selectedAccountId && savedMenu.style === style ? savedMenu : null
   const editHref = currentMenu?.targetId ? `/rich-menus/edit?id=${encodeURIComponent(currentMenu.targetId)}` : null
   const title = currentMenu?.name ?? (style ? `${styleLabel(style)}の見本` : 'リッチメニューの見本')
@@ -81,7 +88,7 @@ export default function RichMenuSampleV8() {
       {profile.error ? <ListState kind="error" title="使い方を読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : resolvedMenu.error ? <ListState kind="error" title="見本を読み込めませんでした" error={resolvedMenu.error} onRetry={resolvedMenu.reload} /> : style ? <SampleMenuTiles style={style} buttons={resolvedMenu.buttons} imageUrl={resolvedMenu.imageUrl} imageHeight={resolvedMenu.imageHeight} size="preview" selected={shown} warned={[...warned]} onSelect={setSelected} label="お客さまの見え方（押すと、押したときの見え方を出します）" /> : <ListState kind="loading" title="使い方を確認しています" />}
       {shownTile ? (
         <section className={styles.tap} aria-live="polite">
-          <p className={styles.tapLabel}>{`押したとき（${AREAS[shown]} ${shownTile.label}）`}</p>
+          <p className={styles.tapLabel}>{`押したとき（${areaLabel(shown)} ${shownTile.label}）`}</p>
           {notReady(shownTile) ? (
             <>
               <p className={styles.tapTitle}>{PREPARING_TITLE}</p>
@@ -89,7 +96,7 @@ export default function RichMenuSampleV8() {
             </>
           ) : (
             <>
-              <p className={styles.tapTitle}>{shownTile.destination??FEATURES[shownTile.feature]?.opens??'ページを開く'}</p>
+              <p className={styles.tapTitle}>{shownTile.destination??featureMeta(shownTile.feature)?.opens??'ページを開く'}</p>
               <p className={styles.tapNote}>お客さまの LINE で、このページが開きます。</p>
             </>
           )}
@@ -128,19 +135,20 @@ export default function RichMenuSampleV8() {
             </GridHeadRow>
             {menu.tiles.map((tile, index) => {
               const open = notReady(tile)
+              const meta = featureMeta(tile.feature)
               return (
-                <GridRow key={tile.label}>
-                  <GridCell>{AREAS[index]}</GridCell>
+                <GridRow key={`${tile.feature}:${index}`}>
+                  <GridCell>{areaLabel(index)}</GridCell>
                   <GridCell><button type="button" className={styles.buttonName} onClick={() => setSelected(index)}>{tile.label}</button></GridCell>
                   <GridCell className={styles.opens}>
-                    <span className={open ? styles.opensMain : undefined}>{tile.destination??FEATURES[tile.feature]?.opens??'ページを開く'}</span>
+                    <span className={open ? styles.opensMain : undefined}>{tile.destination??meta?.opens??'ページを開く'}</span>
                     {open ? <span className={styles.opensNote}>{tile.reason??`${featureName(tile.feature)}の決まりが未設定`}</span> : null}
                   </GridCell>
                   <GridCell><StatusBadge tone={open ? 'warning' : 'success'} dot>{open ? '中身が未設定' : '使える'}</StatusBadge></GridCell>
                   <GridCell>
                     {canEdit && (editHref || open) ? <RowMenu appearance="box" size="row" label={`${tile.label}の操作`} items={[
                       ...(editHref ? [{ id: 'change', label: '押したときを変更する', href: editHref }] : []),
-                      ...(open ? [FEATURES[tile.feature]?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(FEATURES[tile.feature]!.preparing!) } : { id: 'configure', label: '決まりを入れる', href:tile.formId?`/form-submissions/edit?id=${encodeURIComponent(tile.formId)}&tab=basic`:tile.target==='history'?'/getting-started/rich-menu':hrefOf(tile.feature) }] : []),
+                      ...(open ? [meta?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(meta.preparing!) } : { id: 'configure', label: '決まりを入れる', href:tile.formId?`/form-submissions/edit?id=${encodeURIComponent(tile.formId)}&tab=basic`:tile.target==='history'?'/getting-started/rich-menu':hrefOf(tile.feature) }] : []),
                     ]} /> : null}
                   </GridCell>
                 </GridRow>

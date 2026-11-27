@@ -1537,3 +1537,4 @@
 - [予約枠ガイド席数入力とデリバリー一覧ページ範囲・異常値表示の修正履歴](release-log/unreleased/PR-kenta-later-gemini109-1127.md) — 反映履歴、確認 2026-11-28。
 - [承認差し戻し理由の初期化と枠を閉じる知らせの予約台帳日付・多重実行防止](release-log/unreleased/PR-kenta-later-gemini110-1127.md) — 反映履歴、確認 2026-11-28。
 - [運営お知らせの件数・エラー状態と公開予約一覧の403・再表示状態の修正](release-log/unreleased/PR-kenta-later-gemini111-1127.md) — 反映履歴、確認 2026-11-28。
+- [リッチメニュー試用小窓の403・再表示状態と見本メニューの選択範囲・面ラベル修正](release-log/unreleased/PR-kenta-later-gemini112-1127.md) — 反映履歴、確認 2026-11-28。
