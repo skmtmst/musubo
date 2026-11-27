@@ -190,6 +190,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 variant="danger"
                 onClick={() => void confirmReplacement()}
                 disabled={deleteBusy || replacementPhase !== 'ready' || !replacementImpact?.canReplace || !deleteReason.trim()}
+                disabledReason={replacementPhase !== 'ready' ? '差し替え後の影響を確認してください。' : !replacementImpact?.canReplace ? '差し替えられない箇所を確認してください。' : !deleteReason.trim() ? '消した理由・止める理由を入力してください。' : undefined}
                 title={deleteBusy ? '差し替えています' : replacementPhase !== 'ready' ? '差し替え後の影響を確認してください' : !replacementImpact?.canReplace ? '差し替えられない箇所を確認してください' : !deleteReason.trim() ? '消した理由・止める理由を入力してください' : undefined}
                 busy={deleteBusy}
                 busyLabel="差し替え中…"
@@ -201,6 +202,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 variant="primary"
                 onClick={() => void confirmStopInstead()}
                 disabled={deleteBusy || !deleteReason.trim()}
+                disabledReason={!deleteReason.trim() ? '消した理由・止める理由を入力してください。' : undefined}
                 title={deleteBusy ? '止めています' : !deleteReason.trim() ? '消した理由・止める理由を入力してください' : undefined}
                 busy={deleteBusy}
                 busyLabel="止めています…"
