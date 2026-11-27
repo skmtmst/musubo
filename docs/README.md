@@ -1440,3 +1440,4 @@
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
+- [予約フォーム復旧案内の権限・代理ログイン表示とリマインダ作成フッターの処理中ガード](release-log/unreleased/PR-kenta-later-gemini78-1127.md) — 反映履歴、確認 2026-11-27。
