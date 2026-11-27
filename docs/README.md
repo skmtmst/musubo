@@ -1465,3 +1465,4 @@
 - [初期セットの確認できない項目を外す操作を修正](release-log/unreleased/PR-kenta-later-cx2-23-1128.md) — 反映履歴、確認 2026-11-28。
 - [配布先のフォルダ所属を確認できないときの選択を修正](release-log/unreleased/PR-kenta-later-cx2-24-1128.md) — 反映履歴、確認 2026-11-28。
 - [初期セットの見本を確認できないときの読み直しを修正](release-log/unreleased/PR-kenta-later-cx2-25-1128.md) — 反映履歴、確認 2026-11-28。
+- [シナリオの不正な配信時刻の表示修正](release-log/unreleased/PR-kenta-later-cx3-06-1128.md) — 反映履歴、確認 2026-11-28。
