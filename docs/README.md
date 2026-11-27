@@ -1493,3 +1493,4 @@
 - [LINE来店フォローの単位切り替え時の小数表示を修正](release-log/unreleased/PR-kenta-timing-fields-unit-1127.md) — 反映履歴、確認 2026-11-27。
 - [サービス別営業時間確認の欠損表示とリッチメニューのタブ数制御の修正](release-log/unreleased/PR-kenta-later-gemini70-1127.md) — 反映履歴、確認 2026-11-27。
 - [営業時間変更案の重複日付制御と見本リッチメニューの画像・座標ガード](release-log/unreleased/PR-kenta-later-gemini71-1127.md) — 反映履歴、確認 2026-11-27。
+- [リッチメニューボタン設定の面番号・ID制御とシナリオ削除確認のガード](release-log/unreleased/PR-kenta-later-gemini72-1127.md) — 反映履歴、確認 2026-11-27。
