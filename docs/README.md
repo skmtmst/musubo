@@ -1445,3 +1445,4 @@
 - [ウェビナー一覧の不正な集計値の表示修正](release-log/unreleased/PR-kenta-later-cx3-04-1128.md) — 反映履歴、確認 2026-11-28。
 - [在庫日付変更の処理中ガードとウェビナー作成手順帯の選択制御](release-log/unreleased/PR-kenta-later-gemini81-1127.md) — 反映履歴、確認 2026-11-27。
 - [予約カレンダーの時刻計算とシナリオ開始前確認の安全判定](release-log/unreleased/PR-kenta-later-gemini86-1127.md) — 反映履歴、確認 2026-11-27。
+- [リッチメニュー優先順の正規化とシナリオ経過時間表示の修正](release-log/unreleased/PR-kenta-later-gemini90-1127.md) — 反映履歴、確認 2026-11-28。
