@@ -36,6 +36,9 @@ export function customerNotificationKpis(input: {
     ? input.quota.reason
     : input.quota === null ? (failed ? '取得失敗' : '送信枠を取得中') : 'LINEの今月分'
   const unlimited = input.quota?.state === 'unlimited'
+  const validQuota = input.quota?.state === 'available'
+    && Number.isSafeInteger(input.quota.used) && input.quota.used >= 0
+    && Number.isSafeInteger(input.quota.total) && input.quota.total >= 0
 
   return [
     { label: '今日 送った', value: value(input.sentToday), unit: '通', note: input.sentBreakdown || (failed ? '取得失敗' : '種類別の件数は未取得'), href: null },
@@ -45,10 +48,10 @@ export function customerNotificationKpis(input: {
       : input.quota?.state === 'available'
         ? {
           label: '今月の送信枠',
-          value: input.ready ? input.quota.used : null,
-          valueText: input.ready ? `${polishFormatNumber(input.quota.used)} / ${polishFormatNumber(input.quota.total)}` : undefined,
+          value: input.ready && validQuota ? input.quota.used : null,
+          valueText: input.ready && validQuota ? `${polishFormatNumber(input.quota.used)} / ${polishFormatNumber(input.quota.total)}` : undefined,
           unit: '通',
-          note: quotaUnavailable,
+          note: validQuota ? quotaUnavailable : '送信枠を確認できません',
           href: null,
         }
         : { label: '今月の送信枠', value: null, unit: '通', note: quotaUnavailable, href: null },
