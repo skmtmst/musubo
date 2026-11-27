@@ -72,6 +72,7 @@ export function useSheets() {
   const [runsError, setRunsError] = useState('')
   const [runsLoading, setRunsLoading] = useState(false)
   const [busy, setBusy] = useState<'connect' | 'target' | 'sync' | 'disconnect' | null>(null)
+  const writeLocks = useRef(new Map<string, 'target' | 'sync'>())
   const [showTargetForm, setShowTargetForm] = useState(false)
   const [targetInput, setTargetInput] = useState('')
   const [disconnectFor, setDisconnectFor] = useState<{ id: string; label: string } | null>(null)
@@ -150,7 +151,7 @@ export function useSheets() {
     setDisconnectFor(null)
     setTargetInput('')
     setShowTargetForm(false)
-    setBusy(null)
+    setBusy(selectedAccountId ? writeLocks.current.get(selectedAccountId) ?? null : null)
     setActionError('')
     setSaveNotice('')
     setDisconnectNotice('')
@@ -182,7 +183,8 @@ export function useSheets() {
   const handleSaveTarget = async (event: React.FormEvent) => {
     event.preventDefault()
     const accountId = selectedAccountId
-    if (!accountId) return
+    if (!accountId || writeLocks.current.has(accountId)) return
+    writeLocks.current.set(accountId, 'target')
     setBusy('target')
     setActionError('')
     setSaveNotice('')
@@ -204,13 +206,15 @@ export function useSheets() {
       { if (!fieldFailure)
       setActionError('出力先を保存できませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
+      writeLocks.current.delete(accountId)
       if (accountRef.current === accountId) setBusy(null)
     }
   }
 
   const handleSync = async () => {
     const accountId = selectedAccountId
-    if (!accountId) return
+    if (!accountId || writeLocks.current.has(accountId)) return
+    writeLocks.current.set(accountId, 'sync')
     setBusy('sync')
     setActionError('')
     try {
@@ -230,6 +234,7 @@ export function useSheets() {
       { if (!fieldFailure)
       setActionError('同期を始められませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
+      writeLocks.current.delete(accountId)
       if (accountRef.current === accountId) setBusy(null)
     }
   }
