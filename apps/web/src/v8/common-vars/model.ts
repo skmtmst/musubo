@@ -7,10 +7,21 @@ import type { CommonVar, CommonVarDeleteImpact, CommonVarDeleteImpactItem } from
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { requiredText, type FormRequirement } from '@/lib/form-requirement'
 
+function validNonNegInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 export const reasonRequirement = requiredText('理由を入力してください。')
 export function typedKeyRequirement(impact: CommonVarDeleteImpact | null): FormRequirement {
-  const expected = impact ? placeholderText(impact.variable.varKey) : ''
-  return { required: Boolean(impact?.canDelete), check: value => value.trim() === expected ? null : `確認のため ${expected} を入力してください。` }
+  const varKey = typeof impact?.variable?.varKey === 'string' ? impact.variable.varKey.trim() : ''
+  const expected = varKey ? placeholderText(varKey) : ''
+  return {
+    required: Boolean(impact?.canDelete),
+    check: (value) => {
+      if (!expected) return '差し込みキーを確認できないため削除できません。'
+      return value.trim() === expected ? null : `確認のため ${expected} を入力してください。`
+    },
+  }
 }
 
 export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused' | 'draft' | 'stopped' | 'expired'
@@ -45,8 +56,8 @@ export function filterAndSortCommonVars(
     .toSorted((left, right) => {
       if (input.order === 'name_asc') return left.name.localeCompare(right.name, 'ja-JP')
       if (input.order === 'updated_desc') return right.updatedAt.localeCompare(left.updatedAt)
-      const leftUsage = left.usageCount ?? -1
-      const rightUsage = right.usageCount ?? -1
+      const leftUsage = validNonNegInt(left.usageCount) ? left.usageCount : -1
+      const rightUsage = validNonNegInt(right.usageCount) ? right.usageCount : -1
       return rightUsage - leftUsage || left.name.localeCompare(right.name, 'ja-JP')
     })
 }
@@ -81,6 +92,7 @@ export function placeholderText(varKey: string): string {
  * **0か所は「どこにも差し込まれていません」。** 未取得と混ぜない。
  */
 export function usageText(impact: CommonVarDeleteImpact): string {
+  if (!validNonNegInt(impact.total)) return `${placeholderText(impact.variable.varKey)} の使用先件数を確認できません。`
   if (impact.total === 0) return 'どこにも差し込まれていません。'
   return `${placeholderText(impact.variable.varKey)} は ${formatNumber(impact.total)}か所で差し込まれています。`
 }
@@ -93,6 +105,9 @@ export function usageText(impact: CommonVarDeleteImpact): string {
  */
 export function consequenceText(impact: CommonVarDeleteImpact): string | null {
   if (impact.total === 0) return null
+  if (!validNonNegInt(impact.total)) {
+    return `削除すると、使用中の場所の ${placeholderText(impact.variable.varKey)} は空欄のまま送られます。`
+  }
   return `削除すると、その${formatNumber(impact.total)}か所の `
     + `${placeholderText(impact.variable.varKey)} は空欄のまま送られます。`
 }
@@ -116,9 +131,12 @@ export function splitItems(items: CommonVarDeleteImpactItem[]): {
 
 /** 見せられない使用先。**件数を隠さない。** 名前だけ出せないと言う。 */
 export function unavailableText(impact: CommonVarDeleteImpact): string | null {
+  if (!Array.isArray(impact.unavailableReferences)) return '一部の使用先を確認できませんでした。'
   if (impact.unavailableReferences.length === 0) return null
   return impact.unavailableReferences
-    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)} 件（${ref.reason}）`)
+    .map((ref) => validNonNegInt(ref.count)
+      ? `${ref.kindLabel}${formatNumber(ref.count)} 件（${ref.reason}）`
+      : `${ref.kindLabel}（件数を確認できません・${ref.reason}）`)
     .join('／')
 }
 
@@ -138,6 +156,7 @@ export function canDelete(input: {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
+  if (!validNonNegInt(impact.total)) return false
   if (reasonRequirement.check(input.reason)) return false
   return typedKeyRequirement(impact).check(input.typedKey) === null
 }
@@ -151,9 +170,13 @@ export function blockedReason(input: {
   const impact = input.impact
   if (!impact) return '使用先をまだ読み込めていません。'
   if (!impact.canDelete) {
+    if (!validNonNegInt(impact.blockingTotal) || impact.blockingTotal <= 0) {
+      return '使用先があるため削除できません。使用先から外してから、もう一度お試しください。'
+    }
     return `${formatNumber(impact.blockingTotal)}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
+  if (!validNonNegInt(impact.total)) return '使用先件数を確認できないため削除できません。画面を読み直してからお試しください。'
   if (reasonRequirement.check(input.reason)) return '消した理由を入力してください。'
   const keyProblem = typedKeyRequirement(impact).check(input.typedKey)
   if (keyProblem) return keyProblem
@@ -162,6 +185,7 @@ export function blockedReason(input: {
 
 /** 確かめた時刻。「いつ時点の話か」が無いと、消す判断ができない。 */
 export function checkedAtText(checkedAt: string): string {
+  if (typeof checkedAt !== 'string' || !checkedAt.trim()) return NOT_AVAILABLE
   const date = new Date(checkedAt)
   if (Number.isNaN(date.getTime())) return NOT_AVAILABLE
   return formatDateTime(date)
