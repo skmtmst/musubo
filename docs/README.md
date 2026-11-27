@@ -27,6 +27,7 @@
 - [フォームの受付条件の修正履歴](release-log/unreleased/PR-kenta-later-cx5-24-1128.md)
 - [来店スタンプの条件表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-25-1128.md)
 - [会員証の表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-26-1128.md)
+- [予約期限と会員ランクの表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-27-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
