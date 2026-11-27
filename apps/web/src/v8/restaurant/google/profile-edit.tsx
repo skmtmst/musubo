@@ -46,8 +46,12 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   const pickerRequest = useRef(0)
   const [data, setData] = useState<GoogleProfileData | null>(null)
   const [form, setForm] = useState<ProfileForm | null>(null)
-  const [photos, setPhotos] = useState<GooglePhoto[] | null>(null)
+  const [photos, setPhotosRaw] = useState<GooglePhoto[] | null>(null)
+  const [photosLoading, setPhotosLoading] = useState(false)
   const [photosError, setPhotosError] = useState('')
+  const setPhotos = (next: GooglePhoto[]) => { setPhotosRaw(next); setPhotosError('') }
+  const [profileAttempt, setProfileAttempt] = useState(0)
+  const [photosAttempt, setPhotosAttempt] = useState(0)
   const [adds, setAdds] = useState<MediaItem[]>([])
   const [deletes, setDeletes] = useState<string[]>([])
   const [picker, setPicker] = useState<{ open: boolean; items: MediaItem[]; loading: boolean; error: string }>({ open: false, items: [], loading: false, error: '' })
@@ -58,15 +62,24 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
 
   useEffect(() => {
     let alive = true
+    setLoading(true)
+    setLoadError('')
     restaurantGoogleApi.profile(accountId)
       .then((response) => { if (alive) { setData(response); setForm(formFrom(response)) } })
       .catch((err) => { if (alive) setLoadError(errorMessage(err, 'プロフィールを読み込めませんでした。')) })
       .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false; pickerRequest.current += 1 }
+  }, [accountId, profileAttempt])
+
+  useEffect(() => {
+    let alive = true
+    setPhotosLoading(true)
     restaurantGoogleApi.photos(accountId)
       .then((response) => { if (alive) setPhotos(response.photos) })
       .catch((err) => { if (alive) { setPhotos([]); setPhotosError(errorMessage(err, '写真を読み込めませんでした。')) } })
-    return () => { alive = false; pickerRequest.current += 1 }
-  }, [accountId])
+      .finally(() => { if (alive) setPhotosLoading(false) })
+    return () => { alive = false }
+  }, [accountId, photosAttempt])
 
   const base = data ? formFrom(data) : null
   const changedFields = form && base ? (Object.keys(form) as Array<keyof ProfileForm>).filter((k) => form[k].trim() !== base[k].trim()) : []
@@ -121,7 +134,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   }
 
   if (loading) return <ListState kind="loading" title="プロフィールを読み込んでいます" />
-  if (loadError || !data || !form) return <ListState kind="error" title="プロフィールを表示できませんでした" description={loadError} onRetry={() => go({ tab: 'profile', view: 'edit' })} />
+  if (loadError || !data || !form) return <ListState kind="error" title="プロフィールを表示できませんでした" description={loadError} onRetry={() => { setProfileAttempt((n) => n + 1); if (photos === null || photosError) setPhotosAttempt((n) => n + 1) }} />
 
   const set = (key: keyof ProfileForm) => (value: string) => setForm({ ...form, [key]: value })
   const storeName = data.profile.title ?? data.store.name
@@ -152,8 +165,8 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
         </Field>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="写真">
-        <SectionHeader size="small" title={`写真（${photos === null ? '—' : `${formatNumber(photoTotal)}枚`}）`} actions={<Button lockedReason={lockedReason} onClick={() => void openPicker()} disabled={!canEdit || picker.loading || !editable}>登録メディアから追加する</Button>} />
-        {photosError ? <Notice tone="warn">{photosError}</Notice> : null}
+        <SectionHeader size="small" title={`写真（${photos === null || Boolean(photosError) ? (adds.length ? `追加 ${formatNumber(adds.length)}枚` : '—') : `${formatNumber(photoTotal)}枚`}）`} actions={<Button lockedReason={lockedReason} onClick={() => void openPicker()} disabled={!canEdit || picker.loading || !editable}>登録メディアから追加する</Button>} />
+        {photosError ? <Notice tone="warn" action={<Button variant="text" size="inline" onClick={() => { if (!photosLoading) setPhotosAttempt((n) => n + 1) }} disabled={photosLoading} busy={photosLoading}>写真を読み直す</Button>}>{photosError}</Notice> : null}
         <div className={styles.pickerGrid}>
           {visiblePhotos.map((p, index) => <div key={p.name} className={styles.imageSlot} role="group" aria-label={`既存の写真${index + 1}`}>
             <ImageFrame title="店舗写真" value={p.thumbnailUrl ?? p.googleUrl ?? null} previewAlt={`既存の写真${index + 1}`} readOnly />
