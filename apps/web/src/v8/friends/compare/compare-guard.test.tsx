@@ -9,6 +9,7 @@ const fixture = vi.hoisted(() => ({
   detail: null as IdentityCandidateWithProfiles | null,
   deciding: false,
   decide: vi.fn(),
+  reloadDetail: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=cand-1') }))
@@ -21,6 +22,7 @@ vi.mock('@/components/identity/identity-review', () => ({
     detail: fixture.detail,
     deciding: fixture.deciding,
     decide: fixture.decide,
+    reloadDetail: fixture.reloadDetail,
   }),
 }))
 
@@ -113,17 +115,37 @@ describe('CompareV8 ガード', () => {
     }
   })
 
-  it('配列フィールドが欠けて壊れた詳細データでも画面が落ちずに表示できる', () => {
+  it('判定に必要な配列（profileCandidates・evidence・impact）が壊れているときは読み込み失敗と再読み込みを出し、判定APIを呼ばせない', () => {
+    const cases: Array<Partial<IdentityCandidateWithProfiles>> = [
+      { profileCandidates: null as unknown as IdentityCandidateWithProfiles['profileCandidates'] },
+      { evidence: null as unknown as IdentityCandidateWithProfiles['evidence'] },
+      { impact: null as unknown as IdentityCandidateWithProfiles['impact'] },
+    ]
+    for (const broken of cases) {
+      fixture.reloadDetail.mockClear()
+      fixture.decide.mockClear()
+      fixture.detail = makeDetail(broken)
+      render(<Compare />)
+
+      expect(screen.getByText('候補の詳細を読み込めませんでした')).toBeTruthy()
+      expect(screen.queryByRole('button', { name: '同じ人として結び付ける' })).toBeNull()
+      expect(screen.queryByRole('button', { name: '別の人だった' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'あとで決める（保留）' })).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+      expect(fixture.reloadDetail).toHaveBeenCalledTimes(1)
+      expect(fixture.decide).not.toHaveBeenCalled()
+      cleanup()
+    }
+  })
+
+  it('表示専用の配列（history・tagCandidates）が欠けていても画面は落ちずに表示できる', () => {
     fixture.detail = makeDetail({
-      evidence: null as unknown as IdentityCandidateWithProfiles['evidence'],
-      impact: null as unknown as IdentityCandidateWithProfiles['impact'],
       history: null as unknown as IdentityCandidateWithProfiles['history'],
-      profileCandidates: null as unknown as IdentityCandidateWithProfiles['profileCandidates'],
       tagCandidates: null as unknown as IdentityCandidateWithProfiles['tagCandidates'],
     })
     render(<Compare />)
 
     expect(screen.getByRole('heading', { name: '見本A ↔ 見本B' })).toBeTruthy()
-    expect(screen.getByText('比べる項目はまだありません。')).toBeTruthy()
   })
 })

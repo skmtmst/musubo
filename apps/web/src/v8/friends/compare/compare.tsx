@@ -59,6 +59,14 @@ const DECISIONS: Array<{ value: IdentityCandidateDecision; label: string }> = [
 /* 結び付けるときの3つの確認（文）。3つそろうまで判定できない。 */
 const CONSENTS = ['利用目的の範囲で結び付ける', '本人の同意（または正当な理由）がある', 'あとで戻せることを知っている']
 
+function isValidCompareDetail(detail: IdentityCandidateWithProfiles): boolean {
+  if (!detail.left || typeof detail.left.id !== 'string' || !detail.right || typeof detail.right.id !== 'string') return false
+  if (!Array.isArray(detail.evidence) || !Array.isArray(detail.impact)) return false
+  if (!('profileCandidates' in detail) || !Array.isArray(detail.profileCandidates)) return false
+  if (detail.profileCandidates.some((field) => !field || typeof field.fieldKey !== 'string' || !Array.isArray(field.options))) return false
+  return true
+}
+
 function CompareInner() {
   usePageTitle('重複候補を比べて決める')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
@@ -81,14 +89,16 @@ function CompareInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [review.state, review.selectedId, first?.id, wantedId])
 
-  const detail = review.detail as IdentityCandidateWithProfiles | null
+  const rawDetail = review.detail as IdentityCandidateWithProfiles | null
+  const detailCorrupt = Boolean(rawDetail && !isValidCompareDetail(rawDetail))
+  const detail = rawDetail && !detailCorrupt ? rawDetail : null
   const profileCandidates = useMemo(
-    () => (detail && 'profileCandidates' in detail && Array.isArray(detail.profileCandidates) ? detail.profileCandidates : []),
+    () => (detail ? detail.profileCandidates : []),
     [detail],
   )
   const tagCandidates = detail && 'tagCandidates' in detail && Array.isArray(detail.tagCandidates) ? detail.tagCandidates : []
-  const evidenceList = detail && Array.isArray(detail.evidence) ? detail.evidence : []
-  const impactList = detail && Array.isArray(detail.impact) ? detail.impact : []
+  const evidenceList = detail ? detail.evidence : []
+  const impactList = detail ? detail.impact : []
   const historyList = detail && Array.isArray(detail.history) ? detail.history : []
   const decisive = evidenceList.find((item) => item.strength === 'strong') ?? evidenceList[0]
 
@@ -182,11 +192,11 @@ function CompareInner() {
           onRetry={review.reload}
         />
 
-        {review.state === 'ready' && review.selectedId && !detail ? <ListState
-          kind={review.detailState === 'forbidden' ? 'forbidden' : review.detailState === 'error' ? 'error' : 'loading'}
-          title={review.detailState === 'error' ? '候補の詳細を読み込めませんでした' : undefined}
-          description={review.detailFailure?.description}
-          onRetry={review.detailState === 'error' ? review.reloadDetail : undefined}
+        {review.state === 'ready' && (detailCorrupt || (review.selectedId && !detail)) ? <ListState
+          kind={detailCorrupt ? 'error' : review.detailState === 'forbidden' ? 'forbidden' : review.detailState === 'error' ? 'error' : 'loading'}
+          title={detailCorrupt || review.detailState === 'error' ? '候補の詳細を読み込めませんでした' : undefined}
+          description={detailCorrupt ? '判定に必要なデータを読み込めませんでした。再読み込みしてお試しください。' : review.detailFailure?.description}
+          onRetry={detailCorrupt || review.detailState === 'error' ? review.reloadDetail : undefined}
         /> : null}
         {review.state === 'ready' && detail ? (
           <>
