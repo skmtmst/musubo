@@ -25,3 +25,10 @@ it('履歴の不正な行は空扱いや画面停止にせず、読み直せる'
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
   expect(await screen.findByText('友だちに追加されました')).toBeTruthy()
 })
+it('フォーム回答の不正な行は空扱いや画面停止にせず、読み直せる', async () => {
+  net.forms.mockResolvedValueOnce({ success: true, data: { items: [null], total: 1, nextCursor: null } }).mockResolvedValueOnce({ success: true, data: { items: [], total: 0, nextCursor: null } })
+  render(<View tab="forms" />)
+  expect(await screen.findByText('回答を読み込めませんでした。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  expect(await screen.findByText('フォームの回答はまだありません。')).toBeTruthy()
+})
