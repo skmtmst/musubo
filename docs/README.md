@@ -1470,3 +1470,4 @@
 - [ウェビナーテスト受信者の応答検証と飲食の店の組一覧の切替分離](release-log/unreleased/PR-kenta-later-gemini53-1127.md) — 反映履歴、確認 2026-11-27。
 - [カルーセル画像の切替分離とシナリオ配信対象保存の失敗表示](release-log/unreleased/PR-kenta-later-gemini54-1127.md) — 反映履歴、確認 2026-11-27。
 - [クーポン編集の未選択・失敗・未検出出し分けと本文差し込み欄の入力ガード](release-log/unreleased/PR-kenta-later-gemini55-1127.md) — 反映履歴、確認 2026-11-27。
+- [席数配分の空入力・理由表示と特別営業日編集の範囲・無効制御の修正](release-log/unreleased/PR-kenta-later-gemini56-1127.md) — 反映履歴、確認 2026-11-27。
