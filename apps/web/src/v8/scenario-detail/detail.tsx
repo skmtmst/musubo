@@ -134,7 +134,7 @@ export default function ScenarioDetailV8({
     void api.folders.list('scenario', folderAccountId ?? undefined)
       .then((res) => {
         if (cancelled) return
-        if (res.success) {
+        if (res.success && Array.isArray(res.data)) {
           setFolders(res.data)
           setFolderState('ready')
         } else {

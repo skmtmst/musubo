@@ -1453,3 +1453,4 @@
 - [テンプレート編集時の不正なフォルダ応答からの読み直しを修正](release-log/unreleased/PR-kenta-later-cx3-34-1128.md) — 反映履歴、確認 2026-11-28。
 - [テンプレート詳細と版の履歴の不正な応答を読み直せるよう修正](release-log/unreleased/PR-kenta-later-cx3-35-1128.md) — 反映履歴、確認 2026-11-28。
 - [対応マークの不正な一覧と二重操作を修正](release-log/unreleased/PR-kenta-later-cx3-36-1128.md) — 反映履歴、確認 2026-11-28。
+- [シナリオと来店スタンプの一覧の読み込みを修正](release-log/unreleased/PR-kenta-later-cx3-37-1128.md) — 反映履歴、確認 2026-11-28。
