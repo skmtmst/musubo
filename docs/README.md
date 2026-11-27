@@ -1424,3 +1424,4 @@
 - [フォーム名と店舗追加の案内の反映履歴](release-log/unreleased/PR-kenta-later-codex30.md)
 - [共通情報の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex31.md)
 - [認証と初期セットの操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex32.md)
+- [自動化と予約枠の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex33.md)
