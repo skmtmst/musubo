@@ -1498,3 +1498,4 @@
 - [テンプレート削除ダイアログの確定・キャンセルガード](release-log/unreleased/PR-kenta-later-gemini73-1127.md) — 反映履歴、確認 2026-11-27。
 - [在庫自動停止履歴の表示補正とリッチメニュー形設定のガード追加](release-log/unreleased/PR-kenta-later-gemini74-1127.md) — 反映履歴、確認 2026-11-27。
 - [リマインダ配信予定の操作ガード・失敗表示とリッチメニュー削除不可窓の処理中ガード](release-log/unreleased/PR-kenta-later-gemini75-1127.md) — 反映履歴、確認 2026-11-27。
+- [リマインダ確認窓の処理中ガードと予約台帳一覧の行操作・ツールバー操作ガード](release-log/unreleased/PR-kenta-later-gemini76-1127.md) — 反映履歴、確認 2026-11-27。
