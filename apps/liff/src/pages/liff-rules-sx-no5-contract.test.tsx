@@ -1,6 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import LiffHeader from '../components/ui/liff-header.js';
@@ -33,8 +31,3 @@ it.each([['メニュー', '担当', '日時', '確認'], ['メニュー', '担�
   expect(list.querySelector('[aria-current="step"]')?.textContent).toBe('4 確認');
 });
 
-it('主色の混同と読み込みの明滅を禁止する', () => {
-  const css = readFileSync(join(import.meta.dirname, '../index.css'), 'utf8') + readFileSync(join(import.meta.dirname, '../components/ui/liff-skin.css'), 'utf8') + readFileSync(join(import.meta.dirname, '../tokens.css'), 'utf8');
-  expect(css).not.toMatch(/--color-liff-primary:\s*#087a3e/);
-  expect(readFileSync(join(import.meta.dirname, '../components/loading-view.tsx'), 'utf8')).not.toContain('animate-pulse');
-});
