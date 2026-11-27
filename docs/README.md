@@ -1477,3 +1477,4 @@
 - [デリバリー受付操作の未知状態防御とスタイル体験タブ選択の修正](release-log/unreleased/PR-kenta-later-gemini122-1127.md) — 反映履歴、確認 2026-11-28。
 - [運営の閲覧のみ判定フェイルクローズとリッチメニュー対象設定の防御](release-log/unreleased/PR-kenta-later-gemini123-1127.md) — 反映履歴、確認 2026-11-28。
 - [運営サポート件数カードの欠損防御とリッチメニュー再読み込み検証](release-log/unreleased/PR-kenta-later-gemini124-1127.md) — 反映履歴、確認 2026-11-28。
+- [Google投稿状態確認の再読込整合と通知ベル小窓の防御](release-log/unreleased/PR-kenta-later-gemini125-1127.md) — 反映履歴、確認 2026-11-28。
