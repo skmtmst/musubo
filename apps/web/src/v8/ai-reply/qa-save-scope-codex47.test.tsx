@@ -27,3 +27,45 @@ it('保存を同時に2回押しても下書きは1回だけ作る', () => {
   expect(mocks.create).toHaveBeenCalledTimes(1)
 })
 
+it('保存中にアカウントが変わったら古い結果で新しい画面を閉じない', async () => {
+  let resolve!: (value: unknown) => void
+  mocks.create.mockReturnValue(new Promise(done => { resolve = done }))
+  const onSaved = vi.fn()
+  const { rerender } = render(<QaEditDialog open accountId="a" seed={null} canPublish onSaved={onSaved} onClose={vi.fn()} />)
+  fill(); fireEvent.click(screen.getByRole('button', { name: '下書きで保存する' }))
+  rerender(<QaEditDialog open accountId="b" seed={null} canPublish onSaved={onSaved} onClose={vi.fn()} />)
+  await act(async () => resolve({ success: true, data: { id: 'sample' } }))
+  expect(onSaved).not.toHaveBeenCalled()
+  expect(mocks.toast).not.toHaveBeenCalled()
+  expect(screen.getByRole('dialog', { name: 'Q&A を追加する' })).toBeTruthy()
+})
+
+it('切替前の保存失敗を新しいアカウントに表示しない', async () => {
+  let reject!: (error: Error) => void
+  mocks.create.mockReturnValue(new Promise((_done, fail) => { reject = fail }))
+  const { rerender } = render(<QaEditDialog open accountId="a" seed={null} canPublish onSaved={vi.fn()} onClose={vi.fn()} />)
+  fill(); fireEvent.click(screen.getByRole('button', { name: '下書きで保存する' }))
+  rerender(<QaEditDialog open accountId="b" seed={null} canPublish onSaved={vi.fn()} onClose={vi.fn()} />)
+  await act(async () => reject(new Error('見本の通信失敗')))
+  expect(screen.queryByText(/見本の通信失敗/)).toBeNull()
+  expect(screen.getByRole('textbox', { name: /質問/ })).toHaveProperty('value', '')
+  expect(screen.getByRole('button', { name: '下書きで保存する' })).toBeTruthy()
+})
+
+it('新しいアカウントの保存中に古い応答が来ても、処理中を保つ', async () => {
+  let finishOld!: (value: unknown) => void
+  let finishNew!: (value: unknown) => void
+  mocks.create.mockReturnValueOnce(new Promise(done => { finishOld = done }))
+    .mockReturnValueOnce(new Promise(done => { finishNew = done }))
+  const onSaved = vi.fn()
+  const { rerender } = render(<QaEditDialog open accountId="a" seed={null} canPublish onSaved={onSaved} onClose={vi.fn()} />)
+  fill(); fireEvent.click(screen.getByRole('button', { name: '下書きで保存する' }))
+  rerender(<QaEditDialog open accountId="b" seed={null} canPublish onSaved={onSaved} onClose={vi.fn()} />)
+  fill(); fireEvent.click(screen.getByRole('button', { name: '下書きで保存する' }))
+  await act(async () => finishOld({ success: true, data: { id: 'old' } }))
+  expect(onSaved).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: /処理中/ })).toHaveProperty('disabled', true)
+  await act(async () => finishNew({ success: true, data: { id: 'new' } }))
+  expect(onSaved).toHaveBeenCalledTimes(1)
+  expect(onSaved).toHaveBeenCalledWith({ id: 'new' })
+})

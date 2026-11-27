@@ -35,6 +35,11 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
   const [questionError, setQuestionError] = useState('')
   const [answerError, setAnswerError] = useState('')
   const saveTicket = useRef<object | null>(null)
+  const scope = useRef({ open, accountId, id: seed?.entry?.id, version: seed?.entry?.version, question: seed?.question })
+  if (scope.current.open !== open || scope.current.accountId !== accountId || scope.current.id !== seed?.entry?.id || scope.current.version !== seed?.entry?.version || scope.current.question !== seed?.question) {
+    scope.current = { open, accountId, id: seed?.entry?.id, version: seed?.entry?.version, question: seed?.question }
+    saveTicket.current = null
+  }
 
   useEffect(() => {
     if (!open) return
@@ -43,7 +48,8 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
     setError('')
     setQuestionError('')
     setAnswerError('')
-  }, [open, seed])
+  }, [open, seed, accountId])
+  useEffect(() => { setBusy(false) }, [open, accountId, seed?.entry?.id, seed?.entry?.version, seed?.question])
 
   const initialQuestions = seed?.entry ? seed.entry.questions.join('\n') : seed?.question ?? ''
   const dirty = questions !== initialQuestions || answer !== (seed?.entry?.answerText ?? '')
@@ -71,19 +77,23 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
     setAnswerError(ae)
     if (qe || ae) return
     const ticket = {}
+    const saveScope = scope.current
     saveTicket.current = ticket
+    const isCurrent = () => alive.current && scope.current === saveScope && saveTicket.current === ticket
     setBusy(true)
     setError('')
     try {
       const res = seed?.entry
         ? await aiReplyApi.updateQa(accountId, seed.entry.id, { questions: list, answerText: answer.trim(), expectedVersion: seed.entry.version })
         : await aiReplyApi.createQa(accountId, { questions: list, answerText: answer.trim() })
+      if (!isCurrent()) return
       notifyToast(seed?.entry ? 'Q&A を保存しました' : 'Q&A を下書きで作りました')
       onSaved(res.data)
     } catch (caught) {
+      if (!isCurrent()) return
       if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, 'Q&A の保存'))
     } finally {
-      if (saveTicket.current === ticket) { saveTicket.current = null; setBusy(false) }
+      if (isCurrent()) { saveTicket.current = null; setBusy(false) }
     }
   }
 
