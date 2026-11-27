@@ -1443,3 +1443,4 @@
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車11の画面と記録の修正](release-log/unreleased/PR-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
 - [ウェビナー一覧の不正な集計値の表示修正](release-log/unreleased/PR-kenta-later-cx3-04-1128.md) — 反映履歴、確認 2026-11-28。
+- [在庫日付変更の処理中ガードとウェビナー作成手順帯の選択制御](release-log/unreleased/PR-kenta-later-gemini81-1127.md) — 反映履歴、確認 2026-11-27。
