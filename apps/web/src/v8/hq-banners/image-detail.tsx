@@ -8,7 +8,7 @@
  * 渡す・外す・お気に入り・もう一度生成は、現役の画面のAPIと動作試験で守る。
  */
 import { Download, ImagePlus, RefreshCw, Send, Star, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Button from '@/components/shared/button'
 import { HqAccountPickerField } from '@/components/shared/hq-account-picker'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -70,6 +70,13 @@ export function BannerImageDetailV8({
   // アーカイブしたアカウントへは渡さない（受け取る口が止まっている）。
   const targets = useMemo(() => accounts.filter((a) => !a.archivedAt), [accounts])
   const delivered = useMemo(() => new Set(image.deliveredAccountIds), [image.deliveredAccountIds])
+  const eligibleSelected = selected.filter((id) => targets.some((account) => account.id === id) && !delivered.has(id))
+  useEffect(() => {
+    setSelected((current) => {
+      const next = current.filter((id) => targets.some((account) => account.id === id) && !delivered.has(id))
+      return next.length === current.length ? current : next
+    })
+  }, [targets, delivered])
   // 名前のほか LINE ID・タグの名前でも探せる（前の探す欄と同じ）。
   const pickerAccounts = useMemo(() => targets.map((a) => ({ id: a.id, name: a.displayName ?? a.name,
     keywords: `${a.basicId ?? ''} ${a.channelId ?? ''} ${(a.tags ?? []).map((t) => t.name).join(' ')}` })), [targets])
@@ -148,23 +155,23 @@ export function BannerImageDetailV8({
           <section className={styles.deliver} aria-label="アカウントへ配る">
             <h3 className={styles.sectionTitle}>アカウントへ配る</h3>
             <p className={styles.note}>配ったアカウントの登録メディア（フォルダ「02_バナー」）に入ります</p>
-            <HqAccountPickerField label="配るアカウント" accounts={pickerAccounts} value={selected} onChange={setSelected}
+            <HqAccountPickerField label="配るアカウント" accounts={pickerAccounts} value={eligibleSelected} onChange={setSelected}
               disabledIds={image.deliveredAccountIds} readOnly={!canManage} disabled={busy}
               meta={(account) => delivered.has(account.id) ? '配布済み' : undefined} />
             {targets.length === 0 ? <p className={styles.note}>この統括にアカウントがありません。</p> : null}
             {canManage ? (
               <div className={styles.deliverFoot}>
-                <span className={styles.note}>{selected.length > 0 ? `${selected.length} アカウントを選んでいます` : 'アカウントを選んでください'}</span>
+                <span className={styles.note}>{eligibleSelected.length > 0 ? `${eligibleSelected.length} アカウントを選んでいます` : 'アカウントを選んでください'}</span>
                 <span className={styles.spacer} />
                 <Button
                   variant="primary"
-                  disabled={busy || selected.length === 0}
-                  title={selected.length === 0 ? '配るアカウントを選んでください。' : undefined}
-                  onClick={() => void onDeliver(selected).then((ok) => { if (ok) setSelected([]) })}
+                  disabled={busy || eligibleSelected.length === 0}
+                  title={eligibleSelected.length === 0 ? '配るアカウントを選んでください。' : undefined}
+                  onClick={() => void onDeliver(eligibleSelected).then((ok) => { if (ok) setSelected([]) })}
                   busy={busy}
                   busyLabel="配っています…"
                 >
-                  <Send aria-hidden="true" className={styles.icon} />{`${selected.length}アカウントへ配る`}
+                  <Send aria-hidden="true" className={styles.icon} />{`${eligibleSelected.length}アカウントへ配る`}
                 </Button>
               </div>
             ) : null}
