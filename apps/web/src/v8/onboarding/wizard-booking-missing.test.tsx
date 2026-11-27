@@ -17,9 +17,11 @@ const { default: StyleSetupWizard } = await import('./wizard')
 afterEach(cleanup)
 it('見つからない予約メニューを表示し、有効化の候補には含めず、他の項目は表示する', async () => {
   render(<StyleSetupWizard accountId="a" state={{ style: 'salon', styleSelected: true, styleMode: 'configured', version: 1, answers: {} }} initialStep="summary" onClose={() => {}} />)
-  const name = await screen.findByText('見本の予約')
+  const inserted = await screen.findByRole('region', { name: '入った物' })
+  const name = await within(inserted).findByText('見本の予約')
   const row = name.closest('li')!
   expect(within(row).getByText('見つかりません')).toBeTruthy()
   expect(screen.getByText('お知らせ')).toBeTruthy()
-  expect(screen.queryByRole('checkbox', { name: '見本の予約を動かす' })).toBeNull()
+  expect(screen.queryByRole('switch', { name: '見本の予約を動かす' })).toBeNull()
+  expect(screen.getByRole('switch', { name: 'お知らせを動かす' })).toBeTruthy()
 })
