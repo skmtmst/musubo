@@ -83,8 +83,15 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const generation = useRef(0)
+  const participantsLoadingRef = useRef(false)
   const csvLock = useRef(false)
   const moreLock = useRef(false)
+
+  const retryParticipants = useCallback(() => {
+    if (participantsLoadingRef.current) return
+    participantsLoadingRef.current = true
+    setAttempt((count) => count + 1)
+  }, [])
 
   const downloadCsv = useCallback(() => {
     if (!canExport || csvLock.current) return
@@ -100,6 +107,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   useEffect(() => {
     let cancelled = false
     generation.current += 1
+    participantsLoadingRef.current = true
     moreLock.current = false
     setLoadingMore(false)
     setRule(null)
@@ -115,6 +123,7 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
       .participants(webinar.id, undefined, PARTICIPANTS_PAGE_SIZE, filter || undefined)
       .then((res) => {
         if (cancelled) return
+        participantsLoadingRef.current = false
         setItems(res.data.items)
         setNextCursor(res.data.nextCursor)
         setRule(res.data.rule ?? null)
@@ -123,10 +132,12 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
       })
       .catch((cause) => {
         if (cancelled) return
+        participantsLoadingRef.current = false
         setState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
       })
     return () => {
       cancelled = true
+      participantsLoadingRef.current = false
       generation.current += 1
     }
   }, [webinar.id, attempt, filter])
@@ -157,8 +168,11 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   }
 
   const summary = analytics?.summary ?? null
-  const unviewed = summary ? Math.max(0, summary.reservations - summary.registeredAndJoined) : null
-  const dropped = summary ? Math.max(0, summary.viewers - summary.completed) : null
+  const analyticsError = analyticsState === 'error'
+  const analyticsLoading = analyticsState === 'loading' || (!analytics && !analyticsError)
+  const analyticsStatusDetail = analyticsError ? '読み込めませんでした' : analyticsLoading ? '読み込んでいます' : null
+  const unviewed = summary && !analyticsError ? Math.max(0, summary.reservations - summary.registeredAndJoined) : null
+  const dropped = summary && !analyticsError ? Math.max(0, summary.viewers - summary.completed) : null
   const searched = query.trim() === '' ? items : items.filter((item) => (item.friendName ?? '').includes(query.trim()))
   const pageCount = Math.max(1, Math.ceil(searched.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -167,14 +181,14 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   const to = Math.min(searched.length, currentPage * pageSize)
 
   const kpis = [
-    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
-    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.completed, summary.reservations)}` : emptyValue('unknown'), help: '動画の9割以上を見た人です。' },
-    { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: '平均離脱時間 —', help: '入場した人から、視聴完了の人を引いた数です。途中で離れた人だけの平均離脱時間は、まだ数えていません。' },
-    { key: 'unviewed', title: '見ていない', icon: Undo2, value: unviewed, unit: '人', detail: '見逃し案内の対象', help: '申し込んだが入場の記録がない人です。' },
+    { key: 'reservations', title: '申込', icon: History, value: analyticsError ? null : (summary?.reservations ?? null), unit: '人', detail: summary && !analyticsError ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : (analyticsStatusDetail ?? emptyValue('unknown')), help: '申し込んだ人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
+    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: analyticsError ? null : (summary?.completed ?? null), unit: '人', detail: summary && !analyticsError ? `申込の ${percent(summary.completed, summary.reservations)}` : (analyticsStatusDetail ?? emptyValue('unknown')), help: '動画の9割以上を見た人です。' },
+    { key: 'dropped', title: '途中で離れた', icon: LogOut, value: dropped, unit: '人', detail: analyticsStatusDetail ?? '平均離脱時間 —', help: '入場した人から、視聴完了の人を引いた数です。途中で離れた人だけの平均離脱時間は、まだ数えていません。' },
+    { key: 'unviewed', title: '見ていない', icon: Undo2, value: unviewed, unit: '人', detail: analyticsStatusDetail ?? '見逃し案内の対象', help: '申し込んだが入場の記録がない人です。' },
   ]
 
   const chips: Array<{ key: WebinarParticipantClassification; label: string; count: number | null; icon: typeof CircleCheck }> = [
-    { key: 'completed', label: '視聴完了', count: summary?.completed ?? null, icon: CircleCheck },
+    { key: 'completed', label: '視聴完了', count: analyticsError ? null : (summary?.completed ?? null), icon: CircleCheck },
     { key: 'dropped_off', label: '途中で離れた', count: dropped, icon: LogOut },
     { key: 'unviewed', label: '見ていない', count: unviewed, icon: CircleSlash },
   ]
@@ -183,9 +197,9 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
   if (state === 'denied') {
     body = <ListState kind="forbidden" title="個人の参加履歴はオーナーと管理者だけが確認できます" description="友だちごとの視聴・申込の記録を出す権限がないため、表は出せません。集計は上の数と「分析」で確認できます。" />
   } else if (state === 'loading') {
-    body = <p className={styles.state} role="status">読み込み中…</p>
+    body = <ListState kind="loading" title="参加者を読み込んでいます" />
   } else if (state === 'error') {
-    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={() => setAttempt((count) => count + 1)} />
+    body = <ListState kind="error" title="参加者の一覧を読み込めませんでした" description="通信を確認して、もう一度読み込んでください。" onRetry={retryParticipants} />
   } else if (pageItems.length === 0) {
     body = <ListState kind="empty" emptyPreset={filter || query.trim() ? 'filtered' : 'readonly'} title={filter || query.trim() !== '' ? 'この条件に当てはまる人はいません' : 'まだ参加者はいません'} action={filter || query.trim() ? <Button onClick={() => { setFilter(''); setQuery(''); setPage(1) }}>条件を外す</Button> : undefined} />
   } else {
@@ -241,14 +255,14 @@ export default function ParticipantsPane({ ctx, chrome }: { ctx: EditContext; ch
             {rule ? ` 視聴完了＝動画の9割（${fmtSec(rule.completionThresholdSeconds)}）以上を見た人。` : ''}
             {measurement?.state === 'unavailable' ? ` ${measurement.reason}。個人の分類は「計測外」になります。` : ''} </>}
         stats={<>
-          {analyticsState === 'error' ? (
+          {analyticsError ? (
             <div className={styles.statsNotice}>
-              <Notice tone="info" action={<Button onClick={ctx.retryAnalytics}>もう一度読み込む</Button>}>集計を読み込めませんでした。</Notice>
+              <Notice tone="info" action={<Button onClick={ctx.retryAnalytics} disabled={analyticsLoading} busy={analyticsLoading} busyLabel="読み込み中…">もう一度読み込む</Button>}>集計を読み込めませんでした。</Notice>
             </div>
           ) : null}
           <KpiBand>
             {kpis.map((kpi) => (
-              <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={<span title={kpi.help}>{kpi.detail}</span>} />
+              <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} loading={analyticsLoading} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={<span title={kpi.help}>{kpi.detail}</span>} detailLayout={analyticsStatusDetail ? 'single' : undefined} />
             ))}
           </KpiBand><Notice tone="info" icon={null} appearance="soft">「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</Notice>
         </>}
