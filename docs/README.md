@@ -1540,3 +1540,4 @@
 - [リッチメニュー試用小窓の403・再表示状態と見本メニューの選択範囲・面ラベル修正](release-log/unreleased/PR-kenta-later-gemini112-1127.md) — 反映履歴、確認 2026-11-28。
 - [予約枠・在庫の総席数・未選択案内とリッチメニュー詳細の進捗応答・件数・状態表示の修正](release-log/unreleased/PR-kenta-later-gemini113-1127.md) — 反映履歴、確認 2026-11-28。
 - [NEN配信ページ送りの範囲正規化と運営シェルパンくず重複・パス判定の修正](release-log/unreleased/PR-kenta-later-gemini114-1127.md) — 反映履歴、確認 2026-11-28。
+- [デリバリー受注のURL・履歴競合・重複送信防御とGoogle投稿一覧・確認画面の切替修正](release-log/unreleased/PR-kenta-later-gemini115-1127.md) — 反映履歴、確認 2026-11-28。
