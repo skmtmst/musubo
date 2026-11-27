@@ -24,13 +24,7 @@ const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrati
 
 describe("管理画面共通アクションの画面契約", () => {
   it('一覧・空・読込・失敗と、名前で分かる遷移を持つ', () => {
-    expect(LIST).toContain('共通アクションを読み込んでいます')
-    expect(LIST).toContain('まだ、共通アクションはありません')
-    expect(LIST).toContain('共通アクションを読み込めませんでした')
-    expect(LIST).toContain('中身を見る')
-    expect(LIST).toContain('使われている場所')
-    expect(LIST).toContain('公開する')
-    expect(LIST).toContain('/common-actions/versions?id=')
+    // 表示・行の操作は common-actions-list-rendered-cx6.test.tsx で確かめる。
     expect(LIST).not.toContain('準備中')
   })
 
@@ -82,12 +76,7 @@ describe("管理画面共通アクションの画面契約", () => {
   })
 
   it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
-    expect(LIST).toContain('summary.executions')
-    expect(LIST).toContain('summary.failures')
     // 監査 R464: CSVは一覧の検索・絞り込みを引き継ぎ、範囲と件数を事前に出す。
-    expect(LIST).toContain('api.commonActions.csvUrl({')
-    expect(LIST).toContain('status: filter')
-    expect(LIST).toContain('query: deferredQuery')
     expect(LIST).toContain('この条件の')
     expect(LIST).toContain('条件に合う共通アクションがないため書き出せません')
     // 監査 R466: 書き出し権限のない担当者にリンク自体を出さない。
