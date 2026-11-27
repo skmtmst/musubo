@@ -1461,3 +1461,4 @@
 - [はじめの設定の状態と理由の表示を修正](release-log/unreleased/PR-kenta-later-cx3-42-1128.md) — 反映履歴、確認 2026-11-28。
 - [休業前の予約確認を修正](release-log/unreleased/PR-kenta-later-cx3-43-1128.md) — 反映履歴、確認 2026-11-28。
 - [ホームのアカウント読み込みと未選択表示を修正](release-log/unreleased/PR-kenta-later-cx3-44-1128.md) — 反映履歴、確認 2026-11-28。
+- [マニュアル対応表の検索と確認日時を修正](release-log/unreleased/PR-kenta-later-cx3-45-1128.md) — 反映履歴、確認 2026-11-28。
