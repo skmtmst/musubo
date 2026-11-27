@@ -57,11 +57,21 @@ export function TemplateEditFrame({
   status?: ReactNode
 }) {
   const [alsoSave, setAlsoSave] = useState(false)
+  const canSaveTemplate = composerHost?.composer?.canSaveTemplate !== false
+  const composerScope = composerHost?.composer
+    ? `${composerHost.composer.accountId ?? ''}:${composerHost.composer.index}:${canSaveTemplate}`
+    : ''
+  const [seenComposerScope, setSeenComposerScope] = useState(composerScope)
+  if (seenComposerScope !== composerScope) {
+    setSeenComposerScope(composerScope)
+    setAlsoSave(false)
+  }
+  const effectiveAlsoSave = canSaveTemplate && alsoSave
   const sideContent = typeof side === 'function' ? side(false) : side
   const dialogContent = typeof side === 'function' ? side(true) : side
   if (composerHost?.composer) return <Drawer open dirty={false} width="composer" viewportInset heightMode="viewport" title={title} titleAccessory={<span className={styles.composerTitleAccessories}><HelpTip label="この画面の使い方">テンプレートと同じ編集画面です。作ったものをこの吹き出しに入れます。</HelpTip><StatusBadge tone="neutral" dot={false}>{`吹き出し ${composerHost.composer.index + 1} に入ります`}</StatusBadge></span>} onClose={composerHost.onCancel} busy={composerHost.busy} footer={<div className={styles.composerFooter}>
-    {composerHost.composer.canSaveTemplate !== false ? <span className={styles.composerTitleAccessories}><SaveErrorField names={["alsoSave","also_save"]}><ToggleField disabled={composerHost.busy} checked={alsoSave} onChange={setAlsoSave}>テンプレートとしても保存する</ToggleField></SaveErrorField><HelpTip label="テンプレートとしても保存する">入れた中身をテンプレートの一覧にも残します。ほかの配信でも呼び出せます。</HelpTip></span> : <span />}
-    <span className={styles.composerFooterActions} data-incomplete={Boolean(inputReason) || undefined}><Button disabled={composerHost.busy} onClick={composerHost.onCancel}>キャンセル</Button><Button variant="primary" disabled={composerHost.busy || Boolean(inputReason)} disabledReason={inputReason} busy={composerHost.busy} onClick={() => onComposerInsert?.(alsoSave)}><Check size={16} aria-hidden="true" />この吹き出しに入れる</Button></span>
+    {canSaveTemplate ? <span className={styles.composerTitleAccessories}><SaveErrorField names={["alsoSave","also_save"]}><ToggleField disabled={composerHost.busy} checked={effectiveAlsoSave} onChange={setAlsoSave}>テンプレートとしても保存する</ToggleField></SaveErrorField><HelpTip label="テンプレートとしても保存する">入れた中身をテンプレートの一覧にも残します。ほかの配信でも呼び出せます。</HelpTip></span> : <span />}
+    <span className={styles.composerFooterActions} data-incomplete={Boolean(inputReason) || undefined}><Button disabled={composerHost.busy} onClick={composerHost.onCancel}>キャンセル</Button><Button variant="primary" disabled={composerHost.busy || Boolean(inputReason)} disabledReason={inputReason} busy={composerHost.busy} onClick={() => { if (composerHost.busy || Boolean(inputReason)) return; onComposerInsert?.(effectiveAlsoSave) }}><Check size={16} aria-hidden="true" />この吹き出しに入れる</Button></span>
   </div>}><div className={styles.composerSplit}><div className={styles.composerContent}>{band}{children}</div><aside className={styles.composerSide}>{sideContent}</aside></div></Drawer>
   return (
     <PageFrame kind="create" boardId={boardId} hasFooter={Boolean(footerActions)}>

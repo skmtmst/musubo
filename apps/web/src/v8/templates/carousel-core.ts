@@ -277,11 +277,14 @@ export async function saveCarousel(
         folderId: input.folderId,
         ...carouselOptions,
       })
-      return res.success ? { ok: true, id: input.templateId, expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision } : fail(res.error)
+      if (!res?.success) return fail(res?.error || '保存できませんでした')
+      if (!res.data) return fail('保存結果を確認できませんでした')
+      return { ok: true, id: input.templateId, expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
     }
 
+    if (!input.selectedAccountId) return fail('LINE公式アカウントを選んでください')
     const created = await ops.create({
-      accountId: input.selectedAccountId!,
+      accountId: input.selectedAccountId,
       name: input.name.trim(),
       category: 'カルーセル',
       messageType: 'carousel',
@@ -289,7 +292,8 @@ export async function saveCarousel(
       folderId: input.folderId,
       ...carouselOptions,
     })
-    if (!created.success) return fail(created.error)
+    if (!created?.success) return fail(created?.error || '保存できませんでした')
+    if (!created.data?.id) return fail('保存結果を確認できませんでした')
     createdId = created.data.id
     version = { expectedVersion: created.data.publishedVersion, expectedDraftRevision: created.data.draftRevision }
 
@@ -301,7 +305,8 @@ export async function saveCarousel(
         ...version,
         messageContent: buildCarouselContent(input.panels, createdId, input.liffId ?? null),
       })
-      if (!fixed.success) return fail(fixed.error)
+      if (!fixed?.success) return fail(fixed?.error || '保存できませんでした')
+      if (!fixed.data) return fail('保存結果を確認できませんでした')
       version = { expectedVersion: fixed.data.publishedVersion, expectedDraftRevision: fixed.data.draftRevision }
     }
     return { ok: true, id: createdId, expectedVersion: version.expectedVersion!, expectedDraftRevision: version.expectedDraftRevision! }

@@ -25,6 +25,15 @@ type Props = {
 
 /** 対象とアカウントを保持し、一覧変更後は古い確認から削除しない。 */
 export default function ScenarioDeleteDialog({ target, busy, error, summary, disabled, targetStillListed, sameScope, lockedReason, countLabel, onConfirm, onCancel }: Props) {
+  const blocked = disabled || !targetStillListed || !sameScope
+  const handleConfirm = () => {
+    if (!target || busy || blocked || lockedReason) return
+    onConfirm()
+  }
+  const handleCancel = () => {
+    if (busy) return
+    onCancel()
+  }
   return <ConfirmDialog
     open={target !== null}
     title={target ? `「${target.name}」を削除しますか？` : ''}
@@ -33,11 +42,11 @@ export default function ScenarioDeleteDialog({ target, busy, error, summary, dis
     destructive
     busy={busy}
     error={error}
-    onConfirm={onConfirm}
-    confirmDisabled={disabled || !targetStillListed || !sameScope}
+    onConfirm={handleConfirm}
+    confirmDisabled={blocked}
     confirmLockedReason={targetStillListed && sameScope ? lockedReason : undefined}
     confirmDisabledReason={!targetStillListed || !sameScope ? '一覧が変わりました。閉じて選び直してください。' : undefined}
-    onCancel={onCancel}
+    onCancel={handleCancel}
   >
     {target && <div className={styles.deleteBody}>
       <OperationTargetSummary accounts={target.lineAccountId === null ? [] : [{ id: target.lineAccountId ?? '' }]} allAccounts={target.lineAccountId === null} />

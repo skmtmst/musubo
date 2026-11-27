@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bell, Check, Megaphone, Ticket } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -25,6 +25,11 @@ export function GuideSetupComplete({ exposure, onAcknowledge, onNavigate }: {
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<{ href?: string } | null>(null)
   const pending = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
   const description = !exposure
     ? 'LINEでの予約受付状況を確認できませんでした。予約枠とリッチメニューをご確認ください。'
     : exposure.reservationLink && exposure.publicReservationMenu && exposure.availableCapacity
@@ -34,16 +39,19 @@ export function GuideSetupComplete({ exposure, onAcknowledge, onNavigate }: {
     if (pending.current) return
     pending.current = true
     setBusy(true)
-    setFailed(null)
     try {
       if (await onAcknowledge()) {
+        if (!alive.current) return
+        setFailed(null)
         if (href) onNavigate(href)
-      } else setFailed({ href })
+      } else if (alive.current) {
+        setFailed({ href })
+      }
     } catch {
-      setFailed({ href })
+      if (alive.current) setFailed({ href })
     } finally {
-      setBusy(false)
       pending.current = false
+      if (alive.current) setBusy(false)
     }
   }
   return (
@@ -62,7 +70,7 @@ export function GuideSetupComplete({ exposure, onAcknowledge, onNavigate }: {
     >
       {failed ? <div className={styles.completeFailure}>
         <Notice tone="warn" appearance="subtle" statusWord={false}>完了の保存を確認できませんでした。もう一度お試しください。</Notice>
-        <Button className={styles.confirmAction} presentation="first-run-start" onClick={() => void acknowledge(failed.href)}>もう一度確かめる</Button>
+        <Button className={styles.confirmAction} presentation="first-run-start" busy={busy} busyLabel="確かめています…" onClick={() => void acknowledge(failed.href)}>もう一度確かめる</Button>
       </div> : null}
       <section className={styles.next} aria-label="次にできること">
         <h3>次にできること</h3>
@@ -71,7 +79,7 @@ export function GuideSetupComplete({ exposure, onAcknowledge, onNavigate }: {
             <Card key={href} edge="hairline" contentPadding="var(--space-14) var(--space-14)">
               <div className={styles.nextAction}>
                 <Icon className={styles.choiceIcon} size={16} aria-hidden="true" />
-                <Link className={styles.choiceLink} href={href} onClick={event => { event.preventDefault(); void acknowledge(href) }}>{label}</Link>
+                <Link className={styles.choiceLink} href={href} aria-disabled={busy || undefined} onClick={event => { event.preventDefault(); if (!busy) void acknowledge(href) }}>{label}</Link>
                 <p className={styles.choiceNote}>{note}</p>
               </div>
             </Card>

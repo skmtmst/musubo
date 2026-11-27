@@ -81,7 +81,12 @@ export async function loadCommonVar({ accountLoading, applyDetail, id, latestAcc
         }
         return
       }
-      const found = detailResult.data.success ? detailResult.data.data : undefined
+      if (!detailResult.data.success) {
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+        setLoadFailure('error')
+        return
+      }
+      const found = detailResult.data.data
       if (!found) {
         setError('この共通情報は見つかりませんでした')
         setLoadFailure('missing')

@@ -19,15 +19,20 @@ export default function TableRowActions({ table, canEdit, busy, pendingAccount, 
   const disabledReason = pendingAccount ? '選んだアカウントの一覧を確認してください' : busy ? 'ほかの変更を反映しています' : undefined
   const locked = !canEdit ? permissionReason : pendingAccount ? disabledReason : undefined
   const off = busy || (!canEdit && !permissionReason)
+  const blocked = !canEdit || busy || pendingAccount
+  const run = (action: (item: RestaurantTable) => void) => () => {
+    if (blocked) return
+    return action(table)
+  }
   return <RowActions subjectName={`${table.code}・${table.label}`}
-    edit={{ label: '変更', disabled: off, lockedReason: locked, onClick: () => onEdit(table) }}
+    edit={{ label: '変更', disabled: off, lockedReason: locked, onClick: run(onEdit) }}
     menuButtonProps={{ disabled: off }}
-    menuItems={[{id:'duplicate',label:'複製',icon:<Copy size={16} aria-hidden="true"/>,disabled:off,lockedReason:locked,disabledReason,onSelect:()=>onDuplicate(table)},{
+    menuItems={[{id:'duplicate',label:'複製',icon:<Copy size={16} aria-hidden="true"/>,disabled:off,lockedReason:locked,disabledReason,onSelect:run(onDuplicate)},{
       id: table.is_active ? 'stop' : 'resume',
       label: table.is_active ? '停止' : '再開',
       disabled: off,
       lockedReason: locked,
       disabledReason,
-      onSelect: () => table.is_active ? onStop(table) : onResume(table),
-    }, { id: 'delete', label: '削除', tone: 'danger', disabled: off, lockedReason: locked, disabledReason, onSelect: () => onDelete(table) }]} />
+      onSelect: run(table.is_active ? onStop : onResume),
+    }, { id: 'delete', label: '削除', tone: 'danger', disabled: off, lockedReason: locked, disabledReason, onSelect: run(onDelete) }]} />
 }

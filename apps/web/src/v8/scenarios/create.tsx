@@ -17,6 +17,7 @@ import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
 import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { ScenarioDraftLoadNotice } from '@/v8/autosave/public/scenario-draft-load-notice/index'
 import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { TextField } from '@/components/shared/text-field';
@@ -510,6 +511,7 @@ export default function ScenarioCreateV8() {
         ) : null}
         {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {createdId ? <Notice tone="info">作成したシナリオは保存されています。<Link href={`/scenarios/detail?id=${encodeURIComponent(createdId)}`}>作成済みのシナリオを見る</Link></Notice> : null}
+        <ScenarioDraftLoadNotice failed={browserDraft.loadFailed} onRetry={browserDraft.retryLoad} />
         <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
         <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
       </div>

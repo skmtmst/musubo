@@ -126,6 +126,7 @@ export function useChatSearch(friendId: string | null): ChatSearch {
     if (!hits.has(to)) {
       const q = queryRef.current.trim()
       const seq = seqRef.current
+      const id = friendRef.current
       // 古い方へ進むときはその番号が塊の最後、新しい方へはその番号が塊の最初になるよう読む。
       const offset = to < index ? Math.max(0, to - CHAT_SEARCH_PAGE + 1) : to
       try {
@@ -134,7 +135,7 @@ export function useChatSearch(friendId: string | null): ChatSearch {
         setHits((prev) => putHits(prev, offset, page.hits))
         if (!page.hits.length) return
       } catch {
-        setStatus('error')
+        if (seq === seqRef.current && friendRef.current === id && queryRef.current.trim() === q) setStatus('error')
         return
       }
     }

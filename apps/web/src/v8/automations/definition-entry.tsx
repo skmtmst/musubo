@@ -23,6 +23,7 @@ export default function AutomationDefinitionEntry({ automationId }: { automation
     void api.automations.createDraftFromAutomation(automationId).then(res => {
       if (!alive) return
       if (!res.success) throw new Error(res.error)
+      if (typeof res.data?.id !== 'string' || !res.data.id.trim()) throw new Error('下書きの情報を確認できませんでした。')
       router.replace(`/automations/drafts?id=${encodeURIComponent(res.data.id)}`)
     }).catch(cause => { if (alive) { saveErrors.capture(cause); setError(cause) } })
     return () => { alive = false }

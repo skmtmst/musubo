@@ -101,6 +101,7 @@ beforeEach(() => {
     if (deleteMatch && method === 'DELETE') {
       const answer = deleteStatus.get(deleteMatch[1]) ?? 200
       const status = typeof answer === 'function' ? await answer() : answer
+      if (status === 201) return json({ success: false, error: 'not deleted' })
       return status === 200 ? json({ success: true, data: null }) : json({ success: false, error: 'conflict' }, status)
     }
     return json({ success: false, error: 'not mocked' }, 404)
@@ -417,6 +418,16 @@ describe('まとめて削除', () => {
     await click(host.querySelector('input[aria-label="A.pngを選ぶ"]'))
     await click(host.querySelector('input[aria-label="B.pngを選ぶ"]'))
   }
+
+  it('削除できなかった応答を成功件数に含めない', async () => {
+    media = [{ id: 'm-a', filename: 'A.png', usageCount: 0 }, { id: 'm-b', filename: 'B.png', usageCount: 0 }]
+    deleteStatus.set('m-b', 201)
+    await render(); await selectAll()
+    await click(buttonIn(document, '選択したメディアを削除（2）'))
+    await click(buttonIn(dialog(), '削除する'))
+    expect(host.textContent).toContain('失敗1 件（B.png）')
+    expect(toast).not.toHaveBeenCalled()
+  })
 
   it('一括削除の窓を再表示した後は古い操作を受け付けない', async () => {
     media = [{ id: 'm-a', filename: 'A.png', usageCount: 0 }, { id: 'm-b', filename: 'B.png', usageCount: 0 }]

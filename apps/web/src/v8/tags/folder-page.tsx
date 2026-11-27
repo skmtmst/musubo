@@ -82,6 +82,7 @@ function TagFolderPage() {
   const [color, setColor] = useState(DEFAULT_COLOR)
   const [folderAccountId, setFolderAccountId] = useState<string | null>(selectedAccountId)
   const [saving, setSaving] = useState(false)
+  const saveLock = useRef(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const deleteTicket = useRef<object | null>(null)
   const renderedDeleteTicket = deleteTicket.current
@@ -109,6 +110,7 @@ function TagFolderPage() {
     setDeleteOpen(false)
     setError('')
     setNameError('')
+    saveLock.current = false
     setSaving(false)
     if (!editId) {
       baseline.current = { name: '', color: DEFAULT_COLOR }
@@ -124,7 +126,7 @@ function TagFolderPage() {
     void api.tagGroups.list(selectedAccountId)
       .then((result) => {
         if (!sameRequest(activeRef.current, request)) return
-        if (!result.success) { setLoadState('error'); return }
+        if (!result.success || !Array.isArray(result.data)) { setLoadState('error'); return }
         const group = result.data.find((item) => item.id === editId)
         if (!group) { setLoadState('error'); return }
         baseline.current = { name: group.name, color: folderDisplayColor(group) }
@@ -139,13 +141,20 @@ function TagFolderPage() {
         setLoadState(status === 403 ? 'forbidden' : 'error')
       })
   }
-  useEffect(loadFolder, [editId, selectedAccountId])
+  useEffect(() => {
+    loadFolder()
+    return () => {
+      activeRef.current = { editId, generation: activeRef.current.generation + 1 }
+      saveLock.current = false
+    }
+  }, [editId, selectedAccountId])
 
   const save = async () => {
-    if (saving || loadState !== 'ready') return
+    if (saveLock.current || saving || loadState !== 'ready' || (!editId && !selectedAccountId)) return
     if (!name.trim()) { setNameError('フォルダ名を入力してください'); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     const request = { ...activeRef.current }
+    saveLock.current = true
     setSaving(true)
     setError('')
     try {
@@ -168,6 +177,7 @@ function TagFolderPage() {
 
       setError(folderSaveError(reason instanceof ApiError ? reason.status : undefined)) }
     } finally {
+      saveLock.current = false
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
   }
@@ -201,12 +211,13 @@ function TagFolderPage() {
 
   if (staffRole !== null && !canManageRole(staffRole)) return <SaveErrorScope errors={saveErrors}><ReadOnlyNotice>閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></SaveErrorScope>
 
-  /* 止まっている理由は押せない見た目だけにせず、ボタンの title と本文に出す。 */
+  /* 止まっている理由は押せない見た目だけにせず、ボタンの title と理由文に出す。 */
   const blockedReason =
     loadState === 'loading' ? '読み込んでいます'
       : loadState === 'error' ? '読み込めませんでした'
         : loadState === 'forbidden' ? permissionDeniedMessage('store')
-          : null
+          : !editId && !selectedAccountId ? 'アカウントを選んでください。'
+            : null
   const title = editId ? 'フォルダを直す' : scope === 'friend_field' ? '友だち情報欄のフォルダを追加する' : 'フォルダを追加する'
 
   return (
@@ -232,7 +243,7 @@ function TagFolderPage() {
             ) : null}
             <span className={styles.dialogFooterEnd}>
               <Button type="button" disabled={saving} onClick={close}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined}  onClick={() => save()} busy={saving}>
+              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} disabledReason={blockedReason} title={blockedReason ?? undefined} onClick={() => save()} busy={saving}>
                 {editId ? <FolderCheck size={16} aria-hidden="true" /> : <FolderPlus size={16} aria-hidden="true" />}
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>

@@ -134,6 +134,10 @@ function WebhooksCreateV8Inner() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const accountRef = useRef(selectedAccountId)
+  const accountScope = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (accountScope.current.accountId !== selectedAccountId) {
+    accountScope.current = { accountId: selectedAccountId, generation: accountScope.current.generation + 1 }
+  }
   /* WEB232：作れたが止められなかった送り先（下書きのつもりで、いまは動いている）。 */
   const createdActiveRef = useRef<{ id: string; accountId: string } | null>(null)
   accountRef.current = selectedAccountId
@@ -157,7 +161,11 @@ function WebhooksCreateV8Inner() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const { gate, prompt: stepUpPrompt, cancel: cancelStepUp } = useStepUpGate()
 
-  useEffect(() => { cancelStepUp() }, [selectedAccountId, cancelStepUp])
+  useEffect(() => {
+    cancelStepUp()
+    setSaving(false)
+    setError(null)
+  }, [selectedAccountId, cancelStepUp])
 
   const initialSecretRef = useRef(secret)
   const dirty = Boolean(
@@ -208,7 +216,9 @@ function WebhooksCreateV8Inner() {
     }
     const canContinue = captureWebhookWriteAccess()
     const accountId = selectedAccountId
-    if (!accountId || accountRef.current !== accountId) {
+    const requestGeneration = accountScope.current.generation
+    const stillSameScope = () => accountRef.current === accountId && accountScope.current.generation === requestGeneration
+    if (!accountId || !stillSameScope()) {
       setError('上のバーでLINE公式アカウントを選んでください')
       return
     }
@@ -239,10 +249,12 @@ function WebhooksCreateV8Inner() {
     if (next === 'draft' && pendingStop && pendingStop.accountId === accountId) {
       try {
         const stop = await api.webhooks.outgoing.update(pendingStop.id, accountId, { isActive: false })
+        if (!stillSameScope()) return
         if (!stop.success) throw new Error(stop.error)
         createdActiveRef.current = null
         router.push(createPageReturnHref('/webhooks', pendingStop.id))
       } catch (saveFailure) {
+        if (!stillSameScope()) return
         const fieldFailure = saveErrors.capture(saveFailure)
 
         { if (!fieldFailure)
@@ -269,13 +281,14 @@ function WebhooksCreateV8Inner() {
         maxRetries: Number(maxRetries) || 0,
       }
       const create = (stepUpToken?: string) => {
-        if (!canContinue() || accountRef.current !== accountId) throw new Error('権限やLINEアカウントが変わったため中止しました。')
+        if (!canContinue() || !stillSameScope()) throw new Error('権限やLINEアカウントが変わったため中止しました。')
         return api.webhooks.outgoing.create(payload, stepUpToken)
       }
       let res
       try {
         res = await create()
       } catch (caught) {
+        if (!stillSameScope()) return
         saveErrors.capture(caught);
 
         if (!isStepUpRequired(caught)) {
@@ -283,10 +296,11 @@ function WebhooksCreateV8Inner() {
           throw caught
         }
         const token = await gate('webhook.secret', 'Webhookを登録する')
+        if (!stillSameScope()) return
         if (!token) throw caught
-        if (accountRef.current !== accountId) throw new Error('LINEアカウントが切り替わりました。登録せずに止めました。もう一度やり直してください。')
         res = await create(token)
       }
+      if (!stillSameScope()) return
       if (!res.success) throw new Error(res.error)
       if (next === 'draft' && res.data.isActive !== false) {
         // 停止状態を返さない古い API では、作成後に停止を確認する。
@@ -294,10 +308,12 @@ function WebhooksCreateV8Inner() {
         createdActiveRef.current = { id: res.data.id, accountId }
         let stopped = false
         try {
-          if (!canContinue() || accountRef.current !== accountId) throw new Error('権限やLINEアカウントが変わったため中止しました。')
+          if (!canContinue() || !stillSameScope()) throw new Error('権限やLINEアカウントが変わったため中止しました。')
           const stop = await api.webhooks.outgoing.update(res.data.id, accountId, { isActive: false })
+          if (!stillSameScope()) return
           stopped = stop.success
         } catch (saveFailure) {
+          if (!stillSameScope()) return
           saveErrors.capture(saveFailure)
           stopped = false
         }
@@ -306,8 +322,10 @@ function WebhooksCreateV8Inner() {
         }
         createdActiveRef.current = null
       }
+      if (!stillSameScope()) return
       router.push(createPageReturnHref('/webhooks', res.data.id))
     } catch (cause) {
+      if (!stillSameScope()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)

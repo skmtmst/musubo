@@ -1438,3 +1438,4 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
+- [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。

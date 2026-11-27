@@ -54,7 +54,8 @@ export async function loadMediaList({ folderFilter, kinds, latestAccountRef, lis
         offset: (page - 1) * pageSize,
       }).catch(() => null)
       if (!isLatest()) return
-      if (res?.success) {
+      if (res?.success && res.data && Array.isArray(res.data.items)
+        && Number.isInteger(res.data.total) && res.data.total >= 0) {
         setItems(res.data.items)
         setTotal(res.data.total)
         setListKnown(true)

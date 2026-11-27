@@ -151,6 +151,8 @@ export function useFeatureSettings() {
    */
   const accountGuard = useMemo(() => createAccountRequestGuard(), [])
   const accountRef = useRef(selectedAccountId)
+  const savingRef = useRef(false)
+  const impactBusyRef = useRef(false)
 
   /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
   const groups = useMemo(() => {
@@ -184,6 +186,8 @@ export function useFeatureSettings() {
     if (accountRef.current !== selectedAccountId) {
       accountRef.current = selectedAccountId
       accountGuard.advance()
+      savingRef.current = false
+      impactBusyRef.current = false
       // Aの未保存状態をBへ持ち込まない。Bの値は load が改めて確定する。
       setSavedFeatures(CATALOG_DEFAULT_FEATURES)
       setFeatures(CATALOG_DEFAULT_FEATURES)
@@ -197,11 +201,14 @@ export function useFeatureSettings() {
       setUsageFeatures([])
       setUsageFailed(false)
       setOrdering(false)
+      setSaving(false)
+      setConflict(false)
       setError('')
       setLoadFailed(false)
       setLoadErrorStatus(undefined)
       setImpactOpen(false)
       setImpactGroups([])
+      setImpactBusy(false)
       setImpactError('')
       setResetToDefaultsOpen(false)
       cancelLeave()
@@ -458,6 +465,7 @@ export function useFeatureSettings() {
       // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
+        if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
         setError(loadFailed
           ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
           : FEATURE_SETTINGS_CONFLICT_MESSAGE)
@@ -562,6 +570,7 @@ export function useFeatureSettings() {
       // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
+        if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         setConflict(true)
         setError(loadFailed
           ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
@@ -571,7 +580,7 @@ export function useFeatureSettings() {
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
       return false
     } finally {
-      setSaving(false)
+      if (accountGuard.isCurrent(ticket, selectedAccountId)) setSaving(false)
     }
   }
 
@@ -580,22 +589,32 @@ export function useFeatureSettings() {
    * 止まる仕事があるときは確認ダイアログを開いて止める。
    */
   const save = async () => {
-    if (!selectedAccountId || !dirty) return
+    if (!selectedAccountId || !dirty || saving || savingRef.current) return
     // サーバーが理由なしの保存を400にする。往復させる前にここで止める。
     if (!reason.trim()) {
       setError('変更理由を入力してください')
       return
     }
+    const ticket = accountGuard.issue(selectedAccountId)
     const offKeys = Object.keys(features).filter(
       (key) => savedFeatures[key] === true && features[key] === false,
     )
     if (offKeys.length === 0) {
-      return persist()
+      savingRef.current = true
+      try {
+        return await persist()
+      } finally {
+        if (accountGuard.isCurrent(ticket, selectedAccountId)) {
+          savingRef.current = false
+        }
+      }
     }
+    savingRef.current = true
     setSaving(true)
     setError('')
     try {
       const data = await checkImpact()
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
       if (!data) return false
       if (data.requiresConfirmation) {
         setImpactGroups(data.impacts)
@@ -605,7 +624,10 @@ export function useFeatureSettings() {
       }
       return await persist()
     } finally {
-      setSaving(false)
+      if (accountGuard.isCurrent(ticket, selectedAccountId)) {
+        savingRef.current = false
+        setSaving(false)
+      }
     }
   }
 
@@ -614,11 +636,14 @@ export function useFeatureSettings() {
    * その場のトークンで保存する。トークンの持ち回しはしない。
    */
   const confirmImpactSave = async () => {
-    if (impactBusy || !selectedAccountId) return
+    if (impactBusy || impactBusyRef.current || !selectedAccountId) return
+    const ticket = accountGuard.issue(selectedAccountId)
+    impactBusyRef.current = true
     setImpactBusy(true)
     setImpactError('')
     try {
       const data = await checkImpact()
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!data) {
         setImpactError('確認を取り直せませんでした。閉じてもう一度保存してください。')
         return
@@ -631,9 +656,13 @@ export function useFeatureSettings() {
       setImpactGroups(data.impacts)
       setImpactOpen(true)
       const ok = await persist(data.impactToken)
+      if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (ok) setImpactOpen(false)
     } finally {
-      setImpactBusy(false)
+      if (accountGuard.isCurrent(ticket, selectedAccountId)) {
+        impactBusyRef.current = false
+        setImpactBusy(false)
+      }
     }
   }
 

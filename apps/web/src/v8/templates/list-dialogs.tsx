@@ -77,7 +77,7 @@ type RenderTemplateDialogsContext = {
   moving: boolean
   navItems: Template[]
   openMove: (ids: string[]) => void
-  panelDetail: { detail: { id: string; accountId: string | null; name: string; category: string; messageType: string; messageContent: string; messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: "draft" | "published"; folderId: string | null; carouselActions: unknown | null; carouselTapLimitMode: string; carouselTapLimitText: string | null; usedBy: { autoReplies: Array<{ id: string; keyword: string; matchType: "exact" | "contains"; lineAccountId: string | null; templateVersion: number | null; }>; automations: Array<{ id: string; name: string; eventType: string; }>; scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; displayOrder?: number; templateVersion: number | null; }>; reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string; }>; richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null; }>; trackedLinks: Array<{ id: string; name: string; }>; broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: "fixed" | "latest"; }>; reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string; }>; }; createdAt: string; updatedAt: string; hasDraft: boolean; publishedVersion: number; publishedAt: string | null; draftRevision: number; } | null; error: string; publishing: boolean; publish: () => Promise<void>; }
+  panelDetail: { detail: { id: string; accountId: string | null; name: string; category: string; messageType: string; messageContent: string; messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: "draft" | "published"; folderId: string | null; carouselActions: unknown | null; carouselTapLimitMode: string; carouselTapLimitText: string | null; usedBy: { autoReplies: Array<{ id: string; keyword: string; matchType: "exact" | "contains"; lineAccountId: string | null; templateVersion: number | null; }>; automations: Array<{ id: string; name: string; eventType: string; }>; scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number; displayOrder?: number; templateVersion: number | null; }>; reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string; }>; richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null; }>; trackedLinks: Array<{ id: string; name: string; }>; broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: "fixed" | "latest"; }>; reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string; }>; }; createdAt: string; updatedAt: string; hasDraft: boolean; publishedVersion: number; publishedAt: string | null; draftRevision: number; } | null; error: string; loading?: boolean; publishing: boolean; publish: () => Promise<void>; reload?: () => Promise<void>; }
   panelMove: boolean
   panelUsageRows: UsageRow[]
   pendingBulkDelete: Template[] | null
@@ -388,7 +388,18 @@ export function renderTemplateDialogs({ moveGuard, folderDeleteAccounts, cancelF
                   ? emptyValue('none')
                   : `${activeTemplate.usageCount}か所`}
              </DetailField>
-            {panelDetail.error ? <Notice tone="danger">{panelDetail.error}</Notice> : null}
+            {panelDetail.error ? (
+              <Notice
+                tone="danger"
+                action={panelDetail.reload ? (
+                  <Button type="button" variant="secondary" size="compact" busy={panelDetail.loading} busyLabel="読み込み中…" onClick={() => void panelDetail.reload?.()}>
+                    もう一度読み込む
+                  </Button>
+                ) : undefined}
+              >
+                {panelDetail.error}
+              </Notice>
+            ) : null}
             {panelUsageRows.length > 0 ? <div className={styles.usageList}><ul>
               {panelUsageRows.map((row) => <li key={row.key} className={styles.usageRow}>
                 <span className={styles.usageKind}>{row.kind}</span>

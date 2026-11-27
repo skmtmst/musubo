@@ -60,6 +60,13 @@ function fillTone(row: StyleRow): 'full' | 'ok' {
   return row.booked !== undefined && row.capacity !== undefined && row.booked >= row.capacity ? 'full' : 'ok'
 }
 
+function vacancyLabel(vacancy: StyleRow['vacancy']): string | undefined {
+  if (vacancy === '×') return '空きなし'
+  if (vacancy === '△') return '残りわずか'
+  if (vacancy === '○') return '空きあり'
+  return undefined
+}
+
 export function TodayList({ style, rows, note, canWrite, busyId, selectedId, menuFor, onVisit, onUndo, onSelect, onNoShow, onApprove, onResult, empty, columnsOverride }: {
   style: IndustryStyle
   rows: StyleRow[]
@@ -95,7 +102,7 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
       case 'state': return <StatusOrDash badge={row.state} />
       case 'fill': return row.capacity === undefined ? <span className={styles.cellText}>{row.remaining !== undefined ? `残り ${row.remaining}` : '—'}</span> : <span className={styles.fill}><span className={styles.cellStrong}>{row.booked ?? 0}／{row.capacity ?? 0}</span><span className={styles.fillTrack}><span className={styles.fillBar} data-tone={fillTone(row)} style={{ inlineSize: `${Math.min(100, Math.round(((row.booked ?? 0) / Math.max(1, row.capacity ?? 1)) * 100))}%` }} /></span></span>
       case 'waiting': return <span className={styles.cellText}>{row.waiting ?? '—'}</span>
-      case 'vacancy': return <span className={styles.cellText} aria-label={row.vacancy === '×' ? '空きなし' : row.vacancy === '△' ? '残りわずか' : '空きあり'}>{row.vacancy ?? '—'}</span>
+      case 'vacancy': return <span className={styles.cellText} aria-label={vacancyLabel(row.vacancy)}>{row.vacancy ?? '—'}</span>
       case 'action': return actionCell(row)
       default: return null
     }
@@ -112,8 +119,9 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
     if (row.action === 'approve') return <Button size="compact" disabled={busyId === row.id} onClick={() => onApprove?.(row)} aria-label={`${withHonorific(row.name)}の予約を承認する`}><Check size={16} aria-hidden="true" />承認する</Button>
     if (row.action === 'result') return <Button size="compact" disabled={busyId === row.id} onClick={() => onResult?.(row)} aria-label={`${withHonorific(row.name)}の結果を付ける`}><ClipboardCheck size={16} aria-hidden="true" />結果を付ける</Button>
     if (row.action === 'undo') return <button type="button" className={styles.textAction} disabled={busyId === row.id} onClick={() => onUndo(row)} aria-label={`${withHonorific(row.name)}の来店の印を取り消す`}>取り消す</button>
-    if (row.action === 'meet') return <Button size="compact" href={row.actionHref} external={Boolean(row.actionHref)}><Video size={16} aria-hidden="true" />Meet に入る</Button>
-    if (row.action === 'place') return <Button size="compact" href={row.actionHref} external={Boolean(row.actionHref)}><MapPin size={16} aria-hidden="true" />場所を開く</Button>
+    const actionHref = row.actionHref?.trim()
+    if (row.action === 'meet') return actionHref ? <Button size="compact" href={actionHref} external><Video size={16} aria-hidden="true" />Meet に入る</Button> : null
+    if (row.action === 'place') return actionHref ? <Button size="compact" href={actionHref} external><MapPin size={16} aria-hidden="true" />場所を開く</Button> : null
     return null
   }
   if (rows.length === 0) return <>{empty ?? <ListState kind="empty" title="この日の予約はまだありません" />}</>
