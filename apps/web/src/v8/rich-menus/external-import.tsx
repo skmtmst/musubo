@@ -63,6 +63,7 @@ export function ExternalImportWorkspace({
   const [selectedId, setSelectedId] = useState(unmanaged[0]?.richMenuId ?? '')
   const selected = unmanaged.find((menu) => menu.richMenuId === selectedId) ?? unmanaged[0] ?? null
   const areas = selected ? Array.from({ length: Math.min(selected.areasCount, 6) }, (_, index) => String.fromCharCode(65 + index)) : []
+  const hasLoadedAreas = Boolean(selected?.areas?.length)
 
   return (
     <div data-design-node="TL7tp" className={`mx-auto flex flex-col gap-4 ${styles.wrap}`}>
@@ -73,7 +74,7 @@ export function ExternalImportWorkspace({
           <span className="mx-2">›</span>
           <span>管理画面の外のメニュー</span>
         </nav>
-        <Button type="button" onClick={onReload}>↻ LINEから読み直す</Button>
+        <Button type="button" onClick={onReload} disabled={loading} aria-busy={loading || undefined}>↻ LINEから読み直す</Button>
       </div>
 
       {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
@@ -148,7 +149,16 @@ export function ExternalImportWorkspace({
                 ) : (
                   <p className="text-ink-faint mt-2 text-xs leading-5">LINEから面ごとの動きを読み込めませんでした。読み直してから取り込んでください。</p>
                 )}
-                <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="mt-4"
+                  disabled={!hasLoadedAreas}
+                  disabledReason={!hasLoadedAreas ? '面ごとの動きを読み込めていないため取り込めません。読み直してからお試しください。' : undefined}
+                  onClick={() => onImport(selected)}
+                >
+                  この内容で取り込む
+                </Button>
                 {onDelete ? (
                   <RowMenu
                     label={`LINE上の「${selected.name || '名前なし'}」の操作`}
