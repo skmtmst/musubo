@@ -3,6 +3,7 @@
 - [リマインダと権限案内の画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-02-1128.md)（説明・2026-11-28確認）
 - [自動化の見本選びの画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-03-1128.md)（説明・2026-11-28確認）
 - [外部連携の試し送信の画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-04-1128.md)（説明・2026-11-28確認）
+- [共通アクションの案内の画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-05-1128.md)（説明・2026-11-28確認）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
