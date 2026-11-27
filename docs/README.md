@@ -1546,3 +1546,4 @@
 - [飲食店本日データの切替リセット・媒体応答検証とリマインダ通知編集の時刻クリア・上限防御](release-log/unreleased/PR-kenta-later-gemini118-1127.md) — 反映履歴、確認 2026-11-28。
 - [NEN配信のきっかけ表示と今日のお店の集計・日時表示の修正](release-log/unreleased/PR-kenta-later-gemini93-1127.md) — 反映履歴、確認 2026-11-28。
 - [店舗追加の利用規約読了判定とGoogle口コミ星評価表示の修正](release-log/unreleased/PR-kenta-later-gemini94-1127.md) — 反映履歴、確認 2026-11-28。
+- [LINE来店フォローの時期表示と卓管理の予約移し替え・表示の修正](release-log/unreleased/PR-kenta-later-gemini95-1127.md) — 反映履歴、確認 2026-11-28。
