@@ -148,6 +148,7 @@ export default function QaListV8() {
           />
         ) : null}
         {ai.status === 'error' ? <ListState kind="error" title="AI の使い方を読み込めませんでした" description="もう一度読み込んでください。" onRetry={() => void ai.reload()} /> : null}
+        {accountId && ai.status === 'ready' && ai.settings && (ai.settings.publishedQaCount === null || ai.settings.draftQaCount === null) ? <ListState kind="error" title="Q&A の件数を読み込めませんでした" onRetry={() => void ai.reload()} /> : null}
       </div>}
       toolbar={<ListToolbarFrame singleRow><ListToolbarRow>
         <ListToolbarSearchSlot search={{ placeholder: '質問・答えで探す', value: url.q, onChange: (q) => setUrl({ q, page: '1' }), width: 280 }} />
