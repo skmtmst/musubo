@@ -1,6 +1,7 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [登録メディアと緊急停止の反映履歴](release-log/unreleased/PR-kenta-later-codex61.md)（説明・2026-11-27確認）
 - [Google投稿の画像形式の反映履歴](release-log/unreleased/PR-kenta-google-post-mime.md)（説明・2026-11-27確認）
+- [フォームの見本の反映履歴](release-log/unreleased/PR-kenta-later-codex62.md)（説明・2026-11-27確認）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 - [友だち追加の条件と自動化の下書きの反映履歴](release-log/unreleased/PR-kenta-later-codex55.md)（説明・2026-11-27確認）
