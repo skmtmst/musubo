@@ -1471,3 +1471,4 @@
 - [マニュアル対応表の不正な画面名と行き先を修正](release-log/unreleased/PR-kenta-later-cx3-47-1128.md) — 反映履歴、確認 2026-11-28。
 - [テンプレート編集の入口確認を修正](release-log/unreleased/PR-kenta-later-cx3-48-1128.md) — 反映履歴、確認 2026-11-28。
 - [機能設定の読み込み確認を修正](release-log/unreleased/PR-kenta-later-cx3-49-1128.md) — 反映履歴、確認 2026-11-28。
+- [運営ダッシュボード最初の10分の異常値防御と最初のリッチメニュー選択の保存切替防御](release-log/unreleased/PR-kenta-later-gemini119-1127.md) — 反映履歴、確認 2026-11-28。

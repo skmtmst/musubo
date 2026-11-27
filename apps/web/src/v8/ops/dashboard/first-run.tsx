@@ -35,14 +35,26 @@ const HELP = '期間にアカウントを作った新しいお店の数です（
   + 'じょうごの各段は、前の地点が全部そろったお店だけを数えます。'
   + '「6段を全部」の LINE をつなぐ段は、稼働中で LINE のシークレットがあるかだけを見ます（Webhook は問い合わせません）。'
 
-function minutes(value: number | null): string {
-  return value === null ? '—' : `${formatNumber(value)} 分`
+function isValidNonNegative(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function minutes(value: number | null | undefined): string {
+  return isValidNonNegative(value) ? `${formatNumber(value)} 分` : '—'
+}
+
+function percentText(value: number | null | undefined): string {
+  return isValidNonNegative(value) ? `${value}%` : '—'
+}
+
+function countText(value: number | null | undefined): string {
+  return isValidNonNegative(value) ? `${formatNumber(Math.trunc(value))} 件` : '—'
 }
 
 /** 段の右の 1 行。1 段目は全体の割合、2 段目からは前の段からの割合とかかった分の中央値。 */
 function stageDetail(stage: OpsFirstRunFunnel['stages'][number]): string {
-  if (stage.fromPrevious === null) return `${stage.percent}%`
-  return `前から ${stage.fromPrevious}%・中央値 ${minutes(stage.minutesFromPrevious)}`
+  if (stage.fromPrevious === null) return percentText(stage.percent)
+  return `前から ${percentText(stage.fromPrevious)}・中央値 ${minutes(stage.minutesFromPrevious)}`
 }
 
 export default function OpsFirstRunCard({ period }: { period: OpsDashboardPeriod }) {
@@ -55,15 +67,30 @@ export default function OpsFirstRunCard({ period }: { period: OpsDashboardPeriod
 
   // 期間を切り替えた後に、前の期間の答えで上書きしない。
   useEffect(() => {
-    if (readOnly) return
+    if (readOnly) {
+      setData(null)
+      setError('')
+      return
+    }
     let active = true
     setError('')
     setData(null)
     api.ops.firstRun(period).then(
       (res) => {
         if (!active) return
-        if (res.success) setData(res.data)
-        else setError(res.error || '読み込めませんでした')
+        const payload = res.success ? res.data : null
+        if (
+          res.success
+          && payload
+          && Array.isArray(payload.stages)
+          && payload.stages.every((stage) => isValidNonNegative(stage.count))
+          && payload.minutesToFirstMessage
+          && payload.allStepsDone
+        ) {
+          setData(payload)
+        } else {
+          setError((!res.success && res.error) || '読み込めませんでした')
+        }
       },
       (failure: unknown) => {
         if (!active) return
@@ -90,18 +117,18 @@ export default function OpsFirstRunCard({ period }: { period: OpsDashboardPeriod
           <KpiBand density="compact">
             <KpiCard title="最初の1通まで（中央値）" valueText={minutes(data.minutesToFirstMessage.median)} icon={null} presentation="band" value={null} unit="" detail={null} />
             <KpiCard title="最初の1通まで（75%点）" valueText={minutes(data.minutesToFirstMessage.p75)} icon={null} presentation="band" value={null} unit="" detail={null} />
-            <KpiCard title="10分以内に届いた" valueText={`${data.withinTenMinutesPercent}%`} icon={null} presentation="band" value={null} unit="" detail={null} />
-            <KpiCard title="6段を全部終えた" valueText={`${data.allStepsDone.percent}%`} icon={null} presentation="band" value={null} unit="" detail={null} />
+            <KpiCard title="10分以内に届いた" valueText={percentText(data.withinTenMinutesPercent)} icon={null} presentation="band" value={null} unit="" detail={null} />
+            <KpiCard title="6段を全部終えた" valueText={percentText(data.allStepsDone.percent)} icon={null} presentation="band" value={null} unit="" detail={null} />
           </KpiBand>
           {data.biggestDrop ? (
-            <Notice tone="warn">{`いちばん落ちている段：${firstRunStageWord(data.biggestDrop.key)}（前の段から ${data.biggestDrop.fromPrevious}%・${formatNumber(data.biggestDrop.lost)} 件がここで止まっています）`}</Notice>
+            <Notice tone="warn">{`いちばん落ちている段：${firstRunStageWord(data.biggestDrop.key)}（前の段から ${percentText(data.biggestDrop.fromPrevious)}・${countText(data.biggestDrop.lost)}がここで止まっています）`}</Notice>
           ) : null}
           <FunnelChart
             label="最初の10分の段ごとの数"
             unit="件"
-            items={data.stages.map((stage) => ({ key: stage.key, label: firstRunStageWord(stage.key), value: stage.count, detail: <span>{stageDetail(stage)}</span> }))}
+            items={data.stages.map((stage) => ({ key: stage.key, label: firstRunStageWord(stage.key), value: isValidNonNegative(stage.count) ? Math.trunc(stage.count) : 0, detail: <span>{stageDetail(stage)}</span> }))}
           />
-          <p className={parts.note}>{`${data.periodLabel}に作られたアカウント ${formatNumber(data.accounts)} 件・最初の1通まで届いた ${formatNumber(data.minutesToFirstMessage.reached)} 件で数えています`}</p>
+          <p className={parts.note}>{`${data.periodLabel}に作られたアカウント ${countText(data.accounts)}・最初の1通まで届いた ${countText(data.minutesToFirstMessage.reached)}で数えています`}</p>
         </>
       )}
     </Card>

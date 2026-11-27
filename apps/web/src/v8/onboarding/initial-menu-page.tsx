@@ -1,6 +1,6 @@
 'use client'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
@@ -26,24 +26,37 @@ export default function InitialMenuPage() {
  const useRestaurantGuide=styleReady&&profile.data?.style==='restaurant'
  usePageTitle(styleReady&&!useRestaurantGuide?'最初のリッチメニューを選ぶ':MENU_TITLE)
  const [choice,setChoice]=useState<InitialMenuSelection>({value:'simple'}),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null),[dirty,setDirty]=useState(false)
+ const allowed=canManageRole(role),style=profile.data?.style??'standard'
+ const busyRef=useRef(false)
+ const scopeRef=useRef({accountId:selectedAccountId,allowed,generation:0})
+ if(scopeRef.current.accountId!==selectedAccountId||scopeRef.current.allowed!==allowed){
+  scopeRef.current={accountId:selectedAccountId,allowed,generation:scopeRef.current.generation+1}
+ }
+ const mountedRef=useRef(true)
+ useEffect(()=>{mountedRef.current=true;return ()=>{mountedRef.current=false;scopeRef.current={...scopeRef.current,generation:scopeRef.current.generation+1}}},[])
+ useEffect(()=>{busyRef.current=false;setBusy(false)},[selectedAccountId,allowed])
  useEffect(()=>{setChoice({value:'simple'});setDirty(false);setError(null)},[selectedAccountId])
  useEffect(()=>{if(useRestaurantGuide)router.replace('/?guide=richMenu')},[router,useRestaurantGuide])
- const allowed=canManageRole(role),style=profile.data?.style??'standard'
  const save=async()=>{
-  if(!allowed||!selectedAccountId||!profile.data?.styleSelected||profile.stale||busy)return
+  if(!allowed||!selectedAccountId||!profile.data?.styleSelected||profile.stale||busy||busyRef.current)return
   const account=selectedAccountId,version=profile.data.version
+  const generation=scopeRef.current.generation
+  busyRef.current=true
   setBusy(true);setError(null);saveErrors.reset()
   try{
    if(choice.value==='existing'&&!choice.resourceId)throw new Error('使うリッチメニューを選んでください')
    const set=await styleApi.starterSet(account,style,choice.value==='simple')
-   if(!set.success)throw new Error('メニューを確認できませんでした')
-   const key=set.data.definition.items.find(item=>item.kind==='rich_menu')?.key
+   if(!mountedRef.current||scopeRef.current.generation!==generation)return
+   const items=set.success&&Array.isArray(set.data?.definition?.items)?set.data.definition.items:null
+   if(!items)throw new Error('メニューを確認できませんでした')
+   const key=items.find(item=>item.kind==='rich_menu')?.key
    const image=choice.value==='later'?{mode:'later' as const}:{mode:'configured' as const,value:choice.value==='simple'?'simple':'existing',...(choice.value==='existing'?{resourceId:choice.resourceId}:{})}
    const choices=key&&choice.value!=='later'?{[key]:choice.value==='existing'?{mode:'existing' as const,resourceId:choice.resourceId!}:{mode:'sample' as const}}:undefined
    const result=await styleApi.save(account,{expectedVersion:version,confirmInitialMenu:choice.value==='simple',answers:{image},choices})
+   if(!mountedRef.current||scopeRef.current.generation!==generation)return
    if(!result.success)throw new Error('メニューを保存できませんでした')
    accountStyleUpdated(account);setDirty(false);router.push('/getting-started')
-  }catch(error){if(!saveErrors.capture(error))setError(describeApiFailure(error,'保存'))}finally{setBusy(false)}
+  }catch(error){if(mountedRef.current&&scopeRef.current.generation===generation&&!saveErrors.capture(error))setError(describeApiFailure(error,'保存'))}finally{if(mountedRef.current&&scopeRef.current.generation===generation){busyRef.current=false;setBusy(false)}}
  }
  if (profile.status === 'error' || profile.stale) return <PagePending stage="style" title={MENU_TITLE} failed
    errorTitle="使い方を読み込めませんでした" error={profile.error} onRetry={profile.reload} />
