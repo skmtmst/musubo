@@ -32,12 +32,12 @@ export default function SavedDistributionDialog({ accounts, folders, selected, o
     footer={<DialogActions leadingAction={<span className={styles.footerInfo} data-distribution-notice>
         {notice}
         <span className={styles.count} aria-live="polite">{`選んだ ${selected.length} アカウント`}</span>
-      </span>}>
+      </span>} note={!busy && canDistribute && selected.length === 0 ? '配るアカウントを選んでください。' : undefined}>
       {/* 配るもの（ひな形の名前・タグの札）と選んだ数は下の帯に置く。一覧の枠と重ねない（10-09 オーナー）。 */}
 
       <>
       <Button disabled={busy} onClick={onLater}>あとで</Button>
-      <Button variant="primary" disabled={busy || !canDistribute || selected.length === 0} busy={busy} onClick={onDistribute}><Send size={16} aria-hidden="true" />{`${selected.length} アカウントへ配る`}</Button>
+      <Button variant="primary" disabled={busy || !canDistribute || selected.length === 0} aria-description={canDistribute && selected.length === 0 ? '配るアカウントを選んでください。' : undefined} busy={busy} onClick={onDistribute}><Send size={16} aria-hidden="true" />{`${selected.length} アカウントへ配る`}</Button>
       </>
     </DialogActions>}
   >

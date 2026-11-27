@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import { CAPABILITY_LABEL } from '@/lib/operation-restore'
 import { collectRecentUpdates, RECENT_UPDATES_LIMIT, type UpdateRelease } from '@/lib/operation-updates'
@@ -19,6 +19,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
 import { formatNumber } from '@/lib/format'
+import styles from './history-details.module.css'
 
 export type HistoryDetail = 'incidents' | 'updates' | null
 const HISTORY_FETCH_LIMIT = 200
@@ -43,17 +44,32 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [period, setPeriod] = useState<'year' | '30days'>('year')
   const [revision, setRevision] = useState(0)
+  const loadingRef = useRef(false)
+  const retry = useCallback(() => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    setRevision((value) => value + 1)
+  }, [])
   useEffect(() => {
     if (!panel) return
     let cancelled = false
+    loadingRef.current = true
     setHistory([])
     setState('loading')
     api.operations.history(HISTORY_FETCH_LIMIT).then((response) => {
       if (cancelled) return
+      loadingRef.current = false
       if (response.success && Array.isArray(response.data)) { setHistory(response.data); setState('ready') }
       else setState('error')
-    }).catch(() => { if (!cancelled) setState('error') })
-    return () => { cancelled = true }
+    }).catch(() => {
+      if (cancelled) return
+      loadingRef.current = false
+      setState('error')
+    })
+    return () => {
+      cancelled = true
+      loadingRef.current = false
+    }
   }, [panel, revision])
 
   const cutoff = Date.now() - (period === '30days' ? 30 : 365) * DAY
@@ -72,6 +88,7 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
   const recentUpdates = updates.slice(0, RECENT_UPDATES_LIMIT)
   const hiddenCount = totalCount - recentUpdates.length
   const ready = state === 'ready'
+  const kpiStatusDetail = state === 'error' ? '読み込めませんでした' : state === 'loading' ? '読み込んでいます' : null
   const downloadCsv = () => {
     if (!ready) return
     saveCsvFile(operationHistoryCsv(entries), 'operation-history.csv')
@@ -80,12 +97,13 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
     description={panel === 'incidents' ? '選んだ期間の一覧・回数・最長停止を確認します。' : `新しい${RECENT_UPDATES_LIMIT}件を表示します。まだ画面に入っていない変更は行に混ぜません。`}
     onCancel={onClose} cancelLabel="閉じる" size="wide"
     footer={panel === 'incidents' ? <DialogActions><Button variant="secondary" disabled={!ready} onClick={downloadCsv}>CSVで書き出す</Button></DialogActions> : undefined}>
-    {state === 'error' ? <ListState kind="error" title="運用履歴を読み込めませんでした" description="履歴なしとは扱いません。もう一度読み直してください。" action={<Button variant="secondary" onClick={() => setRevision((value) => value + 1)}>もう一度読み込む</Button>} /> : null}
+    <div className={styles.body}>
+    {state === 'error' ? <ListState kind="error" title="運用履歴を読み込めませんでした" description="履歴なしとは扱いません。もう一度読み直してください。" onRetry={retry} /> : null}
     {panel === 'incidents' ? <>
       <Field label="表示期間"><Select aria-label="表示期間" size="full" value={period} onChange={(value) => setPeriod(value as 'year' | '30days')} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: '過去30日' }]} /></Field>
       <KpiBand>
-        <KpiCard title="止めた回数" value={null} valueText={ready ? `${formatNumber(entries.length)}回${truncated ? '以上' : ''}` : '—'} unit="" detail={period === '30days' ? '過去30日' : 'この1年'} />
-        <KpiCard title="いちばん長かった停止" value={null} valueText={ready && longestMinutes > 0 ? formatMinutesRough(longestMinutes) : '—'} unit="" detail={truncated ? '直近の記録から' : period === '30days' ? '過去30日' : 'この1年'} />
+        <KpiCard title="止めた回数" loading={state === 'loading'} value={null} valueText={ready ? `${formatNumber(entries.length)}回${truncated ? '以上' : ''}` : '—'} unit="" detail={kpiStatusDetail ?? (period === '30days' ? '過去30日' : 'この1年')} detailLayout={kpiStatusDetail ? 'single' : undefined} />
+        <KpiCard title="いちばん長かった停止" loading={state === 'loading'} value={null} valueText={ready && longestMinutes > 0 ? formatMinutesRough(longestMinutes) : '—'} unit="" detail={kpiStatusDetail ?? (truncated ? '直近の記録から' : period === '30days' ? '過去30日' : 'この1年')} detailLayout={kpiStatusDetail ? 'single' : undefined} />
       </KpiBand>
       {unreadableEntries.length > 0 ? <Notice tone="warn">日付を読み取れない記録が{formatNumber(unreadableEntries.length)}件あります。期間の絞り込みから外しています。</Notice> : null}
       {state === 'loading' ? <ListState kind="loading" title="記録を読み込んでいます" /> : ready && entries.length === 0 ? <ListState kind="empty" title="この期間の記録はありません" /> : ready ?
@@ -100,7 +118,7 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
           </GridRow>)}
         </GridTable> : null}
     </> : <>
-      {recentUpdates.length === 0 ? (ready ? <ListState kind="empty" title="更新の記録はありません" /> : state === 'loading' ? <ListState kind="loading" title="更新の記録を読み込んでいます" /> : null) :
+      {state === 'loading' ? <ListState kind="loading" title="更新の記録を読み込んでいます" /> : ready ? (recentUpdates.length === 0 ? <ListState kind="empty" title="更新の記録はありません" /> : <>
         <GridTable label="管理画面の更新内容の一覧" design={{ columns: 'minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr)', gap: 'var(--tpl-rest3-uh-gap)', rowPadding: 'var(--tpl-rest3-uh-row-pad)', fontSize: 'var(--tpl-rest3-em-body)' }}>
           <GridHeadRow>{['いつ', '変更内容', '担当・PR'].map((label) => <GridCell key={label} role="columnheader">{label}</GridCell>)}</GridHeadRow>
           {recentUpdates.map((entry, index) => <GridRow key={`${entry.version}|${entry.pr ?? index}|${entry.at ?? index}`}>
@@ -108,9 +126,11 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
             <GridCell role="cell" title={entry.text}><TruncatedText value={entry.text} /></GridCell>
             <GridCell role="cell"><TruncatedText value={`${entry.by ?? '自動'}${entry.pr ? ` #${entry.pr}` : ''}`} /></GridCell>
           </GridRow>)}
-        </GridTable>}
-      {hiddenCount > 0 ? <p>続きが{formatNumber(hiddenCount)}件あります。</p> : null}
-      {pendingCount > 0 ? <p>まだ画面に入っていない変更が{formatNumber(pendingCount)}件あります。</p> : null}
+        </GridTable>
+        {hiddenCount > 0 ? <p>続きが{formatNumber(hiddenCount)}件あります。</p> : null}
+        {pendingCount > 0 ? <p>まだ画面に入っていない変更が{formatNumber(pendingCount)}件あります。</p> : null}
+      </>) : null}
     </>}
+    </div>
   </Dialog>
 }

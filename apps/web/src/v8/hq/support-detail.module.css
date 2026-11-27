@@ -179,3 +179,11 @@
 
 /* 画像を添える所（MediaSlot・Z7vd2 の小さい形）。 */
 .attachSlot { width: var(--tpl-slot-w-compact); }
+
+/* 右の箱の再読み込み案内（狭い列で文字を潰さないよう縦に積む）。 */
+.sideError {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-hq-plan-head-gap);
+}
