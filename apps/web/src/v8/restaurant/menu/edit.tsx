@@ -121,6 +121,7 @@ function MenuEditBody() {
   const [draft, setDraft] = useState<Draft>(draftOf(null))
   const [saved, setSaved] = useState<Draft>(draftOf(null))
   const [courseSaved, setCourseSaved] = useState(false)
+  const [publishedAfterPartialSave, setPublishedAfterPartialSave] = useState(false)
   const [busy, setBusy] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
   const uploadPermission = useRef({ canEdit, contextKey, storeAccountId })
@@ -216,9 +217,9 @@ function MenuEditBody() {
   const confirmationVersion = useRef({ key: contextKey, generation: 0 })
   if (confirmationVersion.current.key !== contextKey) confirmationVersion.current = { key: contextKey, generation: confirmationVersion.current.generation + 1 }
   const currentConfirmationScope = JSON.stringify([contextKey, confirmationVersion.current.generation])
-  const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
-  if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
-  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setCourseSaved(false); setMenuConflict(false); setError(null) }, [contextKey])
+  const mutationContext = useRef<{ key: string; menuSignature: string | null; published: boolean }>({ key: contextKey, menuSignature: null, published: false })
+  if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null, published: false }
+  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setConfirmingPublish(false); setCourseSaved(false); setPublishedAfterPartialSave(false); setMenuConflict(false); setError(null) }, [contextKey])
 
   async function save(version = confirmedRevision) {
     if (!canEdit || !selectedAccountId || !guideFormReady || !guideCanSave || menuConflict || courseSaved || imageUploading) return
@@ -246,6 +247,7 @@ function MenuEditBody() {
         if (attempt.menuSignature !== signature) {
           await restaurantTestApi.updateMenu(selectedAccountId, editing.id, updateBody)
           attempt.menuSignature = signature
+          if (updateBody.status === 'active') attempt.published = true
         }
         if (editing.kind === 'course') await payment.save(editing.id)
         if (!stillHere()) return
@@ -273,7 +275,7 @@ function MenuEditBody() {
         return false
       }
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
-      if (cause instanceof PaymentConflictError) { setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
+      if (cause instanceof PaymentConflictError) { setPublishedAfterPartialSave(attempt.published); setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
       saveErrors.capture(cause)
       if (cause instanceof ApiError && cause.code === 'MENU_IMAGE_UNAVAILABLE') setImageError('選択した画像を利用できません。登録メディアから選び直してください。')
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
@@ -345,8 +347,9 @@ function MenuEditBody() {
 
   const publishStatusField = !editing || draftItem ? <div data-guide-anchor="menu.status" data-guide-ready>
             <Field label="保存する状態" help="下書きは、お客さまに見せるメニューには出ません。内容を確かめてから公開できます。">
-              <SaveErrorField names={['status', 'draft.status']}><Select aria-label="保存する状態" size="full" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value === 'active' ? 'active' : 'draft' })} options={[{ value: 'draft', label: '下書き' }, { value: 'active', label: '公開' }]} /></SaveErrorField>
+              <SaveErrorField names={['status', 'draft.status']}><Select aria-label="保存する状態" size="full" value={draft.status} disabled={publishedAfterPartialSave} onChange={(value) => setDraft({ ...draft, status: value === 'active' ? 'active' : 'draft' })} options={[{ value: 'draft', label: '下書き' }, { value: 'active', label: '公開' }]} /></SaveErrorField>
             </Field>
+            {publishedAfterPartialSave ? <p role="status">メニューは公開済みです。状態を変えるには一覧から操作してください。</p> : null}
           </div> : null
 
   return (

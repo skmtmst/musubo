@@ -637,3 +637,22 @@ describe('取り込みの記録の器（監査A2）', () => {
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner'}))
+
+it('未知の出来事が継承名でも、未対応と正しい状態を一覧に表示する', async () => {
+  const { container: el, root: r } = mount()
+  await render(el, r)
+  await act(async () => { await drainMicrotasks() })
+  await act(async () => {
+    overviewFor('account-a').resolve(ok(overview(2)))
+    eventsDeferreds[0].resolve(ok(recordsList([
+      action('unknown', { eventType: 'constructor', eventLabel: '未知の出来事' }),
+      action('known', { eventType: 'ec.customer.profile_updated', eventLabel: '会員情報更新' }),
+    ])))
+    await drainMicrotasks()
+  })
+  expect(el.textContent).toContain('未対応の出来事（constructor）')
+  const unknownRow = Array.from(el.querySelectorAll('tr')).find((row) => row.textContent?.includes('未知の出来事'))
+  expect(unknownRow?.textContent).toContain('処理完了')
+  expect(el.textContent).toContain('会員情報を更新')
+  expect(el.textContent).toContain('更新完了')
+})
