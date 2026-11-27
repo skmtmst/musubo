@@ -96,6 +96,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
       const response = await api.tenants.me()
       if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error(response.error)
+      if (!response.data || (response.data.name !== null && typeof response.data.name !== 'string')) throw new Error('Invalid tenant name')
       setName(response.data.name ?? '')
       setBaseline(response.data.name ?? '')
       setReady(true)
@@ -128,9 +129,13 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
     try {
       const response = await api.tenants.updateName(trimmed)
       if (!response.success) throw new Error(response.error)
-      setName(response.data.name ?? trimmed)
-      setBaseline(response.data.name ?? trimmed)
-      publishTenantName(response.data.name ?? trimmed)
+      if (!response.data || typeof response.data.name !== 'string') {
+        setError('保存結果を確認できませんでした。入力は残っています。再読み込みして結果を確認してください。')
+        return false
+      }
+      setName(response.data.name)
+      setBaseline(response.data.name)
+      publishTenantName(response.data.name)
       notifySaved('統括名を保存しました。')
       return true
     } catch (caught) {
