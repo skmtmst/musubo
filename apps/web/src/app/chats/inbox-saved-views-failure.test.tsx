@@ -6,13 +6,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import ChatsPage from './page'
 import * as toast from '@/components/shared/toast'
 
-/**
- * 受信箱の「保存した検索」保存失敗の文言分け(N-027)。
- *
- * 本物のReactで本物の `ChatsPage` を mount し、保存APIだけ失敗を返す。
- * 409(同名競合)・403(権限)・それ以外(通信障害)で、運用者へ出る文言が
- * 分かれること、そして入力した名前が消えないことを確かめる。
- */
+/** 保存した検索の読込失敗と再試行を確認する。 */
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string,

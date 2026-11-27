@@ -1,12 +1,6 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
-- [共通情報の削除確認の反映履歴](release-log/unreleased/PR-kenta-later-codex67-1127.md)（説明・2026-11-27確認）
 
-- [AIと共通情報の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex68-1127.md)（説明・2026-11-27確認）
-- [AIと自動応答の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex69-1127.md)（説明・2026-11-27確認）
-- [受信一覧と注目の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex70-1127.md)（説明・2026-11-27確認）
-- [友だち追加リンクと受信箱の反映履歴](release-log/unreleased/PR-kenta-later-codex71-1127.md)（説明・2026-11-27確認）
-- [比較値と会話内検索の反映履歴](release-log/unreleased/PR-kenta-later-codex72-1127.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
@@ -1445,20 +1439,4 @@
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
-- [予約フォーム復旧案内の権限・代理ログイン表示とリマインダ作成フッターの処理中ガード](release-log/unreleased/PR-kenta-later-gemini78-1127.md) — 反映履歴、確認 2026-11-27。
-- [業種別ホームの空表示権限ガードとGoogle営業時間の入力ガード](release-log/unreleased/PR-kenta-later-gemini79-1127.md) — 反映履歴、確認 2026-11-27。
-- [対応マーク基本設定とスタイル選択ボタンの無効ガード修正](release-log/unreleased/PR-kenta-later-gemini80-1127.md) — 反映履歴、確認 2026-11-27。
-- [リッチメニュー見本プレビュー寸法整合とGoogle営業予定カレンダーの無効ガード](release-log/unreleased/PR-kenta-later-gemini82-1127.md) — 反映履歴、確認 2026-11-27。
-- [友だち情報欄の並び替え保護とテンプレート吹き出し表示の修正](release-log/unreleased/PR-kenta-later-gemini83-1127.md) — 反映履歴、確認 2026-11-27。
-- [コラム配信見本とスタイル選択デモの安全表示の修正](release-log/unreleased/PR-kenta-later-gemini84-1127.md) — 反映履歴、確認 2026-11-27。
-- [デリバリー一括設定の送信中保護とウェビナー通知要約の安全表示](release-log/unreleased/PR-kenta-later-gemini85-1127.md) — 反映履歴、確認 2026-11-27。
-- [リマインダ人数・時刻表示と在庫担当者・卓番号表記の修正](release-log/unreleased/PR-kenta-later-gemini87-1127.md) — 反映履歴、確認 2026-11-27。
-- [お知らせ公開日時の実在検査とカルーセル順チップの安全表示](release-log/unreleased/PR-kenta-later-gemini88-1127.md) — 反映履歴、確認 2026-11-27。
-- [コラム下書き日時検査と来店フォロー時刻表記の安全化](release-log/unreleased/PR-kenta-later-gemini89-1127.md) — 反映履歴、確認 2026-11-28。
-- [保存した検索と共通情報の読み込みを直した反映履歴](release-log/unreleased/PR-kenta-later-codex51.md) — 反映履歴、確認 2026-11-27。
-- [保存した検索の読み込み失敗と再読み込みの案内](release-log/unreleased/PR-kenta-inbox-saved-views-failure.md) — 反映履歴、確認 2026-11-27。
-- [記録の JSON 表示を直した反映履歴](release-log/unreleased/PR-kenta-later-codex46.md) — 反映履歴、確認 2026-11-27。
-- [長い記録の表示を直した反映履歴](release-log/unreleased/PR-kenta-log-record-long.md) — 反映履歴、確認 2026-11-27。
-- [一覧の列幅を整える処理の高速化](release-log/unreleased/PR-kenta-list-column-sizing-speed.md) — 反映履歴、確認 2026-11-27。
-- [リマインダ基準オフセットとサポート先月比較表記の安全化](release-log/unreleased/PR-kenta-later-gemini91-1127.md) — 反映履歴、確認 2026-11-28。
-- [テンプレートの質問・カルーセルの表示修正](release-log/unreleased/PR-kenta-later-cx3-01-1128.md) — 反映履歴、確認 2026-11-28。
+- [列車11の画面と記録の修正](release-log/unreleased/PR-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
