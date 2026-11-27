@@ -379,3 +379,17 @@ it('新規の有効な入力でもread代理へ切り替えたらcreate0、write
   await save()
   expect(net.createDraft).toHaveBeenCalledTimes(1)
 })
+
+it('保存結果に版番号がないときは成功と見せず、入力と以前の版を保つ', async () => {
+  await mount('basic')
+  const field = screen.getByRole('textbox', { name: 'ルール名' }) as HTMLInputElement
+  fireEvent.change(field, { target: { value: '残しておく名前' } })
+  net.saveDraft.mockResolvedValueOnce({ success: true, data: {} })
+  await save()
+  expect(screen.getByText(/保存結果を確認できません/)).toBeTruthy()
+  expect(field.value).toBe('残しておく名前')
+  expect(net.publishDraft).not.toHaveBeenCalled()
+  await save()
+  expect(net.saveDraft.mock.calls.map(call => call[1].expectedVersion)).toEqual([1, 1])
+})
+

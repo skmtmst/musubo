@@ -63,6 +63,7 @@ export async function saveWizardDraft({ autoReplyId, buildInput, createKeyRef, f
           expectedVersion: versionNumber,
         })
         if (!res.success) throw new Error(res.error || 'save failed')
+        if (!Number.isSafeInteger(res.data?.versionNumber) || res.data.versionNumber < 1) throw new Error('保存結果を確認できません。画面を読み直してください。')
         savedVersionRef.current = res.data.versionNumber
         setVersionNumber(res.data.versionNumber)
       } else {
