@@ -20,8 +20,13 @@ export type RichMenuActionAll = RichMenuAction | 'duplicate'
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
 export function richMenuErrorAll(error: unknown, action: RichMenuActionAll): string {
   if (action === 'duplicate') {
-    if (error instanceof ApiError && error.status === 409) {
-      return '複製がほかの操作と重なりました。一覧を読み直してから、もう一度お試しください。'
+    if (error instanceof ApiError) {
+      if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
+      if (error.status === 404) return '対象のリッチメニューが見つかりません。一覧を読み直してください。'
+      if (error.status === 409) {
+        return '複製がほかの操作と重なりました。一覧を読み直してから、もう一度お試しください。'
+      }
+      if (error.status === 429) return 'LINEへの操作が混み合っています。少し待ってから、もう一度お試しください。'
     }
     return 'リッチメニューを複製できませんでした。もう一度お試しください。'
   }
