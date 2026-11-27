@@ -51,6 +51,11 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
     setBusy(true)
     setError('')
     setData(null)
+    if (capacity.trim() !== '' && (!Number.isSafeInteger(Number(capacity)) || Number(capacity) < 1)) {
+      setError('定員は1以上の整数で入力してください。')
+      setBusy(false)
+      return
+    }
     try {
       const result = await eventsApi.applicationPreview(accountId, {
         ...draft,
@@ -90,7 +95,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
               : data.venueName}</p> : null}
             {data.venueAddress ? <p>{data.venueAddress}</p> : null}
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
-            <p>残り {data.capacity} 席</p>
+            <p>{capacity.trim() === '' ? '定員なし' : `残り ${data.capacity} 席`}</p>
             {data.questions.map((question) => (
               <Field key={question.id} label={question.label} required={question.required}><TextField disabled aria-label={question.label} /></Field>
             ))}
