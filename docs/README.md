@@ -1,22 +1,7 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
-- [登録メディアと緊急停止の反映履歴](release-log/unreleased/PR-kenta-later-codex61.md)（説明・2026-11-27確認）
-- [Google投稿の画像形式の反映履歴](release-log/unreleased/PR-kenta-google-post-mime.md)（説明・2026-11-27確認）
-- [フォームの見本の反映履歴](release-log/unreleased/PR-kenta-later-codex62.md)（説明・2026-11-27確認）
-- [素材のプレビューと一括削除の反映履歴](release-log/unreleased/PR-kenta-later-codex63.md)（説明・2026-11-27確認）
-- [シナリオ下書きの読み込みの反映履歴](release-log/unreleased/PR-kenta-scenario-draft-load.md)（説明・2026-11-27確認）
-- [素材の削除時の再確認の反映履歴](release-log/unreleased/PR-kenta-media-delete-reread.md)（説明・2026-11-27確認）
-- [素材の一覧と削除確認の反映履歴](release-log/unreleased/PR-kenta-later-codex64.md)（説明・2026-11-27確認）
-- [素材の削除確認と会話内検索の反映履歴](release-log/unreleased/PR-kenta-later-codex65.md)（説明・2026-11-27確認）
-- [UID移行の読み込みの反映履歴](release-log/unreleased/PR-kenta-later-codex66.md)（説明・2026-11-27確認）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
-- [友だち追加の条件と自動化の下書きの反映履歴](release-log/unreleased/PR-kenta-later-codex55.md)（説明・2026-11-27確認）
-- [自動応答の保存結果の反映履歴](release-log/unreleased/PR-kenta-later-codex56.md)（説明・2026-11-27確認）
-- [来店の印の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex57.md)（説明・2026-11-27確認）
-- [友だち詳細の履歴と回答の反映履歴](release-log/unreleased/PR-kenta-later-codex58.md)（説明・2026-11-27確認）
-- [初期セットの配布確認の反映履歴](release-log/unreleased/PR-kenta-later-codex59.md)（説明・2026-11-27確認）
 
-- [初期セット配布中の操作の反映履歴](release-log/unreleased/PR-kenta-starter-distribute-state.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
@@ -36,15 +21,6 @@
 - [EC連携の未対応の出来事の反映履歴](release-log/unreleased/259-kenta-ec-unknown-event.md)（説明・2026-11-27確認）
 - [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
-- [来店スタンプQRと営業時間文章入力の修正履歴](release-log/unreleased/PR-kenta-later-gemini60-1127.md)（説明・2026-11-27確認）
-- [開店準備完了ダイアログと予約回答フォーム編集の修正履歴](release-log/unreleased/PR-kenta-later-gemini61-1127.md)（説明・2026-11-27確認）
-- [リッチメニュー画像保存と閲覧用資産一覧の修正履歴](release-log/unreleased/PR-kenta-later-gemini62-1127.md)（説明・2026-11-27確認）
-- [操作見本のスタイル切替と監査ログ件数取得の修正履歴](release-log/unreleased/PR-kenta-later-gemini63-1127.md)（説明・2026-11-27確認）
-- [吹き出し編集枠とリマインダ基本設定の修正履歴](release-log/unreleased/PR-kenta-later-gemini64-1127.md)（説明・2026-11-27確認）
-- [台帳の盤の操作メニューとスタイル体験自動再生の修正履歴](release-log/unreleased/PR-kenta-later-gemini65-1127.md)（説明・2026-11-27確認）
-- [カルーセル保存とウェビナー基本設定フォームの修正履歴](release-log/unreleased/PR-kenta-later-gemini66-1127.md)（説明・2026-11-27確認）
-- [シナリオ移動ダイアログとテンプレート保存処理の修正履歴](release-log/unreleased/PR-kenta-later-gemini67-1127.md)（説明・2026-11-27確認）
-- [営業時間確認画面とリッチメニュー画像枠の修正履歴](release-log/unreleased/PR-kenta-later-gemini68-1127.md)（説明・2026-11-27確認）
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
@@ -1460,45 +1436,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
-- [受信箱の AI 要約と返信案を直した反映履歴](release-log/unreleased/PR-kenta-later-codex48.md) — 反映履歴、確認 2026-11-27。
-- [運営の二段階認証設定とテンプレート詳細パネルの読み込み失敗時の案内・再読み込み修正](release-log/unreleased/PR-kenta-later-gemini37-1127.md) — 反映履歴、確認 2026-11-27。
-- [友だち詳細のフォーム回答表示を直した反映履歴](release-log/unreleased/PR-kenta-later-codex49.md) — 反映履歴、確認 2026-11-27。
-- [受信箱の画像添付を直した反映履歴](release-log/unreleased/PR-kenta-later-codex50.md) — 反映履歴、確認 2026-11-27。
-- [PC 受信箱の画像読み込み中の送信を直した反映履歴](release-log/unreleased/PR-kenta-inbox-pc-image-send.md) — 反映履歴、確認 2026-11-27。
-- [保存した検索と共通情報の読み込みを直した反映履歴](release-log/unreleased/PR-kenta-later-codex51.md) — 反映履歴、確認 2026-11-27。
-- [予約メニューの版の履歴と初期設定の状態表示の修正](release-log/unreleased/PR-kenta-later-codex52.md) — 反映履歴、確認 2026-11-27。
-- [運営お知らせ作成の読み込み失敗復帰と未知プラン名表示](release-log/unreleased/PR-kenta-later-gemini38b-1127.md) — 反映履歴、確認 2026-11-27。
-- [イベントの申込ページの見本の表示を修正](release-log/unreleased/PR-kenta-later-codex53.md) — 反映履歴、確認 2026-11-27。
-- [API接続の鍵発行とWebhook送り先作成のアカウント切替時ガード修正](release-log/unreleased/PR-kenta-later-gemini40-1127.md) — 反映履歴、確認 2026-11-27。
-- [イベントの申込ページの見本の定員表示を修正](release-log/unreleased/PR-kenta-event-preview-capacity.md) — 反映履歴、確認 2026-11-27。
-- [ウェビナーCTA編集の切替ガードとリマインダ新規作成のアカウント切替保護](release-log/unreleased/PR-kenta-later-gemini41-1127.md) — 反映履歴、確認 2026-11-27。
-- [シナリオ詳細の設定保存・開始停止・複製削除の切替時ガード修正](release-log/unreleased/PR-kenta-later-gemini42-1127.md) — 反映履歴、確認 2026-11-27。
-- [シナリオ通の並べ替え保護とペット編集の保存中切替ガード](release-log/unreleased/PR-kenta-scenario-step-reorder-1127.md) — 反映履歴、確認 2026-11-27。
-- [自動化の見込み人数と次の配信の表示を修正](release-log/unreleased/PR-kenta-later-codex54.md) — 反映履歴、確認 2026-11-27。
-- [はじめの質問と機能設定の保存まわりを修正](release-log/unreleased/PR-kenta-later-gemini43-1127.md) — 反映履歴、確認 2026-11-27。
-- [Googleビジネス営業時間とマニュアル対応表の保存まわりを修正](release-log/unreleased/PR-kenta-later-gemini44-1127.md) — 反映履歴、確認 2026-11-27。
-- [統合ユーザー一覧とリッチメニュー公開予約の通信まわりを修正](release-log/unreleased/PR-kenta-later-gemini45-1127.md) — 反映履歴、確認 2026-11-27。
-- [開店準備ガイドと統括リッチメニュー下書きの切替まわりを修正](release-log/unreleased/PR-kenta-later-gemini46-1127.md) — 反映履歴、確認 2026-11-27。
-- [既存リッチメニュー選択と投稿画像の切り取り確認窓を修正](release-log/unreleased/PR-kenta-later-gemini47-1127.md) — 反映履歴、確認 2026-11-27。
-- [飲食メニューの再開ガードとリッチメニュー公開時のエラー案内を修正](release-log/unreleased/PR-kenta-later-gemini48-1127.md) — 反映履歴、確認 2026-11-27。
-- [外部リッチメニュー取り込みの読み込み中・未読取ガードと業種デモ動画の切替リセット](release-log/unreleased/PR-kenta-later-gemini49-1127.md) — 反映履歴、確認 2026-11-27。
-- [LINE来店フォローの時期数値・単位追従と運営招待の重複応答・二重送信ガード](release-log/unreleased/PR-kenta-later-gemini50-1127.md) — 反映履歴、確認 2026-11-27。
-- [見本リッチメニューの未選択時読み込み停止と運営ログインの二重送信ガード](release-log/unreleased/PR-kenta-later-gemini51-1127.md) — 反映履歴、確認 2026-11-27。
-- [飲食の座席表読み込みの店舗切替分離とコース写真調整のガード](release-log/unreleased/PR-kenta-later-gemini52-1127.md) — 反映履歴、確認 2026-11-27。
-- [ウェビナーテスト受信者の応答検証と飲食の店の組一覧の切替分離](release-log/unreleased/PR-kenta-later-gemini53-1127.md) — 反映履歴、確認 2026-11-27。
-- [カルーセル画像の切替分離とシナリオ配信対象保存の失敗表示](release-log/unreleased/PR-kenta-later-gemini54-1127.md) — 反映履歴、確認 2026-11-27。
-- [クーポン編集の未選択・失敗・未検出出し分けと本文差し込み欄の入力ガード](release-log/unreleased/PR-kenta-later-gemini55-1127.md) — 反映履歴、確認 2026-11-27。
-- [席数配分の空入力・理由表示と特別営業日編集の範囲・無効制御の修正](release-log/unreleased/PR-kenta-later-gemini56-1127.md) — 反映履歴、確認 2026-11-27。
-- [シナリオステップ編集の順序入力・保存中キャンセル制御と自動配席設定の応答検証・競合防止](release-log/unreleased/PR-kenta-later-gemini57-1127.md) — 反映履歴、確認 2026-11-27。
-- [予約メール取り込みアドレス欄の競合・再読み込み修正とLINEフォローのテンプレート選択のアカウント切替修正](release-log/unreleased/PR-kenta-later-gemini58-1127.md) — 反映履歴、確認 2026-11-27。
-- [タグフォルダ作成の連打・未選択制御とウェビナー基本設定の保存・テスト送信制御の修正](release-log/unreleased/PR-kenta-later-gemini59-1127.md) — 反映履歴、確認 2026-11-27。
-- [業種ダッシュボード一覧の空き表示・行き先ボタンと LINE来店フォロー編集の修正](release-log/unreleased/PR-kenta-later-gemini69-1127.md) — 反映履歴、確認 2026-11-27。
-- [LINE来店フォローの単位切り替え時の小数表示を修正](release-log/unreleased/PR-kenta-timing-fields-unit-1127.md) — 反映履歴、確認 2026-11-27。
-- [サービス別営業時間確認の欠損表示とリッチメニューのタブ数制御の修正](release-log/unreleased/PR-kenta-later-gemini70-1127.md) — 反映履歴、確認 2026-11-27。
-- [営業時間変更案の重複日付制御と見本リッチメニューの画像・座標ガード](release-log/unreleased/PR-kenta-later-gemini71-1127.md) — 反映履歴、確認 2026-11-27。
-- [リッチメニューボタン設定の面番号・ID制御とシナリオ削除確認のガード](release-log/unreleased/PR-kenta-later-gemini72-1127.md) — 反映履歴、確認 2026-11-27。
-- [テンプレート削除ダイアログの確定・キャンセルガード](release-log/unreleased/PR-kenta-later-gemini73-1127.md) — 反映履歴、確認 2026-11-27。
-- [在庫自動停止履歴の表示補正とリッチメニュー形設定のガード追加](release-log/unreleased/PR-kenta-later-gemini74-1127.md) — 反映履歴、確認 2026-11-27。
-- [リマインダ配信予定の操作ガード・失敗表示とリッチメニュー削除不可窓の処理中ガード](release-log/unreleased/PR-kenta-later-gemini75-1127.md) — 反映履歴、確認 2026-11-27。
-- [リマインダ確認窓の処理中ガードと予約台帳一覧の行操作・ツールバー操作ガード](release-log/unreleased/PR-kenta-later-gemini76-1127.md) — 反映履歴、確認 2026-11-27。
-- [座席・卓一覧の行操作ガードとリマインダ作成フッターの処理中ガード](release-log/unreleased/PR-kenta-later-gemini77-1127.md) — 反映履歴、確認 2026-11-27。
+- [列車10の画面の修正](release-log/unreleased/PR-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
