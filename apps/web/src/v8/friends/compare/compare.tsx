@@ -82,9 +82,19 @@ function CompareInner() {
   }, [review.state, review.selectedId, first?.id, wantedId])
 
   const detail = review.detail as IdentityCandidateWithProfiles | null
-  const profileCandidates = useMemo(() => (detail && 'profileCandidates' in detail ? detail.profileCandidates : []), [detail])
-  const tagCandidates = detail && 'tagCandidates' in detail ? detail.tagCandidates : []
-  const decisive = detail?.evidence.find((item) => item.strength === 'strong') ?? detail?.evidence[0]
+  const profileCandidates = useMemo(
+    () => (detail && 'profileCandidates' in detail && Array.isArray(detail.profileCandidates) ? detail.profileCandidates : []),
+    [detail],
+  )
+  const tagCandidates = detail && 'tagCandidates' in detail && Array.isArray(detail.tagCandidates) ? detail.tagCandidates : []
+  const evidenceList = detail && Array.isArray(detail.evidence) ? detail.evidence : []
+  const impactList = detail && Array.isArray(detail.impact) ? detail.impact : []
+  const historyList = detail && Array.isArray(detail.history) ? detail.history : []
+  const decisive = evidenceList.find((item) => item.strength === 'strong') ?? evidenceList[0]
+
+  const fieldOptions = (field: typeof profileCandidates[number]) => (Array.isArray(field.options) ? field.options : [])
+  const subjectAttributes = (subject: IdentityCandidateWithProfiles['left'] | undefined) => (subject && Array.isArray(subject.attributes) ? subject.attributes : [])
+  const tagSourceIds = (tag: typeof tagCandidates[number]) => (Array.isArray(tag.sourceFriendIds) ? tag.sourceFriendIds : [])
 
   /* ── 判定の小窓 ── */
   const [differencesOnly, setDifferencesOnly] = useState(true)
@@ -102,18 +112,24 @@ function CompareInner() {
     setPanelOpen(false)
     setReason('')
     setConsents([false, false, false])
-    setSelections(Object.fromEntries(profileCandidates.flatMap((field) => (field.options[0] ? [[field.fieldKey, field.options[0].sourceFriendId]] : []))))
+    setSelections(Object.fromEntries(profileCandidates.flatMap((field) => {
+      const firstOption = fieldOptions(field)[0]
+      return firstOption ? [[field.fieldKey, firstOption.sourceFriendId]] : []
+    })))
   }, [detail?.id, profileCandidates])
 
   const openPanel = (next: IdentityCandidateDecision) => {
-    if (!canManage || lockedReason) return
+    if (!canManage || lockedReason || !detail?.canDecide || review.deciding) return
     setDecision(next)
     setPanelOpen(true)
     requestAnimationFrame(() => panelRef.current?.scrollIntoView({ block: 'center', behavior: scrollMotion() }))
   }
 
   const linkedReady = decision !== 'linked' || (
-    profileCandidates.every((field) => Boolean(selections[field.fieldKey])) && consents.every(Boolean)
+    profileCandidates.every((field) => {
+      const chosen = selections[field.fieldKey]
+      return Boolean(chosen) && fieldOptions(field).some((option) => option.sourceFriendId === chosen)
+    }) && consents.every(Boolean)
   )
   const ready = canManage && !lockedReason && Boolean(detail) && canSubmitDecision({ canDecide: detail?.canDecide ?? false, reason, busy: review.deciding }) && linkedReady
 
@@ -135,18 +151,18 @@ function CompareInner() {
   const sourceLabels = comparisonSourceLabels(detail ? [detail.left, detail.right].map((subject) => ({ id: subject.id, name: subject.label, source: subject.lineAccountName })) : [])
   const sourceName = (friendId: string | undefined, fallback = '') => friendId ? sourceLabels[friendId] || fallback : fallback
   const sameField = (field: typeof profileCandidates[number]) => sameKnownValues([
-    field.options.find((option) => option.sourceFriendId === detail?.left.id)?.valuePreview,
-    field.options.find((option) => option.sourceFriendId === detail?.right.id)?.valuePreview,
+    fieldOptions(field).find((option) => option.sourceFriendId === detail?.left.id)?.valuePreview,
+    fieldOptions(field).find((option) => option.sourceFriendId === detail?.right.id)?.valuePreview,
   ])
   const visibleProfileCandidates = profileCandidates.filter((field) => !differencesOnly || !sameField(field))
-  const showTags = tagCandidates.length > 0 && (!differencesOnly || tagCandidates.some((tag) => tag.sourceFriendIds.includes(detail?.left.id ?? '') !== tag.sourceFriendIds.includes(detail?.right.id ?? '')))
+  const showTags = tagCandidates.length > 0 && (!differencesOnly || tagCandidates.some((tag) => tagSourceIds(tag).includes(detail?.left.id ?? '') !== tagSourceIds(tag).includes(detail?.right.id ?? '')))
   const sameAttribute = (label: string) => {
-    const left = detail?.left.attributes.find((item) => item.label === label)
-    const right = detail?.right.attributes.find((item) => item.label === label)
+    const left = subjectAttributes(detail?.left).find((item) => item.label === label)
+    const right = subjectAttributes(detail?.right).find((item) => item.label === label)
     return left?.verified === right?.verified && sameKnownValues([left?.valuePreview, right?.valuePreview])
   }
   const firstSelection = profileCandidates[0]
-  const firstChosen = firstSelection?.options.find((option) => option.sourceFriendId === selections[firstSelection.fieldKey])
+  const firstChosen = firstSelection ? fieldOptions(firstSelection).find((option) => option.sourceFriendId === selections[firstSelection.fieldKey]) : undefined
   const selectionSummary = firstChosen
     ? `採用する値：表で選んだ値（${sourceName(firstChosen.sourceFriendId, firstChosen.sourceLabel)}：${firstChosen.valuePreview ?? emptyValue('unconfigured')}${profileCandidates.length > 1 ? ' ほか' : ''}）`
     : '採用する値：表で選んだ値'
@@ -186,7 +202,7 @@ function CompareInner() {
                   <p className={styles.subjectName}>{subject.label}</p>
                   <p className={styles.subjectSub}>{[subject.detail, subject.lineAccountName].filter(Boolean).join('・') || emptyValue('unknown')}</p>
                   <dl className={styles.attrs}>
-                    {subject.attributes.filter((attribute) => !differencesOnly || !sameAttribute(attribute.label)).map((attribute) => (
+                    {subjectAttributes(subject).filter((attribute) => !differencesOnly || !sameAttribute(attribute.label)).map((attribute) => (
                       <div key={attribute.label} className={styles.attr}>
                         <dt>{lookupWord(ATTRIBUTE_WORD, attribute.label, attribute.label)}</dt>
                         <dd className={styles.mono}>{attribute.valuePreview ?? '—（未取得）'}</dd>
@@ -202,7 +218,7 @@ function CompareInner() {
               <Card layout="vertical" padding="default" gap="normal" aria-labelledby="compare-evidence">
                 <h3 id="compare-evidence" className={styles.cardTitle}>根拠</h3>
                 <ul className={styles.lines}>
-                  {detail.evidence.map((item) => (
+                  {evidenceList.map((item) => (
                     <li key={item.key} className={styles.line}>
                       <span title={item.valuePreview ?? undefined}>{item.label}</span>
                       <span className={item.strength === 'strong' ? styles.strong : styles.weak}>{lookupWord(STRENGTH_WORD, item.strength, '未確認')}</span>
@@ -214,11 +230,15 @@ function CompareInner() {
               <Card layout="vertical" padding="default" gap="normal" aria-labelledby="compare-impact">
                 <h3 id="compare-impact" className={styles.cardTitle}>結び付けたときの影響</h3>
                 <ul className={styles.lines}>
-                  {detail.impact.map((metric) => (
+                  {impactList.map((metric) => (
                     <li key={metric.key} className={styles.line}>
                       <span>{metric.label}</span>
                       <span className={styles.lineValue} title={metric.note ?? undefined}>
-                        {metric.value === null ? '—（つないだあとに出ます）' : `${metric.value}${metric.unit}`}
+                        {metric.value === null
+                          ? '—（つないだあとに出ます）'
+                          : typeof metric.value === 'number' && Number.isFinite(metric.value)
+                            ? `${metric.value}${metric.unit ?? ''}`
+                            : '確認できません'}
                       </span>
                     </li>
                   ))}
@@ -234,7 +254,7 @@ function CompareInner() {
                   <Card key="decision" layout="vertical" padding="default" gap="normal"><div ref={panelRef} className="grid gap-3" role="group" aria-label="この2件の判定"><p id="compare-decide" className={styles.panelTitle}>判定</p>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
-                        <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
+                        <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} disabled={review.deciding} onChange={() => setDecision(item.value)}>
                           {item.label}
                         </Radio></SaveErrorField>
                       ))}
@@ -245,12 +265,12 @@ function CompareInner() {
                         <Select aria-label="過去の扱い" size="full" value="merge" onChange={() => undefined}
                           options={[{ value: 'merge', label: '過去の扱い：これまでの履歴を1人分にまとめる' }]} />
                         {/* 採用する値は表の「使う値」の要約。A・B どちらかにまとめて切り替えることもできる。 */}
-                        <Select aria-label="採用する値" size="full" disabled={!canManage || !detail.canDecide}
+                        <Select aria-label="採用する値" size="full" disabled={!canManage || !detail.canDecide || review.deciding}
                           value="table"
                           onChange={(value) => {
                             if (value !== 'A' && value !== 'B') return
                             const id = value === 'A' ? detail.left.id : detail.right.id
-                            setSelections((current) => ({ ...current, ...Object.fromEntries(profileCandidates.flatMap((field) => field.options.some((option) => option.sourceFriendId === id) ? [[field.fieldKey, id]] : [])) }))
+                            setSelections((current) => ({ ...current, ...Object.fromEntries(profileCandidates.flatMap((field) => fieldOptions(field).some((option) => option.sourceFriendId === id) ? [[field.fieldKey, id]] : [])) }))
                           }}
                           options={[
                             { value: 'table', label: selectionSummary },
@@ -262,6 +282,7 @@ function CompareInner() {
                             <Tr key={label}><Td><SaveErrorField names={["consents"]}><Checkbox
                               key={label}
                               checked={consents[index]}
+                              disabled={review.deciding}
                               onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => (itemIndex === index ? checked : value)))}
                             >
                               {label}
@@ -273,6 +294,7 @@ function CompareInner() {
 <Field label="判定の理由" htmlFor="compare-reason" required><SaveErrorField names={["reason"]}><TextField
                       id="compare-reason"
                       value={reason}
+                      disabled={review.deciding}
                       onChange={(event) => setReason(event.target.value)}
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
                     /></SaveErrorField></Field>
@@ -284,7 +306,7 @@ function CompareInner() {
                   <Card key="history" layout="vertical" padding="default" gap="normal">
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>
-                      {detail.history.map((item) => (
+                      {historyList.map((item) => (
                         <li key={item.id} className={styles.historyLine}>
                           <span>{slashDateTime(item.decidedAt)}</span>
                           <span>{`${candidateStatusWord(item.toStatus)}・${item.actorName}「${item.reason}」`}</span>
@@ -316,8 +338,9 @@ function CompareInner() {
                 </thead>
                 <tbody>
                   {visibleProfileCandidates.map((field) => {
-                    const left = field.options.find((option) => option.sourceFriendId === detail.left.id)
-                    const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
+                    const options = fieldOptions(field)
+                    const left = options.find((option) => option.sourceFriendId === detail.left.id)
+                    const right = options.find((option) => option.sourceFriendId === detail.right.id)
                     return (
                       <Tr key={field.fieldKey} className={styles.row}>
                         <Td><TruncatedText className={styles.itemName} value={field.fieldLabel === 'メールアドレス' ? 'メール' : field.fieldLabel} /></Td>
@@ -328,9 +351,9 @@ function CompareInner() {
                             aria-label={`${field.fieldLabel}に使う値`}
                             size="full"
                             value={selections[field.fieldKey] ?? ''}
-                            disabled={!canManage || !detail.canDecide}
+                            disabled={!canManage || !detail.canDecide || review.deciding}
                             onChange={(value) => setSelections((current) => ({ ...current, [field.fieldKey]: value }))}
-                            options={field.options.map((option) => ({
+                            options={options.map((option) => ({
                               value: option.sourceFriendId,
                               label: `${sourceName(option.sourceFriendId, option.sourceLabel)}：${option.valuePreview ?? emptyValue('unconfigured')}`,
                             }))}
@@ -343,8 +366,8 @@ function CompareInner() {
                   {showTags ? (
                     <Tr className={styles.rowPlain}>
                       <Td><span className={styles.itemName}>タグ</span></Td>
-                      <Td>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
-                      <Td>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
+                      <Td>{tagCandidates.filter((tag) => tagSourceIds(tag).includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
+                      <Td>{tagCandidates.filter((tag) => tagSourceIds(tag).includes(detail.right.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
                       <Td><span className={styles.faint}>元の友だちに残す</span></Td>
                     </Tr>
                   ) : null}
