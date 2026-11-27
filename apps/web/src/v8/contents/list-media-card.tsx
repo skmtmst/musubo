@@ -85,7 +85,7 @@ export function MediaCardV8({
 }: MediaCardV8Props) {
   const selectTitle = item.archivedAt
     ? '退避済みは削除できません。一覧へ戻してから削除してください'
-    : item.usageCount == null
+    : typeof item.usageCount !== 'number' || !Number.isInteger(item.usageCount) || item.usageCount < 0
       ? '使用先を確認できないため選べません'
       : item.usageCount > 0
         ? '使用先から外すまで削除できません'
@@ -167,8 +167,8 @@ export function MediaCardV8({
               onChange={(e) => onRenameChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
-                if (e.key === 'Enter') onRenameConfirm()
-                if (e.key === 'Escape') onRenameCancel()
+                if (e.key === 'Enter' && !renamingBusy && !renameConflict) onRenameConfirm()
+                if (e.key === 'Escape' && !renamingBusy) onRenameCancel()
               }}
               aria-label="ファイル名"
               className={styles.renameInput}
