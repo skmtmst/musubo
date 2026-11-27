@@ -65,6 +65,25 @@ export function ScheduleStageV8({
   const rangeCount = range === '7d' ? preview?.summary.next7Days ?? null : range === '30d' ? preview?.summary.next30Days ?? null : preview ? preview.summary.duplicateCount : null
   const nextItem = items.find((item) => item.state === 'scheduled') ?? null
   const messagesHref = `/reminders/edit?id=${encodeURIComponent(reminderId)}`
+  const canProceed = !busy && settings.steps.length > 0
+  const handleCancel = () => {
+    if (busy) return
+    return onCancel()
+  }
+  const handleSaveDraft = () => {
+    if (busy) return
+    return onSaveDraft()
+  }
+  const handleNext = () => {
+    if (!canProceed) return
+    return onNext()
+  }
+  const handleRetryPreview = onRetryPreview
+    ? () => {
+        if (busy) return
+        return onRetryPreview()
+      }
+    : undefined
 
   return (
     <CreatePage
@@ -92,14 +111,14 @@ export function ScheduleStageV8({
       )}
       footerActions={(
         <WizardFooterV8
-          onCancel={onCancel}
+          onCancel={handleCancel}
           cancelDisabled={busy}
-          onDraft={onSaveDraft}
+          onDraft={handleSaveDraft}
           draftBusy={busy}
           nextLabel="次へ：確認"
           nextIcon={<ArrowRight size={16} aria-hidden="true" />}
-          onNext={onNext}
-          nextDisabled={busy || settings.steps.length === 0}
+          onNext={handleNext}
+          nextDisabled={!canProceed}
         />
       )} dirty={false}
     >
@@ -128,7 +147,22 @@ export function ScheduleStageV8({
         {settings.steps.length === 0 ? (
           <ListState kind="empty" title="送る通知がまだありません" description="通知の中身（手順3）で本文を作成してから、配信予定を確認してください。" action={<Button href={messagesHref}>通知の中身へ</Button>} />
         ) : previewFailed ? (
-          <ListState kind="error" title="配信予定を確認できませんでした" description="通信または権限を確認して、もう一度お試しください。" onRetry={onRetryPreview} />
+          handleRetryPreview ? (
+            <ListState
+              kind="error"
+              title="配信予定を確認できませんでした"
+              description="通信または権限を確認して、もう一度お試しください。"
+              onRetry={handleRetryPreview}
+              retrying={busy}
+            />
+          ) : (
+            <ListState
+              kind="error"
+              title="配信予定を確認できませんでした"
+              description="通信または権限を確認し、ページを読み直してください。"
+              action={<Button href={messagesHref}>通知の中身へ</Button>}
+            />
+          )
         ) : !preview ? (
           <ListState kind="loading" title="配信予定を確認しています" />
         ) : rows.length === 0 ? (
