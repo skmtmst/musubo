@@ -1425,3 +1425,4 @@
 - [共通情報の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex31.md)
 - [認証と初期セットの操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex32.md)
 - [自動化と予約枠の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex33.md)
+- [LINE通知の運用者へのお知らせ失敗・切替対策と広告とのつなぎの読み込み中表示](release-log/unreleased/PR-kenta-later-gemini24-1127.md) — 反映履歴、確認 2026-11-27。
