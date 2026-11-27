@@ -34,7 +34,8 @@ export default function InitialMenuPage() {
  }
  const mountedRef=useRef(true)
  useEffect(()=>{mountedRef.current=true;return ()=>{mountedRef.current=false;scopeRef.current={...scopeRef.current,generation:scopeRef.current.generation+1}}},[])
- useEffect(()=>{busyRef.current=false;setBusy(false);setChoice({value:'simple'});setDirty(false);setError(null)},[selectedAccountId])
+ useEffect(()=>{busyRef.current=false;setBusy(false)},[selectedAccountId,allowed])
+ useEffect(()=>{setChoice({value:'simple'});setDirty(false);setError(null)},[selectedAccountId])
  useEffect(()=>{if(useRestaurantGuide)router.replace('/?guide=richMenu')},[router,useRestaurantGuide])
  const save=async()=>{
   if(!allowed||!selectedAccountId||!profile.data?.styleSelected||profile.stale||busy||busyRef.current)return

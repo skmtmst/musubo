@@ -94,6 +94,65 @@ describe('InitialMenuPage 保存中のアカウント切替・二重送信・不
     await waitFor(() => expect(fx.save).toHaveBeenCalledWith('acc-b', expect.anything()))
   })
 
+  it('保存中に権限が閲覧へ変わり古い応答が遅れて返ったあと管理へ戻っても、保存ボタンが押せる状態に戻る', async () => {
+    const firstStarter = deferred<unknown>()
+    fx.starterSet.mockReturnValueOnce(firstStarter.promise)
+
+    const view = render(<InitialMenuPage />)
+    const submitBtn = screen.getByRole('button', { name: 'このメニューで進む' }) as HTMLButtonElement
+    fireEvent.click(submitBtn)
+    expect(fx.starterSet).toHaveBeenCalledTimes(1)
+    expect(submitBtn.disabled).toBe(true)
+
+    // 同じアカウントのまま閲覧のみへ切り替わる
+    fx.role = 'viewer'
+    view.rerender(<InitialMenuPage />)
+
+    // 古い保存処理が遅れて完了・失敗しても遷移やエラーを出さない
+    await act(async () => {
+      firstStarter.resolve({ success: true, data: { definition: { items: [{ kind: 'rich_menu', key: 'rm-1' }] } } })
+      await Promise.resolve()
+    })
+    expect(fx.save).not.toHaveBeenCalled()
+    expect(fx.push).not.toHaveBeenCalled()
+    expect(screen.queryByText(/保存/)).toBeNull()
+
+    // 権限が管理へ戻ると、処理中のまま固まらず再度保存できる
+    fx.role = 'owner'
+    view.rerender(<InitialMenuPage />)
+
+    const submitAgain = screen.getByRole('button', { name: 'このメニューで進む' }) as HTMLButtonElement
+    expect(submitAgain.disabled).toBe(false)
+    fireEvent.click(submitAgain)
+    await waitFor(() => expect(fx.save).toHaveBeenCalledWith('acc-a', expect.anything()))
+    await waitFor(() => expect(fx.push).toHaveBeenCalledWith('/getting-started'))
+  })
+
+  it('保存中に権限が閲覧へ変わり古い保存処理がエラーで返っても、エラー表示せず管理へ戻った時に押せる', async () => {
+    const firstStarter = deferred<unknown>()
+    fx.starterSet.mockReturnValueOnce(firstStarter.promise)
+
+    const view = render(<InitialMenuPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'このメニューで進む' }))
+    expect(fx.starterSet).toHaveBeenCalledTimes(1)
+
+    fx.role = 'viewer'
+    view.rerender(<InitialMenuPage />)
+
+    await act(async () => {
+      firstStarter.reject(new Error('古い通信エラー'))
+      await Promise.resolve()
+    })
+
+    fx.role = 'owner'
+    view.rerender(<InitialMenuPage />)
+
+    expect(screen.queryByText(/古い通信エラー/)).toBeNull()
+    expect(fx.push).not.toHaveBeenCalled()
+    const submitAgain = screen.getByRole('button', { name: 'このメニューで進む' }) as HTMLButtonElement
+    expect(submitAgain.disabled).toBe(false)
+  })
+
   it('starterSet の定義 items が欠損した不正応答でも落ちずにエラー表示する', async () => {
     fx.starterSet.mockResolvedValueOnce({ success: true, data: { definition: null } })
     render(<InitialMenuPage />)
