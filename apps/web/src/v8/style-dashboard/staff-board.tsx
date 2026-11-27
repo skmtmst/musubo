@@ -1,7 +1,7 @@
 'use client'
 import { CalendarSlotButton, useCalendarTimeScale } from '@/components/shared/calendar-parts'
 import { CircleHelp, Plus, Star } from 'lucide-react'
-import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { BookingBlock } from '@/components/shared/booking-controls'
@@ -38,8 +38,11 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
   const count = board.columns.length
   const [openId, setOpenId] = useState<string | null>(null)
   const anchor = useRef<HTMLButtonElement | null>(null)
-  const opened = board.entries.find((e) => e.id === openId) ?? null
   const shown = board.entries.filter((e) => !search || e.name.includes(search) || e.menu.includes(search))
+  const opened = shown.find((e) => e.id === openId && e.state !== 'off' && board.columns.some((c) => c.id === e.columnId)) ?? null
+  useEffect(() => {
+    if (openId && !opened) setOpenId(null)
+  }, [openId, opened])
   const timeScale = useCalendarTimeScale(shown, [], false, 'board')
   return (
     <section ref={timeScale} className={styles.board} aria-label="台帳の盤">
