@@ -1454,3 +1454,4 @@
 - [デリバリー一括設定の送信中保護とウェビナー通知要約の安全表示](release-log/unreleased/PR-kenta-later-gemini85-1127.md) — 反映履歴、確認 2026-11-27。
 - [リマインダ人数・時刻表示と在庫担当者・卓番号表記の修正](release-log/unreleased/PR-kenta-later-gemini87-1127.md) — 反映履歴、確認 2026-11-27。
 - [お知らせ公開日時の実在検査とカルーセル順チップの安全表示](release-log/unreleased/PR-kenta-later-gemini88-1127.md) — 反映履歴、確認 2026-11-27。
+- [コラム下書き日時検査と来店フォロー時刻表記の安全化](release-log/unreleased/PR-kenta-later-gemini89-1127.md) — 反映履歴、確認 2026-11-28。
