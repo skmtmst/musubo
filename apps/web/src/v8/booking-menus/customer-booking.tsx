@@ -124,14 +124,12 @@ export function useMenuCustomerBooking(canManage: boolean) {
   }, [])
   const recurringChanged = values.recurring !== null && !sameRecurring(values.recurring, saved.recurring)
   const addonsChanged = [...values.addonMenuIds].sort().join(',') !== [...saved.addonMenuIds].sort().join(',')
-  const dirty = canManage && (
-    values.addonOnly
-      ? values.addonOnly !== saved.addonOnly
-      : (recurringChanged || addonsChanged || values.maxPartySize !== saved.maxPartySize || values.addonOnly !== saved.addonOnly)
-  )
+  const dirty = canManage && (recurringChanged || addonsChanged || values.maxPartySize !== saved.maxPartySize || values.addonOnly !== saved.addonOnly)
   const error = canManage && !values.addonOnly ? recurringError(values.recurring) : null
   const recurringPayload = (): NonNullable<Gap2MenuWrite['recurring']> | null => {
     if (!recurringChanged || !values.recurring) return null
+    // 追加専用で隠れている繰り返し設定が不正な入力のときは、その項目だけ送らない。
+    if (values.addonOnly && recurringError(values.recurring) !== null) return null
     const validFreqs = uniqueStrings(values.recurring.freqs.filter(isFreq))
     const fallbackFreqs = saved.recurring?.freqs.length ? saved.recurring.freqs : DEFAULT_RECURRING.freqs
     const parsedMaxCount = parseMaxCountText(values.recurring.maxCount)
@@ -146,12 +144,11 @@ export function useMenuCustomerBooking(canManage: boolean) {
   const body = (): Partial<Gap2MenuWrite> => {
     if (!canManage) return {}
     const out: Partial<Gap2MenuWrite> = {}
-    if (values.addonOnly !== saved.addonOnly) out.addonOnly = values.addonOnly
-    if (values.addonOnly) return out
     const nextRecurring = recurringPayload()
     if (nextRecurring) out.recurring = nextRecurring
     if (values.maxPartySize !== saved.maxPartySize) out.maxPartySize = values.maxPartySize as Gap2MenuWrite['maxPartySize']
     if (addonsChanged) out.addonMenuIds = values.addonMenuIds
+    if (values.addonOnly !== saved.addonOnly) out.addonOnly = values.addonOnly
     return out
   }
   return {
@@ -163,19 +160,18 @@ export function useMenuCustomerBooking(canManage: boolean) {
     load,
     /** 保存できたら、いまの入力を保存済みにする（繰り返しが読めない口でも、送った値を覚える）。 */
     markSaved: () => {
-      if (values.addonOnly) {
-        setSaved((prev) => ({ ...prev, addonOnly: true }))
-        return
-      }
+      const omittedInvalidRecurring = values.addonOnly && recurringError(values.recurring) !== null
       const nextRecurring = recurringPayload()
-      const synced: CustomerBookingValues = nextRecurring
-        ? {
-            ...values,
-            recurring: { enabled: nextRecurring.enabled, freqs: nextRecurring.freqs, maxCount: String(nextRecurring.maxCount) },
-          }
-        : values
+      const synced: CustomerBookingValues = {
+        ...values,
+        recurring: omittedInvalidRecurring
+          ? saved.recurring
+          : nextRecurring
+            ? { enabled: nextRecurring.enabled, freqs: nextRecurring.freqs, maxCount: String(nextRecurring.maxCount) }
+            : values.recurring,
+      }
       setSaved(synced)
-      if (nextRecurring) setValues(synced)
+      if (omittedInvalidRecurring || nextRecurring) setValues(synced)
     },
     setRecurring: (patch: Partial<Recurring>) => setValues((current) => {
       const base = current.recurring ?? DEFAULT_RECURRING

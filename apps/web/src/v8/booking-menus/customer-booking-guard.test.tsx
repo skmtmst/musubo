@@ -72,18 +72,37 @@ describe('booking-menus/customer-booking ガード', () => {
     expect(result.current.body()).toEqual({})
   })
 
-  it('追加専用に切り替えたら隠れた繰り返し入力の不備で保存を止めず、addonOnly だけを送る', () => {
-    const { result } = renderHook(() => useMenuCustomerBooking(true))
+  it('人数や有効な設定を変えて追加専用をオンにしても正しい値はすべて送り、隠れた繰り返し入力が不正な時だけその項目を省いて保存できる', () => {
+    const valid = renderHook(() => useMenuCustomerBooking(true))
     act(() => {
-      result.current.setRecurring({ enabled: true, freqs: [], maxCount: '99' })
-      result.current.setMaxPartySize(3)
+      valid.result.current.setMaxPartySize(3)
+      valid.result.current.setAddonOnly(true)
     })
-    expect(result.current.error).not.toBeNull()
+    expect(valid.result.current.dirty).toBe(true)
+    expect(valid.result.current.error).toBeNull()
+    expect(valid.result.current.body()).toEqual({ maxPartySize: 3, addonOnly: true })
     act(() => {
-      result.current.setAddonOnly(true)
+      valid.result.current.markSaved()
     })
-    expect(result.current.error).toBeNull()
-    expect(result.current.body()).toEqual({ addonOnly: true })
+    expect(valid.result.current.dirty).toBe(false)
+
+    const withInvalidRecurring = renderHook(() => useMenuCustomerBooking(true))
+    act(() => {
+      withInvalidRecurring.result.current.setRecurring({ enabled: true, freqs: [], maxCount: '99' })
+      withInvalidRecurring.result.current.setMaxPartySize(3)
+    })
+    expect(withInvalidRecurring.result.current.error).not.toBeNull()
+    act(() => {
+      withInvalidRecurring.result.current.setAddonOnly(true)
+    })
+    expect(withInvalidRecurring.result.current.error).toBeNull()
+    expect(withInvalidRecurring.result.current.dirty).toBe(true)
+    expect(withInvalidRecurring.result.current.body()).toEqual({ maxPartySize: 3, addonOnly: true })
+    act(() => {
+      withInvalidRecurring.result.current.markSaved()
+    })
+    expect(withInvalidRecurring.result.current.dirty).toBe(false)
+    expect(withInvalidRecurring.result.current.body()).toEqual({})
   })
 
   it('非整数・範囲外の保存値や NaN/Infinity を安全に正規化し、候補や表示に壊れた数値を出さない', () => {
