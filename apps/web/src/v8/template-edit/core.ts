@@ -125,7 +125,9 @@ export async function saveTemplateEdit(input: TemplateSaveInput): Promise<Templa
     const res = input.templateId
       ? await api.templates.update(input.templateId, { ...payload, expectedVersion: input.expectedVersion, expectedDraftRevision: input.expectedDraftRevision })
       : await api.templates.create({ accountId: input.selectedAccountId as string, ...payload })
-    return res.success ? { ok: true, id: res.data.id, expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision } : { ok: false, error: res.error }
+    if (!res?.success) return { ok: false, error: res?.error || '保存できませんでした' }
+    if (!res.data?.id) return { ok: false, error: '保存結果を確認できませんでした' }
+    return { ok: true, id: res.data.id, expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
   } catch (e) {
     if (e instanceof ApiError && e.status === 409) return { ok: false, error: describeSaveFailure(e), conflict: true }
     return { ok: false, error: describeSaveFailure(e), fields: readSaveFieldErrors(e) }
@@ -137,12 +139,12 @@ export function templateUsageEntries(usedBy: TemplateUsedBy): Array<{ key: strin
   return [
     ...usedBy.scenarioSteps.map((usage) => ({
       key: `scenario-${usage.stepId}`,
-      href: `/scenarios/detail?id=${usage.scenarioId}`,
+      href: `/scenarios/detail?id=${encodeURIComponent(usage.scenarioId)}`,
       label: `シナリオ「${usage.scenarioName}」${usage.displayOrder ?? usage.stepOrder} 通目`,
     })),
     ...usedBy.autoReplies.map((usage) => ({
       key: `auto-reply-${usage.id}`,
-      href: `/auto-replies/edit?id=${usage.id}`,
+      href: `/auto-replies/edit?id=${encodeURIComponent(usage.id)}`,
       label: `自動応答「${usage.keyword}」の返信`,
     })),
     ...usedBy.automations.map((usage) => ({
@@ -154,22 +156,22 @@ export function templateUsageEntries(usedBy: TemplateUsedBy): Array<{ key: strin
     })),
     ...usedBy.reminderSteps.map((usage) => ({
       key: `reminder-${usage.stepId}`,
-      href: `/reminders/edit?id=${usage.reminderId}`,
+      href: `/reminders/edit?id=${encodeURIComponent(usage.reminderId)}`,
       label: `リマインダ「${usage.reminderName}」`,
     })),
     ...(usedBy.reminderEnrollments ?? []).map((usage) => ({
       key: `reminder-enrollment-${usage.enrollmentId}`,
-      href: `/reminders/detail?id=${usage.reminderId}`,
+      href: `/reminders/detail?id=${encodeURIComponent(usage.reminderId)}`,
       label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
     })),
     ...usedBy.richMenuAreas.map((usage) => ({
       key: `rich-menu-${usage.areaId}`,
-      href: `/rich-menus/edit?id=${usage.groupId}`,
+      href: `/rich-menus/edit?id=${encodeURIComponent(usage.groupId)}`,
       label: `リッチメニュー「${usage.groupName}」${usage.pageName}`,
     })),
     ...usedBy.trackedLinks.map((usage) => ({
       key: `tracked-link-${usage.id}`,
-      href: `/inflow-links/detail?id=${usage.id}`,
+      href: `/inflow-links/detail?id=${encodeURIComponent(usage.id)}`,
       label: `流入リンク「${usage.name}」`,
     })),
   ]
