@@ -1045,6 +1045,7 @@ export default function TemplatesListV8() {
   if (!isTemplateSection && selectedAccountId) {
     return <>{detailGuard.dialog}<AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
       accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates} onScopeGuardChange={setAssetScopeGuard}
+      query={templateQuery} setQuery={setTemplateQuery}
       lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} /></>
   }
 

@@ -1,4 +1,4 @@
-import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
+import { findPickerDialog, pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
  * 分析レポート作成の V8（板 ）と作成時の競合小窓。
@@ -7,7 +7,7 @@ import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/link', () => ({
@@ -226,6 +226,27 @@ describe('V8 レポート作成（H5UoIu）', () => {
     expect(container.textContent).toContain('このまま保存すると宛先から外れます')
     expect(net.puts).toHaveLength(0)
   })
+  it('通知先の選択状態がチェックと行に反映され、再度開いても残る', async () => {
+    await mount()
+    await settle()
+    const open = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: /^レポートを受け取る人/ }))
+      return findPickerDialog()
+    }
+    let dialog = await open()
+    const checkbox = await within(dialog).findByRole('checkbox', { name: '担当1' }) as HTMLInputElement
+    expect(checkbox.checked).toBe(false)
+    const row = checkbox.closest('[class*="multiRow"]')!
+    expect(row.hasAttribute('data-selected')).toBe(false)
+    fireEvent.click(checkbox)
+    expect(checkbox.checked).toBe(true)
+    expect(row.getAttribute('data-selected')).toBe('true')
+    fireEvent.click(within(dialog).getByRole('button', { name: /^(選ぶ|選択する)（1件）$/ }))
+    await waitFor(() => expect(screen.queryAllByRole('dialog')).not.toContain(dialog))
+    dialog = await open()
+    expect((await within(dialog).findByRole('checkbox', { name: '担当1' }) as HTMLInputElement).checked).toBe(true)
+  })
+
   it('宛先が未選択なら理由を伝えて送信せず、選んだ後に同じ操作が使える', async () => {
     await mount()
     await settle()

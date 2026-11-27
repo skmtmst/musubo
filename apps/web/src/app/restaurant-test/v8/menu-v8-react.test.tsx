@@ -118,7 +118,7 @@ describe('MJoJR メニュー管理のV8', () => {
     vi.spyOn(api.media, 'list').mockResolvedValue({ success:true, data:{ items:[{id:'media-test',filename:'架空.png',lineAccountId:'account-1',kind:'image'}], total:1, limit:20, offset:0 } } as never)
     render(<MenuEditV8 />)
     fireEvent.change(await screen.findByLabelText('メニューの説明'), { target: { value: '季節の説明' } })
-    fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' }))
     fireEvent.click(await screen.findByRole('option', { name: /架空.png/ }))
     expect(screen.getByText('選択中の画像名を確認しています')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))

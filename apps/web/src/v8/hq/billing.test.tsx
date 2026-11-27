@@ -152,7 +152,7 @@ describe('V8 統括の請求：いまのプランと変えるボタン', () => {
     expect(buttonsIn(current)).toEqual([{ text: 'いまのプラン', disabled: true }])
     for (const name of ['ライト', 'プロ']) {
       expect(card(name).textContent).not.toContain('利用中')
-      expect(buttonsIn(card(name))).toEqual([{ text: 'このプランに変える', disabled: false }])
+      expect(buttonsIn(card(name))).toEqual([{ text: 'このプランに変更する', disabled: false }])
     }
     expect(document.body.textContent).toContain('いまのプラン：スタンダード（月払い ¥9,800）・次回の更新日 11/1（日）')
   })
@@ -178,7 +178,7 @@ describe('V8 統括の請求：いまのプランと変えるボタン', () => {
     }))
     expect(card('スタンダード').textContent).toContain('利用中')
     expect(buttonsIn(card('スタンダード'))).toEqual([{ text: 'いまのプラン', disabled: true }])
-    expect(buttonsIn(card('ライト'))).toEqual([{ text: 'このプランに変える', disabled: false }])
+    expect(buttonsIn(card('ライト'))).toEqual([{ text: 'このプランに変更する', disabled: false }])
     expect(document.body.textContent).toContain('いまのプラン：スタンダード（課金の対象外）')
     await act(async () => { card('ライト').querySelector('button')!.click() })
     await flush()
@@ -206,6 +206,6 @@ describe('V8 統括の請求：いまのプランと変えるボタン', () => {
     expect(card('スタンダード').textContent).toContain('利用中')
     expect(buttonsIn(card('ライト'))).toEqual([])
     expect(buttonsIn(card('プロ'))).toEqual([])
-    expect(buttonByText('このプランに変える')).toBeUndefined()
+    expect(buttonByText('このプランに変更する')).toBeUndefined()
   })
 })

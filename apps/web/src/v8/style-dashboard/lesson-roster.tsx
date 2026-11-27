@@ -1,9 +1,9 @@
 'use client'
-import { CheckCheck, CreditCard, MessageCircle, X } from 'lucide-react'
+import { CheckCheck, CreditCard, MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+import CloseButton from '@/components/shared/close-button'
 import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import type { StyleRoster } from './model'
@@ -37,7 +37,7 @@ export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbs
           <span className={styles.cellSub}>{roster.head}</span>
           <h3>{roster.title}</h3>
         </div>
-        <IconButton aria-label="名簿を閉じる" onClick={onClose}><X size={16} /></IconButton>
+        <CloseButton size="standard" aria-label="名簿を閉じる" onClick={onClose} />
       </div>
       <div className={styles.rosterMeta}><StatusBadge tone={roster.pay.tone}>{roster.pay.label}</StatusBadge><span className={styles.cellMuted}>{roster.meta}</span></div>
       {canWrite ? (

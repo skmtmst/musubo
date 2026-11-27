@@ -99,7 +99,7 @@ for (const [title, Component, name, menuTitle] of [
     expect(screen.queryByRole('link', { name: '編集する' }) !== null).toBe(role !== 'staff')
     if (role === 'staff') {
       expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
-      expect(screen.queryByRole('button', { name: /名前を変える|複製して保存/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /名前を変更する|複製して保存/ })).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
       fireEvent.click(screen.getByRole('button', { name: `${menuTitle}「${name}」の操作`, exact: true }))
       await screen.findByRole('menuitem', { name: title === '保存した検索' ? '友だち一覧へ' : '詳しく見る' })

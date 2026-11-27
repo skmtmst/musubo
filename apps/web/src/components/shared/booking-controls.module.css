@@ -61,6 +61,7 @@
 
 /* 縦の担当盤では、空き枠をセルの通常の流れに置く。 */
 .slotAdd[data-placement='cell'] { position: static; width: 100%; }
+.slotAdd[data-placement='timeline'] { inset: 0; width: 100%; height: 100%; border-radius: 0; }
 
 .phoneTable {
   flex: 1 1 var(--tpl-rs-rsv-phone-table-basis);

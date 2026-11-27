@@ -28,6 +28,7 @@ export function Steps({
   steps,
   currentKey,
   connectorSize,
+  unavailableReason,
   layout = 'horizontal',
   summaries,
   summaryLayout = 'default',
@@ -42,6 +43,7 @@ export function Steps({
   /** いまいる段の key（例：URL の `?step=`）。渡さないときは state が current の最初の段。 */
   currentKey?: string
   connectorSize?: 'short'
+  unavailableReason?: string
   /** 窓の左で、回答済み・現在・未回答の質問へ移る列。 */
   layout?: 'horizontal' | 'sidebar' | 'guidance'
   /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
@@ -162,7 +164,7 @@ export function Steps({
                   {name}
                 </button>
               ) : (
-                <span className={styles.step} title={step.label} aria-current={isCurrent ? 'step' : undefined}>
+                <span className={styles.step} title={state === 'todo' && unavailableReason ? unavailableReason : step.label} aria-current={isCurrent ? 'step' : undefined}>
                   {dot}
                   {name}
                 </span>
@@ -175,7 +177,7 @@ export function Steps({
         {summaryItems.map((step) => <div role="listitem" key={step.key} className={styles.sectionHead}>
           <span className={styles.sectionTitle}>{step.label}</span>
           <span className={styles.sectionSummary} title={summaries[step.key]}>{summaries[step.key]}</span>
-          {step.onSelect && !readOnly && !hideSummaryChangeKeys.includes(step.key) ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変える`} onClick={step.onSelect}>変える</Button> : null}
+          {step.onSelect && !readOnly && !hideSummaryChangeKeys.includes(step.key) ? <Button variant="secondary" size="compact" aria-label={`${step.label}を変更する`} onClick={step.onSelect}>変更する</Button> : null}
         </div>)}
       </div> : null}
     </nav>
@@ -212,7 +214,7 @@ export function StepSection({ order, title, summary, open, onChange, children, r
       <span className={styles.sectionNumber}>{order}</span>
       <span className={styles.sectionTitle}>{title}</span>
       <span className={styles.sectionSummary} title={open ? undefined : summary}>{open ? null : summary}</span>
-      {open || readOnly ? null : <Button variant="secondary" onClick={onChange}>変える</Button>}
+      {open || readOnly ? null : <Button variant="secondary" onClick={onChange}>変更する</Button>}
     </div>
     {open ? <div className={styles.sectionBody}>{children}</div> : null}
   </Card>

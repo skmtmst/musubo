@@ -77,12 +77,14 @@ function BookingStatus({ accountId, eventId, refreshKey }: { accountId: string; 
   </>
 }
 
-function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string; eventId: string; onChanged: () => void }) {
+export function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string; eventId: string; onChanged: () => void }) {
   const saveErrors = useSaveFormErrors()
   const [lifecycle, setLifecycle] = useState<EventLifecycleStatus | null>(null)
   const [hasFuture, setHasFuture] = useState<boolean | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadSeq, setLoadSeq] = useState(0)
+  const [slotsSeq, setSlotsSeq] = useState(0)
+  const [slotsFailed, setSlotsFailed] = useState(false)
   const [pending, setPending] = useState<(typeof NEXT_LIFECYCLE)['draft'][number] | null>(null)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -92,15 +94,19 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
   useEffect(() => {
     const request = requests.start('lifecycle', true)
     if (!request) return
-    setLifecycle(null); setHasFuture(null); setLoadFailed(false)
+    setLifecycle(null); setLoadFailed(false)
     void eventsApi.getEvent(accountId, eventId).then(detail => {
       if (request.isCurrent()) setLifecycle(detail.lifecycle_status ?? (detail.is_published === 1 ? 'published' : 'draft'))
     }).catch(() => { if (request.isCurrent()) setLoadFailed(true) }).finally(() => { request.finish() })
-    const slotsRequest = requests.start('lifecycle-slots', true)
-    if (slotsRequest) void eventsApi.listSlots(accountId, eventId).then(({ items }) => {
-      if (slotsRequest.isCurrent()) setHasFuture(items.some(slot => slot.is_active === 1 && Date.parse(slot.starts_at) >= Date.now()))
-    }).catch(() => {}).finally(() => { slotsRequest.finish() })
   }, [accountId, eventId, loadSeq, requests])
+  useEffect(() => {
+    const request = requests.start('lifecycle-slots', true)
+    if (!request) return
+    setHasFuture(null); setSlotsFailed(false)
+    void eventsApi.listSlots(accountId, eventId).then(({ items }) => {
+      if (request.isCurrent()) setHasFuture(items.some(slot => slot.is_active === 1 && Date.parse(slot.starts_at) >= Date.now()))
+    }).catch(() => { if (request.isCurrent()) setSlotsFailed(true) }).finally(() => { request.finish() })
+  }, [accountId, eventId, slotsSeq, requests])
   async function runSwitch() {
     if (!pending || busy || (pending.needsReason && reason.trim() === '')) return
     const request = requests.start('switch')
@@ -124,17 +130,19 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
     } finally { if (request.isCurrent()) setBusy(false); request.finish() }
   }
   const pastPublished = lifecycle === 'published' && hasFuture === false
-  const displayLifecycle = pastPublished ? 'ended' : lifecycle
-  const actions = lifecycle ? (pastPublished ? NEXT_LIFECYCLE.published.filter(option => option.to !== 'paused') : NEXT_LIFECYCLE[lifecycle]) : []
+  const waitingForSlots = lifecycle === 'published' && hasFuture === null
+  const displayLifecycle = waitingForSlots ? null : pastPublished ? 'ended' : lifecycle
+  const actions = lifecycle && !waitingForSlots ? (pastPublished ? NEXT_LIFECYCLE.published.filter(option => option.to !== 'paused') : NEXT_LIFECYCLE[lifecycle]) : []
   const choose = (option: (typeof NEXT_LIFECYCLE)['draft'][number]) => requestUnsavedAction(() => { setReason(''); setError(''); setPending(option) })
   return <SaveErrorScope errors={saveErrors}><span className={styles.lifecycle}>
+    {waitingForSlots ? slotsFailed ? <Notice tone="warn" action={<Button onClick={() => setSlotsSeq(value => value + 1)}>予約枠を読み直す</Button>}>予約枠を読み込めないため、公開状態を確認できません。</Notice> : <span role="status">予約枠を確認しています…</span> : null}
     {displayLifecycle ? <StatusBadge tone={displayLifecycle === 'published' ? 'success' : 'neutral'}>{LABELS[displayLifecycle]}</StatusBadge> : null}
     {actions[0] ? <Button variant={pastPublished ? 'primary' : 'secondary'} disabled={busy} onClick={() => choose(actions[0])}>{actions[0].label}</Button> : null}
     {actions.length > 1 ? <RowMenu label="公開状態の操作" items={actions.slice(1).map(option => ({ id: option.to, label: option.label, disabled: busy, onSelect: () => choose(option) }))} /> : null}
     {lifecycle === null ? loadFailed ? <><Notice tone="danger" message="公開の状態を読み込めませんでした。" /><Button onClick={() => setLoadSeq((value) => value + 1)}>読み直す</Button></> : <span role="status">状態を読み込んでいます…</span> : null}
     <ConfirmDialog open={pending !== null} title={`このイベントを${pending?.label ?? '変える'}？`}
       description={pending?.to === 'cancelled' ? '中止にすると申込の受付は止まり、申込の履歴は残ります。元に戻すことはできません。' : pending?.to === 'paused' ? '一時停止中はお客様の画面から申込ができなくなります。申込の履歴は残ります。' : '状態を変えます。'}
-      destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変える'} busy={busy} error={error}
+      destructive={pending?.to === 'cancelled'} confirmLabel={pending?.label ?? '変更する'} busy={busy} error={error}
       confirmDisabled={Boolean(pending?.needsReason && reason.trim() === '')} onConfirm={runSwitch}
       onCancel={() => { if (!busy) { setPending(null); setReason(''); setError('') } }}>
       <OperationTargetSummary accounts={[{ id: accountId }]} />

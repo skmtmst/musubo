@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import { downloadCsv } from '@/components/shared/csv-download'
 import { jstDate } from '@/lib/jst-datetime'
@@ -32,6 +33,9 @@ const STATUS_LABEL: Record<GoogleChangeStatus, { label: string; tone: StatusBadg
 }
 
 const KIND_LABEL: Record<string, string> = { special_hours: '営業時間', regular_hours: '営業時間', profile: 'プロフィール', photo: 'プロフィール', review_reply: '口コミ返信' }
+export const googleHistoryKind = (kind: string) => knownValue(KIND_LABEL, kind, '種類を確認できません')
+export const googleHistoryStatus = (status: string) => knownValue(STATUS_LABEL, status, { label: '状態を確認できません', tone: 'neutral' as const })
+
 const HISTORY_KINDS: Array<{ key: GoogleHistoryKind; label: string }> = [
   { key: 'all', label: 'すべて' },
   { key: 'hours', label: '営業時間' },
@@ -83,7 +87,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       const rows: string[][] = [['日時', '内容', 'スタッフ', '種類', '結果', '備考']]
       for (let p = 1; p <= 25; p += 1) {
         const chunk = await restaurantGoogleApi.history(accountId, { kind, result, days: Number.parseInt(days, 10), q: applied || undefined, page: p, perPage: 100 })
-        for (const e of chunk.changes) rows.push([e.createdAt, e.summary, e.staffName ?? '', KIND_LABEL[e.kind] ?? e.kind, STATUS_LABEL[e.status].label, e.error ?? ''])
+        for (const e of chunk.changes) rows.push([e.createdAt, e.summary, e.staffName ?? '', googleHistoryKind(e.kind), googleHistoryStatus(e.status).label, e.error ?? ''])
         if (p * chunk.perPage >= chunk.total) break
       }
       const csv = `﻿${rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')}`
@@ -114,13 +118,13 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
         <DataTable label="変更履歴" density="records">
           <thead><TableHeadRow><Th truncate>日時</Th><Th truncate grow>内容</Th><Th truncate>スタッフ</Th><Th truncate>種類</Th><Th truncate>結果</Th></TableHeadRow></thead>
           <tbody>{data.changes.map((entry) => {
-            const status = STATUS_LABEL[entry.status]
+            const status = googleHistoryStatus(entry.status)
             const open = entry.changeId ? () => go({ tab: 'profile', view: 'confirm', id: entry.changeId! }) : undefined
             return <Tr key={entry.id} onOpen={open} aria-label={entry.summary}>
               <Td title={formatStampFull(entry.createdAt)}>{formatStampFull(entry.createdAt)}</Td>
               <Td grow><TruncatedText value={entry.summary} /></Td>
               <Td><TruncatedText value={entry.staffName ?? '—'} /></Td>
-              <Td><StatusBadge tone={entry.kind === 'special_hours' || entry.kind === 'regular_hours' ? 'warning' : 'neutral'}>{KIND_LABEL[entry.kind] ?? entry.kind}</StatusBadge></Td>
+              <Td><StatusBadge tone={entry.kind === 'special_hours' || entry.kind === 'regular_hours' ? 'warning' : 'neutral'}>{googleHistoryKind(entry.kind)}</StatusBadge></Td>
               <Td><StatusBadge tone={status.tone}>{status.label}{entry.status === 'failed' && entry.error ? `（${entry.error}）` : ''}</StatusBadge></Td>
             </Tr>
           })}</tbody>

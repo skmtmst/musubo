@@ -343,7 +343,7 @@
   margin: var(--polish-space-field) 0 var(--polish-space-card);
 }
 :root .panel[data-design-layout^='stacked'] > .descriptionBand { padding: 0; margin: 0; }
-:root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+:root .close { border: 0; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
 :root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
@@ -531,6 +531,14 @@ html:root .panel .close {
   padding: 0;
   border-radius: var(--radius-pill);
   box-shadow: none;
+}
+html:root .panel[data-plain-close] .close:not(:hover):not(:focus-visible) {
+  outline-color: transparent;
+  background: transparent;
+}
+html:root .panel[data-plain-close] .close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 html:root .headerContent { gap: var(--space-4); }
 /* 題の実際の行高を継ぎ、説明の行数に関係なく最初の行へそろえる。 */

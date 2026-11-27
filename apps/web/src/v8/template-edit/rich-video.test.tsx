@@ -2,24 +2,24 @@ import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
 import { richVideoContent, richVideoDraftError, type RichVideoDraft } from './rich-video-core'
 import { messageTemplateToBubble, bubbleLegacyMessage, assetBubbleError } from '@/lib/broadcast-template'
-const mocks=vi.hoisted(()=>({role:'owner',account:'a',get:vi.fn(),create:vi.fn(),update:vi.fn(),push:vi.fn(),disarm:vi.fn(),guarded:vi.fn((action:()=>void)=>action())}))
+const mocks=vi.hoisted(()=>({role:'owner',account:'a',folders:vi.fn(),get:vi.fn(),create:vi.fn(),update:vi.fn(),push:vi.fn(),disarm:vi.fn(),guarded:vi.fn((action:()=>void)=>action())}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:mocks.push}),usePathname:()=>'/templates/edit',useSearchParams:()=>new URLSearchParams('kind=rich_video')}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>mocks.role,canManageRole:(role:string)=>role==='owner'||role==='admin'}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:mocks.account,accounts:[{id:'a',name:'本店'}]})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
 vi.mock('@/lib/use-unsaved-guard',()=>({useUnsavedGuard:()=>({leaveTarget:null,disarm:mocks.disarm,guarded:mocks.guarded})}))
 vi.mock('@/lib/unsaved-leave-dialog',()=>({UnsavedLeaveDialog:()=>null}))
-vi.mock('@/lib/api',()=>({api:{templates:{get:mocks.get,create:mocks.create,update:mocks.update},folders:{list:async()=>({success:true,data:[]})}}}))
+vi.mock('@/lib/api',()=>({api:{templates:{get:mocks.get,create:mocks.create,update:mocks.update},folders:{list:mocks.folders}}}))
 vi.mock('./rich-video-core', async original => ({...await original<typeof import('./rich-video-core')>(),videoPreviewFile:vi.fn(async()=>({file:new File(['preview'],'preview.jpg',{type:'image/jpeg'}),height:520}))}))
 import Editor from './rich-video'
 import type { TemplateEditHost } from './host'
 const draft:RichVideoDraft={name:'動画',folderId:'',originalContentUrl:'https://worker.example/images/video.mp4',previewImageUrl:'https://worker.example/images/preview.jpg',height:520,buttonEnabled:true,actionLabel:'詳しく見る',actionUrl:'https://example.com/menu',altText:'新しい動画です'}
 function stored(button=true){return {...richVideoContent({...draft,buttonEnabled:button}),baseUrl:'https://worker.example/images/imagemaps/map'}}
-beforeEach(()=>{vi.clearAllMocks();mocks.role = verifiedStaffRole('owner');mocks.account='a';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
+beforeEach(()=>{vi.clearAllMocks();mocks.role = verifiedStaffRole('owner');mocks.account='a';mocks.folders.mockReset().mockResolvedValue({success:true,data:[]});mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored()),publishedVersion:1,draftRevision:0}});mocks.update.mockResolvedValue({success:true,data:{id:'r'}})})
 afterEach(cleanup)
 it('動画のプレビューは配信日時を決めつけない', () => {
   render(<Editor />)
@@ -28,6 +28,28 @@ it('動画のプレビューは配信日時を決めつけない', () => {
 })
 
 describe('リッチビデオ編集',()=>{
+ it('アカウント切替後に前のフォルダを出さず、遅い応答を捨てる',async()=>{
+  let resolveOld!: (value: unknown) => void
+  const old = new Promise(resolve => { resolveOld = resolve })
+  mocks.folders.mockReturnValueOnce(old).mockResolvedValueOnce({success:true,data:[{id:'new',name:'新しい店のフォルダ'}]})
+  const view=render(<Editor />)
+  expect((screen.getByRole('button',{name:'フォルダ'}) as HTMLButtonElement).disabled).toBe(true)
+  mocks.account='b';view.rerender(<Editor />)
+  await waitFor(()=>expect(mocks.folders).toHaveBeenCalledTimes(2))
+  await act(async()=>resolveOld({success:true,data:[{id:'old',name:'前の店のフォルダ'}]}))
+  fireEvent.click(screen.getByRole('button',{name:'フォルダ'}))
+  expect(await screen.findByText('新しい店のフォルダ')).toBeTruthy()
+  expect(screen.queryByText('前の店のフォルダ')).toBeNull()
+ })
+ it('フォルダの取得失敗を知らせ、再取得できる',async()=>{
+  mocks.folders.mockResolvedValueOnce({success:false}).mockResolvedValueOnce({success:true,data:[{id:'folder-1',name:'動画用'}]})
+  render(<Editor />)
+  await screen.findByText(/フォルダを読み込めませんでした/)
+  fireEvent.click(screen.getByRole('button',{name:'もう一度読み込む'}))
+  await waitFor(()=>expect(mocks.folders).toHaveBeenCalledTimes(2))
+  await waitFor(()=>expect(screen.queryByText(/フォルダを読み込めませんでした/)).toBeNull())
+ })
+
  it('統括は店を選ばず取り込み、ひな形の口へ保存して配る（Ni0V8）',async()=>{
   mocks.account='';
   const video={id:'video',kind:'video' as const,filename:'video.mp4',mimeType:'video/mp4',sizeBytes:3,width:null,height:null,durationMs:1000,r2Key:'hq-templates/tenant/uploads/video.mp4',publicUrl:draft.originalContentUrl,versionId:'video-v',versionNo:1,contentHash:'a'.repeat(64)}
@@ -88,7 +110,7 @@ describe('リッチビデオ編集',()=>{
  });
  it('閲覧のみには保存・アップロード・スイッチを出さない',async()=>{
   mocks.role = verifiedStaffRole('staff');render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
-  expect(screen.getByRole('status').textContent).toContain(PERMISSION_LOCK_SUMMARY.feature);expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'ファイルを選ぶ'})).toBeNull();expect(screen.queryByRole('checkbox')).toBeNull();expect(screen.queryByRole('switch')).toBeNull();
+  expect(screen.getByRole('status').textContent).toContain(PERMISSION_LOCK_SUMMARY.feature);expect(screen.queryByRole('button',{name:'保存する'})).toBeNull();expect(screen.queryByRole('button',{name:'ファイルを選択する'})).toBeNull();expect(screen.queryByRole('checkbox')).toBeNull();expect(screen.queryByRole('switch')).toBeNull();
  });
  it('読み込み失敗時に保存せず、別アカウントに切り替えても保存しない',async()=>{
   mocks.get.mockRejectedValue(new Error('failed'));const {unmount}=render(<Editor id="r"/>);await screen.findByRole('alert');expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(true);unmount();

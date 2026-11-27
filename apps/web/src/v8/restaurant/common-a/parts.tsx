@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 /*
  * ★V8 飲食店向けの板に共通の小さな部品（担当 a の画面だけで使う）。
@@ -14,7 +15,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import styles from './parts.module.css'
 
 const statusLabel: Record<string, string> = {
-  connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: 'アーカイブ', approved: '承認済', completed: '完了', visited: '来店済',
+  connected: '正常', active: '有効', paused: '停止中', invited: '招待中', suspended: '停止中', archived: 'アーカイブ', approved: '承認済', completed: '完了', visited: '来店済',
   confirmed: '予約確定', warning: '要確認', pending: '承認待ち', draft: '下書き', scheduled: '予約済',
   unreplied: '未返信', unconfigured: '未設定', disabled: '停止中', error: 'エラー', returned: '差戻し',
   seated: '来店中', cancelled: '取消', no_show: '無断キャンセル', preview_only: 'プレビューのみ',
@@ -29,7 +30,7 @@ export function statusTone(value: string): StatusBadgeTone {
 
 /** 板の「状態の札」（点＋文字）。 */
 export function Status({ value, label }: { value: string; label?: string }) {
-  return <StatusBadge tone={statusTone(value)} className={styles.status}>{label ?? statusLabel[value] ?? value}</StatusBadge>
+  return <StatusBadge tone={statusTone(value)} className={styles.status}>{label ?? knownValue(statusLabel, value, '状態を確認できません')}</StatusBadge>
 }
 
 /** 数の帯（各マスは共通部品）。 */

@@ -605,7 +605,7 @@ export default function ApprovalsTab() {
         </div>
       ) : null}
       <BulkBar count={canSelect ? selected.size : 0} onClear={clearSelections} total={shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).length} onSelectAll={() => setSelected(new Set(shownItems.filter(item => item.approvalStatus === 'pending' && approvalReviewReasons(item).length === 0).map(item => item.eventId)))} hint="対象を確認してから操作を選んでください">
-        <Button type="button" onClick={openBulkWizard}><ListChecks size={16} aria-hidden="true" /> 操作を選ぶ</Button>
+        <Button type="button" onClick={openBulkWizard}><ListChecks size={16} aria-hidden="true" /> 操作を選択する</Button>
       </BulkBar>
     </>
   )

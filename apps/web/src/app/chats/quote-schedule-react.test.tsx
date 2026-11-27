@@ -417,7 +417,7 @@ describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付'
     await act(async () => { root.render(<ChatsPage />) })
     await eventually(() => { expect(host.textContent).toContain('値段はいくらですか？') })
     expect(Array.from(document.querySelectorAll('button')).some((b) => b.textContent?.trim() === '添付')).toBe(false)
-    expect(document.querySelector('button[aria-label="添付するものを選ぶ"]')).toBeTruthy()
+    expect(document.querySelector('button[aria-label="添付するものを選択する"]')).toBeTruthy()
     expect(host.textContent).toContain('画像・動画・ファイルを添付')
     await pickFile(new File(['%PDF-1.7'], '案内.pdf', { type: 'application/pdf' }))
     await eventually(() => {

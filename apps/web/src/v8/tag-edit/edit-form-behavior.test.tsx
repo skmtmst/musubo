@@ -11,12 +11,12 @@ import type { Tag } from '@line-crm/shared'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
-const net = vi.hoisted(() => ({ preview: vi.fn() }))
+const net = vi.hoisted(() => ({ preview: vi.fn(), list: vi.fn() }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
     commonActions: { ...actual.api.commonActions, resources: async () => ({ success: false, error: 'not configured' }) },
-    tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }), retroactivePreview: net.preview },
+    tags: { ...actual.api.tags, list: net.list, retroactivePreview: net.preview },
   } }
 })
 import { TagEditForm } from './edit-form'
@@ -32,6 +32,7 @@ function renderForm(props: Props = {}) {
 const openRegion = (name: string) => fireEvent.click(within(screen.getByRole('region', { name })).getByRole('button', { name: '開く' }))
 
 beforeEach(() => {
+  net.list.mockReset().mockResolvedValue({ success: true, data: [] })
   net.preview.mockResolvedValue({ success: true, data: { selfTargets: 4, referralTargets: 1, selfMiles: 400, referralMiles: 0, selfExcluded: 1, referralExcluded: 0, previewToken: 'pt-1' } })
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
@@ -131,4 +132,38 @@ describe('連動の行', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ありがとう' }))
     expect(screen.queryByRole('button', { name: /^連動の対象：/ })).toBeNull()
   })
+})
+
+it.each(['response', 'network'])('タグ編集の同名確認%s失敗を知らせ、名前を残して読み直せる', async failure => {
+  if (failure === 'response') net.list.mockResolvedValueOnce({ success: false })
+  else net.list.mockRejectedValueOnce(new Error('offline'))
+  net.list.mockResolvedValueOnce({ success: true, data: [{ id: 'other', name: '見本' }] })
+  renderForm()
+  fireEvent.change(screen.getByLabelText('タグ名'), { target: { value: '見本' } })
+  expect(await screen.findByText(/同じ名前のタグを確認できませんでした/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '重複を確認し直す' }))
+  await waitFor(() => expect(screen.queryByText(/同じ名前のタグを確認できませんでした/)).toBeNull())
+  expect((screen.getByLabelText('タグ名') as HTMLInputElement).value).toBe('見本')
+  expect(screen.getByText(/同じ名前のタグがすでにあります/)).toBeTruthy()
+  expect(net.list).toHaveBeenCalledTimes(2)
+})
+
+it('アカウント切替後は前の遅い同名候補を出さない', async () => {
+  let finishOld!: (value: unknown) => void
+  net.list.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+    .mockResolvedValueOnce({ success: true, data: [] })
+  const tag = { id: 't1', name: '見本', status: 'active', linkedEnabled: false } as Tag
+  const props = { tag, groups: [], dependencies: null, readOnly: false, conflict: false, compareBusy: false, onCompare: vi.fn(), onReloadLatest: vi.fn(), retroactiveReference: false, initialActions: [], saving: false, error: '', onCancel: vi.fn(), onSave: vi.fn(), onDelete: vi.fn() }
+  const view = render(<TagEditForm {...props} accountId="a" />)
+  view.rerender(<TagEditForm {...props} accountId="b" />)
+  await waitFor(() => expect(net.list).toHaveBeenCalledTimes(2))
+  await act(async () => { finishOld({ success: true, data: [{ id: 'old', name: '見本' }] }) })
+  expect(screen.queryByText(/同じ名前のタグがすでにあります/)).toBeNull()
+})
+
+it('閲覧のみでは同名の確認を取得しない', async () => {
+  renderForm({ readOnly: true })
+  await act(async () => {})
+  expect(net.list).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button', { name: '重複を確認し直す' })).toBeNull()
 })

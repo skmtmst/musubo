@@ -20,4 +20,8 @@ describe('ウェビナー失敗文の日本語表示の契約', () => {
     expect(webinarErrorText(new Error('something_broke'), '操作を完了できませんでした。'))
       .toBe('操作を完了できませんでした。')
   })
+
+  it.each(['constructor', 'toString', '__proto__'])('未登録のコード %s も予備文を出す', (code) => {
+    expect(webinarErrorText(new ApiError(500, '失敗', code), '公開できませんでした')).toBe('公開できませんでした')
+  })
 })

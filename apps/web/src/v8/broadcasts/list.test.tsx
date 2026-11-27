@@ -632,6 +632,24 @@ it('取得に成功して0件だったときだけ、空の一覧を出す', asy
   expect(buttonByText('もう一度読み込む')).toBeUndefined()
 })
 
+it('空の作成と上の詳しく作るは同じページへ移り、一覧内にフォームを開かない', async () => {
+  listBroadcasts.mockResolvedValue({ success: true, data: [], pagination: { total: 0, limit: 20, offset: 0 } })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  routerPush.mockClear()
+  act(() => { buttonByText('最初の一斉配信を作る')!.click() })
+  expect(routerPush).toHaveBeenCalledTimes(1)
+  const emptyDestination = routerPush.mock.lastCall?.[0] as string
+  expect(emptyDestination.split('?')[0]).toBe('/broadcasts/new')
+  expect(host.querySelector('[data-loaded-broadcast-form]')).toBeNull()
+  act(() => { buttonByText('配信を作る')!.click() })
+  await flush()
+  const detailed = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.includes('詳しく作る')) as HTMLElement
+  act(() => { detailed.click() })
+  expect(routerPush).toHaveBeenCalledTimes(2)
+  expect(routerPush).toHaveBeenLastCalledWith(emptyDestination)
+})
+
 it('WEB-014：一斉配信には手動順・つまみ・上下移動を置かない', async () => {
     await act(async () => root.render(<BroadcastListV8 />)); await flush()
     expect(host.querySelector('[data-reorder-handle]')).toBeNull()
@@ -1197,7 +1215,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('この操作はオーナーか管理者だけができます。')
     act(() => fireEvent.click(add)); expect(document.querySelector('[role="dialog"]')).toBeNull()
     act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
-    for (const label of ['名前を変える', '色を変える', '並べ替える（下へ）', '消す']) {
+    for (const label of ['名前を変更する', '色を変更する', '並べ替える（下へ）', '消す']) {
       expect(menuItem(label).getAttribute('aria-disabled')).toBe('true')
       act(() => fireEvent.click(menuItem(label)))
     }
@@ -1222,7 +1240,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     act(() => root.render(<BroadcastListV8 />)); await flush()
     if (editing) {
       act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
-      act(() => fireEvent.click(menuItem('名前を変える')))
+      act(() => fireEvent.click(menuItem('名前を変更する')))
     } else act(() => buttonByText('フォルダを追加')!.click())
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!
@@ -1250,7 +1268,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect(createFolder).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'broadcast', name: '新しい分類', accountId: 'account-a' }))
     expect(dialog.isConnected).toBe(false)
     act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
-    act(() => fireEvent.click(menuItem('名前を変える'))); await flush()
+    act(() => fireEvent.click(menuItem('名前を変更する'))); await flush()
     dialog = document.querySelector('[role="dialog"]')!
     act(() => fireEvent.change(dialog.querySelector('input')!, { target: { value: '変更した分類' } }))
     confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.trim() === '保存する')!

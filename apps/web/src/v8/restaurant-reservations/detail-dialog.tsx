@@ -179,7 +179,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
     actions={{
       primary: quickAttendance[0] ? buttonFor(quickAttendance[0]) : null,
       secondary: quickAttendance[1] ? buttonFor(quickAttendance[1]) : null,
-      menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変える', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
+      menuItems: [...undoAttendance.map(item => ({...item, allowed: canWrite})), {id: 'edit-reservation', label: '内容を変更する', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}, ...(!inactive ? [{id: 'change-table', label: '卓を変更する', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (canWrite) onEdit(reservation.id) }}] : []), {id: 'cancel-reservation', label: inactive ? '予約を有効に戻す' : '取り消す', tone: inactive ? 'default' : 'danger', allowed: canWrite, disabled: busy || waitingForReload, onSelect: () => { if (!canWrite) return; if (inactive) onRestore(reservation.id); else onCancel(reservation.id) }}],
     }}>
     <DetailField label="状態">{currentStatus}</DetailField>
     <DetailField label="お客さま">{withHonorific(reservation.customer_name, 'さま', { space: true })}</DetailField>
@@ -208,7 +208,7 @@ export default function ReservationDetailDialog({ reservation, accountId, tables
             <Button type="button" variant="primary" disabled={busy || waitingForReload || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onRestore(reservation.id) }}>予約を有効に戻す</Button>
           ) : (
             <Button type="button" variant="primary" disabled={busy || waitingForReload || !canWrite} lockedReason={permissionReason} onClick={() => { if (canWrite) onEdit(reservation.id) }}>
-              <Pencil size={16} aria-hidden="true" />内容を変える
+              <Pencil size={16} aria-hidden="true" />内容を変更する
             </Button>
           )}
         </>

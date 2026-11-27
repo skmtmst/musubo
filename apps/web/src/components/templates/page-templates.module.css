@@ -27,6 +27,9 @@
 /* 「この画面の説明」を開いても、右の操作（店舗の欄・主ボタン）を題の行に残す。説明の長い1行が幅を取り、操作が次の行へ落ちていた。 */
 :global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
 :global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
+/* 閲覧帯の文が長くても、右の操作を題の行に保つ。 */
+:global(:root) .heading:has(> .actions) > .headingText:has(> .headingNotice) { flex-basis: 0; }
+:global(:root) .heading:has(> .headingText > .headingNotice) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 :global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
 :global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }

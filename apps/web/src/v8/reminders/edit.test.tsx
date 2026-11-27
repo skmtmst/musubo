@@ -168,7 +168,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
     const frame = host.querySelector('[data-page-template="create"]')
     expect(frame?.getAttribute('data-design-node')).toBe('YChR6')
     expect(host.querySelector('[aria-label="設定済みの内容"]')?.textContent).toContain('予約前日のご案内・予約日時')
-    await act(async () => { (host.querySelector('[aria-label="基本設定を変える"]') as HTMLButtonElement).click() })
+    await act(async () => { (host.querySelector('[aria-label="基本設定を変更する"]') as HTMLButtonElement).click() })
     expect(pushMock).toHaveBeenCalledWith('/reminders/edit?id=reminder-new&stage=basics')
     await act(async () => { (host.querySelector('svg[data-help-mark]')!.closest('button') as HTMLButtonElement).click() })
     expect(host.textContent).toContain('名前：予約前日のご案内・いまは下書きです')
@@ -354,7 +354,7 @@ describe('監査 WEB079/080/082', () => {
     await render('target')
     const pick = [...host.querySelectorAll<HTMLElement>('[role="radio"], input[type="radio"]')].find(el => el.textContent?.includes('条件に合う人だけ') || el.getAttribute('value') === 'condition')!
     await act(async () => { pick.click() })
-    expect(host.querySelector('[aria-label="追加する条件を選ぶ"]')).toBeTruthy()
+    expect(host.querySelector('[aria-label="追加する条件を選択する"]')).toBeTruthy()
     await act(async () => { buttonByText('次へ：通知の中身')!.click() })
     expect(draftStore.saved).toHaveLength(0)
     expect(pushMock).not.toHaveBeenCalled()

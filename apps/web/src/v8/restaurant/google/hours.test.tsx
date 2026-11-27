@@ -6,6 +6,7 @@ import { emptyHoursWorkspace, HOURS_WEEKDAYS, type HoursWorkspace, type OpeningW
 import type { GoogleProfileData } from '@/lib/restaurant-google-api'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import HoursPage from './hours'
+import { hoursHolidayRangeNote } from './hours-model'
 const mocks=vi.hoisted(()=>({profile:vi.fn(),hoursWorkspace:vi.fn(),saveHoursWorkspace:vi.fn(),reviewHoursWorkspace:vi.fn(),sendChange:vi.fn(),change:vi.fn(),proposeHours:vi.fn(),allowed:true}))
 vi.mock('@/lib/restaurant-google-api',()=>({restaurantGoogleApi:mocks}))
 vi.mock('./use-google-permission',()=>({useGooglePermission:()=>({allowed:mocks.allowed,known:true,lockedReason:mocks.allowed?undefined:'管理者のみ変更できます'})}))
@@ -90,4 +91,9 @@ describe('営業時間ツールの操作',()=>{
  it('閲覧だけの人は内容を見られるが変更・保存・送信できない',async()=>{
   mocks.allowed=false;await open();fireEvent.click(screen.getByRole('button',{name:'日付を指定'}));expect(screen.queryByRole('dialog',{name:'特別営業日の変更'})).toBeNull();expect(mocks.saveHoursWorkspace).not.toHaveBeenCalled();expect(mocks.sendChange).not.toHaveBeenCalled()
  })
+})
+
+it('連休の範囲は月またぎでも終了月を表示する', () => {
+ expect(hoursHolidayRangeNote('2027-01-01','2027-01-03')).toBe('1/1 – 3の連休')
+ expect(hoursHolidayRangeNote('2026-12-31','2027-01-03')).toBe('12/31 – 1/3の連休')
 })

@@ -19,7 +19,7 @@ function Host() {
 it('本人が止めた宣伝の409は窓を残して再送せず、最新の版と本人の操作を読み直してから明示保存する', async () => {
   net.save.mockRejectedValueOnce(new ApiError(409, 'ほかの人が先に変更しました。')).mockResolvedValue({ success: true, data: [] })
   render(<Host />)
-  fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+  fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
   fireEvent.click(screen.getByRole('radio', { name: '受け取る' }))
   fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承を得た' } })
   fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -39,7 +39,7 @@ it('本人が止めた宣伝の409は窓を残して再送せず、最新の版�
  it('注意の窓を通らない保存の422でも理由を残し、入力を直して一度だけ送り直せる', async () => {
   net.save.mockRejectedValueOnce(new ApiError(422, '理由を確認してください。', undefined, undefined, undefined, undefined, { reason: '了承を得た理由を記入してください。' })).mockResolvedValue({ success: true, data: [] })
   render(<Host />)
-  fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[0])
+  fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
   fireEvent.click(screen.getByRole('radio', { name: '受け取る' }))
   fireEvent.change(screen.getByLabelText('理由'), { target: { value: '入力した理由' } })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })

@@ -104,10 +104,10 @@ it('競合時は理由と読み直しを示す', async () => {
 })
 
 it.each([
-  ['confirmed', null, '来店にする', '内容を変える', '無断にする'],
-  ['pending', null, '来店にする', '内容を変える', '無断にする'],
-  ['visited', null, '退店にする', '内容を変える', '来店を取り消す'],
-  ['visited', '2026-10-01T12:00:00Z', null, '内容を変える', '退店を訂正する'],
+  ['confirmed', null, '来店にする', '内容を変更する', '無断にする'],
+  ['pending', null, '来店にする', '内容を変更する', '無断にする'],
+  ['visited', null, '退店にする', '内容を変更する', '来店を取り消す'],
+  ['visited', '2026-10-01T12:00:00Z', null, '内容を変更する', '退店を訂正する'],
   ['cancelled', null, null, '予約を有効に戻す', null],
   ['no_show', null, null, '予約を有効に戻す', null],
 ] as const)('予約状態 %s の操作を維持する', async (status, departed, secondary, primary, menuItem) => {

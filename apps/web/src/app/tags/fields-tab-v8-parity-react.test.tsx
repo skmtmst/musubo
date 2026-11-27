@@ -97,13 +97,13 @@ describe('友だち情報欄V8一覧', () => {
     const rendered = await draw()
     await rendered.findByText('会員番号')
     const used = await menuOf(rendered, '会員番号')
-    const link = within(used).getByRole('menuitem', { name: '移行（種類を変える）' })
+    const link = within(used).getByRole('menuitem', { name: '移行（種類を変更する）' })
     expect(new URL(link.getAttribute('href')!, 'https://fixture.invalid').pathname).toBe('/tags/fields/migrate')
     expect(new URL(link.getAttribute('href')!, 'https://fixture.invalid').searchParams.get('id')).toBe('f1')
     fireEvent.keyDown(used, { key: 'Escape' })
     await waitFor(() => expect(rendered.queryByRole('menu')).toBeNull())
     const unused = await menuOf(rendered, '好きな色')
-    expect(within(unused).queryByRole('menuitem', { name: '移行（種類を変える）' })).toBeNull()
+    expect(within(unused).queryByRole('menuitem', { name: '移行（種類を変更する）' })).toBeNull()
   })
 
   test.each([

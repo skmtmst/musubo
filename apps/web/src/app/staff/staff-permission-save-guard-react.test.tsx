@@ -158,7 +158,7 @@ describe('R497/R498 権限保存の画面', () => {
       fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '役割を変更する' }))
     })
     await waitFor(() => { expect(screen.getByRole('textbox', { name: 'メールアドレス' })).toBeTruthy() })
     fireEvent.change(screen.getByRole('textbox', { name: '名前' }), { target: { value: '二重保存を試す名前' } })

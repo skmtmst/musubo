@@ -220,7 +220,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(screen.queryByText('LINEアカウントの登録が完了しました')).toBeNull()
     expect(calls.styleSave).not.toHaveBeenCalled()
     const stickyBar = document.querySelector<HTMLElement>('[data-shared-part="sticky-bar"]')!
-    fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選ぶ' }))
+    fireEvent.click(within(stickyBar).getByRole('button', { name: 'スタイルを選択する' }))
     await chooseStyle('飲食店')
     expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
     expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'later' } } }, true)

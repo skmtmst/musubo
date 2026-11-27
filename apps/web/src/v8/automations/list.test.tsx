@@ -523,3 +523,19 @@ describe('ルール一覧の読み込みと表示', () => {
     expect([...host.querySelectorAll('[data-row-id]')].map(row => row.getAttribute('data-row-id'))).toEqual(['large', 'small'])
   })
 })
+
+it('共通アクションが空のときも閲覧のみには作成入口と理由を示し、移動しない', async () => {
+  role.value = verifiedStaffRole('viewer')
+  const previousFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/common-actions') return json({ success: true, data: [], pagination: { total: 0, limit: 20, offset: 0 }, summary: { total: 0, published: 0, draft: 0, oldVersion: 0, unused: 0, archived: 0, actions: 0, bindings: 0, outdated: 0, outdatedItems: 0, executions: 0, failures: 0 } })
+    return previousFetch(input, init)
+  })
+  await render(<CommonActionsV8 />)
+  await waitFor(() => host.textContent?.includes('まだ、共通アクションはありません') ?? false, '空一覧')
+  const empty = [...host.querySelectorAll<HTMLElement>('[data-list-state="empty"]')].find(node => node.textContent?.includes('まだ、共通アクションはありません'))!
+  const create = within(empty).getByRole('button', { name: '共通アクションを作る' })
+  await expectPermissionLocked(create)
+  expect(create.getAttribute('href')).toBeNull()
+  expect(push).not.toHaveBeenCalled()
+})

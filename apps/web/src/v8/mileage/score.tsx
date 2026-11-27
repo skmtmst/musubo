@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import StatusBadge from '@/components/shared/status-badge'
 import ScoreValue from './score-value'
@@ -90,6 +91,11 @@ const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
   normal: 'ふつう',
   low: '低い',
 }
+
+export const scoreBandCsvWord = (band: string) => knownValue(BAND_LABELS, band, '状態を確認できません')
+
+export const friendBandWord = (band: string) => knownValue(FRIEND_BAND_LABELS, band, '状態を確認できません')
+
 
 function bandName(band: ActionScoreBand, highMin: number, normalMin: number) {
   if (band === 'high') return `点が高い（${formatMileageNumber(highMin)} 点〜）`
@@ -251,7 +257,7 @@ export default function ScoreTab() {
     const rows = overview.items.map((item) => [
       item.displayName,
       item.currentScore ?? '',
-      BAND_LABELS[item.band],
+      scoreBandCsvWord(item.band),
       item.change30d ?? '',
       actionScoreReasonLabel(item.lastReason),
       formatMileageDate(item.lastChangedAt),
@@ -568,7 +574,7 @@ export default function ScoreTab() {
                 <Td grow><FolderDotName><span  title={item.displayName}>{item.displayName}</span></FolderDotName></Td>
                 <Td align="right" className={styles.colScore}><span className={styles.scoreNum}>{formatMileageNumber(item.currentScore)}</span></Td>
                 <Td className={styles.colBand}>
-                  <StatusBadge tone={item.band === 'high' ? 'success' : item.band === 'low' ? 'warning' : 'neutral'}>{FRIEND_BAND_LABELS[item.band]}</StatusBadge>
+                  <StatusBadge tone={item.band === 'high' ? 'success' : item.band === 'low' ? 'warning' : 'neutral'}>{friendBandWord(item.band)}</StatusBadge>
                 </Td>
                 <Td align="right" className={styles.colTrend}>
                   <span className={styles.scoreNum}><ScoreValue change={change} negativeTone="danger">{change === null ? emptyValue('unknown') : formatMileageChange(change)}</ScoreValue></span>

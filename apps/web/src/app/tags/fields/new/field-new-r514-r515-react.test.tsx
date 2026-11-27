@@ -177,7 +177,7 @@ it('フォルダ作成中は情報欄の保存を止め、理由を表示する'
   fireEvent.click(screen.getByRole('button', { name: '友だち情報欄のフォルダ' }))
   fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
   fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '作成途中' } })
-  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '作って選択する' }))
   expect(createButton().disabled).toBe(true)
   expect(screen.getByText('フォルダを作成中です。完了するまでお待ちください。')).toBeTruthy()
   expect(fixture.fieldsCreate).not.toHaveBeenCalled()

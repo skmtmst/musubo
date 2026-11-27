@@ -44,7 +44,7 @@ export default function StyleEntry() {
         <span className={styles.note}>ダッシュボード・はじめの質問・初期セットが、このスタイルに合わせて変わります。</span>
       </span>
       <RowStatusActions status={<StatusBadge tone={style.selected ? 'info' : 'neutral'} dot>{style.selected ? styleLabel(style.style) : 'まだ選んでいません'}</StatusBadge>}>
-        <Button presentation="row-action" lockedReason={lockedReason} {...(role === null ? { disabled: true } : { href: '/?setup=0&setupReturn=accounts' })}>スタイルを変える</Button>
+        <Button presentation="row-action" lockedReason={lockedReason} {...(role === null ? { disabled: true } : { href: '/?setup=0&setupReturn=accounts' })}>スタイルを変更する</Button>
       </RowStatusActions>
     </section>
   )

@@ -2,4 +2,5 @@
 export type { StoreMedium } from '../../use-store-today'
 export type { StoreToday } from '../../use-store-today'
 export { loadStoreMedia } from '../../use-store-today'
+export { selectAccountStore } from '../../use-store-today'
 export { useStoreToday } from '../../use-store-today'

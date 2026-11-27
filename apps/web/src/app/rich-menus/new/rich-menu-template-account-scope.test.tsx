@@ -154,7 +154,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     })
     await settle(50)
     await act(async () => {
-      fireEvent.click(host.querySelector('button[aria-label="送るテンプレート：選ぶ"]')!)
+      fireEvent.click(host.querySelector('button[aria-label="送るテンプレート：選択する"]')!)
     })
     await settle(50)
     expect(document.querySelector('input[type="radio"][aria-label="予約確認"]')).not.toBeNull()
@@ -175,7 +175,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     })
     await settle(50)
     // acc-1 のテンプレート「お知らせ」を選ぶ（選ぶ窓を開き、行を選んで［選ぶ］）
-    const templateTrigger = host.querySelector('button[aria-label="送るテンプレート：選ぶ"]')
+    const templateTrigger = host.querySelector('button[aria-label="送るテンプレート：選択する"]')
     expect(templateTrigger).toBeTruthy()
     await act(async () => {
       fireEvent.click(templateTrigger!)
@@ -186,7 +186,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     await act(async () => {
       fireEvent.click(radio!)
     })
-    const confirm = (Array.from(radio!.closest('[role="dialog"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '選ぶ') ?? querySupplementaryPageAction('選ぶ'))
+    const confirm = (Array.from(radio!.closest('[role="dialog"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '選択する') ?? querySupplementaryPageAction('選択する'))
     expect(confirm).toBeTruthy()
     await act(async () => {
       fireEvent.click(confirm!)

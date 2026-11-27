@@ -312,6 +312,19 @@ it('inventory channel read failure does not become no channels',async()=>{
 afterEach(() => { verifiedStaffRole(null) })
 
 describe('予約枠・在庫の切り替え', () => {
+  it('店舗の取得中と失敗時も題と切り替えを保ち、再読み込みできる', async () => {
+    fixture.snapshot.mockReturnValueOnce(new Promise(() => {}))
+    const first = render(<InventoryPage />)
+    expect(screen.getByRole('heading', { name: '予約枠・在庫' })).toBeTruthy()
+    expect(screen.getByRole('group', { name: '予約枠・在庫の切り替え' })).toBeTruthy()
+    first.unmount()
+    fixture.snapshot.mockRejectedValueOnce(new Error('取得失敗'))
+    render(<InventoryPage />)
+    await screen.findByRole('button', { name: 'もう一度読み込む' })
+    expect(screen.getByRole('heading', { name: '予約枠・在庫' })).toBeTruthy()
+    expect(screen.getByRole('group', { name: '予約枠・在庫の切り替え' })).toBeTruthy()
+  })
+
   it('共通タブを外し、画面内の切り替えを保つ', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')

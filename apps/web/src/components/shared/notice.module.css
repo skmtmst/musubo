@@ -61,7 +61,7 @@
 .action .close { align-self: center; }
 .action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-link); font-weight: var(--font-weight-ui); }
 .close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-32); height: var(--space-32); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); cursor: pointer; }
-.close:hover { background: var(--color-surface-pearl); }
+.close:is(:hover, :focus-visible) { background: var(--color-surface-pearl); }
 .close:focus-visible, .notice a:focus-visible { outline: revert; }
 .twoLine { align-items: flex-start; }
 .states { display: flex; flex-wrap: wrap; gap: var(--polish-space-row) var(--polish-space-card); padding: 0; margin: var(--polish-space-field) 0 0; list-style: none; font-size: var(--text-micro); }

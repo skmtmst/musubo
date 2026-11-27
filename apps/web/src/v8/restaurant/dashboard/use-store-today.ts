@@ -13,7 +13,7 @@ import { jstDayStartIso } from '@/lib/jst-datetime'
  *  - Google の接続と未返信の口コミ。
  * どれかが読めなくても、読めた物だけで出す（読めなかった段は「読み込めませんでした」）。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RestaurantChannelCloseTask, RestaurantOpeningDay } from '@line-crm/shared'
 import { fetchApi } from '@/lib/api'
 import { restaurantGoogleApi, type GoogleConnectionData, type GoogleReview } from '@/lib/restaurant-google-api'
@@ -95,9 +95,25 @@ export async function loadStoreMedia(accountId: string, storeId: string): Promis
   return mergeMediaLinks(channels, links)
 }
 
+/** 確認できない選択を別店舗の操作に置き換えない。 */
+export function selectAccountStore(stores: RestaurantStore[], accountId: string, selected: string | undefined): string | null {
+  const owned = stores.filter((store) => store.line_account_id === accountId && store.status !== 'archived')
+  if (selected) {
+    if (owned.some((store) => store.id === selected)) return selected
+    throw new Error('選択中の店舗を確認できません。店舗の選択を確認してください。')
+  }
+  if (owned.length > 1) throw new Error('店舗を選択してください。')
+  return owned[0]?.id ?? null
+}
+
 export function useStoreToday(accountId: string | null): StoreToday {
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
-  const [storeId, setStoreId] = useState('')
+  const [storeSelection, setStoreSelection] = useState<{ account: string; id: string } | null>(null)
+  const storeId = storeSelection?.account === accountId ? storeSelection.id : ''
+  const scope = useRef({ accountId, generation: 0 })
+  if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1 }
+  const snapshotRequest = useRef(0)
+  const storeRequest = useRef(0)
   const { begin, accept, tableDefinition } = useTableDefinition(accountId, snapshot)
   const [today, setToday] = useState<RestaurantReservation[] | null>(null)
   const [rotation,setRotation]=useState<RestaurantRotation|null>(null)
@@ -116,30 +132,40 @@ export function useStoreToday(accountId: string | null): StoreToday {
     return { from: jstDayStartIso(now), to: jstDayStartIso(now, 1) }
   }, [])
 
-  /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭。 */
+  /* 店舗を確認できないときは別の店を自動選択しない。 */
   const loadSnapshot = useCallback(async () => {
+    const generation = scope.current.generation
+    const request = ++snapshotRequest.current
+    storeRequest.current += 1
     const definitionRequest = begin(accountId)
     if (!accountId) { setSnapshot(null); setLoading(false); return }
     setLoading(true)
     try {
-      const [snap, context] = await Promise.all([
+      const [snapshotResult, contextResult] = await Promise.allSettled([
         restaurantTestApi.snapshot(accountId, { from: range.from, to: range.to, limit: 500, offset: 0 }),
-        restaurantTestApi.storeContext(accountId).catch(() => null),
+        restaurantTestApi.storeContext(accountId),
       ])
+      if (generation !== scope.current.generation || request !== snapshotRequest.current) return
+      if (snapshotResult.status === 'rejected') throw snapshotResult.reason
+      const snap = snapshotResult.value
       setSnapshot(snap.data)
       accept(definitionRequest, snap.data)
-      const selected = context?.data.selectedStore?.id
-      setStoreId(snap.data.stores.some((s) => s.id === selected) ? selected! : snap.data.stores[0]?.id ?? '')
+      if (contextResult.status === 'rejected') throw contextResult.reason
+      const selected = selectAccountStore(snap.data.stores, accountId, contextResult.value.data.selectedStore?.id)
+      setStoreSelection(selected ? { account: accountId, id: selected } : null)
       setError(null)
+      return selected
     } catch (caught) {
-      setError(caught)
+      if (generation === scope.current.generation && request === snapshotRequest.current) { setStoreSelection(null); setError(caught) }
     } finally {
-      setLoading(false)
+      if (generation === scope.current.generation && request === snapshotRequest.current) setLoading(false)
     }
   }, [accountId, range, begin, accept])
 
   const loadStore = useCallback(async () => {
     if (!accountId || !storeId) return
+    const generation = scope.current.generation
+    const request = ++storeRequest.current
     const day = toYmd(new Date())
     try {
       const [rotation, reservations, media, tasks] = await Promise.all([
@@ -149,9 +175,10 @@ export function useStoreToday(accountId: string | null): StoreToday {
         restaurantTestApi.channelCloseTasks(accountId, storeId),
       ])
       if (!Array.isArray(reservations.data?.reservations) || !Array.isArray(tasks.data)) throw new Error('invalid_store_response')
+      if (generation !== scope.current.generation || request !== storeRequest.current) return
       setRotation(rotation); setToday(reservations.data.reservations); setMedia(media); setCloseTasks(tasks.data)
       setError(null); setUpdatedAt(new Date())
-    } catch (caught) { setError(caught) }
+    } catch (caught) { if (generation === scope.current.generation && request === storeRequest.current) setError(caught) }
 
   }, [accountId, storeId])
 
@@ -189,7 +216,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   const store = snapshot?.stores.find((s) => s.id === storeId) ?? null
 
-  const reload = useCallback(async () => { await loadSnapshot(); await loadStore() }, [loadSnapshot,loadStore])
+  const reload = useCallback(async () => { const selected = await loadSnapshot(); if (selected && selected === storeId) await loadStore() }, [loadSnapshot, loadStore, storeId])
 
   return { accountId: accountId ?? '', tableDefinition, snapshot, store, today, rotation, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
 }

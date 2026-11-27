@@ -126,7 +126,7 @@ export function featureSetStep(entry: FeatureSetEntry | null): StepResult {
       : state === 'forbidden'
         ? '管理者に頼んでください。'
         : '業種に合う初期セットを選ぶと、使う機能がそろいます。',
-    action: state === 'todo' ? { label: '使う機能を選ぶ', href: '/settings' } : null,
+    action: state === 'todo' ? { label: '使う機能を選択する', href: '/settings' } : null,
     blockedReason: state === 'forbidden' ? '管理者に頼んでください' : state === 'unknown' ? '状態を取得できませんでした' : null,
   }
 }

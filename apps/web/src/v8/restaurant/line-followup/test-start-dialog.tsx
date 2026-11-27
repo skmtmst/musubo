@@ -33,7 +33,7 @@ export function TestStartDialog({row,accountId,storeId,storeName,recipient,canMa
     {started&&<Notice tone="success">公開と承認が完了しました。この内容で送り始めます。</Notice>}
     {unconfirmed?<Notice tone="warn">送信結果が分からないため、送り直しません。履歴を確認し、サポートへお問い合わせください。</Notice>:error?<Notice tone="danger" role="alert">{error}</Notice>:!started?(proof?<Notice tone="success">{withHonorific(proof.recipientName)}へテスト送信できました。同じ版を公開し、承認してからお客さまへ送り始めます。</Notice>:<Notice tone="info">まだお客さまへ送っていません。{ready?`${self?'自分のLINE':'登録済みテスト宛先'}（${recipient.recipient?.displayName}）へ、見本の予約情報を使って試します。`:'本人のLINEを接続するか、登録済みのテスト送信先を設定してください。'}</Notice>):null}
    </NoticeStack>
-   <FollowupMessageSample bubbles={row.bubbles} storeName={storeName}/>
+   <FollowupMessageSample trigger={row.trigger} bubbles={row.bubbles} storeName={storeName}/>
   </div>
  </Dialog>
 }

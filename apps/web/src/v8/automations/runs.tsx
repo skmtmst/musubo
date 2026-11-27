@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 import { DetailContent, DetailFields, DetailField } from '@/components/shared/detail-content'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -126,6 +127,14 @@ const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], 
   failed: '失敗',
   skipped: '見送り',
   cancelled: '取りやめ',
+}
+
+export function runStatusLabel(status: string): string {
+  return knownValue(STATUS_LABEL, status, '状態を確認できません')
+}
+
+export function stepStatusLabel(status: string): string {
+  return knownValue(STEP_STATUS_LABEL, status, '状態を確認できません')
 }
 
 function statusTone(status: RunStatus): 'success' | 'danger' | 'warning' | 'neutral' {
@@ -549,7 +558,7 @@ export default function AutomationRunsV8() {
                       <span className={styles.sub}>{versionLine}</span>
                     </Td>
                     <Td className={styles.colResult}>
-                      <StatusBadge tone={statusTone(run.status)}>{STATUS_LABEL[run.status]}</StatusBadge>
+                      <StatusBadge tone={statusTone(run.status)}>{runStatusLabel(run.status)}</StatusBadge>
                       {reason ? <span className={styles.sub} title={reason}>{reason}</span> : null}
                     </Td>
                     <Td className={styles.colDone}>
@@ -617,11 +626,11 @@ primary: confirmCancel && run.canCancel && canOperate && !operateReason ? <Butto
 menuItems: confirmCancel && run.canRetry ? [{ id: 'retry-run', label: '失敗した処理をもう一度やる', allowed: canOperate, disabled: retryingId !== null, lockedReason: operateReason, onSelect: () => void retryRun(run) }] : [],
 secondary: run.canCancel ? confirmCancel && canOperate && !operateReason ? <Button variant="secondary" onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button> : <Button variant="secondary" onClick={() => { if (canUseRunActionNow('operate')) setConfirmCancel(true) }} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null}>この実行を取りやめる</Button> : null,
 } : undefined}
-         status={run ? <StatusBadge tone={statusTone(run.status)}>{STATUS_LABEL[run.status]}</StatusBadge> : null}>
+         status={run ? <StatusBadge tone={statusTone(run.status)}>{runStatusLabel(run.status)}</StatusBadge> : null}>
 <DetailContent>
           {run ? (
             <div className={styles.panel}>
-              <LogEntryCopy canCopy={permissions?.canExport === true} entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: STATUS_LABEL[run.status], reason: resultReason(run) ?? STATUS_LABEL[run.status] }} />
+              <LogEntryCopy canCopy={permissions?.canExport === true} entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: runStatusLabel(run.status), reason: resultReason(run) ?? runStatusLabel(run.status) }} />
               <DetailField label="版">
                 {`第${(runDetail ?? run).versionNumber}版`}
                 {(runDetail ?? run).isTest ? '・テスト実行' : ''}
@@ -629,7 +638,7 @@ secondary: run.canCancel ? confirmCancel && canOperate && !operateReason ? <Butt
               </DetailField>
               <DetailFields>
                 <div><dt>きっかけ</dt><dd>{run.triggerLabel}</dd></div>
-                <div><dt>結果</dt><dd>{STATUS_LABEL[run.status]}</dd></div>
+                <div><dt>結果</dt><dd>{runStatusLabel(run.status)}</dd></div>
                 <div><dt>したこと・失敗理由</dt><dd>{run.detail ?? '何もしていません'}</dd></div>
                 <div><dt>かかった時間</dt><dd>{durationText(run.durationMs)}</dd></div>
                 {runDetail?.holdReason ? <><div><dt>止まっている理由</dt><dd>{runDetail.holdReason}</dd></div></> : null}
@@ -648,7 +657,7 @@ secondary: run.canCancel ? confirmCancel && canOperate && !operateReason ? <Butt
                   {runDetail.steps.map((step) => (
                     <li key={step.stepKey} className={styles.step}>
                       <span>{step.actionLabel}{step.commonActionVersionId ? '（共通アクション）' : ''}</span>
-                      <span className={styles.stepMeta}>{`${step.attemptNumber} 回目・${STEP_STATUS_LABEL[step.status]}`}</span>
+                      <span className={styles.stepMeta}>{`${step.attemptNumber} 回目・${stepStatusLabel(step.status)}`}</span>
                       {step.errorMessage ? <span className={styles.stepError}>{step.errorMessage}</span> : null}
                     </li>
                   ))}

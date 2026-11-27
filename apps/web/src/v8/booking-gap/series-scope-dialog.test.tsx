@@ -26,7 +26,7 @@ test('対象は選んだ回から後の有効な回だけ（取消済みは数�
   const onDone = vi.fn()
   render(<SeriesScopeDialog open mode="change" accountId="a1" target={target} newStartsAt="2026-12-11T16:00:00+09:00" onClose={() => {}} onDone={onDone} />)
   expect(await screen.findByText('変わる日（3 件）')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: '3 件を変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '3 件を変更する' }))
   await waitFor(() => expect(change).toHaveBeenCalledTimes(1))
   expect(change.mock.calls[0][2]).toMatchObject({ scope: 'following', fromBookingId: 'b3', expectedVersion: 3, change: { startsAt: '2026-12-11T16:00:00+09:00' } })
   /* 変えられなかった回（口の conflicts）は黙らず知らせる。 */
@@ -70,7 +70,7 @@ test('埋まっている回を数えず、見込みの取得失敗は実行を�
   ] } })
   render(<SeriesScopeDialog open mode="change" accountId="a1" target={target} newStartsAt="2026-12-11T16:00:00+09:00" onClose={() => {}} onDone={() => {}} />)
   expect(await screen.findByText(/埋まっています・14:00 のまま/)).toBeTruthy()
-  expect(screen.getByRole('button', { name: '2 件を変える' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '2 件を変更する' })).toBeTruthy()
   /* 見出しとボタンの数が食い違って見えないよう「3 件のうち 2 件」と書く。 */
   expect(screen.getByText('変わる日（3 件のうち 2 件）')).toBeTruthy()
   cleanup()

@@ -122,7 +122,7 @@ export function PreviewStep({ rule, definition, routeNames, runTest, onTestCondi
             <div key={row.label} className={styles.confirmRow}>
               <dt>{row.label}</dt>
               <dd title={row.value}>{row.value}</dd>
-              <dd>{canEdit ? <Button variant="text" size="inline" href={row.href}>変える</Button> : <Button variant="text" size="inline" disabled lockedReason={editLockReason}>変える</Button>}</dd>
+              <dd>{canEdit ? <Button variant="text" size="inline" href={row.href}>変更する</Button> : <Button variant="text" size="inline" disabled lockedReason={editLockReason}>変更する</Button>}</dd>
             </div>
           ))}
         </dl>

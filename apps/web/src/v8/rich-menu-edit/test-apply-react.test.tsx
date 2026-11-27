@@ -207,3 +207,14 @@ it.each(['apply', 'revert'] as const)('閉じたテスト確認の古い確定�
   await act(async () => { await oldClick({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button}) })
   expect(kind === 'apply' ? net.apply : net.revert).not.toHaveBeenCalled()
 })
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の本人テスト状態 %s は操作を止めて案内する', async status => {
+  net.state.active = item(status)
+  const panel = await openTest()
+  expect(within(panel).getByText('いまの状態: 状態を確認しています')).toBeTruthy()
+  expect((within(panel).getByRole('button', { name: '自分のLINEに適用して試す' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(within(panel).queryByRole('button', { name: '元のメニューに戻す' })).toBeNull()
+  expect(net.apply).not.toHaveBeenCalled()
+  expect(net.revert).not.toHaveBeenCalled()
+})

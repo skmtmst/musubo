@@ -48,7 +48,7 @@ export default function StoreSelectionGate({ children }: { children: React.React
       <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-card-surface">
         <h1 className="text-xl font-bold text-ink">LINE公式アカウントを選んでください</h1>
         <p className="mt-2 text-sm text-ink-secondary">この画面はLINE公式アカウントごとのデータを扱います。統括のアカウント一覧から選んでください。</p>
-        <Button href={selectHref} variant="primary" className="mt-6">LINE公式アカウントを選ぶ</Button>
+        <Button href={selectHref} variant="primary" className="mt-6">LINE公式アカウントを選択する</Button>
       </section>
     )
   }

@@ -270,7 +270,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       { id: 'edit', label: '編集', external: false, href: `/tags/fields/edit?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/edit?id=${encodeURIComponent(field.id)}`) },
     ]
     if ((knownUsageCount(field) ?? 0) > 0) {
-      list.push({ id: 'migrate', label: '移行（種類を変える）', external: false, href: `/tags/fields/migrate?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`) })
+      list.push({ id: 'migrate', label: '移行（種類を変更する）', external: false, href: `/tags/fields/migrate?id=${encodeURIComponent(field.id)}`, onSelect: () => router.push(`/tags/fields/migrate?id=${encodeURIComponent(field.id)}`) })
     }
     if (!field.isInherited) {
       const blocked = fieldDeletionBlockedReason(field)

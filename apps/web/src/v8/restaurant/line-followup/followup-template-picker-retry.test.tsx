@@ -50,7 +50,7 @@ describe('FollowupTemplatePicker の失敗時再読み込みと再選択', () =>
 
     const option = await screen.findByRole('radio', { name: templateA.name })
     fireEvent.click(option)
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する' }))
     await waitFor(() => expect(onPick).toHaveBeenCalledTimes(1))
     expect(calls.messages).toHaveBeenCalledTimes(2)
   })
@@ -65,7 +65,7 @@ describe('FollowupTemplatePicker の失敗時再読み込みと再選択', () =>
 
     const option = await screen.findByRole('radio', { name: templateA.name })
     fireEvent.click(option)
-    const confirm = screen.getByRole('button', { name: '選ぶ' }) as HTMLButtonElement
+    const confirm = screen.getByRole('button', { name: '選択する' }) as HTMLButtonElement
     fireEvent.click(confirm)
 
     await screen.findByText('このテンプレートを読み込めませんでした。もう一度選んでください')

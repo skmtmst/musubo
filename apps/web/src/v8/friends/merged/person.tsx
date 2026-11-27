@@ -98,7 +98,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
               </li>
               {person.profileValues.map((value) => (
                   <li key={value.fieldKey} className={styles.value} title={profileValueDetails(value)}>
-                    <span className={styles.valueLabel}>{FIELD_WORD[value.fieldLabel] ?? value.fieldLabel}</span>
+                    <span className={styles.valueLabel}>{Object.prototype.hasOwnProperty.call(FIELD_WORD, value.fieldLabel) ? FIELD_WORD[value.fieldLabel] : value.fieldLabel}</span>
                     <span className={styles.valueText}>{value.valuePreview ?? emptyValue('unknown')}</span>
                   </li>
               ))}

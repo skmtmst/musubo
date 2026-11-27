@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { formatStamp } from '@/lib/common-vars'
 import { formatListTimestamp,formatDate as polishFormatDate } from '@/lib/format'
@@ -88,7 +90,7 @@ export function stateBadge(item: CommonVar): { label: string; tone: 'success' | 
     return { label: formatMonthDay(item.validUntil), tone: 'info' }
   }
   return {
-    label: COMMON_VAR_STATE_LABELS[state] ?? '使用中',
+    label: knownValue(COMMON_VAR_STATE_LABELS, state, '状態を確認できません'),
     tone: state === 'active' ? 'success' : state === 'expired' ? 'warning' : 'neutral',
   }
 }

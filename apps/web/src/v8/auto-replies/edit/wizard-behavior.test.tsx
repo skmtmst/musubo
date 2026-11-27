@@ -113,6 +113,17 @@ it('見送りになったら、先に動くルールと見送った理由を運�
   expect(screen.getByText(/見送った理由：/).textContent).toBe('見送った理由：上のルールが先に動きます・担当者が対応中です')
 })
 
+it('未知の見送り理由が組み込み名と同じでも理由を文字列として表示する', async () => {
+  net.testDraft.mockResolvedValue({ success: true, data: {
+    draftWon: false, winner: { autoReplyId: 'rule-top', name: '先に動くルール' }, staleTest: false,
+    candidates: [{ autoReplyId: 'synthetic-rule', reasonCodes: ['operator_handling', 'new_reason', 'constructor', 'toString', '__proto__'] }],
+  } })
+  render(<Page />); await act(async () => {})
+  fireEvent.change(document.querySelector('#wiz-test-message') as HTMLInputElement, { target: { value: '予約したい' } })
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '試す', exact: true })))
+  expect(screen.getByText(/見送った理由：/).textContent).toBe('見送った理由：担当者が対応中です・理由を確認できませんでした')
+})
+
 it('保存できたときだけ「下書きを保存しました」を出す', async () => {
   net.query = 'id=synthetic-rule&step=basic'
   render(<Page />); await act(async () => {})

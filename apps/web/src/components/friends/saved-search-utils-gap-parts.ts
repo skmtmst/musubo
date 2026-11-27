@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import type { SavedSearchCondition, SavedSearchConditions, Tag } from '@line-crm/shared';
 
 
@@ -77,7 +78,7 @@ export function describeSavedCondition(
       : '項目未指定'
     if (condition.op === 'exists' || condition.op === 'has') return `${fieldName} が登録あり`
     if (condition.op === 'not_exists' || condition.op === 'not_has') return `${fieldName} が未登録`
-    return `${fieldName} ${FIELD_OP_LABELS[condition.op] ?? 'が次と同じ'}「${value || '未指定'}」`
+    return `${fieldName} ${knownValue(FIELD_OP_LABELS, condition.op, 'が次と同じ')}「${value || '未指定'}」`
   }
   if (condition.kind === 'status_message') return condition.op === 'eq' ? `ステータスメッセージが「${value || '未指定'}」` : `ステータスメッセージに「${value || '未指定'}」を含む`
   if (condition.kind === 'mark') return `対応マークが「${labels.marks?.[raw] ?? (raw ? '選択済みの対応マーク' : '未指定')}」`
@@ -96,7 +97,7 @@ export function describeSavedCondition(
     return `最後の来店・購入の日 ${r.from ?? '…'} 〜 ${r.to ?? '…'}`
   }
   if (condition.kind === 'member_tier') return '会員ランクを指定'
-  if (condition.kind === 'chat_status') return `対応状況が「${CHAT_STATUS_LABELS[raw] ?? (raw ? '選択済みの状態' : '未指定')}」`
+  if (condition.kind === 'chat_status') return `対応状況が「${knownValue(CHAT_STATUS_LABELS, raw, raw ? '選択済みの状態' : '未指定')}」`
   if (condition.kind === 'following') return condition.value === true ? '友だち中' : 'ブロック済み'
   if (condition.kind === 'created_at') return singleDateLabel(condition, '友だち追加日')
   if (condition.kind === 'last_activity') return singleDateLabel(condition, '最終反応日')

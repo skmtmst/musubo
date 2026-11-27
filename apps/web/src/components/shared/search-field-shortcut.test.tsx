@@ -5,7 +5,7 @@ import {afterEach,expect,it,vi} from 'vitest'
 import SearchField from './search-field'
 import CommandPalette from './command-palette'
 import Button from './button'
-vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),prefetch:vi.fn()})}))
+vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),prefetch:vi.fn()}),usePathname:()=>'/'}))
 afterEach(()=>{cleanup();delete document.documentElement.dataset.theme})
 it('古い指定があっても ⌘K は探す窓だけを開く',()=>{
  document.documentElement.dataset.theme='v8'

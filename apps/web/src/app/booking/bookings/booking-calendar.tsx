@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { formatYen } from '@line-crm/shared';
 
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
@@ -118,7 +120,7 @@ function BookingCard({ booking, compact = false, onOpen }: {
   onOpen: (id: string) => void
 }) {
   const phone = isPhoneBooking(booking)
-  const statusMark = CARD_STATUS_LABEL[booking.status]
+  const statusMark = knownValue(CARD_STATUS_LABEL, booking.status, '')
   return (
     <button
       type="button"

@@ -292,7 +292,7 @@ const STATUS_ORDER: ChatStatus[] = ['unread', 'in_progress', 'on_hold', 'resolve
 export function StatusDropdown({
   value,
   onChange,
-  ariaLabel = '対応状況を変える',
+  ariaLabel = '対応状況を変更する',
 }: {
   value: ChatStatus
   onChange: (next: ChatStatus) => void

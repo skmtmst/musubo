@@ -37,7 +37,7 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
   disabledReason?: string; visibilityControl?: React.ReactNode; visibilityLabel?: string
 }) {
   const controls = <>
-    <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
+    <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選択する`}>{photo ? '替える' : '写真を選択する'}</Button>
     {photo || position ? <Button onClick={onRemove} disabled={busy || !photo} disabledReason={disabledReason ?? (!photo ? '写真はありません。' : undefined)} aria-label={`${name}の写真を外す`}>外す</Button> : null}
     {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
   </>

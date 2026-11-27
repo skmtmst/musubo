@@ -43,8 +43,11 @@ export default function FieldEdit() {
   /* R517: 版の衝突で返ってきた最新の内容。 */
   const [conflictName, setConflictName] = useState<string | null>(null)
   const latestConflict = useRef<FriendField | null>(null)
-  const context = useRef({ account: selectedAccountId, id })
-  context.current = { account: selectedAccountId, id }
+  const context = useRef({ account: selectedAccountId, id, generation: 0 })
+  if (context.current.account !== selectedAccountId || context.current.id !== id) context.current = { account: selectedAccountId, id, generation: context.current.generation + 1 }
+  const folderRequest = useRef(0)
+  const [loadedGeneration, setLoadedGeneration] = useState<number | null>(null)
+  useEffect(() => { setSaving(false); setFoldersReloading(false) }, [selectedAccountId, id])
   const draftValues = useRef<FieldEditorValues | null>(null)
   const trackDraft = useCallback((values: FieldEditorValues) => { draftValues.current = values }, [])
   const [loading, setLoading] = useState(true)
@@ -55,26 +58,31 @@ export default function FieldEdit() {
   const [error, setError] = useState('')
 
   const loadFolders = useCallback(async () => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || context.current.account !== selectedAccountId || context.current.id !== id) return
+    const generation = context.current.generation
+    const request = ++folderRequest.current
     setFoldersReloading(true)
     try {
       const res = await api.folders.list('friend_field')
+      if (generation !== context.current.generation || request !== folderRequest.current) return
       if (!res.success) throw new Error(res.error)
       setFolders(res.data)
       setFoldersState('ready')
     } catch (saveFailure) {
+      if (generation !== context.current.generation || request !== folderRequest.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
       // R516: 失敗を隠さず、所属の選択欄の場所で再試行する。
       { if (!fieldFailure)
       setFoldersState('error') }
     } finally {
-      setFoldersReloading(false)
+      if (generation === context.current.generation && request === folderRequest.current) setFoldersReloading(false)
     }
-  }, [selectedAccountId, saveErrors])
+  }, [selectedAccountId, id, saveErrors])
 
   useEffect(() => {
     let cancelled = false
-    if (!id || !selectedAccountId) { setLoading(false); return }
+    const generation = context.current.generation
+    if (!id || !selectedAccountId) { setLoadedGeneration(generation); setLoading(false); return }
     setLoading(true)
     setError('')
     setField(null)
@@ -108,7 +116,7 @@ export default function FieldEdit() {
         setError(describeApiFailure(reason, '項目の読み込み'))
       }
     }).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled) { setLoadedGeneration(generation); setLoading(false) }
     })
     return () => { cancelled = true }
   }, [id, reloadKey, selectedAccountId])
@@ -120,10 +128,11 @@ export default function FieldEdit() {
    */
   const handleVersionConflict = async (sent: SentFieldContent) => {
     const account = selectedAccountId
+    const generation = context.current.generation
     if (!account || !field) return
     try {
       const res = await api.friendFields.list(account, { withUsage: true })
-      if (context.current.account !== account || context.current.id !== field.id) return
+      if (context.current.generation !== generation) return
       if (!res.success) throw new Error(res.error)
       const latest = res.data.find((item) => item.id === field.id) ?? null
       if (!latest) {
@@ -145,6 +154,7 @@ export default function FieldEdit() {
             setError('ほかの担当者が先に変更しました。最新の内容を確認してから保存し直してください。')
       }
     } catch (saveFailure) {
+      if (context.current.generation !== generation) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
@@ -154,7 +164,8 @@ export default function FieldEdit() {
   }
 
   const save = async (values: FieldEditorValues) => {
-    if (saving || !field || !selectedAccountId) return
+    if (saving || !field || !selectedAccountId || context.current.account !== selectedAccountId || context.current.id !== id) return
+    const generation = context.current.generation
     const sent: SentFieldContent = {
       name: values.name,
       folderId: values.folderId || null,
@@ -174,6 +185,7 @@ export default function FieldEdit() {
         // 読んだ版と違えばサーバーが409で止める。他の人の先勝ちを黙って潰さない。
         version: field.version,
       })
+      if (generation !== context.current.generation) return
       if (!res.success) throw new Error(res.error)
       setField(res.data)
       setSiblings((rows) => rows.map((row) => row.id === res.data.id ? res.data : row))
@@ -181,6 +193,7 @@ export default function FieldEdit() {
       collision.clear()
       notifySaved()
     } catch (reason) {
+      if (generation !== context.current.generation) return
       const fieldFailure = saveErrors.capture(reason);
 
       if (reason instanceof ApiError && reason.status === 409
@@ -191,7 +204,7 @@ export default function FieldEdit() {
         setError(describeApiFailure(reason, '項目の保存')) }
       }
     } finally {
-      setSaving(false)
+      if (generation === context.current.generation) setSaving(false)
     }
   }
 
@@ -222,7 +235,7 @@ export default function FieldEdit() {
       /></SaveErrorScope>
     )
   }
-  if (loading) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
+  if (loading || loadedGeneration !== context.current.generation) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!selectedAccountId) return <SaveErrorScope errors={saveErrors}><ListState kind="empty" title="上部でLINE公式アカウントを選んでください" /></SaveErrorScope>
   if (notFound || (!error && !field)) {
     return (
@@ -258,6 +271,7 @@ export default function FieldEdit() {
     </>
   )
 
+  const createGeneration = context.current.generation
   return (
     <>
     <SaveErrorScope errors={saveErrors}><FieldEditor
@@ -270,7 +284,10 @@ export default function FieldEdit() {
       foldersReloading={foldersReloading}
       onRetryFolders={() => void loadFolders()}
       onCreateFolder={canCreateFolder
-        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+        ? folderCreator((name, color) => {
+          if (context.current.generation !== createGeneration) throw new Error('アカウントが変わりました。開き直してください。')
+          return api.folders.create({ kind: 'friend_field', name, color, accountId: selectedAccountId })
+        }, folderById, (created) => { if (context.current.generation === createGeneration) setFolders((current) => [...current, created]) })
         : undefined}
       siblings={siblings}
       siblingsReady

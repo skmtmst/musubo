@@ -436,11 +436,11 @@ describe('フォルダ', () => {
 
   it('フォルダの操作は名前・色・並べ替え・消す。端の行には動けない向きの並べ替えを出さない', async () => {
     await renderList()
-    expect(await folderMenu('予約')).toEqual(['名前を変える', '色を変える', '並べ替える（下へ）', '消す'])
+    expect(await folderMenu('予約')).toEqual(['名前を変更する', '色を変更する', '並べ替える（下へ）', '消す'])
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(await folderMenu('来店')).toEqual(['名前を変える', '色を変える', '並べ替える（上へ）', '並べ替える（下へ）', '消す'])
+    expect(await folderMenu('来店')).toEqual(['名前を変更する', '色を変更する', '並べ替える（上へ）', '並べ替える（下へ）', '消す'])
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(await folderMenu('発送')).toEqual(['名前を変える', '色を変える', '並べ替える（上へ）', '消す'])
+    expect(await folderMenu('発送')).toEqual(['名前を変更する', '色を変更する', '並べ替える（上へ）', '消す'])
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(await folderMenu('すべて')).toContain('フォルダを追加')
   })

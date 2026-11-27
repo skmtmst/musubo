@@ -30,7 +30,7 @@ import { Fragment,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,FirstStepsFeedback,summarizeFirstSteps,useFirstSteps } from './first-steps'
-import { isFirstStepsComplete } from './first-steps-model'
+import { isFirstStepsComplete, shouldKeepFirstStepsVisible } from './first-steps-model'
 import { FirstRunDoneDialog } from './first-run-done'
 import { FirstRunPopup, useFirstRunPopup } from './first-run-popup'
 import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
@@ -358,7 +358,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       onChanged={() => { start.reload(); setup.reload() }} />
   ) : null
   const onboardingSummary = start.summary ?? (start.status === 'ready' && canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
-  const keepOnboarding = start.status !== 'ready' || setup.status === 'loading' || Boolean(start.error || setup.error)
+  const keepOnboarding = shouldKeepFirstStepsVisible(start, setup)
   const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage) && (keepOnboarding || !isFirstStepsComplete(onboardingSummary))
   /* 初回ポップアップ（枠 02 / 02b）と、上の帯の「開店準備 N/9」の札。 */
   const firstRunPopup = useFirstRunPopup({
@@ -406,7 +406,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。 */}
-        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>}
+        {canEditLayout ? <Button type="button" onClick={d.openEditor}><SlidersHorizontal size={16} aria-hidden="true" />表示を変更する</Button> : <Button type="button" lockedReason={layoutLockReason} disabled={!layoutLockReason}><SlidersHorizontal size={16} aria-hidden="true" />表示を変更する</Button>}
         {canManage ? <Button variant="primary" href="/broadcasts/new"><Plus size={16} aria-hidden="true" />配信を作る</Button> : <Button variant="primary" lockedReason={manageLockReason} disabled={!manageLockReason}><Plus size={16} aria-hidden="true" />配信を作る</Button>}
       </>}
       notice={notice}

@@ -51,6 +51,23 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('ログインユーザーを追加する：欄を離れたときの検査', () => {
+  it('送信前の確認には入力した宛先・担当店舗・役割が反映される', async () => {
+    await act(async () => { render(<NewStaffPage />) })
+    const section = screen.getByRole('region', { name: '送信前の確認' })
+    expect(within(section).getAllByText('未入力')).toHaveLength(2)
+    fireEvent.change(nameField(), { target: { value: '見本 花子' } })
+    fireEvent.change(document.getElementById('staff-email')!, { target: { value: 'hanako@example.test' } })
+    fireEvent.click(screen.getByRole('radio', { name: /閲覧のみ/ }))
+    expect(within(section).getByText('見本 花子')).toBeTruthy()
+    expect(within(section).getByText('hanako@example.test')).toBeTruthy()
+    expect(within(section).getByText('本店')).toBeTruthy()
+    expect(within(section).getByText('閲覧のみ')).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: /スタッフ/ }))
+    expect(within(section).getByText('未選択')).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ダッシュボード' }))
+    expect(within(section).getByText('ダッシュボード')).toBeTruthy()
+    expect(createStaff).not.toHaveBeenCalled()
+  })
   it('名前の欄を空のまま離れると、その欄だけ理由を出し、入れると消える', async () => {
     await act(async () => { render(<NewStaffPage />) })
     expect(screen.queryByText('名前を入力してください')).toBeNull()

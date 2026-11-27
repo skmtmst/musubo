@@ -602,7 +602,7 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     expect(net.calls.some((call) => call.path.includes('/audiences?'))).toBe(false)
   })
 
-  it('staffには編集・停止・保管の操作を出さない', async () => {
+  it('staffには編集・停止・保管を理由付きで表示し、実行しない', async () => {
     fixture.tab = 'funnel'
     net.handler = async (path: string) => {
       if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'staff' } }
@@ -613,11 +613,13 @@ describe('ファネルの編集・停止・保管(#841)', () => {
     await render()
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
 
-    expect(host.textContent).not.toContain('定義を編集')
-    expect(Array.from(host.querySelectorAll('button')).some(item => item.textContent === '削除する')).toBe(false)
-    expect(
-      Array.from(host.querySelectorAll('button')).some((item) => item.textContent === '停止'),
-    ).toBe(false)
+    for (const label of ['定義を編集', '削除する', '停止']) {
+      const control = Array.from(host.querySelectorAll('button')).find(item => item.textContent === label)
+      expect(control).toBeDefined()
+      expect(control!.disabled || control!.getAttribute('aria-disabled') === 'true').toBe(true)
+      await act(async () => { control!.click() })
+    }
+    expect(net.calls.some(call => call.path.includes('/status?') || call.path.includes('/versions?'))).toBe(false)
   })
 })
 

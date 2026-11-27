@@ -13,7 +13,7 @@ test('区分を変えても並べ替えた下書きを保ち、確定した時�
   const apply = vi.fn()
   render(<ReorderDialog groups={groups} initialOrder={{}} onApply={apply} onCancel={() => {}} moveItemInOrder={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: '一斉配信を下へ' }))
-  fireEvent.click(screen.getByRole('button', { name: '並びを変える区分を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '並びを変更する区分を選択する' }))
   fireEvent.click(within(screen.getByRole('option', { name: 'メイン' })).getByRole('button'))
   expect(screen.getByText('友だち')).toBeTruthy()
   expect(apply).not.toHaveBeenCalled()

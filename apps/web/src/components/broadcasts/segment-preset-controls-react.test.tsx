@@ -57,7 +57,7 @@ function button(label: string): HTMLButtonElement {
 }
 
 async function openChooser() {
-  await act(async () => { fireEvent.click(button('保存した条件から選ぶ')) })
+  await act(async () => { fireEvent.click(button('保存した条件から選択する')) })
   await flush()
 }
 
@@ -78,7 +78,7 @@ describe('保存した対象条件を読む・保存する', () => {
     await openChooser()
     expect(mocks.list).toHaveBeenCalledExactlyOnceWith('acc-1')
     // 押し口は設計 cPk8A、選ぶ窓の中身は設計 sqFXf の形。
-    expect(document.querySelector('[data-design-node="cPk8A"]')?.textContent).toContain('保存した条件から選ぶ')
+    expect(document.querySelector('[data-design-node="cPk8A"]')?.textContent).toContain('保存した条件から選択する')
     expect(document.querySelector('[role="dialog"] [data-design-node="sqFXf"]')).not.toBeNull()
     expect(document.body.textContent).toContain('反応した友だち')
 
@@ -185,14 +185,14 @@ describe('押せない理由を本文に出す', () => {
   it('アカウントが無いときは保存も選ぶも押せず、理由を文字で出す', () => {
     render(<SegmentPresetControls accountId={null} value={condition} onApply={() => {}} />)
     expect(button('この条件を保存する').disabled).toBe(true)
-    expect(button('保存した条件から選ぶ').disabled).toBe(true)
+    expect(button('保存した条件から選択する').disabled).toBe(true)
     expect(document.body.textContent).toContain('先にLINEアカウントを選ぶと、この条件を保存できます。')
   })
 
   it('詳細条件が空のときは保存を押せず、理由を文字で出す', () => {
     render(<SegmentPresetControls accountId="acc-1" value={null} onApply={() => {}} />)
     expect(button('この条件を保存する').disabled).toBe(true)
-    expect(button('保存した条件から選ぶ').disabled).toBe(false)
+    expect(button('保存した条件から選択する').disabled).toBe(false)
     expect(document.body.textContent).toContain('詳細条件を1つ以上入力すると、この条件を保存できます。')
   })
 })

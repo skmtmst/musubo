@@ -59,3 +59,10 @@ it('取得失敗からの再読込中も履歴タブで待ち、送信へ移ら�
   await waitFor(() => expect(screen.getByRole('tab', { name: '問い合わせを送る' }).getAttribute('aria-selected')).toBe('true'))
   expect(source.create).not.toHaveBeenCalled()
 })
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の問い合わせ状態 %s は解決と決めずに表示する', async status => {
+  source.list.mockResolvedValue({ success: true, data: [{ id: 'r1', kind: 'usage', kindLabel: '使い方', subject: '予約の設定', status, createdAt: '2026-10-25T01:00:00Z', replies: [] }] })
+  render(<HqSupportV8 />)
+  expect(await screen.findByText('状態を確認できません')).toBeTruthy()
+  expect(screen.queryByText('解決済み')).toBeNull()
+})

@@ -568,7 +568,7 @@ function InflowDetailContent() {
                 <Button onClick={() => reopenRoute()} busyLabel="処理中…">受付を再開する</Button>
               )}
               <Button variant="primary" onClick={() => setEditingRoute(true)}>
-                <Pencil size={16} aria-hidden="true" />{happenParts.length > 0 ? 'することを変える' : 'することを決める'}
+                <Pencil size={16} aria-hidden="true" />{happenParts.length > 0 ? 'することを変更する' : 'することを決める'}
               </Button>
             </>}
           </>} heading={<>{happenTitle}</>}>

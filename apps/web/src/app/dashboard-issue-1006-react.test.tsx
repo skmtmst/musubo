@@ -261,7 +261,7 @@ function todayCard(title: string): HTMLElement {
 }
 
 async function openEditor() {
-  await act(async () => { button('表示を変える').click() })
+  await act(async () => { button('表示を変更する').click() })
   await screen.findByRole('dialog', { name: 'ダッシュボード編集' })
 }
 

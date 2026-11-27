@@ -101,14 +101,14 @@ describe('M012 友だち詳細の失敗表示', () => {
     await act(async () => { button('シナリオを開く').click() })
     await settle()
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[aria-label="登録するシナリオ：選ぶ"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="登録するシナリオ：選択する"]')!.click()
     })
     const pickerDialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
     await act(async () => {
       pickerDialog.querySelector<HTMLInputElement>('input[type="radio"][aria-label="7日間フォロー"]')!.click()
     })
     await act(async () => {
-      [...pickerDialog.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ')!.click()
+      [...pickerDialog.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選択する')!.click()
     })
     await settle()
     await act(async () => { button('このシナリオに登録する').click() })

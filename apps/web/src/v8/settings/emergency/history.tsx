@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 import { useRunningVersion } from '@/lib/use-running-version'
 
 /*
@@ -106,7 +107,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
           <ul className={styles.lines} aria-label="この回のすべての変更">
             {card.entries.map((entry, index) => (
               <li key={`${index}|${entry.text}`} className={styles.line}>
-                <span className={styles.kind}>{KIND_LABEL[entry.kind as UpdateKind] ?? '変更'}</span>{entry.text}
+                <span className={styles.kind}>{knownValue(KIND_LABEL, entry.kind as UpdateKind, '変更')}</span>{entry.text}
               </li>
             ))}
           </ul>

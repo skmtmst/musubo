@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import TextLink from '@/components/shared/text-link'
 import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
@@ -90,7 +91,7 @@ const BRANCH_LABELS: Record<string, string> = {
   expired: '期限切れ',
 }
 
-const BADGE_TONE: Record<string, 'info' | 'warning' | 'caution' | 'success' | 'danger'> = {
+const BADGE_TONE: Record<string, 'info' | 'warning' | 'caution' | 'success' | 'danger' | 'neutral'> = {
   pending_approval: 'caution',
   scheduled: 'info',
   preparing: 'info',
@@ -99,6 +100,9 @@ const BADGE_TONE: Record<string, 'info' | 'warning' | 'caution' | 'success' | 'd
   partial_failed: 'warning',
   failed: 'danger',
 }
+
+export const broadcastBranchLabel = (status: string) => knownValue(BRANCH_LABELS, status, '')
+export const broadcastBadgeTone = (status: string) => knownValue(BADGE_TONE, status, 'neutral')
 
 type TabKey = 'overview' | 'recipients' | 'activity'
 
@@ -175,7 +179,7 @@ export default function BroadcastDetail({
   const abResult = useAbResult(broadcast.status === 'draft' ? null : broadcast.id)
   const abStatus = abStatusDefinition(abResult.result)
   const statusLabel = abStatus?.label ?? baseStatusLabel
-  const badgeTone = abStatus ? (abStatus.tone === 'neutral' ? 'info' : abStatus.tone) : BADGE_TONE[displayStatus]
+  const badgeTone = abStatus ? (abStatus.tone === 'neutral' ? 'info' : abStatus.tone) : broadcastBadgeTone(displayStatus)
   const isDraft = broadcast.status === 'draft'
   const isSent = broadcast.status === 'sent'
   const isScheduled = broadcast.status === 'scheduled'
@@ -600,7 +604,7 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval, abWaiting = f
     : displayStatus === 'expired' ? (withApproval ? 'pending_approval' : 'draft')
     : displayStatus
   const currentIndex = Math.max(0, steps.findIndex((step) => step.key === progressKey))
-  const branchLabel = BRANCH_LABELS[displayStatus]
+  const branchLabel = broadcastBranchLabel(displayStatus)
   return (
     <ol className={styles.rail} aria-label="配信の状態">
       {steps.map((step, index) => {
@@ -619,7 +623,7 @@ function DeliveryRail({ broadcast, approvalInvolved: withApproval, abWaiting = f
       {branchLabel ? (
         <li className={styles.railItem}>
           <span className={styles.railLine} aria-hidden="true" />
-          <StatusBadge tone={BADGE_TONE[displayStatus] ?? 'neutral'}>{branchLabel}</StatusBadge>
+          <StatusBadge tone={broadcastBadgeTone(displayStatus)}>{branchLabel}</StatusBadge>
         </li>
       ) : null}
     </ol>

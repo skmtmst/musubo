@@ -60,9 +60,9 @@ it('増加は緑の札に改善と全角の符号で出し、要確認は今の�
   await screen.findByText('前月 1人')
   for (const [title, text] of [['有効な友だち', '＋2'], ['今月の追加', '＋3']] as const) {
     const slot = deltaSlot(title)!
-    expect(slot.querySelector('svg')).toBeNull()
+    expect(slot.querySelector('svg[data-delta-direction="up"]')).not.toBeNull()
     expect(slot.querySelector('[data-delta-word]')?.textContent).toBe('改善')
-    expect(slot.firstElementChild?.firstElementChild?.textContent).toBe(text)
+    expect(slot.firstElementChild?.querySelector('span')?.textContent).toBe(text)
     expect(slot.textContent).not.toMatch(/[+-]/)
     expect(screen.getByText(text).closest('[aria-hidden="true"]')).toBeNull()
   }
@@ -79,9 +79,9 @@ it('減少は赤の札に悪化と全角の符号で出し、1つの札にまと
   await screen.findByText('前月 5人')
   for (const [title, text] of [['有効な友だち', '−1,200'], ['今月の追加', '−3']] as const) {
     const slot = deltaSlot(title)!
-    expect(slot.querySelector('svg')).toBeNull()
+    expect(slot.querySelector('svg[data-delta-direction="down"]')).not.toBeNull()
     expect(slot.querySelector('[data-delta-word]')?.textContent).toBe('悪化')
-    expect(slot.firstElementChild?.firstElementChild?.textContent).toBe(text)
+    expect(slot.firstElementChild?.querySelector('span')?.textContent).toBe(text)
     expect(slot.firstElementChild?.textContent).toBe(`${text}悪化`)
     expect(slot.textContent).not.toMatch(/[+-]/)
     expect(slot.querySelector('[data-tone="neutral"]')).toBeNull()

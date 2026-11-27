@@ -53,6 +53,19 @@ it('上の段を軽くするため読み直しは文字の押し口にする', a
   expect(reload.getAttribute('data-variant')).toBe('text')
 })
 
+it('二つのカードは何を畳むかを読み上げで区別でき、それぞれ独立して開閉する', async () => {
+  render(<StyleDashboard style="restaurant" />)
+  const first = await screen.findByRole('button', { name: 'はじめにやることを畳む' })
+  const today = await screen.findByRole('button', { name: '今日の確認を畳む' })
+  expect(first.textContent).toContain('畳む')
+  expect(today.textContent).toContain('畳む')
+  fireEvent.click(first)
+  expect(screen.getByRole('button', { name: 'はじめにやることを開く' }).getAttribute('aria-expanded')).toBe('false')
+  expect(today.getAttribute('aria-expanded')).toBe('true')
+  fireEvent.click(today)
+  expect(screen.getByRole('button', { name: '今日の確認を開く' }).getAttribute('aria-expanded')).toBe('false')
+})
+
 it('探す欄は正の包みで220pxの幅を保つ', async () => {
   render(<StyleDashboard style="restaurant" />)
   const input = await screen.findByPlaceholderText('名前・タグ・メモで探す')
@@ -239,4 +252,20 @@ it('飲食の手順が全部済むとカードを隠し、未確認があれば�
   firstRun.progressSteps = { ...firstRun.progressSteps, hours: { complete: null } }
   view.rerender(<StyleDashboard style="restaurant" />)
   expect(await screen.findByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+})
+
+it('飲食は全手順が完了していても設定の取得中と失敗時は案内を残し、復旧後に隠す', async () => {
+  firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'done', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
+  firstRun.progressSteps = Object.fromEntries(['attributes', 'friendAdd', 'scenario', 'hours', 'followup', 'richMenu'].map(key => [key, { complete: true }]))
+  let reject!: (reason: Error) => void
+  state.warnings.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(state.warnings).toHaveBeenCalled())
+  expect(await screen.findByRole('region', { name: 'はじめにやること', hidden: true })).toBeTruthy()
+  await act(async () => reject(new Error('offline')))
+  expect(await screen.findByText('使い方の設定を確認できませんでした')).toBeTruthy()
+  expect(screen.getByRole('region', { name: 'はじめにやること' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'はじめにやること', hidden: true })).toBeNull())
+  expect(state.warnings).toHaveBeenCalledTimes(2)
 })

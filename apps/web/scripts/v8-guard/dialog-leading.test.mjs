@@ -19,7 +19,7 @@ const rowMenu = async (page, item) => { await page.locator('main tbody button[ar
 const support = async page => { await page.getByRole('region', { name: 'チケットの一覧' }).locator('li button').first().click(); await page.getByRole('textbox', { name: '返信', exact: true }).waitFor() }
 
 const recipes = [
-  { source: 'components/friends/bulk-run-dialog.tsx', path: '/friends', open: async page => { const checks = page.locator('main tbody input[type="checkbox"]'); await checks.nth(0).check(); await checks.nth(1).check(); await button(page, '操作を選ぶ').click() } },
+  { source: 'components/friends/bulk-run-dialog.tsx', path: '/friends', open: async page => { const checks = page.locator('main tbody input[type="checkbox"]'); await checks.nth(0).check(); await checks.nth(1).check(); await button(page, '操作を選択する').click() } },
   { source: 'v8/onboarding/wizard.tsx', index: 0, path: '/?setup=0&setupReturn=accounts', after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
   { source: 'v8/onboarding/wizard.tsx', index: 1, path: '/?setup=0&setupReturn=accounts', noLeading: true, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
   { source: 'components/friend-fields/edit-tag-page-v4.tsx', path: '/tags/edit?id=tag-0', dependencyFailure: true, open: async page => { await button(page, 'タグを削除する').click() } },
@@ -32,7 +32,7 @@ const recipes = [
   { source: 'v8/affiliates/dialogs.tsx', path: '/affiliates?tab=payment', open: async page => { await page.locator('main tbody button').first().click() } },
   { source: 'v8/hq-templates/saved-distribution-dialog.tsx', path: '/hq/templates?item=visual-hq-tpl-autumn&mode=edit', open: async page => { await page.getByRole('textbox', { name: 'テンプレート名', exact: true }).fill('操作帯の確認'); await button(page, '保存する').click() } },
   { source: 'v8/webhooks/interactions.tsx', path: '/webhooks?tab=interactions', after: async page => { await button(page, '技術的な記録を開く').click(); await button(page, '技術的な記録を閉じる').waitFor() }, open: async page => { await rowMenu(page, '中身を見る') } },
-  { source: 'v8/restaurant/google/post-media-picker-dialog.tsx', path: '/restaurant-test/google?tab=posts&view=new&kind=standard', open: async page => { await button(page, '登録メディアから選ぶ').click() } },
+  { source: 'v8/restaurant/google/post-media-picker-dialog.tsx', path: '/restaurant-test/google?tab=posts&view=new&kind=standard', open: async page => { await button(page, '登録メディアから選択する').click() } },
   { source: 'v8/contents/media-upload-dialog.tsx', path: '/contents', open: async page => { await button(page, /メディアを登録|ファイルを入れる/).click() } },
   { source: 'v8/contents/list.tsx', path: '/contents', open: async page => { await page.locator('main [data-qa-open="YfTfJ"]').first().click(); await page.getByRole('menuitem', { name: '削除する', exact: true }).click() } },
   { source: 'v8/auto-replies/quick-create.tsx', path: '/auto-replies', open: async page => { await menu(page, /ルールを作る/, 'かんたんに作る') } },

@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { DetailContent, DetailFields } from '@/components/shared/detail-content'
@@ -83,7 +84,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   manual: '手動',
   birthday: '誕生日のきまり',
 }
-const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : emptyValue('unknown'))
+export const sourceLabel = (tag: Tag): string => (tag.assignSource ? knownValue(SOURCE_LABELS, tag.assignSource, '付け方を確認できません') : emptyValue('unknown'))
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 

@@ -26,7 +26,7 @@ it('V8でタグから配布先を選び、渡し済みを新しい選択に数�
   expect(already.disabled).toBe(true)
   expect(already.checked).toBe(false)
   fireEvent.click(within(dialog).getByRole('checkbox', { name: '支店' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する（1件）' }))
   await waitFor(() => expect(screen.queryAllByRole('dialog').includes(dialog)).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: '1アカウントへ配る' }))
   expect(deliver).toHaveBeenCalledWith(['b'])

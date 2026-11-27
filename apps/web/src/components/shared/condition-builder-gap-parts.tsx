@@ -51,7 +51,7 @@ function KindPicker({
   blockedRef.current = blocked
   useEffect(() => { if (blocked) setOpen(false) }, [blocked])
   return <>
-    <Button type="button" aria-label="追加する条件を選ぶ" disabled={disabled} lockedReason={lockedReason} onClick={() => { if (!blockedRef.current) setOpen(true) }}>
+    <Button type="button" aria-label="追加する条件を選択する" disabled={disabled} lockedReason={lockedReason} onClick={() => { if (!blockedRef.current) setOpen(true) }}>
       <Plus size={16} aria-hidden="true" />条件を足す
     </Button>
     {open && !blocked ? <EntityPickerDialog title="条件を選ぶ" confirmLabel="条件を足す" searchPlaceholder="条件の名前で探す"

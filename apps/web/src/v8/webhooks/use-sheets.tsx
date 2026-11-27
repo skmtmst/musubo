@@ -16,7 +16,7 @@ import { shortDateTime } from './words'
 
 
 
-import { RUN_KIND_LABEL, STALE_RUN_MS, groupRuns, syncResultProblem } from './sheets-runs'
+import { runKindLabel, runStatusLabel, STALE_RUN_MS, groupRuns, syncResultProblem } from './sheets-runs'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -32,6 +32,16 @@ const CALLBACK_MESSAGES: Record<string, { tone: 'success' | 'warn' | 'danger'; t
   'error:encryption_key_missing': { tone: 'danger', text: 'この環境の暗号化設定が不足しています。管理者に確かめてください。' },
   'error:state_cancelled': { tone: 'warn', text: 'この接続操作は、途中で別の接続操作や解除が行われたため取り消されました。接続したい場合はもう一度最初から進めてください。' },
   'error:no_permission': { tone: 'danger', text: 'Googleの許可画面でスプレッドシートの許可が外れていたため、接続していません。もう一度接続して、この許可を付けたままにしてください。' },
+}
+
+export function sheetsCallbackNotice(result: string | null) {
+  if (!result) return null
+  if (Object.prototype.hasOwnProperty.call(CALLBACK_MESSAGES, result)) return CALLBACK_MESSAGES[result]
+  return result.startsWith('error:') ? { tone: 'danger' as const, text: 'Googleとの接続に失敗しました。もう一度お試しください。' } : null
+}
+
+export function sheetsLastSyncText(at: string | null | undefined, status: string | null | undefined, kind: string | null | undefined): string {
+  return at ? `${shortDateTime(at)}${kind ? ` ${runKindLabel(kind)}` : ''}・${runStatusLabel(status ?? '')}` : emptyValue('unknown')
 }
 
 export function useSheets() {
@@ -252,19 +262,14 @@ export function useSheets() {
     }
   }
 
-  const callbackNotice = callbackResult
-    ? CALLBACK_MESSAGES[callbackResult]
-      ?? (callbackResult.startsWith('error:') ? { tone: 'danger' as const, text: 'Googleとの接続に失敗しました。もう一度お試しください。' } : null)
-    : null
+  const callbackNotice = sheetsCallbackNotice(callbackResult)
 
   const connStatus: 'connected' | 'pending_target' | 'expired' | 'disconnected' = connection?.status ?? 'disconnected'
   const staleRunningRun = runs.find((run) => run.status === 'running' && Date.parse(run.startedAt) < Date.now() - STALE_RUN_MS)
   const effectivelyRunning = syncRunning && !staleRunningRun
   const groups = groupRuns(runs)
   const lastKind = runs.find((run) => run.startedAt === connection?.lastSyncedAt)?.kind
-  const lastSyncText = connection?.lastSyncedAt
-    ? `${shortDateTime(connection.lastSyncedAt)}${lastKind ? ` ${RUN_KIND_LABEL[lastKind]}` : ''}・${connection.lastSyncStatus === 'partial' ? '一部だけ完了' : connection.lastSyncStatus === 'error' ? '失敗' : '完了'}`
-    : emptyValue('unknown')
+  const lastSyncText = sheetsLastSyncText(connection?.lastSyncedAt, connection?.lastSyncStatus, lastKind)
 
 
   return { saveErrors, selectedAccountId, selectedAccount, accounts, isOwner, overview, connection, canManage, oauthConfigured, status, actionError, saveNotice, disconnectNotice, runsError, runsLoading, busy, showTargetForm, setShowTargetForm, targetInput, setTargetInput, disconnectFor, setDisconnectFor, loadRuns, load, handleConnect, handleSaveTarget, handleSync, handleDisconnect, callbackNotice, connStatus, staleRunningRun, effectivelyRunning, groups, lastSyncText }

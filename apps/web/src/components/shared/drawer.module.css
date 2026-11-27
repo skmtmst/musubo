@@ -251,8 +251,6 @@
   height: var(--tpl-de-close);
   flex-basis: var(--tpl-de-close);
   border-radius: var(--radius-segment);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
   color: var(--color-ink-secondary);
 }
 
@@ -310,13 +308,13 @@
 :root .panel[data-layout='inset'] .description { margin-top: var(--tpl-af-dr-head-gap); font-size: var(--text-caption); line-height: normal; white-space: normal; overflow-wrap: anywhere; }
 :root .panel[data-layout='inset'] .body { padding: 0; }
 :root .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
-:root .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
+:root .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
 /* 注文の参照：本文と頭の間16・下の操作は左右。ほかの幅は変えない。 */
 :root .panel[data-width='order'] { width: min(var(--tpl-st2-od-w), 100%); gap: var(--tpl-st2-od-gap); }
 :root .panel[data-width='order'] .header { border: 0; padding: var(--tpl-st2-od-pad) var(--tpl-st2-od-pad) 0; }
 :root .panel[data-width='order'] .title { font-size: var(--tpl-st2-od-title); font-weight: 700; line-height: var(--tpl-st2-od-title-lh); }
 :root .panel[data-width='order'] .description { margin-top: var(--tpl-st2-od-head-text-gap); color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-st2-od-text-lh); }
-:root .panel[data-width='order'] .close { width: var(--tpl-st2-od-close); height: var(--tpl-st2-od-close); flex-basis: var(--tpl-st2-od-close); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+:root .panel[data-width='order'] .close { width: var(--tpl-st2-od-close); height: var(--tpl-st2-od-close); flex-basis: var(--tpl-st2-od-close); border-radius: var(--radius-control); }
 :root .panel[data-width='order'] .body { display: flex; flex-direction: column; gap: var(--tpl-st2-od-gap); padding: 0 var(--tpl-st2-od-pad); }
 :root .panel[data-width='order'] .footer { display: flex; justify-content: space-between; gap: var(--tpl-st2-od-gap); border: 0; padding: 0 var(--tpl-st2-od-pad) var(--tpl-st2-od-pad); }
 /* G-9: メッセージ作成の広い引き出し。ほかの引き出しは変えない。 */
@@ -377,11 +375,10 @@ html:root .panel[data-initial-focus='panel']:focus-visible { outline-color: tran
 html:root .panel .close {
   border: 0;
   border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
+  background: transparent;
   box-shadow: none;
 }
+html:root .panel .close:is(:hover, :focus-visible):not(:disabled) { background: var(--color-canvas-sunken); }
 html:root .panel .close:focus-visible {
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);

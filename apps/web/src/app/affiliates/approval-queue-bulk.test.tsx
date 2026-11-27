@@ -122,7 +122,7 @@ async function openBulkConfirm() {
     fireEvent.click(screen.getByLabelText('利用者2の成果を選ぶ'))
   })
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '操作を選択する' }))
   })
 }
 
@@ -161,7 +161,7 @@ describe('一括承認の確認と結果表示', () => {
     expect(fixture.bulkDecideCalls).toHaveLength(0)
     // 開き直して確定する。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
+      fireEvent.click(screen.getByRole('button', { name: '操作を選択する' }))
     })
     const reopened = await bulkConfirmation()
     await act(async () => {
@@ -373,7 +373,7 @@ describe('200件を超える成果の読み込みと操作', () => {
       fireEvent.click(checkbox)
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
+      fireEvent.click(screen.getByRole('button', { name: '操作を選択する' }))
     })
     const dialog = await bulkConfirmation()
     expect(within(dialog).getByText('利用者201／紹介者1／案件A')).toBeTruthy()
@@ -458,7 +458,7 @@ describe('アカウントでの絞り込み', () => {
       fireEvent.click(screen.getByLabelText('利用者Bの成果を選ぶ'))
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '操作を選ぶ' }))
+      fireEvent.click(screen.getByRole('button', { name: '操作を選択する' }))
     })
     const dialog = await bulkConfirmation()
     expect(within(dialog).getByText('利用者B／紹介者1／案件A')).toBeTruthy()

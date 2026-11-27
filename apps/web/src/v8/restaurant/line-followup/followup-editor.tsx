@@ -61,7 +61,7 @@ export function FollowupEditor({row,initialDraft,accountId,storeName,pageDirty,p
   if(!hasBody){setError('送る本文を入れるか、テンプレートを選んでください');return}
   onConfirm({...draft,enabled:true})
  }}>
-  <DetailColumns variant="followup-editor" asideLabel="届き方" expanded={expanded} onExpandedChange={setExpanded} aside={<FollowupMessageSample bubbles={draft.bubbles} storeName={storeName}/>}>
+  <DetailColumns variant="followup-editor" asideLabel="届き方" expanded={expanded} onExpandedChange={setExpanded} aside={<FollowupMessageSample trigger={row.trigger} bubbles={draft.bubbles} storeName={storeName}/>}>
    <div className={styles.stack} ref={setEditor}>
     <Field label="だれに（きっかけ）"><TextField readOnly value={origins[row.trigger]}/></Field>
     <FollowupTimingFields trigger={row.trigger} value={draft.timing} onChange={timing=>changeDraft({...draft,timing})}/>

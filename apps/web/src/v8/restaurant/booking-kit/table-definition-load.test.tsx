@@ -49,8 +49,8 @@ for (const entry of ['shell', 'today'] as const) {
     expect(current.tableDefinition).toBeUndefined()
     expect(fx.snapshot).toHaveBeenCalledTimes(2)
     if (entry === 'today') {
-      // loadStore が共通 error を消しても、snapshot の失敗を成功へ戻さない。
-      await waitFor(() => expect((current as StoreToday).error).toBeNull())
+      // 店舗の確認が失敗したら前の店を読み直さず、失敗を表示する。
+      await waitFor(() => expect((current as StoreToday).error).toBeTruthy())
       expect(current.tableDefinition).toBeUndefined()
     }
   })
@@ -71,9 +71,7 @@ for (const entry of ['shell', 'today'] as const) {
     act(() => { one = current.reload(); two = current.reload() })
     await act(async () => { latest.resolve({ data: newest }); await two })
     await act(async () => { old.resolve({ data: snap() }); await one })
-    // today の旧data反映は既存のまま。参照不一致なら説明だけを捨てる。
-    if (entry === 'today') expect(current.tableDefinition).toBeUndefined()
-    else expect(current.tableDefinition?.snapshot).toBe(newest)
+    expect(current.tableDefinition?.snapshot).toBe(newest)
     expect(fx.snapshot).toHaveBeenCalledTimes(5)
   })
   it(`${entry}: account A→B→A の保持data・旧応答から理由を復活させず通常要求だけを使う`, async () => {
@@ -97,4 +95,20 @@ it('StrictModeの二回描画でも最新通常取得の説明が残り、取得
   renderHook(() => { today = useStoreToday('account-1') }, { wrapper: StrictMode })
   await waitFor(() => expect(today.tableDefinition).toBeDefined())
   expect(fx.snapshot).toHaveBeenCalledTimes(2)
+})
+it('店舗の選択を確認できなくても全体情報は残し、選択後に読み直せる', async () => {
+  const data = snap()
+  data.stores = [...data.stores, { ...data.stores[0], id: 'store-2' }]
+  fx.snapshot.mockResolvedValue({ data })
+  fx.storeContext.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ data: { selectedStore: null } }).mockResolvedValue({ data: { selectedStore: { id: 'store-2' } } })
+  const h = renderHook(() => useStoreToday('account-1'))
+  await waitFor(() => expect(h.result.current.error).toBeTruthy())
+  expect(h.result.current.snapshot).toBe(data)
+  expect(fx.reservationsDay).not.toHaveBeenCalled()
+  await act(async () => { await h.result.current.reload() })
+  expect(h.result.current.error).toBeTruthy()
+  expect(fx.reservationsDay).not.toHaveBeenCalled()
+  await act(async () => { await h.result.current.reload() })
+  await waitFor(() => expect(fx.reservationsDay).toHaveBeenCalledWith('account-1', 'store-2', expect.any(String)))
+  expect(h.result.current.error).toBeNull()
 })

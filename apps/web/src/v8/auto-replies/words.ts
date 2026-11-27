@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /**
  * 自動応答の一覧に出す言葉を、1か所にまとめる。
  *
@@ -199,12 +200,12 @@ const ACTION_SHORT_WORDS: Record<string, string> = {
 }
 
 export function actionShortWord(actionType: string): string {
-  return ACTION_SHORT_WORDS[actionType] ?? 'その他の処理'
+  return knownValue(ACTION_SHORT_WORDS, actionType, 'その他の処理')
 }
 
 export function actionWord(actionType: string): string {
   // 知らない値をそのまま出すと、画面に内部の値が復活する。
-  return ACTION_WORDS[actionType] ?? 'その他の処理'
+  return knownValue(ACTION_WORDS, actionType, 'その他の処理')
 }
 
 /**

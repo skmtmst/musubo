@@ -92,6 +92,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<{ account: string; state: 'ready' | 'error' } | null>(null)
+  const [folderRetry, setFolderRetry] = useState(0)
+  const [folderDraftAccount, setFolderDraftAccount] = useState(selectedAccountId)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   /* 「押されたら」の窓：開いている選択肢と、窓の中の下書き（［決める］で戻す・［キャンセル］で捨てる）。 */
@@ -118,15 +121,24 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
+  if (folderDraftAccount !== selectedAccountId) {
+    setFolderDraftAccount(selectedAccountId)
+    if (!host && !id) { setFolderId(null); setCategory('未分類') }
+  }
+  const foldersReady = Boolean(host) || Boolean(folderAccountId && folderState?.account === folderAccountId && folderState.state === 'ready')
+  const foldersFailed = !host && Boolean(folderAccountId && folderState?.account === folderAccountId && folderState.state === 'error')
   useEffect(() => {
     setFolders([])
+    setFolderState(null)
     if (!folderAccountId || host) return
     let cancelled = false
     void api.folders.list('template', folderAccountId).then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
-    }).catch(() => {})
+      if (cancelled) return
+      if (res.success) { setFolders(res.data); setFolderState({ account: folderAccountId, state: 'ready' }) }
+      else setFolderState({ account: folderAccountId, state: 'error' })
+    }).catch(() => { if (!cancelled) setFolderState({ account: folderAccountId, state: 'error' }) })
     return () => { cancelled = true }
-  }, [folderAccountId])
+  }, [folderAccountId, host, folderRetry])
 
   /* 「押されたら」の名前（タグ・シナリオ）。読めなくても設定は消えない（名前の代わりに種類を出す）。 */
   useEffect(() => {
@@ -343,6 +355,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                 size="full"
                 aria-label="フォルダ"
+                key={host ? 'host' : folderAccountId ?? 'no-account'}
+                disabled={!foldersReady}
                 value={host ? host.folder : folderId ?? ''}
                 onChange={(value) => {
                   if (host) { host.onFolderChange(value); return }
@@ -350,7 +364,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   setFolderId(next)
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
-                folders={host ? host.folders : folders.map(folderById)}
+                folders={host ? host.folders : foldersReady ? folders.map(folderById) : []}
                 colors
                 onCreate={host
                   ? hostFolderCreate(host)
@@ -358,6 +372,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                     : undefined}
               /></SaveErrorField>
+              {foldersFailed ? <Notice tone="danger" action={<Button onClick={() => setFolderRetry(n => n + 1)}>もう一度読み込む</Button>}>フォルダを読み込めませんでした。</Notice> : null}
             </Field>
           </SettingsFormRow>
         </Card>

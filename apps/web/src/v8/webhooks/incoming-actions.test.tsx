@@ -22,7 +22,7 @@ async function addTag() {
   fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ }))
   const dialog = screen.getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
   fireEvent.click(within(dialog).getByRole('radio', { name: '新しいタグ' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
 }
 it('版と照合設定を保ち、確定した対象を順番どおり保存する', async () => {
   mocks.resources.mockResolvedValue({ success: true, data: resources }); mocks.save.mockResolvedValue({ success: true })

@@ -71,7 +71,7 @@ import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
 import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/public/host/index'
 import type { Folder,SendConfirmationPreview } from '@line-crm/shared'
-import { AlertTriangle,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
+import { AlertTriangle,ArrowLeft,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { useScopedDialog } from './use-scoped-dialog'
@@ -1099,13 +1099,14 @@ export default function BroadcastForm({
   const steps = currentStep
     ? progressSteps.map((step) => {
         const filled = step.state === 'done'
-        const needsFix = !filled && currentStep === 'confirm'
+        const needsFix = !filled && stepOrder.indexOf(step.key) < currentStepIndex
         return {
           ...step,
+          anchor: stepOrder.indexOf(step.key) > currentStepIndex ? undefined : step.anchor,
           label: ({ basic: '基本設定', audience: '配信対象', message: 'メッセージを作成', schedule: '送信設定', confirm: '最終確認' })[step.key],
-          state: (needsFix ? 'attention' : filled ? 'done' : 'todo') as 'done' | 'todo' | 'attention',
+          state: (needsFix ? 'attention' : filled && stepOrder.indexOf(step.key) < currentStepIndex ? 'done' : 'todo') as 'done' | 'todo' | 'attention',
           // 段ごとの画面にいるときは、済み・要修正の段を押すとその段へ移る。
-          onSelect: (filled || needsFix) && onStepChange ? () => goToStep(step.key) : undefined,
+          onSelect: stepOrder.indexOf(step.key) < currentStepIndex && onStepChange ? () => goToStep(step.key) : undefined,
         }
       })
     : progressSteps
@@ -1312,7 +1313,7 @@ export default function BroadcastForm({
         <p>{currentStepIndex >= 0 ? <><span data-step-count>{`${currentStepIndex + 1}/${stepOrder.length} ${steps[currentStepIndex]?.label ?? ''}`}</span>{' ・ '}</> : null}<span aria-live="polite">{draftStatusLabel || '下書き・未保存'}</span></p>
       </div>
       {/* ★V8：手順は題と説明のすぐ下・左寄せ・1行（型の共通部品 Steps・Fa8ED / q1xNMz）。v7 はこれまでの帯のまま。 */}
-      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${formatNumber(bubbles.length)}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
+      {<div className={styles.stepsBelow}><Steps connectorSize={currentStep === 'message' ? 'short' : undefined} label="配信作成の進み" unavailableReason="前の手順を完了してください" steps={steps} currentKey={currentStep ?? undefined} summaries={currentStep ? { basic: title.trim(), audience: confirmAudienceLabel, message: `${formatNumber(bubbles.length)}通・${bubbles.map(bubble => String(bubble.content.text ?? typeLabel(bubble.type))).join(' / ')}`, schedule: sendWhenLabel ?? '未設定' } : undefined} /></div>}
       <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={16} aria-hidden /> LINEの見え方</Button>
     </header>
     {/*
@@ -1340,7 +1341,7 @@ export default function BroadcastForm({
       </Notice>
     ) : null}
     {editingDraft && currentStep !== 'message' ? (
-      <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
+      <p className={`${styles.draftNotice} border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs`}>
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
@@ -1437,19 +1438,17 @@ export default function BroadcastForm({
       <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode, effectiveSpreadMinutes])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
-    <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(
+    <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} leadAction={currentStepIndex > 0 ? <Button type="button" disabled={saving || composerBusy} onClick={() => goToStep(stepOrder[currentStepIndex - 1])}><ArrowLeft size={16} aria-hidden />{currentStep === 'schedule' ? 'メッセージ' : progressSteps[currentStepIndex - 1].label}へ戻る</Button> : null} actions={(
       <>
       {currentStep ? (
         <>
-          {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          {currentStep === 'schedule' ? <Button type="button" disabled={saving || composerBusy} onClick={() => goToStep('message')}>メッセージへ戻る</Button> : null}
           <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={16} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" disabled={composerBusy || nextBlockReason !== null} aria-describedby={nextBlockReason ? 'broadcast-footer-reason' : undefined} onClick={() => { if (nextBlockReason === null) goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)]) }}>
               {currentStep === 'basic' ? '対象設定へ'
                 : currentStep === 'audience' ? 'メッセージ設定へ'
-                  : currentStep === 'message' ? <><span>送信設定へ</span><ArrowRight size={16} aria-hidden /></>
-                    : '配信前チェックへ'}
+                  : currentStep === 'message' ? '送信設定へ'
+                    : '配信前チェックへ'}<ArrowRight size={16} aria-hidden />
             </Button>
           ) : (
             <Button variant="primary" disabled={saving || confirmBlockReason !== null} title={confirmBlockReason ?? undefined} aria-describedby={confirmBlockReason ? 'broadcast-footer-reason' : undefined} onClick={openConfirm} busy={saving}>

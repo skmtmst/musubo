@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import { formatYen } from '@line-crm/shared';
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -90,7 +91,7 @@ export default function BookingDetailV8({
                 取り消す
               </Button>
               <Button variant="primary" href={detailHref}>
-                変える
+                変更する
               </Button>
         </DialogActions>
       ) : undefined}
@@ -107,7 +108,7 @@ export default function BookingDetailV8({
           <dt className="text-ink-faint text-xs">{words.menu}</dt>
           <dd className="text-ink mt-0.5">
             {b.menu_name} <span className="tabular-nums">{formatYen(b.price_at_booking)}</span> ・
-            {SOURCE_LABEL[b.source] ?? b.source}から
+            {knownValue(SOURCE_LABEL, b.source, b.source)}から
           </dd>
         </div>
         <div>

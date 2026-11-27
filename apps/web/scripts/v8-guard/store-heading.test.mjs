@@ -35,6 +35,7 @@ function measureHeading() {
   const pickers = [...document.querySelectorAll('main [data-entity-picker-field]')]
     .filter(element => !element.parentElement.closest('[data-entity-picker-field]'))
     .filter(element => element.querySelector('button[aria-label="店舗"]'))
+    .filter(element => getComputedStyle(element).visibility === 'visible')
     .map(rect).filter(r => r.width > 0 && r.height > 0)
   return { title: title ? rect(title) : null, text: title?.textContent, pickers, width: innerWidth, scrollWidth: document.documentElement.scrollWidth }
 }

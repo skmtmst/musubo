@@ -9,6 +9,7 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
@@ -27,6 +28,11 @@
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
+
+
+- [夜間の画面修正の反映履歴](release-log/unreleased/243-kenta-train-night-1126.md)
+
+- [AI応答の動作](../apps/web/src/v8/ai-reply/BEHAVIOR.md)
 
 ## 使う人の手引き
 
@@ -295,6 +301,8 @@
 - [マイル（V8）の動き](../apps/web/src/v8/mileage/BEHAVIOR.md)
 - [たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）](../apps/web/src/v8/mileage/earning-rule-new/BEHAVIOR.md)
 - [電話の画面の対応（BEHAVIOR.md）](../apps/web/src/v8/mobile-todo/BEHAVIOR.md)
+- [電話の画面の今日（BEHAVIOR.md）](../apps/web/src/v8/mobile-today/BEHAVIOR.md)
+- [電話の画面のもっと（BEHAVIOR.md）](../apps/web/src/v8/mobile-more/BEHAVIOR.md)
 - [NEN配信の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-campaigns/BEHAVIOR.md)
 - [健康日記（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-health/BEHAVIOR.md)
 - [会員（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-members/BEHAVIOR.md)
@@ -1405,6 +1413,13 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
+
+
+
+
+
+- [画面の読み直しと表示の列車5](release-log/unreleased/243-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
+- [画面の読み直しと操作の列車6](release-log/unreleased/243-kenta-train6-1126.md) — 読み直しと画面操作の改善履歴。確認 2026-11-26。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。

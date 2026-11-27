@@ -149,7 +149,7 @@ describe('109 承認が主・断る側は文字だけ', () => {
   const variants = () => {
     const buttons = [...host.querySelectorAll('button')]
     return {
-      pass: buttons.find((b) => b.textContent === '見送る（理由を選ぶ）'),
+      pass: buttons.find((b) => b.textContent === '見送る（理由を選択する）'),
       reject: buttons.find((b) => b.textContent === '却下する'),
       adopt: buttons.find((b) => b.textContent === 'このまま採用'),
       adoptFree: buttons.find((b) => b.textContent === '報酬なしで採用'),

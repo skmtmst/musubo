@@ -4,12 +4,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const list = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { listByKind: list, folders: { list: async () => [] }, get: async () => { throw new Error('no') } } }))
+const folders = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { listByKind: list, folders: { list: folders }, get: async () => { throw new Error('no') } } }))
 import HqTemplatePicker from './template-picker'
 
 const rows = [{ id: 't-1', name: '店からの案内', kind: 'message', content_summary: 'お休みのお知らせ' }]
 const props = { onClose: vi.fn(), onPick: vi.fn(async () => null) }
-beforeEach(() => { document.documentElement.dataset.theme = 'v8'; list.mockReset(); list.mockResolvedValue(rows) })
+beforeEach(() => { document.documentElement.dataset.theme = 'v8'; list.mockReset(); list.mockResolvedValue(rows); folders.mockReset(); folders.mockResolvedValue([]) })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; vi.clearAllMocks() })
 
 it('初回失敗→再試行で本当に読み直し、一覧から選べる', async () => {
@@ -42,4 +43,33 @@ it('閉じて開き直したあとの古い取得成功を捨てる', async () =
   await screen.findByRole('radio', { name: '店からの案内' })
   await act(async () => { finish([{ ...rows[0], id: 'old', name: '古い取得' }]) })
   expect(screen.queryByRole('radio', { name: '古い取得' })).toBeNull()
+})
+
+it('フォルダの失敗を知らせ、一覧を保ってフォルダだけ読み直せる', async () => {
+  folders.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([{ id: 'folder-1', name: 'お知らせ' }])
+  render(<HqTemplatePicker open {...props} />)
+  await screen.findByText('フォルダを読み込めませんでした。すべての候補から選べます。')
+  expect(screen.getByRole('radio', { name: '店からの案内' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを読み直す' }))
+  await screen.findByText('お知らせ')
+  expect(list).toHaveBeenCalledTimes(1)
+  expect(folders).toHaveBeenCalledTimes(2)
+})
+
+it('一覧の後から届いたフォルダを表示し、閉じた窓の古い応答を捨てる', async () => {
+  let finish!: (value: { id: string; name: string }[]) => void
+  folders.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+  const view = render(<HqTemplatePicker open {...props} />)
+  await screen.findByRole('radio', { name: '店からの案内' })
+  await act(async () => { finish([{ id: 'late', name: '後からのフォルダ' }]) })
+  expect(await screen.findByText('後からのフォルダ')).toBeTruthy()
+  folders.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+  view.rerender(<HqTemplatePicker open={false} {...props} />)
+  view.rerender(<HqTemplatePicker open {...props} />)
+  await waitFor(() => expect(folders).toHaveBeenCalledTimes(2))
+  view.rerender(<HqTemplatePicker open={false} {...props} />)
+  view.rerender(<HqTemplatePicker open {...props} />)
+  await waitFor(() => expect(folders).toHaveBeenCalledTimes(3))
+  await act(async () => { finish([{ id: 'old', name: '古いフォルダ' }]) })
+  expect(screen.queryByText('古いフォルダ')).toBeNull()
 })

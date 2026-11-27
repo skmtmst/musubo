@@ -376,7 +376,8 @@ html:root .card.compact[data-compact-typography='banner'] { padding: var(--space
 html:root .card.compact[data-compact-typography='banner'] > .radio { top: var(--space-12); right: var(--space-12); }
 
 /* カードの枠を焦点の持ち主にし、行形式は丸の輪を保つ。 */
-html:root .card:not(.row) .radio:focus-visible { outline: var(--polish-focus-width) solid transparent; }
+/* フォーカス輪は親カードに表示するため、内側の輪の幅をなくす。 */
+html:root .card:not(.row) .radio:focus-visible { outline-width: 0; }
 html:root .card:not(.row).invalid:has(.radio:focus-visible) { outline-color: var(--color-danger); }
 
 /* 権限の理由がある時だけ灰色へ。選択の印と焦点の輪は別々に残す。 */

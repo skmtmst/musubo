@@ -1200,7 +1200,7 @@ export default function MenuFormV8() {
             )}
             <div className={styles.changeRow}>
               <Button variant="text" textTone="ink" onClick={() => setOwnRules((v) => !v)}>
-                {ownRules ? 'お店のきまりに戻す' : <><Pencil aria-hidden="true" />このメニューだけ変える</>}
+                {ownRules ? 'お店のきまりに戻す' : <><Pencil aria-hidden="true" />このメニューだけ変更する</>}
               </Button>
             </div>
           </Card>

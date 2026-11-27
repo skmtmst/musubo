@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const api = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn(), history: vi.fn() }))
 vi.mock('@/lib/api/helpers/friend-delivery-consents', () => ({ friendDeliveryConsentsApi: api, friendDeliveryConsentHistoryApi: { list: api.history } }))
 
-const { default: Drawer, useDeliveryConsents } = await import('./delivery-consent')
+const { default: Drawer, useDeliveryConsents, DeliveryConsentSummary } = await import('./delivery-consent')
 
 const row = (purpose: string, state: string, source: string, version = 1) => ({ purpose, state, reason: '本人の操作', source, updatedBy: null, updatedAt: '2026-10-12T05:05:00.000Z', version })
 const ROWS = [row('transaction', 'granted', 'manual'), row('marketing', 'revoked', 'liff', 3)]
@@ -23,6 +23,60 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 const open = (canEdit = true) => render(<Drawer open friendId="f1" friendName="見本 143" rows={ROWS as never} canEdit={canEdit} onClose={() => {}} onSaved={() => {}} />)
 
 describe('配信の受け取り', () => {
+  it('右パネル内で取得に失敗したら不明と誤表示せず再取得する', async () => {
+    const retry = vi.fn()
+    render(<Drawer open friendId="f1" friendName="見本1" rows={[]} canEdit={false} status="error" onRetry={retry} onClose={() => {}} onSaved={() => {}} />)
+    expect(screen.queryByText('不明')).toBeNull()
+    expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+  it('概要の失敗表示から再読み込みできる', () => {
+    const retry = vi.fn()
+    render(<DeliveryConsentSummary status="error" rows={[]} onRetry={retry} />)
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+  it('権限の読み込みが終わっても進行中の履歴を表示する', async () => {
+    let finish!: (value: unknown) => void
+    api.history.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    const view = render(<Drawer open friendId="f1" friendName="見本1" rows={[]} canEdit={false} onClose={() => {}} onSaved={() => {}} />)
+    view.rerender(<Drawer open friendId="f1" friendName="見本1" rows={[]} canEdit onClose={() => {}} onSaved={() => {}} />)
+    await act(async () => { finish({ success: true, data: { items: [], total: 0, nextCursor: null } }) })
+    expect(await screen.findByText('まだ記録はありません。')).toBeTruthy()
+  })
+  it('保存後の再取得待ち中に友だちが変われば前の履歴を再取得しない', async () => {
+    let finishSave!: () => void
+    const onSaved = () => new Promise<void>(resolve => { finishSave = resolve })
+    const view = render(<Drawer open friendId="f1" friendName="見本1" rows={ROWS as never} canEdit onClose={() => {}} onSaved={onSaved} />)
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
+    fireEvent.change(screen.getByLabelText('理由'), { target: { value: '本人からの連絡' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    await waitFor(() => expect(finishSave).toBeTypeOf('function'))
+    view.rerender(<Drawer open friendId="f2" friendName="見本2" rows={[]} canEdit onClose={() => {}} onSaved={onSaved} />)
+    await waitFor(() => expect(api.history).toHaveBeenCalledWith('f2', { limit: 20 }))
+    await act(async () => { finishSave() })
+    expect(api.history.mock.calls.filter(([id]) => id === 'f1')).toHaveLength(1)
+  })
+  it('友だちを切り替えた後に古い履歴を混ぜない', async () => {
+    let finish!: (value: unknown) => void
+    api.history.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    api.history.mockResolvedValueOnce({ success: true, data: { items: [], total: 0, nextCursor: null } })
+    const view = render(<Drawer open friendId="f1" friendName="見本1" rows={[]} canEdit={false} onClose={() => {}} onSaved={() => {}} />)
+    view.rerender(<Drawer open friendId="f2" friendName="見本2" rows={[]} canEdit={false} onClose={() => {}} onSaved={() => {}} />)
+    expect(await screen.findByText('まだ記録はありません。')).toBeTruthy()
+    await act(async () => { finish({ success: true, data: { items: [{ id: 7, purpose: 'marketing', actor: { kind: 'self' }, before: null, after: null, createdAt: '2026-10-12T05:05:00Z' }] } }) })
+    expect(screen.getByText('まだ記録はありません。')).toBeTruthy()
+  })
+  it('履歴取得の失敗から再読み込みできる', async () => {
+    api.history.mockRejectedValueOnce(new Error('network'))
+    open()
+    expect(await screen.findByText('履歴を読み込めませんでした')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(await screen.findByRole('columnheader', { name: '目的' })).toBeTruthy()
+    expect(api.history).toHaveBeenCalledTimes(2)
+  })
+
   it('4つの目的ごとに状態を出す。記録が無い目的は「不明」', async () => {
     open()
     expect((await screen.findAllByText('予約の連絡')).length).toBeGreaterThan(0)
@@ -33,7 +87,7 @@ describe('配信の受け取り', () => {
 
   it('理由が空なら保存せず、欄の下に理由を出す', async () => {
     open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
     expect(await screen.findByText('理由を入れてください。')).toBeTruthy()
     expect(api.save).not.toHaveBeenCalled()
@@ -41,7 +95,7 @@ describe('配信の受け取り', () => {
 
   it('目的を変えるときは、版（なければ 0）と理由を添えて保存する', async () => {
     open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[0])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[0])
     fireEvent.click(screen.getByLabelText('止めている', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '電話でご連絡' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
@@ -50,7 +104,7 @@ describe('配信の受け取り', () => {
 
   it('本人が止めた宣伝を「受け取る」に戻すときは、注意の窓を挟み、確かめてから保存する', async () => {
     open()
-    const buttons = await screen.findAllByRole('button', { name: '変える' })
+    const buttons = await screen.findAllByRole('button', { name: '変更する' })
     fireEvent.click(buttons[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承を得た' } })
@@ -64,7 +118,7 @@ describe('配信の受け取り', () => {
 
   it('注意を開いてから版が変われば新しい版で勝手に上書きしない', async () => {
     const view = open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -76,7 +130,7 @@ describe('配信の受け取り', () => {
 
   it('注意を開いてから友だちが変われば別の友だちへ送らない', async () => {
     const view = open()
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -89,7 +143,7 @@ describe('配信の受け取り', () => {
 
   it('本人のアカウントが不明なときに選択中の別アカウントを代わりに使わない', async () => {
     render(<Drawer open friendId="f1" friendName="山田 花子" friendAccountId={null} selectedAccountId="other" rows={ROWS as never} canEdit onClose={() => {}} onSaved={() => {}} />)
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -103,7 +157,7 @@ describe('配信の受け取り', () => {
   it('選択アカウントを変えて戻しても古い確認は復活しない', async () => {
     const props = { open: true, friendId: 'f1', friendName: '山田 花子', friendAccountId: 'owner', rows: ROWS as never, canEdit: true, onClose: () => {}, onSaved: () => {} }
     const view = render(<Drawer {...props} selectedAccountId="a" />)
-    fireEvent.click((await screen.findAllByRole('button', { name: '変える' }))[2])
+    fireEvent.click((await screen.findAllByRole('button', { name: '変更する' }))[2])
     fireEvent.click(screen.getByLabelText('受け取る', { selector: 'input' }))
     fireEvent.change(screen.getByLabelText('理由'), { target: { value: '来店時に了承' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
@@ -117,7 +171,7 @@ describe('配信の受け取り', () => {
   it('閲覧のみの人には、［変える］を灰色で出し押せない', async () => {
     open(false)
     await screen.findAllByText('予約の連絡')
-    const change = screen.queryAllByRole('button', { name: '変える' })
+    const change = screen.queryAllByRole('button', { name: '変更する' })
     expect(change.length).toBeGreaterThan(0)
     for (const el of change) { expect(((el: HTMLElement) => el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled)(el)).toBe(true); fireEvent.click(el) }
     expect(screen.queryByRole('alertdialog')).toBeNull()

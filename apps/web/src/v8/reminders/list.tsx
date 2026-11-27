@@ -937,7 +937,7 @@ export default function RemindersListV8() {
         </span>
         {reorderDisabledReason ? <span className="sr-only" data-reorder-reason>{reorderDisabledReason}</span> : null}
         <div className={styles.tableWrap}>
-          <DataTable>
+          <DataTable mobileMinWidth="40rem">
             <colgroup>
               {/* ★V8 列の幅＝絵の中身の幅＋欄の間16（左右8ずつ）。端の列は端の24も足す（apLqS：選ぶ16・並べ替え14・状態80・予定90・次120・操作28） */}
               {/* 閲覧のみでも選ぶ列の幅は残す（箱は出さない）。名前の位置を絵どおりに保つ。 */}
@@ -1354,11 +1354,9 @@ export default function RemindersListV8() {
           </ManagedFolderPanel>
         </>}
         collapsedFolders={<>
-          {canEdit ? (
-            <Button href="/reminders/new" variant="primary">
-              ＋ リマインダを作る
-            </Button>
-          ) : null}
+          <PermissionGatedButton allowed={canEdit} href="/reminders/new" variant="primary">
+            ＋ リマインダを作る
+          </PermissionGatedButton>
           {folderSelect}
         </>}
         toolbar={<>

@@ -37,6 +37,7 @@ vi.mock('@/lib/visit-stamps-api', () => ({
   },
 }))
 vi.mock('@/lib/api', () => ({
+  ApiError: class ApiError extends Error {},
   api: { friends: { list: fx.friendsList, get: fx.friendsGet }, staff: { list: fx.staffList }, uploads: { image: fx.uploadImage } },
   describeSaveFailure: (e: unknown) => (e instanceof Error ? e.message : '保存できませんでした。'),
 }))
@@ -84,8 +85,18 @@ describe('来店スタンプ（管理画面）', () => {
     fx.cards.mockReturnValue(new Promise(() => {}))
     window.history.replaceState(null, '', '/visit-stamps?tab=settings')
     render(<VisitStampsV8 />)
+    expect(screen.getByRole('heading', { name: '来店スタンプ' })).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: '来店スタンプの表示' })).toBeTruthy()
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  })
+
+  it('取得失敗時も題とタブと再読み込みを保つ', async () => {
+    fx.cards.mockRejectedValueOnce(new Error('取得失敗'))
+    render(<VisitStampsV8 />)
+    expect(await screen.findByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '来店スタンプ' })).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: '来店スタンプの表示' })).toBeTruthy()
   })
 
   it('タブを移っても下書きを保ち、URLの友だちと他の指定を残して保存の帯だけを切り替える', async () => {
@@ -361,7 +372,7 @@ describe('来店スタンプ（管理画面）', () => {
     expect(screen.queryByRole('button', { name: /承認/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '却下' })).toBeNull()
     expect(screen.queryByRole('button', { name: '押印を足す' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'ファイルを選択する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /色を選ぶ/ })).toBeNull()
     expect((screen.getByRole('textbox', { name: '使い方の説明' }) as HTMLTextAreaElement).readOnly).toBe(true)
   })

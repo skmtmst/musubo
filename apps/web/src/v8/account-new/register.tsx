@@ -859,7 +859,7 @@ function AccountRegistrationForm({ draftKey, resumeKey, initialAccountId }: {
               if (!importRunning && noticeDialog === 'done') prepareRegistrationWelcome()
             }}><ArrowLeft size={16} aria-hidden="true" />管理画面へ</Button>
           </> : currentStep === 4 ? <>
-            <Button type="button" onClick={() => showStyleDialog(true)} disabled={busy}>スタイルを選ぶ</Button>
+            <Button type="button" onClick={() => showStyleDialog(true)} disabled={busy}>スタイルを選択する</Button>
           </> : currentStep === 3 && sub === 1 && !rowsOk ? <>
             <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
             <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>

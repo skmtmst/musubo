@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 /* 担当スタッフのつなぐ先（B7・uRd8A・GcYWx）：読み込み・書き込みは別々に保存、書き込みのオフは確かめの窓を通す。閲覧のみは押せるものを置かない。 */
@@ -70,4 +70,54 @@ it('会議URLの保存は下の操作帯に置き、まとまりの読み上げ�
   expect(document.querySelector('[data-detail-content] [data-variant="primary"]')).toBeNull()
   fireEvent.click(save)
   await waitFor(() => expect(net.saveStaffUrl).toHaveBeenCalledWith('acc-1', 'bs-1', 'https://meet.example.invalid/new', 1))
+})
+it('会議URLを読めないときは無いと見せず、その部分を読み直せる', async () => {
+  net.getStaffUrl.mockRejectedValueOnce(new Error('offline'))
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit={false} onClose={() => undefined} />)
+  expect(await screen.findByText('会議の URL を読み込めませんでした。')).toBeTruthy()
+  expect(screen.queryByText('固定の URL はありません')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '会議URLを読み直す' }))
+  expect(await screen.findByText('https://meet.google.com/abc')).toBeTruthy()
+  expect(net.getSwitches).toHaveBeenCalledTimes(2)
+  expect(net.getStaffUrl).toHaveBeenCalledTimes(2)
+})
+it('店全体の設定を読み直しても会議URLの入力は残る', async () => {
+  net.getSwitches.mockImplementation(async (_account, staff) => {
+    if (!staff && net.getSwitches.mock.calls.filter(call => !call[1]).length === 1) throw new Error('offline')
+    return { success: true, data: SWITCH }
+  })
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  const field = await screen.findByRole<HTMLInputElement>('textbox', { name: '固定の会議の URL' })
+  expect(screen.getByText('店全体の設定を読み込めませんでした。')).toBeTruthy()
+  fireEvent.change(field, { target: { value: 'https://meet.google.com/edited' } })
+  fireEvent.click(screen.getByRole('button', { name: '店全体の設定を読み直す' }))
+  await waitFor(() => expect(screen.queryByText('店全体の設定を読み込めませんでした。')).toBeNull())
+  expect(field.value).toBe('https://meet.google.com/edited')
+  expect(net.getStaffUrl).toHaveBeenCalledTimes(1)
+})
+it('担当者切替後に前の会議URLの応答を出さない', async () => {
+  let resolveOld!: (value: unknown) => void
+  net.getStaffUrl.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    .mockResolvedValueOnce({ success: true, data: { url: 'https://meet.google.com/new', version: 2 } })
+  const nextPerson = { id: 'bs-2', name: '別の担当者' } as never
+  const view = render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  view.rerender(<StaffCalendarPanel accountId="acc-1" person={nextPerson} menuCount={4} canEdit onClose={() => undefined} />)
+  const field = await screen.findByRole<HTMLInputElement>('textbox', { name: '固定の会議の URL' })
+  expect(field.value).toBe('https://meet.google.com/new')
+  await act(async () => { resolveOld({ success: true, data: { url: 'https://meet.google.com/old', version: 1 } }) })
+  expect(field.value).toBe('https://meet.google.com/new')
+})
+it('閲覧の権限がない設定は権限不足を知らせ、読み直しを勧めない', async () => {
+  const { ApiError } = await import('@/lib/api')
+  net.getSwitches.mockImplementation(async (_account, staff) => {
+    if (!staff) throw new ApiError(403, 'forbidden')
+    return { success: true, data: SWITCH }
+  })
+  net.getStaffUrl.mockRejectedValue(new ApiError(403, 'forbidden'))
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit={false} onClose={() => undefined} />)
+  expect(await screen.findByText('店全体の設定を見る権限がありません。')).toBeTruthy()
+  expect(screen.getByText('会議の URL を見る権限がありません。')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '店全体の設定を読み直す' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '会議URLを読み直す' })).toBeNull()
+  expect(screen.queryByText('固定の URL はありません')).toBeNull()
 })

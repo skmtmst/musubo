@@ -31,7 +31,7 @@ describe('タグCSV取り込みのファイル選択（★管理画面 NQMnx）'
     openDialog()
     expect(screen.getByText('ここにCSVを置く')).not.toBeNull()
     expect(screen.getByText('UTF-8・最大500件・1MB以下')).not.toBeNull()
-    expect(screen.getByRole('button', { name: 'CSVを選ぶ' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'CSVを選択する' })).not.toBeNull()
   })
 
   it('選んだCSVは行に名前・件数・大きさと外すが出る', async () => {

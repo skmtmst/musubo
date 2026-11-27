@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useEffect, useState } from 'react'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import { CAPABILITY_LABEL } from '@/lib/operation-restore'
@@ -32,7 +34,7 @@ export function operationHistoryCsv(entries: OperationHistoryEntry[]) {
     return `"${safe.replaceAll('"', '""')}"`
   }
   const rows = entries.map((item) => [item.createdAt, item.actorId,
-    item.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・'),
+    item.capabilities.map((capability) => knownValue(CAPABILITY_LABEL, capability, '対象を確認できません')).join('・'),
     item.lineAccountId ?? 'すべてのアカウント', item.reason, item.resolvedAt ?? ''])
   return `\uFEFF${[['いつ・だれが', '担当者', '止めたもの', '対象', '理由', '戻した'], ...rows].map((row) => row.map(quote).join(',')).join('\n')}`
 }
@@ -93,7 +95,7 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
           <GridHeadRow>{['いつ・だれが', '止めたもの', '対象', '理由', '戻した'].map((label) => <GridCell key={label} role="columnheader">{label}</GridCell>)}</GridHeadRow>
           {entries.map((entry) => <GridRow key={entry.id}>
             <GridCell role="cell" title={`${formatOperationDate(entry.createdAt)} · ${entry.actorId}`}><TruncatedText value={`${formatOperationDate(entry.createdAt)} · ${entry.actorId}`} /></GridCell>
-            <GridCell role="cell"><TruncatedText value={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} /></GridCell>
+            <GridCell role="cell"><TruncatedText value={entry.capabilities.map((capability) => knownValue(CAPABILITY_LABEL, capability, '対象を確認できません')).join('・')} /></GridCell>
             <GridCell role="cell"><TruncatedText value={entry.lineAccountId ?? 'すべてのアカウント'} /></GridCell>
             <GridCell role="cell" title={`${entry.reason}${entry.detail ? ` · ${entry.detail}` : ''}`}><TruncatedText value={`${entry.reason}${entry.detail ? ` · ${entry.detail}` : ''}`} /></GridCell>
             <GridCell role="cell"><TruncatedText value={entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'} /></GridCell>

@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
 
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -424,7 +426,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const boxedTd = (key: string, inner: ReactNode) => <Td key={key}>{inner}</Td>
   const columns: Column[] = type === 'template' ? [
     { key: 'kind', head: '種類', col: <col key="kind" className={storeStyles.colKind} />, cell: (row) => {
-      const label = !row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : KIND_LABEL[row.kind] ?? emptyValue('unknown')
+      const label = !row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : knownValue(KIND_LABEL, row.kind, emptyValue('unknown'))
       return boxedTd('kind', label === emptyValue('unknown') ? label : <TagPill name={label} />)
     } },
     { key: 'state', head: '配布状況', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
@@ -485,7 +487,7 @@ export default function HqStoreList(props: HqStoreListProps) {
         <tbody>
           {ordered.map((row) => {
             const folder = folderOf(row.folder_id)
-            const sub = templateSubLine(row, KIND_LABEL[(row.kind ?? 'message') as TemplateKind] ?? words.item)
+            const sub = templateSubLine(row, knownValue(KIND_LABEL, (row.kind ?? 'message') as TemplateKind, words.item))
             return (
               <Tr selected={selectedIds.includes(row.id)} key={row.id} data-row-id={row.id} density="template" onOpen={() => (onOpen ?? onEdit)(row)}>
                 {type === 'rich_menu' ? <Td presentation="template-plain">{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}

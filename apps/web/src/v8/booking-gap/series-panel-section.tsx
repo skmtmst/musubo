@@ -53,7 +53,7 @@ export default function SeriesPanelSection({ series, bookings, accountId, custom
         ))}
       </ol>
       {canOperate ? <div className={styles.actions}>
-        <Button variant="secondary" onClick={() => setPicking(true)}>この予約の時間を変える</Button>
+        <Button variant="secondary" onClick={() => setPicking(true)}>この予約の時間を変更する</Button>
         <Button variant="danger-outline" onClick={() => setMode('cancel')}>繰り返しを取り消す</Button>
       </div> : null}
       <Dialog open={picking} size="small" title="新しい時間を選ぶ" description={`${dayWithWeekday(startsAt)} の開始時刻を変えます。次の確かめで、この回だけか後ぜんぶかを選びます。`} confirmLabel="次へ" onConfirm={() => { setPicking(false); setMode('change') }} onCancel={() => setPicking(false)}>

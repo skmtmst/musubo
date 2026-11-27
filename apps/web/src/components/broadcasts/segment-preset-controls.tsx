@@ -211,7 +211,7 @@ export default function SegmentPresetControls({
           title={accountMissing ? '先にLINEアカウントを選んでください' : undefined}
           className="min-h-0 px-3 py-1 text-xs"
         >
-          保存した条件から選ぶ
+          保存した条件から選択する
         </Button>
       </div>
 

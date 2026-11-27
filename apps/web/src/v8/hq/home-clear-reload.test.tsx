@@ -98,7 +98,7 @@ test('フォルダの「色を変える」から既存色を変えて保存し�
   render(<HqHomeV8 />)
   await screen.findAllByText('銀座店')
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ「関西」の操作' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '色を変更する' }))
   expect(screen.getByRole('textbox', { name: 'フォルダの名前' }).getAttribute('value')).toBe('関西')
   /* 色の無いフォルダは自動の色から始まる（色なしは選べない・2026-10-09 オーナー） */
   fireEvent.click(screen.getByRole('button', { name: /^フォルダの色：/ }))
@@ -149,7 +149,7 @@ test('フォルダは名前と色が未変更なら理由を出して保存せ�
   render(<HqHomeV8 />)
   await screen.findAllByText('銀座店')
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ「関西」の操作' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '色を変更する' }))
   const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
   expect(save.disabled).toBe(true)
   expect(screen.getByText('名前か色を変えると保存できます。')).toBeTruthy()

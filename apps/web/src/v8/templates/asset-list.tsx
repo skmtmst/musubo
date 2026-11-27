@@ -37,6 +37,8 @@ type Props = {
   lockedReason?: string
   onChanged: () => void
   onScopeGuardChange?: (guard: ((action: () => void) => void) | null) => void
+  query: string
+  setQuery: (value: string) => void
 }
 type AssetFolder = { id: string; name: string }
 
@@ -45,16 +47,16 @@ export default function AssetTemplatesList(props: Props) {
     renderLayout={state => <AssetListLayout {...props} {...state} />} />
 }
 
-function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items, loadState,
+function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, query, setQuery, items, loadState,
   reload, onEdit, onDelete, editor, deleteDialog }: Props & BroadcastAssetListLayout) {
   const saveErrors = useSaveFormErrors()
   const [folders, setFolders] = useState<AssetFolder[]>([])
   const [folderError, setFolderError] = useState('')
   const [folderRetry, setFolderRetry] = useState(0)
   const [folderId, setFolderId] = useState('all')
-  const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [query])
   const [folderOpen, setFolderOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)

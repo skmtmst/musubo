@@ -115,7 +115,7 @@ export default function HqOpenPage() {
         />
       ) : null}
       {!failure && !loading && accounts.length > 0 ? (
-        <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="このアカウントを選ぶ" />
+        <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="このアカウントを選択する" />
       ) : null}
     </div>
   )

@@ -95,6 +95,9 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const role = useStaffRole()
   const canManage = canManageRole(role)
   const manageReason = usePermissionLockReason(canManage)
+  const canRunRole = role !== null && role !== 'viewer'
+  const runReason = usePermissionLockReason(canRunRole)
+  const canRun = canRunRole && !runReason
   const readOnly = role !== null && !canManage
   const narrow = useNarrowViewport(1351)
   const scope = `${selectedAccountId}:${tab}`
@@ -126,7 +129,7 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
     : tab === 'conversion-report' ? <ConversionReportV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'cross' ? <CrossV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage}
       renderSave={slots?.renderSave ? (props) => slots.renderSave?.({ ...props, accountId: selectedAccountId, sourceKind: 'cross' }) : undefined} />
-    : tab === 'funnel' ? <FunnelV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage}
+    : tab === 'funnel' ? <FunnelV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} canRun={canRun}
       presetConversion={params.get('conversionPointId') ? { id: params.get('conversionPointId') ?? '', name: params.get('conversionPointName') ?? '' } : null}
       renderForm={slots?.renderFunnelForm ? (props) => slots.renderFunnelForm?.({ ...props, accountId: selectedAccountId }) : undefined}
       renderSave={slots?.renderSave ? (props) => slots.renderSave?.({ ...props, accountId: selectedAccountId, sourceKind: 'funnel' }) : undefined}

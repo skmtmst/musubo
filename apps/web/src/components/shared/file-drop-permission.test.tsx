@@ -33,7 +33,7 @@ describe('ファイル操作の権限拒否', () => {
     const zone = container.firstElementChild as HTMLElement
     const input = zone.querySelector('input')!
     const opened = vi.fn(); input.addEventListener('click', opened)
-    const button = screen.getByRole('button', { name: variant === 'default' || variant === 'video' ? 'ファイルを選ぶ' : '対応表' })
+    const button = screen.getByRole('button', { name: variant === 'default' || variant === 'video' ? 'ファイルを選択する' : '対応表' })
     expectReason(button)
     if (variant === 'upload' || variant === 'composer') expect(button.tabIndex).toBe(0)
     else fireEvent.click(button)
@@ -51,7 +51,7 @@ describe('ファイル操作の権限拒否', () => {
     const zone = container.firstElementChild as HTMLElement
     const input = zone.querySelector('input')!
     const opened = vi.fn(); input.addEventListener('click', opened)
-    fireEvent.click(screen.getByRole('button', { name: 'ファイルを選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ファイルを選択する' }))
     fireEvent.drop(zone, { dataTransfer: { files: [file(), file()], items: [] } })
     fireEvent.paste(zone)
     fireEvent.change(input, { target: { files: [file(), file()] } })
@@ -62,20 +62,20 @@ describe('ファイル操作の権限拒否', () => {
     fireEvent.dragEnter(zone, { dataTransfer: { items: [] } })
     expect(zone.getAttribute('data-drag')).toBe('active')
     rerender(<FileDropzone title="対応表" lockedReason={reason} onFiles={onFiles} onPaste={onPaste} multiple />)
-    expect(screen.getByRole('button', { name: 'ファイルを選ぶ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'ファイルを選択する' })).toBeTruthy()
     attemptSelection(zone, input)
     expect(opened).toHaveBeenCalledTimes(1)
     expect(onFiles).toHaveBeenCalledTimes(2)
     expect(onPaste).toHaveBeenCalledTimes(1)
     rerender(<FileDropzone title="対応表" onFiles={onFiles} onPaste={onPaste} multiple />)
     expect(zone.getAttribute('data-drag')).toBe('idle')
-    fireEvent.click(screen.getByRole('button', { name: 'ファイルを選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'ファイルを選択する' }))
     expect(opened).toHaveBeenCalledTimes(2)
   })
 
   it('入力・状態によるdisabledは通常disabledのまま権限の印と理由を足さない', () => {
     const { container } = render(<FileDropzone title="対応表" disabled onFiles={vi.fn()} />)
-    const button = screen.getByRole('button', { name: 'ファイルを選ぶ' }) as HTMLButtonElement
+    const button = screen.getByRole('button', { name: 'ファイルを選択する' }) as HTMLButtonElement
     expect(button.disabled).toBe(true)
     expect(container.querySelector('[data-permission-locked]')).toBeNull()
     expect(screen.queryByRole('tooltip')).toBeNull()

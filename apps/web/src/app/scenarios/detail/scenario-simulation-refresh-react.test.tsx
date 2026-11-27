@@ -244,7 +244,7 @@ function plannedNumber() {
 }
 
 async function toggleConcurrent() {
-  await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '名前・説明・置き場を変える' })) })
+  await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '名前・説明・置き場を変更する' })) })
   await act(async () => { fireEvent.click(getByRole(document.body, 'checkbox', { name: /同時購読を許可する/ })) })
   await clickText('この内容で保存する')
 }

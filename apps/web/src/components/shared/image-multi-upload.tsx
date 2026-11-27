@@ -22,7 +22,7 @@ export default function ImageMultiUpload({ presentation, disabled, busy, onUploa
     disabled={disabled}
     busy={busy}
     aria-label="参照画像のファイルを選ぶ"
-    secondary={onPickLibrary ? <Button variant="text" textTone="accent" disabled={disabled || busy} onClick={onPickLibrary}>ライブラリから選ぶ</Button> : undefined}
+    secondary={onPickLibrary ? <Button variant="text" textTone="accent" disabled={disabled || busy} onClick={onPickLibrary}>ライブラリから選択する</Button> : undefined}
     onFiles={files => { if (files[0]) onUpload(files[0]) }}
   />
 }

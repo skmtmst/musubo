@@ -19,7 +19,7 @@ afterEach(cleanup)
 it('動きは要約で表示し、開いた設定の変更を閉じても同じボタンへ保持する', () => {
   render(<Harness />)
   expect(screen.queryByRole('button', { name: '次の処理を追加する' })).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: 'カード1のボタン1の動きを変える' }))
+  fireEvent.click(screen.getByRole('button', { name: 'カード1のボタン1の動きを変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '次の処理を追加する' }))
   fireEvent.click(screen.getByRole('button', { name: '設定を閉じる' }))
   expect(screen.queryByRole('button', { name: '次の処理を追加する' })).toBeNull()

@@ -64,7 +64,7 @@ it.each([422,409])('保存失敗%sでも選んだ版と変更を残し、理由�
  net.save.mockRejectedValueOnce(new ApiError(status,'選んだ版を確認してください',status===409?'version_conflict':undefined,undefined,undefined,undefined,status===422?{'definition.selections.0.versionId':'この版を選び直してください'}:{}))
  render(<Page/>);await screen.findByRole('heading',{name:'飲食店の初期セット'});fireEvent.click(screen.getByRole('switch'))
  fireEvent.click(screen.getByRole('button',{name:'変更を保存'}));await waitFor(()=>expect(net.save).toHaveBeenCalledTimes(1))
- if(status===422){await screen.findByText('この版を選び直してください');expect(screen.getByRole('button',{name:'リッチメニューを選ぶ：変える'}).getAttribute('aria-invalid')).toBe('true')}
+ if(status===422){await screen.findByText('この版を選び直してください');expect(screen.getByRole('button',{name:'リッチメニューを選ぶ：変更する'}).getAttribute('aria-invalid')).toBe('true')}
  else await waitFor(()=>expect(screen.getAllByRole('alert').length).toBeGreaterThan(0))
  expect(screen.getByRole('button',{name:'選んだメニュー（版1）の中身を見る'})).toBeTruthy()
  expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('false')

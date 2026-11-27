@@ -34,7 +34,7 @@ function context(overrides: Partial<EditContext['webinar']> = {}): EditContext {
 }
 async function openVideo(ctx = context()) {
   render(<VideoPane ctx={ctx} chrome={chrome} onDirtyChange={() => {}} registerSave={() => {}} />)
-  fireEvent.click(screen.getByRole('button', { name: ctx.webinar.videoPrefix || ctx.webinar.videoMediaId ? '差し替える' : '動画を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: ctx.webinar.videoPrefix || ctx.webinar.videoMediaId ? '差し替える' : '動画を選択する' }))
   const dialog = await screen.findByRole('dialog', { name: '動画を差し替える' })
   return within(dialog)
 }

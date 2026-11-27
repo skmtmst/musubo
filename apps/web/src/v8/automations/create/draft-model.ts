@@ -393,4 +393,5 @@ export const TEST_RUN_STATUS_LABEL: Record<string, string> = {
   busy: '混み合っています',
 }
 
-export const testRunStatusLabel = (status: string): string => TEST_RUN_STATUS_LABEL[status] ?? '確認中'
+export const testRunStatusLabel = (status: string): string =>
+  Object.prototype.hasOwnProperty.call(TEST_RUN_STATUS_LABEL, status) ? TEST_RUN_STATUS_LABEL[status] : '確認中'
