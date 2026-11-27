@@ -23,11 +23,11 @@ export default function SeatBookingBlock({block,value,onChange,courseRefresh=0}:
  const [retry,setRetry]=useState(0);
  useEffect(()=>{let live=true;
   setCoursesFailed(false);
-  restaurantBookingApi.courses(storeId).then(r=>{if(live){setCourses(r.data);if(courseRefresh>0 && courseId && !block.booking?.courseId && !r.data.some(course=>course.id===courseId)){setCourseId(null);onChange('');}if(r.timezone){setTimeZone(r.timezone);if(firstLoad.current)setDate(zonedToday(r.timezone));}firstLoad.current=false;}}).catch(()=>{if(live)setCoursesFailed(true);});
+  restaurantBookingApi.courses(storeId).then(r=>{if(live){if(!r || !Array.isArray(r.data))throw new Error('Invalid courses response');setCourses(r.data);if(courseRefresh>0 && courseId && !block.booking?.courseId && !r.data.some(course=>course.id===courseId)){setCourseId(null);onChange('');}if(r.timezone){setTimeZone(r.timezone);if(firstLoad.current)setDate(zonedToday(r.timezone));}firstLoad.current=false;}}).catch(()=>{if(live)setCoursesFailed(true);});
   return()=>{live=false;};
  },[storeId,retry,courseRefresh]);
  useEffect(()=>{let live=true;setLoading(true);setFailed(false);
-  restaurantBookingApi.availability(storeId,date,count,courseId).then(r=>{if(live)setSlots(r.data.slots);}).catch(()=>{if(live){setFailed(true);setSlots([]);}}).finally(()=>{if(live)setLoading(false);});
+  restaurantBookingApi.availability(storeId,date,count,courseId).then(r=>{if(live){if(!r?.data || !Array.isArray(r.data.slots))throw new Error('Invalid availability response');setSlots(r.data.slots);}}).catch(()=>{if(live){setFailed(true);setSlots([]);}}).finally(()=>{if(live)setLoading(false);});
   return()=>{live=false;};
  },[storeId,date,count,courseId,retry]);
  const clear=()=>onChange('');
