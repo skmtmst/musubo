@@ -3,6 +3,7 @@ import {
 type BannerImage
 } from '@/lib/hq-banners'
 import { Hourglass } from 'lucide-react'
+import MediaThumbnail from '@/components/shared/media-thumbnail'
 import { useState } from 'react'
 import styles from './project.module.css'
 
@@ -22,13 +23,14 @@ export function PendingTile({ running, label }: { running: boolean; label: strin
 }
 
 
-/** 画像の1枚。読めない画像は壊れた印を出さず、地の色のままにする。 */
+/** 読み込み失敗は空白と区別し、画像が変われば新しく読み込む。 */
 export function Thumb({ image }: { image: BannerImage }) {
+  return <ThumbImage key={image.media.url} url={image.media.url} />
+}
+
+function ThumbImage({ url }: { url: string }) {
   const [failed, setFailed] = useState(false)
-  return (
-    <span className={styles.thumb}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      {!failed ? <img width={240} height={126} src={image.media.url} alt="" loading="lazy" onError={() => setFailed(true)} /> : null}
-    </span>
-  )
+  return <span className={`${styles.thumb} ${styles.metaText}`} title={failed ? '画像を表示できません' : undefined} onErrorCapture={() => setFailed(true)}>
+    <MediaThumbnail kind="image" src={url} alt="" />
+  </span>
 }
