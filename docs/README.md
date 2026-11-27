@@ -1421,3 +1421,4 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 
 - [夜の画面の直し（列車6）](release-log/unreleased/PR-kenta-train-night6-1127.md) — 反映履歴、確認 2026-11-27。
+- [来店スタンプ履歴の空理由表示の修正](release-log/unreleased/PR-kenta-visit-stamps-empty-reason-1127.md) — 反映履歴、確認 2026-11-27。
