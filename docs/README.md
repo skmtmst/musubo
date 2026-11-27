@@ -1547,3 +1547,4 @@
 - [NEN配信のきっかけ表示と今日のお店の集計・日時表示の修正](release-log/unreleased/PR-kenta-later-gemini93-1127.md) — 反映履歴、確認 2026-11-28。
 - [店舗追加の利用規約読了判定とGoogle口コミ星評価表示の修正](release-log/unreleased/PR-kenta-later-gemini94-1127.md) — 反映履歴、確認 2026-11-28。
 - [LINE来店フォローの時期表示と卓管理の予約移し替え・表示の修正](release-log/unreleased/PR-kenta-later-gemini95-1127.md) — 反映履歴、確認 2026-11-28。
+- [予約空き時刻・卓候補の計算とリッチメニュー公開予定下書き保存の修正](release-log/unreleased/PR-kenta-later-gemini96-1127.md) — 反映履歴、確認 2026-11-28。
