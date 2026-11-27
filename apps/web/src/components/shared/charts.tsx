@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { barChartTicks } from './bar-chart'
 import styles from './charts.module.css'
 export const CHART_COLORS = { primary: 'var(--color-accent-deep)', secondary: 'var(--color-ink-faint)' } as const
@@ -9,6 +9,8 @@ export type ChartPoint = { key: string; label: string; value: number | null; not
 export function ValueBarChart({ items, label, unit = '', presentation = 'standard', signed = false, showLastAxis = true }: { items: ChartPoint[]; label: string; unit?: string; presentation?: 'standard' | 'summary'; signed?: boolean; showLastAxis?: boolean }) {
  const columnsRef = useRef<HTMLDivElement>(null)
  const [labelStep, setLabelStep] = useState(1)
+ const [columnsWidth, setColumnsWidth] = useState(0)
+ const [edgeClamp, setEdgeClamp] = useState({ first: false, last: false })
  useEffect(() => {
   const columns = columnsRef.current
   if (!columns) return
@@ -20,13 +22,27 @@ export function ValueBarChart({ items, label, unit = '', presentation = 'standar
    const gap = Number.parseFloat(getComputedStyle(columns).columnGap) || 0
    const longest = Math.max(...items.map(item => chartDate(item.label).length)) * fontSize
    setLabelStep(Math.max(1, Math.ceil((longest + gap) / ((width + gap) / items.length))))
+   const roundedWidth = Math.floor(width)
+   setColumnsWidth(prev => prev === roundedWidth ? prev : roundedWidth)
+   const colWidth = (width - gap * Math.max(0, items.length - 1)) / items.length
+   const axisWidth = (edge: 'first' | 'last', text: string) => {
+    const el = columns.querySelector<HTMLElement>(`[data-axis-edge="${edge}"]`)
+    const measured = el ? el.getBoundingClientRect().width : 0
+    if (measured > 0 && (items.length === 1 || Math.abs(measured - width) > 0.5)) return measured
+    let units = 0
+    for (const ch of text) units += ch.charCodeAt(0) <= 0x7f ? 0.65 : 1
+    return units * fontSize
+   }
+   const first = items.length > 1 && axisWidth('first', chartDate(items[0].label)) > colWidth + 0.5
+   const last = items.length > 1 && showLastAxis && axisWidth('last', chartDate(items[items.length - 1].label)) > colWidth + 0.5
+   setEdgeClamp(prev => prev.first === first && prev.last === last ? prev : { first, last })
   }
   measure()
   const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
   observer?.observe(columns)
   void document.fonts?.ready.then(measure)
   return () => observer?.disconnect()
- }, [items])
+ }, [items, showLastAxis])
  const max = Math.max(1,...items.map(p=>p.value ?? 0)); const positiveTicks = barChartTicks(max); const top=positiveTicks.at(-1) || 1
  const below=signed ? barChartTicks(Math.max(0,...items.map(p=>-(p.value??0)))).at(-1)! : 0
  const minimum=signed && items.some(p=>(p.value??0)<0) ? -below : 0, span=top-minimum
@@ -34,7 +50,11 @@ export function ValueBarChart({ items, label, unit = '', presentation = 'standar
  const bottom=(value:number)=>(value-minimum)/span*100
  return <div className={styles.root} role="group" aria-label={label}>
   <div className={styles.plot} data-presentation={presentation}>{presentation === 'standard' && ticks.map(tick=><span className={styles.grid} key={tick} style={{bottom:`${bottom(tick)}%`}} aria-hidden="true"><span>{chartNumber(tick,unit)}</span></span>)}
-   <div ref={columnsRef} className={styles.columns} data-dense={items.length > 14 || undefined}>{items.map((item,index)=><div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{...(signed?{position:'absolute' as const,bottom:`${bottom(Math.min(0,item.value??0))}%`,height:`${Math.abs(item.value??0)/span*100}%`}:{height:`${Math.max(0,item.value??0)/top*100}%`}),background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined} hidden={index !== 0 && (index !== items.length - 1 || !showLastAxis) && (index % labelStep !== 0 || (showLastAxis && items.length - 1 - index < labelStep))}>{chartDate(item.label)}</span></div>)}</div>
+   <div ref={columnsRef} className={styles.columns} data-dense={items.length > 14 || undefined} style={columnsWidth ? { '--chart-columns-width': `${columnsWidth}px` } as CSSProperties : undefined}>{items.map((item,index)=>{
+    const edge = items.length > 1 ? index === 0 ? 'first' : index === items.length - 1 ? 'last' : undefined : undefined
+    const clamp = edge === 'first' && edgeClamp.first ? 'first' : edge === 'last' && edgeClamp.last ? 'last' : undefined
+    return <div className={styles.column} key={item.key}><button type="button" className={styles.hit} aria-label={`${item.label} ${chartNumber(item.value,unit)}${item.note ? `・${item.note}`:''}`}><span className={styles.bar} style={{...(signed?{position:'absolute' as const,bottom:`${bottom(Math.min(0,item.value??0))}%`,height:`${Math.abs(item.value??0)/span*100}%`}:{height:`${Math.max(0,item.value??0)/top*100}%`}),background:presentation === 'summary' && !item.emphasis ? 'var(--color-accent)' : CHART_COLORS.primary}}/><span className={styles.tooltip}>{item.label} {chartNumber(item.value,unit)}{item.note}</span></button><span className={styles.axis} data-chart-axis data-axis-edge={edge} data-axis-clamp={clamp} hidden={index !== 0 && (index !== items.length - 1 || !showLastAxis) && (index % labelStep !== 0 || (showLastAxis && items.length - 1 - index < labelStep))}>{chartDate(item.label)}</span></div>
+   })}</div>
   </div>
  </div>
 }

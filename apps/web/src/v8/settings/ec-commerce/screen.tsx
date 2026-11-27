@@ -83,7 +83,7 @@ const NON_SENDING_STATUS_LABEL: Record<string, string> = {
 }
 
 function actionStatusLabel(action: { status: EcActionExecutionStatus; eventType: string }): string {
-  if (action.status === 'succeeded') return NON_SENDING_STATUS_LABEL[action.eventType] ?? ACTION_STATUS.succeeded.label
+  if (action.status === 'succeeded') return Object.prototype.hasOwnProperty.call(NON_SENDING_STATUS_LABEL, action.eventType) ? NON_SENDING_STATUS_LABEL[action.eventType] : ACTION_STATUS.succeeded.label
   return ACTION_STATUS[action.status].label
 }
 
@@ -96,7 +96,7 @@ function actionDone(action: EcActionExecution): string {
       ? `${action.errorMessage ?? '通知は送りませんでした'}。発送後の案内は予約しました`
       : action.errorMessage ?? '何もしていません'
   }
-  return ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`
+  return Object.prototype.hasOwnProperty.call(ACTION_LABEL, action.eventType) ? ACTION_LABEL[action.eventType] : `未対応の出来事（${action.eventType}）`
 }
 
 /** 一覧の日時（年なし・例 9/30 10:12、日本時間）。壊れた値は「—」。 */
