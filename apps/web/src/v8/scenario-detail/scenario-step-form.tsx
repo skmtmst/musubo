@@ -24,6 +24,7 @@ import Select from '@/components/shared/select'
 import { formatNumber } from '@/lib/format'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { ScenarioDraftLoadNotice } from '@/v8/autosave/public/scenario-draft-load-notice/index'
 import { useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import type { DeliveryMode, MessageType, ScenarioStep } from '@line-crm/shared'
 import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
@@ -82,6 +83,7 @@ export function ScenarioStepForm({
       {!editingStepId && (
         <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>
       )}
+      <ScenarioDraftLoadNotice failed={stepDraft.loadFailed} onRetry={stepDraft.retryLoad} />
       <BrowserDraftNotice ago={stepDraft.pendingAgo} onRestore={restoreStepDraft} onDiscard={stepDraft.clear} />
       <ScenarioDraftConflictNotice ago={stepDraft.conflictAgo} onLoadLatest={loadLatestStepDraft} onOverwrite={stepDraft.overwrite} />
       {/* 左が編集、右が「いまどの通を触っているか」。任意値の桁指定ではなく

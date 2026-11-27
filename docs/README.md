@@ -3,6 +3,7 @@
 - [Google投稿の画像形式の反映履歴](release-log/unreleased/PR-kenta-google-post-mime.md)（説明・2026-11-27確認）
 - [フォームの見本の反映履歴](release-log/unreleased/PR-kenta-later-codex62.md)（説明・2026-11-27確認）
 - [素材のプレビューと一括削除の反映履歴](release-log/unreleased/PR-kenta-later-codex63.md)（説明・2026-11-27確認）
+- [シナリオ下書きの読み込みの反映履歴](release-log/unreleased/PR-kenta-scenario-draft-load.md)（説明・2026-11-27確認）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 - [友だち追加の条件と自動化の下書きの反映履歴](release-log/unreleased/PR-kenta-later-codex55.md)（説明・2026-11-27確認）
