@@ -12,6 +12,7 @@
 - [予約スタッフと受付時間の読み込み確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-11-1128.md)
 - [外部連携の見本選択の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-12-1128.md)
 - [リマインダの配信結果確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-13-1128.md)
+- [友だち情報欄の分類案内の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-14-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
