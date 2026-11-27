@@ -264,8 +264,8 @@ describe('M504 QRの表示失敗（動作）', () => {
 })
 
 describe.each([
-  ['お知らせ', '/api/ops/announcements', <OpsAnnouncementsPage />],
-  ['契約先', '/api/ops/tenants', <OpsTenantsPage />],
+  ['お知らせ', '/api/ops/announcements', <OpsAnnouncementsPage key="announcements" />],
+  ['契約先', '/api/ops/tenants', <OpsTenantsPage key="tenants" />],
 ])('%sの取得失敗', (_name, endpoint, page) => {
   it('制限中は待つ案内を出す', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
