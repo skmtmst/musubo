@@ -18,7 +18,7 @@ import type {
 AutoReplyDraftInput
 } from '@line-crm/shared';
 import { validateFlexContent } from '@line-crm/shared';
-import { InputIssue,WizardForm } from './wizard-model';
+import { InputIssue,WizardForm,isKnownReceiveSource } from './wizard-model';
 
 type BuildWizardInputContext = {
   accounts: AccountWithStats[]
@@ -36,6 +36,9 @@ export function buildWizardInput({ accounts, form, matchedAccountId, selectedAcc
     }
     const mismatchNotice = exactAllMismatchNotice(effectiveRules, form.keywordMatchMode)
     if (mismatchNotice) return { error: mismatchNotice, field: 'wiz-keywords', step: 'trigger' }
+    if (!Array.isArray(form.receiveSources) || form.receiveSources.some((source) => !isKnownReceiveSource(source))) {
+      return { error: '受信元を確認できません。選び直してください', step: 'trigger' }
+    }
     const conditionIssue = findConditionDraftIssue(
       form.friendTarget === 'filtered' ? form.friendConditions : null,
     )

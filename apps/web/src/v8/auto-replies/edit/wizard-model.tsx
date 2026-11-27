@@ -155,10 +155,14 @@ function normalizeWeekdays(raw: unknown): number[] {
   ).sort((a, b) => a - b)
 }
 
-function normalizeReceiveSources(raw: unknown): Array<'line' | 'email'> {
-  if (!Array.isArray(raw)) return ['line']
-  const valid = Array.from(new Set(raw.filter((s): s is 'line' | 'email' => s === 'line' || s === 'email')))
-  return valid.length > 0 ? valid : ['line']
+export function isKnownReceiveSource(value: unknown): value is 'line' | 'email' {
+  return value === 'line' || value === 'email'
+}
+
+function readReceiveSources(raw: unknown): Array<'line' | 'email'> {
+  if (raw == null) return ['line']
+  if (!Array.isArray(raw)) return [raw as 'line' | 'email']
+  return raw.length > 0 ? [...(raw as Array<'line' | 'email'>)] : ['line']
 }
 
 /** 保存済みの下書き・公開版の設定を画面の形へ。 */
@@ -197,7 +201,7 @@ export function formFromSettings(s: AutoReplyDraftInput): WizardForm {
     skipWhenOperatorActive: s.skipWhenOperatorActive ?? false,
     oncePerFriend: s.oncePerFriend ?? false,
     unmatchedMode: s.unmatchedAction?.type === 'notify_operator' ? 'notify_operator' : 'none',
-    receiveSources: normalizeReceiveSources(s.receiveSources),
+    receiveSources: readReceiveSources(s.receiveSources),
     priority: typeof s.priority === 'number' && Number.isFinite(s.priority) ? s.priority : 0,
   }
 }

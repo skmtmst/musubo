@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import type { AutoReplyDraftInput } from '@line-crm/shared'
+import { buildWizardInput } from './wizard-input'
 import { formFromSettings, ruleTriggerSummary, weekdaySummary } from './wizard-model'
+
+function baseSettings(over: Record<string, unknown> = {}): AutoReplyDraftInput {
+  return {
+    name: 'テスト',
+    respondToAll: false,
+    keyword: '予約',
+    matchType: 'contains',
+    keywords: null,
+    responseType: 'text',
+    templateId: null,
+    responseContent: '承りました',
+    responseWeekdays: [1],
+    messageKinds: null,
+    replyDelaySeconds: 0,
+    cooldownMinutes: null,
+    receiveSources: ['line'],
+    priority: 0,
+    actions: [],
+    ...over,
+  } as unknown as AutoReplyDraftInput
+}
 
 describe('auto-replies/edit/wizard-model ガード', () => {
   it('重複・範囲外・非整数の曜日を除外し、重複7件を「毎日」と誤認しない', () => {
@@ -16,24 +38,57 @@ describe('auto-replies/edit/wizard-model ガード', () => {
     expect(ruleTriggerSummary({ keyword: null, activeFrom: null, activeUntil: null })).toBe('すべてのメッセージ・いつでも')
   })
 
-  it('壊れた数値・配列・未知の受信元を含む保存設定を安全に正規化して復元する', () => {
-    const malformed = {
-      name: 'テスト',
-      respondToAll: false,
-      keyword: '予約',
-      matchType: 'contains',
-      keywords: null,
-      responseType: 'text',
-      templateId: null,
-      responseContent: '承りました',
+  it('未知の受信元を含む設定・未知だけの設定を黙って消さず line に変えず、保存入力の組み立てを止める', () => {
+    const mixed = formFromSettings(baseSettings({ receiveSources: ['unknown', 'email'] }))
+    expect(mixed.receiveSources).toEqual(['unknown', 'email'])
+    expect(
+      buildWizardInput({
+        accounts: [],
+        form: mixed,
+        matchedAccountId: 'acc-1',
+        selectedAccountId: 'acc-1',
+        templates: [],
+      }),
+    ).toEqual({ error: '受信元を確認できません。選び直してください', step: 'trigger' })
+
+    const unknownOnly = formFromSettings(baseSettings({ receiveSources: ['unknown'] }))
+    expect(unknownOnly.receiveSources).toEqual(['unknown'])
+    expect(
+      buildWizardInput({
+        accounts: [],
+        form: unknownOnly,
+        matchedAccountId: 'acc-1',
+        selectedAccountId: 'acc-1',
+        templates: [],
+      }),
+    ).toEqual({ error: '受信元を確認できません。選び直してください', step: 'trigger' })
+
+    for (const validSources of [['line'], ['email'], ['line', 'email']] as const) {
+      const validForm = formFromSettings(baseSettings({ receiveSources: [...validSources] }))
+      expect(validForm.receiveSources).toEqual([...validSources])
+      const built = buildWizardInput({
+        accounts: [],
+        form: validForm,
+        matchedAccountId: 'acc-1',
+        selectedAccountId: 'acc-1',
+        templates: [],
+      })
+      expect('error' in built).toBe(false)
+      if (!('error' in built)) {
+        expect(built.receiveSources).toEqual([...validSources])
+      }
+    }
+  })
+
+  it('壊れた数値・配列を含む保存設定を安全に正規化して復元する', () => {
+    const malformed = baseSettings({
       responseWeekdays: [1, 1, 9, Number.NaN],
       messageKinds: 'text',
       replyDelaySeconds: Number.NaN,
       cooldownMinutes: Number.POSITIVE_INFINITY,
-      receiveSources: ['unknown', 'email', 'email'],
+      receiveSources: ['email'],
       priority: Number.NaN,
-      actions: [],
-    } as unknown as AutoReplyDraftInput
+    })
 
     const form = formFromSettings(malformed)
     expect(form.weekdays).toEqual([1])

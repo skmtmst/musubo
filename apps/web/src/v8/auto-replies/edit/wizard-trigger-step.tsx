@@ -27,7 +27,7 @@ Users,
 X
 } from 'lucide-react';
 import type { Dispatch,JSX,SetStateAction } from 'react';
-import { KIND_ICONS,MAIN_KINDS,WEEKDAY_PRESETS,WizardForm,kindOrder,weekdaySummary } from './wizard-model';
+import { KIND_ICONS,MAIN_KINDS,WEEKDAY_PRESETS,WizardForm,isKnownReceiveSource,kindOrder,weekdaySummary } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardTriggerStepContext = {
@@ -179,25 +179,27 @@ export function WizardTriggerStep({ disabled = false, lockedReason, effectiveKey
                       受け取る場所
                       <Checkbox disabled={disabled}
                       checked={form.receiveSources.includes('line')}
-                      onCheckedChange={(on) =>
+                      onCheckedChange={(on) => {
+                        const known = form.receiveSources.filter(isKnownReceiveSource)
                         patch({
                           receiveSources: on
-                            ? [...new Set([...form.receiveSources, 'line' as const])]
-                            : form.receiveSources.filter((s) => s !== 'line'),
+                            ? [...new Set([...known, 'line' as const])]
+                            : known.filter((s) => s !== 'line'),
                         })
-                      }
+                      }}
                     >
                       LINE
                     </Checkbox>
                     <Checkbox disabled={disabled}
                       checked={form.receiveSources.includes('email')}
-                      onCheckedChange={(on) =>
+                      onCheckedChange={(on) => {
+                        const known = form.receiveSources.filter(isKnownReceiveSource)
                         patch({
                           receiveSources: on
-                            ? [...new Set([...form.receiveSources, 'email' as const])]
-                            : form.receiveSources.filter((s) => s !== 'email'),
+                            ? [...new Set([...known, 'email' as const])]
+                            : known.filter((s) => s !== 'email'),
                         })
-                      }
+                      }}
                     >
                       メール
                     </Checkbox>
