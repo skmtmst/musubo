@@ -7,7 +7,7 @@
  * ファイルを選ぶ窓に出し、選んだものは親（書く欄）へ渡す。形式・大きさの
  * 確かめ（attachments.ts）とアップロードは親が受け持つ。
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileText, Image as ImageIcon, Paperclip } from 'lucide-react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Button from '@/components/shared/button'
@@ -28,7 +28,10 @@ export default function AttachMenu({
   const mediaRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => { if (disabled) setOpen(false) }, [disabled])
+
   const choose = (slot: AttachSlot) => {
+    if (disabled) return
     setOpen(false)
     ;(slot === 'media' ? mediaRef : fileRef).current?.click()
   }
@@ -48,9 +51,9 @@ export default function AttachMenu({
       >
         <Paperclip aria-hidden size={16} />
       </Button>
-      <MediaSlot title="画像・動画を添付" accept={MEDIA_ACCEPT} fileInputRef={mediaRef} renderTrigger={() => null} onFile={(file) => onPick(file, 'media')} />
-      <MediaSlot kind="file" title="ファイルを添付" accept={FILE_ACCEPT} fileInputRef={fileRef} renderTrigger={() => null} onFile={(file) => onPick(file, 'file')} />
-      <MenuPortal open={open} align="start" getAnchor={() => wrapRef.current} onClose={() => setOpen(false)}>
+      <MediaSlot title="画像・動画を添付" accept={MEDIA_ACCEPT} fileInputRef={mediaRef} renderTrigger={() => null} onFile={(file) => { if (!disabled) onPick(file, 'media') }} />
+      <MediaSlot kind="file" title="ファイルを添付" accept={FILE_ACCEPT} fileInputRef={fileRef} renderTrigger={() => null} onFile={(file) => { if (!disabled) onPick(file, 'file') }} />
+      <MenuPortal open={open && !disabled} align="start" getAnchor={() => wrapRef.current} onClose={() => setOpen(false)}>
         <div role="menu" aria-label="添付するもの" className={styles.attachPop}>
           <button type="button" role="menuitem" className={styles.attachItem} onClick={() => choose('media')}>
             <ImageIcon aria-hidden className={styles.attachItemIcon} />
