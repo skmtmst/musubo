@@ -26,7 +26,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import type { DeliveryMode, MessageType, ScenarioStep } from '@line-crm/shared'
-import type { Dispatch, RefObject, SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { formatScheduleLabel, FormSection, isStructuredKind, messageTypeOptions, ScenarioWithSteps, StepFormState, TagOpt, TemplateOpt } from './detail-model'
 import { cloneScenarioQuestion } from './question-template-model'
 import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
@@ -64,6 +64,19 @@ export function ScenarioStepForm({
   stepFormPreview: { offsetDays: number; offsetHours: number; offsetMinutes: number; }
 }) {
   const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? null)
+  const [orderDraft, setOrderDraft] = useState<string | null>(null)
+  const prevStepOrderRef = useRef(stepForm.stepOrder)
+  useEffect(() => {
+    setOrderDraft(null)
+  }, [editingStepId])
+  useEffect(() => {
+    if (!Object.is(prevStepOrderRef.current, stepForm.stepOrder)) {
+      prevStepOrderRef.current = stepForm.stepOrder
+      setOrderDraft(null)
+    }
+  }, [stepForm.stepOrder])
+  const orderValue = orderDraft !== null ? orderDraft : Number.isFinite(stepForm.stepOrder) ? String(stepForm.stepOrder) : ''
+  const orderInvalid = orderDraft !== null || !Number.isInteger(stepForm.stepOrder) || stepForm.stepOrder < 1
   const displayOrder = editingStepId ? [...(scenario?.steps ?? [])].sort((a, b) => a.stepOrder - b.stepOrder).findIndex((step) => step.id === editingStepId) + 1 : (scenario?.steps ?? []).filter((step) => step.stepOrder < stepForm.stepOrder).length + 1
   return (    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
       {!editingStepId && (
@@ -85,9 +98,26 @@ export function ScenarioStepForm({
             type="number"
             min={1}
             className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-            value={stepForm.stepOrder}
-            onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
-          /></SaveErrorField></Field></div>
+            value={orderValue}
+            invalid={orderInvalid}
+            disabled={stepSaving}
+            aria-describedby={orderInvalid ? 'step-order-error' : undefined}
+            onChange={(e) => {
+              const raw = e.target.value
+              const trimmed = raw.trim()
+              if (trimmed === '') {
+                setOrderDraft(raw)
+                return
+              }
+              const parsed = Number(trimmed)
+              if (!Number.isInteger(parsed) || parsed < 1) {
+                setOrderDraft(raw)
+                return
+              }
+              setOrderDraft(null)
+              setStepForm((prev) => ({ ...prev, stepOrder: parsed }))
+            }}
+          /></SaveErrorField></Field><FieldError id="step-order-error">{orderInvalid ? 'ステップ順序は1以上の整数で入力してください。' : null}</FieldError></div>
         <div {...stepFields.bind('time')} aria-invalid={stepFields.invalid('time') || undefined}>
           <ScheduleInput
             mode={deliveryMode}
@@ -371,12 +401,20 @@ export function ScenarioStepForm({
         {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
         <div className="flex gap-2">
-          <Button variant="primary" onClick={handleSaveStep} disabled={stepSaving} busy={stepSaving}>
+          <Button
+            variant="primary"
+            onClick={handleSaveStep}
+            disabled={stepSaving || orderInvalid}
+            disabledReason={orderInvalid && !stepSaving ? 'ステップ順序を1以上の整数で入力してください。' : undefined}
+            busy={stepSaving}
+          >
             {editingStepId ? '更新' : '追加する'}
           </Button>
           <Button
             variant="secondary"
+            disabled={stepSaving}
             onClick={() => {
+              if (stepSaving) return
               stepDraft.clear()
               closeStepForm()
             }}
