@@ -1470,3 +1470,4 @@
 - [ウェビナー確認欄の状態と申込人数の表示修正](release-log/unreleased/PR-kenta-later-cx3-08-1128.md) — 反映履歴、確認 2026-11-28。
 - [質問の選択肢の不明な動きの表示修正](release-log/unreleased/PR-kenta-later-cx3-09-1128.md) — 反映履歴、確認 2026-11-28。
 - [ウェビナー編集の進み具合に出る設定内容の表示修正](release-log/unreleased/PR-kenta-later-cx3-10-1128.md) — 反映履歴、確認 2026-11-28。
+- [ウェビナーの案内カード保存時の確認修正](release-log/unreleased/PR-kenta-later-cx3-11-1128.md) — 反映履歴、確認 2026-11-28。
