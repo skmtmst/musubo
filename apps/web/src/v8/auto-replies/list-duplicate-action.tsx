@@ -63,6 +63,10 @@ export async function duplicateAutoReply({ duplicateFeedback, duplicateKeysRef, 
         setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
         return
       }
+      if (typeof result.data?.id !== 'string' || !result.data.id.trim()) {
+        setDuplicateError('複製できたか確認できません。一覧を読み直してください。')
+        return
+      }
 
       duplicateKeysRef.current.delete(operationId)
       duplicateFeedback.mark(source.id, result.data.id)
