@@ -14,6 +14,7 @@
 - [予約のキャンセル待ち登録確認の修正履歴](release-log/unreleased/PR-kenta-later-cx5-11-1128.md)
 - [住所の郵便番号検索の修正履歴](release-log/unreleased/PR-kenta-later-cx5-12-1128.md)
 - [飲食店予約フォームの空き情報の修正履歴](release-log/unreleased/PR-kenta-later-cx5-13-1128.md)
+- [予約画面のお店の写真の修正履歴](release-log/unreleased/PR-kenta-later-cx5-14-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
