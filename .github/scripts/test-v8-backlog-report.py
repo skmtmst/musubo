@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import re
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -18,6 +19,18 @@ class BacklogTest(unittest.TestCase):
         required = copy.deepcopy(required)
         required.pop('needs')
         required.pop('if')
+        required.pop('strategy')
+        required['name'] = 'V8 screen guard'
+        for step in required['steps']:
+            if step.get('uses', '').startswith('actions/upload-artifact@'):
+                step['with']['name'] = step['with']['name'].replace('-${{ matrix.shard }}', '')
+        nightly.pop('strategy')
+        nightly['name'] = 'V8 screen guard'
+        for step in nightly['steps']:
+            if 'if' in step:
+                step['if'] = re.sub(r" && matrix\.shard == '[^']+'(?=\s*(?:}})?$)", '', step['if'])
+            if step.get('uses', '').startswith('actions/upload-artifact@'):
+                step['with']['name'] = step['with']['name'].replace('-${{ matrix.shard }}', '')
         original = json.loads(Path('.github/scripts/v8-guard-before-split.json').read_text())
         required['steps'] = required['steps'][:10] + original + required['steps'][-2:]
         self.assertEqual(required, nightly)
