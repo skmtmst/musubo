@@ -1450,3 +1450,4 @@
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車11の画面と記録の修正](release-log/unreleased/PR-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
 - [店の比較で確認できない数と差の表示を修正](release-log/unreleased/PR-kenta-later-cx2-13-1128.md) — 反映履歴、確認 2026-11-28。
+- [流入元の確認できない集計の表示を修正](release-log/unreleased/PR-kenta-later-cx2-14-1128.md) — 反映履歴、確認 2026-11-28。
