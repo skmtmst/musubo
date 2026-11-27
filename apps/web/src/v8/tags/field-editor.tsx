@@ -311,7 +311,7 @@ export default function FieldEditor({
             ))}
             {fieldError('options')}
             <span>
-              <Button type="button" disabled={!optionsActive} title={optionsDisabledReason} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
+              <Button type="button" disabled={!optionsActive} disabledReason={!locked && !optionsActive ? '種類が選択肢の項目のときに追加できます。' : undefined} title={optionsDisabledReason} onClick={() => setOptions([...optionRows, ''])}>選択肢を足す</Button>
             </span>
           </div>
           <div className={styles.defaultBox} ref={(element) => { validationRefs.current.default = element }}>
