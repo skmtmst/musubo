@@ -1464,3 +1464,4 @@
 - [マニュアル対応表の検索と確認日時を修正](release-log/unreleased/PR-kenta-later-cx3-45-1128.md) — 反映履歴、確認 2026-11-28。
 - [スプレッドシート連携の二重操作を修正](release-log/unreleased/PR-kenta-later-cx3-46-1128.md) — 反映履歴、確認 2026-11-28。
 - [マニュアル対応表の不正な画面名と行き先を修正](release-log/unreleased/PR-kenta-later-cx3-47-1128.md) — 反映履歴、確認 2026-11-28。
+- [テンプレート編集の入口確認を修正](release-log/unreleased/PR-kenta-later-cx3-48-1128.md) — 反映履歴、確認 2026-11-28。
