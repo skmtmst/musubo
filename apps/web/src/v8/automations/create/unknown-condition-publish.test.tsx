@@ -47,7 +47,7 @@ it('条件を選び直すと公開でき、確認窓に選んだ状態が出る'
   render(<NewAutomationV8 />)
   await screen.findByDisplayValue('見本のルール')
   expect(action().disabled).toBe(true)
-  fireEvent.click(screen.getByRole('button', {name:'動かす相手を変える'}))
+  fireEvent.click(screen.getByRole('button', {name:'動かす相手を変更する'}))
   fireEvent.click(screen.getByRole('button', {name:'シナリオの状態'}))
   fireEvent.click(within(screen.getByRole('option', {name:'を購読中の人'})).getByRole('button'))
   fireEvent.click(screen.getByRole('button', {name:'この条件にする'}))

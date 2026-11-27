@@ -22,7 +22,7 @@ it('未知の条件名が継承名でも編集画面を開き、ほかの条件�
   fireEvent.click(screen.getByRole('button', { name: '2段目で何をしたら進むか' }))
   const choice = await screen.findByRole('radio', { name: 'ほかの条件' })
   fireEvent.click(choice)
-  fireEvent.click(within(choice.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(choice.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選択する' }))
   expect((await screen.findByLabelText('追加の指定はありません')).tagName).toBe('INPUT')
   expect(screen.getByLabelText('段2の名前')).toHaveProperty('value', '条件')
 })

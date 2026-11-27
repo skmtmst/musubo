@@ -294,8 +294,8 @@ describe('頁と読めなかったとき', () => {
   it('頁の器で来なかった返事は空の一覧にせず、読めなかったと出す', async () => {
     mocks.list.mockImplementation(async (_account: string, params: WebinarListParams) => params.limit === 1 ? response([], 5) : { data: { items: null, total: 0 } })
     const view = render(<WebinarList />)
-    await screen.findByRole('button', { name: 'もう一度読み込む' })
-    expect(view.container.querySelector('[data-list-state="error"]')).not.toBeNull()
+    await waitFor(() => expect(view.container.querySelector('[data-list-state="error"]')).not.toBeNull())
+    expect(within(view.container.querySelector('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
     expect(view.container.querySelector('[data-empty-list]')).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'ウェビナー一覧のページ送り' })).toBeNull()
   })

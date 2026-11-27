@@ -49,13 +49,13 @@ async function open() {
   fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '予約の応答' } })
 }
 it('フォルダを作ると完了を知らせ、選択する', async () => {
-  await open(); await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+  await open(); await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選択する' })) })
   expect(await screen.findByText('自動応答のフォルダを作りました。')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'フォルダ', exact: true }).textContent).toBe('予約の応答')
 })
 it('作成に失敗したら完了を知らせず入力を残す', async () => {
   network.create.mockResolvedValueOnce({ success: false, error: '作れませんでした' }); await open()
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選択する' })) })
   expect(screen.queryByText('自動応答のフォルダを作りました。')).toBeNull()
   expect(screen.getByDisplayValue('予約の応答')).toBeTruthy()
 })
@@ -66,7 +66,7 @@ it('アカウントを切り替えた後の古い結果で通知しない', asyn
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true }))
   fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' }))
   fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '予約の応答' } })
-  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '作って選択する' }))
   view.rerender(<><Host accountId="other" /><ToastHost /></>)
   await act(async () => { resolve({ success: true, data: { id: 'f', name: '予約の応答' } }) })
   expect(screen.queryByText('自動応答のフォルダを作りました。')).toBeNull()

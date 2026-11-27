@@ -41,7 +41,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-it('変更前は保存できない理由を表示し、変更後は確認に進める', async () => {
+it('変更がない場合は保存できない理由を表示し、変更後は確認に進める', async () => {
   render(<RulesBoard {...props} />)
   await screen.findByRole('spinbutton')
   expect(screen.getByText('変更すると保存できます。')).toBeTruthy()

@@ -20,7 +20,7 @@ it('差し替え先を選ぶ必要があることを表示し、選ぶと影響�
   fireEvent.click(screen.getByRole('button', { name: /差し替え先/ }))
   const dialog = screen.getAllByRole('dialog').at(-1)!
   fireEvent.click(within(dialog).getByRole('radio', { name: '見本の画像' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
   expect(net.impact).toHaveBeenCalledWith('source', 'next', 'example')
   expect(screen.queryByText('差し替え先を選んでください。')).toBeNull()
 })

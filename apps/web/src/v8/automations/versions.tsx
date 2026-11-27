@@ -324,6 +324,7 @@ function VersionsInner() {
                     <Td grow>
                       <TruncatedText value={binding.consumerPath || '全体'} />
                       <span className={styles.whereSub}>{consumerLabel(binding.consumerType)}</span>
+                      {!Object.prototype.hasOwnProperty.call(CONSUMER_LABELS, binding.consumerType) ? <span className={styles.whereSub}>{binding.consumerType}</span> : null}
                     </Td>
                     <Td className={styles.colPinned}><span className={styles.cell}>{`第${binding.versionNumber}版`}</span></Td>
                     <Td className={styles.colNum}>

@@ -55,6 +55,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/hq/members',
 }))
+vi.mock('./settings-nav', () => ({ default: () => null, useHqSettingsFolderNav: () => undefined }))
+vi.mock('@/v8/settings/staff', () => ({ SelfSecurity: () => null }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 
 import HqMembersV8 from './members'

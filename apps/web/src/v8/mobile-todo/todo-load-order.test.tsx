@@ -124,7 +124,7 @@ describe('電話の画面の対応', () => {
     expect(host.querySelector('[aria-label="トークを読み込んでいます"]')).not.toBeNull()
   })
 
-  it('店をAからBへ切り替えてAに戻した後、古いAの結果を表示しない', async () => {
+  it('店をAからBへ切り替えて再びAを選んだ場合、古いAの結果を表示しない', async () => {
     let resolveOld!: (response: Response) => void
     let firstA = true
     vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {

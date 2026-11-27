@@ -58,7 +58,7 @@ it('ひな形のフォルダ変更の完了を知らせる', async () => {
   mocks.updateFolder.mockResolvedValueOnce({ id: 'f1', name: '基本情報', revision: 3, color: '#ec4899' })
   render(<><HqAttributes type="friend_field" tab="fields" onTab={vi.fn()} /><ToastHost /></>)
   fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「基本情報」の操作' }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: '色を変える' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '色を変更する' }))
   const dialog = within(screen.getByRole('dialog', { name: 'フォルダを編集する' }))
   fireEvent.click(dialog.getByRole('button', { name: 'フォルダの色：紫' }))
   fireEvent.click(screen.getByRole('radio', { name: 'ピンク' }))
