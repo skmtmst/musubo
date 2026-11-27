@@ -154,7 +154,11 @@ function FriendAddRunsInner() {
   const [retrying, setRetrying] = useState<string | null>(null)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [ruleState, setRuleState] = useState<{ status: string; name: string; generation: number; resendSuppressionHours: number | null } | null>(null)
+  const [ruleStateLoading, setRuleStateLoading] = useState(false)
+  const [ruleStateError, setRuleStateError] = useState(false)
   const requestSequence = useRef(0)
+  const ruleStateSequence = useRef(0)
+  const ruleStateInFlight = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     const requestId = ++requestSequence.current
@@ -272,25 +276,51 @@ function FriendAddRunsInner() {
   const renderScope = scope.current.generation
   const failedItems = items.filter((item) => item.status === 'failed' || item.status === 'partial_failed')
 
-  const loadRuleState = useCallback(async () => {
+  const loadRuleState = useCallback(async (options?: { force?: boolean }) => {
     if (renderScope !== scope.current.generation) return
     if (!selectedAccountId || !activeRuleId) {
+      ruleStateSequence.current += 1
+      ruleStateInFlight.current = null
       setRuleState(null)
+      setRuleStateLoading(false)
+      setRuleStateError(false)
       return
     }
+    if (!options?.force && ruleStateInFlight.current !== null) return
+    const reqId = ++ruleStateSequence.current
+    ruleStateInFlight.current = reqId
+    setRuleStateLoading(true)
+    setRuleStateError(false)
     try {
       const detail = await api.friendAddRules.get(selectedAccountId, activeRuleId)
-      if (!alive.current || renderScope !== scope.current.generation) return
-      setRuleState(detail.success
-        && detail.data.rule.id === activeRuleId && detail.data.rule.accountId === selectedAccountId
-        ? { status: detail.data.rule.status, name: detail.data.rule.name?.trim() ?? '', generation: renderScope, resendSuppressionHours: detail.data.rule.definition.resendSuppressionHours ?? null }
-        : null)
+      if (!alive.current || reqId !== ruleStateSequence.current || renderScope !== scope.current.generation) return
+      if (detail.success && detail.data?.rule?.id === activeRuleId && detail.data.rule.accountId === selectedAccountId) {
+        setRuleState({ status: detail.data.rule.status, name: detail.data.rule.name?.trim() ?? '', generation: renderScope, resendSuppressionHours: detail.data.rule.definition.resendSuppressionHours ?? null })
+        setRuleStateError(false)
+      } else {
+        setRuleState(null)
+        setRuleStateError(true)
+      }
     } catch {
-      if (alive.current && renderScope === scope.current.generation) setRuleState(null)
+      if (alive.current && reqId === ruleStateSequence.current && renderScope === scope.current.generation) {
+        setRuleState(null)
+        setRuleStateError(true)
+      }
+    } finally {
+      if (ruleStateInFlight.current === reqId) ruleStateInFlight.current = null
+      if (alive.current && reqId === ruleStateSequence.current && renderScope === scope.current.generation) {
+        setRuleStateLoading(false)
+      }
     }
   }, [activeRuleId, selectedAccountId, renderScope])
 
-  useEffect(() => { void loadRuleState() }, [loadRuleState])
+  useEffect(() => {
+    void loadRuleState({ force: true })
+    return () => {
+      ruleStateSequence.current += 1
+      ruleStateInFlight.current = null
+    }
+  }, [loadRuleState])
 
   const stopDelivery = async () => {
     const target = stopTarget
@@ -313,7 +343,7 @@ function FriendAddRunsInner() {
       setStopTarget(null)
       setMessage('配信を止めました。')
       await load()
-      await loadRuleState()
+      await loadRuleState({ force: true })
     } catch {
       if (current()) setStopError('配信を停止できませんでした。状態を読み直してください。')
     } finally {
@@ -495,14 +525,33 @@ function FriendAddRunsInner() {
 
       <div className={styles.kpis}>
         <KpiBand data-design="KPIs">
-          <KpiCard presentation="band" icon={<UserPlus size={16} aria-hidden="true" />} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
-            detail={`追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
-          <KpiCard presentation="band" icon={<Send size={16} aria-hidden="true" />} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={successRate} />
-          <KpiCard presentation="band" icon={<TriangleAlert size={16} aria-hidden="true" />} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
-            detail={failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
-          <KpiCard presentation="band" icon={<Play size={16} aria-hidden="true" />} title="シナリオを始めた" value={summary ? summary.scenarioStarts : null} unit="件" detail="直近28日" />
+          <KpiCard presentation="band" loading={accountLoading || loading} icon={<UserPlus size={16} aria-hidden="true" />} title="直近28日の友だち追加" value={summary ? summary.recentFriends ?? null : null} unit="人"
+            detail={error ? '読み込めませんでした' : `追加の記録 ${summary?.recentEvents == null ? emptyValue('unknown') : formatNumber(summary.recentEvents)}件`} />
+          <KpiCard presentation="band" loading={accountLoading || loading} icon={<Send size={16} aria-hidden="true" />} title="送った案内" value={summary ? summary.cumulativeDeliveries : null} unit="通" detail={error ? '読み込めませんでした' : successRate} />
+          <KpiCard presentation="band" loading={accountLoading || loading} icon={<TriangleAlert size={16} aria-hidden="true" />} title="失敗した処理" value={summary ? summary.failed : null} unit="通"
+            detail={error ? '読み込めませんでした' : failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を始めてからの合計です'} />
+          <KpiCard presentation="band" loading={accountLoading || loading} icon={<Play size={16} aria-hidden="true" />} title="シナリオを始めた" value={summary ? summary.scenarioStarts : null} unit="件" detail={error ? '読み込めませんでした' : '直近28日'} />
         </KpiBand>
       </div>
+
+      {!accountLoading && !loading && !error && activeRuleId && ruleStateError ? (
+        <Notice
+          tone="warn"
+          message="配信設定の状態を読み込めませんでした。実行結果の確認はそのまま続けられますが、一時停止の前に設定を読み直してください。"
+          action={
+            <Button
+              variant="text"
+              size="inline"
+              onClick={() => void loadRuleState()}
+              disabled={ruleStateLoading}
+              busy={ruleStateLoading}
+              busyLabel="読み込んでいます"
+            >
+              設定を読み直す
+            </Button>
+          }
+        />
+      ) : null}
 
       {!loading && !error && failedCount > 0 ? (
         <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>
@@ -602,11 +651,22 @@ function FriendAddRunsInner() {
       </Card>
 
       <DashboardColumns layout="cards">{[
-        <CreateSummaryCard key="routes" title="経路ごとの内訳" variant="record" rows={routeBreakdown.map(([route, count]) => ({ key: route, label: route, value: `${formatNumber(count)} 人（${Math.round((count / items.length) * 100)}%）` }))}>
-          {routeBreakdown.length === 0 ? <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、経路ごとの人数が分かります。" /> : null}
+        <CreateSummaryCard key="routes" title="経路ごとの内訳" variant="record" rows={accountLoading || loading || error ? [] : routeBreakdown.map(([route, count]) => ({ key: route, label: route, value: `${formatNumber(count)} 人（${Math.round((count / items.length) * 100)}%）` }))}>
+          {accountLoading || loading ? (
+            <ListState kind="loading" title="内訳を読み込んでいます" />
+          ) : error ? (
+            <ListState
+              kind={errorStatus === 403 ? 'forbidden' : 'error'}
+              title="内訳を読み込めませんでした"
+              description="実行結果を読み直すと、経路ごとの人数が表示されます。"
+              onRetry={() => void load()}
+            />
+          ) : routeBreakdown.length === 0 ? (
+            <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、経路ごとの人数が分かります。" />
+          ) : null}
         </CreateSummaryCard>,
         <CreateSummaryCard key="suppression" title="二重送信を防ぐ・知らせ" variant="record" rows={[
-          { label: '二重送信を防ぐ', value: !ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効' },
+          { label: '二重送信を防ぐ', value: error ? '読み込めませんでした' : ruleStateLoading ? '確認中…' : ruleStateError ? '読み込めませんでした' : !ruleState || ruleState.resendSuppressionHours === null ? emptyValue('unknown') : ruleState.resendSuppressionHours > 0 ? '有効' : '無効' },
           { label: '失敗の知らせ', value: emptyValue('unknown') },
           { label: '最後に送った', value: <span title={summary?.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : undefined}>{summary?.lastDeliveryAt ? jstTime(summary.lastDeliveryAt) : emptyValue('unknown')}</span> },
         ]}><Button variant="text" href="/inflow-links">流入リンクを見る</Button></CreateSummaryCard>

@@ -1402,4 +1402,19 @@
 - [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
 - 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
 - [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
-- [夜の画面修正をまとめて取り込み](release-log/unreleased/PR-kenta-train-night5-1127.md) — 反映履歴、確認 2026-11-27。
+
+- [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
+- [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
+- [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
+- [統括の情報・統括配布一覧の読み込み失敗時再読み込み](release-log/unreleased/251-kenta-later-gemini2-1127.md) — 反映履歴、確認 2026-11-27。
+- [コラム下書き保存の想定外エラー処理](release-log/unreleased/252-kenta-column-error.md) — 反映履歴、確認 2026-11-27。
+- [LINEフォローのテンプレート選択とバナー取り込み窓の再読み込み](release-log/unreleased/253-kenta-later-gemini3-1127.md) — 反映履歴、確認 2026-11-27。
+- [LINEアカウント登録のプロバイダーID案内と吹き出し編集の折り返し修正](release-log/unreleased/254-kenta-later-ui.md) — 反映履歴、確認 2026-11-27。
+- [緊急コントロール送信経路と友だち配信受け取り履歴の再読み込み](release-log/unreleased/255-kenta-later-gemini4-1127.md) — 反映履歴、確認 2026-11-27。
+- [スマホ幅のリマインダ名と共通アクションの未対応の種類の表示を直した反映履歴](release-log/unreleased/257-kenta-later-codex2.md) — 反映履歴、確認 2026-11-27。
+- [EC 連携：注文の詳細でフォローを見送った理由を正しく表示する（LATER）](release-log/unreleased/258-kenta-ec-followup-reason.md) — 反映履歴、確認 2026-11-27。
+- [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
+- [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
+- [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
+
+- [夜の画面の直し（列車6）](release-log/unreleased/PR-kenta-train-night6-1127.md) — 反映履歴、確認 2026-11-27。

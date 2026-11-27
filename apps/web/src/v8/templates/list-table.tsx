@@ -82,7 +82,7 @@ type RenderTemplateListContext = {
 
 /** 種類の小さな印（色なし）。1行の色の点はフォルダだけにする。 */
 const KIND_ICONS = { image: ImageIcon, flex: LayoutTemplate, carousel: GalleryHorizontal, question: HelpCircle, video: Video } as const
-const kindIcon = (kind: string) => KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
+const kindIcon = (kind: string) => Object.prototype.hasOwnProperty.call(KIND_ICONS, kind) ? KIND_ICONS[kind as keyof typeof KIND_ICONS] : FileText
 
 export function renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref, createLabel, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
   return (accountLoading || view === 'loading' ? (
@@ -162,7 +162,8 @@ export function renderTemplateList({ tokenNames, accountLoading, accounts, activ
               {duplicateFeedback.order(shownItems, templates).map((t, saveFieldIndex) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
-                const kindText = isRichVideoTemplate(t) ? 'リッチビデオ' : messageTypeText(kindLabel)
+                const resolvedKindText = messageTypeText(kindLabel)
+                const kindText = isRichVideoTemplate(t) ? 'リッチビデオ' : typeof resolvedKindText === 'string' ? resolvedKindText : 'その他'
                 const folder = folderDotOf(t)
                 const excerpt = excerptOf(t)
                 return (

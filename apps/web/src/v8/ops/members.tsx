@@ -58,6 +58,7 @@ function memberRowItems(m: OpsMember, access: 'unknown' | 'readonly' | 'writer',
 export default function OpsMembersV8() {
   const [members, setMembers] = useState<OpsMember[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [tab] = useUrlTab(['members', 'info'] as const, 'members')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'active' | 'suspended' | 'all'>('active')
@@ -66,6 +67,8 @@ export default function OpsMembersV8() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [listFailed, setListFailed] = useState(false)
+  const [meFailed, setMeFailed] = useState(false)
+  const [meLoading, setMeLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [me, setMe] = useState<string | null>(null)
   const [access, setAccess] = useState<'unknown' | 'readonly' | 'writer'>('unknown')
@@ -73,21 +76,86 @@ export default function OpsMembersV8() {
   const unknown = access === 'unknown'
   const [pending, setPending] = useState<PendingAction | null>(null)
   const pendingRef = useRef<PendingAction | null>(null)
-  useEffect(() => () => { pendingRef.current = null }, [])
+  const loadSeqRef = useRef(0)
+  const loadInFlightRef = useRef<number | null>(null)
+  const meSeqRef = useRef(0)
+  const meInFlightRef = useRef<number | null>(null)
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      pendingRef.current = null
+      loadSeqRef.current += 1
+      loadInFlightRef.current = null
+      meSeqRef.current += 1
+      meInFlightRef.current = null
+    }
+  }, [])
   const [notice, setNotice] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current !== null) return
+    const seq = ++loadSeqRef.current
+    const meSeq = ++meSeqRef.current
+    loadInFlightRef.current = seq
+    meInFlightRef.current = meSeq
+    setLoading(true)
+    setMeLoading(true)
     setError('')
     setListFailed(false)
-    const [res, meRes] = await Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])
-    setLoaded(true)
-    if (meRes.success) { setMe(meRes.data.id); setAccess(meRes.data.readOnly ? 'readonly' : 'writer') }
-    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
-    setMembers(res.data)
+    setMeFailed(false)
+    try {
+      const [res, meRes] = await Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])
+      if (!aliveRef.current || seq !== loadSeqRef.current) return
+      setLoaded(true)
+      if (meSeq === meSeqRef.current) {
+        if (meRes.success && meRes.data) {
+          setMe(meRes.data.id)
+          setAccess(meRes.data.readOnly ? 'readonly' : 'writer')
+          setMeFailed(false)
+        } else {
+          setMeFailed(true)
+        }
+      }
+      if (!res.success || !Array.isArray(res.data)) {
+        setError((!res.success && res.error) || '読み込めませんでした')
+        setListFailed(true)
+        return
+      }
+      setMembers(res.data)
+    } finally {
+      if (loadInFlightRef.current === seq) loadInFlightRef.current = null
+      if (meInFlightRef.current === meSeq) meInFlightRef.current = null
+      if (aliveRef.current && seq === loadSeqRef.current) setLoading(false)
+      if (aliveRef.current && meSeq === meSeqRef.current) setMeLoading(false)
+    }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  const reloadMe = useCallback(async () => {
+    if (meInFlightRef.current !== null) return
+    const meSeq = ++meSeqRef.current
+    meInFlightRef.current = meSeq
+    setMeLoading(true)
+    setMeFailed(false)
+    try {
+      const meRes = await opsCall(api.ops.me())
+      if (!aliveRef.current || meSeq !== meSeqRef.current) return
+      if (meRes.success && meRes.data) {
+        setMe(meRes.data.id)
+        setAccess(meRes.data.readOnly ? 'readonly' : 'writer')
+        setMeFailed(false)
+      } else {
+        setMeFailed(true)
+      }
+    } finally {
+      if (meInFlightRef.current === meSeq) meInFlightRef.current = null
+      if (aliveRef.current && meSeq === meSeqRef.current) setMeLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load({ force: true }) }, [load])
 
   const [inviteError, setInviteError] = useState<string | null>(null)
   const invite = async () => {
@@ -105,7 +173,7 @@ export default function OpsMembersV8() {
       : `${email.trim()} に招待メールを送りました。相手が二段階認証の登録を終えると運営メンバーになります`)
     setEmail('')
     setInviteOpen(false)
-    void load()
+    void load({ force: true })
   }
 
   const resend = async (member: OpsMember) => {
@@ -116,7 +184,7 @@ export default function OpsMembersV8() {
     setResendingId(null)
     if (!res.success) { setError(res.error || '送り直せませんでした'); return }
     setNotice(`${member.email ?? member.name} に招待メールを送り直しました`)
-    void load()
+    void load({ force: true })
   }
 
   const applyPending = async () => {
@@ -128,9 +196,10 @@ export default function OpsMembersV8() {
     setBusy(false)
     if (!res.success) { pendingRef.current = pending; setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     setPending(null)
-    void load()
+    void load({ force: true })
   }
 
+  const countsReady = loaded && !loading && !listFailed
   const active = members.filter(member => member.isActive).length
   const suspended = members.length - active
   const filtered = members.filter(member => `${member.name} ${member.email ?? ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) && (filter === 'all' || (filter === 'active' ? member.isActive : !member.isActive)))
@@ -145,12 +214,31 @@ export default function OpsMembersV8() {
           {tab === 'info' ? <div className={parts.stack}><NoticeLineAccountCard /></div> : <>
             <ListToolbarFrame singleRow><ListToolbarRow>
               <SearchField aria-label="名前・メールで探す" placeholder="名前・メールで探す" value={query} onChange={value => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
-              <SegmentedControl aria-label="利用状態で絞り込む" fit="content" value={filter} onChange={value => { setFilter(value); setPage(1) }} options={[{ value: 'active', label: '有効', count: active }, { value: 'suspended', label: '止めた', count: suspended }, { value: 'all', label: 'すべて' }]} />
+              <SegmentedControl aria-label="利用状態で絞り込む" fit="content" value={filter} onChange={value => { setFilter(value); setPage(1) }} options={[{ value: 'active', label: '有効', count: countsReady ? active : undefined }, { value: 'suspended', label: '止めた', count: countsReady ? suspended : undefined }, { value: 'all', label: 'すべて' }]} />
               <Button variant="primary" lockedReason={lock} disabled={unknown} onClick={() => setInviteOpen(true)}><UserPlus aria-hidden="true" />招待する</Button>
             </ListToolbarRow></ListToolbarFrame>
             {notice ? <p role="status" className={parts.status}>{notice}</p> : null}
+            {loaded && !loading && !listFailed && meFailed && access === 'unknown' ? (
+              <Notice
+                tone="warn"
+                className={parts.alertNoticePlacement}
+                message="操作権限を確認できませんでした。一覧の確認は続けられますが、招待や停止の前に権限を読み直してください。"
+                action={
+                  <Button
+                    variant="text"
+                    size="inline"
+                    onClick={() => void reloadMe()}
+                    disabled={meLoading}
+                    busy={meLoading}
+                    busyLabel="確認しています"
+                  >
+                    権限を読み直す
+                  </Button>
+                }
+              />
+            ) : null}
             {error && !listFailed ? <Notice tone="danger" className={parts.alertNoticePlacement}>{error}</Notice> : null}
-            {!loaded ? <ListState permissionScope="hq" kind="loading" title="運営メンバーを読み込んでいます" />
+            {!loaded || (loading && members.length === 0) ? <ListState permissionScope="hq" kind="loading" title="運営メンバーを読み込んでいます" />
               : listFailed ? <ListState permissionScope="hq" kind="error" title="運営メンバーを読み込めませんでした" description={error} onRetry={() => void load()} />
               : <section className={styles.listCard}>
                 <h2 className={styles.listTitle}>運営メンバー</h2><p className={styles.listCount}>{members.length}人</p>

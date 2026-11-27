@@ -71,7 +71,7 @@ export function eventLabel(value: string): string {
 }
 
 /* 届いたお知らせから開く先（見本の吹き出しの「〇〇で見る ›」）。 */
-const EVENT_PLACES: Record<string, string> = {
+const EVENT_PLACES: Record<string, string> = Object.assign(Object.create(null), {
   booking_created: '予約管理',
   broadcast_completed: '一斉配信',
   form_submitted: '回答フォーム',
@@ -79,7 +79,7 @@ const EVENT_PLACES: Record<string, string> = {
   nen_birthday_coupon_failed: 'クーポン',
   common_var_expiry: '共通情報',
   manual_link_broken: '機能設定',
-}
+})
 
 export function eventPlaceLabel(value: string): string {
   return EVENT_PLACES[value] ?? '管理画面'
