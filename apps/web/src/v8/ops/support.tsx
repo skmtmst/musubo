@@ -92,6 +92,9 @@ export default function OpsSupportV8() {
   const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const unknown = access === 'unknown'
   const [summary, setSummary] = useState<OpsSupportSummary | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(true)
+  const [summaryFailed, setSummaryFailed] = useState(false)
+  const [summaryError, setSummaryError] = useState('')
   const [tickets, setTickets] = useState<OpsSupportTicket[]>([])
   const [total, setTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,6 +109,8 @@ export default function OpsSupportV8() {
   const [notice, setNotice] = useState('')
   const [creating, setCreating] = useState(false)
   const [tenants, setTenants] = useState<OpsTenantRow[]>([])
+  const [tenantsLoading, setTenantsLoading] = useState(false)
+  const [tenantsError, setTenantsError] = useState('')
   const [form, setForm] = useState({ tenantId: '', subject: '', body: '', kind: 'usage', priority: 'medium' as OpsSupportPriority })
   const [busy, setBusy] = useState(false)
   const [reply, setReply] = useState('')
@@ -118,17 +123,30 @@ export default function OpsSupportV8() {
   const insertAt = useRef(0)
   const replyCaretKnown = useRef(false)
   const detailRequest = useRef(0)
+  const detailLoadingRef = useRef(false)
   const listRequest = useRef(0)
+  const listLoadingRef = useRef(false)
+  const summaryRequest = useRef(0)
+  const summaryLoadingRef = useRef(false)
+  const tenantsRequest = useRef(0)
+  const tenantsLoadingRef = useRef(false)
   const deepLink = useRef<string | null>(null)
   const [listFailed, setListFailed] = useState(false)
+  const [listError, setListError] = useState('')
   const [detailFailed, setDetailFailed] = useState(false)
+  const [detailError, setDetailError] = useState('')
   const [confirmReply, setConfirmReply] = useState(false)
   const [createError, setCreateError] = useState('')
 
   useEffect(() => {
     deepLink.current = new URLSearchParams(window.location.search).get('id')
     if (deepLink.current) setSelectedId(deepLink.current)
-    return () => { detailRequest.current += 1; listRequest.current += 1 }
+    return () => {
+      detailRequest.current += 1
+      listRequest.current += 1
+      summaryRequest.current += 1
+      tenantsRequest.current += 1
+    }
   }, [])
 
   useEffect(() => {
@@ -146,9 +164,27 @@ export default function OpsSupportV8() {
   }, [])
 
   const loadSummary = useCallback(async () => {
+    const sequence = ++summaryRequest.current
+    summaryLoadingRef.current = true
+    setSummaryLoading(true)
+    setSummaryFailed(false)
+    setSummaryError('')
     const res = await opsCall(api.ops.support.summary())
-    if (res.success) setSummary(res.data)
+    if (sequence !== summaryRequest.current) return
+    summaryLoadingRef.current = false
+    setSummaryLoading(false)
+    if (!res.success) {
+      setSummaryFailed(true)
+      setSummaryError(res.error || '')
+      return
+    }
+    setSummary(res.data)
   }, [])
+
+  const retrySummary = useCallback(() => {
+    if (summaryLoadingRef.current) return
+    void loadSummary()
+  }, [loadSummary])
 
   /*
    * WEB218：チケットは50件ずつ読む。50件ちょうど返ったときは続きがあるかもしれないので、
@@ -171,17 +207,32 @@ export default function OpsSupportV8() {
 
   const loadList = useCallback(async () => {
     const sequence = ++listRequest.current
+    listLoadingRef.current = true
     setLoading(true)
     setListFailed(false)
+    setListError('')
     const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: TICKET_PAGE }))
     if (sequence !== listRequest.current) return
+    listLoadingRef.current = false
     setLoading(false)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
+    if (!res.success) {
+      const msg = res.error || '読み込めませんでした'
+      setListError(msg)
+      setError(msg)
+      setListFailed(true)
+      return
+    }
+    setError('')
     setTickets(res.data)
     setTotal(typeof res.total === 'number' ? res.total : null)
     setMayHaveMore(res.data.length >= TICKET_PAGE)
     setSelectedId((current) => deepLink.current || (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
   }, [stage, priority, q, sort])
+
+  const retryList = useCallback(() => {
+    if (listLoadingRef.current) return
+    void loadList()
+  }, [loadList])
 
   /*
    * WEB219：同じチケットを読み直すとき（優先度を変えたあとなど）は、書きかけの返信を
@@ -189,12 +240,21 @@ export default function OpsSupportV8() {
    */
   const loadDetail = useCallback(async (id: string, options?: { keepReply?: boolean }) => {
     const sequence = ++detailRequest.current
+    detailLoadingRef.current = true
     setDetailLoading(true)
     setDetailFailed(false)
+    setDetailError('')
     const res = await opsCall(api.ops.support.ticket(id))
     if (sequence !== detailRequest.current) return
+    detailLoadingRef.current = false
     setDetailLoading(false)
-    if (!res.success) { setError(res.error || '内容を読み込めませんでした'); setDetailFailed(true); return }
+    if (!res.success) {
+      const msg = res.error || '内容を読み込めませんでした'
+      setDetailError(msg)
+      setError(msg)
+      setDetailFailed(true)
+      return
+    }
     setDetail(res.data)
     if (options?.keepReply) return
     setReplyStage(res.data.ticket.stage)
@@ -202,20 +262,49 @@ export default function OpsSupportV8() {
     setReply(res.data.draft?.body ?? '')
   }, [])
 
+  const retryDetail = useCallback(() => {
+    if (detailLoadingRef.current || !selectedId) return
+    void loadDetail(selectedId)
+  }, [loadDetail, selectedId])
+
+  const loadTenants = useCallback(async () => {
+    const sequence = ++tenantsRequest.current
+    tenantsLoadingRef.current = true
+    setTenantsLoading(true)
+    setTenantsError('')
+    const res = await opsCall(api.ops.tenants())
+    if (sequence !== tenantsRequest.current) return
+    tenantsLoadingRef.current = false
+    setTenantsLoading(false)
+    if (!res.success) {
+      setTenantsError(res.error || '契約先の一覧を読み込めませんでした。')
+      return
+    }
+    setTenants(res.data.filter((t) => t.status !== 'archived'))
+  }, [])
+
+  const retryTenants = useCallback(() => {
+    if (tenantsLoadingRef.current) return
+    void loadTenants()
+  }, [loadTenants])
+
   useEffect(() => { void loadSummary() }, [loadSummary])
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => {
     setReply(''); setTemplateOpen(false); setStageOpen(false)
     detailRequest.current += 1
+    detailLoadingRef.current = false
     setDetail(null)
+    setDetailFailed(false)
+    setDetailError('')
     if (!selectedId) return
     void loadDetail(selectedId)
   }, [selectedId, loadDetail])
 
   useEffect(() => {
     if (!creating || tenants.length > 0) return
-    void opsCall(api.ops.tenants()).then((res) => { if (res.success) setTenants(res.data.filter((t) => t.status !== 'archived')) })
-  }, [creating, tenants.length])
+    void loadTenants()
+  }, [creating, tenants.length, loadTenants])
 
   const refreshAll = useCallback(async () => {
     await Promise.all([loadSummary(), loadList()])
@@ -331,7 +420,7 @@ export default function OpsSupportV8() {
         description="チケットを選び、返信や状態の変更を行います。"
         band={(
           <div className={styles.band}>
-          <OpsSupportStats summary={summary} loading={loading && summary === null} />
+          <OpsSupportStats summary={summary} loading={summaryLoading && summary === null} />
           </div>
         )}
         actions={(
@@ -340,6 +429,13 @@ export default function OpsSupportV8() {
       />
       </div>
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
+      {summaryFailed ? (
+        <div className={styles.notice}>
+          <Notice tone="danger" action={<Button onClick={retrySummary} disabled={summaryLoading} busy={summaryLoading}>もう一度読み込む</Button>}>
+            {summaryError ? `件数の集計を読み込めませんでした（${summaryError}）。` : '件数の集計を読み込めませんでした。通信を確認して、もう一度読み込んでください。'}
+          </Notice>
+        </div>
+      ) : null}
       {error && !listFailed && !detailFailed ? <Notice tone="danger" >{error}</Notice> : null}
 
       <div data-ops-support-detail={selectedId ? '' : undefined} className={`${styles.columns} ${selectedId ? styles.columnsSelected : ''}`}>
@@ -350,10 +446,15 @@ export default function OpsSupportV8() {
             <SaveErrorField names={["priority"]}><Select aria-label="優先度で絞る" options={PRIORITY_FILTER} value={priority} onChange={value => setPriority(value as '' | OpsSupportPriority)} size="page-size" /></SaveErrorField>
             <SaveErrorField names={["sort"]}><Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={value => setSort(value as typeof sort)} size="page-size" /></SaveErrorField>
           </ListToolbarRow>
+          {listFailed && tickets.length > 0 ? (
+            <Notice tone="danger" action={<Button onClick={retryList} disabled={loading} busy={loading}>もう一度読み込む</Button>}>
+              {listError ? `チケットの一覧を更新できませんでした（${listError}）。以前の一覧を表示しています。` : 'チケットの一覧を更新できませんでした。以前の一覧を表示しています。'}
+            </Notice>
+          ) : null}
           {loading && tickets.length === 0 ? (
             <ListState permissionScope="hq" kind="loading" title="チケットを読み込んでいます" />
           ) : listFailed && tickets.length === 0 ? (
-            <ListState permissionScope="hq" kind="error" title="チケットを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={() => void loadList()} />
+            <ListState permissionScope="hq" kind="error" title="チケットを読み込めませんでした" description={listError || '通信が切れたか、サーバが応えませんでした。'} onRetry={retryList} />
           ) : tickets.length === 0 ? (
             <ListState permissionScope="hq" kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
           ) : (
@@ -380,10 +481,15 @@ export default function OpsSupportV8() {
         <section aria-label="内容と返信" className={styles.detail}>
           {!ticket ? (
             detailLoading ? <ListState permissionScope="hq" kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
-              <ListState permissionScope="hq" kind="error" title="内容を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。" onRetry={selectedId ? () => void loadDetail(selectedId) : undefined} />
+              <ListState permissionScope="hq" kind="error" title="内容を読み込めませんでした" description={detailError || '通信が切れたか、サーバが応えませんでした。'} onRetry={selectedId ? retryDetail : undefined} />
             ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
+              {detailFailed ? (
+                <Notice tone="danger" action={selectedId ? <Button onClick={() => { if (!detailLoadingRef.current) void loadDetail(selectedId, { keepReply: true }) }} disabled={detailLoading} busy={detailLoading}>もう一度読み込む</Button> : undefined}>
+                  {detailError ? `最新の内容を読み込めませんでした（${detailError}）。` : '最新の内容を読み込めませんでした。'}
+                </Notice>
+              ) : null}
               <div className={styles.mobileTop}><Button variant="text" textTone="ink" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</Button><RowMenu label="その他の操作" appearance="outlined" className={styles.outlinedMore} items={proxyMenuItems} /></div>
               <div className={styles.detailTitleRow}><CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} /></div>
               <div className={styles.detailControls}>
@@ -454,6 +560,11 @@ export default function OpsSupportV8() {
         onCancel={() => { if (!busy) setCreating(false) }}
       >
         <div className={parts.dialogBody}>
+          {tenantsError ? (
+            <Notice tone="danger" action={<Button onClick={retryTenants} disabled={tenantsLoading} busy={tenantsLoading}>もう一度読み込む</Button>}>
+              {tenantsError.includes('契約先') ? tenantsError : `契約先の一覧を読み込めませんでした（${tenantsError}）`}
+            </Notice>
+          ) : null}
           <div className={styles.field}>
             <span className={styles.smallLabel}>契約先</span>
             <div className={styles.fullSelect} {...createFields.bind('tenant')}>
