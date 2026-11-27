@@ -9,6 +9,7 @@ export default defineConfig({
     'scripts/visual-qa/friends-interactions.spec.mjs',
     'scripts/visual-qa/inbox-narrow.spec.mjs',
     'scripts/visual-qa/busy-buttons.spec.mjs',
+    'scripts/visual-qa/composer-toggle-wrap.spec.mjs',
     'apps/web/src/app/chats/inbox-673-behavior.spec.mjs',
     'apps/web/src/app/contents/vars/new/page.interaction.spec.ts',
   ],

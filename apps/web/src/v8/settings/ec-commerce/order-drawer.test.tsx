@@ -22,7 +22,7 @@ const action = (status: string, retryAvailable: boolean) => ({
 const detail = (failed: boolean) => ({
   order: { id: 'order-1', lineAccountId: 'account-1', externalOrderId: 'x', orderNumber: 'A-1', customerId: 'c', friendId: 'friend-1', customerName: '見本 16', status: 'current', providerStatus: 'confirmed', currency: 'JPY', totalAmount: 7540, refundedAmount: 0, orderedAt: '2026-10-01T12:02:00.000Z', detailUrl: null, version: 1, orderLines: [{ id: 'l', productId: 'p', productName: '鹿肉ドライ 1kg', quantity: 1, unitAmount: 7540, lineAmount: 7540, productUrl: null }] },
   events: [{ id: 'e', externalEventId: 'x', eventType: 'ec.order.confirmed', status: failed ? 'failed' : 'processed', failureKind: null, receivedAt: '2026-10-01T12:02:00.000Z', processedAt: null, actions: [action(failed ? 'retryable_failed' : 'succeeded', failed)], dispatches: [], deliveries: [] }],
-  followUps: [{ id: 'f', campaignKey: 'k', campaignLabel: '口コミのお願い', scheduledAt: '2026-10-12T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null, failureKind: null }],
+  followUps: [{ id: 'f', campaignKey: 'k', campaignLabel: '口コミのお願い', scheduledAt: '2026-10-12T01:00:00.000Z', status: 'pending', attempts: 0, sentAt: null, reason: null as string | null, failureKind: null }],
   outcomes: { conversions: [], mileage: [{ id: 'm', entryType: 'earn', amount: 75, status: 'confirmed', reason: '商品を買った', occurredAt: '2026-10-01T12:03:00.000Z' }], scores: [] },
 })
 
@@ -82,4 +82,18 @@ it('閲覧のみでは失敗理由を読めるが、もう一度やる操作は�
   render(<OrderDrawer orderId="order-1" accountId="account-1" onClose={() => undefined} onRetryAction={async () => undefined} retryingId={null} canEdit={false} />)
   expect(await screen.findByText(/LINEが送信を受け付けませんでした/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'もう一度やる' })).toBeNull()
+})
+
+
+it('未知の見送り理由が継承名でも正しく表示し、既知の理由は案内文にする', async () => {
+  const data = detail(false)
+  data.followUps = [
+    { ...data.followUps[0], id: 'unknown', status: 'skipped', reason: 'constructor' },
+    { ...data.followUps[0], id: 'known', status: 'skipped', reason: 'order_cancelled' },
+  ] as typeof data.followUps
+  fixture.orderDetail.mockResolvedValue({ success: true, data })
+  render(<OrderDrawer orderId="order-1" accountId="account-1" onClose={() => undefined} onRetryAction={async () => undefined} retryingId={null} />)
+  expect(await screen.findByText(/見送り・constructor/)).toBeTruthy()
+  expect(screen.getByText(/注文の取り消しのため見送り/)).toBeTruthy()
+  expect(screen.queryByText(/function Object/)).toBeNull()
 })
