@@ -1457,3 +1457,5 @@
 - [コラム下書き日時検査と来店フォロー時刻表記の安全化](release-log/unreleased/PR-kenta-later-gemini89-1127.md) — 反映履歴、確認 2026-11-28。
 - [保存した検索と共通情報の読み込みを直した反映履歴](release-log/unreleased/PR-kenta-later-codex51.md) — 反映履歴、確認 2026-11-27。
 - [保存した検索の読み込み失敗と再読み込みの案内](release-log/unreleased/PR-kenta-inbox-saved-views-failure.md) — 反映履歴、確認 2026-11-27。
+- [記録の JSON 表示を直した反映履歴](release-log/unreleased/PR-kenta-later-codex46.md) — 反映履歴、確認 2026-11-27。
+- [長い記録の表示を直した反映履歴](release-log/unreleased/PR-kenta-log-record-long.md) — 反映履歴、確認 2026-11-27。
