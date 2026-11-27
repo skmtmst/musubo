@@ -29,9 +29,10 @@ export default function LessonHistorySection({ onPicking, onLater, onBookingChan
     const generation = ++loadGeneration.current;
     setLoadFailed(false);
     Promise.resolve().then(() => api.myEventBookings('upcoming')).then((r) => { if (generation !== loadGeneration.current) return; const rows = r.items; setKnown((prev) => (Array.isArray(rows) ? [...rows, ...prev.filter((p) => !rows.some((i) => i.id === p.id))] : prev)); setItems(r.items.filter((b) => b.makeup?.enabled && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now())); }).catch(() => { if (generation === loadGeneration.current) setLoadFailed(true); });
-    Promise.resolve().then(() => api.myEventBookings('past')).then((r) => { if (generation === loadGeneration.current) setKnown((prev) => (Array.isArray(r.items) ? [...prev, ...r.items.filter((i) => !prev.some((p) => p.id === i.id))] : prev)); }).catch(() => { if (generation === loadGeneration.current) setLoadFailed(true); });
+    Promise.resolve().then(() => api.myEventBookings('past')).then((r) => { if (!r || !Array.isArray(r.items)) throw new Error('Invalid past bookings response'); if (generation === loadGeneration.current) setKnown((prev) => [...prev, ...r.items.filter((i) => !prev.some((p) => p.id === i.id))]); }).catch(() => { if (generation === loadGeneration.current) setLoadFailed(true); });
     Promise.resolve().then(() => api.makeupCredits()).then((r) => {
       if (generation !== loadGeneration.current) return;
+      if (!r || !Array.isArray(r.credits) || !r.credits.every(c => c && ['open', 'used', 'expired', 'revoked'].includes(c.status))) throw new Error('Invalid makeup credits response');
       const next = r.credits.filter((c) => c.status === 'open');
       setCredits(next);
       setSelectedCreditId((current) => next.some((c) => c.id === current) ? current : next[0]?.id ?? null);
