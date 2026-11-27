@@ -217,6 +217,7 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
           className={styles.submit}
           onClick={() => void submit()}
           disabled={loading || missingChallenge || succeeded || incomplete}
+          disabledReason={!missingChallenge && incomplete ? '認証アプリの6桁の数字を入力してください。' : undefined}
           busy={loading || succeeded}
           busyLabel={succeeded ? '開いています' : '確かめています…'}
         >
