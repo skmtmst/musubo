@@ -6,7 +6,7 @@ import { FEATURE_DISABLED_EVENT, getCsrfToken, API_URL, MUTATING_METHODS, apiRea
 import { adminSessionHeaders } from '../../admin-session'
 import { fetchWithNetworkMessage, extractApiErrorCode, extractApiErrorData, extractUnresolvedVariableData } from './errors'
 import { SESSION_LOST_EVENT } from '../../session-events'
-import { canonicalApiPath, clearApiReadCache, shareApiRead, synchronizeApiReadScope } from './read-cache'
+import { adoptApiRead, canonicalApiPath, clearApiReadCache, shareApiRead, synchronizeApiReadScope } from './read-cache'
 
 /** FEATURE_DISABLED の公開情報だけを共通 shell へ渡す。 */
 export function extractFeatureDisabledDetail(raw: string): FeatureDisabledEventDetail {
@@ -117,6 +117,21 @@ export function reportServerFailure(path: string, status: number): void {
   })()
 }
 
+function buildReadCacheKey(path: string, method: string, context: ApiAccountEventDetail, scopeKey: string, options?: FetchApiOptions): string {
+  const { headers, accountId: _accountId, method: _method, cache: _cache, suppressFeatureDisabledEvent: _suppress, ...requestOptions } = options ?? {}
+  return JSON.stringify([method, canonicalApiPath(path), context.accountId, context.accountIds, scopeKey, [...new Headers(headers)].sort(), requestOptions])
+}
+
+export function adoptPrefetchedApiRead<T>(path: string, promise: Promise<T>, startedAt: number, settledOk = false, options?: FetchApiOptions): void {
+  if (typeof window === 'undefined') return
+  const scope = apiReadScope()
+  synchronizeApiReadScope(scope.key)
+  if (!scope.identified) return
+  const context = apiAccountContext(path, options)
+  const key = buildReadCacheKey(path, 'GET', context, scope.key, options)
+  adoptApiRead(path, key, promise, startedAt, settledOk)
+}
+
 export async function fetchApi<T>(path: string, options?: FetchApiOptions): Promise<T> {
   const context = apiAccountContext(path, options)
   const method = (options?.method ?? 'GET').toUpperCase()
@@ -127,8 +142,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   // Cookieだけで本人の世代を識別できない間は、別ログインの答えを共有しない。
   if (!scope.identified) return load()
   if (method !== 'GET' || options?.signal) return load()
-  const { headers, accountId: _accountId, method: _method, cache: _cache, suppressFeatureDisabledEvent: _suppress, ...requestOptions } = options ?? {}
-  const key = JSON.stringify([method, canonicalApiPath(path), context.accountId, context.accountIds, scope.key, [...new Headers(headers)].sort(), requestOptions])
+  const key = buildReadCacheKey(path, method, context, scope.key, options)
   const shared = shareApiRead(path, key, () => requestApi<T>(path, options), options?.cache === 'reload' || options?.cache === 'no-store', options?.cache === 'no-store')
   return shared.catch(error => {
     const detail = error instanceof Error ? responseEvents.get(error) : undefined

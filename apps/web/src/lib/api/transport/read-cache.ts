@@ -79,3 +79,35 @@ export function shareApiRead<T>(path: string, key: string, load: () => Promise<T
   // 表示用の並べ替え・加工が、別の利用者や保存済みの答えへ伝わらない。
   return (entry.promise as Promise<T>).then(response => structuredClone(response))
 }
+
+/**
+ * 認証確認と並列に始めた取得を、認証確定後の現行スコープへ引き継ぐ。
+ * すでに同キーの便がある場合は上書きせず、失敗・非成功・時間切れは覚えない。
+ */
+export function adoptApiRead<T>(path: string, key: string, promise: Promise<T>, startedAt: number, settledOk = false): void {
+  const now = Date.now()
+  if (startedAt + LIST_REQUEST_TIMEOUT_MS <= now) return
+  for (const [oldKey, entry] of reads) {
+    if (entry.expiresAt <= now) reads.delete(oldKey)
+  }
+  if (reads.has(key)) return
+  const url = new URL(path, 'https://request.invalid')
+  if (!reusablePaths.has(url.pathname) || url.searchParams.get('live') === '1') return
+  if (settledOk) {
+    const expiresAt = startedAt + REUSE_MS
+    if (expiresAt <= now) return
+    reads.set(key, { promise, expiresAt, path })
+    return
+  }
+  const entry: ReadEntry = { promise, expiresAt: startedAt + LIST_REQUEST_TIMEOUT_MS, path }
+  reads.set(key, entry)
+  const forget = () => { if (reads.get(key) === entry) reads.delete(key) }
+  void promise.then(response => {
+    if (reads.get(key) !== entry) return
+    if (entry.expiresAt <= Date.now()) { forget(); return }
+    const successful = response && typeof response === 'object' && 'success' in response
+      && response.success === true && 'data' in response
+    if (!successful) forget()
+    else entry.expiresAt = Date.now() + REUSE_MS
+  }, forget)
+}

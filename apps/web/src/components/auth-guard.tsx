@@ -10,7 +10,7 @@ import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot, type SessionSnapshot } from '@/lib/session-snapshot'
 import { forgetAuthCheck, readAuthCheck, rememberAuthCheck } from '@/lib/auth-check-marker'
 import { clearCommonCaches } from '@/lib/common-caches'
-import { prefetchLineAccounts } from '@/lib/line-accounts-cache'
+import { adoptPrefetchedLineAccounts, prefetchLineAccounts, type LineAccountsPrefetch } from '@/lib/line-accounts-cache'
 import TenantSuspended from './tenant-suspended'
 import AuthPendingShell from './auth-pending-shell'
 import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
@@ -82,7 +82,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
 
     // セッション切れ・別タブでのログアウトは、次の遷移で必ず確認し直す。
     // 使い回していた共通の答えも捨てる（古い権限や別アカウントを見せない）。
-    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot(); forgetAuthCheck(); clearCommonCaches() }
+    let invalidationSeq = 0
+    const invalidate = () => { invalidationSeq++; lastSessionCheck = null; forgetSessionSnapshot(); forgetAuthCheck(); clearCommonCaches() }
     const onStorage = (event: StorageEvent) => {
       if (event.key === 'lh_csrf' || event.key === 'lh_staff_role') invalidate()
     }
@@ -132,7 +133,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
     // 一覧の取得は確認の結果を要らないので、確認と並べて先に始める（直列にしない）。
-    prefetchLineAccounts()
+    const initialPrefetch = prefetchLineAccounts()
     /*
      * R505: この確認の世代と開始時の指紋。応答を当てはめる前に今と照合し、
      * 古ければ捨てる。成功応答の書き戻しも、失敗時のログインへの送りもしない。
@@ -144,9 +145,14 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     const recheckAfterStale = () => {
       if (cancelled || checkSeq !== authSessionCheckSeq) return
       const freshSeq = ++authSessionCheckSeq
-      void runSessionCheck(freshSeq, sessionFingerprint(handoffToken))
+      void runSessionCheck(freshSeq, sessionFingerprint(handoffToken), prefetchLineAccounts(), invalidationSeq)
     }
-    const runSessionCheck = async (mySeq: number, myFingerprint: string) => {
+    const runSessionCheck = async (
+      mySeq: number,
+      myFingerprint: string,
+      prefetchedAccounts: LineAccountsPrefetch,
+      myInvalidationSeq: number,
+    ) => {
       try {
         try { localStorage.removeItem('lh_api_key') } catch { /* HttpOnly / bearer session is still usable */ }
         const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -191,6 +197,11 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         // 印が残るので他タブの店舗選択を消さず、ログインし直しのときだけ
         // 一度だけ消える（NEXT-07）。sessionStorage の残存印も残存扱いにする。
         clearSelectionAfterAuthentication(localStorage, sessionStorage)
+        // 認証と店舗選択が確定した時点で、並列に開始したアカウント一覧の取得を
+        // 現行スコープへ引き継ぐ（AccountProvider 側の重複取得を防ぐ）。
+        if (myInvalidationSeq === invalidationSeq) {
+          adoptPrefetchedLineAccounts(prefetchedAccounts)
+        }
         // 確認した時点の指紋で記憶する（CSRF更新を受けたなら新しい値で）。
         const confirmedFingerprint = sessionFingerprint(handoffToken)
         lastSessionCheck = { at: Date.now(), fingerprint: confirmedFingerprint, tenantStatus: nextTenantStatus, onboardingPath: nextOnboardingPath }
@@ -218,7 +229,7 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
       }
     }
 
-    runSessionCheck(checkSeq, startFingerprint)
+    runSessionCheck(checkSeq, startFingerprint, initialPrefetch, invalidationSeq)
     return () => {
       cancelled = true
       window.removeEventListener(SESSION_LOST_EVENT, invalidate)
