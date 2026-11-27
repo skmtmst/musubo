@@ -60,6 +60,17 @@ type WizardPriorityStepContext = {
 }
 
 export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsReadable = true, permissionPending = false, autoReplyId, conflicts, dryRun, effectiveKeywords, firstConflictAbove, friendLoadState, friendQuery, friends, friendTotal, loadPriorityData, matchedAccountId, moveBeforeFirstConflict, moveUp, myIndex, myPositionLabel, orderedRules, priorityState, runTest, saving, searchFriends, selectedFriendId, setFriendQuery, setSelectedFriendId, setTestMessage, testMessage, thisRuleName }: WizardPriorityStepContext) {
+  const safeOrderedRules = Array.isArray(orderedRules) ? orderedRules : []
+  const safeConflicts = Array.isArray(conflicts) ? conflicts : []
+  const safeFriends = Array.isArray(friends) ? friends : []
+  const validFriendTotal = Number.isInteger(friendTotal) && friendTotal >= 0
+  const firstKeyword = Array.isArray(effectiveKeywords) && typeof effectiveKeywords[0]?.keyword === 'string'
+    ? effectiveKeywords[0].keyword.trim()
+    : ''
+  const selfCandidate = dryRun && Array.isArray(dryRun.candidates)
+    ? dryRun.candidates.find((c) => c.autoReplyId === autoReplyId)
+    : undefined
+  const selfReasonCodes = Array.isArray(selfCandidate?.reasonCodes) ? selfCandidate.reasonCodes : []
   return (<>
               <Notice tone="info">
                 上のルールから順に見て、最初に当たった1つだけが動きます。このルールより上に、同じ受信に当たるルールがあると、このルールは動きません。
@@ -81,10 +92,10 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                   </p>
                 ) : (
                   <ol className={styles.orderList}>
-                    {orderedRules.map((rule, index) => {
+                    {safeOrderedRules.map((rule, index) => {
                       const isSelf = rule.id === autoReplyId
-                      const isConflict = conflictsReadable && conflicts.some((c) => c.autoReplyId === rule.id)
-                      const certain = conflictsReadable && conflicts.some((c) => c.autoReplyId === rule.id && c.certainty === 'certain')
+                      const isConflict = conflictsReadable && safeConflicts.some((c) => c.autoReplyId === rule.id)
+                      const certain = conflictsReadable && safeConflicts.some((c) => c.autoReplyId === rule.id && c.certainty === 'certain')
                       const aboveSelf = myIndex >= 0 && index < myIndex
                       return (
                         <li
@@ -104,7 +115,7 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                             {/* 絵 Guoye：どの行も2行目に一言（このルール＝いまの順番・先に動く重なり＝黄・止まっている・動き方・重なりなし）。 */}
                             <p className={styles.orderSub}>
                               {isSelf ? (
-                                <span>{`いまの順番：${myIndex === orderedRules.length - 1 ? 'いちばん下' : myPositionLabel}`}</span>
+                                <span>{`いまの順番：${myIndex === safeOrderedRules.length - 1 ? 'いちばん下' : myPositionLabel}`}</span>
                               ) : rule.lifecycleStatus === 'draft' || !rule.isActive ? (
                                 <span>停止中</span>
                               ) : certain && aboveSelf ? (
@@ -118,12 +129,12 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                           </div>
                           {isSelf && (
                             <span className={styles.orderMove}>
-                              <Button type="button" disabled={!canEdit || myIndex <= 0} lockedReason={lockedReason} onClick={moveUp}>
+                              <Button type="button" disabled={!canEdit || myIndex <= 0 || saving} lockedReason={lockedReason} onClick={moveUp}>
                                 <ArrowUp size={16} aria-hidden="true" />
                                 上へ
                               </Button>
                               {conflictsReadable && firstConflictAbove && (
-                                <Button type="button" disabled={!canEdit} lockedReason={lockedReason} onClick={moveBeforeFirstConflict}>
+                                <Button type="button" disabled={!canEdit || saving} lockedReason={lockedReason} onClick={moveBeforeFirstConflict}>
                                   <ArrowUpToLine size={16} aria-hidden="true" />
                                   {`「${displayName(firstConflictAbove)}」より前へ`}
                                 </Button>
@@ -133,7 +144,7 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                         </li>
                       )
                     })}
-                    {orderedRules.length === 0 && priorityState !== 'loading' && (
+                    {safeOrderedRules.length === 0 && priorityState !== 'loading' && (
                       <li className={styles.hint}>ほかのルールはまだありません。このルールがいちばん上に動きます。</li>
                     )}
                     {priorityState === 'loading' && <li className={styles.hint}>読み込んでいます…</li>}
@@ -155,12 +166,14 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                     options={
                       friendLoadState === 'error'
                         ? [{ value: '', label: '友だちを読み込めませんでした' }]
-                        : friends.length === 0
+                        : safeFriends.length === 0
                           ? [{ value: '', label: '友だちがいません' }]
-                          : friends.map((f) => ({ ...entityOptionMetadata(f),
+                          : safeFriends.map((f) => ({ ...entityOptionMetadata(f),
                               value: f.id,
                               label: f.id === selectedFriendId
-                                ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${formatNumber(friends.length)}人）`
+                                ? validFriendTotal
+                                  ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${formatNumber(safeFriends.length)}人）`
+                                  : `送信者：${f.displayName || '名前なし'}（名前で探す・候補の人数を確認できません）`
                                 : f.displayName || '名前なし',
                             }))
                     }
@@ -182,7 +195,7 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                     aria-label="届いたメッセージ"
                     value={testMessage}
                     onChange={(e) => setTestMessage(e.target.value)}
-                    placeholder={effectiveKeywords[0]?.keyword.trim() ? `${effectiveKeywords[0].keyword.trim()}したいです` : '例：予約変更したいです'}
+                    placeholder={firstKeyword ? `${firstKeyword}したいです` : '例：予約変更したいです'}
                   /></SaveErrorField>
                   <Button
                     type="button"
@@ -212,12 +225,10 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
                 ? `このルールは見送りです：${dryRun.winner.name}が先に動きます。動かすには、順番をそれより前にします。`
                 : '届いたメッセージや相手の条件が、どのルールにも合いませんでした。'}
           </p>
-          {dryRun.candidates.find((c) => c.autoReplyId === autoReplyId)?.reasonCodes.length ? (
+          {selfReasonCodes.length > 0 ? (
             <p className={styles.testResultNote}>
               見送った理由：
-              {[...new Set(dryRun.candidates
-                .find((c) => c.autoReplyId === autoReplyId)!
-                .reasonCodes.map((code) => Object.prototype.hasOwnProperty.call(REASON_WORDS, code) ? REASON_WORDS[code] : '理由を確認できませんでした'))]
+              {[...new Set(selfReasonCodes.map((code) => Object.prototype.hasOwnProperty.call(REASON_WORDS, code) ? REASON_WORDS[code] : '理由を確認できませんでした'))]
                 .join('・')}
             </p>
           ) : null}
