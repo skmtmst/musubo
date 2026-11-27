@@ -34,6 +34,7 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
   const [error, setError] = useState('')
   const [questionError, setQuestionError] = useState('')
   const [answerError, setAnswerError] = useState('')
+  const saveTicket = useRef<object | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -62,12 +63,15 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
   }
 
   const save = async () => {
+    if (saveTicket.current) return
     const list = questions.split('\n').map((line) => line.trim()).filter(Boolean)
     const qe = list.length === 0 ? '質問を 1 つ以上入れてください' : ''
     const ae = answer.trim() ? '' : '答えを入れてください'
     setQuestionError(qe)
     setAnswerError(ae)
     if (qe || ae) return
+    const ticket = {}
+    saveTicket.current = ticket
     setBusy(true)
     setError('')
     try {
@@ -79,7 +83,7 @@ export default function QaEditDialog({ open, accountId, seed, canPublish, onSave
     } catch (caught) {
       if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, 'Q&A の保存'))
     } finally {
-      setBusy(false)
+      if (saveTicket.current === ticket) { saveTicket.current = null; setBusy(false) }
     }
   }
 
