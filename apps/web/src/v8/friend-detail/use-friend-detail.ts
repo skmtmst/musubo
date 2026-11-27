@@ -271,6 +271,7 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       )
       if (req !== historyReqRef.current || isStale(generation, requestedAccountId)) return
       if (res.success) {
+        if (!Array.isArray(res.data?.items) || res.data.items.some(item => !item || typeof item.id !== 'string' || typeof item.type !== 'string' || typeof item.occurredAt !== 'string' || typeof item.summary !== 'string')) throw new Error('invalid history')
         setHistoryItems((prev) => {
           if (!cursor) return res.data.items
           // IDEA-03「重複なし」: 同じ元の行は足さない。
@@ -307,6 +308,7 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       const res = await api.friends.formSubmissions(friendId, { cursor: cursor ?? null, limit: 10 })
       if (req !== submissionsReqRef.current || isStale(generation, requestedAccountId)) return
       if (res.success) {
+        if (!Array.isArray(res.data?.items) || res.data.items.some(item => !item || typeof item.id !== 'string' || typeof item.formName !== 'string' || typeof item.createdAt !== 'string' || (item.fields != null && !Array.isArray(item.fields)) || (item.data != null && (typeof item.data !== 'object' || Array.isArray(item.data))))) throw new Error('invalid submissions')
         setSubmissions((prev) => {
           if (!cursor) return res.data.items
           const seen = new Set(prev.map((item) => item.id))

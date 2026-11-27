@@ -4,6 +4,7 @@
 - [友だち追加の条件と自動化の下書きの反映履歴](release-log/unreleased/PR-kenta-later-codex55.md)（説明・2026-11-27確認）
 - [自動応答の保存結果の反映履歴](release-log/unreleased/PR-kenta-later-codex56.md)（説明・2026-11-27確認）
 - [来店の印の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex57.md)（説明・2026-11-27確認）
+- [友だち詳細の履歴と回答の反映履歴](release-log/unreleased/PR-kenta-later-codex58.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
