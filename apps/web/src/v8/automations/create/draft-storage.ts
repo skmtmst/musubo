@@ -30,10 +30,16 @@ export interface StoredDraft {
 
 export type StoredDrafts = Record<string, StoredDraft>
 
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+const isSafeAccountKey = (key: unknown): key is string =>
+  typeof key === 'string' && key.trim() !== '' && !FORBIDDEN_KEYS.has(key)
+
 export const isStoredDraft = (value: unknown): value is StoredDraft => {
-  if (!value || typeof value !== 'object') return false
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const draft = value as Partial<StoredDraft>
-  return typeof draft.id === 'string' && typeof draft.draftVersionId === 'string'
+  return typeof draft.id === 'string' && draft.id.trim() !== ''
+    && typeof draft.draftVersionId === 'string' && draft.draftVersionId.trim() !== ''
 }
 
 export const readStoredDrafts = (): StoredDrafts => {
@@ -41,27 +47,33 @@ export const readStoredDrafts = (): StoredDrafts => {
     const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== 'object') return {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
 
     // 以前の1店舗分だけの控えも読み、次の保存で店舗別の形へ移す。
     const legacy = parsed as Partial<StoredDraft> & { accountId?: unknown }
     const legacyAccountId = legacy.accountId
-    if (typeof legacyAccountId === 'string' && isStoredDraft(legacy)) {
+    if (isSafeAccountKey(legacyAccountId) && isStoredDraft(legacy)) {
       return { [legacyAccountId]: { id: legacy.id, draftVersionId: legacy.draftVersionId } }
     }
 
     return Object.fromEntries(
-      Object.entries(parsed).filter((entry): entry is [string, StoredDraft] => isStoredDraft(entry[1])),
+      Object.entries(parsed).filter(
+        (entry): entry is [string, StoredDraft] => isSafeAccountKey(entry[0]) && isStoredDraft(entry[1]),
+      ),
     )
   } catch {
     return {}
   }
 }
 
-export const readStoredDraft = (accountId: string): StoredDraft | null =>
-  readStoredDrafts()[accountId] ?? null
+export const readStoredDraft = (accountId: string): StoredDraft | null => {
+  if (!isSafeAccountKey(accountId)) return null
+  const drafts = readStoredDrafts()
+  return Object.prototype.hasOwnProperty.call(drafts, accountId) ? drafts[accountId] : null
+}
 
 export const writeStoredDraft = (accountId: string, draft: StoredDraft): void => {
+  if (!isSafeAccountKey(accountId) || !isStoredDraft(draft)) return
   try {
     sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
       ...readStoredDrafts(),
@@ -73,6 +85,7 @@ export const writeStoredDraft = (accountId: string, draft: StoredDraft): void =>
 }
 
 export const clearStoredDraft = (accountId: string): void => {
+  if (!isSafeAccountKey(accountId)) return
   try {
     const drafts = readStoredDrafts()
     delete drafts[accountId]
