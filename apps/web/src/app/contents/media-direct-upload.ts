@@ -9,7 +9,7 @@ const MEBIBYTE = 1024 * 1024
  * 選んだ時点で弾けず、まとめて送った口の400で有効なファイルまで巻き込む。
  * 口側へ形式を足したらここも足す。容量の上限も口と同じ値に揃える。
  */
-const MEDIA_SPECS: Record<string, { ext: readonly string[]; maxBytes: number }> = {
+const MEDIA_SPECS: Record<string, { ext: readonly string[]; maxBytes: number }> = Object.assign(Object.create(null), {
   'image/png': { ext: ['png'], maxBytes: 10 * MEBIBYTE },
   'image/jpeg': { ext: ['jpg', 'jpeg'], maxBytes: 10 * MEBIBYTE },
   'image/gif': { ext: ['gif'], maxBytes: 10 * MEBIBYTE },
@@ -18,7 +18,7 @@ const MEDIA_SPECS: Record<string, { ext: readonly string[]; maxBytes: number }> 
   'audio/mpeg': { ext: ['mp3'], maxBytes: 200 * MEBIBYTE },
   'audio/mp4': { ext: ['m4a'], maxBytes: 200 * MEBIBYTE },
   'application/pdf': { ext: ['pdf'], maxBytes: 20 * MEBIBYTE },
-}
+})
 
 export const MEDIA_ACCEPT = Object.keys(MEDIA_SPECS).join(',')
 
