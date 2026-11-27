@@ -1476,3 +1476,4 @@
 - [日別分析グラフの不正な集計と日付の表示修正](release-log/unreleased/PR-kenta-later-cx3-14-1128.md) — 反映履歴、確認 2026-11-28。
 - [カルーセルのボタンの不明な動きの表示修正](release-log/unreleased/PR-kenta-later-cx3-15-1128.md) — 反映履歴、確認 2026-11-28。
 - [ホームの不明な指標と説明の表示修正](release-log/unreleased/PR-kenta-later-cx3-16-1128.md) — 反映履歴、確認 2026-11-28。
+- [ウェビナー参加者の回数と参加経路の表示修正](release-log/unreleased/PR-kenta-later-cx3-17-1128.md) — 反映履歴、確認 2026-11-28。
