@@ -13,7 +13,7 @@ export function deduplicationLabel(
 ): string {
   if (mode === 'once_per_friend') return '1人1回だけ'
   if (mode === 'window') {
-    return typeof windowDays === 'number' && windowDays > 0
+    return typeof windowDays === 'number' && Number.isInteger(windowDays) && windowDays > 0
       ? `${windowDays}日に1回まで`
       : '決めた日数に1回まで'
   }
