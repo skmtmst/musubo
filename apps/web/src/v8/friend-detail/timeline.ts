@@ -80,13 +80,28 @@ export function timelineStatusLabel(type: string, status: string | null) {
   return knownValue(labels, status, status)
 }
 
+const SAME_ORIGIN_BASE = 'https://same.invalid'
+
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i)
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
+
 function safeSourceUrl(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const trimmed = raw.trim()
-  if (!trimmed) return null
-  // 「/」1つで始まる相対パスは許可する（プロトコル相対「//」やバックスラッシュは拒否）。
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !/^\/\\/.test(trimmed)) {
-    return trimmed
+  if (!trimmed || hasControlChar(trimmed)) return null
+  // 相対パスは固定基準 URL で解決し、オリジンが変わらない場合のみ許可する。
+  if (trimmed.startsWith('/')) {
+    try {
+      const resolved = new URL(trimmed, SAME_ORIGIN_BASE)
+      return resolved.origin === SAME_ORIGIN_BASE ? trimmed : null
+    } catch {
+      return null
+    }
   }
   try {
     const parsed = new URL(trimmed)
