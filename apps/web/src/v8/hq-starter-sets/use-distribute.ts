@@ -25,6 +25,7 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
   const [draft, setDraft] = useState<DistributeDraft | null>(null)
   const [preview, setPreview] = useState<{ key: string; data: StarterDistributionPreview } | null>(null)
   const [error, setError] = useState('')
+  const [preflightFailed, setPreflightFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const running = useRef(false)
   const [tick,setTick]=useState(0)
@@ -33,17 +34,25 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
 
   useEffect(() => {
     setPreview(null)
+    setPreflightFailed(false)
     if (!key || !target || version === null) return
     let cancelled = false
     void hqStyleApi.preflight(style, { expectedVersion: version, target }).then((res) => {
       if (!res.success) throw new Error('preflight failed')
       if (typeof res.data?.token !== 'string' || !res.data.token.trim() || !Number.isSafeInteger(res.data.accountCount) || res.data.accountCount < 0 || !Number.isSafeInteger(res.data.editedCount) || res.data.editedCount < 0) throw new Error('preflight failed')
       if (!cancelled) setPreview({ key, data: res.data })
-    }).catch((caught: unknown) => { if (!cancelled) setError(describeApiFailure(caught, '読み込み', { scope: 'hq' })) })
+    }).catch((caught: unknown) => { if (!cancelled) { setPreflightFailed(true); setError(describeApiFailure(caught, '読み込み', { scope: 'hq' })) } })
     return () => { cancelled = true }
   }, [key,tick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(()=>{setError('')},[key])
+
+  const retryPreflight = () => {
+    if (!preflightFailed || running.current) return
+    setPreflightFailed(false)
+    setError('')
+    setTick(n => n + 1)
+  }
 
   const ready = preview !== null && preview.key === key
   const run = async () => {
@@ -67,5 +76,5 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
     }
   }
   const tooMany = draft?.target === 'pick' && draft.accounts.length > DISTRIBUTE_ACCOUNT_LIMIT
-  return { draft, setDraft, preview: ready ? preview.data : null, error, busy, run, tooMany }
+  return { draft, setDraft, preview: ready ? preview.data : null, error, preflightFailed, retryPreflight, busy, run, tooMany }
 }
