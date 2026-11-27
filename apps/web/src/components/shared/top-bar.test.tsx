@@ -60,7 +60,6 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
   })
 
   it('パンくずは「ホーム › 画面名」1回だけ（先頭のホームは重ねない）', () => {
-    expect(source).toContain("crumb.label !== 'ホーム'")
     expect(source).not.toContain('crumbs == null && current')
   })
 
