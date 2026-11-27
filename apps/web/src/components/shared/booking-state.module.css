@@ -116,7 +116,7 @@
   .cardMeta [data-booking-count] { display: block; }
   .cardMeta [data-booking-count][data-many], .cardMeta [data-booking-warning-text] { display: none; }
   .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { display: flex; align-items: center; justify-content: center; min-height: var(--tpl-rs-lh-11); }
-  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: var(--space-8); height: var(--space-8); flex: none; }
+  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: min(var(--space-8), 100%); height: auto; aspect-ratio: 1; flex: none; }
   .cardMeta [data-booking-count-unit] { display: none; }
 }
 
