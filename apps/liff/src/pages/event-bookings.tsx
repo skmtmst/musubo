@@ -79,6 +79,7 @@ export default function EventBookings() {
     setActionError(null);
     try {
       const res = await api.myEventBookings(tab);
+      if (!res || !Array.isArray(res.items)) throw new Error('Invalid event bookings response');
       if (generation === requestGeneration.current) setItems(res.items);
     } catch (e) {
       logFailure('event-bookings', e);
@@ -276,10 +277,10 @@ export default function EventBookings() {
             ) : (
               <ul className="space-y-3.5">
                 {items.map((b) => {
-                  const baseMeta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  const baseMeta = Object.hasOwn(statusMeta, b.status) ? statusMeta[b.status] : { text: '状態を確認できません', tone: 'neutral' as const };
                   const lessonStatus: Record<string, string> = { requested: words.approvalPending, confirmed: '確定', attended: '出席', no_show: '欠席', rejected: 'お受けできませんでした' };
                   const meta = canLeaveWaitlist(b) ? { text: 'キャンセル待ち', tone: 'pending' as const }
-                    : style === 'lesson' ? { ...baseMeta, text: lessonStatus[b.status] ?? baseMeta.text } : baseMeta;
+                    : style === 'lesson' ? { ...baseMeta, text: Object.hasOwn(lessonStatus, b.status) ? lessonStatus[b.status] : baseMeta.text } : baseMeta;
                   return (
                     <li key={b.id}>
                       <Card className="p-3.5">
