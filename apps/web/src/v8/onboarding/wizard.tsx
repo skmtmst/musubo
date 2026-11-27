@@ -138,7 +138,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, st
                 <li key={group.kind} className={styles.row}>
                   <SetupIcon name={KIND_WORD[group.kind].icon} className={styles.rowIcon} />
                   <span className={styles.rowText}><span className={styles.rowTitle}>{KIND_WORD[group.kind].label}</span><span className={styles.rowNote}>{group.note}</span></span>
-                  <StatusBadge tone="neutral" dot>見本</StatusBadge>
+                  <StatusBadge tone={group.missing ? 'warning' : 'neutral'} dot>{group.missing ?? '見本'}</StatusBadge>
                   <Link href={KIND_WORD[group.kind].href(style)} className={styles.link}>見る</Link>
                 </li>
               ))}
@@ -224,17 +224,20 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, st
 }
 
 /** 入った物を種類ごとにまとめる（テンプレートは「A・B ほか n件」）。 */
-function groupInserted(pairs: Pair[]): Array<{ kind: string; note: string }> {
+function groupInserted(pairs: Pair[]): Array<{ kind: string; note: string; missing?: string }> {
   const items = pairs.map((pair) => pair.item)
   const kinds = [...new Set(items.map((item) => item.kind))]
   return kinds.map((kind) => {
     const list = items.filter((item) => item.kind === kind)
+    const matching = pairs.filter((pair) => pair.item.kind === kind)
+    const missingCount = kind === 'booking_menu' ? matching.filter((pair) => pair.state.status === 'missing').length : 0
+    const missing = missingCount ? (missingCount === matching.length ? '見つかりません' : '一部見つかりません') : undefined
     if (kind === 'rich_menu') {
       const menu = list[0]
       return { kind, note: `${menu.name}${menu.buttons ? `（${menu.buttons.length}つのボタン）` : ''}` }
     }
-    if (list.length > 3) return { kind, note: `${list.slice(0, 2).map((item) => item.name).join('・')} ほか ${formatNumber(list.length)}件` }
-    return { kind, note: list.map((item) => item.name).join('・') }
+    if (list.length > 3) return { kind, missing, note: `${list.slice(0, 2).map((item) => item.name).join('・')} ほか ${formatNumber(list.length)}件` }
+    return { kind, missing, note: list.map((item) => item.name).join('・') }
   })
 }
 

@@ -1419,3 +1419,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [予約メニューの版の履歴と初期設定の状態表示の修正](release-log/unreleased/PR-kenta-later-codex52.md) — 反映履歴、確認 2026-11-27。
+- [初期設定で予約メニューが見つからない場合の表示](release-log/unreleased/PR-kenta-booking-menu-not-found.md) — 反映履歴、確認 2026-11-27。

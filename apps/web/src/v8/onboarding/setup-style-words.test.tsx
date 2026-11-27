@@ -51,3 +51,14 @@ it.each([
   expect(screen.queryByRole('button', { name: '中身を見る' })).toBeNull()
   expect(active.done).toBe(summary.done)
 })
+
+it('知らない状態の操作不可の項目を受けても、設定画面は他の項目を表示し、誤って有効化させない', () => {
+  const state: StyleState = { style: 'salon', styleSelected: true, version: 1, answers: {} }
+  const items: StarterItemState[] = [
+    { target_id: 'missing', kind: 'booking_menu', is_sample: 1, status: 'future_unknown', draftRevision: null, activationAllowed: false },
+    { target_id: 'notice', kind: 'automation', is_sample: 1, status: 'draft', draftRevision: null },
+  ]
+  render(<SetupTasks heading summary={summarizeSetup(state, [], items)} onOpenStep={vi.fn()} />)
+  expect(screen.getByText('入ったお知らせを動かす')).toBeTruthy()
+  expect(screen.queryByText(/施術メニュー.*を動かす/)).toBeNull()
+})

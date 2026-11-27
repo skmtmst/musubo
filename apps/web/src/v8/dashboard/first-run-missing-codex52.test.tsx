@@ -23,3 +23,13 @@ it('同じ種類に停止中と見つからない物があれば両方の案内�
   expect(await screen.findByText('一部見つかりません')).toBeTruthy()
   expect(screen.getByText(/止めている物は、はじめの質問/)).toBeTruthy()
 })
+
+it('予約メニューが見つからないときは他の項目を残して知らせる', async () => {
+  net.starterSet.mockResolvedValue({ success: true, data: { definition: { items: [{ kind: 'booking_menu' }, { kind: 'automation' }] } } })
+  net.starterItems.mockResolvedValue({ success: true, data: { items: [{ kind: 'booking_menu', status: 'missing', activationAllowed: false }, { kind: 'automation', status: 'active' }] } })
+  render(<FirstRunDoneDialog accountId="a" style="standard" minutes={null} steps={[]} onClose={() => {}} />)
+  const row = (await screen.findByText('予約メニュー')).closest('li')!
+  expect(within(row).getByText('見つかりません')).toBeTruthy()
+  expect(within(row).queryByText('止めています')).toBeNull()
+  expect(within(screen.getByText('オートメーション').closest('li')!).getByText('動いています')).toBeTruthy()
+})

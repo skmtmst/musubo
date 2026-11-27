@@ -187,16 +187,12 @@ styles.get(base + '/starter-items', async (c) => {
         .first<{ status: string; current_draft_version_id: string | null }>();
       status = row?.status ?? 'missing';
       draftRevision = row?.current_draft_version_id ?? null;
-    } else if (item.kind === 'booking_menu')
-      status = (
-        await c.env.DB.prepare(
-          'SELECT is_active FROM menus WHERE id=? AND line_account_id=?',
-        )
-          .bind(item.target_id, a)
-          .first<{ is_active: number }>()
-      )?.is_active
-        ? 'active'
-        : 'stopped';
+    } else if (item.kind === 'booking_menu') {
+      const menu = await c.env.DB.prepare(
+        'SELECT is_active FROM menus WHERE id=? AND line_account_id=?',
+      ).bind(item.target_id, a).first<{ is_active: number }>();
+      status = menu == null ? 'missing' : menu.is_active ? 'active' : 'stopped';
+    }
     else if (item.kind === 'rich_menu')
       status =
         (
@@ -229,7 +225,7 @@ styles.get(base + '/starter-items', async (c) => {
             .first<{ status: string }>()
         )?.status ?? 'missing';
     const requiresActivation = ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)) && !blockedConfirmation;
-    const activationAllowed = !blockedConfirmation && !['form', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind));
+    const activationAllowed = !blockedConfirmation && !(item.kind === 'booking_menu' && status === 'missing') && !['form', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind));
     const table = resourceTables[String(item.kind)];
     const resource = item.kind==='form' ? await c.env.DB.prepare('SELECT f.name FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=?').bind(item.target_id,a).first<{name:string}>() : table
       ? await c.env.DB.prepare(

@@ -341,3 +341,36 @@ describe('初期セットの本文とメタ情報の境界', () => {
     expect(JSON.stringify(response.body)).toContain('機能本文の目印');
   });
 });
+
+test('初期セットの予約メニューが消えていても一覧を保ち、その項目を見つからないと返す', async () => {
+  const saved = await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'salon', answers: allAnswers });
+  expect(saved.status).toBe(200);
+  const path = base + '/starter-items?account_id=a';
+  const before = await request(path);
+  const menu = before.body.data.items.find((item: any) => item.kind === 'booking_menu');
+  expect(menu).toBeTruthy();
+  expect(menu.status).toBe('stopped');
+  sql.raw.prepare('UPDATE menus SET is_active = 1 WHERE id = ?').run(menu.target_id);
+  const active = await request(path);
+  expect(active.body.data.items.find((item: any) => item.target_id === menu.target_id).status).toBe('active');
+  // 実データは触らず、テスト用の初期セット参照だけを存在しないIDに向ける。
+  sql.raw.prepare('UPDATE style_starter_items SET target_id = ? WHERE line_account_id = ? AND item_key = ?').run('not-found', 'a', menu.key);
+  for (const readOnly of [false, true]) {
+    actor = { ...actor, role: 'owner', readOnly } as Env['Variables']['staff'];
+    const result = await request(path);
+    expect(result.status).toBe(200);
+    expect(result.body.success).toBe(true);
+    const items = result.body.data.items as any[];
+    expect(items.find((item) => item.target_id === 'not-found')).toMatchObject({ status: 'missing', activationAllowed: false });
+    expect(items.some((item) => item.target_id !== 'not-found')).toBe(true);
+  }
+  // 他アカウントの同じIDも、このアカウントでは存在しない扱いにする。
+  sql.raw.exec("INSERT INTO line_accounts(id,tenant_id,channel_id,name,channel_access_token,channel_secret,created_at) VALUES('b','t','b','店B','fixture','fixture','2026-10-15T10:00:00.000')");
+  sql.raw.prepare('UPDATE menus SET line_account_id = ? WHERE id = ?').run('b', menu.target_id);
+  sql.raw.prepare('UPDATE style_starter_items SET target_id = ? WHERE line_account_id = ? AND item_key = ?').run(menu.target_id, 'a', menu.key);
+  for (const readOnly of [false, true]) {
+    actor = { ...actor, role: 'owner', readOnly } as Env['Variables']['staff'];
+    const otherAccount = await request(path);
+    expect(otherAccount.body.data.items.find((item: any) => item.target_id === menu.target_id)).toMatchObject({ status: 'missing', activationAllowed: false, name: null });
+  }
+});
