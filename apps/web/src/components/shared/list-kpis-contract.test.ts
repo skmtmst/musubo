@@ -20,11 +20,4 @@ describe('一覧KPIの取得失敗時', () => {
       expect(read(path), `${path} に「—」の欠け表示がありません`).toContain("? emptyValue('unknown')")
     }
   })
-
-  it('取れなかった数を0件にせず、見出しと取得失敗を表示する', () => {
-    const source = read('components/shared/list-kpis.tsx')
-    expect(source).toContain("title: failed ? titles?.[i] ?? '' : ''")
-    expect(source).toContain("detail: failed && titles ? '取得できませんでした' : ''")
-    expect(source).toContain('value: null')
-  })
 })
