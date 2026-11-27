@@ -39,6 +39,7 @@ export function usePeopleVisitMarks(accountId: string | null, date: string, enab
       if (kind === null) await bookingApi.deleteVisitMark(accountId, id)
       else nextMark = (await bookingApi.postVisitMark(accountId, id, { kind, ...(lateMinutes === undefined ? {} : { late_minutes: lateMinutes }) })).visit_mark
       if (!mounted.current || current.current !== key) return
+      if (kind !== null && (!nextMark || nextMark.kind !== kind)) throw new Error('invalid visit mark')
       setState(previous => previous.key === key ? { ...previous, marks: new Map(previous.marks).set(id, nextMark) } : previous)
       onChanged()
       setSeq(value => value + 1)
