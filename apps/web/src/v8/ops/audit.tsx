@@ -57,7 +57,9 @@ const ACTION_WORD: Record<string, string> = {
 }
 
 function actionWord(action: string): string {
-  return ACTION_WORD[action] ?? AUDIT_ACTION_LABEL[action]?.label ?? action
+  const word = Object.prototype.hasOwnProperty.call(ACTION_WORD, action) ? ACTION_WORD[action] : undefined
+  const fallback = Object.prototype.hasOwnProperty.call(AUDIT_ACTION_LABEL, action) ? AUDIT_ACTION_LABEL[action]?.label : undefined
+  return word ?? fallback ?? action
 }
 
 /** 短い日時（10/1 15:20 の形）。 */

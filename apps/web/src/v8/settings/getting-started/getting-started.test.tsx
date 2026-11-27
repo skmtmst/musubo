@@ -292,3 +292,23 @@ it('停止していた段が完了済みなら再開先の未完了段を示し�
   view.rerender(<GuideSharedProvider value={{ guide: baseGuide, summary, setup: { accountId: 'other', run: {} as never, progress: {} as never, setWatch: vi.fn() } }}><GettingStarted /></GuideSharedProvider>)
   expect(screen.queryByRole('button', { name: 'ガイドを再開' })).toBeNull()
 })
+
+it('担当者（staff）には管理者専用の［レシピから作る］を灰色＋理由で止め、管理者以上は開ける', () => {
+  state.role = 'staff'
+  state.stepState = 'todo'
+  const { unmount } = render(<GettingStarted />)
+  expect(screen.queryByRole('link', { name: 'レシピから作る' })).toBeNull()
+  const button = screen.getByRole('button', { name: 'レシピから作る' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(button.hasAttribute('disabled')).toBe(false)
+  expect(button.hasAttribute('href')).toBe(false)
+  expect(button.getAttribute('data-variant')).not.toBe('primary')
+  const reason = document.getElementById(button.getAttribute('aria-describedby')!)?.textContent
+  expect(reason).toBe('この操作はオーナーか管理者だけができます。')
+  expect(button.closest('[role="row"]')?.textContent).not.toContain('次はここ')
+  unmount()
+
+  state.role = 'admin'
+  render(<GettingStarted />)
+  expect(screen.getByRole('link', { name: 'レシピから作る' }).getAttribute('href')).toBe('/recipes')
+})
