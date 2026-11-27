@@ -83,7 +83,7 @@ export function manualLinkRow(link: ManualLink): ManualLinkRow {
     taskId: link.keyKind === 'task' ? link.key : null,
     name: link.name,
     url: link.url ?? '',
-    checkedAt: link.lastCheckedAt,
+    checkedAt: link.lastCheckedAt === null || typeof link.lastCheckedAt === 'string' ? link.lastCheckedAt : '日時を確認できません',
     status: link.status,
   }
 }
@@ -120,7 +120,7 @@ export function matchesStatus(row: ManualLinkRow, filter: StatusFilter): boolean
 export function matchesQuery(row: ManualLinkRow, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (q === '') return true
-  return [row.screenId, row.taskId ?? '', row.name].some((v) => v.toLowerCase().includes(q))
+  return [row.screenId, row.taskId ?? '', row.name].some((v) => typeof v === 'string' && v.toLowerCase().includes(q))
 }
 
 /**
