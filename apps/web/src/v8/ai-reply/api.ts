@@ -88,10 +88,9 @@ const write = (input: { questions: string[]; answerText: string }) => ({ questio
 
 export const aiReplyApi = {
   settings: async (accountId: string): Promise<Result<AiSettings>> => {
-    const [res, qa] = await Promise.all([gap2.settings(accountId), gap2.qa(accountId, '', 0).catch(() => null)])
-    /* Q&A の件数が読めなくても、段の読み込みは成功させる（件数は 0 と数えず「不明」を 0 件扱いにするだけ）。 */
-    const items = qa?.success ? qa.data : null
-    const countOf = (status: string) => (items ? items.filter((row) => row.status === status).length : 0)
+    const [res, qa] = await Promise.all([gap2.settings(accountId), gap2.qa(accountId, '', 0)])
+    if (!qa?.success || !Array.isArray(qa.data)) throw new Error('qa_count_unavailable')
+    const countOf = (status: string) => qa.data.filter((row) => row.status === status).length
     return { success: true, data: { mode: res.data.mode, suspendedReason: null, publishedQaCount: countOf('published'), draftQaCount: countOf('draft'), version: res.data.version, autoReplyAvailable: res.data.autoReplyAvailable } }
   },
   saveSettings: async (accountId: string, input: { mode: AiMode; expectedVersion: number; reason?: string }, _stepUpToken?: string): Promise<Result<AiSettings>> => {
