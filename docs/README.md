@@ -1444,3 +1444,4 @@
 - [投稿画像の登録メディア選択でアカウント切替初期化・適用連打防止・未選択理由表示を追加](release-log/unreleased/PR-kenta-after243-post-media-picker-1127.md) — 反映履歴、確認 2026-11-27。
 - [TapAreaEditor の27番目以降の面ラベル記号化を修正](release-log/unreleased/PR-kenta-after243-tap-area-letter-1127.md) — 反映履歴、確認 2026-11-27。
 - [教室の名簿が正しく取得できない場合の操作を修正](release-log/unreleased/PR-kenta-later-cx3-02-1128.md) — 反映履歴、確認 2026-11-28。
+- [リッチメニュー下書き切替先とデリバリー停止対象選択の安全化](release-log/unreleased/PR-kenta-later-gemini92-1127.md) — 反映履歴、確認 2026-11-28。
