@@ -57,7 +57,7 @@ export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, 
           いるので、影響を読み直してから見せる。
         */
         { if (!fieldFailure)
-        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。') }
+        setDeleteError('いま使われ始めたため、削除できませんでした。使用先を確認しています。') }
         /* 読み直しの返事も、同じ3つで照合してから映す。 */
         const at = { ...impactRequestRef.current }
         try {
@@ -68,11 +68,23 @@ export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, 
             && impactRequestRef.current.accountId === at.accountId
             && impactRequestRef.current.mediaId === at.mediaId
             && impactRequestRef.current.generation === at.generation
-          if (same && again.success) setImpact(again.data)
+          if (same && again.success) {
+            setImpact(again.data)
+            if (!fieldFailure) setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
+          }
+          else if (same) {
+            setImpact(null)
+            setImpactPhase('error')
+            if (!fieldFailure) setDeleteError('いま使われ始めたため、削除できませんでした。')
+          }
         } catch (saveFailure) {
           saveErrors.capture(saveFailure);
 
-          if (isCurrentDelete()) setImpactPhase('error')
+          if (isCurrentDelete()) {
+            setImpact(null)
+            setImpactPhase('error')
+            if (!fieldFailure) setDeleteError('いま使われ始めたため、削除できませんでした。')
+          }
         }
         return
       }
