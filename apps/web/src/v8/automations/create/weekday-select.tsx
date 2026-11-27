@@ -27,8 +27,9 @@ export function WeekdaySelect({
   onChange: (days: number[]) => void
   error?: string
 }) {
-  const days = normalizeWeekdays(value)
-  const next = nextWeeklyRunText(days, String(time ?? ''))
+  const days = normalizeWeekdays(Array.isArray(value) ? value : [])
+  const trimmedTime = typeof time === 'string' ? time.trim() : ''
+  const next = nextWeeklyRunText(days, trimmedTime)
   const names = weekdayNames(days)
   const toggle = (day: number) => {
     onChange(days.includes(day) ? days.filter((item) => item !== day) : [...days, day].sort((a, b) => a - b))
@@ -54,7 +55,7 @@ export function WeekdaySelect({
       {!error ? <p className="mt-2 text-xs text-ink-secondary" role="status">
         {days.length === 0
           ? '曜日を1つ以上選んでください。'
-          : `毎週 ${names} の ${String(time || '時刻未定')}（日本時間）に動きます。${next ? `次は ${next}` : '時刻を選ぶと次の日時が分かります。'}`}
+          : `毎週 ${names} の ${trimmedTime || '時刻未定'}（日本時間）に動きます。${next ? `次は ${next}` : '時刻を選ぶと次の日時が分かります。'}`}
       </p> : null}
     </div>
   )
