@@ -5,6 +5,7 @@
 - [AIと共通情報の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex68-1127.md)（説明・2026-11-27確認）
 - [AIと自動応答の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex69-1127.md)（説明・2026-11-27確認）
 - [受信一覧と注目の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex70-1127.md)（説明・2026-11-27確認）
+- [友だち追加リンクと受信箱の反映履歴](release-log/unreleased/PR-kenta-later-codex71-1127.md)（説明・2026-11-27確認）
 
 # 文書の入口
 

@@ -98,9 +98,11 @@ export function useInboxConversation({ sendLockRef, CHAT_MESSAGE_PAGE_SIZE, sele
         beforeId: oldest.id,
       })
       if (selectedChatIdRef.current !== requestedChatId || detailAccountRef.current !== requestedAccountId) return
+      if (!res.success) throw new Error('older_messages_unavailable')
       if (res.success) {
         const detail = res.data
         const rows = detail.messages ?? []
+        setError((current) => current === '前のメッセージを読み込めませんでした。' ? '' : current)
         /*
          * INBOX-27: 上へ足す追加なので、いま読んでいる位置を保持する。
          * 2026-10-07：位置は窓分け（ChatThreadWindow）が「いちばん上に見えている
