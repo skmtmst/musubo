@@ -6,8 +6,12 @@ export function makeHqMenuSeed({ host, name, chatBarText, folderId, size, group,
   host?: RichMenuCreateHost; name: string; chatBarText: string; folderId: string; size: 'large' | 'compact'; group: Group | null
   audience: 'all' | 'targeted' | 'none' | 'tag'; hqTagName: string; defaultOpen: boolean; targetingPriority: number; pages: Page[]
 }): HqRichMenuSeed {
-  return { id: host?.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId || null,
-    size: group?.size ?? size, displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store',
+  const existingDefault = group?.defaultPageId && pages.some((page) => page.id === group.defaultPageId)
+    ? group.defaultPageId
+    : null
+  const safeSize = group?.size === 'large' || group?.size === 'compact' ? group.size : size
+  return { id: host?.initial?.id, name: name.trim(), chatBarText: chatBarText.trim(), folderId: folderId.trim() || null,
+    size: safeSize, displayAudience: audience === 'all' ? 'all' : audience === 'tag' ? 'tag' : 'store',
     displayTagName: audience === 'tag' ? hqTagName.trim() : '', defaultOpen, displayOrder: targetingPriority,
-    defaultPageId: group?.defaultPageId ?? pages[0]?.id ?? '', pages: pages.map(page => ({ id:page.id, name:page.name, imageR2Key:page.imageR2Key, areas:page.areas })) }
+    defaultPageId: existingDefault ?? pages[0]?.id ?? '', pages: pages.map(page => ({ id:page.id, name:page.name, imageR2Key:page.imageR2Key, areas:page.areas })) }
 }
