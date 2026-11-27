@@ -137,9 +137,9 @@ export default function Step2Connect({
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
             <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>プロバイダーIDを確認する</h2>
-            <span className={styles.precheckHelpMark} title="Step 1で使ったプロバイダーをLINE Developersで確認してください。" aria-label="Step 1で使ったプロバイダーをLINE Developersで確認してください。"><CircleHelp size={16} aria-hidden="true" /></span>
+            <span className={styles.precheckHelpMark} title="Messaging APIチャネルのプロバイダーIDを入力します。" aria-label="Messaging APIチャネルのプロバイダーIDを入力します。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
-          <p className={styles.precheckLead}>Step 1で使ったプロバイダーをLINE Developersで確認してください。</p>
+          <p className={styles.precheckLead}>Messaging APIチャネルのプロバイダーIDを入力します。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developersでプロバイダー設定を開いてください</p>
             <p>Step 1で使ったMessaging APIチャネルのプロバイダーを選び、「プロバイダー設定」→「基本情報」を開きます。</p>

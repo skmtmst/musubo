@@ -8,18 +8,18 @@ import { automationWaitLabel } from '@line-crm/shared'
  * 切替の確認窓の両方で使う。画面に出す言葉はここに集める。
  */
 
-export const ACTION_LABELS: Record<string, string> = {
+export const ACTION_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   add_tag: 'タグを付ける', remove_tag: 'タグを外す', set_metadata: '友だち情報を設定する',
   start_scenario: 'シナリオを開始する', stop_scenario: 'シナリオを停止する',
   resume_scenario: 'シナリオを再開する', send_message: 'LINEメッセージを送る',
   send_webhook: '外部サービスへ送る', switch_rich_menu: 'リッチメニューを切り替える',
   remove_rich_menu: 'リッチメニューを外す', wait: '待つ', common_action: '別の共通アクションを呼ぶ',
   branch: '条件で分ける',
-}
+})
 
-const FAILURE_LABELS: Record<string, string> = {
+const FAILURE_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   stop: '止める', continue: '次へ進む',
-}
+})
 
 function stepLabel(type: string): string {
   return Object.prototype.hasOwnProperty.call(ACTION_LABELS, type) ? ACTION_LABELS[type] : '処理'

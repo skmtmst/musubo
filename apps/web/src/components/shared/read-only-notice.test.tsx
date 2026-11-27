@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
-import ReadOnlyNotice, { READ_ONLY_MESSAGE, READ_ONLY_MESSAGE_HQ } from './read-only-notice'
+import ReadOnlyNotice, { ADMIN_LOCK_SUMMARY, READ_ONLY_MESSAGE, READ_ONLY_MESSAGE_HQ } from './read-only-notice'
 import { PERMISSION_LOCK_SUMMARY } from './permission-lock'
 
 beforeEach(() => { forgetStaffIdentity(); forgetSessionSnapshot() })
@@ -71,4 +71,18 @@ it('本人確定後の閲覧帯は青い点で、iと目の印を使わない', 
   expect(view.container.querySelector('[data-notice-dot="true"]')).not.toBeNull()
   expect(view.container.querySelector('.lucide-info')).toBeNull()
   expect(view.container.querySelector('.lucide-eye')).toBeNull()
+})
+
+it('管理者が店の画面で権限不足の帯を見るときはオーナーへ依頼する文にし、担当者は従来の文を保つ', () => {
+  rememberStaffIdentity({ role: 'admin' } as StaffMember)
+  const { rerender } = render(<ReadOnlyNotice need="feature" />)
+  expect(screen.getByRole('status').textContent).toBe(ADMIN_LOCK_SUMMARY)
+  expect(screen.getByRole('status').textContent).not.toContain('管理者に頼んでください')
+
+  rerender(<ReadOnlyNotice scope="hq" need="feature" />)
+  expect(screen.getByRole('status').textContent).toBe(PERMISSION_LOCK_SUMMARY.tenantWide)
+
+  act(() => { rememberStaffIdentity({ role: 'staff' } as StaffMember) })
+  rerender(<ReadOnlyNotice need="feature" />)
+  expect(screen.getByRole('status').textContent).toBe(PERMISSION_LOCK_SUMMARY.feature)
 })

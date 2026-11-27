@@ -5,6 +5,7 @@ import { knownValue } from '@/lib/known-value'
 import { useEffect, useState } from 'react'
 import { api, type OperationSendPath, type OperationSendPathsResponse } from '@/lib/api'
 import { formatOperationDate } from '@/lib/operation-status'
+import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { CAPABILITY_LABEL } from '@/lib/operation-restore'
 
@@ -46,6 +47,7 @@ export function operatorPathNote(text: string | null | undefined): string | null
 export function SendPathCoveragePanel({ accountId, revision }: { accountId: string | null; revision: number }) {
   const [data, setData] = useState<OperationSendPathsResponse | null>(null)
   const [failed, setFailed] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -71,10 +73,23 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
-  }, [accountId, revision])
+  }, [accountId, revision, retryCount])
 
   if (failed) {
-    return <Notice tone="warn">
+    return <Notice
+      tone="warn"
+      action={
+        <Button
+          variant="text"
+          size="inline"
+          data-notice-inline-action
+          type="button"
+          onClick={() => setRetryCount((value) => value + 1)}
+        >
+          もう一度読み込む
+        </Button>
+      }
+    >
       送信経路の台帳を読み込めませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
     </Notice>
   }

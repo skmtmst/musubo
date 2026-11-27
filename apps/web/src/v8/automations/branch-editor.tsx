@@ -139,10 +139,10 @@ const OPERATOR_LABEL: Record<'AND' | 'OR', string> = {
   OR: 'どれかに当てはまる',
 }
 
-const RULE_TYPE_LABEL: Record<string, string> = {
+const RULE_TYPE_LABEL: Record<string, string> = Object.assign(Object.create(null), {
   tag_exists: 'タグがある',
   tag_not_exists: 'タグがない',
-}
+})
 
 /* 編集画面で扱えない子処理は読み取り専用で残す。消さない。 */
 function readonlyStepSummary(step: CommonActionStep): string {

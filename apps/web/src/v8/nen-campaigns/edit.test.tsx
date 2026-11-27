@@ -447,6 +447,20 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     expect(host.querySelector('#nen-col-title-error')).toBeNull()
   })
 
+  it.each(['toString', 'constructor', '__proto__'])('未知の保存エラー %s は画面を壊さず案内する', async (code) => {
+    const { ApiError } = await import('@/lib/api')
+    calls.createColumn.mockRejectedValueOnce(new ApiError(400, 'unknown', code))
+    await act(async () => { root.render(<ColumnNew />) })
+    await flush()
+    await act(async () => { fireEvent.change(host.querySelector('input[aria-label="題名"]')!, { target: { value: '見本の記事' } }) })
+    await act(async () => { fireEvent.change(host.querySelector('input[aria-label="記事の URL"]')!, { target: { value: 'https://example.test/article' } }) })
+    await act(async () => { fireEvent.click(button('下書きを保存')!) })
+    await flush()
+    expect(host.textContent).toContain('送れない項目が含まれていました。入力を確認してください。')
+    expect((host.querySelector('input[aria-label="題名"]') as HTMLInputElement).value).toBe('見本の記事')
+    expect(calls.push).not.toHaveBeenCalled()
+  })
+
   it('閲覧のみの人には書く欄も保存も置かず、帯と戻る道だけ出す', async () => {
     role.value = verifiedStaffRole('staff')
     await act(async () => { root.render(<ColumnNew />) })

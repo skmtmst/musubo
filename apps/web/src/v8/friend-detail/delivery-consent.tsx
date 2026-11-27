@@ -114,6 +114,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
     setHistory({ friendId, events: null, failed: false })
     try {
       const response = await friendDeliveryConsentHistoryApi.list(friendId, { limit: 20 })
+      if (historyRequest.current !== seq) return
       if (!response.success) throw new Error('history_failed')
       if (seq !== historyRequest.current || scope.current.friendId !== friendId || !scope.current.open) return
       setHistory({ friendId, events: Array.isArray(response.data?.items) ? response.data.items : [], failed: false })

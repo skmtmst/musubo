@@ -40,24 +40,24 @@ import { withHonorific } from '@line-crm/shared'
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
 /** 処理の種類の名前（設定の言葉が読めないとき）。 */
-const ACTION_LABELS: Record<string, string> = {
+const ACTION_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   tag: 'タグ操作',
   friend_field: '友だち情報の更新',
   support_mark: '対応マークの更新',
   scenario: 'シナリオ操作',
   common_var: '共通情報の更新',
   mile: 'マイル付与',
-}
+})
 
 /** 失敗の帯の「〇〇ところで止まりました」。 */
-const ACTION_STOPPED_AT: Record<string, string> = {
+const ACTION_STOPPED_AT: Record<string, string> = Object.assign(Object.create(null), {
   tag: 'タグを付けるところ',
   friend_field: '友だち情報を更新するところ',
   support_mark: '対応マークを付けるところ',
   scenario: 'シナリオを始めるところ',
   common_var: '共通情報を更新するところ',
   mile: 'マイルを付けるところ',
-}
+})
 
 /** 設定の処理（`add_tag` など）と、実行した処理の種類（`tag` など）が同じ仲間か。 */
 const CONFIGURED_KIND: Record<string, string> = { add_tag: 'tag', remove_tag: 'tag', start_scenario: 'scenario' }
