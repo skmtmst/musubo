@@ -6,7 +6,7 @@
  * ［このテンプレートを使う］で、開いている吹き出しをそのひな形で置き換える。
  * まだ統括から送れない種類（質問・リサーチ・Flex）は使っても置き換えず、理由を窓の中に出す。
  */
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { MessageTemplateDefinition } from '@line-crm/shared'
 import { BubblePreview } from '@/components/broadcasts/broadcast-form'
 import Button from '@/components/shared/button'
@@ -56,13 +56,17 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
   const [loadError, setLoadError] = useState<unknown>(null)
   const [reload, setReload] = useState(0)
   const [busy, setBusy] = useState(false)
+  const picking = useRef(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!open || list) return
     let current = true
     setLoadError(null)
-    void hqTemplatesApi.listByKind().then((rows) => { if (current) setList(rows) }).catch((caught) => { if (current) setLoadError(caught) })
+    void hqTemplatesApi.listByKind().then((rows) => {
+      if (!Array.isArray(rows) || rows.some(row => !row || typeof row.id !== 'string' || typeof row.name !== 'string')) throw new Error('invalid templates')
+      if (current) setList(rows)
+    }).catch((caught) => { if (current) setLoadError(caught) })
     return () => { current = false }
   }, [open, list, reload])
 
@@ -79,11 +83,19 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
 
   if (!open) return null
   const pick = async (id: string) => {
+    if (picking.current) return
+    picking.current = true
     setBusy(true); setError('')
-    const why = await onPick(id)
-    setBusy(false)
-    if (why) { setError(why); return }
-    onClose()
+    try {
+      const why = await onPick(id)
+      if (why) { setError(why); return }
+      onClose()
+    } catch {
+      setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+    } finally {
+      picking.current = false
+      setBusy(false)
+    }
   }
   return <EntityPickerDialog title="テンプレートから選ぶ" description="統括のテンプレートを選ぶと、開いているメッセージをその内容に置き換えます。" confirmLabel="このテンプレートを使う"
     items={(list ?? []).filter((t) => !kind || t.kind === kind).map(templatePickerItem)} folders={folders} foldersFailed={foldersFailed} categories={KINDS} busy={busy} error={error || undefined}
