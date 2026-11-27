@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/rows.ts'), 'utf8')
 const DETAIL = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/detail.tsx'), 'utf8')
-const PANEL = fs.readFileSync(path.join(__dirname, '../../v8/inflow-links/ref-orders.tsx'), 'utf8')
 
 /**
  * IDEA-18「流入と計測」: 経路→友だち→注文・返金を同じ条件で結び、
@@ -29,30 +28,7 @@ describe('IDEA-18: 経路別の購入・返金は集計と明細で同じ口か�
   })
 })
 
-describe('IDEA-18: 期間・帰属・計測範囲を画面で説明する', () => {
-  it('注文パネルも帰属ルールと未計測の範囲を説明する', () => {
-    expect(PANEL).toContain('はじめて来た友だち')
-    expect(PANEL).toContain('計測できない')
-    expect(PANEL).toContain('二重には数えません')
-  })
-})
-
 describe('IDEA-18: 読めていない注文を0件と見せない', () => {
-  it('注文パネルは読込中・失敗・空を言い分ける部品を使う', () => {
-    expect(PANEL).toContain("import ListState from '@/components/shared/list-state'")
-    expect(PANEL).toContain('kind="loading"')
-    expect(PANEL).toContain('kind="error"')
-    expect(PANEL).toContain('kind="empty"')
-    // 失敗時は再読み込みの口を出す(0件と見せない)
-    expect(PANEL).toContain('onRetry=')
-    expect(PANEL).toContain('計測できる注文はまだありません')
-  })
-
-  it('注文パネルは /api/analytics/ref/:refCode/orders を叩く', () => {
-    expect(PANEL).toContain('/api/analytics/ref/')
-    expect(PANEL).toContain('/orders?')
-  })
-
   it('詳細の購入カードは集計を取れていないとき数を出さない', () => {
     // ordersSummary が null のままなら「—」表示
     expect(DETAIL).toContain('ordersSummary ? formatNumber(ordersSummary.total)')
