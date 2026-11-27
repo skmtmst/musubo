@@ -29,6 +29,9 @@ export default function LogRecordJson({ value, label = '記録', canCopy }: {
   const bodyId = useId()
   const text = useMemo(() => (open ? formatLogRecord(value) : ''), [open, value])
   const cut = text.length > LOG_RECORD_SHOWN_CHARS
+  // 代理対の途中で切ると表示が壊れるため、文字の手前で止める。
+  const cutAt = cut && /[\uD800-\uDBFF]/.test(text[LOG_RECORD_SHOWN_CHARS - 1])
+    ? LOG_RECORD_SHOWN_CHARS - 1 : LOG_RECORD_SHOWN_CHARS
   return (
     <div className={styles.root} data-log-record-json={open ? 'open' : 'closed'}>
       <div className={styles.head}>
@@ -40,9 +43,9 @@ export default function LogRecordJson({ value, label = '記録', canCopy }: {
       </div>
       {open ? (
         <div id={bodyId} className={styles.body}>
-          <div className={styles.code}><CodeBlock wrap>{cut ? text.slice(0, LOG_RECORD_SHOWN_CHARS) : text}</CodeBlock></div>
+          <div className={styles.code}><CodeBlock wrap>{cut ? text.slice(0, cutAt) : text}</CodeBlock></div>
           <p className={styles.note}>
-            {cut ? `長いので先頭の ${formatNumber(LOG_RECORD_SHOWN_CHARS)} 文字だけを出しています。コピーすると全文を写せます。` : null}
+            {cut ? `長いので先頭の ${formatNumber(cutAt)} 文字だけを出しています。コピーすると全文を写せます。` : null}
             秘密値と個人情報は伏せた形で出しています。
           </p>
         </div>
