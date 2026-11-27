@@ -98,7 +98,8 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     // 一覧と母集団がずれる。未割当NULL行は一覧に出ないため件数へ入れない。
     expect(CONTENTS).toContain(`api.folders.list('media', accountAtRequest)`)
     expect(VARS).toContain(`api.folders.list('common_var', accountAtRequest)`)
-    expect(RICHMENUS).toContain(`api.folders.list('rich_menu', selectedAccount?.id ?? undefined)`)
+    // 選択中のアカウントを控えてから渡す（切り替え後の古い応答を捨てるため）。未選択なら呼ばない。
+    expect(RICHMENUS).toMatch(/const accountId = selectedAccount\?\.id \?\? null\n[\s\S]{0,200}?if \(!accountId\) \{[\s\S]{0,120}?api\.folders\.list\('rich_menu', accountId\)/)
   })
 
   it('3画面とも「未分類」の件数はAPIから来た値(unfiledCount)を使い、現在ページのフィルタ計算をしていない', () => {

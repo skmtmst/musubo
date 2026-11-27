@@ -52,7 +52,7 @@ export default function FieldsTable({ canEdit, host, items, loaded, status, erro
                 interactive
                 key={field.id}
                 data-reorder-id={field.id}
-                onDragEnter={canEdit && dragId && !field.isInherited ? () => liveOrder.enter(field.id) : undefined}
+                onDragEnter={() => { if (canEdit && dragId && !field.isInherited) liveOrder.enter(field.id) }}
                 onDragOver={canEdit && dragId && !field.isInherited ? (event) => event.preventDefault() : undefined}
                 onDrop={canEdit && dragId && !field.isInherited ? () => void move(liveOrder.dropTarget(field.id)) : undefined}
                 className={`${styles.row} ${styles.fieldRow}`}

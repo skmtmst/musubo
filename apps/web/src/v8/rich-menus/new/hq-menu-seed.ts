@@ -4,9 +4,10 @@ import type { Group, Page } from './create-types'
 
 export const MISSING_DEFAULT_PAGE_ERROR = '最初に出す面を選び直してください'
 
-/** 統括の保存用の形を作れなかったときに出す文。理由が無ければ最初に出す面の選び直しを案内する。 */
+/** 統括の保存用の形を作れなかったときに出す文。最初に出す面が無いときは選び直しを案内する。 */
 export function hqSeedFailureMessage(caught: unknown): string {
-  return caught instanceof Error && caught.message ? caught.message : MISSING_DEFAULT_PAGE_ERROR
+  if (caught instanceof Error && caught.message === MISSING_DEFAULT_PAGE_ERROR) return MISSING_DEFAULT_PAGE_ERROR
+  return '保存する内容を用意できませんでした。入力を確かめて、もう一度お試しください。'
 }
 
 export function resolveHqDefaultPageId(group: Group | null, pages: Page[]): string | null {

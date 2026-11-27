@@ -52,7 +52,7 @@ it('件数が読めない場合は0件にせず、再試行で0件を確認で�
   expect(screen.getByText('Q&A の件数を読み込めませんでした')).toBeTruthy()
   expect(screen.getByText(/AI の使い方：返信案だけ/)).toBeTruthy()
   expect(screen.queryByText(/公開中の Q&A 0 件/)).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '自動で答える' }))
   expect(screen.queryByRole('dialog')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))

@@ -28,7 +28,7 @@ import { flushListUrlState } from '@/components/shared/list-url-state'
 const RUN = {
   id: 'run-1',
   title: '春キャンペーン配信',
-  status: 'sent',
+  status: 'scheduled',
   version: 1,
   scheduledAt: null,
   input: {

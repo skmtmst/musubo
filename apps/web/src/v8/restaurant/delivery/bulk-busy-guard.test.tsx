@@ -49,7 +49,7 @@ describe('SoldOutBoard の送信中・ページ範囲ガード', () => {
     const onToggleAll = vi.fn()
     render(<SoldOutBoard {...baseProps({ busy: true, onToggleAll })} />)
 
-    const clearButton = screen.getByRole('button', { name: '選ぶのをやめる' })
+    const clearButton = screen.getByRole('button', { name: '選択するのをやめる' })
     fireEvent.click(clearButton)
 
     expect(onToggleAll).not.toHaveBeenCalled()
