@@ -23,14 +23,15 @@ export function BookingMonthBar({ monthLabel, isThisMonth, onPrev, onNext, onTod
   urls: ReactNode
   caption?: ReactNode
 }) {
+  const visibleMonth = typeof monthLabel === 'string' ? monthLabel.trim() : ''
   return (
     <div className={styles.bar} data-design="MonthBar">
       <div className={styles.row}>
-        {monthLabel ? (
+        {visibleMonth ? (
           <div className={styles.nav} role="group" aria-label="表示する月">
             <IconButton size="compact" aria-label="前の月" onClick={onPrev}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
             <IconButton size="compact" aria-label="次の月" onClick={onNext}><ChevronRight size={16} aria-hidden="true" /></IconButton>
-            <strong className={styles.month} aria-live="polite">{monthLabel}</strong>
+            <strong className={styles.month} aria-live="polite">{visibleMonth}</strong>
             <Button size="compact" onClick={onToday} aria-current={isThisMonth ? 'date' : undefined}>今日</Button>
           </div>
         ) : <span />}
@@ -43,9 +44,10 @@ export function BookingMonthBar({ monthLabel, isThisMonth, onPrev, onNext, onTod
 
 /** 「🔗 友だち予約URL ｜ コピーする」の1つ。押すとコピーし、済んだら「コピー済み」。 */
 export function BookingUrlCopy({ label, copied, onCopy }: { label: string; copied: boolean; onCopy: () => void }) {
+  const safeLabel = typeof label === 'string' && label.trim() ? label.trim() : 'URL'
   return (
-    <Button size="compact" onClick={onCopy} aria-label={`${label}をコピーする`}>
-      <Link2 size={16} aria-hidden="true" />{label}<span className={styles.copyWord}>{copied ? 'コピー済み' : 'コピーする'}</span>
+    <Button size="compact" onClick={onCopy} aria-label={`${safeLabel}をコピーする`}>
+      <Link2 size={16} aria-hidden="true" />{safeLabel}<span className={styles.copyWord}>{copied ? 'コピー済み' : 'コピーする'}</span>
     </Button>
   )
 }
