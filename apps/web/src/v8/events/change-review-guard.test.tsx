@@ -21,6 +21,10 @@ const fx = vi.hoisted(() => ({
     'slot-1': { startsAt: '2026-12-01T14:00', endsAt: '2026-12-01T13:00', capacity: '10', isActive: true },
     'slot-2': { startsAt: '2026-12-02T10:00', endsAt: '2026-12-02T12:00', capacity: '10', isActive: true },
   } as Record<string, { startsAt: string; endsAt: string; capacity: string; isActive: boolean }>,
+  slotList: [
+    { id: 'slot-1', starts_at: '2026-12-01T01:00:00Z', ends_at: '2026-12-01T03:00:00Z', capacity: 10, active_count: 2, is_active: 1 },
+    { id: 'slot-2', starts_at: '2026-12-02T01:00:00Z', ends_at: '2026-12-02T03:00:00Z', capacity: 10, active_count: 1, is_active: 1 },
+  ],
 }))
 
 vi.mock('next/navigation', () => ({
@@ -49,10 +53,7 @@ vi.mock('./change-review-model', async (importOriginal) => {
       selectedAccountId: fx.accountId,
       status: 'ready' as const,
       event: { id: fx.eventId, name: '秋のセミナー' },
-      slotList: [
-        { id: 'slot-1', starts_at: '2026-12-01T01:00:00Z', ends_at: '2026-12-01T03:00:00Z', capacity: 10, active_count: 2, is_active: 1 },
-        { id: 'slot-2', starts_at: '2026-12-02T01:00:00Z', ends_at: '2026-12-02T03:00:00Z', capacity: 10, active_count: 1, is_active: 1 },
-      ],
+      slotList: fx.slotList,
       edits: fx.edits,
       setEdits: vi.fn(),
       venueName: '東京会場',
@@ -87,6 +88,10 @@ beforeEach(() => {
     total_waiting: -1,
     impacts: [],
   }
+  fx.slotList = [
+    { id: 'slot-1', starts_at: '2026-12-01T01:00:00Z', ends_at: '2026-12-01T03:00:00Z', capacity: 10, active_count: 2, is_active: 1 },
+    { id: 'slot-2', starts_at: '2026-12-02T01:00:00Z', ends_at: '2026-12-02T03:00:00Z', capacity: 10, active_count: 1, is_active: 1 },
+  ]
   fx.edits = {
     'slot-1': { startsAt: '2026-12-01T14:00', endsAt: '2026-12-01T13:00', capacity: '10', isActive: true },
     'slot-2': { startsAt: '2026-12-02T10:00', endsAt: '2026-12-02T12:00', capacity: '10', isActive: true },
@@ -127,5 +132,32 @@ describe('EventChangeReviewV8 他スロット不正入力・NaN人数・イベ�
     fx.eventId = 'ev-2'
     view.rerender(<EventChangeReviewV8 />)
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('秒を含む正しい開催回（未変更）がある状態でも、別の開催回の正しい変更を適用できる', () => {
+    fx.slotList = [
+      // JST 10:00:00〜10:00:30（分単位の入力表現では両方 10:00 になる正しい回・未変更）
+      { id: 'slot-1', starts_at: '2026-12-01T01:00:00Z', ends_at: '2026-12-01T01:00:30Z', capacity: 10, active_count: 2, is_active: 1 },
+      { id: 'slot-2', starts_at: '2026-12-02T01:00:00Z', ends_at: '2026-12-02T03:00:00Z', capacity: 10, active_count: 1, is_active: 1 },
+    ]
+    fx.edits = {
+      'slot-1': { startsAt: '2026-12-01T10:00', endsAt: '2026-12-01T10:00', capacity: '10', isActive: true },
+      'slot-2': { startsAt: '2026-12-02T11:00', endsAt: '2026-12-02T13:00', capacity: '10', isActive: true },
+    }
+    fx.preview = {
+      blocked: false,
+      total_confirmed: 2,
+      total_waiting: 0,
+      impacts: [],
+    }
+    render(<EventChangeReviewV8 />)
+
+    const submitBtn = screen.getByRole('button', { name: '変えてお知らせする' }) as HTMLButtonElement
+    expect(submitBtn.disabled).toBe(false)
+    fireEvent.click(submitBtn)
+
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '変えて 2 人にお知らせする' }))
+    expect(fx.runApply).toHaveBeenCalledTimes(1)
   })
 })

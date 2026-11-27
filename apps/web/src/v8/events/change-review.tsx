@@ -36,13 +36,27 @@ function validCount(value: unknown): number | null {
 }
 
 function slotValidationErrors(
+  slot: { starts_at: string; ends_at: string; capacity: number | null } | null | undefined,
   edit: SlotEdit | null | undefined,
   impactErrors: readonly string[] | undefined,
 ): { startError: string; endError: string; capacityError: string } {
-  if (!edit) return { startError: '', endError: '', capacityError: '' }
-  const startError = !localInputToIso(edit.startsAt) ? '開始日時を選んでください' : ''
-  const endError = !localInputToIso(edit.endsAt) || edit.endsAt <= edit.startsAt ? '終了日時は開始日時より後にしてください' : ''
-  const capacityError = edit.capacity.trim() && (!Number.isInteger(Number(edit.capacity)) || Number(edit.capacity) < 1)
+  if (!slot || !edit) return { startError: '', endError: '', capacityError: '' }
+  const origStartsAt = isoToLocalInput(slot.starts_at)
+  const origEndsAt = isoToLocalInput(slot.ends_at)
+  const startsChanged = edit.startsAt !== origStartsAt
+  const endsChanged = edit.endsAt !== origEndsAt
+  const startIso = startsChanged ? localInputToIso(edit.startsAt) : slot.starts_at
+  const endIso = endsChanged ? localInputToIso(edit.endsAt) : slot.ends_at
+  const startError = startsChanged && !startIso ? '開始日時を選んでください' : ''
+  const startMs = startIso ? Date.parse(startIso) : Number.NaN
+  const endMs = endIso ? Date.parse(endIso) : Number.NaN
+  const endError = (endsChanged && !endIso)
+    || ((startsChanged || endsChanged) && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs <= startMs)
+    ? '終了日時は開始日時より後にしてください'
+    : ''
+  const origCapacity = slot.capacity == null ? '' : String(slot.capacity)
+  const capacityChanged = edit.capacity.trim() !== origCapacity
+  const capacityError = capacityChanged && edit.capacity.trim() && (!Number.isInteger(Number(edit.capacity)) || Number(edit.capacity) < 1)
     ? '定員は1以上の数で入れてください'
     : impactErrors?.includes('slot_capacity_below_bookings')
       ? '定員を、すでに申し込まれている人数より下げられません'
@@ -168,13 +182,14 @@ function ChangeReview({ eventId }: { eventId: string }) {
   ])
   const reasonMissing = isPublished && !reason.trim()
   const { startError, endError, capacityError } = slotValidationErrors(
+    activeSlot,
     activeEdit,
     activeSlot ? impactBySlot.get(activeSlot.id)?.errors : undefined,
   )
   const anySlotHasError = slotList.some((slot) => {
     const edit = edits[slot.id]
     if (!edit) return false
-    const errs = slotValidationErrors(edit, impactBySlot.get(slot.id)?.errors)
+    const errs = slotValidationErrors(slot, edit, impactBySlot.get(slot.id)?.errors)
     return Boolean(errs.startError || errs.endError || errs.capacityError)
   })
   const confirmedCount = validCount(preview?.total_confirmed)
