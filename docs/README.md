@@ -1472,3 +1472,4 @@
 - [テンプレート編集の入口確認を修正](release-log/unreleased/PR-kenta-later-cx3-48-1128.md) — 反映履歴、確認 2026-11-28。
 - [機能設定の読み込み確認を修正](release-log/unreleased/PR-kenta-later-cx3-49-1128.md) — 反映履歴、確認 2026-11-28。
 - [運営ダッシュボード最初の10分の異常値防御と最初のリッチメニュー選択の保存切替防御](release-log/unreleased/PR-kenta-later-gemini119-1127.md) — 反映履歴、確認 2026-11-28。
+- [リッチメニュー公開確認ステップの未知サイズ・異常数防御と初期設定状態読み込みの不正形防御](release-log/unreleased/PR-kenta-later-gemini120-1127.md) — 反映履歴、確認 2026-11-28。

@@ -57,13 +57,37 @@ type RenderHqPublishStepContext = {
   totalAreaCount: number
 }
 
+function areaLetter(index: number): string {
+  return index >= 0 && index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
+}
+
+function isKnownRichMenuSize(sizeKey: string): sizeKey is keyof typeof RICH_MENU_DIMENSIONS {
+  return Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, sizeKey)
+}
+
+function dimensionsLabel(sizeKey: string): string {
+  if (!isKnownRichMenuSize(sizeKey)) return 'サイズ不明'
+  const dims = RICH_MENU_DIMENSIONS[sizeKey]
+  return `${dims.width}×${dims.height}`
+}
+
+function areaCountLabel(count: number): string {
+  return typeof count === 'number' && Number.isFinite(count) && count >= 0 ? `${Math.trunc(count)}面` : '面数不明'
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
 export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, hqDuplicateMode, pages, setHqDuplicateMode, size, tabCount, totalAreaCount }: RenderHqPublishStepContext) {
-    const sizeLabel = (group?.size ?? size) === 'large' ? '大きい' : '小さい'
+    const resolvedSize = group?.size ?? size
+    const sizeKnown = isKnownRichMenuSize(resolvedSize)
+    const sizeLabel = resolvedSize === 'large' ? '大きい' : resolvedSize === 'compact' ? '小さい' : 'サイズ不明'
     const pageCount = group ? pages.length : tabCount + 1
     const showTab = pageCount > 1
     const actionRows = (group ? pages : []).flatMap((page) => page.areas.map((area, index) => ({
       key: `${page.id}:${area.id}`,
-      letter: String.fromCharCode(65 + index),
+      letter: areaLetter(index),
       name: `${showTab ? `${page.name}・` : ''}${areaDisplayName(area, index)}`,
       summary: areaActionSummary(area),
     })))
@@ -84,7 +108,7 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                 pages={[]}
                 activePageId={null}
               />
-              <p className={styles.cardNote}>{`${sizeLabel}・${totalAreaCount}面・${showTab ? `切替タブ ${pageCount}ページ` : '切替タブなし'}`}</p>
+              <p className={styles.cardNote}>{`${sizeLabel}・${areaCountLabel(totalAreaCount)}・${showTab ? `切替タブ ${pageCount}ページ` : '切替タブなし'}`}</p>
             </div>
             <div className={styles.hqReviewActions}>
               <p className={styles.hqReviewLabel}>面ごとの動き</p>
@@ -103,6 +127,9 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
 
         <Card variant="form" gap="normal">
           <SectionHeader title="足りないもの" help="配る前に、この画面で分かる足りないものです。アカウントごとに無いタグ・テンプレートなどは、保存したあとの配る前の確認で一覧にします。" helpLabel="足りないものの説明" />
+          {!sizeKnown ? (
+            <Notice tone="danger">メニューのサイズを確認できないため配布できません。</Notice>
+          ) : null}
           <ul className={styles.checkList}>
             {missingRows.length > 0 ? (
               <li className={styles.checkRow}>
@@ -127,12 +154,20 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                   <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選択する</Button>
                 </span>
               </li>
+            ) : !sizeKnown ? (
+              <li className={styles.checkRow}>
+                <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>画像・大きさ・面の数</p>
+                  <p className={styles.checkNote}>サイズを確認できないため公開できません。画面を読み直すか新しく作り直してください</p>
+                </div>
+              </li>
             ) : (
               <li className={styles.checkRow}>
                 <CircleCheck className={`${styles.checkIcon} ${styles.checkIconOk}`} aria-hidden />
                 <div className={styles.checkBody}>
                   <p className={styles.checkName}>画像・大きさ・面の数</p>
-                  <p className={styles.checkNote}>{`${RICH_MENU_DIMENSIONS[group?.size ?? size].width}×${RICH_MENU_DIMENSIONS[group?.size ?? size].height}・${totalAreaCount}面`}</p>
+                  <p className={styles.checkNote}>{`${dimensionsLabel(resolvedSize)}・${areaCountLabel(totalAreaCount)}`}</p>
                 </div>
               </li>
             )}
@@ -243,8 +278,9 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
      * 面の動きは②、画像は①で決めるので、足りないときはその手順へ戻る口を出す。
      */
     const reviewSize = group?.size ?? size
-    const reviewDims = `${RICH_MENU_DIMENSIONS[reviewSize].width}×${RICH_MENU_DIMENSIONS[reviewSize].height}`
-    const reviewSizeLabel = SIZE_OPTIONS.find((o) => o.value === reviewSize)?.label ?? ''
+    const reviewSizeKnown = isKnownRichMenuSize(reviewSize)
+    const reviewDims = dimensionsLabel(reviewSize)
+    const reviewSizeLabel = SIZE_OPTIONS.find((o) => o.value === reviewSize)?.label ?? 'サイズ不明'
     const missingPages = pages.filter(page => !page.areas.length || page.areas.some(area => !isAreaActionConfigured(area)))
     const missingImages = pages.filter((p) => !p.imageR2Key)
     const review = group ? (
@@ -254,7 +290,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
           <div className={styles.reviewRow}>
             <div className={styles.reviewThumb}>
               <MenuContent size={reviewSize} imageUrl={previewImageUrl} areas={previewAreas} pages={[]} activePageId={null} />
-              <p className={styles.reviewCaption}>{reviewSizeLabel}・{totalAreaCount}面・{pages.length > 1 ? `切替タブ${pages.length}つ` : '切替タブなし'}</p>
+              <p className={styles.reviewCaption}>{reviewSizeLabel}・{areaCountLabel(totalAreaCount)}・{pages.length > 1 ? `切替タブ${pages.length}つ` : '切替タブなし'}</p>
             </div>
             <div className={styles.reviewFaces}>
               <p className={styles.reviewFacesTitle}>面ごとの動き</p>
@@ -267,7 +303,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                         const summary = areaActionSummary(area)
                         return (
                           <li key={area.id} className={styles.faceRow}>
-                            <span className={styles.faceLetter} aria-hidden="true">{String.fromCharCode(65 + i)}</span>
+                            <span className={styles.faceLetter} aria-hidden="true">{areaLetter(i)}</span>
                             <span className={styles.faceName} title={areaDisplayName(area, i)}>{areaDisplayName(area, i)}</span>
                             <span className={summary ? styles.faceSummary : styles.faceSummaryWarn} title={summary || undefined}>{summary || '未設定'}</span>
                           </li>
@@ -286,7 +322,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
             {missingPages.map(page => {
               const unset = page.areas.filter(area => !isAreaActionConfigured(area))
               const prefix = pages.length > 1 ? `${page.name}：` : ''
-              const label = `${prefix}${page.areas.length ? `面 ${unset.map(area => String.fromCharCode(65 + page.areas.indexOf(area))).join('・')} の動きが未設定` : '面が未設定'}`
+              const label = `${prefix}${page.areas.length ? `面 ${unset.map(area => areaLetter(page.areas.indexOf(area))).join('・')} の動きが未設定` : '面が未設定'}`
               return <li key={page.id} className={styles.checkRow}>
                 <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
                 <div className={styles.checkBody}>
@@ -299,12 +335,18 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
               </li>
             })}
             <li className={styles.checkRow}>
-              {missingImages.length > 0
+              {missingImages.length > 0 || !reviewSizeKnown
                 ? <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
                 : <CheckIcon state="ok" />}
               <div className={styles.checkBody}>
                 <p className={styles.checkName}>画像・大きさ・面の数</p>
-                <p className={styles.checkNote}>{missingImages.length > 0 ? '画像がまだありません。①で選びます' : `${reviewDims}・${totalAreaCount}面`}</p>
+                <p className={styles.checkNote}>
+                  {missingImages.length > 0
+                    ? '画像がまだありません。①で選びます'
+                    : !reviewSizeKnown
+                      ? 'サイズを確認できないため公開できません。画面を読み直すか新しく作り直してください'
+                      : `${reviewDims}・${areaCountLabel(totalAreaCount)}`}
+                </p>
               </div>
               {missingImages.length > 0 ? (
                 <span className={styles.checkAction}>
@@ -404,8 +446,11 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
         <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="公開の前の確認" />
-            <p className={styles.cardNote} title={checks ? `ページ数: ${checks.pages.count} / ${checks.pages.max}${checks.pages.state === 'ng' ? '（上限を超えています）' : ''}` : undefined}>3つそろうと公開できます</p>
+            <p className={styles.cardNote} title={checks && isNonNegativeFinite(checks.pages.count) && isNonNegativeFinite(checks.pages.max) ? `ページ数: ${Math.trunc(checks.pages.count)} / ${Math.trunc(checks.pages.max)}${checks.pages.state === 'ng' ? '（上限を超えています）' : ''}` : undefined}>3つそろうと公開できます</p>
           </div>
+          {!reviewSizeKnown ? (
+            <Notice tone="danger">メニューのサイズを確認できないため公開できません。</Notice>
+          ) : null}
           {checksError ? (
             <p className={styles.fieldError}>確認の状態を読み込めませんでした。</p>
           ) : checksLoading && !checks ? (
@@ -474,8 +519,8 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                 : conditionEmpty
                   ? '公開しても今は誰の画面にも出ません（0人）。条件を1つ以上足してください。'
                   : '公開すると、条件に当てはまる人に出来事のタイミングで順次出ます。'}
-            {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && targetPreview.overlap?.value
-              ? `${targetPreview.higherMenus[0]}の${formatNumber(targetPreview.overlap.value)}人には、いままでどおり上のメニューが出ます。`
+            {targetPreview?.higherMenus && targetPreview.higherMenus.length > 0 && isNonNegativeFinite(targetPreview.overlap?.value) && targetPreview.overlap.value > 0
+              ? `${targetPreview.higherMenus[0]}の${formatNumber(Math.trunc(targetPreview.overlap.value))}人には、いままでどおり上のメニューが出ます。`
               : ''}
           </span>
         </Notice>

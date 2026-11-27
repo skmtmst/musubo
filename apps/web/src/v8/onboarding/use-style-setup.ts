@@ -25,8 +25,11 @@ export function useStyleSetup(accountId: string | null, role: string | null) {
     let cancelled = false
     void Promise.all([styleApi.get(accountId), styleApi.warnings(accountId), styleApi.starterItems(accountId)])
       .then(([state, warnings, items]) => {
-        if (!state.success || !warnings.success || !items.success) throw new Error('初期設定の状態を読み込めませんでした')
-        if (!cancelled) setSnapshot({ accountId, role, data: { state: state.data, warnings: warnings.data.items ?? [], items: items.data.items ?? [] }, error: null, status: 'ready' })
+        const validState = state?.success && state.data && typeof state.data === 'object' && !Array.isArray(state.data)
+        const validWarnings = warnings?.success && warnings.data && typeof warnings.data === 'object' && Array.isArray(warnings.data.items)
+        const validItems = items?.success && items.data && typeof items.data === 'object' && Array.isArray(items.data.items)
+        if (!validState || !validWarnings || !validItems) throw new Error('初期設定の状態を読み込めませんでした')
+        if (!cancelled) setSnapshot({ accountId, role, data: { state: state.data, warnings: warnings.data.items, items: items.data.items }, error: null, status: 'ready' })
       })
       .catch((error: unknown) => { if (!cancelled) setSnapshot({ accountId, role, data: null, error, status: 'error' }) })
     return () => { cancelled = true }
