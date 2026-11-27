@@ -29,6 +29,7 @@
 - [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
 - [来店スタンプQRと営業時間文章入力の修正履歴](release-log/unreleased/PR-kenta-later-gemini60-1127.md)（説明・2026-11-27確認）
+- [開店準備完了ダイアログと予約回答フォーム編集の修正履歴](release-log/unreleased/PR-kenta-later-gemini61-1127.md)（説明・2026-11-27確認）
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
