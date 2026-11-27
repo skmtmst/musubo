@@ -43,6 +43,7 @@ export function friendAddFlowSteps(input: {
   scenarioName: string | null
 }): FriendAddFlowStep[] {
   const { definition } = input
+  const actions = Array.isArray(definition.actions) ? definition.actions : []
   // 再追加で「何も配信しない」は最初の案内を届けない（R261）。
   // 案内後のアクション（タグ付けやシナリオ開始）は実行される。
   const deliversNothing = input.friendKind === 'returning' && definition.returningMode === 'none'
@@ -58,7 +59,7 @@ export function friendAddFlowSteps(input: {
       ? input.routeNames.join('、')
       : '対象の流入リンクは未選択です'
     const notes = ['選んだ経路のURL・QR（どちらも同じ入口）から追加された人に動きます。']
-    if (input.missingRouteCount > 0) {
+    if (Number.isInteger(input.missingRouteCount) && input.missingRouteCount > 0) {
       notes.push(`停止・削除済みの経路が${formatNumber(input.missingRouteCount)} 件含まれています。`)
     }
     notes.push('基本の追加URLなど経路を特定できない追加には、この設定ではなく「経路が分からなかった人」の設定が動きます。')
@@ -72,15 +73,16 @@ export function friendAddFlowSteps(input: {
   const firstTitle = sendsWelcome
     ? `初回案内（${knownValue(MESSAGE_TYPE_LABEL, definition.messageType, '種類を確認できません')}）`
     : '初回案内'
+  const hasMessageText = typeof definition.messageText === 'string' && Boolean(definition.messageText.trim())
   const firstDetail = deliversNothing
     ? '「何も配信しない」の設定のため届きません。'
     : sendsWelcome
-      ? `${definition.timing === 'immediate' ? '登録直後に届きます。' : 'シナリオの時刻に従って届きます。'}${definition.messageText.trim() ? '' : '文面は未設定です。'}`
+      ? `${definition.timing === 'immediate' ? '登録直後に届きます。' : 'シナリオの時刻に従って届きます。'}${hasMessageText ? '' : '文面は未設定です。'}`
       : '最初の1通は送らず、シナリオへの登録だけを行います。'
 
   // ③ 付く属性 —— タグの追加・解除（start_scenario は次の配信へ回す）
-  const tagActions = definition.actions.filter(
-    (action) => action.type === 'add_tag' || action.type === 'remove_tag',
+  const tagActions = actions.filter(
+    (action) => action && (action.type === 'add_tag' || action.type === 'remove_tag'),
   )
   const attrDetail = tagActions.length > 0
     ? tagActions.map((action) => action.label).join('／')
@@ -99,7 +101,7 @@ export function friendAddFlowSteps(input: {
   } else {
     nextParts.push('配信シナリオは未選択です。')
   }
-  const scenarioActions = definition.actions.filter((action) => action.type === 'start_scenario')
+  const scenarioActions = actions.filter((action) => action && action.type === 'start_scenario')
   if (scenarioActions.length > 0) {
     nextParts.push(scenarioActions.map((action) => action.label).join('／'))
   }
@@ -139,7 +141,7 @@ export function addTimeWindow(windows: FriendAddTimeWindow[] | undefined): Frien
 
 /** サマリー向けの時間帯表示。複数あるときは全件あることが分かる形にする。 */
 export function timeWindowsSummary(windows: FriendAddTimeWindow[] | undefined): string {
-  const list = windows ?? []
+  const list = Array.isArray(windows) ? windows : []
   if (list.length === 0) return 'いつでも'
   if (list.length === 1) return `${list[0].start}〜${list[0].end}`
   return `${list[0].start}〜${list[0].end} など${formatNumber(list.length)} 件`
@@ -155,6 +157,7 @@ export function friendAddReaddLines(input: {
   definition: FriendAddRuleDefinition
 }): string[] {
   const lines: string[] = []
+  const actions = Array.isArray(input.definition.actions) ? input.definition.actions : []
   if (input.status === 'stopped') {
     lines.push('この設定は停止中です。はじめての追加にも再追加にも動きません。')
   } else if (input.status === 'draft') {
@@ -164,20 +167,22 @@ export function friendAddReaddLines(input: {
   if (input.friendKind === 'first_time') {
     lines.push('再追加・ブロック解除で戻った人には動きません。「以前からの友だち・ブロック解除した人」側の設定が動きます。')
   } else {
-    // 未選択は実行側の既定（別のシナリオ扱い）に合わせる。
+    // 未選択は実行側の既定（別のシナリオ扱い）に合わせる。未知値は断定しない。
     const mode = input.definition.returningMode ?? 'other'
     if (mode === 'none') {
       // 実行側と同じ区別：最初の案内は届けないが、案内後のアクション
       // （シナリオ開始を含む）は実行される。「シナリオを動かさない」と
       // 書くと、開始するよう設定した文と矛盾する（R261）。
       lines.push('再追加では最初の案内は届きません。')
-      lines.push(input.definition.actions.length > 0
+      lines.push(actions.length > 0
         ? '設定したアクションは実行されます。'
         : 'アクションも実行されません。')
     } else if (mode === 'same') {
       lines.push('再追加では、はじめての人と同じ案内・シナリオ・アクションが動きます。')
-    } else {
+    } else if (mode === 'other') {
       lines.push(`再追加では選んだシナリオを${input.definition.startPosition === 'resume' ? '前回配信した次から' : '最初から'}流します。`)
+    } else {
+      lines.push('再追加時の配信設定を確認できません。')
     }
   }
 
@@ -185,9 +190,13 @@ export function friendAddReaddLines(input: {
   const deliversNothing = input.friendKind === 'returning' && input.definition.returningMode === 'none'
   if (!deliversNothing) {
     const hours = input.definition.resendSuppressionHours ?? 24
-    lines.push(hours > 0
-      ? `同じ人への再送は「${resendSuppressionText(hours)}」。期間内に届いている人には送りません。`
-      : '同じ人への再送は制限しません。')
+    if (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0) {
+      lines.push('同じ人への再送制限を確認できません。')
+    } else if (hours > 0) {
+      lines.push(`同じ人への再送は「${resendSuppressionText(hours)}」。期間内に届いている人には送りません。`)
+    } else {
+      lines.push('同じ人への再送は制限しません。')
+    }
   }
   return lines
 }
