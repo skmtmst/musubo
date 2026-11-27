@@ -1,4 +1,5 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+- [対応が必要な受信の読込試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-32-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 # 文書の入口
