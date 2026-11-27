@@ -64,7 +64,8 @@ export default function MenuVersionHistory({
     try {
       const response = await bookingApi.listMenuVersions(accountId, menuId)
       if (sequence !== loadSequence.current) return
-      const list = Array.isArray(response.versions) ? response.versions : []
+      if (!Array.isArray(response.versions)) throw new Error('invalid version history')
+      const list = response.versions
       setVersions(list)
       const latest = list.find((v) => v.status === 'in_use')?.version_number
         ?? list.reduce<number | null>((max, v) => (max == null || v.version_number > max ? v.version_number : max), null)
