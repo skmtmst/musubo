@@ -43,7 +43,7 @@ describe('wizard-preview ガード', () => {
     cleanup()
   })
 
-  it('試し送信でどのルールにも当たらなかったとき「別のルールが先に動く」と誤表示しない', () => {
+  it('試し送信でどのルールにも当たらなかったとき「別のルールが先に動く」と誤表示せず返信吹き出しも出さない', () => {
     const noHit: AutoReplyDryRunResult = {
       draftWon: false,
       winner: null,
@@ -52,6 +52,7 @@ describe('wizard-preview ガード', () => {
     render(<>{renderWizardPreview(baseContext({ step: 'priority', dryRun: noHit }), true)}</>)
 
     expect(screen.getAllByText(/どのルールにも当たりませんでした/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('ご案内いたします')).toBeNull()
     expect(screen.queryByText(/別のルール/)).toBeNull()
     expect(screen.queryByText('このルールが返します')).toBeNull()
   })

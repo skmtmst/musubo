@@ -9,7 +9,6 @@ const fx = vi.hoisted(() => ({
   followerImportState: vi.fn(),
   stepFollowerImport: vi.fn(),
   styleGet: vi.fn(),
-  capturedIdleSeconds: [] as number[],
 }))
 
 vi.mock('next/navigation', () => ({
@@ -39,12 +38,6 @@ vi.mock('@/lib/api/helpers/styles', () => ({
     get: (...args: unknown[]) => fx.styleGet(...args),
   },
 }))
-vi.mock('./step5-completion', () => ({
-  default: ({ idleSeconds }: { idleSeconds: number }) => {
-    fx.capturedIdleSeconds.push(idleSeconds)
-    return <div data-testid="step5-idle">{String(idleSeconds)}</div>
-  },
-}))
 
 import ResumeFollowerHandover from './resume-handover'
 
@@ -52,7 +45,6 @@ describe('ResumeFollowerHandover ガード', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     fx.accountId = 'acc-1'
-    fx.capturedIdleSeconds = []
     rememberStaffIdentity({ id: 'viewer', role: 'viewer' } as StaffMember)
     fx.followerImportState.mockResolvedValue({
       success: true,
@@ -68,6 +60,7 @@ describe('ResumeFollowerHandover ガード', () => {
         conflicts: 0,
         invalid: 0,
         profilesUpdated: 0,
+        profileErrors: 0,
       },
     })
     fx.styleGet.mockResolvedValue({
@@ -81,17 +74,17 @@ describe('ResumeFollowerHandover ガード', () => {
     forgetStaffIdentity()
   })
 
-  it('updatedAt が不正日時でも idleSeconds が NaN にならず、未知のプロトタイプ名スタイルもそのまま表示しない', async () => {
+  it('updatedAt が不正日時のとき「0秒前」と言い切らず「最終更新を確認できません」と要確認表示を出し、未知のプロトタイプ名スタイルも出さない', async () => {
     render(<ResumeFollowerHandover />)
 
     await waitFor(() => {
-      expect(fx.followerImportState).toHaveBeenCalledWith('acc-1')
-      expect(fx.styleGet).toHaveBeenCalledWith('acc-1')
+      expect(screen.getByText('最終更新を確認できません')).toBeTruthy()
     })
 
-    const idleNode = screen.getByTestId('step5-idle')
-    expect(idleNode.textContent).toBe('0')
-    expect(idleNode.textContent).not.toBe('NaN')
+    expect(screen.queryByText(/最終更新：0秒前/)).toBeNull()
+    expect(screen.getByText('進み具合を確認できません')).toBeTruthy()
+    expect(screen.getByText('進み具合を確認できません。状態を再確認してください。')).toBeTruthy()
+    expect(screen.getByText('要確認')).toBeTruthy()
     expect(screen.queryByText(/function toString/)).toBeNull()
   })
 })

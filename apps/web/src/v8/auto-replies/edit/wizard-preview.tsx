@@ -173,9 +173,11 @@ export function renderWizardPreview({ conflictsReadable = true, acknowledged, au
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
-                  <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
-                    {(conflictsReadable && dryRun?.winner?.responseContent) || replyPreviewText}
-                  </LinePreviewMessage>
+                  {!(conflictsReadable && dryRun && !dryRun.draftWon && !dryRun.winner) ? (
+                    <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
+                      {(conflictsReadable && dryRun?.winner?.responseContent) || replyPreviewText}
+                    </LinePreviewMessage>
+                  ) : null}
                   {!conflictsReadable ? <p className={styles.bubbleMeta}>設定した返信のプレビューです</p> : dryRun && !dryRun.draftWon && !dryRun.winner ? (
                     <p className={styles.bubbleMeta}>どのルールにも当たりませんでした</p>
                   ) : dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
