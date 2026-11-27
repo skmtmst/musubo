@@ -1,6 +1,7 @@
 'use client'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
@@ -56,6 +57,7 @@ export default function FileScanScreen() {
   const {
     selectedAccountId,
     phase,
+    loadError,
     canEdit,
     items,
     total,
@@ -206,8 +208,9 @@ export default function FileScanScreen() {
         ) : phase === 'error' ? (
           <ListState
             kind="error"
-            title="ファイルの安全確認を読み込めませんでした"
-            description="通信状態を確認して、もう一度読み込んでください。"
+            title={isForbiddenOrRateLimited(loadError) ? undefined : 'ファイルの安全確認を読み込めませんでした'}
+            description={isForbiddenOrRateLimited(loadError) ? undefined : '通信状態を確認して、もう一度読み込んでください。'}
+            error={loadError ?? undefined}
             onRetry={() => void load()}
           />
         ) : phase === 'forbidden' ? (
