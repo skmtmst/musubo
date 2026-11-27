@@ -33,7 +33,7 @@ function baseHookState(overrides: Record<string, unknown> = {}) {
         { accountId: 'a2', accountName: '支店', friends: 10, dups: 2, dupRate: 0.2 },
       ],
       pairwiseOverlap: [
-        // a1 -> a2 は欠損、a2 -> a1 は NaN
+        // Worker 仕様どおり 0 件の組（a1 -> a2）は配列から省かれ、明示された a2 -> a1 のみ不正値（NaN）
         { fromAccountId: 'a2', toAccountId: 'a1', overlap: Number.NaN },
       ],
     },
@@ -74,7 +74,7 @@ describe('DuplicatesListV8 ガード', () => {
     cleanup()
   })
 
-  it('アカウント別の不正数値や欠損ペアを NaN% や 0 件と偽装せず「—」で表示する', () => {
+  it('アカウント別の不正数値や明示された不正ペアを「—」で表示し、配列から省かれた 0 件の組は「0」で表示する', () => {
     render(<DuplicatesListV8 />)
 
     // 重なって届いた配信は NaN を出さず未取得表示
@@ -86,10 +86,43 @@ describe('DuplicatesListV8 ガード', () => {
     expect(within(accountsTable).queryByText('-1')).toBeNull()
     expect(within(accountsTable).getByText('20%')).toBeTruthy()
 
-    // マトリクス: 欠損ペアと NaN ペアが「0」に捏造されず「—」表示
+    // マトリクス: 配列から省かれた 0 件の組（本店→支店）は「0」、明示された NaN ペア（支店→本店）は「—」
     const matrixHeading = screen.getByRole('heading', { name: 'アカウント間 重複マトリクス' })
     const matrixCard = matrixHeading.parentElement!.parentElement!
-    expect(within(matrixCard).queryByText('0')).toBeNull()
-    expect(within(matrixCard).getAllByText('—').length).toBeGreaterThanOrEqual(2)
+    const bodyRows = matrixCard.querySelectorAll('tbody tr')
+    const hontenCells = bodyRows[0].querySelectorAll('td')
+    const shitenCells = bodyRows[1].querySelectorAll('td')
+    // 本店行: [本店, 対角(—), 支店(0)]
+    expect(hontenCells[2].textContent).toBe('0')
+    // 支店行: [支店, 本店(—), 対角(—)]
+    expect(shitenCells[1].textContent).toBe('—')
+  })
+
+  it('Worker と同じ形（0 件の組を省き重複ありの組のみ含む pairwiseOverlap）で 0 件の組が 0、重複ありの組がその数値になる', () => {
+    fx.hookState = baseHookState({
+      data: {
+        computedAt: '2026-11-20T00:00:00Z',
+        overlappingDeliveryCount: 3,
+        perAccount: [
+          { accountId: 'a1', accountName: '本店', friends: 20, dups: 2, dupRate: 0.1 },
+          { accountId: 'a2', accountName: '支店', friends: 10, dups: 2, dupRate: 0.2 },
+          { accountId: 'a3', accountName: 'EC店', friends: 5, dups: 0, dupRate: 0 },
+        ],
+        pairwiseOverlap: [
+          { fromAccountId: 'a1', toAccountId: 'a2', overlap: 2 },
+          { fromAccountId: 'a2', toAccountId: 'a1', overlap: 2 },
+        ],
+      },
+    })
+
+    render(<DuplicatesListV8 />)
+    const matrixCard = screen.getByRole('heading', { name: 'アカウント間 重複マトリクス' }).parentElement!.parentElement!
+    const bodyRows = matrixCard.querySelectorAll('tbody tr')
+    // 本店行: [本店, 対角(—), 支店(2), EC店(0)]
+    expect(bodyRows[0].querySelectorAll('td')[2].textContent).toBe('2')
+    expect(bodyRows[0].querySelectorAll('td')[3].textContent).toBe('0')
+    // EC店行: [EC店, 本店(0), 支店(0), 対角(—)]
+    expect(bodyRows[2].querySelectorAll('td')[1].textContent).toBe('0')
+    expect(bodyRows[2].querySelectorAll('td')[2].textContent).toBe('0')
   })
 })

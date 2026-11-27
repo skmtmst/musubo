@@ -297,7 +297,7 @@ export default function DuplicatesListV8() {
           </Card>
         ) : null}
 
-        {d.data && d.data.perAccount.length >= 2 && d.data.pairwiseOverlap ? (
+        {d.data && d.data.perAccount.length >= 2 && Array.isArray(d.data.pairwiseOverlap) ? (
           <Card variant="records" padding="roomy" aria-labelledby="dup-matrix-title">
             <div className={styles.panelHead}>
               <h3 id="dup-matrix-title" className={styles.panelTitle}>アカウント間 重複マトリクス</h3>
@@ -316,8 +316,8 @@ export default function DuplicatesListV8() {
                     <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
                     {d.data!.perAccount.map((col) => {
                       if (row.accountId === col.accountId) return <Td key={col.accountId}><EmptyCell /></Td>
-                      const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
-                      return <Td key={col.accountId}>{pair && validNonNegInt(pair.overlap) ? formatNumber(pair.overlap) : emptyValue('unknown')}</Td>
+                      const pair = d.data!.pairwiseOverlap!.find((p) => p && p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
+                      return <Td key={col.accountId}>{pair === undefined ? formatNumber(0) : validNonNegInt(pair.overlap) ? formatNumber(pair.overlap) : emptyValue('unknown')}</Td>
                     })}
                   </Tr>
                 ))}
