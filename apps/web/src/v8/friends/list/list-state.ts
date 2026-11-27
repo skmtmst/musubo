@@ -10,6 +10,7 @@
  */
 import type { AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
+import { validAdvancedSearch } from './list-search-validation'
 
 const KEY_PREFIX = 'lh_friends_list_state_v1:'
 export const LIST_PAGE_SIZES = STANDARD_PAGE_SIZES
@@ -38,7 +39,7 @@ function storage(): Storage | null {
 
 /** 壊れた保存値・古い形をそのまま適用しないための軽い形チェック。 */
 function isSnapshot(value: unknown): value is FriendsListSnapshot {
-  if (!value || typeof value !== 'object') return false
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const v = value as Record<string, unknown>
   if (typeof v.searchInput !== 'string' || typeof v.searchSubmitted !== 'string') return false
   if (typeof v.selectedTagId !== 'string' || typeof v.operatorId !== 'string') return false
@@ -47,7 +48,7 @@ function isSnapshot(value: unknown): value is FriendsListSnapshot {
   if (v.sortMode !== 'recent' && v.sortMode !== 'oldest') return false
   if (!Number.isSafeInteger(v.page) || (v.page as number) < 1) return false
   if (!LIST_PAGE_SIZES.includes(v.pageSize as (typeof LIST_PAGE_SIZES)[number])) return false
-  if (v.advanced !== null && (typeof v.advanced !== 'object' || !v.advanced)) return false
+  if (!validAdvancedSearch(v.advanced)) return false
   return true
 }
 
