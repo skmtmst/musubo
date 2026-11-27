@@ -7,8 +7,25 @@ import type { ReminderDraftSettings } from '@line-crm/shared'
  * 版の履歴APIは無いので、読み直す前に最新を1回取ってその場で比べる。
  */
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    return Object.fromEntries(
+      Object.keys(record)
+        .sort()
+        .map((key) => [key, canonicalize(record[key])]),
+    )
+  }
+  return value
+}
+
 function sameJson(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return JSON.stringify(canonicalize(left)) === JSON.stringify(canonicalize(right))
+}
+
+function trimmedName(value: string | null | undefined): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 /** 変わった手順の名前を順に返す。同じなら空。 */
@@ -17,9 +34,11 @@ export function describeReminderDiff(
   incoming: ReminderDraftSettings,
 ): string[] {
   const lines: string[] = []
-  if (mine.name !== incoming.name) {
+  const mineName = trimmedName(mine.name)
+  const incomingName = trimmedName(incoming.name)
+  if (mineName !== incomingName) {
     lines.push(
-      `リマインダ名が違います（最新「${incoming.name || '（無題）'}」／あなた「${mine.name || '（無題）'}」）`,
+      `リマインダ名が違います（最新「${incomingName || '（無題）'}」／あなた「${mineName || '（無題）'}」）`,
     )
   } else if (
     mine.description !== incoming.description ||
