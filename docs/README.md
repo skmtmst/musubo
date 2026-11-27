@@ -1446,3 +1446,4 @@
 - [API接続の鍵発行とWebhook送り先作成のアカウント切替時ガード修正](release-log/unreleased/PR-kenta-later-gemini40-1127.md) — 反映履歴、確認 2026-11-27。
 - [イベントの申込ページの見本の定員表示を修正](release-log/unreleased/PR-kenta-event-preview-capacity.md) — 反映履歴、確認 2026-11-27。
 - [ウェビナーCTA編集の切替ガードとリマインダ新規作成のアカウント切替保護](release-log/unreleased/PR-kenta-later-gemini41-1127.md) — 反映履歴、確認 2026-11-27。
+- [シナリオ詳細の設定保存・開始停止・複製削除の切替時ガード修正](release-log/unreleased/PR-kenta-later-gemini42-1127.md) — 反映履歴、確認 2026-11-27。
