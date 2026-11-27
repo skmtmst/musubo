@@ -61,9 +61,13 @@ function areaLetter(index: number): string {
   return index >= 0 && index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
 }
 
+function isKnownRichMenuSize(sizeKey: string): sizeKey is keyof typeof RICH_MENU_DIMENSIONS {
+  return Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, sizeKey)
+}
+
 function dimensionsLabel(sizeKey: string): string {
-  if (!Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, sizeKey)) return 'サイズ不明'
-  const dims = RICH_MENU_DIMENSIONS[sizeKey as keyof typeof RICH_MENU_DIMENSIONS]
+  if (!isKnownRichMenuSize(sizeKey)) return 'サイズ不明'
+  const dims = RICH_MENU_DIMENSIONS[sizeKey]
   return `${dims.width}×${dims.height}`
 }
 
@@ -77,6 +81,7 @@ function isNonNegativeFinite(value: unknown): value is number {
 
 export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, hqDuplicateMode, pages, setHqDuplicateMode, size, tabCount, totalAreaCount }: RenderHqPublishStepContext) {
     const resolvedSize = group?.size ?? size
+    const sizeKnown = isKnownRichMenuSize(resolvedSize)
     const sizeLabel = resolvedSize === 'large' ? '大きい' : resolvedSize === 'compact' ? '小さい' : 'サイズ不明'
     const pageCount = group ? pages.length : tabCount + 1
     const showTab = pageCount > 1
@@ -145,6 +150,14 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                 <span className={styles.checkAction}>
                   <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選択する</Button>
                 </span>
+              </li>
+            ) : !sizeKnown ? (
+              <li className={styles.checkRow}>
+                <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
+                <div className={styles.checkBody}>
+                  <p className={styles.checkName}>画像・大きさ・面の数</p>
+                  <p className={styles.checkNote}>サイズを確認できないため公開できません。画面を読み直すか新しく作り直してください</p>
+                </div>
               </li>
             ) : (
               <li className={styles.checkRow}>
@@ -262,6 +275,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
      * 面の動きは②、画像は①で決めるので、足りないときはその手順へ戻る口を出す。
      */
     const reviewSize = group?.size ?? size
+    const reviewSizeKnown = isKnownRichMenuSize(reviewSize)
     const reviewDims = dimensionsLabel(reviewSize)
     const reviewSizeLabel = SIZE_OPTIONS.find((o) => o.value === reviewSize)?.label ?? 'サイズ不明'
     const missingPages = pages.filter(page => !page.areas.length || page.areas.some(area => !isAreaActionConfigured(area)))
@@ -318,12 +332,18 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
               </li>
             })}
             <li className={styles.checkRow}>
-              {missingImages.length > 0
+              {missingImages.length > 0 || !reviewSizeKnown
                 ? <CircleAlert className={`${styles.checkIcon} ${styles.checkIconWarn}`} aria-hidden />
                 : <CheckIcon state="ok" />}
               <div className={styles.checkBody}>
                 <p className={styles.checkName}>画像・大きさ・面の数</p>
-                <p className={styles.checkNote}>{missingImages.length > 0 ? '画像がまだありません。①で選びます' : `${reviewDims}・${areaCountLabel(totalAreaCount)}`}</p>
+                <p className={styles.checkNote}>
+                  {missingImages.length > 0
+                    ? '画像がまだありません。①で選びます'
+                    : !reviewSizeKnown
+                      ? 'サイズを確認できないため公開できません。画面を読み直すか新しく作り直してください'
+                      : `${reviewDims}・${areaCountLabel(totalAreaCount)}`}
+                </p>
               </div>
               {missingImages.length > 0 ? (
                 <span className={styles.checkAction}>
@@ -425,6 +445,9 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
             <SectionHeader title="公開の前の確認" />
             <p className={styles.cardNote} title={checks && isNonNegativeFinite(checks.pages.count) && isNonNegativeFinite(checks.pages.max) ? `ページ数: ${Math.trunc(checks.pages.count)} / ${Math.trunc(checks.pages.max)}${checks.pages.state === 'ng' ? '（上限を超えています）' : ''}` : undefined}>3つそろうと公開できます</p>
           </div>
+          {!reviewSizeKnown ? (
+            <Notice tone="danger">メニューのサイズを確認できないため公開できません。</Notice>
+          ) : null}
           {checksError ? (
             <p className={styles.fieldError}>確認の状態を読み込めませんでした。</p>
           ) : checksLoading && !checks ? (

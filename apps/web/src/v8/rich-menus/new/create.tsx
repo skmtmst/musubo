@@ -89,6 +89,7 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { orderTargetingGroups } from '@/v8/rich-menus/targeting-order'
 import {
+RICH_MENU_DIMENSIONS,
 type Folder,
 type MediaItem
 } from '@line-crm/shared'
@@ -1021,8 +1022,14 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
     if (validatePublishLabels()) return publishMenuNow({ audience, group, confirmedImages:publishTarget.images, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing })
   }
 
+  const publishSizeKnown = Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, group?.size ?? size)
+
   /** 「公開する」/「予約する」。時刻を決めた公開は予約口へ。 */
   async function handlePublishSubmit() {
+    if (!publishSizeKnown) {
+      setError('メニューのサイズを確認できないため公開できません。画面を読み直すか新しく作り直してください。')
+      return
+    }
     if (!validatePublishLabels()) return
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (timingIsScheduled) {
@@ -1055,7 +1062,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
 
   const locked = group !== null // 形（大きさ・面・タブ数）は create 後は変えられない
   const template = TEMPLATES.find((t) => t.key === templateKey) ?? TEMPLATES[0]
-  const shownLayouts = V8_LAYOUT_KEYS[size]
+  const shownLayouts = (Object.prototype.hasOwnProperty.call(V8_LAYOUT_KEYS, size) ? V8_LAYOUT_KEYS[size] : [])
     .map((key) => TEMPLATES.find((t) => t.key === key))
     .filter((t): t is RichMenuTemplate => Boolean(t))
 
@@ -1287,10 +1294,11 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
                     disabled={
                       busy ||
                       !canOperate ||
+                      !publishSizeKnown ||
                       (checks !== null && publishPlan.mode === 'now' && !checksAllOk) ||
                       (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
-                    title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
+                    title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : !publishSizeKnown ? 'メニューのサイズを確認できないため公開できません。画面を読み直すか新しく作り直してください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
                     busy={publishing || saving} icon={publishPlan.mode === 'now' ? <Send size={16} aria-hidden="true" /> : <CalendarClock size={16} aria-hidden="true" />}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
                     onClick={() => void handlePublishSubmit()}

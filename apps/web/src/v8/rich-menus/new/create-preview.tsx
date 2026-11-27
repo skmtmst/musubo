@@ -40,6 +40,15 @@ export function MenuContent({
   pages: Array<{ id: string; name: string }>
   activePageId: string | null
 }) {
+  if (!Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, size)) {
+    return (
+      <div>
+        <div className={styles.previewMenuEmpty}>
+          <span className={styles.previewMenuEmptyText}>サイズを確認できません</span>
+        </div>
+      </div>
+    )
+  }
   const dims = RICH_MENU_DIMENSIONS[size]
   const areaBoxes = areas && areas.length > 0 ? (
     <div className={styles.previewMenuAreas} aria-hidden="true">
