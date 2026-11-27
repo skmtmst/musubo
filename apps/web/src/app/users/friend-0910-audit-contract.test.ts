@@ -54,28 +54,4 @@ describe('FRIEND-09 UID絞り込みは全件へかかる', () => {
  * FRIEND-10: CSV書き出しは共通の csvCell（先頭 = + - @ への ' 付け）を使い、
  * 表示中ページではなく条件に合う全件を対象にする。
  */
-describe('FRIEND-10 統合ユーザーCSVは全件を共通部品で書き出す', () => {
-  it('共通の csvCell を使う（独自の引用符だけの整形を残さない）', () => {
-    expect(PAGE).toContain("import { csvCell } from '@/lib/presentation'")
-    expect(PAGE).not.toContain('localCsvCell')
-    expect(PAGE).toContain('.map(csvCell)')
-  })
-
-  it('表示中ページではなく全ページを取りにいく', () => {
-    expect(PAGE).toContain('all.push(...res.data.rows)')
-    // 1回の応答上限で順に取り、件数分集まるまで続ける。
-    expect(PAGE).toContain('pageSize: 200')
-    // WEB323：画面の件数（読めていないと0）を信じず、口の件数まで集める。
-    expect(PAGE).toContain('all.length >= exportTotal')
-    // 安全弁（無限に追い続けない上限）。上限で止めたときは書き出さない（WEB323）。
-    expect(PAGE).toContain('USERS_CSV_MAX_PAGES = 500')
-    expect(PAGE).toContain('if (!complete)')
-  })
-
-  it('UTF-8 BOM を付け、成否どちらでも exporting を戻す', () => {
-    expect(PAGE).toContain('\\uFEFF')
-    expect(PAGE).toContain('} catch {')
-    expect(PAGE).toContain('setExporting(false)')
-    expect(PAGE).toContain('CSVを書き出せませんでした')
-  })
-})
+// CSVの全件取得・安全な整形・失敗は users-csv-rendered-cx6.test.tsx の画面操作で確かめる。
