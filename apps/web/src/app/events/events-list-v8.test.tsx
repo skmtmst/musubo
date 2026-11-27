@@ -300,3 +300,56 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(foldersCreate).toHaveBeenCalledWith(expect.objectContaining({ kind: 'event', accountId: 'acc-1', name: '新しい教室' }))
   })
 })
+
+describe('イベント一覧の件数と読み込み状態', () => {
+  const card = (label: string) => {
+    const element = [...document.querySelectorAll<HTMLElement>('[data-kpi-label]')].find(e => e.textContent?.trim() === label)
+    const result = element?.closest('[data-kpi-presentation]') as HTMLElement | null
+    expect(result).toBeTruthy()
+    return result!
+  }
+
+  it('読込中と失敗では数を0とせず、失敗時はページ送りを出さない', async () => {
+    fetchApi.mockImplementation(() => new Promise(() => {}))
+    await renderList()
+    expect(card('これからの回').textContent).toContain('—')
+    expect(card('これからの回').textContent).not.toContain('読み込めませんでした')
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.includes('filter=pending')) return { items: [], total: 0 }
+      throw new Error('failure')
+    })
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await renderList()
+    expect(card('これからの回').textContent).toContain('—')
+    expect(card('これからの回').textContent).toContain('読み込めませんでした')
+    expect(document.body.textContent).not.toContain('件中')
+    expect(document.body.textContent).not.toContain('まだイベントがありません')
+  })
+
+  it('取得に成功した0は実数で表示し、空一覧と区別する', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.includes('filter=pending')) return { items: [], total: 0 }
+      return { items: [], total: 0, summary: { upcoming_slots: 0, upcoming_active: 0, upcoming_capacity: 0, fill_rate: 0, nearly_full: 0, low_applications: 0, nearest_upcoming_starts_at: null, nearest_low_starts_at: null } }
+    })
+    await renderList()
+    expect(card('これからの回').textContent).toContain('0')
+    expect(card('申込').textContent).toContain('0')
+    expect(document.body.textContent).toContain('まだイベントがありません')
+    expect(document.body.textContent).not.toContain('件中')
+  })
+
+  it('集計帯に全体の件数と、申し込みの少ない回の案内を表示する', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.includes('filter=pending')) return { items: [], total: 0 }
+      return { ...listPayload(), summary: { ...listPayload().summary, nearest_low_starts_at: '2099-10-12T05:00:00.000Z' } }
+    })
+    await renderList()
+    expect(card('これからの回').textContent).toContain('9')
+    expect(card('申込').textContent).toContain('29')
+    expect(document.body.textContent).toContain('1件中 1〜1件')
+    expect(card('あと少しで満席').textContent).toContain('1')
+    expect(card('申し込みが少ない').textContent).toContain('声をかけると埋まります')
+    expect(document.body.textContent).not.toContain('定員の充足')
+  })
+})
