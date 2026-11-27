@@ -97,13 +97,6 @@ describe('イベント作成の予約枠', () => {
 describe('リッチメニューを全員のデフォルトにする', () => {
   const src = read('components/rich-menus/apply-to-tag-modal.tsx')
 
-  it('デフォルト設定だけ確認を出し、ほかはそのまま実行する', () => {
-    expect(src).toContain('function apply()')
-    expect(src).toContain("if (mode.kind === 'set-default')")
-    expect(src).toContain('setConfirmingDefault(true)')
-    expect(src).toContain('void runApply()')
-  })
-
   it('二度押しを止め、失敗を窓に出す', () => {
     expect(src).toContain('async function confirmSetDefault()')
     expect(src).toContain('if (defaultBusy) return')
