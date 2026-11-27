@@ -6,7 +6,11 @@ export const CATALOG_DEFAULT_FEATURES: Record<FeatureId, boolean> = Object.fromE
 ) as Record<FeatureId, boolean>
 
 /** API の不足値や余分な値を、共有カタログの顔ぶれへそろえる。 */
-export function normalizeFeatureSettings(raw: Record<string, boolean> = {}): Record<FeatureId, boolean> {
+export function normalizeFeatureSettings(raw: Record<string, boolean>): Record<FeatureId, boolean> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+    || FEATURE_IDS.some((id) => Object.hasOwn(raw, id) && typeof raw[id] !== 'boolean')) {
+    throw new Error('機能設定を確認できませんでした。')
+  }
   return Object.fromEntries(FEATURE_CATALOG.map(({ featureId, defaultEnabled }) => [
     featureId,
     typeof raw[featureId] === 'boolean' ? raw[featureId] : defaultEnabled,
