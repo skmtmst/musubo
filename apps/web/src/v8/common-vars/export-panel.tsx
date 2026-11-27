@@ -80,6 +80,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   const [requesting, setRequesting] = useState(false)
   const [error, setError] = useState('')
   const [historyFailed, setHistoryFailed] = useState(false)
+  const [statusFailed, setStatusFailed] = useState(false)
   /** 遅れて返った別アカウントの結果を映さないための世代番号。 */
   const generationRef = useRef(0)
 
@@ -108,6 +109,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
     setRequesting(false)
     setError('')
     setHistoryFailed(false)
+    setStatusFailed(false)
     if (!accountId) return
     void (async () => {
       try {
@@ -129,26 +131,30 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
 
   // queued/running の間は状態を聞き直す。
   useEffect(() => {
-    if (!active || (active.status !== 'queued' && active.status !== 'running')) return
+    if (!active || (active.status !== 'queued' && active.status !== 'running')) { setStatusFailed(false); return }
     const generation = generationRef.current
+    let watching = true
     // 隠れたタブでは聞き直さない（V6R-S3-g）。
     const timer = window.setInterval(onlyWhenVisible(async () => {
       try {
         const res = await api.commonVars.exportDetail(active.id)
-        if (generationRef.current !== generation) return
+        if (!watching || generationRef.current !== generation) return
+        if (!res.success) throw new Error('status_failed')
         if (res.success) {
+          setStatusFailed(false)
           setActive(current => current?.id === active.id ? res.data : current)
           if (res.data.status !== 'queued' && res.data.status !== 'running' && accountId) {
             void refresh(accountId, generation)
           }
         }
       } catch (saveFailure) {
-        if (generationRef.current === generation) saveErrors.capture(saveFailure)
-
-        /* 一時的な通信障害では監視を止めない */
+        if (watching && generationRef.current === generation) {
+          saveErrors.capture(saveFailure)
+          setStatusFailed(true)
+        }
       }
     }), POLL_INTERVAL_MS)
-    return () => window.clearInterval(timer)
+    return () => { watching = false; window.clearInterval(timer) }
   }, [active, accountId, refresh, saveErrors])
 
   const run = async (operation: (token?: string) => Promise<CommonVarExportJob | void>, action: string) => {
@@ -228,9 +234,10 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
       disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
     </Button>
   )
-  const status = error || historyFailed || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
+  const status = error || historyFailed || statusFailed || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
     <SaveErrorScope errors={saveErrors}>
       {historyFailed ? <Notice tone="warn" action={<Button type="button" variant="text" onClick={() => { if (accountId) void refresh(accountId, generationRef.current) }}>もう一度読み込む</Button>}>書き出し履歴を読み込めませんでした。</Notice> : null}
+      {statusFailed ? <Notice tone="warn">書き出しの状態を読み込めませんでした。自動でもう一度確認します。</Notice> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {!error && active && active.id !== dismissedJobId ? (
         <Notice
