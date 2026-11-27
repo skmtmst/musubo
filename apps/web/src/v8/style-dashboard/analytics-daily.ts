@@ -1,13 +1,10 @@
+import { isCalendarDate } from '@line-crm/shared'
 import type { IndustryStyle, StyleAnalyticsData, StyleMetric } from '@line-crm/shared'
 import type { StyleAnalytics } from './model'
 
 const count = (metric: StyleMetric | undefined): number | null => metric?.status === 'available'
   && typeof metric.value === 'number' && Number.isFinite(metric.value) && metric.value >= 0 ? metric.value : null
-const validDate = (value: unknown): value is string => {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const date = new Date(`${value}T00:00:00Z`)
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
-}
+const validDate = isCalendarDate
 
 /** Pair the same ordinal day of the selected and comparison periods. */
 export function dailyAnalyticsSeries(style: IndustryStyle, comparison: StyleAnalyticsData['dailyComparison']): NonNullable<StyleAnalytics['chart']> {

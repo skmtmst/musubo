@@ -1,6 +1,7 @@
 import { useCustomerWords } from './customer-style-scope.js';
 import PaymentPreparingNote from './payment-preparing-note.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
+import { isCalendarDate } from '@line-crm/shared';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
@@ -43,8 +44,7 @@ export default function Done({
   const { search } = useLocation();
   const navigate = useNavigate();
   const knownStatus = status === 'confirmed' || status === 'requested';
-  const date = typeof slot.date === 'string' ? new Date(`${slot.date}T00:00:00Z`) : new Date(NaN);
-  const validSlot = Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === slot.date && typeof slot.start === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(slot.start);
+  const validSlot = isCalendarDate(slot.date) && typeof slot.start === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(slot.start);
   /** お支払いへ進む：starting | phone（決済が無い店）| failed。 */
   const [payState, setPayState] = useState<'idle' | 'starting' | 'phone' | 'failed'>('idle');
 

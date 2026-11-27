@@ -3,8 +3,9 @@ import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
 import { useMenuShapeDraft } from './use-menu-shape-draft'
 import { useHqRichMenuDraft } from './use-hq-rich-menu-draft'
-import { makeHqMenuSeed, MISSING_DEFAULT_PAGE_ERROR, resolveHqDefaultPageId } from './hq-menu-seed'
+import { hqSeedFailureMessage, makeHqMenuSeed, MISSING_DEFAULT_PAGE_ERROR, resolveHqDefaultPageId } from './hq-menu-seed'
 
+import { RichMenuCreateNotices } from './create-notices'
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
 import { seedMenuShape } from './create-seed-shape'
@@ -54,7 +55,6 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
-import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import NumberInput from '@/components/shared/number-field'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -1190,7 +1190,6 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
 
   const busy = saving || publishing || Boolean(host?.busy)
   const hqOperateAllowed = Boolean(host?.canOperate)
-  const hqOperateLockReason = usePermissionLockReason(hqOperateAllowed, 'manager')
   const hqDefaultPageMissing = Boolean(host && group && !resolveHqDefaultPageId(group, pages))
   const selectHqDefaultPage = (pageId: string) => {
     if (!hqOperateAllowed || busy) return
@@ -1216,12 +1215,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
     }
     if (!validateBasics()) return
     let seed: HqRichMenuSeed
-    try {
-      seed = seedNow()
-    } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : MISSING_DEFAULT_PAGE_ERROR)
-      return
-    }
+    try { seed = seedNow() } catch (caught) { setError(hqSeedFailureMessage(caught)); return }
     host.onSave(seed, distribute, hqDuplicateMode)
   }
   function seedNow(): HqRichMenuSeed { return makeHqMenuSeed({ host, name, chatBarText, folderId, size, group, audience, hqTagName, defaultOpen, targetingPriority, pages }) }
@@ -1340,48 +1334,11 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
       {host?.notice}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
-      {hqDefaultPageMissing ? (
-        <Notice
-          tone="danger"
-          message={MISSING_DEFAULT_PAGE_ERROR}
-          className="mb-1"
-          action={
-            pages.length > 0 ? (
-              <span className={styles.pageTools}>
-                {pages.map((page) => (
-                  <Button
-                    key={page.id}
-                    type="button"
-                    variant="secondary"
-                    size="compact"
-                    disabled={busy || (!hqOperateAllowed && !hqOperateLockReason)}
-                    lockedReason={!hqOperateAllowed ? hqOperateLockReason : undefined}
-                    onClick={() => selectHqDefaultPage(page.id)}
-                  >
-                    {`${page.name}を最初に出す面にする`}
-                  </Button>
-                ))}
-              </span>
-            ) : undefined
-          }
-        />
-      ) : null}
-      {error && !(hqDefaultPageMissing && error === MISSING_DEFAULT_PAGE_ERROR) ? (
-        <Notice
-          tone="danger"
-          message={error}
-          className="mb-1"
-          action={
-            loadFailedKinds.length > 0 && !isForbidden(loadError) ? (
-              <Button type="button" onClick={() => { setError(null); return load() }} busyLabel="処理中…">
-                もう一度読み込む
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : null}
-      {notice ? <Notice tone="success" message={notice} className="mb-1" onClose={() => setNotice('')} /> : null}
-      {candidatePruneNotice ? <Notice tone="warn" message={candidatePruneNotice} onClose={() => setCandidatePruneNotice('')} /> : null}
+      <RichMenuCreateNotices
+        missingDefaultPage={hqDefaultPageMissing} pages={pages} busy={busy} canOperate={hqOperateAllowed} onSelectDefaultPage={selectHqDefaultPage}
+        error={error} onRetry={loadFailedKinds.length > 0 && !isForbidden(loadError) ? () => { setError(null); return load() } : undefined}
+        notice={notice} onCloseNotice={() => setNotice('')} pruneNotice={candidatePruneNotice} onClosePruneNotice={() => setCandidatePruneNotice('')}
+      />
 
           {step === 'shape' ? renderShape() : null}
           {step === 'buttons' ? renderButtons() : null}
