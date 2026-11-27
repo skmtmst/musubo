@@ -14,8 +14,12 @@ concurrency:
 
 jobs:
   v8-screen-guard:
-    name: V8 screen guard
+    name: V8 screen guard (${{ matrix.shard }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [inventory, defects, comparison, general]
     # Check the current V8 screens at 1152, 1440 and 1920.
     env:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8788
@@ -104,17 +108,17 @@ jobs:
             exit 1
           fi
       - name: No permission copy flashes during navigation
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'general'
         env:
           V8_GUARD_BASE: http://127.0.0.1:4310
           V8_GUARD_ARTIFACT_DIR: /tmp/v8-guard/permission-navigation
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs
       - name: No V8 layout breaks at 1152, 1440 and 1920
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'general'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
       # 空白量は診断のみ。切れ・重なり・操作の遮断を必須で確認する。
       - name: Broken fixtures must fail the V8 layout guard
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'defects'
         env:
           V8_GUARD_BASE: http://127.0.0.1:4310
           V8_GUARD_DETAIL_OUT: /tmp/detail-out
@@ -123,63 +127,63 @@ jobs:
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/viewport-footer.test.mjs
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/heading-band.test.mjs apps/web/scripts/v8-guard/store-heading.test.mjs apps/web/scripts/v8-guard/dashboard-content.test.mjs apps/web/scripts/v8-guard/home-pending-heading.test.mjs apps/web/scripts/v8-guard/document-title.test.mjs apps/web/scripts/v8-guard/canonical-route.test.mjs apps/web/scripts/v8-guard/dialog-footer.test.mjs apps/web/scripts/v8-guard/dialog-leading.test.mjs apps/web/scripts/v8-guard/patrol-layout.test.mjs apps/web/scripts/v8-guard/scheduled-message.test.mjs apps/web/scripts/v8-guard/route-pending.test.mjs apps/web/scripts/v8-guard/style-switcher.test.mjs apps/web/scripts/v8-guard/monthly-flow.test.mjs
       - name: Sidebar, booking and pagination details stay as designed
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'defects'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/nav-detail.test.mjs apps/web/scripts/v8-guard/booking-dialog-layout.test.mjs apps/web/scripts/v8-guard/booking-title.test.mjs
       - name: Narrow preview opens once and preserves form input
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'defects'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs
       - name: Train 17 waitlist failure and inflow mouse regressions
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'general'
         run: node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17
       - name: Booking preview date agrees through settings and preview tabs
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'general'
         run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
       - name: No new V8 layout or owner-rule defects
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'comparison'
         run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
       - name: Store comparison delta labels stay inside their values
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'general'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs
       - name: Inventory edge insets, folder dots and page actions on all admin screens
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'inventory'
         run: node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
       - name: List row rules
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'comparison'
         run: |
           node apps/web/scripts/list-row-audit.mjs
           node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
           node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
       - name: Speed measurement and reference policy controls
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && matrix.shard == 'general' }}
         run: node --test apps/web/scripts/v8-guard/mock-local.test.mjs apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
       - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && matrix.shard == 'general' }}
         env:
           V8_SPEED_PROFILE: ci
         run: pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: Train 17 absolute targets
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && matrix.shard == 'general' }}
         run: node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json
       - name: 2000 friends meet absolute speed targets
         id: stress_speed
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && matrix.shard == 'general' }}
         env:
           V8_SPEED_PROFILE: ci
         run: node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json
       - name: PERF-01 fixed list speed targets
         id: perf3_targets
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && matrix.shard == 'general' }}
         run: node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json
       - name: Report speed reference results (including incomplete measurements)
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && matrix.shard == 'general' }}
         env:
           SPEED_BUDGET_OUTCOME: ${{ steps.speed_budget.outcome }}
           STRESS_SPEED_OUTCOME: ${{ steps.stress_speed.outcome }}
           PERF3_TARGETS_OUTCOME: ${{ steps.perf3_targets.outcome }}
         run: node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json
       - name: Virtual table selection, keyboard and layout
-        if: steps.scope.outputs.run == 'true'
+        if: steps.scope.outputs.run == 'true' && matrix.shard == 'general'
         run: |
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
           node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
@@ -187,7 +191,7 @@ jobs:
         if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v8-screen-guard
+          name: v8-screen-guard-${{ matrix.shard }}
           path: |
             /tmp/v8-guard/
             /tmp/mock-api.log
@@ -199,7 +203,7 @@ jobs:
         if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: v8-speed-diagnosis
+          name: v8-speed-diagnosis-${{ matrix.shard }}
           path: /tmp/v8-guard/speed.json.diagnosis/
           if-no-files-found: ignore
           retention-days: 7

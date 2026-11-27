@@ -39,7 +39,10 @@ class BehaviorGuardPolicy(unittest.TestCase):
 
     def test_all_original_checks_are_assigned_without_weakening(self):
         behavior = self.jobs['v8-behavior-guard']['steps']
-        visual = self.jobs['v8-screen-guard']['steps']
+        visual = [dict(step) for step in self.jobs['v8-screen-guard']['steps']]
+        for step in visual:
+            if 'if' in step:
+                step['if'] = re.sub(r" && matrix\.shard == '[^']+'(?=\s*(?:}})?$)", '', step['if'])
         behavior_steps = set(self.classification['behavior_steps'])
         for old in self.original:
             name = old['name']
