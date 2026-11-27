@@ -31,7 +31,7 @@ export const calendarEntryBox = (start: string, end: string, day: number, days: 
   const safeDay = Number.isFinite(day) && day >= 0 ? day : 0
   return {
     insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(startMin - from * 60) / 60} + var(--tpl-sd-board-top))`,
-    blockSize: `max(0px, calc(var(--tpl-sd-week-hour) * ${(endMin - startMin) / 60} - var(--tpl-sd-entry-gap)))`,
+    blockSize: `max(var(--tpl-sd-free-h), calc(var(--tpl-sd-week-hour) * ${(endMin - startMin) / 60} - var(--tpl-sd-entry-gap)))`,
     insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${safeDays} * ${safeDay})`,
     inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${safeDays})`,
   }

@@ -70,7 +70,7 @@ function evalCssPx(expr: string, vars: Record<string, number>): number {
 }
 
 describe('WeekCalendar / DayList の時刻配置・高さ・重複行ガード', () => {
-  it('極端に短い予約を描画しても配置ラッパーの高さが 0 未満にならない', () => {
+  it('極端に短い予約を描画しても配置ラッパーが最小の高さ（1行分）を保って見える', () => {
     const week: StyleWeek = {
       title: '2026年11月',
       from: '2026-11-27',
@@ -84,6 +84,15 @@ describe('WeekCalendar / DayList の時刻配置・高さ・重複行ガード',
           end: '12:01',
           title: '短時間コース',
           name: '短い予約',
+          state: 'confirmed',
+        },
+        {
+          id: 'e-normal',
+          day: '2026-11-27',
+          start: '13:00',
+          end: '14:00',
+          title: '通常コース',
+          name: '通常の予約',
           state: 'confirmed',
         },
       ],
@@ -100,29 +109,32 @@ describe('WeekCalendar / DayList の時刻配置・高さ・重複行ガード',
       />,
     )
 
-    const vars = { '--tpl-sd-week-hour': 60, '--tpl-sd-board-top': 8, '--tpl-sd-entry-gap': 4 }
-    const bookingButton = screen.getByRole('button', { name: /短い予約/ })
-    const wrapper = bookingButton.parentElement as HTMLElement
-    const top = evalCssPx(wrapper.style.insetBlockStart, vars)
-    const height = evalCssPx(wrapper.style.blockSize, vars)
-    expect(Number.isFinite(top)).toBe(true)
-    expect(Number.isFinite(height)).toBe(true)
-    expect(height).toBeGreaterThanOrEqual(0)
+    const vars = { '--tpl-sd-week-hour': 48, '--tpl-sd-board-top': 8, '--tpl-sd-entry-gap': 4, '--tpl-sd-free-h': 22 }
+    const shortWrapper = screen.getByRole('button', { name: /短い予約/ }).parentElement as HTMLElement
+    const shortTop = evalCssPx(shortWrapper.style.insetBlockStart, vars)
+    const shortHeight = evalCssPx(shortWrapper.style.blockSize, vars)
+    expect(Number.isFinite(shortTop)).toBe(true)
+    expect(Number.isFinite(shortHeight)).toBe(true)
+    expect(shortHeight).toBeGreaterThanOrEqual(22)
+
+    const normalWrapper = screen.getByRole('button', { name: /通常の予約/ }).parentElement as HTMLElement
+    const normalHeight = evalCssPx(normalWrapper.style.blockSize, vars)
+    expect(normalHeight).toBe(44)
   })
 
-  it('不正な時刻・逆転時刻・日数0でも位置と高さが有限で 0 以上になる', () => {
-    const vars = { '--tpl-sd-week-hour': 60, '--tpl-sd-board-top': 8, '--tpl-sd-entry-gap': 4 }
+  it('不正な時刻・逆転時刻・日数0でも高さ0で消えず最小の高さを保つ', () => {
+    const vars = { '--tpl-sd-week-hour': 48, '--tpl-sd-board-top': 8, '--tpl-sd-entry-gap': 4, '--tpl-sd-free-h': 22 }
     const reversed = calendarEntryBox('12:00', '11:00', 0, 1, 10)
     const reversedHeight = evalCssPx(String(reversed.blockSize ?? ''), vars)
     expect(Number.isFinite(reversedHeight)).toBe(true)
-    expect(reversedHeight).toBeGreaterThanOrEqual(0)
+    expect(reversedHeight).toBeGreaterThanOrEqual(22)
 
     const malformed = calendarEntryBox('invalid', '11:00', 0, 0, 10)
     const malformedTop = evalCssPx(String(malformed.insetBlockStart ?? ''), vars)
     const malformedHeight = evalCssPx(String(malformed.blockSize ?? ''), vars)
     expect(Number.isFinite(malformedTop)).toBe(true)
     expect(Number.isFinite(malformedHeight)).toBe(true)
-    expect(malformedHeight).toBeGreaterThanOrEqual(0)
+    expect(malformedHeight).toBeGreaterThanOrEqual(22)
   })
 
   it('DayList に同時刻・同名の行が複数あっても警告なく描画できる', () => {
