@@ -641,15 +641,23 @@ export function TargetStageV8({
   const total = recount ? recount.matched + recount.excluded : savedAudience.total
   const excluded = recount ? recount.excluded : savedAudience.excluded
 
+  const facesLoadingRef = useRef(false)
+  useEffect(() => () => {
+    facesLoadingRef.current = false
+  }, [reminderId])
+
   function openFaces() {
     if (recount) {
+      facesLoadingRef.current = false
       setFaces({ loading: false, error: '', sample: recount.sample, matched: recount.matched })
-    } else {
+    } else if (!facesLoadingRef.current) {
+      facesLoadingRef.current = true
       setFaces({ loading: true, error: '', sample: [], matched: null })
       void api.reminders.audience(reminderId).then((response) => {
         if (response.success) setFaces({ loading: false, error: '', sample: response.data.sample, matched: response.data.matched })
         else setFaces({ loading: false, error: response.error, sample: [], matched: null })
       }).catch(() => setFaces({ loading: false, error: '対象者を確認できませんでした。', sample: [], matched: null }))
+        .finally(() => { facesLoadingRef.current = false })
     }
     setFacesOpen(true)
   }
@@ -794,12 +802,15 @@ export function TargetStageV8({
         open={facesOpen}
         title="対象者を確認"
         description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${formatNumber(faces.sample.length)} 人です。` : undefined}
-        onCancel={() => setFacesOpen(false)}
+        onCancel={() => {
+          facesLoadingRef.current = false
+          setFacesOpen(false)
+        }}
       >
         {!faces || faces.loading
           ? <p className={styles.fieldNote}>数えています…</p>
           : faces.error
-            ? <p className={styles.fieldNote}>{faces.error}</p>
+            ? <Notice tone="danger" action={<Button variant="text" size="inline" onClick={openFaces} disabled={faces.loading} busy={faces.loading}>もう一度読み込む</Button>}>{faces.error}</Notice>
             : faces.sample.length === 0
               ? <p className={styles.fieldNote}>条件に当てはまる人がまだいません。条件をゆるめるとここに出ます。</p>
               : <ul className={styles.diffList}>{faces.sample.map((friend) => <li key={friend.id}>{friend.displayName}</li>)}</ul>}
