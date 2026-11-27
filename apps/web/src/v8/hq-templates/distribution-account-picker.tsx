@@ -18,6 +18,16 @@ const UNFILED = 'none'
 const toPicker = (filter: string) => filter === ALL_ACCOUNTS ? PICKER_ALL : filter === UNFILED ? PICKER_UNFILED : filter
 const fromPicker = (folder: string) => folder === PICKER_ALL ? ALL_ACCOUNTS : folder === PICKER_UNFILED ? UNFILED : folder
 
+function validReceived(rows: unknown): rows is HqTemplateReceivedVersion[] {
+  return Array.isArray(rows) && rows.every((item: unknown) => {
+    if (!item || typeof item !== 'object') return false
+    const row = item as Record<string, unknown>
+    if (typeof row.accountId !== 'string' || !row.targetVersion || typeof row.targetVersion !== 'object') return false
+    const version = (row.targetVersion as Record<string, unknown>).version
+    return version === null || (typeof version === 'number' && Number.isSafeInteger(version) && version > 0)
+  })
+}
+
 export default function DistributionAccountPicker({ accounts, folders, selected, onChange, filter, onFilter, search = '', onSearch, received = null, receivedFailed = false, busy, compact = false, accountState, notice, accountMeta, headerSearch = false, showCount = true, selectAll = false }: {
   /** 一覧の上に「すべて選ぶ」（今のフォルダと検索で見えているアカウント）を置く。 */
   selectAll?: boolean
@@ -33,13 +43,14 @@ export default function DistributionAccountPicker({ accounts, folders, selected,
   busy: boolean; compact?: boolean
 }) {
   const items = toHqAccountItems(accounts, folders, () => undefined)
+  const receivedValid = received !== null && validReceived(received)
   const state = (accountId: string) => {
     if (accountState) return accountState(accountId)
     if (compact) return null
-    const version = received?.find((row) => row.accountId === accountId)?.targetVersion.version
+    const version = receivedValid ? received.find((row) => row.accountId === accountId)?.targetVersion.version : undefined
     return <>
       {version != null ? <span className={styles.overwrite}>配ると上書き</span> : null}
-      {received === null ? <span className={styles.pending}>{receivedFailed ? '配布状況を確認できません' : '配布状況を確認中…'}</span>
+      {!receivedValid ? <span className={styles.pending}>{receivedFailed || received !== null ? '配布状況を確認できません' : '配布状況を確認中…'}</span>
         : <StatusBadge size="compact" tone={version != null ? 'info' : 'neutral'}>{version != null ? `版 ${version} を配布済み` : '未配布'}</StatusBadge>}
     </>
   }
