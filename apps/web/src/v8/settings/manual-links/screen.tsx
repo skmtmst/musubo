@@ -61,10 +61,11 @@ export default function ManualLinksScreen() {
     dirty,
   } = useManualLinks()
 
+  const editingName = rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name
   const frame = (children: React.ReactNode) => (
     <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。"
       notice={status === 'ready' && canView && !canEdit ? <ReadOnlyNotice need="ops" /> : undefined}
-      saveStatus={canEdit && editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
+      saveStatus={canEdit && editingKey ? `${typeof editingName === 'string' ? editingName : '画面名を確認できません'}の行き先を編集中` : undefined}
       saveActions={canEdit && editingKey && (dirty || saving) ? <>
         <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
         <Button variant="primary" actionWording disabled={saving} onClick={() => void saveEdit()} busy={saving} busyLabel="保存しています…">決める</Button>
@@ -156,28 +157,32 @@ export default function ManualLinksScreen() {
               const key = row.taskId ?? row.screenId
               const editing = canEdit && editingKey === key
               const checked = row.checkedAt ? formatDate(row.checkedAt, { style: 'list', fallback: checkedLabel(row.checkedAt) }) : emptyValue('unknown')
+              const name = typeof row.name === 'string' ? row.name : '画面名を確認できません'
+              const validUrl = typeof row.url === 'string'
+              const url = validUrl ? urlLabel(row.url) : 'URLを確認できません'
+              const status = validUrl ? manualLinkStatusLabel(row.status) : '状態を確認できません'
               // 114: 開けない行も白のまま。赤は状態の札だけ。
               return (
                 <GridRow key={key}>
                   <GridCell role="cell" className={styles.cell}>{row.screenId}</GridCell>
-                  <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={row.name}>{row.name}</GridCell>
-                  <GridCell role="cell" className={styles.cell} title={urlLabel(row.url)}>
+                  <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={name}>{name}</GridCell>
+                  <GridCell role="cell" className={styles.cell} title={url}>
                     {editing ? (
                       <SaveErrorField names={["editingUrl","editing_url"]}><TextField
-                        aria-label={`${row.name}のマニュアルのURL`}
+                        aria-label={`${name}のマニュアルのURL`}
                         value={editingUrl}
                         onChange={(event) => setEditingUrl(event.target.value)}
                       /></SaveErrorField>
                     ) : (
-                      <span className={row.url ? styles.url : styles.urlEmpty} title={row.url || undefined}>{row.url ? urlLabel(row.url) : emptyValue('unconfigured')}</span>
+                      <span className={row.url ? styles.url : styles.urlEmpty} title={validUrl ? row.url || undefined : undefined}>{!validUrl || row.url ? url : emptyValue('unconfigured')}</span>
                     )}
                   </GridCell>
                   <GridCell role="cell" className={styles.cell} title={checkedLabel(row.checkedAt)}><span data-list-date-time>{checked}</span></GridCell>
-                  <GridCell role="cell" className={styles.cell} title={manualLinkStatusLabel(row.status)}>
-                    <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : manualLinkStatusLabel(row.status)}</StatusBadge>
+                  <GridCell role="cell" className={styles.cell} title={status}>
+                    <StatusBadge tone={!validUrl ? 'neutral' : row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{validUrl && row.status === 'unset' ? emptyValue('unconfigured') : status}</StatusBadge>
                   </GridCell>
                   <GridCell role="cell" className={styles.actions}>
-                    {editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', lockedReason: permissionReason, disabled: staff === null, onSelect: () => startEdit(key) }]} />}
+                    {editing ? null : <RowActions subjectName={name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', lockedReason: permissionReason ?? (validUrl ? undefined : 'URLを確認できません。読み直してください。'), disabled: staff === null, onSelect: () => startEdit(key) }]} />}
                   </GridCell>
                 </GridRow>
               )
