@@ -55,12 +55,19 @@ function isConditionShape(value: unknown, seen: WeakSet<object> = new WeakSet())
   return valid
 }
 
+function isEmptyConditionValue(condition: ExclusionCondition): boolean {
+  const groupCount = (condition.groups ?? []).filter(
+    (group) => group.rules.length > 0 || (group.groups?.length ?? 0) > 0,
+  ).length
+  return condition.rules.length === 0 && groupCount === 0
+}
+
 /** sourceConfig から実効する条件オブジェクトだけを読む。無い・壊れたときは null。 */
 export function readExclusionCondition(sourceConfig: unknown): ExclusionCondition | null {
   if (!sourceConfig || typeof sourceConfig !== 'object' || Array.isArray(sourceConfig)) return null
   const raw = (sourceConfig as Record<string, unknown>).exclusion
   if (!isConditionShape(raw)) return null
-  if (countRules(raw) === 0) return null
+  if (raw.rules.length === 0 && (!raw.groups || raw.groups.length === 0)) return null
   return raw
 }
 
@@ -162,8 +169,8 @@ export function readExclusionView(sourceConfig: unknown): ExclusionView {
   const raw = config.exclusion
   if (raw === undefined || raw === null) return view
   if (!isConditionShape(raw)) return { ...view, invalid: true }
+  if (isEmptyConditionValue(raw)) return view
   const ruleCount = countRules(raw)
-  if (ruleCount === 0) return view
   const labels = collectRuleLabels(raw)
   return {
     ...view,

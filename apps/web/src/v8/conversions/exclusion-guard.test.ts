@@ -47,16 +47,28 @@ describe('conversions/exclusion ガード', () => {
     expect(readExclusionCondition({ exclusion: cyclic })).toBeNull()
   })
 
-  it('入れ子グループまで空なら条件なし（invalid ではない）、有効な入れ子条件は件数と要約を返す', () => {
-    const emptyNested = {
+  it('入れ子の空グループを含む条件をサーバー契約と同様に保持し、有効な入れ子条件の件数と要約を返す', () => {
+    const nestedEmptyGroups = {
       exclusion: {
         operator: 'AND',
         rules: [],
-        groups: [{ operator: 'OR', rules: [] }],
+        groups: [{ operator: 'AND', rules: [], groups: [{ operator: 'AND', rules: [] }] }],
       },
     }
-    expect(readExclusionView(emptyNested)).toMatchObject({ invalid: false, hasCondition: false, ruleCount: 0 })
-    expect(readExclusionCondition(emptyNested)).toBeNull()
+    expect(readExclusionCondition(nestedEmptyGroups)).toEqual(nestedEmptyGroups.exclusion)
+    expect(readExclusionView(nestedEmptyGroups)).toMatchObject({
+      invalid: false,
+      hasCondition: true,
+    })
+
+    const topLevelEmpty = {
+      exclusion: {
+        operator: 'AND',
+        rules: [],
+      },
+    }
+    expect(readExclusionCondition(topLevelEmpty)).toBeNull()
+    expect(readExclusionView(topLevelEmpty)).toMatchObject({ invalid: false, hasCondition: false, ruleCount: 0 })
 
     const validNested = {
       exclusion: {
