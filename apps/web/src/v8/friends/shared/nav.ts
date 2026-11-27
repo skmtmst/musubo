@@ -33,10 +33,11 @@ export const FRIENDS_TAB_NOTES: Record<FriendsTabKey, string> = {
  */
 export function hasEditKey(permission: string): boolean {
   if (typeof window === 'undefined') return false
+  if (typeof permission !== 'string' || permission.trim().length === 0) return false
   try {
     const raw = window.localStorage.getItem('lh_staff_permissions')
     const parsed: unknown = raw ? JSON.parse(raw) : []
-    return Array.isArray(parsed) && parsed.includes(permission)
+    return Array.isArray(parsed) && parsed.some((item) => typeof item === 'string' && item === permission)
   } catch {
     return false
   }
