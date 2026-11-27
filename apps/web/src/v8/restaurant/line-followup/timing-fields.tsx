@@ -46,7 +46,18 @@ function CountdownField({value,before,onChange}:{value:number;before:boolean;onC
   const next=parsed===0?0:(before?-1:1)*parsed*UNIT_MINUTES[unit]
   setState(prev=>({...prev,emittedValue:next,draft:null}))
   onChange(next)
- }} onBlur={()=>{if(draft!==null)setState(prev=>({...prev,draft:null}))}}/></SaveErrorField><Select aria-label="時間の単位" value={unit} onChange={next=>setState(prev=>({...prev,unit:next as OffsetUnit,draft:null}))} options={[{value:'minutes',label:'分'},{value:'hours',label:'時間'},{value:'days',label:'日'}]}/></SettingsFormRow>
+ }} onBlur={()=>{if(draft!==null)setState(prev=>({...prev,draft:null}))}}/></SaveErrorField><Select aria-label="時間の単位" value={unit} onChange={next=>{
+  const nextUnit=next as OffsetUnit
+  const unitMinutes=UNIT_MINUTES[nextUnit]
+  if(!Number.isFinite(value)||value===0){setState(prev=>({...prev,unit:nextUnit,draft:null}));return}
+  const rawAmount=(before?-value:value)/unitMinutes
+  if(Number.isInteger(rawAmount)){setState(prev=>({...prev,unit:nextUnit,draft:null}));return}
+  const maxAmount=Math.floor(525600/unitMinutes)
+  const snapped=Math.min(maxAmount,Math.max(1,Math.round(rawAmount)))
+  const nextMinutes=(before?-1:1)*snapped*unitMinutes
+  setState(prev=>({...prev,unit:nextUnit,emittedValue:nextMinutes,draft:null}))
+  onChange(nextMinutes)
+ }} options={[{value:'minutes',label:'分'},{value:'hours',label:'時間'},{value:'days',label:'日'}]}/></SettingsFormRow>
 }
 
 function DaysField({offsetDays,anniversary,onChange}:{offsetDays:number;anniversary:boolean;onChange:(offsetDays:number)=>void}){
