@@ -19,6 +19,7 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import MusuboMark from '@/components/shared/musubo-mark'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import ListState from '@/components/shared/list-state'
 import TruncatedText from '@/components/shared/truncated-text'
 import MediaSlot from '@/components/shared/media-slot'
 import TapActionField from '@/components/shared/tap-action-field'
@@ -104,6 +105,15 @@ function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | n
   return null
 }
 
+function validReferences(rows: unknown): rows is HqMessageReference[] {
+  return Array.isArray(rows) && rows.every((item: unknown) => {
+    if (!item || typeof item !== 'object') return false
+    const row = item as Record<string, unknown>
+    return typeof row.kind === 'string' && ['form', 'scenario', 'booking', 'visit_stamp'].includes(row.kind) &&
+      typeof row.id === 'string' && typeof row.name === 'string' && typeof row.accountName === 'string'
+  })
+}
+
 export default function MessageForm({
   name, onNameChange, value, onChange, folders, folderId, onFolderChange, onCreateFolder, folderLoadFailed,
   disabled, catalogFailed, onReloadCatalog, onBusyChange, onReceipt, notice, fields,
@@ -112,19 +122,33 @@ export default function MessageForm({
   const [targetDate, setTargetDate] = useState('')
   const [references, setReferences] = useState<HqMessageReference[]>([])
   const [referenceError, setReferenceError] = useState('')
+  const [referencesLoading, setReferencesLoading] = useState(true)
   // カード（タイトル・本文・ボタン）で作るか。今の画面と同じ判定：保存済みのカード、または新しく作ったテキスト。
   const usesCard = (Boolean(value.card) || (current.id === 'hq-authored-message' && (current.messageType === 'text' || current.messageType === 'flex') && !current.carouselActionsJson && !current.questionJson))
   const card: HqMessageCard = value.card ?? { format: current.messageType === 'flex' ? 'flex' : 'text', title: '', body: current.messageContent, buttons: [] }
 
-  const loadReferences = () => hqTemplatesApi.messageReferences()
-    .then((rows) => { setReferences(rows); setReferenceError('') })
-    .catch(() => setReferenceError('ボタンの参照先を読み込めませんでした。入力を残したまま再読み込みできます。'))
+  const referenceRequest = useRef(0)
+  const referencesBusy = useRef(false)
+  const loadReferences = async () => {
+    if (referencesBusy.current) return
+    referencesBusy.current = true
+    const request = ++referenceRequest.current
+    setReferencesLoading(true)
+    try {
+      const rows = await hqTemplatesApi.messageReferences()
+      if (!validReferences(rows)) throw new Error('Invalid references')
+      if (referenceRequest.current === request) { setReferences(rows); setReferenceError('') }
+    } catch {
+      if (referenceRequest.current === request) setReferenceError('ボタンの参照先を読み込めませんでした。入力を残したまま再読み込みできます。')
+    } finally {
+      if (referenceRequest.current === request) { referencesBusy.current = false; setReferencesLoading(false) }
+    }
+  }
   useEffect(() => {
-    let alive = true
-    void hqTemplatesApi.messageReferences()
-      .then((rows) => { if (alive) setReferences(rows) })
-      .catch(() => { if (alive) setReferenceError('ボタンの参照先を読み込めませんでした。入力を残したまま再読み込みできます。') })
-    return () => { alive = false }
+    void loadReferences()
+    return () => { referenceRequest.current++; referencesBusy.current = false }
+    // 初回だけ読み込み、終了後の応答は破棄する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   fields?.define('name', 'ひな形の名前', () => (name.trim() ? null : 'ひな形の名前を入力してください'), { required: true })
@@ -176,7 +200,8 @@ export default function MessageForm({
           {card.format === 'flex' && (
             <div className={styles.buttonsBox}>
               <span className={styles.smallLabel}>ボタン <small className={styles.optional}>最大 3 つ</small></span>
-              {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
+              {referencesLoading && <ListState kind="loading" />}
+              {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled || referencesLoading} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
                   <Field label="ボタンの文字" requirement={FIELD_REQUIREMENTS.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><SharedTextField className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
@@ -198,14 +223,14 @@ export default function MessageForm({
                       hasLiff
                       readOnly={disabled}
                       textMax={300}
-                      sources={referenceError ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
+                      sources={referenceError || referencesLoading ? {} : { form: references.filter((row) => row.kind === 'form').map((row) => ({ id: row.id, name: `${row.name}（${row.accountName}）` })) }}
                       renderBody={(kind) => kind !== 'scenario' ? undefined : (
                         /* 統括の参照先はアカウントをまたぐので、店のフォルダは読まず行を直接渡す（選ぶ窓 dJZ7Q）。 */
                         <SaveErrorField names={[`buttons.${index}.value`,"value","button.value"]}><EntityPickerField
                           label={`ボタン${index + 1}の参照先`}
                           noun={ENTITY_KINDS.scenario.noun}
                           icon={ENTITY_KINDS.scenario.icon}
-                          disabled={disabled || Boolean(referenceError)}
+                          disabled={disabled || referencesLoading || Boolean(referenceError)}
                           items={references.filter((row) => row.kind === 'scenario').map((row) => ({ id: row.id, name: row.name, meta: row.accountName, keywords: row.accountName }))}
                           value={button.value}
                           onChange={(next) => updateButton(button.id, { value: next })}
