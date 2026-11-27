@@ -127,6 +127,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const [ruleActive, setRuleActive] = useState(true)
   const [ruleProtectionMinutes, setRuleProtectionMinutes] = useState(0)
   const [saving, setSaving] = useState(false)
+  const saveLock = useRef(false)
   const [error, setError] = useState('')
   /* 保存で権限不足（403）が返ってきた。以後は押させず、理由だけ見せる（R511）。 */
   const [saveForbidden, setSaveForbidden] = useState(false)
@@ -201,6 +202,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       const res = await api.supportMarks.list(account)
       if (loadSeqRef.current !== seq) return
       if (!res.success) throw new Error(res.error)
+      if (!Array.isArray(res.data)) throw new Error('一覧の応答を確認できません')
       const rows = res.data
       loadedAccountRef.current = account
       setItems(rows)
@@ -303,11 +305,13 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   }
 
   const save = async () => {
+    if (saveLock.current) return
     if (markNameRequirement.check(name)) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     if (loadState !== 'ready' || canManageByRole !== true || saveForbidden) return
     if (loadedAccountRef.current !== selectedAccountId) return
+    saveLock.current = true
     setSaving(true)
     setError('')
     setConflict(null)
@@ -359,6 +363,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
       { if (!fieldFailure)
       setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
     } finally {
+      saveLock.current = false
       setSaving(false)
     }
   }
