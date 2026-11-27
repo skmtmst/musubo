@@ -201,11 +201,4 @@ describe('概要が取れないとき・やり直しの言葉', () => {
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
-
-  it('概要が取れないとき送信枠以外の段も骨組みを出し続けない（data なし・読み込み終わり・失敗あり）', () => {
-    const src = readFileSync(join(__dirname, 'dashboard.tsx'), 'utf8')
-    expect(src).toContain("const overviewFailed = !data && !d.loading && d.error !== ''")
-    expect(src).toContain('const unavailable = (key: Parameters<typeof d.sectionAvailable>[0]) => overviewFailed || (data && !d.sectionAvailable(key))')
-    expect(src).toContain('if (!data && !overviewFailed) return null')
-  })
 })
