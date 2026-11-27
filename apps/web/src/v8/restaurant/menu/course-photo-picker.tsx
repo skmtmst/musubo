@@ -12,6 +12,7 @@ import { PHOTO_GALLERY_PAGE_SIZE } from '@/components/shared/page-size-options'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { api } from '@/lib/api'
 import MediaUploadDialog, { type RegisteredPhoto } from '@/v8/contents/public/media-upload-dialog'
 import styles from './course-photo-picker.module.css'
@@ -41,6 +42,11 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
   const [uploadLimit, setUploadLimit] = useState<number | null>(null)
   const [folderId, setFolderId] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  const [foldersLoading, setFoldersLoading] = useState(false)
+  const [foldersError, setFoldersError] = useState('')
+  const [foldersAttempt, setFoldersAttempt] = useState(0)
+  const foldersLoadingRef = useRef(false)
+  const foldersSeqRef = useRef(0)
   const [sort, setSort] = useState<'newest' | 'oldest'>('newest')
   const [input, setInput] = useState('')
   const [query, setQuery] = useState('')
@@ -48,7 +54,11 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
   const [version, refresh] = useState(0)
   const [results, setResults] = useState<MediaPage | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const listLoadingRef = useRef(false)
+  const listSeqRef = useRef(0)
   const [checking, setChecking] = useState(false)
+  const [checkError, setCheckError] = useState('')
   const active = useRef(true)
 
   useEffect(() => {
@@ -57,25 +67,52 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
   }, [])
 
   useEffect(() => {
-    let current = true
+    const seq = ++foldersSeqRef.current
+    foldersLoadingRef.current = true
+    setFoldersLoading(true)
+    setFoldersError('')
     void api.folders.list('media', accountId).then(response => {
-      if (current && response.success) setFolders(response.data)
-    }).catch(() => { /* フォルダ未分類の登録と一覧の写真選択は続けられる。 */ })
-    return () => { current = false }
-  }, [accountId])
+      if (seq !== foldersSeqRef.current) return
+      foldersLoadingRef.current = false
+      setFoldersLoading(false)
+      if (!response.success) {
+        setFoldersError('フォルダ一覧を読み込めませんでした。写真の選択は続けられます。')
+        return
+      }
+      setFolders(response.data)
+    }).catch((error: unknown) => {
+      if (seq !== foldersSeqRef.current) return
+      foldersLoadingRef.current = false
+      setFoldersLoading(false)
+      setFoldersError(describeApiFailure(error, 'フォルダ一覧の読み込み'))
+    })
+    return () => {
+      foldersSeqRef.current += 1
+      foldersLoadingRef.current = false
+    }
+  }, [accountId, foldersAttempt])
+
+  const retryFolders = () => {
+    if (foldersLoadingRef.current) return
+    setFoldersAttempt(value => value + 1)
+  }
 
   useEffect(() => {
     if (uploadLimit !== null) return
-    let current = true
+    const seq = ++listSeqRef.current
+    listLoadingRef.current = true
     setResults(null)
     setLoadFailed(false)
+    setLoadError('')
     void api.media.list(accountId, {
       kind: 'image', folderId: folderId || undefined, query: query || undefined,
       sort, limit: PHOTO_GALLERY_PAGE_SIZE, offset: (page - 1) * PHOTO_GALLERY_PAGE_SIZE,
     }).then(response => {
-      if (!current) return
+      if (seq !== listSeqRef.current) return
+      listLoadingRef.current = false
       if (!response.success) {
         setLoadFailed(true)
+        setLoadError('写真の読み込みに失敗しました。通信を確認して、もう一度読み込んでください。')
         return
       }
       const { items, total } = response.data
@@ -84,9 +121,22 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
         return
       }
       setResults({ items: items.filter(item => item.kind === 'image' && item.lineAccountId === accountId && !item.archivedAt), total })
-    }).catch(() => { if (current) setLoadFailed(true) })
-    return () => { current = false }
+    }).catch((error: unknown) => {
+      if (seq !== listSeqRef.current) return
+      listLoadingRef.current = false
+      setLoadFailed(true)
+      setLoadError(describeApiFailure(error, '写真の読み込み'))
+    })
+    return () => {
+      listSeqRef.current += 1
+      listLoadingRef.current = false
+    }
   }, [accountId, folderId, page, query, sort, uploadLimit, version])
+
+  const retryMedia = () => {
+    if (listLoadingRef.current) return
+    refresh(value => value + 1)
+  }
 
   const available = Math.max(0, RESTAURANT_COURSE_PHOTO_LIMIT - existing.length)
   const pending = registered.filter(photo => photo.scanStatus === 'pending')
@@ -106,14 +156,24 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
   async function checkPending() {
     if (checking || pending.length === 0) return
     setChecking(true)
-    const results = await Promise.all(pending.map(async photo => {
+    setCheckError('')
+    let failedCount = 0
+    const settled = await Promise.all(pending.map(async photo => {
       try {
         const response = await api.fileScan.forMedia(photo.id, accountId)
-        return response.success && response.data.scan ? { ...photo, scanStatus: response.data.scan.status } : photo
-      } catch { return photo }
+        if (!response.success) {
+          failedCount += 1
+          return photo
+        }
+        return response.data.scan ? { ...photo, scanStatus: response.data.scan.status } : photo
+      } catch {
+        failedCount += 1
+        return photo
+      }
     }))
     if (!active.current) return
-    addRegistered(results)
+    addRegistered(settled)
+    if (failedCount > 0) setCheckError('検査状況の確認に失敗した写真があります。少し待ってから「読み直す」を押してください。')
     setChecking(false)
     refresh(current => current + 1)
   }
@@ -181,11 +241,17 @@ export default function CoursePhotoPicker({ accountId, existing, onClose, onAdd 
           <Button type="submit">検索</Button>
         </form>
       </div>
+      {foldersError ? (
+        <Notice tone="danger" action={<Button onClick={retryFolders} disabled={foldersLoading} busy={foldersLoading}>もう一度読み込む</Button>}>
+          フォルダ一覧を読み込めませんでした。写真の選択は続けられます。
+        </Notice>
+      ) : null}
       {pending.length > 0 ? <Notice tone="info" action={<Button onClick={() => void checkPending()} busy={checking}>読み直す</Button>}>
         検査中の写真が{pending.length}枚あります。確認が終わった写真を選べます。
       </Notice> : null}
+      {checkError ? <Notice tone="danger">{checkError}</Notice> : null}
       {rejected ? <Notice tone="warn">検査を通らなかった写真は使えません。別の写真を選んでください。</Notice> : null}
-      {loadFailed ? <ListState kind="error" title="写真を読み込めませんでした" onRetry={() => refresh(value => value + 1)} /> : !results ? (
+      {loadFailed ? <ListState kind="error" title="写真を読み込めませんでした" description={loadError || '通信を確認して、もう一度読み込んでください。'} onRetry={retryMedia} /> : !results ? (
         <ListState kind="loading" title="写真を読み込んでいます" />
       ) : results.items.length > 0 ? <>
         <ul className={styles.grid} aria-label="登録メディアの写真">
