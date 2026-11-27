@@ -32,15 +32,17 @@ export default function CustomerLookScreen() {
  const accountName=(selectedAccount?.id===selectedAccountId?selectedAccount?.name:accounts.find(account=>account.id===selectedAccountId)?.name)?.trim()||'店名未取得'
  const permissionReason=usePermissionLockReason(canEditRole,'manager');const canEdit=canEditRole&&!permissionReason
  const [saved,setSaved]=useState<CustomerLook | null>(null),[draft,setDraft]=useState<CustomerLook>({...DEFAULT_CUSTOMER_LOOK})
- const [version,setVersion]=useState(0),[status,setStatus]=useState<'loading'|'ready'|'error'>('loading'),[error,setError]=useState(''),[saving,setSaving]=useState(false),[retry,setRetry]=useState(0)
+ const [version,setVersion]=useState(0),[status,setStatus]=useState<'loading'|'ready'|'error'>('loading'),[error,setError]=useState(''),[loadError,setLoadError]=useState(''),[saving,setSaving]=useState(false),[retry,setRetry]=useState(0)
  const {conflict,mark:markConflict,clear:clearConflict}=useSaveConflict({contextKey:selectedAccountId??'',fetchLatest:async()=>{if(!selectedAccountId)return null;const result=await api.accountSettings.getCustomerLook(selectedAccountId);if(!result.success)throw new Error(result.error);return result.data},reload:()=>reloadLatest()})
  const saveErrors=useSaveFormErrors()
  const generation=useRef(0)
- useEffect(()=>{const request=++generation.current;setStatus('loading');setSaved(null);setError('');setSaving(false);clearConflict()
+ const loadingRef=useRef(false)
+ useEffect(()=>{const request=++generation.current;loadingRef.current=Boolean(selectedAccountId);setStatus('loading');setSaved(null);setError('');setLoadError('');setSaving(false);clearConflict()
   if(!selectedAccountId)return
-  api.accountSettings.getCustomerLook(selectedAccountId).then(result=>{if(request!==generation.current)return;if(!result.success)throw new Error(result.error);setSaved(result.data.look);setDraft(result.data.look);setVersion(result.data.version);setStatus('ready')}).catch(()=>{if(request===generation.current){setStatus('error');setError('デザインを読み込めませんでした')}})
-  return()=>{generation.current++}
+  api.accountSettings.getCustomerLook(selectedAccountId).then(result=>{if(request!==generation.current)return;loadingRef.current=false;if(!result.success)throw new Error(result.error);setSaved(result.data.look);setDraft(result.data.look);setVersion(result.data.version);setStatus('ready')}).catch((failure)=>{if(request===generation.current){loadingRef.current=false;setStatus('error');setLoadError(japaneseDetailOf(failure)||'通信を確認して、もう一度読み込んでください。')}})
+  return()=>{generation.current++;loadingRef.current=false}
  },[selectedAccountId,retry])
+ const retryLoad=()=>{if(loadingRef.current)return;setRetry(current=>current+1)}
  const dirty=!!saved && JSON.stringify(saved)!==JSON.stringify(draft)
  const guard=useUnsavedGuard({dirty,busy:saving})
  const patch=(next:Partial<CustomerLook>)=>{if(canEdit&&!saving&&!lockReason(canEditRole,'manager'))setDraft(current=>({...current,...next}))}
@@ -64,9 +66,9 @@ export default function CustomerLookScreen() {
   help={canEdit ? '予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。' : '予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインです。'}
   notice={status==='ready'&&role!==null&&!canEdit?<ReadOnlyNotice need="manager"/>:undefined}
   preview={status==='ready'?<CustomerLookPreview accountId={selectedAccountId} look={draft} accountName={accountName}/>:undefined}
-  saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
+  saveStatus={status==='ready'&&error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
   saveActions={status==='ready'&&(dirty||saving||!canEdit)?<>{dirty||saving?<Button disabled={saving||!dirty} disabledReason={saving ? '保存しています' : !dirty ? '変更していません' : undefined} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button>:null}<Button variant="primary" lockedReason={permissionReason} disabled={!canEdit||!dirty||!!conflict} disabledReason={permissionReason||role===null?undefined:conflict ? '最新のデザインを読み直してから保存してください' : !dirty ? '変更していません' : undefined} busy={saving} onClick={()=>save()}>保存する</Button></>:undefined}>
-   {!selectedAccountId?<ListState kind="empty" title="店を選んでください"/>:status==='loading'?<ListState kind="loading" title="デザインを読み込んでいます"/>:status==='error'?<ListState kind="error" title={error} action={<Button onClick={()=>setRetry(current=>current+1)}>もう一度読み込む</Button>}/>:<>
+   {!selectedAccountId?<ListState kind="empty" title="店を選んでください"/>:status==='loading'?<ListState kind="loading" title="デザインを読み込んでいます"/>:status==='error'?<ListState kind="error" title="デザインを読み込めませんでした" description={loadError || '通信を確認して、もう一度読み込んでください。'} onRetry={retryLoad}/>:<>
     <Card padding="roomy" layout="vertical" gap="normal"><SectionHeader title="デザインの型" description={canEdit ? "型を押すと、右の見本がすぐ変わります" : "予約・回答フォームなどに使われるデザインです"}/>
      <CustomerDesignPicker value={draft.preset} columns={2} readOnly={!canEdit||saving} onChange={preset=>patch({preset})}/>
      {/* 型の下に「カスタムの色と書体」の開け閉めする段を常に置く（VsZ25）。入力できるのはカスタムを選んだときだけ。 */}
