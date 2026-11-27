@@ -1487,3 +1487,4 @@
 - [共通情報の削除影響ガードとLINEアカウント登録ロジックの異常値防御（gemini132）](release-log/unreleased/PR-kenta-later-gemini132-1127.md) — 反映履歴、確認 2026-11-28。
 - [統合ユーザー詳細と共通情報編集欄の異常値・処理中ガード（gemini133）](release-log/unreleased/PR-kenta-later-gemini133-1127.md) — 反映履歴、確認 2026-11-28。
 - [自動応答プレビューと引き継ぎ再開画面の異常値・誤表示ガード（gemini134）](release-log/unreleased/PR-kenta-later-gemini134-1127.md) — 反映履歴、確認 2026-11-28。
+- [重複検出一覧と回答フォーム見た目タブの数値・状態ガード（gemini135）](release-log/unreleased/PR-kenta-later-gemini135-1127.md) — 反映履歴、確認 2026-11-28。
