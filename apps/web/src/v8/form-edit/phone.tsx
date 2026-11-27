@@ -148,7 +148,7 @@ function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; booking
         block.type === 'date' && block.dateStyle === 'ymd' ? <DateYmdField value={text} placeholder={block.placeholder} readOnly onChange={() => {}} /> :
           <FormTextControl block={block} value={text} readOnly onChange={() => {}} />
       ) : null}
-      {block.type === 'select' || block.type === 'prefecture' ? <FormSelectControl aria-label={block.label} value={text || selectedChoices[0] || (block.type === 'select' ? block.choices?.[0]?.label : '') || ''} onChange={() => {}}>
+      {block.type === 'select' || block.type === 'prefecture' ? <FormSelectControl aria-label={block.label} value={text || selectedChoices[0] || ''} onChange={() => {}}>
         <option value="">{block.type === 'prefecture' ? '都道府県を選択' : '選択してください'}</option>
         {(block.type === 'prefecture' ? PREFECTURES : (block.choices ?? []).map((c) => c.label)).map((label) => <option key={label} value={label}>{label}</option>)}
       </FormSelectControl> : null}
