@@ -2,6 +2,7 @@
 - [予約メニューの料金とルールの確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-19-1128.md)
 - [流入経路一覧の読み込み確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-20-1128.md)
 - [NEN自動配信の一覧確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-21-1128.md)
+- [サイト計測コードと計測先の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-22-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 - [ダッシュボードと予約経路の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex104-1127.md)
 
