@@ -40,11 +40,6 @@
     "reason": "複製本体の成功後だけの補助検索。候補を得られなければloadFormsの失敗表示付き再取得へ。複製は再送せず作成済みを保持。"
   },
   {
-    "filename": "src/v8/inflow-links/edit-route-dialog.tsx",
-    "fingerprint": "94084b258022c39a",
-    "reason": "現行呼出はlist.tsxのみでpoolMemberNamesを必ず渡す。自前取得の枝は現行画面では実行されない。親候補の取得拒否は追加実画面試験5条件で失敗表示を確認済み。"
-  },
-  {
     "filename": "src/v8/settings/line-notifications/screen.tsx",
     "fingerprint": "5bd0ee0cb62e144c",
     "reason": "definitionsFailedを別に保持し、取得失敗を定義なしとして新規作成しない。必要でない機能はそもそも読まない。"

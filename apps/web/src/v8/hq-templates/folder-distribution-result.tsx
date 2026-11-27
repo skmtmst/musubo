@@ -47,10 +47,10 @@ export default function FolderDistributionResult({ name, runs, accounts, folders
         </div>)}
       </div>
     </section>
-    <div className={styles.footer}>
+    <div className={`${styles.footer} ${styles.folderResultFooter}`}>
       <Button disabled={busy || unresolved} onClick={onBack}>ひな形一覧へ</Button>
       <Button disabled={busy} onClick={onRefresh}>結果を再確認</Button>
-      {failures.length ? <Button variant="primary" disabled={busy || unresolved || unsubmitted > 0} onClick={onRetry}>{`失敗した ${formatNumber(failures.length)} 件だけ再確認`}</Button> : null}
+      {failures.length ? <Button variant="primary" disabled={busy || unresolved || unsubmitted > 0} disabledReason={!busy ? unresolved ? '先に結果を再確認してください。' : unsubmitted > 0 ? '先に未配布分を再確認してください。' : undefined : undefined} onClick={onRetry}>{`失敗した ${formatNumber(failures.length)} 件だけ再確認`}</Button> : null}
       {unsubmitted > 0 ? <Button variant="primary" disabled={busy || unresolved} onClick={onRecheck}>未配布分を再確認</Button> : null}
     </div>
 

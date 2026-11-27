@@ -1417,4 +1417,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 
-- [夜の画面の直し（列車7）](release-log/unreleased/PR-kenta-train-night7-1127.md) — 反映履歴、確認 2026-11-27。
+- [夜の画面の直し（列車8）](release-log/unreleased/PR-kenta-train-night8-1127.md) — 反映履歴、確認 2026-11-27。

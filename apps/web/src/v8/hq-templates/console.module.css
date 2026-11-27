@@ -138,6 +138,7 @@
   position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: center; align-items: center; gap: var(--tpl-htn-gap-s);
   padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top);
 }
+.folderResultFooter { flex-wrap: wrap; }
 
 /* 配った結果の窓：名前 200・文・札。行は下に線、上下 8。窓の下の帯は薄い地。 */
 .resultSummary { margin: var(--tpl-htn-result-summary-pull) 0 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }

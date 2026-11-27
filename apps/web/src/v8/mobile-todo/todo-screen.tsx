@@ -45,7 +45,16 @@ function MobileTodoBody() {
   const canSeeTalk = shell.canView('/chats')
   const [talks, setTalks] = useState<Loaded<ChatListItem> | null>(null)
   const [notices, setNotices] = useState<Loaded<NotificationCenterItem> | null>(null)
+  const [, setClockTick] = useState(0)
+  const now = Date.now()
   const generation = useRef(0)
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') setClockTick((value) => value + 1) }
+    const interval = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', refresh) }
+  }, [])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -125,7 +134,7 @@ function MobileTodoBody() {
                   <span className={styles.notice}>
                     <span className={styles.noticeHead}>
                       <StatusBadge tone="danger" size="compact">エラー</StatusBadge>
-                      <time className={styles.time} title={formatListRecentTitle(item.createdAt) || undefined}>{formatListRecent(item.createdAt)}</time>
+                      <time className={styles.time} title={formatListRecentTitle(item.createdAt, { now }) || undefined}>{formatListRecent(item.createdAt, { now })}</time>
                     </span>
                     <span className={styles.noticeTitle} title={item.title}>{item.title}</span>
                     {item.body ? <span className={styles.noticeBody}>{item.body}</span> : null}

@@ -65,9 +65,11 @@
 }
 .addRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-toolbar-gap);
 }
+.questionToggle { flex: 0 0 auto; }
 .checks {
   display: flex;
   flex-direction: column;

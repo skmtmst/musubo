@@ -101,6 +101,19 @@ describe('電話の画面の対応', () => {
 
   const show = async () => { await act(async () => root.render(<MobileShell><MobileTodoScreen /></MobileShell>)) }
 
+  it('お知らせの相対時刻は開いたまま1分ごとに進む', async () => {
+    let refresh: (() => void) | undefined
+    vi.spyOn(window, 'setInterval').mockImplementation(((callback: TimerHandler, delay?: number) => { if (delay === 60_000) refresh = callback as () => void; return 1 }) as typeof window.setInterval)
+    const now = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-26T01:00:30.000Z'))
+    await show()
+    await eventually(() => expect(host.textContent).toContain('配信が止まりました'))
+    const time = host.querySelector('a[aria-label="配信が止まりました（PC の画面で開く）"] time')!
+    expect(time.textContent).toBe('たった今')
+    now.mockReturnValue(Date.parse('2026-10-26T01:01:30.000Z'))
+    await act(async () => { refresh?.() })
+    expect(time.textContent).toBe('1分前')
+  })
+
   it('返事を待っているトークと、まだ読んでいないエラーだけをカードで出す', async () => {
     await show()
     await eventually(() => expect(host.querySelector('a[href="/m/chats?friend=friend-a"]')).not.toBeNull())
