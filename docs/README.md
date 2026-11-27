@@ -1439,3 +1439,4 @@
 - [友だち詳細のフォーム回答表示を直した反映履歴](release-log/unreleased/PR-kenta-later-codex49.md) — 反映履歴、確認 2026-11-27。
 - [受信箱の画像添付を直した反映履歴](release-log/unreleased/PR-kenta-later-codex50.md) — 反映履歴、確認 2026-11-27。
 - [PC 受信箱の画像読み込み中の送信を直した反映履歴](release-log/unreleased/PR-kenta-inbox-pc-image-send.md) — 反映履歴、確認 2026-11-27。
+- [保存した検索と共通情報の読み込みを直した反映履歴](release-log/unreleased/PR-kenta-later-codex51.md) — 反映履歴、確認 2026-11-27。
