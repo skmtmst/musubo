@@ -1,4 +1,5 @@
 'use client'
+import { notifySaved } from '@/components/shared/toast'
 
 import { useEffect, useRef, useState } from 'react'
 import { CalendarDays, IdCard, Ticket } from 'lucide-react'
@@ -191,6 +192,10 @@ export function ReminderBasicsFormV8({
   latestOnChange.current = onChange
 
   // DEEP-05: 応答が届いた時点でアカウントが変わっていたら、その応答は捨てる。
+  const folderScope = useRef({ accountId: selectedAccountId, generation: 0, mounted: true })
+  if (folderScope.current.accountId !== selectedAccountId) folderScope.current = { ...folderScope.current, accountId: selectedAccountId, generation: folderScope.current.generation + 1 }
+  const folderGeneration = folderScope.current.generation
+  useEffect(() => { folderScope.current.mounted = true; return () => { folderScope.current.mounted = false } }, [])
   const accountRef = useRef(selectedAccountId)
 
   useEffect(() => {
@@ -281,6 +286,7 @@ export function ReminderBasicsFormV8({
             <Field label="フォルダ">
             <div className={styles.testRow}>
               <SaveErrorField names={["folderId","value.folderId","folder_id","value.folder_id"]}><FolderSelect
+                key={selectedAccountId ?? 'no-account'}
                 value={value.folderId}
                 onChange={(next) => patch({ folderId: next })}
                 disabled={foldersLoadState !== 'ready'}
@@ -290,7 +296,7 @@ export function ReminderBasicsFormV8({
                 folders={folders.map(folderById)}
                 // 一覧の左の列の「フォルダを追加」と同じ口（リマインダのフォルダは共有）。
                 onCreate={canCreateFolder
-                  ? folderCreator((name, color) => api.folders.create({ kind: 'reminder', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
+                  ? folderCreator(async (name, color) => { const result = await api.folders.create({ kind: 'reminder', name, color, accountId: selectedAccountId }); if (!folderScope.current.mounted || folderScope.current.generation !== folderGeneration) throw new Error('アカウントが切り替わりました。'); return result }, folderById, (created) => { setFolders((current) => [...current, created]); notifySaved('リマインダのフォルダを作りました。') })
                   : undefined}
               /></SaveErrorField>
               {foldersLoadState === 'error' ? (

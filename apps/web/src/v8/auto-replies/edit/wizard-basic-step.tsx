@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef } from 'react';
+import { notifySaved } from '@/components/shared/toast';
 import Button from '@/components/shared/button';
 import Card,{ CardHeader } from '@/components/shared/card';
 import FolderSelect,{ folderById,folderCreator } from '@/components/shared/folder-select';
@@ -31,6 +33,10 @@ type WizardBasicStepContext = {
 }
 
 export function WizardBasicStep({ accountId, canManage, disabled = false, lockedReason, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
+  const scope = useRef({ accountId, generation: 0, mounted: true })
+  if (scope.current.accountId !== accountId) scope.current = { ...scope.current, accountId, generation: scope.current.generation + 1 }
+  const generation = scope.current.generation
+  useEffect(() => { scope.current.mounted = true; return () => { scope.current.mounted = false } }, [])
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
@@ -42,6 +48,7 @@ export function WizardBasicStep({ accountId, canManage, disabled = false, locked
                       placeholder="例：予約の日程変更"
                     /></SaveErrorField></Field></div>
                   <div className={styles.field}><Field label="フォルダ" htmlFor="wiz-folder"><SaveErrorField names={["folderId","form.folderId","folder_id","form.folder_id"]}><FolderSelect
+                      key={accountId ?? 'no-account'}
                       id="wiz-folder"
                       aria-label="フォルダ"
                       size="full"
@@ -52,7 +59,7 @@ export function WizardBasicStep({ accountId, canManage, disabled = false, locked
                       folders={folders.map(folderById)}
                       // 一覧の左の列の「フォルダを追加」と同じ口（自動応答と同じアカウントのフォルダ）。
                       onCreate={canManage && !disabled && folderState === 'ready'
-                        ? folderCreator((name, color) => { if (!canEditWizardNow()) return Promise.reject(new Error('権限のためフォルダを作れません。')); return api.folders.create({ kind: 'auto_reply', name, color, accountId }) }, folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
+                        ? folderCreator(async (name, color) => { if (!canEditWizardNow()) throw new Error('権限のためフォルダを作れません。'); const result = await api.folders.create({ kind: 'auto_reply', name, color, accountId }); if (!scope.current.mounted || scope.current.generation !== generation) throw new Error('アカウントが切り替わりました。'); return result }, folderById, (created) => { setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]); notifySaved('自動応答のフォルダを作りました。') })
                         : undefined}
                     /></SaveErrorField></Field></div>
                 </SettingsFormRow>

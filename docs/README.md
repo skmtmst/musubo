@@ -1,4 +1,1405 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
-- [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
+# 文書の入口
+
+目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
+
+各文章の頭は用途・正本か説明か・最後に確かめた日を示します。今回の確認日は役割・入口・ローカル参照を確かめた日で、稼働環境の設定や全事実を再検証した日ではありません。保護された文書と反映履歴は既存の本文・日付を保ちます。画像・データ・実行時の基準表は内容を壊さず、この入口と棚卸し一覧に役割・確認日を載せます。
+
+新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
+
+- [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
+- [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
+- [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)
+- [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
+- [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
+- [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
+- [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
+- [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
+
+- [内部の説明の整理の反映履歴](release-log/unreleased/164-kenta-q04-comments.md)
+- [各種設定の内部説明の整理の反映履歴](release-log/unreleased/166-kenta-q04-comments2.md)
+- [最初に読む：製品とコードの入口](START-HERE.md)
+- [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
+- [更新時のマイグレーション履歴と復旧](update-migration-history.md)
+
+
+## 使う人の手引き
+
+- [LINE Harness](../README.en.md)
+- [LINE Harness](../README.es.md)
+- [LINE Harness](../README.ko.md)
+- [LINE Harness](../README.md)
+- [LINE Harness](../README.zh-CN.md)
+- [setup-placeholder.svg](../apps/docs/public/manual/setup-placeholder.svg) — 図・手引きの資料、確認 2026-10-19
+- [page.mdx](../apps/docs/src/app/manual/line-account-setup/page.mdx)
+- [m1-dev-id.webp](../apps/web/public/manuals/line-connect/images/m1-dev-id.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-dev-secret.webp](../apps/web/public/manuals/line-connect/images/m1-dev-secret.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-confirm.webp](../apps/web/public/manuals/line-connect/images/m1-oam-confirm.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-inuse.webp](../apps/web/public/manuals/line-connect/images/m1-oam-inuse.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-messaging-api.webp](../apps/web/public/manuals/line-connect/images/m1-oam-messaging-api.webp) — 図・手引きの資料、確認 2026-10-19
+- [m1-oam-privacy.webp](../apps/web/public/manuals/line-connect/images/m1-oam-privacy.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-provider.webp](../apps/web/public/manuals/line-connect/images/m1-oam-provider.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-unused.webp](../apps/web/public/manuals/line-connect/images/m1-oam-unused.webp) — 図・手引きの資料、確認 2026-10-29
+- [m2-create-1.webp](../apps/web/public/manuals/line-connect/images/m2-create-1.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-2.webp](../apps/web/public/manuals/line-connect/images/m2-create-2.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-3.webp](../apps/web/public/manuals/line-connect/images/m2-create-3.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-4.webp](../apps/web/public/manuals/line-connect/images/m2-create-4.webp) — 図・手引きの資料、確認 2026-10-29
+- [m2-create-5.webp](../apps/web/public/manuals/line-connect/images/m2-create-5.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-home.webp](../apps/web/public/manuals/line-connect/images/m2-home.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-login-id.webp](../apps/web/public/manuals/line-connect/images/m2-login-id.webp) — 図・手引きの資料、確認 2026-10-29
+- [m2-login-secret.webp](../apps/web/public/manuals/line-connect/images/m2-login-secret.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-provider-id-musubo.webp](../apps/web/public/manuals/line-connect/images/m2-provider-id-musubo.webp) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
+- [m2-provider.webp](../apps/web/public/manuals/line-connect/images/m2-provider.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-publish.webp](../apps/web/public/manuals/line-connect/images/m2-publish.webp) — 図・手引きの資料、確認 2026-10-19
+- [m3-callback-1.webp](../apps/web/public/manuals/line-connect/images/m3-callback-1.webp) — 図・手引きの資料、確認 2026-10-19
+- [m3-callback-2.webp](../apps/web/public/manuals/line-connect/images/m3-callback-2.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-dev-response.webp](../apps/web/public/manuals/line-connect/images/m3-dev-response.webp) — 図・手引きの資料、確認 2026-10-19
+- [m3-linked-edit.webp](../apps/web/public/manuals/line-connect/images/m3-linked-edit.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-linked-oa.webp](../apps/web/public/manuals/line-connect/images/m3-linked-oa.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-login-tab.webp](../apps/web/public/manuals/line-connect/images/m3-login-tab.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-oam-response.webp](../apps/web/public/manuals/line-connect/images/m3-oam-response.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-webhook-configured-musubo.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-configured-musubo.webp) — Webhook設定後の確認画面、確認 2026-10-29
+- [m3-musubo-webhook.webp](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.webp) — musuboのWebhook設定画面、確認 2026-10-29
+- [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
+- [LINEアカウント登録（V6 33-2）](line-account-register.md)
+- [Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）](manuals/google-business-feature-matrix.md)
+- [Googleビジネスプロフィール API 審査パッケージ（撮影チェックリスト・公開URL・想定質問）](manuals/google-business-review-package.md)
+- [申請書類：Googleビジネス連携（機密スコープ business.manage）の審査申請](manuals/google-business-verification-application.md)
+- [m1-dev-id.jpg](manuals/line-connect/images/m1-dev-id.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-dev-secret.jpg](manuals/line-connect/images/m1-dev-secret.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-confirm.jpg](manuals/line-connect/images/m1-oam-confirm.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-inuse.jpg](manuals/line-connect/images/m1-oam-inuse.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-messaging-api.jpg](manuals/line-connect/images/m1-oam-messaging-api.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m1-oam-privacy.jpg](manuals/line-connect/images/m1-oam-privacy.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-provider.jpg](manuals/line-connect/images/m1-oam-provider.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-unused.jpg](manuals/line-connect/images/m1-oam-unused.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m2-create-1.jpg](manuals/line-connect/images/m2-create-1.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-2.jpg](manuals/line-connect/images/m2-create-2.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-3.jpg](manuals/line-connect/images/m2-create-3.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-4.jpg](manuals/line-connect/images/m2-create-4.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m2-create-5.jpg](manuals/line-connect/images/m2-create-5.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-home.jpg](manuals/line-connect/images/m2-home.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-login-id.jpg](manuals/line-connect/images/m2-login-id.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m2-login-secret.jpg](manuals/line-connect/images/m2-login-secret.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-provider-id-musubo.jpg](manuals/line-connect/images/m2-provider-id-musubo.jpg) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
+- [m2-provider.jpg](manuals/line-connect/images/m2-provider.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-publish.jpg](manuals/line-connect/images/m2-publish.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m3-callback-1.jpg](manuals/line-connect/images/m3-callback-1.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m3-callback-2.jpg](manuals/line-connect/images/m3-callback-2.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-dev-response.jpg](manuals/line-connect/images/m3-dev-response.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m3-linked-edit.jpg](manuals/line-connect/images/m3-linked-edit.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-linked-oa.jpg](manuals/line-connect/images/m3-linked-oa.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-login-tab.jpg](manuals/line-connect/images/m3-login-tab.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-oam-response.jpg](manuals/line-connect/images/m3-oam-response.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-webhook-configured-musubo.jpg](manuals/line-connect/images/m3-webhook-configured-musubo.jpg) — Webhook設定後の確認画面、確認 2026-10-29
+- [m3-musubo-webhook.webp](manuals/line-connect/images/m3-musubo-webhook.webp) — musuboのWebhook設定画面、確認 2026-10-29
+- [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
+
+## 要件
+
+- [V6 要件定義](v6-requirements/README.md)
+- [用語表（画面に出る言葉の決めごと）](v6-requirements/v6-00-glossary.md)
+- [V6 1 ダッシュボード 要件定義（実装照合版・下書き）](v6-requirements/v6-01-dashboard-requirements-draft.md)
+- [V6 受信箱 担当者ごとの未読数 引き継ぎ](v6-requirements/v6-02-inbox-assignee-unread-handoff.md)
+- [V6 2 受信箱 要件定義（実装照合版・下書き）](v6-requirements/v6-02-inbox-requirements-draft.md)
+- [V6 3 友だち 要件定義（実装照合版・下書き）](v6-requirements/v6-03-friends-requirements-draft.md)
+- [V6 4 友だち属性 要件定義（実装照合版・下書き）](v6-requirements/v6-04-friend-attributes-requirements-draft.md)
+- [V6 5 シナリオ配信 要件定義（実装照合版・下書き）](v6-requirements/v6-05-scenario-delivery-requirements-draft.md)
+- [V6 6 一斉配信 要件定義（実装照合版・下書き）](v6-requirements/v6-06-broadcast-requirements-draft.md)
+- [V6 7 リマインダ 要件定義（実装照合版・下書き）](v6-requirements/v6-07-reminder-requirements-draft.md)
+- [V6 8 自動応答 要件定義（実装照合版・下書き）](v6-requirements/v6-08-auto-reply-requirements-draft.md)
+- [V6 9 友だち追加時の配信 要件定義（実装照合版・下書き）](v6-requirements/v6-09-friend-add-delivery-requirements-draft.md)
+- [V6 10 ウェビナー 要件定義（実装照合版・下書き）](v6-requirements/v6-10-webinar-requirements-draft.md)
+- [V6 テンプレート本文上限 契約引き継ぎ](v6-requirements/v6-11-template-message-length-handoff.md)
+- [V6 11 テンプレート 要件定義（実装照合版・下書き）](v6-requirements/v6-11-template-requirements-draft.md)
+- [V6 12 リッチメニュー 要件定義（実装照合版・下書き）](v6-requirements/v6-12-rich-menu-requirements-draft.md)
+- [V6 13 回答フォーム 要件定義（実装照合版・下書き）](v6-requirements/v6-13-response-form-requirements-draft.md)
+- [V6 14 共通情報 要件定義（実装照合版・下書き）](v6-requirements/v6-14-common-information-requirements-draft.md)
+- [V6 15 登録メディア 要件定義（実装照合版・下書き）](v6-requirements/v6-15-media-library-requirements-draft.md)
+- [V6 16 成果・アフィリエイト 要件定義（実装照合版・下書き）](v6-requirements/v6-16-affiliate-requirements-draft.md)
+- [V6 17 マイレージ・行動スコア 要件定義（実装照合版・下書き）](v6-requirements/v6-17-mileage-score-requirements-draft.md)
+- [V6 18 流入と計測 要件定義（実装照合版・下書き）](v6-requirements/v6-18-inflow-measurement-requirements-draft.md)
+- [V6 19 コンバージョン 要件定義（実装照合版・下書き）](v6-requirements/v6-19-conversion-requirements-draft.md)
+- [V6 20 分析 要件定義（実装照合版・下書き）](v6-requirements/v6-20-analytics-requirements-draft.md)
+- [V6 21 NEN配信 要件定義（実装照合版・下書き）](v6-requirements/v6-21-nen-delivery-requirements-draft.md)
+- [V6 22 写真審査 要件定義（実装照合版・下書き）](v6-requirements/v6-22-photo-review-requirements-draft.md)
+- [V6 23 EC連携 要件定義（実装照合版・下書き）](v6-requirements/v6-23-ec-integration-requirements-draft.md)
+- [V6 24 LINE通知 要件定義（実装照合版・下書き）](v6-requirements/v6-24-line-notification-requirements-draft.md)
+- [V6 25 オートメーション・共通アクション接続契約（カタログ正本）](v6-requirements/v6-25-automation-action-contract.md)
+- [V6 25 オートメーション 要件定義（実装照合版・下書き）](v6-requirements/v6-25-automation-requirements-draft.md)
+- [V6 25 オートメーション・きっかけ接続契約](v6-requirements/v6-25-automation-trigger-contract.md)
+- [V6 26 外部連携 要件定義（実装照合版・下書き）](v6-requirements/v6-26-external-integrations-requirements-draft.md)
+- [V6 27 予約管理 要件定義（実装照合版・下書き）](v6-requirements/v6-27-booking-management-requirements-draft.md)
+- [V6 28 予約設定 要件定義（実装照合版・下書き）](v6-requirements/v6-28-booking-settings-requirements-draft.md)
+- [V6 29 イベント予約 要件定義（実装照合版・下書き）](v6-requirements/v6-29-event-booking-requirements-draft.md)
+- [V6 30 ログインユーザー 要件定義（実装照合版・下書き）](v6-requirements/v6-30-login-users-requirements-draft.md)
+- [V6 31 機能設定 要件定義（実装照合版・下書き）](v6-requirements/v6-31-feature-settings-requirements-draft.md)
+- [V6 全32機能 横断整合レビュー](v6-requirements/v6-32-feature-cross-review.md)
+- [V6 32 運用状態 要件定義（実装照合版・下書き）](v6-requirements/v6-32-operations-status-requirements-draft.md)
+- [V6 33 LINE公式アカウント設定 要件定義（実装照合版・下書き）](v6-requirements/v6-33-account-settings-requirements-draft.md)
+- [V6 34 はじめの設定と案内 要件定義（実装照合版・下書き）](v6-requirements/v6-34-onboarding-guidance-requirements-draft.md)
+- [V6 データ移行・API・受け入れテスト計画](v6-requirements/v6-data-api-migration-acceptance-plan.md)
+- [V6 全34機能 要件定義 正本索引](v6-requirements/v6-requirements-master-index.md)
+- [V6 共通基盤 要件定義](v6-requirements/v6-shared-platform-requirements.md)
+- [V7 追加要件（流れ図・受信箱のキー操作・写真の連続審査・処理の進み）](v6-requirements/v7-additions-requirements.md)
+- [未実装機能の確定（2026-09-25）](v6-requirements/v7-unbuilt-features-confirmed.md)
+- [V8 で足した決まり（要件）の索引](v8-requirements/README.md)
+- [B-244〜B-247 適用の点検表（2026-10-12）](v8-requirements/b244-rollout-audit.md)
+- [01 ダッシュボード 操作と挙動（受け入れ）](v8-requirements/behavior/01-dashboard.md)
+- [02 受信箱 操作と挙動（受け入れ）](v8-requirements/behavior/02-inbox.md)
+- [03 友だち 操作と挙動（受け入れ）](v8-requirements/behavior/03-friends.md)
+- [04 友だちの属性 操作と挙動（受け入れ）](v8-requirements/behavior/04-friend-attributes.md)
+- [05 シナリオ配信 操作と挙動（受け入れ）](v8-requirements/behavior/05-scenario-delivery.md)
+- [06 一斉配信 操作と挙動（受け入れ）](v8-requirements/behavior/06-broadcast.md)
+- [07 リマインダ 操作と挙動（受け入れ）](v8-requirements/behavior/07-reminder.md)
+- [08 自動応答 操作と挙動（受け入れ）](v8-requirements/behavior/08-auto-reply.md)
+- [09 友だち追加時の配信 操作と挙動（受け入れ）](v8-requirements/behavior/09-friend-add-delivery.md)
+- [10 ウェビナー 操作と挙動（受け入れ）](v8-requirements/behavior/10-webinar.md)
+- [11 テンプレート 操作と挙動（受け入れ）](v8-requirements/behavior/11-template.md)
+- [12 リッチメニュー 操作と挙動（受け入れ）](v8-requirements/behavior/12-rich-menu.md)
+- [13 回答フォーム 操作と挙動（受け入れ）](v8-requirements/behavior/13-response-form.md)
+- [14 共通情報 操作と挙動（受け入れ）](v8-requirements/behavior/14-common-information.md)
+- [15 登録メディア 操作と挙動（受け入れ）](v8-requirements/behavior/15-media-library.md)
+- [16 アフィリエイト 操作と挙動（受け入れ）](v8-requirements/behavior/16-affiliate.md)
+- [17 マイル・行動スコア 操作と挙動（受け入れ）](v8-requirements/behavior/17-mileage-score.md)
+- [18 流入と計測 操作と挙動（受け入れ）](v8-requirements/behavior/18-inflow-measurement.md)
+- [19 コンバージョン（成果地点） 操作と挙動（受け入れ）](v8-requirements/behavior/19-conversion.md)
+- [20 分析 操作と挙動（受け入れ）](v8-requirements/behavior/20-analytics.md)
+- [21 NEN配信 操作と挙動（受け入れ）](v8-requirements/behavior/21-nen-delivery.md)
+- [22 写真の投稿・審査 操作と挙動（受け入れ）](v8-requirements/behavior/22-photo-review.md)
+- [23 EC連携 操作と挙動（受け入れ）](v8-requirements/behavior/23-ec-integration.md)
+- [24 LINE通知 操作と挙動（受け入れ）](v8-requirements/behavior/24-line-notification.md)
+- [25 オートメーション 操作と挙動（受け入れ）](v8-requirements/behavior/25-automation.md)
+- [26 外部連携 操作と挙動（受け入れ）](v8-requirements/behavior/26-external-integrations.md)
+- [27 予約管理 操作と挙動（受け入れ）](v8-requirements/behavior/27-booking-management.md)
+- [28 予約設定 操作と挙動（受け入れ）](v8-requirements/behavior/28-booking-settings.md)
+- [29 イベント予約 操作と挙動（受け入れ）](v8-requirements/behavior/29-event-booking.md)
+- [30 ログイン・ユーザー 操作と挙動（受け入れ）](v8-requirements/behavior/30-login-users.md)
+- [31 機能設定 操作と挙動（受け入れ）](v8-requirements/behavior/31-feature-settings.md)
+- [32 運用状態 操作と挙動（受け入れ）](v8-requirements/behavior/32-operations-status.md)
+- [33 LINE 公式アカウント設定 操作と挙動（受け入れ）](v8-requirements/behavior/33-account-settings.md)
+- [34 はじめの設定と案内 操作と挙動（受け入れ）](v8-requirements/behavior/34-onboarding-guidance.md)
+- [お客さまの画面のデザイン 操作と挙動（受け入れ）](v8-requirements/behavior/customer-look.md)
+- [業種ごとの毎日・毎週の操作の流れ（全体）](v8-requirements/behavior/daily-operations.md)
+- [回答フォームの書類の添付 操作と挙動（受け入れ）](v8-requirements/behavior/form-file-attachments.md)
+- [友だちの決まった欄と表示項目 操作と挙動（受け入れ）](v8-requirements/behavior/friend-fixed-fields.md)
+- [外のサービスごとの起きうる失敗と復旧（全機能の横断）](v8-requirements/behavior/integration-failures.md)
+- [飲食（融合1〜4：予約盤・来店と退店・前日の返事・席予約と紹介） 操作と挙動（受け入れ）](v8-requirements/behavior/restaurant-fusion.md)
+- [② スタイル切り替えとお金まわり 操作と挙動（受け入れ）](v8-requirements/behavior/style-and-money.md)
+- [予約の追加（前回と同じ・キャンセル待ち・今日・売上・無断・写真・F-24・F-25） 操作と挙動（受け入れ）](v8-requirements/behavior/v8-booking-additions.md)
+- [機能追加 F-1〜F-25 操作と挙動（受け入れ）](v8-requirements/behavior/v8-feature-additions.md)
+- [お客さまの画面（LIFF） 操作と挙動（受け入れ）](v8-requirements/behavior/v8-liff.md)
+- [整理の段2：決定と共通契約](v8-requirements/cleanup-stage2-contract.md)
+- [お客さまの画面のデザイン](v8-requirements/customer-look.md)
+- [回答フォームの書類の添付の決まり（B-176・B-213・B-374）](v8-requirements/form-file-attachments.md)
+- [友だちの決まった欄と表示項目](v8-requirements/friend-fixed-fields.md)
+- [B1 キャンセル料（カード登録→店が請求）とデポジット（一部前払い）](v8-requirements/gap-features/B1-cancel-fee-deposit.md)
+- [B2 回数券・月謝（サブスク）と予約の連動](v8-requirements/gap-features/B2-tickets-monthly.md)
+- [B3 欠席の振替（教室・レッスン）](v8-requirements/gap-features/B3-makeup-lesson.md)
+- [B4 繰り返し予約（毎週・隔週・毎月）](v8-requirements/gap-features/B4-recurring-booking.md)
+- [B5 同伴・複数人・複数メニューを 1 回で予約](v8-requirements/gap-features/B5-party-multi-menu.md)
+- [B6 回答で予約先を振り分けるフォーム](v8-requirements/gap-features/B6-routing-form.md)
+- [B7 外部カレンダーの同期（Google・Outlook）と Web 会議の URL（手で入れる／Meet・Zoom・Teams で自動発行）](v8-requirements/gap-features/B7-online-meeting-calendar.md)
+- [B8 Google で予約（Google マップ・検索から予約）](v8-requirements/gap-features/B8-reserve-with-google.md)
+- [B9 タグで出し分ける予約メニューと指名料](v8-requirements/gap-features/B9-tag-menu-nomination-fee.md)
+- [G1 配信の A/B テスト（勝った方を残りへ自動で送る）](v8-requirements/gap-features/G1-ab-test.md)
+- [G2 AI の要約・返信案 → 登録 Q&A の自動応答](v8-requirements/gap-features/G2-ai-reply-and-qa.md)
+- [G3 受信箱の自動割り当てと返事の期限](v8-requirements/gap-features/G3-inbox-routing-sla.md)
+- [G4 運用者のスマホ（PWA）とプッシュ通知](v8-requirements/gap-features/G4-operator-pwa-push.md)
+- [G5 RFM（お客さまの分け方）と会員ランク](v8-requirements/gap-features/G5-rfm-member-rank.md)
+- [G6 カゴ落ち・閲覧落ち・再入荷の自動 LINE](v8-requirements/gap-features/G6-ec-auto-line.md)
+- [G7 統括（本部）の店の比較](v8-requirements/gap-features/G7-hq-store-compare.md)
+- [G8 送り手（送信者の名前・アイコン）の切り替え](v8-requirements/gap-features/G8-sender-switch.md)
+- [G9 AI とつなぐ（MCP）](v8-requirements/gap-features/G9-mcp-connect.md)
+- [H1 統括のひな形：予約メニューとマイルの景品（板 YYWAs）](v8-requirements/gap-features/H1-hq-booking-menu-reward-templates.md)
+- [③-2 ライバルに対抗する機能：要件と「操作と挙動」の一覧（B-340）](v8-requirements/gap-features/README.md)
+- [U1 送信の取り消しと「送る前の確かめ」（板 lKmZK ほか 6 か所）](v8-requirements/gap-features/U1-unsend-and-send-confirm.md)
+- [Googleビジネス・Instagram 複数連携の要件（2026-11-16 決定）](v8-requirements/multi-sns-connections.md)
+- [Googleビジネス・Instagram 複数連携：3つの口の契約（契約枠・主連携・請求）](v8-requirements/multi-sns-connections-ports.md)
+- [動きのばらつき（2026-10-09・オーナー「同じ動きにした方がいいのに動きがバラバラのもの」）](v8-requirements/owner-decisions/BEHAVIOR-AUDIT-1009.md)
+- [行き先と触り方のばらつき（2026-10-09・オーナー「遷移先などはできる限りデザインや触り方は統一」）](v8-requirements/owner-decisions/DESTINATION-AUDIT-1009.md)
+- [一覧の骨格の点検（AH・2026-10-09）](v8-requirements/owner-decisions/LIST-SKELETON-AUDIT-1009.md)
+- [型の違いの洗い出し（2026-10-09・オーナー「共通部品なのに違うところは共通として」「フォルダの違いなど」）](v8-requirements/owner-decisions/PATTERN-AUDIT-1009.md)
+- [細かい仕上げの決まり 1〜10（2026-10-09 オーナー「全て採用」B-152）](v8-requirements/owner-decisions/POLISH-RULES-1009.md)
+- [オーナーの決定の控え](v8-requirements/owner-decisions/README.md)
+- [決まりと絵の食い違いの点検（2026-10-09 夜・読むだけの点検）](v8-requirements/owner-decisions/RULES-CONSISTENCY-1009.md)
+- [決まりの無いずれ（2026-10-09・オーナー「決まりが決まっていなくてずれていないところはもうないか」）](v8-requirements/owner-decisions/UNRULED-AUDIT-1009.md)
+- [言葉の決まり（2026-10-09 オーナー決定・B-146）](v8-requirements/owner-decisions/WORDING-RULES-1009.md)
+- [V8 を本番に入れるときの確認表（オーナー確認用）](v8-requirements/owner-decisions/decision-log.md)
+- [飲食の融合1・共通の予約盤の契約](v8-requirements/restaurant-fusion-contract.md)
+- [飲食の融合2：来店・退店・共通のできごと・来店スタンプ・待ち](v8-requirements/restaurant-fusion2-contract.md)
+- [飲食3：予約起点の共通フォローと前日の返事](v8-requirements/restaurant-fusion3-contract.md)
+- [飲食4：LIFF席予約・フォーム・系列店の紹介](v8-requirements/restaurant-fusion4-contract.md)
+- [6つのスタイルの接続と残る確認](v8-requirements/styles-gaps.md)
+- [6つのスタイルの要件](v8-requirements/styles.md)
+- [言葉の表（正本）](v8-requirements/terms.md)
+- [予約の追加の決まり](v8-requirements/v8-booking-additions.md)
+- [機能追加 F-1〜F-25 の決まり](v8-requirements/v8-feature-additions.md)
+- [お客さまの画面（LIFF）の決まり](v8-requirements/v8-liff.md)
+- [本番を V8 にする手順書](v8-requirements/v8-switch.md)
+
+## 設計と決まり
+
+- [Project Instructions](../AGENTS.md)
+- [飲食店の席の予約（E-11・お客さまの LIFF）](../apps/liff/src/pages/seat/BEHAVIOR.md)
+- [design-impact-baseline.txt](../apps/web/design/design-impact-baseline.txt)
+- [統括のひな形](../apps/web/src/app/hq/templates/README.md)
+- [Webの通信](../apps/web/src/lib/api/README.md)
+- [V8 の画面（一から書く場所）](../apps/web/src/v8/README.md)
+- [LINEアカウントを登録の動き（BEHAVIOR.md）](../apps/web/src/v8/account-new/BEHAVIOR.md)
+- [LINEアカウントの詳細・乗り換え（V8）の動き](../apps/web/src/v8/accounts-detail/BEHAVIOR.md)
+- [案件を作るの動き（BEHAVIOR.md）](../apps/web/src/v8/affiliate-offer-new/BEHAVIOR.md)
+- [成果とアフィリエイト（V8）の動き](../apps/web/src/v8/affiliates/BEHAVIOR.md)
+- [分析（V8）の動き](../apps/web/src/v8/analytics/BEHAVIOR.md)
+- [自動応答一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/auto-replies/BEHAVIOR.md)
+- [オートメーション（V8）の動き（BEHAVIOR.md）](../apps/web/src/v8/automations/BEHAVIOR.md)
+- [オートメーション ルールを作る（V8）の動き](../apps/web/src/v8/automations/create/BEHAVIOR.md)
+- [予約設定（V8）の動き](../apps/web/src/v8/booking-menus/BEHAVIOR.md)
+- [予約スタッフの画面の動き（BEHAVIOR.md）](../apps/web/src/v8/booking-staff/BEHAVIOR.md)
+- [一斉配信の詳細・予約したあと（V8）の動き](../apps/web/src/v8/broadcast-detail/BEHAVIOR.md)
+- [一斉配信一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/broadcasts/BEHAVIOR.md)
+- [共通情報の作る・編集の動き（BEHAVIOR.md）](../apps/web/src/v8/common-vars-edit/BEHAVIOR.md)
+- [共通情報の一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/common-vars/BEHAVIOR.md)
+- [登録メディア一覧（V8）の動き](../apps/web/src/v8/contents/BEHAVIOR.md)
+- [コンバージョン（V8）の動き](../apps/web/src/v8/conversions/BEHAVIOR.md)
+- [ダッシュボードの動き（BEHAVIOR.md）](../apps/web/src/v8/dashboard/BEHAVIOR.md)
+- [イベント予約（V8）の動き](../apps/web/src/v8/events/BEHAVIOR.md)
+- [回答フォームの編集の動き（BEHAVIOR.md）](../apps/web/src/v8/form-edit/BEHAVIOR.md)
+- [集まった回答（V8）の動き](../apps/web/src/v8/form-responses/BEHAVIOR.md)
+- [回答フォーム一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/forms/BEHAVIOR.md)
+- [友だち追加時の配信 作る⑤ 確認・完了（V8）の動き](../apps/web/src/v8/friend-add-publish/BEHAVIOR.md)
+- [友だち追加時の配信の実行結果（V8）の動き](../apps/web/src/v8/friend-add-runs/BEHAVIOR.md)
+- [友だち追加時の配信（V8）の動き](../apps/web/src/v8/friend-add/BEHAVIOR.md)
+- [友だち詳細の動き（BEHAVIOR.md）](../apps/web/src/v8/friend-detail/BEHAVIOR.md)
+- [友だち（V8）の動き（BEHAVIOR.md）](../apps/web/src/v8/friends/BEHAVIOR.md)
+- [統括の対応が要るもの（BEHAVIOR.md）](../apps/web/src/v8/hq-attention/BEHAVIOR.md)
+- [統括のバナー生成の動き（BEHAVIOR.md）](../apps/web/src/v8/hq-banners/BEHAVIOR.md)
+- [統括の一括配信（V8）の動き](../apps/web/src/v8/hq-broadcasts/BEHAVIOR.md)
+- [統括のスタイルの初期セット（BEHAVIOR.md）](../apps/web/src/v8/hq-starter-sets/BEHAVIOR.md)
+- [統括のテンプレートの動き（BEHAVIOR.md）](../apps/web/src/v8/hq-templates/BEHAVIOR.md)
+- [統括（/hq）の画面の動き（BEHAVIOR.md）](../apps/web/src/v8/hq/BEHAVIOR.md)
+- [受信箱：会話の中を探す（V8.pen M0393 段13・枠 v7GV2・会話 W5pVg）](../apps/web/src/v8/inbox-search/BEHAVIOR.md)
+- [流入と計測の一覧（V8）の動き](../apps/web/src/v8/inflow-links/BEHAVIOR.md)
+- [流入リンクを作る（V8）の動き](../apps/web/src/v8/inflow-links/new/BEHAVIOR.md)
+- [運用者へのお知らせを作る・なおす（★V8 gjUz3・hiBO8・公開前の確認 sDXNy）](../apps/web/src/v8/line-notifications/BEHAVIOR.md)
+- [運営 ログイン 2段目の動き（BEHAVIOR.md）](../apps/web/src/v8/login/BEHAVIOR.md)
+- [マイル（V8）の動き](../apps/web/src/v8/mileage/BEHAVIOR.md)
+- [たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）](../apps/web/src/v8/mileage/earning-rule-new/BEHAVIOR.md)
+- [電話の画面の対応（BEHAVIOR.md）](../apps/web/src/v8/mobile-todo/BEHAVIOR.md)
+- [NEN配信の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-campaigns/BEHAVIOR.md)
+- [健康日記（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-health/BEHAVIOR.md)
+- [会員（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-members/BEHAVIOR.md)
+- [マイペット（専用機能）の動き（BEHAVIOR.md）](../apps/web/src/v8/nen-pets/BEHAVIOR.md)
+- [投稿（写真の審査・V8）の動き](../apps/web/src/v8/nen-posts/BEHAVIOR.md)
+- [権限なし（★V8 O5tUeE）](../apps/web/src/v8/no-permission/BEHAVIOR.md)
+- [通知（V8）の動き](../apps/web/src/v8/notifications/BEHAVIOR.md)
+- [はじめの質問・使い方の設定（BEHAVIOR.md）](../apps/web/src/v8/onboarding/BEHAVIOR.md)
+- [運営コンソール（V8）の動き](../apps/web/src/v8/ops/BEHAVIOR.md)
+- [リマインダの作る②〜⑤・完了・詳細（V8）の動き](../apps/web/src/v8/reminders/BEHAVIOR.md)
+- [予約台帳 予約の詳細の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant-reservations/BEHAVIOR.md)
+- [承認ワークフロー（V8）の動き](../apps/web/src/v8/restaurant/approvals/BEHAVIOR.md)
+- [他のサイトの枠を閉じる知らせ（V8）の動き](../apps/web/src/v8/restaurant/close-tasks/BEHAVIOR.md)
+- [休業日・貸切（V8）の動き](../apps/web/src/v8/restaurant/closures/BEHAVIOR.md)
+- [飲食店向け（担当 a）の共通の器の動き](../apps/web/src/v8/restaurant/common-a/BEHAVIOR.md)
+- [飲食の入口（restaurant/dashboard）](../apps/web/src/v8/restaurant/dashboard/BEHAVIOR.md)
+- [デリバリー受注の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/delivery/BEHAVIOR.md)
+- [電話予約・ウォークイン（V8）の動き](../apps/web/src/v8/restaurant/front-desk/BEHAVIOR.md)
+- [Googleビジネス（V8）の動き](../apps/web/src/v8/restaurant/google/BEHAVIOR.md)
+- [予約枠・在庫の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/inventory/BEHAVIOR.md)
+- [LINE来店フォロー（V8・融合 B-186）の動き](../apps/web/src/v8/restaurant/line-followup/BEHAVIOR.md)
+- [メニュー管理の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/menu/BEHAVIOR.md)
+- [組織・権限（V8）の動き](../apps/web/src/v8/restaurant/organization/BEHAVIOR.md)
+- [予約台帳の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/reservations/BEHAVIOR.md)
+- [店舗を追加（V8）の動き](../apps/web/src/v8/restaurant/store-new/BEHAVIOR.md)
+- [座席・卓管理の動き（BEHAVIOR.md）](../apps/web/src/v8/restaurant/tables/BEHAVIOR.md)
+- [利用規約（V8）の動き](../apps/web/src/v8/restaurant/terms/BEHAVIOR.md)
+- [リッチメニューの編集・詳細の動き（BEHAVIOR.md）](../apps/web/src/v8/rich-menu-edit/BEHAVIOR.md)
+- [見本のリッチメニュー（BEHAVIOR.md）](../apps/web/src/v8/rich-menu-sample/BEHAVIOR.md)
+- [リッチメニュー一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/rich-menus/BEHAVIOR.md)
+- [シナリオ配信の編集の動き（BEHAVIOR.md）](../apps/web/src/v8/scenario-detail/BEHAVIOR.md)
+- [シナリオを作る②：1通目を設定（V8）の動き](../apps/web/src/v8/scenario-first-step/BEHAVIOR.md)
+- [シナリオ配信一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/scenarios/BEHAVIOR.md)
+- [LINEアカウント一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/accounts/BEHAVIOR.md)
+- [予約サイト・グルメ媒体（V8）の動き](../apps/web/src/v8/settings/booking-media/BEHAVIOR.md)
+- [設定 › デリバリー連携：絵と作りの食い違いの決着](../apps/web/src/v8/settings/delivery/BEHAVIOR.md)
+- [EC連携の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/ec-commerce/BEHAVIOR.md)
+- [運用状態の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/emergency/BEHAVIOR.md)
+- [機能設定の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/features/BEHAVIOR.md)
+- [ファイルの検査の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/file-scan/BEHAVIOR.md)
+- [はじめの設定の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/getting-started/BEHAVIOR.md)
+- [LINE通知の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/line-notifications/BEHAVIOR.md)
+- [マニュアルの正本表の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/manual-links/BEHAVIOR.md)
+- [プール管理の動き（BEHAVIOR.md）](../apps/web/src/v8/settings/pools/BEHAVIOR.md)
+- [SNS 連携（V8）の動き](../apps/web/src/v8/settings/sns/BEHAVIOR.md)
+- [ログインユーザーの動き（BEHAVIOR.md）](../apps/web/src/v8/settings/staff/BEHAVIOR.md)
+- [業種ダッシュボード（飲食・サロン・面談・教室）の動き](../apps/web/src/v8/style-dashboard/BEHAVIOR.md)
+- [タグ：タグの編集・保存した検索の編集の動き（BEHAVIOR.md）](../apps/web/src/v8/tag-edit/BEHAVIOR.md)
+- [タグ（src/v8/tags）の動き](../apps/web/src/v8/tags/BEHAVIOR.md)
+- [テンプレートの詳細の動き（BEHAVIOR.md）](../apps/web/src/v8/template-detail/BEHAVIOR.md)
+- [テンプレートの作る・編集の動き（BEHAVIOR.md）](../apps/web/src/v8/template-edit/BEHAVIOR.md)
+- [テンプレート一覧の動き（BEHAVIOR.md）](../apps/web/src/v8/templates/BEHAVIOR.md)
+- [来店スタンプ（V8）の動き](../apps/web/src/v8/visit-stamps/BEHAVIOR.md)
+- [外部連携（V8）の動き](../apps/web/src/v8/webhooks/BEHAVIOR.md)
+- [ウェビナーの作る・編集・参加者・分析・コメント演出（V8）の動き](../apps/web/src/v8/webinar-edit/BEHAVIOR.md)
+- [ウェビナーの一覧（V8）の動き](../apps/web/src/v8/webinars/BEHAVIOR.md)
+- [管理画面 UI デザイン設計ルール](admin-ui-design-guidelines.md)
+- [Home.md — 玄関(目次)](brain/Home.md)
+- [Memory.md — 引き継ぎ書(全エージェント必読・最重要)](brain/Memory.md)
+- [corrections.md — 修正指示の蓄積(恒久ルール)](brain/rules/corrections.md)
+- [lint.md — 週次の点検観点](brain/rules/lint.md)
+- [一覧のページ送り・並び順・絞り込み(共通一覧契約)](brain/rules/list-paging.md)
+- [mistakes.md — やらかしと再発防止](brain/rules/mistakes.md)
+- [F-20 公式サイト掲載の閲覧数 — 設計メモ](f20-site-views-design.md)
+- [Lステップ・Liny 画面／裏側挙動の再調査と実装仕様](lstep-liny-screen-behavior-research-2026-08.md)
+- [ダイニー（dinii）比較調査と将来像メモ](rival-dinii-2026-11.md)
+- [revfix-b-load-failures.tsv](qa/revfix-b-load-failures.tsv) — 説明用データ・付随資料、確認 2026-10-19
+- [TikTok利益計算の自動化（設計）](tiktok-pnl/design.md)
+- [V8 の絵（Pencil の板）と画面のコードの対応表](v8-board-to-code.md)
+- [V8 の見た目の決まり（管理画面）](v8-design-rules.md)
+- [V8 型の対応表（パターン台帳）](v8-pattern-catalog.md)
+- [V8の画面を確かめる手順](v8-screen-playbook.md)
+- [V8の速さの測り方（2026-10-11）](v8-speed-rules.md)
+- [V8 の見た目を変えるとき、コードのどこを直すか](v8-where-to-change.md)
+
+## API
+
+- [一括予約の券・支払い・承認・通知（後続実装の契約設計）](booking-bulk-processing-contract.md)
+- [External call executor (A06 / B-365①)](../apps/worker/src/lib/external-call/README.md)
+- [LINE API 互換プロキシ (/line-api)](LINE-API-PROXY.md)
+- [下書き・会話検索・InstagramのAPI](api/drafts-and-instagram.md)
+- [統括API](api/headquarters.md)
+- [受信箱の添付API（2026-10-08）](api/inbox-attachments.md)
+- [設定と計測のAPI](api/operations-and-measurement.md)
+- [店ごとの媒体リンクAPI](api/proposal-e-media-links.md)
+- [飲食店の予約・休業API](api/restaurant-booking.md)
+- [V8 友だち追加機能の API（F-1・F-2）](api/v8-friends-feature-contract.md)
+- [来店とスタンプAPI](api/visits-and-stamps.md)
+- [データベース構造一覧](db-schema.md)
+- [APIのエラーと追跡番号](error-codes.md)
+- [@line-harness/sdk](../packages/sdk/README.md)
+
+## 運用と配備
+
+- [musubo 新リポジトリへの共有検証配備の切り替え準備](deploy/musubo-staging-cutover.md) — 旧経路の停止措置と残る切り替え手順、確認 2026-11-07。
+
+- [開発ガイド](development.md)
+- [PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md)
+- [GitHub 設定の運用メモ](../.github/README.md)
+- [Contributing to LINE Harness](../CONTRIBUTING.md)
+- [Support](../SUPPORT.md)
+- [musubo マニュアルサイト](../apps/docs/README.md)
+- [robots.txt](../apps/liff/public/robots.txt)
+- [robots.txt](../apps/web/public/robots.txt)
+- [空白量の診断](../apps/web/scripts/v8-guard/blank-gap.README.md)
+- [崩れの見張り](../apps/web/scripts/v8-guard/layout-defects.README.md)
+- [速度の参考チェック（PR #1686、2026-10-10）](../apps/web/scripts/v8-guard/speed-budget.README.md)
+- [OpenAPI definitions](../apps/worker/src/routes/openapi/README.md)
+- [飲食5：外部予約の対応 API](../apps/worker/src/routes/restaurant-external-links.md)
+- [.env.example](.env.example) — 説明用データ・付随資料、確認 2026-10-19
+- [デプロイ安全ゲートと排他運用](DEPLOY-GATE.md)
+- [検証環境の自動配備（Cloudflare Git 連携）](staging-deploy-cloudflare-builds.md)
+- [然-NEN- LINE管理システム検証環境](NEN-LINE-STAGING.md)
+- [OSS Sandbox Merge Gate](OSS-SANDBOX-MERGE-GATE.md)
+- [文書の入口](README.md)
+- [Codex クラウド開発環境](codex-cloud-environment.md)
+- [CodexとSlackの共同開発運用](codex-slack-sync.md)
+- [環境設定と秘密情報の名前](config-and-secrets.md)
+- [郵便番号データの出どころ（F11）](data/postal/PROVENANCE.md)
+- [過去資料の保管先](document-archives.md)
+- [機能オフを API・自動処理へ強制する仕様](features/feature-off-enforcement.md)
+- [保存が失敗した時の表示](form-save-errors.md)
+- [統括「バナー生成」— 仕組みと設定（2026-09-12）](hq-banner-generation.md)
+- [統括の課金プラン（月払い・年払い）](hq-billing.md)
+- [musubo 新料金・利用開始フローの実装接続図](musubo-pricing-onboarding-integration.md) — 新料金の接続済み範囲と公開前の残作業、確認 2026-11-09。
+- [会員登録・メールログイン・パスワード再設定（0-1／36-4／36-6）](hq-signup-and-password-login.md)
+- [Instagram同時投稿のためのMetaアプリ準備手順](instagram-meta-app-setup.md)
+- [デリバリー3社 API連携の問い合わせ先と送信文（下書き）](integrations/delivery-api-inquiry.md)
+- [musubo × デリバリーサービス 連携要件書（問い合わせ添付用）](integrations/delivery-integration-requirements.md)
+- [出前館 接続台帳](integrations/demaecan-connection.md)
+- [出前館 QAチェック表の回答台帳](integrations/demaecan-qa-checklist.md)
+- [LINE公式アカウントの接続と確認](integrations/line-connection.md)
+- [ロケットナウ 接続台帳](integrations/rocketnow-connection.md)
+- [Uber Eats 接続台帳](integrations/uber-eats-connection.md)
+- [musubo 利用規約（仮 / v0.1 draft）](legal/musubo-terms-v0.1-draft.md)
+- [約400店舗のLINEアカウント移行：2つの選択肢](line-account-migration-options.md)
+- [共通一覧契約](list-paging-contract.md)
+- [Lステップで確認できなかった箇所と、置いた想定](lstep-unverified-assumptions.md)
+- [musubo マニュアルサイトのCloudflare Pages初回設定](manual-site-pages-setup.md)
+- [D1 マイグレーション手順書](migration-runbook.md)
+- [テナント削除の保護と設計](tenant-purge-trigger-760-design.md)
+- [musubo サービスサイト（Xserver）](musubo-service-site.md)
+- [ランク削除時の会員別EC送信](nen-member-rank-sync.md)
+- [受信処理の再開と入力不足時の停止](operations/inbound-recovery.md)
+- [運営コンソールの動きと設定](ops-console.md)
+- [デリバリー フェーズ2の受け皿（画面なし）](restaurant-delivery-phase2-slots.md)
+- [飲食店向け予約メールのcatch-all取り込み](restaurant-email-intake.md)
+- [予約メール原文の専用R2への移行](restaurant-raw-mail-r2-migration.md)
+- [飲食店向け（テスト）分離設計](restaurant-test-architecture.md)
+- [Slackでの完了報告の書き方（Claude宛て）](slack-report-to-claude.md)
+- [速さの未達台帳](speed-debt.md)
+- [お問い合わせ統合受信のセットアップ](support-inbox-setup.md)
+- [LINE Harness Plugin Template](../packages/plugin-template/README.md)
+- [文書の入口とリンクの検査](../scripts/docs/README.md)
+- [画面確認の道具](../scripts/visual-qa/README.md)
+
+- [cleanup-f01-1019.md](qa/cleanup-f01-1019.md)
+- [cleanup-q01w1-1019.md](qa/cleanup-q01w1-1019.md)
+- [cleanup-q01w4-1019.md](qa/cleanup-q01w4-1019.md)
+- [README.md](../packages/db/README.md)
+- [順番待ちのマイグレーション（新しいコードを配り終えてから当てる分）](../packages/db/migrations-pending/README.md)
+
+## セキュリティ
+
+- [LINE受信の安全対策](security/line-webhook-isolation-2026-10-19.md)
+
+- [Security Policy](../SECURITY.md)
+- [Admin Authentication (cookie session + CSRF)](ADMIN-AUTH.md)
+- [権限・tenant・LINEアカウント境界の土台と後続接続表(board #800)](account-boundary-foundation.md)
+- [LINE資格情報の暗号化移行](line-credential-encryption.md)
+- [手順書：Googleビジネス接続のためのGoogle Cloud設定（検証環境用）](manuals/google-business-oauth-setup.md)
+- [手順書：Googleスプレッドシート連携のためのGoogle Cloud設定（検証環境用）](manuals/google-sheets-oauth-setup.md)
+- [Meet完了コールバックの署名](meet-callback-security.md)
+- [組織内アカウントと機能権限](organization-account-access-policy.md)
+- [外部送信の二重送信防止](outbound-send-idempotency.md)
+- [情報漏えいの疑いを伝える文の型](security/CUSTOMER-NOTICE.md)
+- [漏れたかもしれない、と気づくために](security/DETECTION.md)
+- [事故が起きたときの手順](security/INCIDENT-RUNBOOK.md)
+- [鍵が漏れたときの入れ替えと練習（B-351/13）](security/KEY-ROTATION.md)
+- [ログイン不要の入口（B-351/4）](security/PUBLIC-ENTRYPOINTS.md)
+- [ローンチ前の安全確認（B-265・B-332・B-343・B-351）](security/README.md)
+- [本番前にオーナーがやること1枚（D6）](security/OWNER-HANDOFF-1116.md)
+- [公開前の安全点検表](security/SECURITY-CHECKLIST.md)
+- [安全監視：画面とAPIの契約（B-343）](security/SECURITY-MONITOR-CONTRACT.md)
+- [添付・支払明細の取得と取り直し（B-351/4）](security/SIGNED-DOWNLOADS.md)
+- [二段階認証を付ける手順](security/TWO-FACTOR-SETUP.md)
+- [ブラウザの読み込み制限（CSP）](security/csp.md)
+- [本人確認・ログイン・保存期限の実装説明](security/step-up-and-retention.md)
+
+## 反映履歴
+
+- [統括のアカウントの数の帯の未確認をまとめる](release-log/unreleased/181-kenta-hq-kpi-unconfirmed.md)
+
+- [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)
+
+- [受信箱の検索と顧客情報の修正](release-log/unreleased/196-kenta-inbox-search-field.md)
+
+- [予約台帳と来店スタンプの操作を修正](release-log/unreleased/197-kenta-booking-stamp-tweaks.md)
+
+- [飲食メニューの画像とアレルギーの追加](release-log/unreleased/198-kenta-menu-image-upload.md)
+
+- [休業日カレンダーの過去の日付の表示を修正](release-log/unreleased/199-kenta-closures-day-click.md)
+
+- [イベント編集と公開設定を修正](release-log/unreleased/200-kenta-event-edit.md)
+
+- [二段階認証のお知らせを修正](release-log/unreleased/201-kenta-settings-notice-gray.md)
+
+- [LINEアカウント登録の事前確認を修正](release-log/unreleased/207-kenta-account-new-precheck.md)
+
+- [削除ボタンの表示を統一](release-log/unreleased/203-kenta-delete-button-rule.md)
+
+- [色を選ぶ窓の修正](release-log/unreleased/204-kenta-color-well-clip.md)
+
+- [狭い画面の受信箱の表示を変更](release-log/unreleased/206-kenta-inbox-narrow.md)
+
+- [はじめにやることの案内ボタンを修正](release-log/unreleased/211-kenta-setup-buttons-center.md)
+
+- [今日の確認カードを追加](release-log/unreleased/213-kenta-dashboard-today-card.md)
+
+- [受信箱の受信経路タブを追加](release-log/unreleased/219-kenta-inbox-channel-tabs.md)
+
+- [いつもと違うログインのお知らせを閉じられるように](release-log/unreleased/188-kenta-unfamiliar-dismiss.md)
+
+- [Googleビジネスのつなぐ前の説明の文字をそろえる](release-log/unreleased/189-kenta-google-connect-text.md)
+
+- [ページの題を一回り小さく](release-log/unreleased/195-kenta-page-title-24.md)
+
+- [ログイン確認中の表示](release-log/unreleased/175-kenta-login-polish.md) — 反映履歴。
+
+- [LINEアカウント未選択時の案内](release-log/unreleased/177-kenta-sidebar-unselected.md) — 反映履歴、確認 2026-11-23。
+
+- [比較・分析とログイン中の端末の表示を修正](release-log/unreleased/178-kenta-compare-bands.md) — 反映履歴、確認 2026-11-23。
+
+- [統括のバナー生成に使うアカウント](release-log/unreleased/179-kenta-banner-ai-account.md) — 反映履歴。
+
+- [配信のLINEプレビュー表示](release-log/unreleased/180-kenta-preview-phone-only.md) — 反映履歴。
+
+- [ログイン画面とメニューのロゴ表示](release-log/unreleased/184-kenta-logo-sharp.md) — 反映履歴。
+
+- [統括メンバー画面の設定メニューを整える](release-log/unreleased/185-kenta-hq-members-layout.md) — 反映履歴、確認 2026-11-23。
+
+- [受信箱のマイル表示](release-log/unreleased/191-kenta-friend-mileage-error.md) — マイルを使っていない店舗の表示に関する修正履歴。
+
+- [受信箱のテンプレートの差し込みを名前の札で読む](release-log/unreleased/194-kenta-template-unresolved-vars.md) — 反映履歴、確認 2026-11-23。
+
+- [説明文の文字サイズの修正履歴](release-log/unreleased/192-kenta-inherited-font-size.md) — 反映履歴、確認 2026-11-23。
+
+- [開店準備の進み具合の表示](release-log/unreleased/205-kenta-setup-chip.md)
+
+- [開店準備の進み具合が変わる操作](../apps/web/src/v8/onboarding/setup-chip-progress.md) — 更新対象の説明。
+
+- [ウォークインの階・エリア切り替え](release-log/unreleased/210-kenta-walkin-floor-tabs.md)
+
+- [開店準備ガイドと予約枠・在庫の改善](release-log/unreleased/230-masato-opening-guide-and-inventory.md) — 反映履歴、確認 2026-11-25。
+- [LINEアカウント登録と開店準備の再開](release-log/unreleased/224-masato-line-onboarding-resume.md) — 反映履歴、確認 2026-11-24。
+- [同じLINEユーザーの複数店舗への友だち追加](release-log/unreleased/223-masato-line-friends-account-scope.md) — 反映履歴、確認 2026-11-24。
+
+- [更新履歴の取り込みの印を消す](release-log/unreleased/161-kenta-release-log-markers.md) — 反映履歴、確認 2026-11-22。
+
+- [複数アカウント配信の再送時の重複を防止](release-log/unreleased/146-kenta-a21-multi-resend.md) — 反映履歴、確認 2026-11-21。
+
+- [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
+- [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
+
+- [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
+
+- [新しいLINEアカウントのLIFF自動作成](release-log/unreleased/153-masato-liff-auto-create.md) — 反映履歴、確認 2026-11-22。
+
+- [LINE登録後の「使い方を選ぶ」への自動遷移](release-log/unreleased/154-masato-line-register-auto.md) — 反映履歴、確認 2026-11-22。
+- [LINE初回登録の初期設定保存](release-log/unreleased/162-masato-line-register-style-recovery.md) — 反映履歴、確認 2026-11-22。
+- [LINE登録の完了画面と飲食店の初期設定](release-log/unreleased/167-masato-line-registration-finish.md) — 反映履歴、確認 2026-11-22。
+- [LINEアカウント登録と開店準備ガイドの改善](release-log/unreleased/193-masato-line-opening-setup.md) — 反映履歴、確認 2026-11-23。
+
+- [開店準備ガイドの表示と操作を修正](release-log/unreleased/141-masato-first-steps-guide-visibility.md)
+
+- [GoogleビジネスとInstagramの複数接続（第1段）](release-log/unreleased/137-kenta-sns-multi-connections.md) — 反映履歴、確認 2026-11-21。
+
+- [GoogleビジネスとInstagramの複数接続（第2段）](release-log/unreleased/218-kenta-sns-multi-connections-drop-compat.md) — 反映履歴、確認 2026-11-24。
+
+- [開店準備ガイドの修正](release-log/unreleased/133-masato-restaurant-setup-guide.md)
+
+- [コース写真の保存項目を追加](release-log/unreleased/144-masato-restaurant-course-gallery-d1.md) — 反映履歴、確認 2026-11-21。
+
+- [コースの所要時間の変更](release-log/unreleased/88-kenta-course-duration.md) — コースの時間を追加・変更する修正の履歴。確認 2026-11-16。
+
+- [保守時に確認する説明を整理](release-log/unreleased/121-kenta-q04-misc.md) — 反映履歴、確認 2026-11-19。
+
+- [一斉配信の自動確認を改善](release-log/unreleased/114-kenta-q02b-b11.md) — 反映履歴、確認 2026-11-18。
+- [SNS連携の画面を契約枠・主連携・請求の口へつなぐ](release-log/unreleased/122-kenta-sns-multilink-ports-api.md) — 反映履歴、確認 2026-11-19。
+
+- [Instagramの追加接続で既存アカウントを保持する修正](release-log/unreleased/227-masato-instagram-add-preserve.md) — 反映履歴、確認 2026-11-24。
+- [機能停止中のSNS接続一覧表示](release-log/unreleased/228-masato-instagram-list-settings.md) — 反映履歴、確認 2026-11-24。
+
+- [自動確認の動作への置き換え](release-log/unreleased/112-kenta-q02b-b8.md) — 実際の動きで確かめる試験の履歴。確認 2026-11-18。
+
+- [SNS連携で残る3つの口の決まり](release-log/unreleased/120-kenta-sns-multilink-ports.md) — 反映履歴、確認 2026-11-18。
+
+- [自動確認を実際の動きで確認](release-log/unreleased/115-kenta-q02b-b10.md) — 反映履歴、確認 2026-11-18。
+
+- [お客さま画面の設定確認を改善](release-log/unreleased/116-kenta-q02b-b12.md) — 反映履歴、確認 2026-11-18。
+
+- [配信と通知の内容を確かめる試験を見直し](release-log/unreleased/113-kenta-q02b-b9.md) — 反映履歴、確認 2026-11-18。
+
+- [GoogleビジネスとInstagramの複数連携（第1段）](release-log/unreleased/108-kenta-sns-multilink.md) — 反映履歴、確認 2026-11-17。
+
+- [はじめにやることと初期設定のリッチメニュー手順](release-log/unreleased/109-masato-first-steps-guide.md) — 反映履歴、確認 2026-11-17。
+
+- [LINEアカウントの接続再確認を修正](release-log/unreleased/136-masato-line-account-live-check.md)
+
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/105-kenta-q02b-b7.md) — 反映履歴、確認 2026-11-17。
+
+- [列車：試験だけの4本](release-log/unreleased/102-kenta-train-tests.md) — まとめて入れた試験の履歴。確認 2026-11-17。
+
+- [欠席と振替の動きを確認](release-log/unreleased/101-kenta-gaptest-b1.md) — 反映履歴、確認 2026-11-16。
+
+- [絞り込みや分析の自動確認を改善](release-log/unreleased/100-kenta-q02b-b4.md) — 反映履歴、確認 2026-11-17。
+
+- [一覧や返信の自動確認を改善](release-log/unreleased/99-kenta-q02b-b3.md) — 反映履歴、確認 2026-11-17。
+
+- [自動確認を画面の操作と予定の計算で確認](release-log/unreleased/96-kenta-q02b-b2.md) — 反映履歴、確認 2026-11-16。
+
+- [自動確認を実際の画面の動きで確認](release-log/unreleased/104-kenta-q02b-b5.md) — 反映履歴、確認 2026-11-17。
+
+- [配信と予定確認の動作を確かめる試験を見直し](release-log/unreleased/103-kenta-q02b-b6.md) — 反映履歴、確認 2026-11-17。
+
+- [プログラムと連携処理の説明書きを整理](release-log/unreleased/95-kenta-q04-worker.md) — 反映履歴、確認 2026-11-16。
+
+- [自動確認を実際の動きで確認](release-log/unreleased/94-kenta-q02b.md) — 反映履歴、確認 2026-11-16。
+
+- [通知の試験を時間帯に左右されないよう修正](release-log/unreleased/97-kenta-worker-fix.md) — 反映履歴、確認 2026-11-16。
+- [初期設定・比較の確認を追加](release-log/unreleased/91-kenta-backend-small.md) — 反映履歴、確認 2026-11-16。
+- [通知端末の扱いを確認](release-log/unreleased/92-kenta-gap-msg.md) — 反映履歴、確認 2026-11-16。
+
+- [予約・友だち情報・配信の操作と安全性を改善](release-log/unreleased/36-masato-legacy-port.md) — 反映履歴、確認 2026-11-10。
+- [運営コンソールの問い合わせ画面をPenと照合して修正](release-log/unreleased/41-masato-ops-support-pen-parity.md) — スマートフォンの返信欄とテンプレート引用画面、確認 2026-11-11。
+- [運営の返信テンプレート編集・削除と検索欄の余白修正](release-log/unreleased/44-masato-ops-support-template-edit.md) — 問い合わせ画面の修正履歴、確認 2026-11-12。
+- [運営コンソールのお問い合わせをPen確定案に合わせて刷新](release-log/unreleased/37-masato-ops-support-pen.md) — 返信テンプレートとスマートフォン操作、確認 2026-11-10。
+- [登録メディアの写真確認とアップロード修正](release-log/unreleased/30-masato-media-upload.md) — 反映履歴、確認 2026-11-10。
+- [登録メディアの検証R2設定更新](release-log/unreleased/33-masato-media-upload-cors-token.md) — 反映履歴、確認 2026-11-10。
+- [メンバー招待メールのデザイン更新](release-log/unreleased/25-masato-staff-invite-email.md) — 反映履歴、確認 2026-11-08。
+- [自動配席の設定を簡素化](release-log/unreleased/26-masato-simple-table-assignment.md) — 反映履歴、確認 2026-11-08。
+- [統括メンバーの3役割](release-log/unreleased/27-masato-hq-three-roles.md) — 管理者・担当者・閲覧のみの画面と権限制御、確認 2026-11-08。
+- [階・エリア追加の入力を簡素化](release-log/unreleased/28-masato-simple-floor-area.md) — 反映履歴、確認 2026-11-08。
+- [個別見積もりの料金確認画面](release-log/unreleased/32-masato-individual-quote-review.md) — 契約枠と初回請求の表示、確認 2026-11-10。
+- [利用料金の個数プルダウン表示修正](release-log/unreleased/38-masato-pricing-dropdown.md) — 反映履歴、確認 2026-11-11。
+- [利用開始前のログイン直後の表示を統一](release-log/unreleased/42-masato-onboarding-entry.md) — サイドバーとホーム導線の制御、確認 2026-11-11。
+- [クレジットカード登録からLINE接続への案内を修正](release-log/unreleased/46-masato-card-setup-flow.md) — 登録結果の確認と画面遷移の反映履歴、確認 2026-11-12。
+- [新リポジトリへの検証配備切り替え前の安全確認](release-log/unreleased/9-masato-staging-cutover-gate.md) — 反映履歴、確認 2026-11-06。
+- [DB復旧workflowの安全条件を確かめる試験](release-log/unreleased/10-masato-recovery-workflow-test.md) — 反映履歴、確認 2026-11-06。
+- [予約と友だち情報の表示・操作の改善](release-log/unreleased/2097-kenta-train-1102r.md)
+- [配信の取り消しとテナント削除の安全性](release-log/unreleased/2094-kenta-train-1102q.md)
+- [座席図の卓プレビュー・タブ並び替え・拡大移動の修正](release-log/unreleased/2099-masato-seat-map-ux.md)
+- [Instagramの同一統括内での複数アカウント接続](release-log/unreleased/2080-masato-instagram-shared-accounts.md)
+- [座席・卓管理のPenデザイン反映](release-log/unreleased/2074-masato-table-pen.md)
+- [Googleビジネスのパフォーマンス取得](release-log/unreleased/2026-11-04-masato-google-performance-sync.md)
+- [保存前の確認と配信操作の安全修正](release-log/unreleased/2075-kenta-safety.md)
+- [統括・運営メンバー画面の本人パスキー設定と一覧配置](release-log/unreleased/2026-11-03-masato-hq-ops-passkeys-ui.md)
+- [統括メンバーの本人パスキー設定](release-log/unreleased/2026-11-03-masato-hq-passkeys.md)
+- [統括から引き継いだユーザーの一覧表示](release-log/unreleased/2069-masato-hq-inherited-users.md)
+- [配信枠の確認の修正](release-log/unreleased/2053-kenta-operations-quota.md)
+- [履歴と数の単位の表示修正](release-log/unreleased/2056-kenta-review-wording.md)
+- [使い方デモと管理画面の操作の修正](release-log/unreleased/2057-kenta-demo-operations.md)
+- [予約と会員ランクの操作の修正](release-log/unreleased/2058-kenta-reservations-ranks.md)
+- [SNS連携の設定表示と接続](release-log/unreleased/2010-masato-sns-settings-access.md)
+- [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/1984-kenta-muse-media-drop.md)
+- [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)
+- [予約台帳の卓・予約なしの案内](release-log/unreleased/1972-kenta-muse-ledger-empty.md)
+- [予約台帳の数の帯の幅そろえ](release-log/unreleased/1972-kenta-muse-ledger-band.md)
+- [数の帯の増減の札の直し](release-log/unreleased/1970-kenta-muse-kpi-delta-row.md)
+- [シナリオ作成の権限確認](release-log/unreleased/1971-kenta-train-1029q.md)
+- [本人のパスキー管理](release-log/unreleased/1973-masato-passkey-self.md)
+- [シナリオ作成・受信箱・友だち情報・テンプレートの改善](release-log/unreleased/1972-kenta-train-1029r.md)
+- [定期便のページ送り](release-log/unreleased/1971-kenta-swbm-pagination.md)
+- [プール作成の保存帯](release-log/unreleased/1971-kenta-swbm-pool-footer.md)
+- [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
+- [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
+- [飲食店の入口とメニュー価格の保存](release-log/unreleased/1967-masato-restaurant-simplify.md)
+- [設定メニューの表示項目](release-log/unreleased/1969-masato-hide-settings-menu.md)
+- [友だちの空の案内・保管の札・つづきの統合](release-log/unreleased/1971-kenta-muse-check-a.md)
+- [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
+- [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
+- [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
+- [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
+- [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
+- [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
+- [フォルダ追加の色の板の重なり修正](release-log/unreleased/1970-kenta-muse-check-b.md)
+- [誤りの欄の焦点の輪を赤1本に](release-log/unreleased/1988-kenta-muse-invalid-focus.md)
+- [箱で囲んだ入力の焦点の輪を外枠1本に](release-log/unreleased/1988-kenta-muse-double-ring.md)
+- [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
+- [受信箱の絞り込み・自動応答の題・バナー生成・機能設定の住所・マイル履歴の操作](release-log/unreleased/1971-kenta-muse-fix-d.md)
+- [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
+- [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/1955-kenta-muse-ui-color.md)
+- [行の「…」の枠なし・押せる文字の形](release-log/unreleased/1971-kenta-muse-fix-c.md)
+- [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
+- [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
+- [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
+- [お知らせの帯と次の段の間隔そろえ](release-log/unreleased/1950-kenta-muse-fqa-space.md)
+- [社内メモの窓の破棄確認の取り除き](release-log/unreleased/1952-kenta-muse-ui-state-memo.md)
+- [在庫の保存帯と本文の重なり修正](release-log/unreleased/1950-kenta-swbm-b19.md)
+- [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
+- [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
+- [道具の段の日付と選ぶ欄の地を白にそろえ](release-log/unreleased/1972-kenta-muse-pick-field-surface.md)
+- [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
+- [予約の取消料の表示と同意を修正](release-log/unreleased/1998-kenta-cancel-fee-contract.md)
+- [1998-kenta-train-1029w.md](release-log/unreleased/1998-kenta-train-1029w.md) — 配信の宛先の範囲と画面切り替え・窓の操作の修正。
+- [一斉配信の一覧の受け付け数の表示修正](release-log/unreleased/1916-kenta-muse-broadcast-received-wording.md)
+- [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
+- [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
+- [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
+- [LINEログインチャネル作成手順の追加](release-log/unreleased/1911-masato-line-login-create-guide.md)
+- [LINEログイン画像の重複した番号を削除](release-log/unreleased/1912-masato-line-login-callout-numbers.md)
+- [LINEログインチャネル公開画像の番号とID表示を修正](release-log/unreleased/1913-masato-line-publish-image-cleanup.md)
+- [LINEログインチャネル作成・種類の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-type.webp)
+- [LINEログインチャネル作成・入力欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-fields.webp)
+- [LINEログインチャネル作成・同意欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-final.webp)
+- [LINEログインチャネル作成・種類の文書用画像](manuals/line-connect/images/m4-create-type.jpg)
+- [LINEログインチャネル作成・入力欄の文書用画像](manuals/line-connect/images/m4-create-fields.jpg)
+- [LINEログインチャネル作成・同意欄の文書用画像](manuals/line-connect/images/m4-create-final.jpg)
+- [LINE接続マニュアルのWebhook設定位置を明確化](release-log/unreleased/1899-masato-musubo-webhook-guide.md)
+- [Google口コミのAI下書き案内文の削除](release-log/unreleased/1896-masato-google-review-ai-note-remove.md)
+- [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)
+- [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
+- [LINEアカウント登録の事前確認を回答時に進める変更](release-log/unreleased/1891-masato-line-precheck-auto-next.md)
+- [LINEアカウント登録の選択済み回答と質問一覧の修正](release-log/unreleased/1894-masato-line-precheck-restored-choice.md)
+- [LINEアカウント登録でプロバイダーIDを独立した手順にした変更](release-log/unreleased/1893-masato-provider-id-step2.md)
+- [LINEアカウント登録のチャネル専用Webhook URL](release-log/unreleased/1882-masato-channel-webhook-url.md)
+- [Google・Instagram画像の切り取り](release-log/unreleased/1883-masato-google-instagram-image-crop.md)
+- [検証環境のビルド情報表示](release-log/unreleased/1884-masato-staging-build-metadata.md)
+- [LINEログインのプロバイダー画面への導線](release-log/unreleased/1885-masato-line-provider-step3.md)
+- [投稿メディアの選択画面](release-log/unreleased/1886-masato-post-media-picker.md)
+- [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md)
+- [Messaging API設定への案内](release-log/unreleased/1889-masato-line-manager-step1.md)
+- [運営コンソールの入口整理](release-log/unreleased/1934-masato-ops-menu-cleanup.md)
+- [運営画面の正式ロゴ](release-log/unreleased/1935-masato-ops-musubo-logo.md)
+- [郵便番号の住所データ登録](release-log/unreleased/1936-masato-postal-lookup.md)
+- [契約者専用LINEの通知先接続](release-log/unreleased/1937-masato-notice-line-connect.md)
+- [管理画面のロゴ統一](release-log/unreleased/1938-masato-common-musubo-logo.md)
+- [管理画面のロゴサイズ調整](release-log/unreleased/1939-masato-ops-logo-size.md)
+- [ロゴと上部メニューの高さ調整](release-log/unreleased/1940-masato-logo-header-align.md)
+- [契約者向けLINEの通知専用化](release-log/unreleased/1941-masato-notice-line-only.md)
+- [申込受付と承認画面の調整](release-log/unreleased/1943-masato-registration-approval-pen.md)
+- [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/1946-kenta-muse-red-accounts.md)
+- [友だち分析の日付と縦軸の重なり修正](release-log/unreleased/1950-kenta-chart-date-axis.md)
+- [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
+- [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
+- [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
+- [知らせの札・本文の整列と文字の操作](release-log/unreleased/1997-kenta-notice-status-actions.md)
+- [画面の表示確認の試験準備](release-log/unreleased/1997-kenta-browser-fixture-paths.md)
+- [確認の窓の失敗表示と再試行](release-log/unreleased/2005-kenta-confirm-dialog-errors.md)
+- [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
+- [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
+- [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
+- [反映履歴（アップデート履歴）の設計](change-log-design.md)
+- [0.24.0.md](release-log/0.24.0.md)
+- [リマインダ](release-log/0.25.0.md)
+- [反映履歴の書き方](release-log/README.md)
+- [下見・件数・待ち時間の不具合の修正](release-log/unreleased/1948-kenta-swbs.md)
+- [外部点検のボタン名・導線・表示崩れの修正](release-log/unreleased/1851-kenta-staging-ui.md)
+- [統括名の必須表示と入力エラー時の焦点復帰](release-log/unreleased/1857-kenta-hq-name-focus.md)
+- [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
+- [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
+- [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
+- [統括のアカウントの空きと受信箱の見た目](release-log/unreleased/1799-kenta-beui-round1.md)
+- [一覧・数の帯・手順・ログの見た目と速さ](release-log/unreleased/1802-kenta-beui-round2.md)
+- [細部の直し（左メニューの吹き出し・「？」・2段階認証の欄・主ボタン）](release-log/unreleased/1803-kenta-detail-polish.md)
+- [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
+- [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
+- [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
+- [運営の閲覧のみの操作を隠さず押せない形と理由で表示](release-log/unreleased/1956-kenta-muse-opsviewer.md)
+- [統括トップ・店の比較・お店画面の直し](release-log/unreleased/1953-kenta-muse-dash-store.md)
+- [左下の常設「統括へ」撤去・左メニューの上端と左端そろえ](release-log/unreleased/1972-kenta-muse-sidebar-top.md)
+- [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
+- [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
+- [回復コード機能の撤去](release-log/unreleased/1993-masato-remove-recovery-codes.md)
+- [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)
+- [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
+- [fielderr2.md](release-log/drafts/fielderr2.md)
+- [kenta-form-fixed-1010.md](release-log/drafts/kenta-form-fixed-1010.md)
+- [kenta-hqfeat-rich-video-liff.md](release-log/drafts/kenta-hqfeat-rich-video-liff.md)
+- [kenta-listrow-1010.md](release-log/drafts/kenta-listrow-1010.md)
+- [kenta-owners-1010.md](release-log/drafts/kenta-owners-1010.md)
+- [kenta-pendec-1010.md](release-log/drafts/kenta-pendec-1010.md)
+- [kenta-skeleton-1010.md](release-log/drafts/kenta-skeleton-1010.md)
+- [kenta-v8-folderapi-1009.md](release-log/drafts/kenta-v8-folderapi-1009.md)
+- [unreleased.md](release-log/unreleased.md)
+- [1781-kenta-cleanup-U01.md](release-log/unreleased/1781-kenta-cleanup-U01.md)
+- [ログインのロボット確認と中断後の復帰](release-log/unreleased/1782-kenta-login-robot-check.md)
+- [二段階認証・回復コード案内・送信元表示の修正](release-log/unreleased/1784-kenta-staging-layout.md)
+- [検証反映と独立点検前の引き継ぎ](release-log/unreleased/1786-kenta-staging-handoff.md)
+- [独立点検前の画面接続・承認・集計の修正](release-log/unreleased/1787-kenta-staging-review-fixes.md)
+- [はじめの質問の破棄と途中保存の修正](release-log/unreleased/1788-kenta-style-discard.md)
+- [独立点検からの安全性・予約・表示の修正](release-log/unreleased/1793-masato-independent-audit-fixes.md)
+- [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
+- [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
+- [画面の先読みと友だち一覧の再計測の改善](release-log/unreleased/1792-kenta-v8-rendering-performance.md)
+- [共通描画と注目の星の不要な動きの修正](release-log/unreleased/1795-kenta-common-draw-speed.md)
+- [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
+- [1781-kenta-cleanup-a02.md](release-log/unreleased/1781-kenta-cleanup-a02.md)
+- [1781-kenta-cleanup-a03.md](release-log/unreleased/1781-kenta-cleanup-a03.md)
+- [1781-kenta-cleanup-a04.md](release-log/unreleased/1781-kenta-cleanup-a04.md)
+- [1781-kenta-cleanup-a05.md](release-log/unreleased/1781-kenta-cleanup-a05.md)
+- [1781-kenta-cleanup-a07.md](release-log/unreleased/1781-kenta-cleanup-a07.md)
+- [1781-kenta-cleanup-a08.md](release-log/unreleased/1781-kenta-cleanup-a08.md)
+- [1781-kenta-cleanup-a09.md](release-log/unreleased/1781-kenta-cleanup-a09.md)
+- [1781-kenta-cleanup-a10.md](release-log/unreleased/1781-kenta-cleanup-a10.md)
+- [1781-kenta-cleanup-a11.md](release-log/unreleased/1781-kenta-cleanup-a11.md)
+- [1781-kenta-cleanup-cs1.md](release-log/unreleased/1781-kenta-cleanup-cs1.md)
+- [1781-kenta-cleanup-f02.md](release-log/unreleased/1781-kenta-cleanup-f02.md)
+- [1781-kenta-cleanup-g01.md](release-log/unreleased/1781-kenta-cleanup-g01.md)
+- [1781-kenta-cleanup-g02.md](release-log/unreleased/1781-kenta-cleanup-g02.md)
+- [1781-kenta-cleanup-l01.md](release-log/unreleased/1781-kenta-cleanup-l01.md)
+- [1781-kenta-cleanup-m01.md](release-log/unreleased/1781-kenta-cleanup-m01.md)
+- [1781-kenta-cleanup-m02.md](release-log/unreleased/1781-kenta-cleanup-m02.md)
+- [1781-kenta-cleanup-m03.md](release-log/unreleased/1781-kenta-cleanup-m03.md)
+- [1781-kenta-cleanup-p01.md](release-log/unreleased/1781-kenta-cleanup-p01.md)
+- [1781-kenta-cleanup-q75.md](release-log/unreleased/1781-kenta-cleanup-q75.md)
+- [1781-kenta-cleanup-s01.md](release-log/unreleased/1781-kenta-cleanup-s01.md)
+- [1781-kenta-cleanup-s03.md](release-log/unreleased/1781-kenta-cleanup-s03.md)
+- [1781-kenta-cleanup-s04.md](release-log/unreleased/1781-kenta-cleanup-s04.md)
+- [1781-kenta-cleanup-s05.md](release-log/unreleased/1781-kenta-cleanup-s05.md)
+- [1781-kenta-cleanup-s05a.md](release-log/unreleased/1781-kenta-cleanup-s05a.md)
+- [1781-kenta-cleanup-t00.md](release-log/unreleased/1781-kenta-cleanup-t00.md)
+- [1781-kenta-cleanup-t01.md](release-log/unreleased/1781-kenta-cleanup-t01.md)
+- [1781-kenta-cleanup-t02.md](release-log/unreleased/1781-kenta-cleanup-t02.md)
+- [1781-kenta-cleanup-t03.md](release-log/unreleased/1781-kenta-cleanup-t03.md)
+- [1781-kenta-cleanup-u01f.md](release-log/unreleased/1781-kenta-cleanup-u01f.md)
+- [1781-kenta-cleanup-u02.md](release-log/unreleased/1781-kenta-cleanup-u02.md)
+- [1781-kenta-cleanup-u03.md](release-log/unreleased/1781-kenta-cleanup-u03.md)
+- [1781-kenta-cleanup-u04.md](release-log/unreleased/1781-kenta-cleanup-u04.md)
+- [1781-kenta-cleanup-u05.md](release-log/unreleased/1781-kenta-cleanup-u05.md)
+- [1781-kenta-cleanup-u06.md](release-log/unreleased/1781-kenta-cleanup-u06.md)
+- [1781-kenta-cleanup-u07.md](release-log/unreleased/1781-kenta-cleanup-u07.md)
+- [1728-kenta-cleanup.md](release-log/unreleased/1728-kenta-cleanup.md)
+- [1729-kenta-train33.md](release-log/unreleased/1729-kenta-train33.md)
+- [1730-kenta-train35.md](release-log/unreleased/1730-kenta-train35.md)
+- [1731-kenta-train34.md](release-log/unreleased/1731-kenta-train34.md)
+- [1732-kenta-train-36.md](release-log/unreleased/1732-kenta-train-36.md)
+- [1733-kenta-train-37.md](release-log/unreleased/1733-kenta-train-37.md)
+- [1734-kenta-train-38.md](release-log/unreleased/1734-kenta-train-38.md)
+- [1735-masato-demaecan-qa-checklist.md](release-log/unreleased/1735-masato-demaecan-qa-checklist.md)
+- [1736-masato-ubereats-probe.md](release-log/unreleased/1736-masato-ubereats-probe.md)
+- [1737-masato-ubereats-probe-result.md](release-log/unreleased/1737-masato-ubereats-probe-result.md)
+- [1738-masato-follower-import-resume.md](release-log/unreleased/1738-masato-follower-import-resume.md)
+- [1739-masato-ubereats-probe-cause.md](release-log/unreleased/1739-masato-ubereats-probe-cause.md)
+- [1740-masato-ubereats-sandbox-probe-result.md](release-log/unreleased/1740-masato-ubereats-sandbox-probe-result.md)
+- [1741-masato-ubereats-webhook-signature.md](release-log/unreleased/1741-masato-ubereats-webhook-signature.md)
+- [1742-masato-ubereats-probe-record.md](release-log/unreleased/1742-masato-ubereats-probe-record.md)
+- [1743-kenta-train40-v8.md](release-log/unreleased/1743-kenta-train40-v8.md)
+- [1744-kenta-api-train.md](release-log/unreleased/1744-kenta-api-train.md)
+- [1745-masato-ubereats-deployment-record.md](release-log/unreleased/1745-masato-ubereats-deployment-record.md)
+- [1746-masato-follower-import-verification.md](release-log/unreleased/1746-masato-follower-import-verification.md)
+- [1748-masato-ubereats-request-status.md](release-log/unreleased/1748-masato-ubereats-request-status.md)
+- [1749-kenta-slack-sync-hourly.md](release-log/unreleased/1749-kenta-slack-sync-hourly.md)
+- [1750-masato-delivery-webhook-payload-tests.md](release-log/unreleased/1750-masato-delivery-webhook-payload-tests.md)
+- [1751-masato-follower-import-screen-step.md](release-log/unreleased/1751-masato-follower-import-screen-step.md)
+- [1752-masato-line-account-rollback.md](release-log/unreleased/1752-masato-line-account-rollback.md)
+- [1754-masato-line-add-url-webhook-alias.md](release-log/unreleased/1754-masato-line-add-url-webhook-alias.md)
+- [1755-masato-delivery-phase2-slots.md](release-log/unreleased/1755-masato-delivery-phase2-slots.md)
+- [1756-masato-follower-insight-line-status.md](release-log/unreleased/1756-masato-follower-insight-line-status.md)
+- [1757-kenta-claude-c-groupA.md](release-log/unreleased/1757-kenta-claude-c-groupA.md)
+- [1757-kenta-train41-preflight.md](release-log/unreleased/1757-kenta-train41-preflight.md)
+- [1757-kenta-v8-style-money.md](release-log/unreleased/1757-kenta-v8-style-money.md)
+- [1761-masato-line-account-wizard-v06.md](release-log/unreleased/1761-masato-line-account-wizard-v06.md)
+- [1764-kenta-terms-and-qa-plan.md](release-log/unreleased/1764-kenta-terms-and-qa-plan.md)
+- [1765-kenta-api3-refunds.md](release-log/unreleased/1765-kenta-api3-refunds.md)
+- [1765-kenta-api4-style-followup.md](release-log/unreleased/1765-kenta-api4-style-followup.md)
+- [1765-kenta-behavior-fix.md](release-log/unreleased/1765-kenta-behavior-fix.md)
+- [1765-kenta-booking-ci-checks.md](release-log/unreleased/1765-kenta-booking-ci-checks.md)
+- [1765-kenta-deploy-safety-reason.md](release-log/unreleased/1765-kenta-deploy-safety-reason.md)
+- [1765-kenta-gap1-1016.md](release-log/unreleased/1765-kenta-gap1-1016.md)
+- [1765-kenta-gap3-api-integration.md](release-log/unreleased/1765-kenta-gap3-api-integration.md)
+- [1765-kenta-gapui-integration.md](release-log/unreleased/1765-kenta-gapui-integration.md)
+- [1765-kenta-liff-booking-review.md](release-log/unreleased/1765-kenta-liff-booking-review.md)
+- [1765-kenta-liff-files-1016.md](release-log/unreleased/1765-kenta-liff-files-1016.md)
+- [1765-kenta-prod-flags.md](release-log/unreleased/1765-kenta-prod-flags.md)
+- [1765-kenta-security-b351-remainder.md](release-log/unreleased/1765-kenta-security-b351-remainder.md)
+- [1765-kenta-security-integration.md](release-log/unreleased/1765-kenta-security-integration.md)
+- [1765-kenta-security-monitor-1016.md](release-log/unreleased/1765-kenta-security-monitor-1016.md)
+- [1765-kenta-webhook-clock-checks.md](release-log/unreleased/1765-kenta-webhook-clock-checks.md)
+- [1766-kenta-security-remainder.md](release-log/unreleased/1766-kenta-security-remainder.md)
+- [1767-kenta-deploy-safety-entry.md](release-log/unreleased/1767-kenta-deploy-safety-entry.md)
+- [1770-kenta-cleanup-d01.md](release-log/unreleased/1770-kenta-cleanup-d01.md)
+- [1771-kenta-cleanup-a06.md](release-log/unreleased/1771-kenta-cleanup-a06.md)
+- [1772-masato-line-account-v06-display.md](release-log/unreleased/1772-masato-line-account-v06-display.md)
+- [1773-masato-line-webhook-v06.md](release-log/unreleased/1773-masato-line-webhook-v06.md)
+- [1774-masato-ubereats-store-select.md](release-log/unreleased/1774-masato-ubereats-store-select.md)
+- [機能7 リマインダを設計と並べる](release-log/unreleased/448-kenta-reminders-v6-visual.md)
+- [機能8 自動応答を設計と並べる](release-log/unreleased/450-kenta-auto-replies-v6-visual.md)
+- [568-masato-opsa-tenant-create.md](release-log/unreleased/568-masato-opsa-tenant-create.md)
+- [README.md](release-log/unreleased/README.md)
+- [pending-kenta-matchg-g14.md](release-log/unreleased/pending-kenta-matchg-g14.md)
+- [pending-kenta-matchg-g20.md](release-log/unreleased/pending-kenta-matchg-g20.md)
+- [pending-kenta-matchg-g23-support.md](release-log/unreleased/pending-kenta-matchg-g23-support.md)
+- [pending-kenta-matchg-g23.md](release-log/unreleased/pending-kenta-matchg-g23.md)
+- [pending-kenta-matchg-g24.md](release-log/unreleased/pending-kenta-matchg-g24.md)
+- [pending-kenta-matchk-heavy-1015.md](release-log/unreleased/pending-kenta-matchk-heavy-1015.md)
+- [pending-kenta-matchk-night-1015.md](release-log/unreleased/pending-kenta-matchk-night-1015.md)
+- [pending-kenta-measure2-analysis-1014.md](release-log/unreleased/pending-kenta-measure2-analysis-1014.md)
+- [pending-kenta-measure2-seats-month-1014.md](release-log/unreleased/pending-kenta-measure2-seats-month-1014.md)
+- [pending-kenta-one-f2x-j7-1015.md](release-log/unreleased/pending-kenta-one-f2x-j7-1015.md)
+- [pending-kenta-testfix-1015.md](release-log/unreleased/pending-kenta-testfix-1015.md)
+- [pending-kenta-train40-evening.md](release-log/unreleased/pending-kenta-train40-evening.md)
+- [H-18 作成途中の復元](release-log/unreleased/2049-kenta-form-draft-restore.md)
+- [pending-kenta-fix1-bugs-1025.md](release-log/unreleased/pending-kenta-fix1-bugs-1025.md)
+- [1781-kenta-cleanup-f01.md](release-log/unreleased/1781-kenta-cleanup-f01.md)
+- [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)
+- [1776-masato-line-webhook-padding.md](release-log/unreleased/1776-masato-line-webhook-padding.md)
+- [1781-kenta-cleanup-q01w1.md](release-log/unreleased/1781-kenta-cleanup-q01w1.md)
+- [1781-kenta-cleanup-q01w3.md](release-log/unreleased/1781-kenta-cleanup-q01w3.md)
+- [1781-kenta-cleanup-q01w4.md](release-log/unreleased/1781-kenta-cleanup-q01w4.md)
+- [1781-kenta-cleanup-q03.md](release-log/unreleased/1781-kenta-cleanup-q03.md)
+- [1781-kenta-cleanup-s02b.md](release-log/unreleased/1781-kenta-cleanup-s02b.md)
+- [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
+
+- [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
+- [金額と電話番号の共通化](release-log/unreleased/1781-kenta-cleanup-q01f1.md)
+- [画面コードの置き場と名前の整理](release-log/unreleased/1781-kenta-cleanup-s02a.md)
+- [画面コード整理の検査記録](qa/cleanup-s02a-1019.md)
+
+- [cleanup-q02a1-1019.md](qa/cleanup-q02a1-1019.md)
+
+- [cleanup-q02a1-source-tests.tsv](qa/cleanup-q02a1-source-tests.tsv)
+
+- [1781-kenta-cleanup-q02a1.md](release-log/unreleased/1781-kenta-cleanup-q02a1.md)
+
+- [Q02A2の整理・検証記録](qa/cleanup-q02a2-1019.md)
+- [1781-kenta-cleanup-q02a2.md](release-log/unreleased/1781-kenta-cleanup-q02a2.md)
+- [日本時間の日付の共通化](release-log/unreleased/1781-kenta-cleanup-q01w6.md)
+- [画面と共通処理の試験の整理](release-log/unreleased/1781-kenta-cleanup-q02a3.md)
+- [未使用処理と重複試験の整理](release-log/unreleased/1781-kenta-cleanup-x02a.md)
+
+## 台本整理で加わった文書
+
+- [台本とCIの入口](../scripts/README.md)
+- [S02Cの検査記録](qa/cleanup-s02c-1019.md)
+- [S02Cの変更履歴](release-log/unreleased/1781-kenta-cleanup-s02c.md)
+
+- [コードの構成と名前](code-structure.md)
+- [コメントの書き方](comment-style.md)
+
+- [構成と接続の整理の更新履歴](release-log/unreleased/1781-kenta-cleanup-s02z.md)
+- [予約写真とお客さまの画面・設定カードの表示改善](release-log/unreleased/1781-kenta-cleanup-n01.md)
+- [LINE受付枠の自動調整の設定と記録](release-log/unreleased/1781-kenta-cleanup-f24s.md)
+- [自動で合わせるルールの日付と席数入力の改善](release-log/unreleased/1781-kenta-cleanup-f24n.md)
+- [画面の権限確認の統一](release-log/unreleased/1781-kenta-cleanup-q01s1.md)
+- [管理者によるLINEアカウント登録と接続確認](release-log/unreleased/1779-masato-admin-line-registration.md)
+- [LINEアカウント登録後の受信確認](release-log/unreleased/1780-masato-line-receipt-gate.md)
+
+- [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)
+- [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
+- [使われていない処理と重複する検査の整理履歴](release-log/unreleased/1781-kenta-cleanup-x02b.md)
+
+- [失敗時の案内と連続押しの防止](release-log/unreleased/1781-kenta-cleanup-q01s4.md)
+- [Q01S4 検査記録](qa/cleanup-q01s4-1020.md)
+- [支払いリンクの期限確認の修正履歴](release-log/unreleased/1781-kenta-cleanup-f03.md)
+- [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/1781-kenta-cleanup-q00.md)
+- [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
+
+## 引き継ぎで加わった文書
+
+- [文字を見る試験18ファイルの判断案](qa/quality-source-test-decisions.md)
+- [account-new のコード案内](../apps/web/src/v8/account-new/README.md)
+- [accounts-detail のコード案内](../apps/web/src/v8/accounts-detail/README.md)
+- [affiliate-offer-new のコード案内](../apps/web/src/v8/affiliate-offer-new/README.md)
+- [affiliates のコード案内](../apps/web/src/v8/affiliates/README.md)
+- [ai-reply のコード案内](../apps/web/src/v8/ai-reply/README.md)
+- [analytics のコード案内](../apps/web/src/v8/analytics/README.md)
+- [auto-replies のコード案内](../apps/web/src/v8/auto-replies/README.md)
+- [automations のコード案内](../apps/web/src/v8/automations/README.md)
+- [booking-bookings のコード案内](../apps/web/src/v8/booking-bookings/README.md)
+- [booking-gap のコード案内](../apps/web/src/v8/booking-gap/README.md)
+- [booking-menus のコード案内](../apps/web/src/v8/booking-menus/README.md)
+- [booking-passes のコード案内](../apps/web/src/v8/booking-passes/README.md)
+- [booking-payments のコード案内](../apps/web/src/v8/booking-payments/README.md)
+- [booking-staff のコード案内](../apps/web/src/v8/booking-staff/README.md)
+- [broadcast-detail のコード案内](../apps/web/src/v8/broadcast-detail/README.md)
+- [broadcasts のコード案内](../apps/web/src/v8/broadcasts/README.md)
+- [common-vars のコード案内](../apps/web/src/v8/common-vars/README.md)
+- [common-vars-edit のコード案内](../apps/web/src/v8/common-vars-edit/README.md)
+- [contents のコード案内](../apps/web/src/v8/contents/README.md)
+- [conversions のコード案内](../apps/web/src/v8/conversions/README.md)
+- [dashboard のコード案内](../apps/web/src/v8/dashboard/README.md)
+- [duplicates のコード案内](../apps/web/src/v8/duplicates/README.md)
+- [emergency のコード案内](../apps/web/src/v8/emergency/README.md)
+- [events のコード案内](../apps/web/src/v8/events/README.md)
+- [form-edit のコード案内](../apps/web/src/v8/form-edit/README.md)
+- [form-responses のコード案内](../apps/web/src/v8/form-responses/README.md)
+- [forms のコード案内](../apps/web/src/v8/forms/README.md)
+- [friend-add のコード案内](../apps/web/src/v8/friend-add/README.md)
+- [friend-add-publish のコード案内](../apps/web/src/v8/friend-add-publish/README.md)
+- [friend-add-runs のコード案内](../apps/web/src/v8/friend-add-runs/README.md)
+- [friend-detail のコード案内](../apps/web/src/v8/friend-detail/README.md)
+- [friends のコード案内](../apps/web/src/v8/friends/README.md)
+- [hq のコード案内](../apps/web/src/v8/hq/README.md)
+- [hq-attention のコード案内](../apps/web/src/v8/hq-attention/README.md)
+- [hq-banners のコード案内](../apps/web/src/v8/hq-banners/README.md)
+- [hq-broadcasts のコード案内](../apps/web/src/v8/hq-broadcasts/README.md)
+- [hq-deliveries のコード案内](../apps/web/src/v8/hq-deliveries/README.md)
+- [hq-starter-sets のコード案内](../apps/web/src/v8/hq-starter-sets/README.md)
+- [hq-store-compare のコード案内](../apps/web/src/v8/hq-store-compare/README.md)
+- [hq-templates のコード案内](../apps/web/src/v8/hq-templates/README.md)
+- [inbox-chat のコード案内](../apps/web/src/v8/inbox-chat/README.md)
+- [inbox-search のコード案内](../apps/web/src/v8/inbox-search/README.md)
+- [inflow-links のコード案内](../apps/web/src/v8/inflow-links/README.md)
+- [line-notifications のコード案内](../apps/web/src/v8/line-notifications/README.md)
+- [login のコード案内](../apps/web/src/v8/login/README.md)
+- [mcp-connect のコード案内](../apps/web/src/v8/mcp-connect/README.md)
+- [mileage のコード案内](../apps/web/src/v8/mileage/README.md)
+- [mobile-todo のコード案内](../apps/web/src/v8/mobile-todo/README.md)
+- [nen-campaigns のコード案内](../apps/web/src/v8/nen-campaigns/README.md)
+- [nen-health のコード案内](../apps/web/src/v8/nen-health/README.md)
+- [nen-members のコード案内](../apps/web/src/v8/nen-members/README.md)
+- [nen-pets のコード案内](../apps/web/src/v8/nen-pets/README.md)
+- [nen-posts のコード案内](../apps/web/src/v8/nen-posts/README.md)
+- [no-permission のコード案内](../apps/web/src/v8/no-permission/README.md)
+- [notifications のコード案内](../apps/web/src/v8/notifications/README.md)
+- [onboarding のコード案内](../apps/web/src/v8/onboarding/README.md)
+- [ops のコード案内](../apps/web/src/v8/ops/README.md)
+- [reminders のコード案内](../apps/web/src/v8/reminders/README.md)
+- [restaurant のコード案内](../apps/web/src/v8/restaurant/README.md)
+- [restaurant-reservations のコード案内](../apps/web/src/v8/restaurant-reservations/README.md)
+- [rich-menu-edit のコード案内](../apps/web/src/v8/rich-menu-edit/README.md)
+- [rich-menu-sample のコード案内](../apps/web/src/v8/rich-menu-sample/README.md)
+- [rich-menus のコード案内](../apps/web/src/v8/rich-menus/README.md)
+- [scenario-detail のコード案内](../apps/web/src/v8/scenario-detail/README.md)
+- [scenario-first-step のコード案内](../apps/web/src/v8/scenario-first-step/README.md)
+- [scenarios のコード案内](../apps/web/src/v8/scenarios/README.md)
+- [settings のコード案内](../apps/web/src/v8/settings/README.md)
+- [style-dashboard のコード案内](../apps/web/src/v8/style-dashboard/README.md)
+- [tag-edit のコード案内](../apps/web/src/v8/tag-edit/README.md)
+- [tags のコード案内](../apps/web/src/v8/tags/README.md)
+- [template-detail のコード案内](../apps/web/src/v8/template-detail/README.md)
+- [template-edit のコード案内](../apps/web/src/v8/template-edit/README.md)
+- [templates のコード案内](../apps/web/src/v8/templates/README.md)
+- [users のコード案内](../apps/web/src/v8/users/README.md)
+- [visit-stamps のコード案内](../apps/web/src/v8/visit-stamps/README.md)
+- [webhooks のコード案内](../apps/web/src/v8/webhooks/README.md)
+- [webinar-edit のコード案内](../apps/web/src/v8/webinar-edit/README.md)
+- [webinars のコード案内](../apps/web/src/v8/webinars/README.md)
+- [code-rules](code-rules.md)
+- [feature-guides](feature-guides.md)
+- [handoff-api](handoff-api.md)
+- [handoff-cleanup](handoff-cleanup.md)
+- [dependency-notices](legal/dependency-notices.tsv)
+- [distribution-and-terms](legal/distribution-and-terms.md)
+- [musubo 専用リポジトリへの移行と権利表示の確認事項](legal/musubo-repository-transition.md) — 提案・権利未確定、確認 2026-11-06
+- [cleanup-d02-1020](qa/cleanup-d02-1020.md)
+- [1781-kenta-cleanup-d02](release-log/unreleased/1781-kenta-cleanup-d02.md)
+- [v8-change-map](v8-change-map.md)
+- [見つからないページのコード案内](../apps/web/src/v8/not-found/README.md)
+- [記録の JSON を開いて写す部品のコード案内](../apps/web/src/v8/log-record/README.md)
+- [送信記録の見やすさ](release-log/unreleased/1835-kenta-sendlog.md)
+- [デリバリー注文連携の提供状況](release-log/unreleased/1781-kenta-cleanup-u01l.md)
+- [Uber Eatsの注文受信と重複操作の防止](release-log/unreleased/1800-masato-uber-orders.md)
+- [Uber Eatsの接続確認・解除・再ログイン](release-log/unreleased/1806-masato-uber-connection-management.md)
+- [検査結果と品質記録の整合](release-log/unreleased/1781-kenta-cleanup-f04.md)
+- [デリバリー連携の準備状況を明確化](release-log/unreleased/1781-kenta-cleanup-u01m.md)
+- [公開前の点検と更新履歴の参照](release-log/unreleased/1781-kenta-cleanup-f05.md)
+- [LINE連携の権限確認の更新](release-log/unreleased/1781-kenta-proxy-permissions.md)
+- [リンクの本人確認と案内の更新](release-log/unreleased/1781-kenta-link-identity.md)
+- [登録ファイルの確認と公開の更新](release-log/unreleased/1781-kenta-media-delivery.md)
+- [手動テスト版の見た目と予約の状態の更新](release-log/unreleased/1807-kenta-manual-test-polish.md)
+- [失敗の文を日本語に](release-log/unreleased/1809-kenta-japanese-failure-messages.md)
+- [登録メディアの件数が取れない時の表示](release-log/unreleased/1810-kenta-media-count-dash.md)
+- [画面づくりの説明書の更新](release-log/unreleased/1812-kenta-v8-docs-drift.md)
+- [一覧の読み込みの作りをそろえる](release-log/unreleased/1813-kenta-worker-list-paging.md)
+- [失敗の記録の名前をそろえる](release-log/unreleased/1814-kenta-worker-failure-names.md)
+- [アフィリエイト登録の上書き防止](release-log/unreleased/1815-kenta-affiliate-save-conflict.md)
+- [手動テストの指摘の直し（浮いた部品・すべる切り替え・予約元）](release-log/unreleased/1816-kenta-raised-controls.md)
+- [予約の LIFF のやり取りの形をそろえる](release-log/unreleased/1817-kenta-liff-booking-response.md)
+- [コメントと使われていない部品の片づけ（まとめ）](release-log/unreleased/1826-kenta-train-later-b.md)
+- [決まりの説明書の整理](release-log/unreleased/1822-kenta-docs-current-rules.md)
+- [使われていない部品の片づけ](release-log/unreleased/1823-kenta-remove-unused-files.md)
+- [共通の仕組みの説明の書き方をそろえる](release-log/unreleased/1824-kenta-package-comments.md)
+- [お知らせを白いカードにそろえる](release-log/unreleased/1825-kenta-notice-card.md)
+- [見た目の決まりを 10-25 の決定に合わせる](release-log/unreleased/1827-kenta-rules-1025.md)
+- [LIFF の自動点検の書き換え](release-log/unreleased/1820-kenta-liff-behavior-tests.md)
+- [仕組みの説明の書き方をそろえる](release-log/unreleased/1821-kenta-worker-comments.md)
+- [古い見た目の切り替えの片づけ](release-log/unreleased/1818-kenta-remove-v7-leftovers.md)
+- [見た目の自動点検の整理](release-log/unreleased/1819-kenta-q02d-tests.md)
+- [部品の弱点とコードの自動点検](release-log/unreleased/1828-kenta-security-ci.md)
+- [マイレージの試験の書き換え（B-04）](release-log/unreleased/1829-kenta-q02b-b04.md)
+- [不安定な試験の直し](release-log/unreleased/1830-kenta-flaky-iat-1026.md)
+- [直し①②（不具合とiPad横の幅）](release-log/unreleased/1831-kenta-train-m1-1026.md)
+- [Next.js の版上げ](release-log/unreleased/1833-kenta-next-patch.md)
+- [LINEの鍵の期限の知らせ](release-log/unreleased/1834-kenta-token-expiry.md)
+- [更新履歴を配備1回ごとに分ける下ごしらえ](release-log/unreleased/1834-kenta-release-summary.md)
+- [友だちのブロックの数が毎日 0 のまま記録されていたのを直し、日本時間の日の区切](release-log/unreleased/1834-kenta-block-count.md)
+- [受信箱の一覧を、未読を先にせず新しい順だけで並べて取り出せるようにした](release-log/unreleased/1834-kenta-inbox-sort.md)
+- [ダッシュボードの数を先週の同じ曜日](release-log/unreleased/1834-kenta-kpi-compare.md)
+- [数の帯の先週比と友だちの上限](release-log/unreleased/1835-kenta-kpi-band.md)
+- [テンプレート一覧のLINEでの見え方](release-log/unreleased/1835-kenta-template-preview.md)
+- [見つからないページの場所とよく使うページ](release-log/unreleased/1835-kenta-notfound.md)
+- [ベルと通知の画面のタブを「すべて・未読・システム」にし、未読は古いものまで漏れず](release-log/unreleased/1835-kenta-bell-inbox.md)
+- [一斉配信を作る画面に「2/5 配信対象」のように今の段を出し、配信名・送る相手・](release-log/unreleased/1835-kenta-broadcast-steps.md)
+- [運用状態の更新履歴を、検証へ入れた1回ごとに1枚のカードで見られるようにした。日](release-log/unreleased/1835-kenta-release-history.md)
+- [店の比較で、開いて日が浅い店もそろった日の分で数を出すようにし、テンプレートのフ](release-log/unreleased/1832-kenta-count-rules.md)
+- [友だちやトークがとても多いお店でも画面が遅くならないかを、毎週自動で確かめるよう](release-log/unreleased/1832-kenta-scale-guard.md)
+- [お店の形を選んだ時に入る最初のセットに、友だち追加のあいさつの下書きと、飲食店の](release-log/unreleased/1832-kenta-starter-content.md)
+- [新しいアカウントの初期セットが足りない時に、足りない物だけを止めた状態で入れ直せ](release-log/unreleased/1832-kenta-starter-ensure.md)
+- [スタイルを選ぶ時の見本として、飲食店・サロン・面談・標準・EC ごとに「お客さま](release-log/unreleased/1837-kenta-style-player.md)
+- [スタイルを選ぶ画面・最初の1通の確かめ・初期セットを配る](release-log/unreleased/1837-kenta-first-ten-screens.md)
+- [店の比較の違いだけ表示](release-log/unreleased/1837-kenta-store-diff.md)
+- [直し③⑤（部品と言葉づかい）](release-log/unreleased/1836-kenta-train-m2c-1026.md)
+- [分け方のタグ・シナリオの見本と、本部の初期セットを標準に戻す口](release-log/unreleased/1838-kenta-starter-samples.md)
+- [直し④（部品の手入れ）](release-log/unreleased/1839-kenta-train-m2e-1026.md)
+- [使っている部品に重大な弱点が見つかった週は、自動の点検が赤くなって分かるようにし](release-log/unreleased/1840-kenta-audit-weekly-red.md)
+- [統括のアカウントのカードの高さとボタンの位置を、同じ行でそろえた](release-log/unreleased/1841-kenta-hq-card-height.md)
+- [最初の10分の全アカウントのまとめ（運営だけ）](release-log/unreleased/1843-kenta-funnel-summary.md)
+- [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
+- [ダッシュボードの数を4枚にそろえ、いつもと違う端末の知らせを見やすい場所に移した](release-log/unreleased/1844-kenta-dashboard-kpi.md)
+- [画面の地・カードの影・知らせ・日付の表示](release-log/unreleased/1849-kenta-tone2-card-a.md)
+- [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
+- [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
+- [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
+- [共通UIの並び・形の統一（パンくず・ボタン・選択・空表示など）](release-log/unreleased/1970-kenta-muse-ui-layout.md)
+- [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
+- [飲食店の閲覧のみの案内](release-log/unreleased/1953-kenta-int.md)
+- [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
+- [電話予約のパンくず・予約経路タブ・来店スタンプ・業種盤の担当欄の修正](release-log/unreleased/1953-kenta-muse-booking-ec.md)
+- [飲食店のLINE来店フォローの本番接続（7行・送受・時期・本文・承認）](release-log/unreleased/1984-kenta-muse-line-followup-live.md)
+- [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)
+- [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
+- [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
+
+- [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
+
+- [左メニューのスクロール・予約表示・敬称の修正](release-log/unreleased/1916-kenta-sidebar-scroll.md)
+- [増減の符号と未分類の灰丸](release-log/unreleased/1858-kenta-delta-folder.md) — 増減の印とフォルダ表示の反映履歴。
+- [一斉配信の作成画面名と外枠](release-log/unreleased/1859-kenta-broadcast-title.md) — 作成手順の反映履歴。
+- [ページ送りの現在地と表示条件](release-log/unreleased/1860-kenta-pagination.md) — 一覧操作の反映履歴。
+- [配布状況と記録一覧の配置](release-log/unreleased/1861-kenta-distribution-history.md) — 配布の表示とページ送りの反映履歴。
+- [画面の表示・配置の追加修復](release-log/unreleased/1852-kenta-ui-followup.md)
+- [完成した画面修復の先行反映](release-log/unreleased/1853-kenta-completed-ui.md)
+- [隣接する操作・案内の間隔](release-log/unreleased/1854-kenta-adjacent-spacing.md)
+- [分析と友だち詳細の案内](release-log/unreleased/1855-kenta-analysis-friend-notices.md)
+- [予約メニューの案内の間隔](release-log/unreleased/1856-kenta-booking-notice-spacing.md)
+
+- [友だち一覧の差の印](release-log/unreleased/1862-kenta-friends-delta.md) — 増減と要確認の共通表示の反映履歴。
+- [友だち一覧の増減の札の色と符号](release-log/unreleased/1916-kenta-muse-friends-delta-color.md) — 減少の赤い札・悪化・全角符号の反映履歴。
+- [版表示と窓の最初の操作](release-log/unreleased/1863-kenta-version-focus.md) — 表示と初期焦点の反映履歴。
+- [更新履歴の案内先を管理画面に変更](release-log/unreleased/1930-kenta-muse-history-pagination.md) — 更新案内の反映履歴。
+- [一覧の読み込み表示](release-log/unreleased/1864-kenta-list-loading.md) — 一斉配信の列ずれと自動応答の読み込み表示の反映履歴。
+- [統括の接続情報の更新](release-log/unreleased/1865-kenta-connection-refresh.md) — 単件・全件と再読み込みの反映履歴。
+- [選択中の絞り込み表示](release-log/unreleased/1866-kenta-filter-selection.md) — 薄緑の地と緑の枠・文字の反映履歴。
+- [自動処理のタグ未選択表示](release-log/unreleased/1867-kenta-unselected-tag-summary.md) — 未選択と設定済みの区別の反映履歴。
+- [フォームの区切りと店の接続案内](release-log/unreleased/1868-kenta-form-divider-store-warning.md) — 二重線の解消と対象店名の反映履歴。
+- [シナリオの右詳細の整理](release-log/unreleased/1869-kenta-scenario-detail-panel.md) — 配信状況・説明・名前変更と操作の反映履歴。
+- [個別設定のスイッチ表示](release-log/unreleased/1871-kenta-individual-setting-switches.md) — タグ編集と機能設定のオン・オフの反映履歴。
+- [検証用店舗の同時投稿](release-log/unreleased/1872-masato-instagram-staging-post-test.md) — 検証対象に限る同時投稿の反映履歴。
+- [本文URLがないときの補足](release-log/unreleased/1873-kenta-template-url-note.md) — テンプレート本文のURL一覧を必要なときに表示する反映履歴。
+- [同時投稿画像の縦横比](release-log/unreleased/1874-masato-instagram-image-ratio.md) — Instagramへ投稿する画像の比率を整える反映履歴。
+- [設定案内と配信結果の表現](release-log/unreleased/1875-kenta-setup-recipient-guidance.md) — 初期設定の一本化と宛先の受付表示の反映履歴。
+- [休憩表示と配信結果の位置](release-log/unreleased/1876-kenta-break-and-broadcast-results.md) — 休憩の見分け方と配信結果の数字の配置の反映履歴。
+- [二段階認証の説明](release-log/unreleased/1877-kenta-two-factor-help.md) — 二段階認証の画面に関する反映履歴。
+- [バナーの参照画像の説明](release-log/unreleased/1878-kenta-banner-reference-icons.md) — 説明の印の配置に関する反映履歴。
+- [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
+- [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
+- [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
+- [LINEログインのコピーと公開の案内](release-log/unreleased/1901-masato-line-login-guide-images.md) — 接続マニュアルStep 4の画像案内の反映履歴。
+- [プロバイダーID確認画面の案内](release-log/unreleased/1903-masato-provider-id-manual-image.md) — 接続マニュアルStep 2の画像案内の反映履歴。
+- [musuboのWebhook設定後の案内](release-log/unreleased/1904-masato-musubo-webhook-guide-image.md) — 接続マニュアルStep 3の画像案内の反映履歴。
+- [LINE接続マニュアルの画像整理](release-log/unreleased/1906-masato-line-guide-image-cleanup.md) — Step 3とStep 4の画像整理の反映履歴。
+- [LINE接続マニュアルStep 3の画像更新](release-log/unreleased/1907-masato-line-step3-images.md) — アイコンのモザイクとMessaging APIタブ案内の反映履歴。
+- [LINE接続マニュアルStep 1の画像更新](release-log/unreleased/1908-masato-line-step1-manager-image.md) — Messaging APIの実画面と秘匿表示の反映履歴。
+- [LINE接続マニュアルStep 4の画像更新](release-log/unreleased/1909-masato-line-login-guide-real-screens.md) — LINEログイン実画面と秘匿表示の反映履歴。
+- [LINE接続マニュアルStep 4の友だち追加画像更新](release-log/unreleased/1910-masato-line-linked-oa-guide-screen.md) — 現行画面の編集箇所と秘匿表示の反映履歴。
+- [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
+- [LINE通知の未設定表示](release-log/unreleased/1916-kenta-exa-notification-status.md) — 絞り込み件数と一覧の状態表示の反映履歴。
+- [畳んだ初期案内の設定表示](release-log/unreleased/1916-kenta-onboarding-fold.md) — 後回しの設定と進みを確認する反映履歴。
+- [自動処理のシナリオ・共通アクション未選択表示](release-log/unreleased/1916-kenta-muse-automation-unselected.md) — 未選択と設定済みの区別の反映履歴。
+- [友だち引き継ぎの進捗表示](release-log/unreleased/1914-masato-follower-handover-progress.md) — Penに合わせた動的な進捗画面の反映履歴。
+- [友だち引き継ぎの再開](release-log/unreleased/1915-masato-follower-import-resume.md) — 進捗画面からの再開と人数表示の反映履歴。
+- [LINE接続マニュアルの参考値秘匿](release-log/unreleased/1917-masato-line-manual-redaction-audit.md) — 画像と本文を全点検した反映履歴。
+- [LINE接続マニュアル画像のキャッシュ更新](release-log/unreleased/1920-masato-line-manual-image-cache.md) — 伏せ済み画像をブラウザで確実に表示する修正履歴。
+- [新規アカウントの受信箱をLINEのみに](release-log/unreleased/1922-masato-new-account-line-only-inbox.md) — 新規はLINEのみ・既存はメール表示を残す修正履歴。
+- [左上に統括名を表示](release-log/unreleased/1924-masato-sidebar-tenant-name.md) — 左上の名前を統括名に直した修正履歴。
+- [担当者が店の画面を開けない不具合の修正](release-log/unreleased/1930-kenta-follower-import-staff.md)
+- [閲覧のみの操作と理由の表示](release-log/unreleased/1930-kenta-perm-rebuild.md) — 閲覧時の操作表示と代理ログインの権限制御の反映履歴。
+- [左上の統括名の表示幅](release-log/unreleased/1926-masato-sidebar-name-width.md) — 統括名の表示幅を調整した反映履歴。
+- [店の比較から削除・アーカイブした店を除く](release-log/unreleased/1927-masato-store-comparison-archived.md) — 店の比較とCSVの修正履歴。
+- [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/1933-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
+- [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
+- [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。
+- [登録画面の補足文の削除](release-log/unreleased/1947-masato-registration-hints.md) — 確定済みの3項目の補足文を外した修正履歴。
+- [設定の画面のお知らせとカードの間隔](release-log/unreleased/1948-kenta-muse-settings-gap.md) — お知らせとカードの間の空きをそろえた修正履歴。
+- [本線の見張りの赤の修正](release-log/unreleased/1948-kenta-muse-guard-reds.md) — 言葉・CSS・確認窓の見張り9件の赤を直した反映履歴。
+- [押せない理由の表示](release-log/unreleased/1948-kenta-muse-fqa-table.md) — 閲覧のみの帯と除外の理由結び付けの反映履歴。
+- [今日送った内訳の名前表示](release-log/unreleased/1948-kenta-line-notify-kpi-label.md) — LINE通知の内訳を内部名でなくお知らせ名で出す反映履歴。
+- [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
+- [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
+- [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
+- [LINEの接続状態の統一](release-log/unreleased/1954-kenta-line-connection-state.md) — 反映履歴、確認 2026-10-30
+- [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
+- [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [Google投稿の確認時刻](release-log/unreleased/1955-kenta-swb-google-last-checked.md) — 状態確認の時刻表示の反映履歴。
+- [Google投稿の種類の札](release-log/unreleased/1955-kenta-swb-google-kind-chip.md) — 種類の札をそろえた反映履歴。
+- [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
+- [シナリオの人数と割合](release-log/unreleased/1951-kenta-scenario-counts.md) — 人数の欠測と登録人数による割合の修正履歴。
+- [シナリオ人数の単位と補足位置](release-log/unreleased/1951-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
+- [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
+- [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)
+- [Googleビジネスの権限表示](release-log/unreleased/1955-kenta-swb-google-permission.md) — 閲覧のみの案内と変更操作の反映履歴。
+- [ECのホームの確認項目](release-log/unreleased/1952-kenta-ec-dashboard.md) — 反映履歴、確認 2026-10-30
+- [共通の型と認証画面の帯の間隔](release-log/unreleased/1952-kenta-muse-fqa-space.md)
+- [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)
+- [サロンと面談の空の日の予約案内](release-log/unreleased/1953-kenta-empty-bookings.md) — 反映履歴、確認 2026-10-30
+- [教室のクラスと会員予約の空状態](release-log/unreleased/1953-kenta-lesson-empty-bookings.md) — 反映履歴、確認 2026-10-30
+- [飲食店の左メニューの予約項目](release-log/unreleased/1953-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
+- [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
+- [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
+- [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
+- [一斉配信の権限と結果の列](release-log/unreleased/1955-kenta-train-1029l.md) — 閲覧のみの操作と受付件数の反映履歴。
+- [すばやく送る操作と複製・フォルダの権限確認](release-log/unreleased/1956-kenta-train-1029m.md) — 反映履歴。
+- [musuboの公式ロゴ](release-log/unreleased/1957-masato-musubo-official-logo.md) — 反映履歴。
+- [アカウント登録の入口](release-log/unreleased/1958-masato-registration-entry.md) — 反映履歴。
+- [アカウントごとの二段階認証の件数](release-log/unreleased/1959-masato-account-mfa-count.md) — 反映履歴。
+- [musuboの表記と案内](release-log/unreleased/1960-masato-musubo-branding.md) — 反映履歴。
+- [アカウントごとの監査履歴](release-log/unreleased/1962-masato-audit-account-isolation.md) — 反映履歴。
+- [担当者のアカウント範囲](release-log/unreleased/1961-masato-single-account-staff-scope.md) — 反映履歴。
+- [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
+- [シナリオ一覧の権限とお知らせのベル](release-log/unreleased/1964-kenta-train-1029n.md) — 反映履歴。
+- [シナリオ一覧の操作と途中の失敗の案内](release-log/unreleased/1968-kenta-train-1029o.md) — 反映履歴。
+- [統括のアカウントのトークン期限の知らせの統一](release-log/unreleased/1988-kenta-muse-hq-token-notice.md) — 反映履歴。
+
+- [友だちの履歴の日付区切り](release-log/unreleased/1972-kenta-swb-date-group.md) — 反映履歴。
+- [ユーザー管理と二段階認証の配置](release-log/unreleased/1976-masato-staff-security-placement.md) — 反映履歴。
+- [ログイン時のパスキー確認](release-log/unreleased/1978-masato-passkey-login.md) — 反映履歴。
+- [店舗ごとの権限者数](release-log/unreleased/1979-masato-shed-account-members.md) — 反映履歴。
+- [ユーザー一覧の最終ログイン日](release-log/unreleased/1980-masato-staff-login-date.md) — 反映履歴。
+- [ユーザー管理画面の見た目](release-log/unreleased/1981-masato-staff-visual-cleanup.md) — 反映履歴。
+- [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。
+- [右の詳細欄の文字と操作の統一](release-log/unreleased/1984-kenta-drawer-unify.md) — 反映履歴、確認 2026-10-30。
+- [受信箱でテンプレートの中身を見て選ぶ](release-log/unreleased/1984-kenta-inbox-template-preview.md) — 反映履歴。
+- [画像欄・受信箱・飲食店と見本の本文](release-log/unreleased/1984-kenta-train-1029s.md) — 反映履歴。
+- [Google とSNSの接続](release-log/unreleased/1983-masato-google-sns-connection.md) — 反映履歴。
+- [LINE通知の登録](release-log/unreleased/1985-masato-notice-line-registration.md) — 反映履歴。
+- [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。
+
+- [失敗した時の案内](release-log/unreleased/1988-kenta-japanese-error-details.md) — 保存・削除などの失敗理由の日本語表示。
+
+- [フォルダを作れない理由の表示](release-log/unreleased/1988-kenta-folder-create-errors.md)
+- [来店フォローとリマインダの接続](release-log/unreleased/1988-kenta-line-followup-engines.md)
+
+- [自動送信の翌日時刻の待機と期限切れの記録](release-log/unreleased/1988-kenta-automation-next-day-wait.md) — 反映履歴、確認 2026-10-31。
+- [選ぶ操作の権限と絞り込み](release-log/unreleased/1988-kenta-train-1029t.md) — 反映履歴。
+- [来店フォローの送信直前の承認と予約の確認](release-log/unreleased/1989-kenta-followup-delivery-approval.md) — 反映履歴、確認 2026-10-31。
+- [LINE来店フォローを使わない判断](release-log/unreleased/1989-kenta-followup-not-using.md) — 反映履歴、確認 2026-10-31。
+- [シナリオ配信と初期設定の案内](release-log/unreleased/1989-kenta-train-1029u.md) — 反映履歴、確認 2026-10-31。
+- [デリバリー受注の予告表示](release-log/unreleased/1990-masato-delivery-sidebar-overflow.md) — 反映履歴、確認 2026-10-31。
+- [お気に入りの星の表示](release-log/unreleased/1991-masato-yellow-favorites.md) — 反映履歴、確認 2026-10-31。
+- [来店フォローの下書き・テスト・同じ版の公開と承認](release-log/unreleased/1997-kenta-followup-engines.md) — 反映履歴、確認 2026-10-31。
+- [初期セット・画面切替とクーポン](release-log/unreleased/1997-kenta-train-1029v.md) — 反映履歴、確認 2026-10-31。
+- [機能設定の利用条件](release-log/unreleased/1992-masato-feature-settings-self-gate.md) — 反映履歴、確認 2026-10-31。
+- [検証環境への配備手順](release-log/unreleased/1994-masato-cf-staging-deploy.md) — 反映履歴、確認 2026-10-31。
+- [統括の比較と分析](release-log/unreleased/1996-masato-hq-comparison-analysis.md) — 反映履歴、確認 2026-10-31。
+- [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
+- [店舗の担当者メニュー](release-log/unreleased/1999-masato-store-member-menu.md) — 反映履歴、確認 2026-10-31。
+- [LINEアカウント登録後の初期設定完了](release-log/unreleased/2000-masato-onboarding-account-complete.md) — 反映履歴、確認 2026-10-31。
+
+- [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
+- [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
+- [文字の操作を見分ける表示](release-log/unreleased/2005-kenta-text-button-actions.md) — 反映履歴、確認 2026-10-31。
+
+- [繰り返し設定の読み戻し](release-log/unreleased/2003-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
+- [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
+
+- [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。
+
+- [初期設定の案内と閲覧権限](release-log/unreleased/2004-kenta-setup-guidance.md) — 反映履歴、確認 2026-10-31。
+- [月謝の台帳と閲覧API](release-log/unreleased/2004-kenta-monthly-ledger.md) — 反映履歴、確認 2026-10-31。
+- [クラスの振替の決まり](release-log/unreleased/2005-kenta-class-makeup-rule.md) — 反映履歴、確認 2026-10-31
+
+
+- [選択カードの権限表示](release-log/unreleased/2005-kenta-radio-card-permission.md) — 反映履歴、確認 2026-10-31。
+- [受信箱の会話と機能設定の案内](release-log/unreleased/2006-masato-inbox-feature-gate.md) — 反映履歴、確認 2026-10-31。
+- [店舗設定のLINEアカウント管理導線](release-log/unreleased/2007-masato-store-line-account-menu.md) — 反映履歴、確認 2026-10-31。
+- [設定メニューの表示維持](release-log/unreleased/2008-masato-settings-nav.md) — 反映履歴、確認 2026-10-31。
+- [反映履歴：短い名前・時刻・状態の札の表示](release-log/unreleased/2011-kenta-short-text.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：予約の支払通知の受け取り](release-log/unreleased/2011-kenta-stripe-receipts.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：スタイル選択時の使い方の見本](release-log/unreleased/2011-kenta-style-demo.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：文字欄とシナリオの段の権限](release-log/unreleased/2011-kenta-text-step-permission.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+
+- [名簿の欠席受付](release-log/unreleased/2012-kenta-roster-absence.md) — 反映履歴、確認 2026-10-31
+- [反映履歴：窓の下の操作帯](release-log/unreleased/2012-kenta-dialog-leading.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：UID移行の行き先確認](release-log/unreleased/2012-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
+- [反映履歴：未保存の確認・設定の安全性・表示の改善](release-log/unreleased/2015-kenta-train-1031d.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [設定の入口からお客さまのデザインを開く](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 反映履歴、確認2026-10-31。
+
+- [受信箱の選択アカウント別バッジ](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴。確認 2026-10-31。
+
+- [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
+
+- [反映履歴：フォームの下書き・配信前確認・設定の表示](release-log/unreleased/2019-kenta-train-1031e.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [検証配備で未適用のDB変更だけを確認する](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 反映履歴、確認 2026-11-01。
+
+- [検証管理画面のPages Git連携の手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
+
+- [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
+
+- [操作する対象の確認](v8-requirements/confirmation-targets.md) — 危険な操作の直前に出す対象と環境の正本、確認2026-11-01。
+
+- [反映履歴：LINE来店フォロー・配信イメージ・閲覧と入力の守り](release-log/unreleased/2022-kenta-train-1031f.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [反映履歴：配信の人数と時期・来店フォロー・予約の一覧](release-log/unreleased/2023-kenta-train-1031g.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [反映履歴：通知・受付・回答フォーム・受信と教室の一覧](release-log/unreleased/2024-kenta-train-1031h.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [反映履歴：送る相手・操作先・登録案内・一覧の数字と会員の入口](release-log/unreleased/2025-kenta-train-1031i.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
+
+- [列車1031Qの変更](release-log/unreleased/2033-kenta-train-1031q.md)
+- [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [列車1031L：CSV・受付停止とお客さまの予約画面](release-log/unreleased/2028-kenta-train-1031l.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [電話予約・残席・見本の表示改善](release-log/unreleased/2029-kenta-train-1031m.md) — 反映履歴、確認 2026-11-01。
+
+- [価格・削除確認・卓とフォームの表示改善](release-log/unreleased/2030-kenta-train-1031n.md) — 反映履歴、確認 2026-11-01。
+
+- [予約操作・取込と入力案内の改善](release-log/unreleased/2031-kenta-train-1031o.md) — 反映履歴、確認 2026-11-01。
+
+- [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
+
+- [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
+
+- [予約案内・クーポンと入力理由の改善](release-log/unreleased/2035-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
+
+- [電話予約・卓とメニューの削除・下書き保存](release-log/unreleased/2059-kenta-telephone-delete-draft.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+
+- [飲食の卓・メニューの参照](engineering/restaurant-resource-references.md) — 削除時の参照確認（説明、確認日：2026-11-03）。
+- [LINE通知の運用上の騒音を減らす](release-log/unreleased/2037-masato-operation-alert-line-noise.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [通知量の警告](release-log/unreleased/2039-masato-operation-alert-quota.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [座席図の形・階と入口の操作改善](release-log/unreleased/2081-masato-restaurant-floor-layout.md) — 反映履歴、確認 2026-11-04。
+- [座席図の保存ボタンを見つけやすくする](release-log/unreleased/2083-masato-seat-save-visible.md) — 反映履歴、確認 2026-11-04。
+- [座席図の幅と保存操作をPenにそろえる](release-log/unreleased/2084-masato-seat-map-pen-proportion.md) — 反映履歴、確認 2026-11-04。
+- [座席図の保存ボタンを読みやすくする](release-log/unreleased/2085-masato-seat-save-contrast.md) — 反映履歴、確認 2026-11-04。
+- [検証管理画面の配備先を現在のPagesへそろえる](release-log/unreleased/2087-masato-staging-admin-target.md) — 反映履歴、確認 2026-11-04。
+- [担当者・登録・未保存の保護と利用数の改善](release-log/unreleased/2060-kenta-assignee-registration-guards.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [操作案内と予約・LIFFの改善](release-log/unreleased/2061-kenta-operations-reservations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [操作案内と予約・配信の改善](release-log/unreleased/2062-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [飲食メニューの説明・画像と使用先](release-log/unreleased/2063-kenta-restaurant-menu-media.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [EC 管理マイルと操作確認の改善](release-log/unreleased/2064-kenta-ec-mileage-operations.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [未保存の保護と操作対象の確認](release-log/unreleased/2065-kenta-unsaved-operation-confirm.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [操作対象の確認と画面案内の改善](release-log/unreleased/2066-kenta-operation-safety.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [編集内容の保護と操作確認の改善](release-log/unreleased/2067-kenta-edit-confirmation.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [保存と操作確認の改善](release-log/unreleased/2068-kenta-operation-improvements.md) — 運用者向けの変更記録（説明、確認日：2026-11-03）。
+- [Googleビジネスの店舗選択](release-log/unreleased/2076-masato-google-store-selector.md) — 反映履歴、確認 2026-11-04。
+- [操作確認の改善](release-log/unreleased/2079-kenta-train-1102P.md) — 運用者向けの変更記録（確認日：2026-11-04）。
+
+- [営業時間のPen照合と操作確認](testing/google-hours-pen-qa.md) — 承認済み18画面と営業時間タブの検査。
+
+- [Googleビジネスの営業時間タブ](release-log/unreleased/2082-masato-google-hours.md) — 営業時間の設定と確認の反映履歴。
+- [Google営業時間のPen再照合](release-log/unreleased/2092-masato-google-hours-pen.md) — 編集パネルと実記録に基づく履歴表示の修正。
+- [検証用 Google 投稿先の切替](release-log/unreleased/2086-masato-test2-google-post-test.md) — 反映履歴、確認 2026-11-04。
+- [Instagram投稿先IDの保存修正](release-log/unreleased/2088-masato-instagram-id-precision.md) — 反映履歴、確認 2026-11-04。
+- [TEST2投稿テスト後の検証設定復旧](release-log/unreleased/2089-masato-restore-google-test-gate.md) — 反映履歴、確認 2026-11-04。
+- [座席・卓管理を最新Penデザインにそろえる](release-log/unreleased/2091-masato-table-pen-design.md) — 卓の作成・複製、座席図と一覧の反映履歴。
+- [共有検証への反映順序と巻き戻し防止](release-log/unreleased/2090-masato-ordered-staging-delivery.md) — 反映履歴、確認 2026-11-05。
+- [本番候補の検証配備証拠の確認方法](release-log/unreleased/2093-masato-production-staging-proof.md) — 反映履歴、確認 2026-11-05。
+- [座席図の表示を最新Penに合わせる](release-log/unreleased/2098-masato-table-pen-visual.md) — 卓マーク、選択枠、保存表示の修正履歴。確認 2026-11-06。
+- [卓の追加・削除を座席図へ即時反映する](release-log/unreleased/21-masato-table-immediate-sync.md) — 未保存の配置を残して一覧と座席図を同期する修正履歴。確認 2026-11-07。
+- [卓の削除確認の環境表示を省く](release-log/unreleased/24-masato-table-delete-context.md) — 削除対象の確認に必要な項目を残す修正履歴。確認 2026-11-08。
+- [旧配備経路の停止確認](release-log/unreleased/20-masato-staging-cutover-gate.md) — 検証配備の切り替え前に行う確認の反映履歴。確認 2026-11-07。
+- [公開中の検証版の履歴を新リポジトリへ取り込む](release-log/unreleased/22-masato-published-history-sync.md) — 検証配備の巻き戻しを防ぐための履歴取り込み。確認 2026-11-07。
+- [musuboの新料金・申込フロー](release-log/unreleased/29-masato-musubo-pricing.md) — 料金、申込、請求の反映履歴。確認 2026-11-10。
+- [Googleビジネスの営業時間を予約全体の基準にする](release-log/unreleased/34-masato-google-hours.md) — 接続案内、予約・受付・在庫の営業時間統一。確認 2026-11-10。
+- [Googleビジネスの営業時間を全業種の基準にする](release-log/unreleased/39-masato-google-hours-all-styles.md) — 共通の接続案内、予約・通知・受信箱・差し込みの統一。確認 2026-11-11。
+- [登録メディアの名前変更と操作メニュー](release-log/unreleased/35-masato-media-actions-fix.md) — 登録後の編集と操作表示の修正履歴。確認 2026-11-10。
+- [登録メディア一覧の操作をシンプルにする](release-log/unreleased/40-masato-media-list-simplify.md) — 選択枠の位置と一覧表示の整理。確認 2026-11-11。
+- [登録メディアの名前変更とフォルダ移動を直す](release-log/unreleased/43-masato-media-edit-cors.md) — 保存時の通信エラー修正履歴。確認 2026-11-11。
+- [受信箱のテンプレートの差し込みと二重表示を直す](release-log/unreleased/45-kenta-inbox-template-duplicate.md) — 予約の差し込み・スマホの二重表示・送るとこうなるの見本の修正履歴。確認 2026-11-12。
+- [営業時間のカードの見出しを途中で割らない](release-log/unreleased/48-kenta-hours-heading.md) — 1152px の営業時間の見出しの折り返しの修正履歴。確認 2026-11-12。
+- [旧リポジトリの残りの枝8本を移す](release-log/unreleased/51-kenta-port-legacy-branches.md) — ライバル機能・見直しの残り・撮影用の偽 API などの移植の履歴。確認 2026-11-13。
+- [フォルダの削除確認・A/B の本番記録・EC 自動通知の上限](release-log/unreleased/52-kenta-migrations-port.md) — 旧リポジトリから移した migration 3本の履歴。確認 2026-11-13。
+- [見せる範囲とカレンダーのつぶれ](release-log/unreleased/55-kenta-a14-layout.md) — 1152px で左の列がつぶれていた修正の履歴。確認 2026-11-13。
+- [説明の吹き出しと投稿カードの空き](release-log/unreleased/54-kenta-posts-tip-cards.md) — 吹き出しの縦の列と、カードの右の空きの修正履歴。確認 2026-11-13。
+- [予約の取り消しで確認時の版を照らす](release-log/unreleased/53-kenta-booking-cancel-version.md) — 古い確認のまま取り消さない修正履歴。確認 2026-11-13。
+- [時々落ちるカレンダーの試験を安定させる](release-log/unreleased/57-kenta-d15-flaky-tests.md) — 自動の確認の安定化の履歴。確認 2026-11-13。
+- [A/B の結果の取得失敗を知らせる](release-log/unreleased/58-kenta-r4c-ab-result-load.md) — A/B の結果を読めない時の知らせ方の修正履歴。確認 2026-11-14。
+- [閲覧のみで隠れていた操作を灰色＋理由にそろえる](release-log/unreleased/60-kenta-viewer-gray-buttons.md) — 権限の無い人への見せ方をそろえた履歴。確認 2026-11-14。
+- [テンプレートの本文の文字数](release-log/unreleased/61-kenta-template-text-count.md) — 絵文字の数え方と上限超えの修正履歴。確認 2026-11-14。
+- [文書：閲覧のみの操作の読み替え](release-log/unreleased/62-kenta-docs-gray.md) — 決まりの文書の食い違いを直した履歴。確認 2026-11-14。
+- [予約を入れるボタンの言葉](release-log/unreleased/63-kenta-booking-create-words.md) — 面談・教室の言い換えの履歴。確認 2026-11-14。
+- [トークン期限切れの内訳](release-log/unreleased/64-kenta-token-expiry-breakdown.md) — 接続の問題の内訳を出した履歴。確認 2026-11-14。
+- [選んだ候補の状態を区別して出す](release-log/unreleased/65-kenta-picker-selected-state.md) — 候補を出せない理由を分けた履歴。確認 2026-11-14。
+- [列車 1114](release-log/unreleased/66-kenta-train-1114.md) — 8件をまとめて入れた履歴。確認 2026-11-14。
+- [文書：古いボタンの言葉をそろえる](release-log/unreleased/67-kenta-docs-words.md) — 受け入れ表の言葉を画面に合わせた履歴。確認 2026-11-14。
+- [アフィリエイトの上書き防止](release-log/unreleased/68-kenta-affiliate-expected.md) — 右パネルの保存の競合防止の履歴。確認 2026-11-14。
+- [列車 1114b](release-log/unreleased/70-kenta-train-1114b.md) — まとめて入れた直しの履歴。確認 2026-11-15。
+- [閲覧のみの操作を灰色に（残り）](release-log/unreleased/71-kenta-viewer-gray-app.md) — #60 の続きの履歴。確認 2026-11-15。
+- [文書：A15 の判断を言葉とスタイルの表へ](release-log/unreleased/72-kenta-a15-docs.md) — 来なかった・LINE通知の入口の履歴。確認 2026-11-15。
+- [文書：登録メディアの受け入れ表](release-log/unreleased/74-kenta-media-docs.md) — 一度に10件・使用先の出し方の履歴。確認 2026-11-15。
+- [文書：手動テストの要件の整理](release-log/unreleased/79-kenta-a15-req.md) — 画面と決定に合わせた要件の変更履歴。確認 2026-11-15。
+- [文書：本番前の点検3資料の見直しとオーナー1枚](release-log/unreleased/85-kenta-d6-handoff.md) — 点検表・二段階認証・事故手順の履歴。確認 2026-11-16。
+- [日付に左右される自動確認の修正](release-log/unreleased/90-kenta-worker-date.md) — 予約の自動確認の変更履歴。確認 2026-11-16。
+- [全画面の確かめA14の直し](release-log/unreleased/82-kenta-a14-fix.md) — フォルダの「…」・面談の表などの履歴。確認 2026-11-15。
+- [操作後のお知らせと保管確認](release-log/unreleased/81-kenta-archive-undo.md) — お知らせと保管時の操作の変更履歴。確認 2026-11-15。
+- [EC連携を止めている間の案内](release-log/unreleased/78-kenta-words-behavior.md) — 画面の案内を実際の動きに合わせた修正履歴。確認 2026-11-15。
+- [閲覧のみの作るボタン・行の操作を灰色に](release-log/unreleased/73-kenta-train-viewer.md) — 閲覧のみの人への表示をそろえた履歴。確認 2026-11-15。
+- [列車 1116](release-log/unreleased/83-kenta-train-1116.md) — まとめて入れた直しの履歴。確認 2026-11-16。
+
+- [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
+- [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
+- [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
+- 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
+- [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
+- [夜の画面修正をまとめて取り込み](release-log/unreleased/PR-kenta-train-night5-1127.md) — 反映履歴、確認 2026-11-27。
