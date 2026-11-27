@@ -297,3 +297,64 @@ function MembersInner() {
                 return (
                   <GridRow key={member.id}>
                     <GridNameCell folder={false} name={<span className={styles.identity}><span className={styles.identityLine}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong></span><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
+                    <GridCell stack><StatusBadge tone={memberRoleTone(member.role)}>{memberRoleWord(member.role)}</StatusBadge>{memberStatus(member) === 'active' && member.twoFactorEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</GridCell>
+                    <GridCell><span className={styles.shortText}>{lastLoginsError && !lastLogins[member.id] ? '取得失敗' : lastLoginShort(lastLogins[member.id])}</span></GridCell>
+                    <GridCell align="right">
+                      {canManage ? <RowActions subjectName={member.name} edit={{ label: '権限を変更する', onClick: () => openChange(member) }} menuItems={canResendInvite(member) ? [{ id: 'resend', label: '招待を再送する', disabled: resendingId === member.id, disabledReason: resendingId === member.id ? '招待を送信しています' : undefined, onSelect: () => { void resend(member) } }] : []} /> : null}
+                    </GridCell>
+                  </GridRow>
+                )
+              })}
+            </GridTable></section>
+            <div className={styles.listFoot}><span>メンバー {filteredRows.length}人中 {visibleRows.length}人を表示</span><Pagination page={Math.min(page, pageCount)} pageCount={pageCount} onPageChange={setPage} /></div>
+
+          </>
+        )}
+        </div>
+        <aside className={styles.securityAside}><SelfSecurity /></aside>
+      </div>
+
+      <MemberDialogV8
+        /* 確認を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */
+        open={dialog.open && !confirmChange}
+        active={dialog.open}
+        session={dialogSession}
+        member={dialog.member}
+        isSelf={dialog.member?.id === me?.id}
+        busy={dialogBusy}
+        error={dialogError}
+        onSubmit={(value) => {
+          if (dialog.member) setConfirmChange({ member: dialog.member, value })
+          else void submitDialog(value)
+        }}
+        onCancel={() => {
+          if (dialogBusy) return
+          setConfirmChange(null)
+          setDialog({ open: false, member: null })
+        }}
+      />
+      {confirmChange ? (
+        <MemberChangeConfirmV8
+          member={confirmChange.member}
+          value={confirmChange.value}
+          accountNames={accountNames}
+          busy={dialogBusy}
+          error={dialogError}
+          onCancel={() => { if (!dialogBusy) setConfirmChange(null) }}
+          onConfirm={() => {
+            const pending = confirmChange
+            setConfirmChange(null)
+            return submitDialog(pending.value)
+          }}
+        />
+      ) : null}
+      {stepUp ? (
+        <StepUpPrompt
+          request={{ purpose: 'staff.permissions.change', action: 'メンバーの権限を変更する', retry: stepUp.retry }}
+          onDone={() => setStepUp(null)}
+          onClose={() => setStepUp(null)}
+        />
+      ) : null}
+    </ListPage></SaveErrorScope>
+  )
+}

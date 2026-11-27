@@ -149,3 +149,8 @@ export default function PetsV8({
       ) : tab === 'feeding' ? (
         <FeedingV8 accountId={accountId} canEdit={canEdit} />
       ) : (
+        <PetsListV8 key={accountId} accountId={accountId} canEdit={canEdit} query={query} onQueryChange={setQuery} onKpis={setKpis} onKpisFailed={handleKpisFailed} />
+      )}
+    </ListPage>
+  )
+}
