@@ -77,10 +77,11 @@ export function BasicForm({
             readOnly={readOnly}
             placeholder="musubo活用スタートセミナー"
             invalid={Boolean(fieldErrors.title)}
+            aria-describedby={fieldErrors.title ? `${idPrefix}-title-error` : undefined}
             onChange={(event) => onChange({ title: event.target.value })}
             onBlur={onBlurTitle}
           /></SaveErrorField>
-{fieldErrors.title ? <p className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
+{fieldErrors.title ? <p id={`${idPrefix}-title-error`} className={styles.fieldError} role="alert">{fieldErrors.title}</p> : null}</Field></div>
         <SettingsFormRow layout="columns">
           <div className={styles.field}>
             <Field label="公開ページの URL" help="アドレスの最後の部分です。半角の英小文字・数字・ハイフンで入れます。作るときに空のままなら自動で付けます。" htmlFor={`${idPrefix}-slug`}><SaveErrorField names={["slug","values.slug"]}><TextField
@@ -91,16 +92,17 @@ export function BasicForm({
               placeholder="nen-start"
               inputMode="url"
               invalid={Boolean(fieldErrors.slug)}
+              aria-describedby={fieldErrors.slug ? `${idPrefix}-slug-error` : undefined}
               onChange={(event) => onChange({ slug: event.target.value })}
               onBlur={onBlurSlug}
             /></SaveErrorField></Field>
-            {fieldErrors.slug ? <p className={styles.fieldError} role="alert">{fieldErrors.slug}</p> : null}
+            {fieldErrors.slug ? <p id={`${idPrefix}-slug-error`} className={styles.fieldError} role="alert">{fieldErrors.slug}</p> : null}
           </div>
           <div className={styles.field}><Field label="フォルダ" htmlFor={`${idPrefix}-folder`}>{readOnly
               ? <ReadValue label="フォルダ">{folderOptions.find((option) => option.value === values.folderId)?.label ?? '未分類'}</ReadValue>
               : <SaveErrorField names={["folderId","values.folderId","folder_id","values.folder_id"]}><FolderSelect id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} folders={folderOptions.slice(1).map((option) => ({ ...option, color: folders.find((folder) => folder.id === option.value)?.color ?? null }))} onCreate={onCreateFolder} /></SaveErrorField>}
 {folderState === 'error' ? (
-              <p className={styles.help}>フォルダを読み込めませんでした。<Button size="compact" onClick={onReloadFolders}>もう一度読み込む</Button></p>
+              <p className={styles.help} role="alert">フォルダを読み込めませんでした。<Button size="compact" disabled={disabled} onClick={() => { if (!disabled) onReloadFolders() }}>もう一度読み込む</Button></p>
             ) : null}</Field></div>
         </SettingsFormRow>
         <div className={styles.field}><Field label="案内文" htmlFor={`${idPrefix}-description`}><SaveErrorField names={["description","values.description"]}><TextField
