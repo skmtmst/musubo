@@ -130,9 +130,9 @@ function PhoneBlock({ block, bookingMenus }: { block: FormBlock; bookingMenus: P
 
 /** 読めない画像は壊れた印を出さず、地の色の箱にする。 */
 function PhoneImage({ url, alt }: { url: string; alt?: string }) {
-  const [failed, setFailed] = useState(false)
-  if (!url || failed) return <span className={styles.phoneImage} role="img" aria-label={url ? '画像（読み込めません）' : '画像（未設定）'} />
-  return <img width={280} height={70} className={styles.phoneImage} src={url} alt={alt ?? ""} onError={() => setFailed(true)} />
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  if (!url || failedUrl === url) return <span className={styles.phoneImage} role="img" aria-label={url ? '画像（読み込めません）' : '画像（未設定）'} />
+  return <img width={280} height={70} className={styles.phoneImage} src={url} alt={alt ?? ""} onError={() => setFailedUrl(url)} />
 }
 
 function PhoneQuestion({ block, bookingMenus }: { block: FormInputBlock; bookingMenus: Props['bookingMenus'] }) {
