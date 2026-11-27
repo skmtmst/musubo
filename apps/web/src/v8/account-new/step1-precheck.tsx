@@ -2,7 +2,7 @@ import { Check, CircleHelp } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
-import Notice from '@/components/shared/notice'
+import Notice, { NoticeDetailAction } from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
@@ -88,22 +88,21 @@ export default function Step1Precheck({
                 />
               ))}
             </RadioCardGroup>
+            {ack && (
+              <Card className={styles.precheckAck} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
+                <SaveErrorField names={[ack.key]}><Checkbox checked={Boolean(acks[ack.key])} onCheckedChange={(next) => onToggleAck(ack.key, next)}>{ack.label}</Checkbox></SaveErrorField>
+              </Card>
+            )}
             {guide && (
               <Notice tone={guide.tone}>
                 {guide.title && <p className={styles.precheckNoteTitle}>{guide.title}</p>}
                 <p>{guide.body}</p>
                 {guide.link && (
-                  <div className={styles.precheckNoteLink}>
+                  <NoticeDetailAction note={guide.link.note}>
                     <Button variant="primary" external={guide.link.external} href={guide.link.href}>{guide.link.label}</Button>
-                    <p className={styles.help}>{guide.link.note}</p>
-                  </div>
+                  </NoticeDetailAction>
                 )}
               </Notice>
-            )}
-            {ack && (
-              <Card className={styles.precheckAck} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                <SaveErrorField names={[ack.key]}><Checkbox checked={Boolean(acks[ack.key])} onCheckedChange={(next) => onToggleAck(ack.key, next)}>{ack.label}</Checkbox></SaveErrorField>
-              </Card>
             )}
           </div>
         )}

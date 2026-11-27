@@ -293,15 +293,14 @@ test('a verified LINE registration saves style and reaches the actual completion
   await page.goto(`/accounts/new?resume=${registrationAccountId}`)
   const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   await expect(dialog).toBeVisible()
-  await styleChoiceButtons(dialog).first().click()
-  await dialog.getByRole('button', { name: 'このスタイルにする', exact: true }).click()
-  await dialog.getByRole('button', { name: '次へ', exact: true }).click()
+  await styleChoiceButtons(dialog).nth(1).click()
+  await dialog.getByRole('button', { name: 'サロンで次へ', exact: true }).click()
   await expect(page.getByText('LINEアカウントの登録が完了しました', { exact: true })).toBeAttached()
   await expect(page.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toHaveCount(0)
   await page.reload()
   await expect(page.getByText('LINEアカウントの登録が完了しました', { exact: true })).toBeAttached()
   await expect(dialog).toHaveCount(0)
-  expect(writes).toEqual([expect.objectContaining({ style: 'restaurant' })])
+  expect(writes).toEqual([expect.objectContaining({ style: 'salon' })])
 })
 
 test('salon keeps existing KPI slots and forwards real staff, time and booking identity', async ({ page }) => {

@@ -1,4 +1,5 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+- [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 # 文書の入口
 
@@ -14,6 +15,9 @@
 - [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
+- [EC連携の未対応の出来事の反映履歴](release-log/unreleased/259-kenta-ec-unknown-event.md)（説明・2026-11-27確認）
+- [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
+- [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
@@ -356,6 +360,7 @@
 - [mistakes.md — やらかしと再発防止](brain/rules/mistakes.md)
 - [F-20 公式サイト掲載の閲覧数 — 設計メモ](f20-site-views-design.md)
 - [Lステップ・Liny 画面／裏側挙動の再調査と実装仕様](lstep-liny-screen-behavior-research-2026-08.md)
+- [ダイニー（dinii）比較調査と将来像メモ](rival-dinii-2026-11.md)
 - [revfix-b-load-failures.tsv](qa/revfix-b-load-failures.tsv) — 説明用データ・付随資料、確認 2026-10-19
 - [TikTok利益計算の自動化（設計）](tiktok-pnl/design.md)
 - [V8 の絵（Pencil の板）と画面のコードの対応表](v8-board-to-code.md)
@@ -1397,3 +1402,19 @@
 
 - [データ保持の分類表の重複](release-log/unreleased/145-kenta-retention-dup.md) — 申込記録の分類表の重複を直した履歴。確認 2026-11-21。
 - [はじめの設定のスマホ表示](release-log/unreleased/225-kenta-setup-list-mobile-rows.md) — 手順の重なりを直した反映履歴。確認 2026-11-24。
+- [SNS 連携の Instagram アイコンと受信箱の設定案内](release-log/unreleased/235-kenta-ig-entry.md) — Instagram の公式カラーアイコン統一と受信箱の未設定タブ案内を直した反映履歴。確認 2026-11-25。
+- 更新履歴：ダッシュボードの案内と期間操作の並びの変更（運用者向け・2026-11-25確認） [反映履歴](release-log/unreleased/236-kenta-dashboard-order.md)
+- [画面の直しの列車（登録・Instagram・ダッシュボード）](release-log/unreleased/237-kenta-train-screens.md) — 反映履歴、確認 2026-11-25。
+- [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
+- [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
+- [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
+- [統括の情報・統括配布一覧の読み込み失敗時再読み込み](release-log/unreleased/251-kenta-later-gemini2-1127.md) — 反映履歴、確認 2026-11-27。
+- [コラム下書き保存の想定外エラー処理](release-log/unreleased/252-kenta-column-error.md) — 反映履歴、確認 2026-11-27。
+- [LINEフォローのテンプレート選択とバナー取り込み窓の再読み込み](release-log/unreleased/253-kenta-later-gemini3-1127.md) — 反映履歴、確認 2026-11-27。
+- [LINEアカウント登録のプロバイダーID案内と吹き出し編集の折り返し修正](release-log/unreleased/254-kenta-later-ui.md) — 反映履歴、確認 2026-11-27。
+- [緊急コントロール送信経路と友だち配信受け取り履歴の再読み込み](release-log/unreleased/255-kenta-later-gemini4-1127.md) — 反映履歴、確認 2026-11-27。
+- [スマホ幅のリマインダ名と共通アクションの未対応の種類の表示を直した反映履歴](release-log/unreleased/257-kenta-later-codex2.md) — 反映履歴、確認 2026-11-27。
+- [EC 連携：注文の詳細でフォローを見送った理由を正しく表示する（LATER）](release-log/unreleased/258-kenta-ec-followup-reason.md) — 反映履歴、確認 2026-11-27。
+- [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
+- [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
+- [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。

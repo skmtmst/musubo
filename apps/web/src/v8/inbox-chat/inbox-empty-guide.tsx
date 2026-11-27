@@ -1,9 +1,57 @@
 'use client'
+import { Mail } from 'lucide-react'
+import { InstagramMark } from '@/components/shared/brand-marks'
 import Button from '@/components/shared/button';
 import ListState from '@/components/shared/list-state';
+import { permissionLockReason } from '@/components/shared/permission-lock';
 import { type ChatListItem } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
+import { canManageRole } from '@/lib/staff-role';
 import { oldestAttentionTarget, type EmailInboxItem, type OldestAttentionTarget } from './inbox-model';
+
+/**
+ * 未設定の受信経路（Instagram・メール）を選んだときの中央案内。
+ * 通常の未選択案内と同じ ListState の型で表示し、設定画面へ誘導する。
+ * 権限が足りない人にはボタンを隠さず、共通の押せない表示と理由の吹き出しを付ける。
+ */
+export function InboxChannelSetupGuide({
+  channel,
+  staffRole,
+  onOpenSettings,
+}: {
+  channel: 'instagram' | 'email'
+  staffRole: string | null
+  onOpenSettings: (href: string) => void
+}) {
+  const canManage = canManageRole(staffRole)
+  const lockedReason = staffRole !== null ? permissionLockReason(staffRole, canManage, 'manager') : undefined
+  const isInstagram = channel === 'instagram'
+  const href = isInstagram ? '/settings/sns#instagram' : '/settings/sns'
+  return (
+    <ListState
+      kind="empty"
+      emptyPreset="readonly"
+      icon={isInstagram ? <InstagramMark size={20} /> : <Mail aria-hidden="true" size={20} />}
+      title={isInstagram
+        ? 'Instagram をつなぐと、DM をここで読んで返せます'
+        : 'メールを設定すると、問い合わせメールをここで読んで返せます'}
+      description={isInstagram
+        ? '設定の SNS 連携から Instagram アカウントを接続すると、この受信箱で DM を確認・返信できます。'
+        : '設定からメール受信を有効にすると、この受信箱で問い合わせメールを確認・返信できます。'}
+      action={(
+        <Button
+          variant="primary"
+          type="button"
+          disabled={staffRole === null}
+          lockedReason={lockedReason}
+          onClick={() => onOpenSettings(href)}
+        >
+          {isInstagram ? 'Instagram を設定する' : 'メールを設定する'}
+        </Button>
+      )}
+    />
+  )
+}
 
 /*
  * 会話を選んでいない時の中央（ID27「次にやること」）。

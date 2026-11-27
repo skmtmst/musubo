@@ -373,7 +373,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 .stepDone { background: var(--color-accent-deep); color: var(--color-canvas); }
 .stepCurrent { background: var(--color-ink); color: var(--color-canvas); }
 .stepLine { width: 28px; height: 1.5px; background: var(--color-accent-deep); }
-:root .panel[style*='--dialog-design-footer-padding'] .actions { padding: var(--dialog-design-footer-padding); }
+:root .panel[style*='--dialog-design-footer-padding'] .footer > .actions { padding: var(--dialog-design-footer-padding); }
 :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: auto minmax(0, 1fr); }
 :root .panel[data-footer-align='start'] .buttonPair { grid-column: 2; justify-self: start; }
 :root .panel[data-confirm-placement='start'] .buttonPair { display: contents; }

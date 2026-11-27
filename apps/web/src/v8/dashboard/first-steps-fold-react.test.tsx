@@ -128,12 +128,17 @@ it('基本の手順が未取得でも、頭の1行と再試行だけは残す', 
   expect(retry).toHaveBeenCalledTimes(1)
 })
 
-it('全部済んだら一覧を出さず、進みの1本だけを残す', async () => {
+it('全部済んだらカードごと隠し、未完了・未確認・取得失敗は残す', () => {
   const allDone = { ...summary, done: summary.total, steps: summary.steps.map(step => ({ ...step, done: true, state: 'done' as const })) }
-  await act(async () => { render(<FirstStepsCard summary={allDone} folded={false} onToggle={() => {}} />) })
-  expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  expect(document.getElementById('first-steps-list')).toBeNull()
-  expect(screen.queryByRole('button', { name: '畳む', exact: true })).toBeNull()
+  const view = render(<FirstStepsCard summary={allDone} folded={false} onToggle={() => {}} />)
+  expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
+  view.rerender(<FirstStepsCard summary={{ ...allDone, done: allDone.total - 1, steps: allDone.steps.map((step, i) => i === 0 ? { ...step, state: 'todo', done: false } : step) }} folded={false} onToggle={() => {}} />)
+  expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  view.rerender(<FirstStepsCard summary={{ ...allDone, steps: allDone.steps.map((step, i) => i === 0 ? { ...step, state: 'unknown', done: false } : step) }} folded={false} onToggle={() => {}} />)
+  expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  expect(screen.getByRole('list').textContent).toContain('未確認')
+  view.rerender(<FirstStepsCard summary={allDone} keepVisible feedback={<p>読み直してください</p>} folded={false} onToggle={() => {}} />)
+  expect(screen.getByText('読み直してください')).toBeTruthy()
 })
 
 

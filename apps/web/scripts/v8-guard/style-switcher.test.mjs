@@ -26,7 +26,7 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
   styleDashboardMock('PUT', '/api/dashboard/style', new URLSearchParams(), { style: 'standard' })
   const base = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310', output = join(process.env.V8_GUARD_ARTIFACT_DIR || '/tmp/v8-guard', 'style-switcher', `${entry}-${width}`)
   mkdirSync(output, { recursive: true })
-  const browser = await connectGuardBrowser(), context = await browser.newContext({ viewport: { width, height: 1080 }, locale: 'ja-JP' }), page = await context.newPage()
+  const browser = await connectGuardBrowser(), context = await browser.newContext({ viewport: { width, height: width === 390 ? 800 : 1080 }, locale: 'ja-JP' }), page = await context.newPage()
   const errors = [], writes = [], rows = []; let failure = null
   page.on('pageerror', error => errors.push(error.message))
   await page.addInitScript(values => { for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value) }, PARITY_INIT)
@@ -53,30 +53,11 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
     assert.ok(Math.abs(before.y - below.y) <= 1 && Math.abs(before.height - below.height) <= 1)
     assert.deepEqual(await page.evaluate(scanStyleSwitcher), [])
     await page.screenshot({ animations: 'disabled', path: join(output, 'bottom.png') })
-    if (entry === 'registration') {
-      const unavailable = ['サロン', '面談・相談', '教室・レッスン', '標準', 'EC']
-      if (width < 640) {
-        const trigger = switcher.getByRole('button', { name: '見るスタイル', exact: true })
-        await trigger.click()
-        for (const name of unavailable) {
-          const item = page.getByRole('option', { name, exact: true }).getByRole('button')
-          assert.ok(await item.isDisabled(), `${name}は登録時に選べない`)
-        }
-        await page.keyboard.press('End')
-        await page.keyboard.press('Enter')
-      } else {
-        const group = switcher.getByRole('group', { name: '見るスタイル', exact: true })
-        for (const name of unavailable) {
-          assert.ok(await group.getByRole('button', { name, exact: true }).isDisabled(), `${name}は登録時に選べない`)
-        }
-        await group.getByRole('button', { name: '飲食店', exact: true }).press('End')
-      }
-      await dialog.getByRole('heading', { name: '飲食店でできること', exact: true }).waitFor({ state: 'attached' })
-    } else if (width < 640) {
+    if (width < 640) {
       await switcher.getByRole('button', { name: '見るスタイル', exact: true }).click()
       await page.getByRole('option', { name: /^面談・相談/ }).click()
     } else await switcher.getByRole('group', { name: '見るスタイル', exact: true }).getByRole('button', { name: /^面談・相談/ }).click()
-    if (entry === 'setup') await dialog.getByRole('heading', { name: '面談・相談でできること', exact: true }).waitFor({ state: 'attached' })
+    await dialog.getByRole('heading', { name: '面談・相談でできること', exact: true }).waitFor({ state: 'attached' })
     assert.deepEqual(writes.filter(write => /\/style$|\/styles$|\/line-accounts$/.test(write.path)), [], '見ているスタイルの切り替えだけでは保存しない')
     const normal = await page.evaluate(scanStyleSwitcher)
     await switcher.evaluate(node => { const marker = document.createElement('span'); marker.dataset.styleSwitcherOriginal = ''; node.before(marker); node.closest('[role="dialog"]').querySelector('[data-window-body]').prepend(node) })
@@ -91,7 +72,7 @@ for (const width of [1152, 1440, 390]) for (const entry of ['setup', 'registrati
       await switcher.getByRole('group', { name: '見るスタイル', exact: true }).getByRole('button', { name: /^飲食店/ }).click()
       const choose = dialog.getByRole('button', { name: 'このスタイルにする', exact: true })
       if (await choose.count()) await choose.click()
-      const name = entry === 'registration' ? '次へ' : '保存する'
+      const name = entry === 'registration' ? '飲食店で次へ' : '保存する'
       await dialog.getByRole('button', { name, exact: true }).click()
       if (entry === 'registration') {
         await page.getByText('LINEアカウントの登録が完了しました', { exact: true }).waitFor({ state: 'attached' })
