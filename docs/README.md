@@ -11,6 +11,7 @@
 - [来店スタンプと紙カード申請の読み込み修正履歴](release-log/unreleased/PR-kenta-later-cx5-08-1128.md)
 - [予約のキャンセル待ち一覧の読み込み修正履歴](release-log/unreleased/PR-kenta-later-cx5-09-1128.md)
 - [飲食店のキャンセル待ち確認の修正履歴](release-log/unreleased/PR-kenta-later-cx5-10-1128.md)
+- [予約のキャンセル待ち登録確認の修正履歴](release-log/unreleased/PR-kenta-later-cx5-11-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
