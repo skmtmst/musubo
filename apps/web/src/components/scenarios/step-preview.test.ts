@@ -140,10 +140,10 @@ describe('時刻が空のまま（R235）', () => {
 })
 
 describe('メッセージ本文のプレビュー', () => {
-  it('名前だけを安全な例へ置き換え、そのほかの差し込みは残す', () => {
+  it('名前と日付を安全な例へ置き換える', () => {
     expect(renderPreviewBody('{{name}}さん、{{date}}にお届けします')).toBe(
-      'Kentaさん、{{date}}にお届けします',
+      '見本 143さん、10月2日にお届けします',
     )
-    expect(renderPreviewBody('{{お名前}}さん')).toBe('Kentaさん')
+    expect(renderPreviewBody('{{お名前}}さん')).toBe('見本 143さん')
   })
 })

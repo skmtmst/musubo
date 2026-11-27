@@ -3,7 +3,7 @@
 /* LINEの見え方は書き出しもブラウザも現在のスマホ枠だけ。中身と操作は画面が渡す。 */
 import { usePhonePreviewScale } from './use-phone-preview-scale'
 import { PhonePreviewScale } from './phone-preview-scale'
-import { Fragment, type ReactNode } from 'react'
+import { Children, cloneElement, Fragment, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
 import FlexPreview, { safeFlexAssetUrl, sampleFlexText } from '@/components/flex-preview'
@@ -130,6 +130,17 @@ function withUrlLines(text: string): ReactNode {
     : <Fragment key={index}>{part}</Fragment>)
 }
 
+/** 見本の DOM 内の文字だけを変換し、画像・部品の props や入力値には触れない。 */
+function samplePreviewChildren(children: ReactNode): ReactNode {
+  return Children.map(children, child => {
+    if (typeof child === 'string') return fillPreviewSample(child).text
+    if (!isValidElement(child) || (typeof child.type !== 'string' && child.type !== Fragment)) return child
+    const element = child as ReactElement<{ children?: ReactNode }>
+    if (element.props.children == null || child.type === 'style' || child.type === 'script') return child
+    return cloneElement(element, undefined, samplePreviewChildren(element.props.children))
+  })
+}
+
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
 export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density, bare = false }: {
   accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
@@ -138,7 +149,7 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
 }) {
   /* 本文が文字なら、差し込みの記号を見本の値にして出す（記号のままスマホに出さない）。 */
   const sample = typeof children === 'string' ? fillPreviewSample(children) : null
-  const body = sample ? sample.text : children
+  const body = sample ? sample.text : samplePreviewChildren(children)
   const sampleNote = sample ? previewSampleNote(sample.kinds) : null
   if (direction === 'outgoing') return <div className={styles.outgoingRow}>
     {time ? <span className={styles.messageTime}>{time}</span> : null}
@@ -149,7 +160,7 @@ export function LinePreviewMessage({ accountName, avatar, time, children, direct
     <div className={styles.senderBody}>
       <TruncatedText value={accountName} className={styles.senderName} />
       <div className={styles.bubbleRow}>
-        {bare ? children : <div className={styles.bubble}>
+        {bare ? body : <div className={styles.bubble}>
           <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
           <div className={styles.bubbleBody}><span className={styles.bubbleText}>{typeof body === 'string' ? withUrlLines(body) : body}</span></div>
         </div>}
@@ -172,13 +183,13 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
 }) {
   return <div className={styles.cardRow}>
     <div className={styles.productCard}>
-      <div className={styles.productImage} role="img" aria-label={title} style={{ backgroundImage: `url(${JSON.stringify(imageUrl)})` }} />
+      <div className={styles.productImage} role="img" aria-label={fillPreviewSample(title).text} style={{ backgroundImage: `url(${JSON.stringify(imageUrl)})` }} />
       <div className={styles.productCopy}>
-        <span className={styles.productTitle}>{title}</span>
-        <span className={styles.productDescription}>{description}</span>
-        <span className={styles.priceRow}><span className={styles.price}>{price}</span><span className={styles.tax}>税込</span></span>
+        <span className={styles.productTitle}>{fillPreviewSample(title).text}</span>
+        <span className={styles.productDescription}>{fillPreviewSample(description).text}</span>
+        <span className={styles.priceRow}><span className={styles.price}>{fillPreviewSample(price).text}</span><span className={styles.tax}>税込</span></span>
       </div>
-      {actions.map(action => <button key={action.label} type="button" className={`${styles.productAction} ${action.secondary ? styles.secondaryAction : ''}`} onClick={action.onClick}>{action.label}</button>)}
+      {actions.map(action => <button key={action.label} type="button" className={`${styles.productAction} ${action.secondary ? styles.secondaryAction : ''}`} onClick={action.onClick}>{fillPreviewSample(action.label).text}</button>)}
     </div>
     <span className={styles.messageTime}>{time}</span>
   </div>

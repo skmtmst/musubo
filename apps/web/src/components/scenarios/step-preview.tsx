@@ -13,6 +13,7 @@
 
 import { Clock } from 'lucide-react'
 import LinePreview from '@/components/shared/line-preview'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import StickerPreview from '@/components/shared/sticker-preview'
 import Notice from '@/components/shared/notice'
 import styles from './step-preview.module.css'
@@ -179,9 +180,7 @@ function scheduleWords(
 
 /** 実際の友だち情報を作らず、LINEプレビューだけ安全な例へ置き換える。 */
 export function renderPreviewBody(body: string): string {
-  return body
-    .replaceAll('{{name}}', 'Kenta')
-    .replaceAll('{{お名前}}', 'Kenta')
+  return fillPreviewSample(body).text
 }
 
 export default function StepPreview({
@@ -282,10 +281,10 @@ export default function StepPreview({
           )
         ) : kind === 'question' && question ? (
           <>
-            {question.intro?.trim() ? <Bubble>{question.intro}</Bubble> : null}
+            {question.intro?.trim() ? <Bubble>{fillPreviewSample(question.intro).text}</Bubble> : null}
             <Bubble>
               <span className="text-ink block text-label font-medium">
-                {question.text.trim() || '（質問文がまだ空です）'}
+                {fillPreviewSample(question.text.trim() || '（質問文がまだ空です）').text}
               </span>
               <span className="mt-2 block space-y-1.5">
                 {question.choices.map((choice, i) => (
@@ -297,7 +296,7 @@ export default function StepPreview({
                         : 'border-hairline text-ink-secondary border'
                     }`}
                   >
-                    {choice.label.trim() || `選択肢${i + 1}`}
+                    {fillPreviewSample(choice.label.trim() || `選択肢${i + 1}`).text}
                   </span>
                 ))}
               </span>
@@ -319,11 +318,11 @@ export default function StepPreview({
           kindState?.location.latitude && kindState.location.longitude ? (
             <Bubble>
               <span className="text-ink block text-label font-medium">
-                {kindState.location.title.trim() || '場所'}
+                {fillPreviewSample(kindState.location.title.trim() || '場所').text}
               </span>
               {kindState.location.address.trim() && (
                 <span className="text-ink-secondary mt-0.5 block text-micro">
-                  {kindState.location.address}
+                  {fillPreviewSample(kindState.location.address).text}
                 </span>
               )}
               {/* 地図そのものは出さない。ここで別の地図を出すと、

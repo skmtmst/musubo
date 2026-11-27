@@ -520,7 +520,7 @@ export function ScenarioDetailBody({
                           {fillPreviewSample(q.text ?? shownStep.messageContent).text}
                           {(q.choices ?? []).map((choice, i) => (
                             <span key={i} className={styles.talkChoice}>
-                              {choice.label ?? `選択肢${i + 1}`}
+                              {fillPreviewSample(choice.label ?? `選択肢${i + 1}`).text}
                             </span>
                           ))}
                         </div>
