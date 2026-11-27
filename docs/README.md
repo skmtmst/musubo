@@ -7,6 +7,7 @@
 - [運営画面の読み込みと再試行の画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-06-1128.md)（説明・2026-11-28確認）
 - [スコアのルール削除の画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-07-1128.md)（説明・2026-11-28確認）
 - [ログインユーザーの権限案内の画面確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-08-1128.md)（説明・2026-11-28確認）
+- [定期レポートの作成確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-09-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 

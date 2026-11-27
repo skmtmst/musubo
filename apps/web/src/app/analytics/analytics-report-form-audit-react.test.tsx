@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
+import { fireEvent } from '@testing-library/react'
+import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportNewPage from './reports/new/page'
@@ -272,5 +274,52 @@ describe('R454 しまった1回送信の結果へ到達し送り直せる', () =
     await act(async () => { button('届いていない分を送り直す').click() })
     const retryCall = net.calls.find((call) => call.path.includes('/once-1/retry') && call.method === 'POST')
     expect(retryCall).toBeTruthy()
+  })
+})
+
+describe('新しい定期レポートの表示と取得状態', () => {
+  it('送る内容・時刻・宛先を表示し、未選択なら作成できない', async () => {
+    net.handler = listHandler([])
+    await render()
+    for (const text of ['何を入れますか', 'いつ送りますか', 'だれに送りますか', '知らせの決めごと', '宛先を足す', 'LINEでも同じ内容を送る', '今すぐ1回だけ送る', 'つくって動かす', 'レポートが見ているもの', '気をつけること', '保存した分析を添えます']) expect(host.textContent).toContain(text)
+    expect((host.querySelector('input[placeholder="例：週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
+    expect(button('つくって動かす').disabled).toBe(true)
+    expect(net.calls.some(call => call.path.startsWith('/api/analytics/report-schedules?') && new URL(call.path, 'http://localhost').searchParams.get('account_id') === 'account-a')).toBe(true)
+  })
+  it('宛先がなければ作成せず、名前が空なら欄に理由を表示する', async () => {
+    net.handler = listHandler([])
+    await render()
+    expect(host.textContent).toContain('受け取る人を1人以上選んでください')
+    expect(button('つくって動かす').disabled).toBe(true)
+    await pickEntities('レポートを受け取る人', ['担当1'])
+    const input = host.querySelector<HTMLInputElement>('input[placeholder="例：週次まとめ"]')!
+    await act(async () => { fireEvent.change(input, { target: { value: '' } }); button('つくって動かす').click() })
+    expect(host.textContent).toContain('レポートの名前を入力してください')
+    expect(net.calls.filter(call => call.method === 'POST' && call.path.startsWith('/api/analytics/report-schedules'))).toHaveLength(0)
+  })
+  it('保存した分析を選んで作成すると、選択を送る', async () => {
+    net.handler = (path, init) => {
+      if (path.startsWith('/api/analytics/report-schedules') && init?.method === 'POST') return Promise.resolve({ success: true, data: STAFF_SCHEDULE })
+      if (path.startsWith('/api/analytics/report-schedules')) return Promise.resolve({ success: true, data: { items: [], options: { ...OPTIONS, savedAnalyses: [{ id: 'analysis-1', name: '売上分析', kind: 'cross' }] } } })
+      return listHandler([])(path, init)
+    }
+    await render()
+    await pickEntities('レポートを受け取る人', ['担当1'])
+    await pickEntities('保存した分析', ['売上分析'])
+    const input = host.querySelector<HTMLInputElement>('input[placeholder="例：週次まとめ"]')!
+    await act(async () => { fireEvent.change(input, { target: { value: '営業週報' } }) })
+    await act(async () => { button('つくって動かす').click(); await Promise.resolve() })
+    const call = net.calls.find(call => call.method === 'POST' && call.path.startsWith('/api/analytics/report-schedules'))
+    expect(call?.body).toMatchObject({ name: '営業週報', savedAnalysisIds: ['analysis-1'] })
+  })
+  it('設定の取得中は読み込みを、失敗したらエラーを表示する', async () => {
+    let reject!: (reason: unknown) => void
+    net.handler = (path, init) => path.startsWith('/api/analytics/report-schedules') ? new Promise((_resolve, fail) => { reject = fail }) : listHandler([])(path, init)
+    await render()
+    expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('定期レポートを読み込んでいます')
+    await act(async () => { reject(new Error('private error')); await Promise.resolve() })
+    expect(host.querySelector('[data-list-state="error"]')?.getAttribute('role')).toBe('alert')
+    expect(host.textContent).toContain('定期レポートの設定を読み込めませんでした')
+    expect(host.textContent).not.toContain('private error')
   })
 })
