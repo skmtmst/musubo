@@ -46,8 +46,21 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
   const testRecipients = useTestRecipients(webinar.id, testConfirm)
   const [testResult, setTestResult] = useState('')
   const lock = useRef(false)
+  const testLock = useRef(false)
+  const aliveRef = useRef(true)
+  const webinarIdRef = useRef(webinar.id)
+  webinarIdRef.current = webinar.id
   const folderRequest = useRef(0)
   const version = useRef(editor.version)
+
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      lock.current = false
+      testLock.current = false
+    }
+  }, [])
 
   const coreDirty = values.title !== saved.title || values.slug !== saved.slug || values.folderId !== saved.folderId
   const editorDirty = values.description !== saved.description || values.deliveryKind !== saved.deliveryKind
@@ -103,28 +116,38 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       setError('フォルダをもう一度読み込んでから保存してください。')
       return false
     }
+    const targetId = webinar.id
     lock.current = true
     setSaving(true)
     setError('')
     try {
       /* 版のある設定を先に保存。競合したら基本情報は書き換えない。 */
       if (editorDirty) {
-        const response = await webinarApi.saveEditor(webinar.id, {
+        const response = await webinarApi.saveEditor(targetId, {
           expectedVersion: version.current,
           publicDescription: values.description.trim(),
           deliveryKind: values.deliveryKind,
         })
+        if (!aliveRef.current || webinarIdRef.current !== targetId) return false
+        if ((response as { success?: boolean } | null)?.success === false || !response?.data || typeof response.data.version !== 'number') {
+          throw new Error('save_editor_failed')
+        }
         version.current = response.data.version
         setSaved((prev) => ({ ...prev, description: values.description, deliveryKind: values.deliveryKind }))
         ctx.onEditorChange(response.data)
       }
       if (coreDirty) {
-        const response = await webinarApi.update(webinar.id, { title: values.title.trim(), slug: values.slug.trim(), folderId: values.folderId || null })
+        const response = await webinarApi.update(targetId, { title: values.title.trim(), slug: values.slug.trim(), folderId: values.folderId || null })
+        if (!aliveRef.current || webinarIdRef.current !== targetId) return false
+        if ((response as { success?: boolean } | null)?.success === false || !response?.data) {
+          throw new Error('save_webinar_failed')
+        }
         setSaved((prev) => ({ ...prev, title: values.title, slug: values.slug, folderId: values.folderId }))
         ctx.onWebinarSaved(response.data)
       }
       return true
     } catch (cause) {
+      if (!aliveRef.current || webinarIdRef.current !== targetId) return false
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
@@ -133,7 +156,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
       return false
     } finally {
       lock.current = false
-      setSaving(false)
+      if (aliveRef.current) setSaving(false)
     }
   }
   const latestSave = useRef(save)
@@ -145,25 +168,42 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
   }, [registerSave, readOnly])
 
   const runTest = async () => {
-    if (testing || readOnly || lock.current || !testConfirm || !testRecipients.preview) return
+    if (testLock.current || testing || readOnly || lock.current || !testConfirm || !testRecipients.preview) return
+    const targetId = webinar.id
+    testLock.current = true
     setTesting(true)
+    setError('')
     setTestResult('')
     try {
       if (dirty && !(await save())) return
-      if (!testRecipients.isCurrent() || !testRecipients.preview) return
-      const response = await webinarApi.testNotifications(webinar.id, testRecipients.preview.token, testRecipients.preview.confirmationId)
+      if (!aliveRef.current || webinarIdRef.current !== targetId || !testRecipients.isCurrent() || !testRecipients.preview) return
+      const response = await webinarApi.testNotifications(targetId, testRecipients.preview.token, testRecipients.preview.confirmationId)
+      if (!aliveRef.current || webinarIdRef.current !== targetId) return
+      if ((response as { success?: boolean } | null)?.success === false || !response?.data || typeof response.data.sent !== 'number' || typeof response.data.failed !== 'number') {
+        throw new Error('test_notifications_failed')
+      }
       setTestResult(`通知テスト：成功 ${formatNumber(response.data.sent)} 件・失敗 ${formatNumber(response.data.failed)} 件`)
       setTestConfirm(false)
     } catch (cause) {
+      if (!aliveRef.current || webinarIdRef.current !== targetId) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
 
       setError(withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
     } finally {
-      setTesting(false)
+      testLock.current = false
+      if (aliveRef.current) setTesting(false)
     }
   }
+
+  const testConfirmDisabledReason = testRecipients.error
+    ? 'テスト受信者を確認できません。設定を確かめて開き直してください。'
+    : !testRecipients.preview
+      ? 'テスト受信者を確認しています。'
+      : testRecipients.preview.count === 0
+        ? 'テスト受信者が登録されていません。設定から追加してください。'
+        : undefined
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage dirty={false}
@@ -179,7 +219,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         title={values.title}
         description={values.description}
         accountName={accountName}
-        action={readOnly ? null : <div className={styles.previewActions}><Button disabled={saving || testing} onClick={() => setTestConfirm(true)}>テストを送る</Button></div>}
+        action={readOnly ? null : <div className={styles.previewActions}><Button disabled={saving || testing} onClick={() => { setError(''); setTestConfirm(true) }}>テストを送る</Button></div>}
       />}
     >
       {readOnly ? <ReadOnlyNotice >閲覧のみで見ています。変えるときはオーナーか管理者に頼んでください。</ReadOnlyNotice> : null}
@@ -206,6 +246,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         description="登録したテスト受信者へ、有効な通知の本文をLINEで送ります。申込者全員には届きません。"
         confirmLabel="テストを送る"
         confirmDisabled={!testRecipients.preview || testRecipients.preview.count === 0}
+        confirmDisabledReason={testConfirmDisabledReason}
         busy={saving || testing}
         error={error || undefined}
         onCancel={() => { if (!saving && !testing) setTestConfirm(false) }}
