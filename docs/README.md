@@ -2,6 +2,7 @@
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 - [友だち追加の条件と自動化の下書きの反映履歴](release-log/unreleased/PR-kenta-later-codex55.md)（説明・2026-11-27確認）
+- [自動応答の保存結果の反映履歴](release-log/unreleased/PR-kenta-later-codex56.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
