@@ -14,14 +14,28 @@ export async function fetchAllPages<T>(
   pageSize: number,
   stillWanted: () => boolean,
 ): Promise<T[] | null> {
+  if (typeof pageSize !== 'number' || !Number.isInteger(pageSize) || pageSize <= 0) {
+    throw new RangeError('pageSize must be a positive integer')
+  }
   const first = await fetchPage(0)
   if (!stillWanted()) return null
+  if (!first || !Array.isArray(first.requests)) {
+    throw new Error('一覧の形式を確認できませんでした')
+  }
+  if (typeof first.total !== 'number' || !Number.isFinite(first.total) || first.total < 0) {
+    throw new Error('件数を確認できませんでした')
+  }
   const collected = [...first.requests]
   if (first.requests.length === 0 || collected.length >= first.total) return collected
   const offsets: number[] = []
   for (let offset = first.requests.length; offset < first.total; offset += pageSize) offsets.push(offset)
   const rest = await Promise.all(offsets.map((offset) => fetchPage(offset)))
   if (!stillWanted()) return null
-  for (const page of rest) collected.push(...page.requests)
+  for (const page of rest) {
+    if (!page || !Array.isArray(page.requests)) {
+      throw new Error('一覧の形式を確認できませんでした')
+    }
+    collected.push(...page.requests)
+  }
   return collected
 }
