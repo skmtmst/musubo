@@ -1526,3 +1526,4 @@
 - [友だち情報欄の編集時にフォルダを読み直せるよう修正](release-log/unreleased/PR-kenta-later-cx3-32-1128.md) — 反映履歴、確認 2026-11-28。
 - [タグとフォルダの一覧取得に失敗したときの表示を修正](release-log/unreleased/PR-kenta-later-cx3-33-1128.md) — 反映履歴、確認 2026-11-28。
 - [写真審査の画像URL検査とリッチメニュー下書き復元の修正](release-log/unreleased/PR-kenta-later-gemini100-1127.md) — 反映履歴、確認 2026-11-28。
+- [写真審査の受信日時補正と見つからないページのURL表示修正の反映履歴](release-log/unreleased/PR-kenta-later-gemini101-1127.md) — 反映履歴、確認 2026-11-28。
