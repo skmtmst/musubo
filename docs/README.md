@@ -24,6 +24,7 @@
 - [ひな形の配布先の友だち数の反映履歴](release-log/unreleased/PR-kenta-later-cx2-31-1128.md)（説明・2026-11-28確認）
 - [受信箱の本文表示の反映履歴](release-log/unreleased/PR-kenta-later-cx2-32-1128.md)（説明・2026-11-28確認）
 - [受信箱の添付操作の反映履歴](release-log/unreleased/PR-kenta-later-cx2-33-1128.md)（説明・2026-11-28確認）
+- [ダッシュボードの読み直し確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-01-1128.md)（説明・2026-11-28確認）
 - [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
