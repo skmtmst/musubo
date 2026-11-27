@@ -6,15 +6,17 @@ import { chatListPreview } from './list-preview'
 
 /** 一覧の 1 件を電話の会話の一覧の形へ。 */
 export function talkItem(chat: ChatListItem): MobileTalkItem {
+  const preview = chatListPreview(chat)
+  const knownUnread = typeof chat.isUnread === 'boolean'
   return {
     id: chat.id,
-    name: chat.friendName,
+    name: typeof chat.friendName === 'string' ? chat.friendName : '名前を確認できません',
     pictureUrl: chat.friendPictureUrl,
-    preview: chatListPreview(chat),
+    preview: knownUnread ? preview : `未読状態を確認できません${preview ? `・${preview}` : ''}`,
     outgoing: chat.lastMessageDirection === 'outgoing',
     time: formatListRecent(chat.lastMessageAt),
     timeTitle: formatListRecentTitle(chat.lastMessageAt),
-    unread: Boolean(chat.isUnread),
+    unread: knownUnread && chat.isUnread,
     href: mobileTalkHref(chat.friendId),
   }
 }
