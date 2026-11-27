@@ -5,11 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import EventConfirm from './event-confirm.js';
+import Event from './event.js';
+import EventDone from './event-done.js';
+import EventBookings from './event-bookings.js';
 import { api } from '../lib/api.js';
 
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
 vi.mock('../lib/api.js', () => ({ api: {
-  getEvent: vi.fn(), getEventSlots: vi.fn(), createEventBooking: vi.fn(),
+  getEvent: vi.fn(), getEventSlots: vi.fn(), createEventBooking: vi.fn(), myEventBookings: vi.fn(), bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   customerLook: vi.fn().mockResolvedValue({ success: true, data: { settings: {} } }), liffConfig: vi.fn().mockResolvedValue({ data: {} }),
 } }));
 vi.mock('../lib/user-message.js', async original => ({ ...await original<typeof import('../lib/user-message.js')>(), logFailure: vi.fn() }));
@@ -118,4 +121,44 @@ it('イベント画面の禁止の見張りを保つ', () => {
   expect(confirm).not.toContain('bg-info-bg');
   expect(confirm).not.toContain('bg-yellow');
   expect(event).not.toContain('text-danger');
+});
+
+it('時間を選んだだけでは移動せず、確認を押してから選んだ時間へ進む', async () => {
+  vi.mocked(api.getEventSlots).mockResolvedValue({ items: [{ ...slot, event_id: 'event', capacity: 10, is_active: 1, active_count: 0, remaining: 5 }] } as Awaited<ReturnType<typeof api.getEventSlots>>);
+  vi.mocked(api.myEventBookings).mockResolvedValue({ items: [] });
+  render(<MemoryRouter initialEntries={['/events/event?liffId=account']}><Routes>
+    <Route path="/events/:id" element={<Event />} /><Route path="/events/:id/confirm" element={<Destination />} />
+  </Routes></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: /10:00〜11:00/ }));
+  expect(screen.queryByTestId('destination')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'この時間で申し込む' }));
+  const target = new URL((await screen.findByTestId('destination')).textContent!, 'https://example.test');
+  expect(target.searchParams.get('slotId')).toBe('slot');
+  expect(target.searchParams.get('liffId')).toBe('account');
+});
+
+it('確認画面は申し込みと戻るを区別し、戻るだけでは送信しない', async () => {
+  open();
+  await screen.findByRole('button', { name: '申し込む' });
+  expect(screen.queryByText('予約をリクエスト')).toBeNull();
+  expect(screen.queryByRole('button', { name: /^戻る$/ })).toBeNull();
+  expect(document.body.textContent).not.toMatch(/[📍📅⏳✅]/u);
+  fireEvent.click(screen.getByRole('button', { name: '← 戻る' }));
+  expect(api.createEventBooking).not.toHaveBeenCalled();
+});
+
+it('イベントの履歴はこれまでを選んで読み直し、過去という見出しを出さない', async () => {
+  vi.mocked(api.myEventBookings).mockResolvedValue({ items: [] });
+  render(<MemoryRouter><EventBookings /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('tab', { name: 'これまで' }));
+  await waitFor(() => expect(api.myEventBookings).toHaveBeenLastCalledWith('past'));
+  expect(screen.queryByText('過去')).toBeNull();
+});
+
+it('受付後は詳細の読込を待たず結果を示す', async () => {
+  vi.mocked(api.getEvent).mockImplementation(() => new Promise(() => {}));
+  render(<MemoryRouter initialEntries={['/events/event/done?status=requested']}><Routes><Route path="/events/:id/done" element={<EventDone />} /></Routes></MemoryRouter>);
+  expect(screen.getByText('受付しました')).toBeTruthy();
+  expect(screen.queryByRole('status')).toBeNull();
+  expect(screen.getByRole('button', { name: 'LINEに戻る' })).toBeTruthy();
 });
