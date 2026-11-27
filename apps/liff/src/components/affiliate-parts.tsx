@@ -1,5 +1,5 @@
 import { TextInput } from './forms/controls.js';
-import { useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import Button from './ui/button/index.js';
 import Icon from './ui/icon.js';
 
@@ -54,13 +54,29 @@ function CopyButton({
 }) {
   const [copied, setCopied] = useState(false);
   const [manualCopy, setManualCopy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const currentUrl = useRef(url);
+  const alive = useRef(true);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  currentUrl.current = url;
+  useEffect(() => { setCopied(false); setManualCopy(false); if (timer.current) clearTimeout(timer.current); }, [url]);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; if (timer.current) clearTimeout(timer.current); }; }, []);
 
   async function handleCopy() {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
     const ok = await copyText(url);
+    pending.current = false;
+    if (!alive.current) return;
+    setBusy(false);
+    if (currentUrl.current !== url) return;
     if (ok) {
       setManualCopy(false);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
       return;
     }
     setManualCopy(true);
@@ -79,6 +95,7 @@ function CopyButton({
       <Button variant={compact ? 'inline-action' : 'secondary'} className="w-auto shrink-0"
         type="button"
         onClick={handleCopy}
+        disabled={busy}
       >
         {!compact && <Icon name="copy" className="h-3.5 w-3.5" />}
         {copied ? 'コピーしました' : 'コピーする'}
