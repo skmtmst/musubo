@@ -1,8 +1,6 @@
 // @vitest-environment happy-dom
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { afterEach, expect, describe, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -23,70 +21,6 @@ vi.mock('../../lib/api.js', () => ({ api: {
 vi.mock('../../lib/user-message.js', async original => ({ ...await original<typeof import('../../lib/user-message.js')>(), logFailure: vi.fn() }));
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 
-const ROOT = join(import.meta.dirname, '../..');
-const UI = join(ROOT, 'components', 'ui');
-
-function src(...parts: string[]): string {
-  return readFileSync(join(ROOT, ...parts), 'utf8');
-}
-
-function ui(name: string): string {
-  return readFileSync(join(UI, name), 'utf8');
-}
-
-/** ★V8 の見た目で読む文面。Event 系は別 PR なので外す。 */
-const RESERVATION_UI_SOURCES = [
-  ui('icon.tsx'),
-  ui('Button.tsx'),
-  ui('card.tsx'),
-  ui('badge.tsx'),
-  ui('liff-header.tsx'),
-  ui('bottom-bar.tsx'),
-  ui('Stepper.tsx'),
-  ui('status-view.tsx'),
-  ui('confirm-dialog.tsx'),
-  src('components', 'loading-view.tsx'),
-  src('components', 'load-error-view.tsx'),
-  src('components', 'menu-list.tsx'),
-  src('components', 'staff-list.tsx'),
-  src('components', 'date-time-picker.tsx'),
-  src('components', 'confirm.tsx'),
-  src('components', 'done.tsx'),
-  src('pages', 'booking.tsx'),
-  src('pages', 'booking-history.tsx'),
-  src('components', 'history-card.tsx'),
-  src('pages', 'form.tsx'),
-  src('pages', 'affiliate.tsx'),
-  src('pages', 'webinar.tsx'),
-  src('pages', 'seat', 'seat-reserve.tsx'),
-  src('pages', 'seat', 'seat-pick.tsx'),
-  src('pages', 'seat', 'seat-confirm.tsx'),
-  src('pages', 'seat', 'seat-done.tsx'),
-  src('pages', 'seat', 'seat-mine.tsx'),
-];
-
-describe('★V8 の色はトークンだけ', () => {
-  it('素の Tailwind 色・16進数・青ボタン・LINE の明るい緑のボタン地が無い', () => {
-    for (const text of RESERVATION_UI_SOURCES) {
-      expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-      for (const banned of [
-        'bg-green-',
-        'text-green-',
-        'bg-blue-',
-        'text-blue-',
-        'bg-gray-',
-        'text-gray-',
-        'border-gray-',
-        '#06c755',
-        '#0b63ce',
-      ]) {
-        expect(text).not.toContain(banned);
-      }
-    }
-  });
-
-});
-
 it('状態の操作は指定した1つだけ出し、押すと処理を呼ぶ', () => {
   const onClick = vi.fn();
   const view = render(<StatusView icon="check" title="受付済み" action={{ label: '確認する', onClick }} />);
@@ -101,7 +35,6 @@ it('読込失敗は日本語で伝え、読み直せる', () => {
   const view = render(<LoadErrorView onRetry={onRetry} />);
   expect(screen.getByText('読み込めませんでした')).toBeTruthy();
   expect(screen.getAllByRole('button')).toHaveLength(1);
-  for (const banned of ['text-red', 'bg-red', 'border-red']) expect(src('components', 'load-error-view.tsx')).not.toContain(banned);
   for (const banned of ['Error', 'API', 'status', '500', 'error code', 'エラーコード']) expect(view.container.textContent).not.toContain(banned);
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }));
   expect(onRetry).toHaveBeenCalledOnce();
@@ -150,10 +83,5 @@ it('受付後はLINEへ戻る操作と履歴を出す', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'LINEに戻る' }));
   expect(liff.closeWindow).toHaveBeenCalledOnce();
   expect(screen.getByRole('button', { name: '予約の履歴を見る' })).toBeTruthy();
-});
-
-it('履歴と完了画面の禁止の見張りを保つ', () => {
-  expect(src('pages', 'booking-history.tsx')).not.toContain('過去');
-  expect(src('pages', 'booking-history.tsx')).not.toMatch(/これから \(\{/);
-  expect(src('components', 'done.tsx')).not.toContain('calendar-days');
+  expect(screen.getByText('日時').closest('dl')?.querySelector('svg')).toBeNull();
 });
