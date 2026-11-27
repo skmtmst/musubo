@@ -1436,3 +1436,4 @@
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [受信箱の AI 要約と返信案を直した反映履歴](release-log/unreleased/PR-kenta-later-codex48.md) — 反映履歴、確認 2026-11-27。
 - [運営の二段階認証設定とテンプレート詳細パネルの読み込み失敗時の案内・再読み込み修正](release-log/unreleased/PR-kenta-later-gemini37-1127.md) — 反映履歴、確認 2026-11-27。
+- [友だち詳細のフォーム回答表示を直した反映履歴](release-log/unreleased/PR-kenta-later-codex49.md) — 反映履歴、確認 2026-11-27。
