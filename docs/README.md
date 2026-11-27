@@ -1419,3 +1419,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [LINE来店フォローの時期数値・単位追従と運営招待の重複応答・二重送信ガード](release-log/unreleased/PR-kenta-later-gemini50-1127.md) — 反映履歴、確認 2026-11-27。
+- [LINE来店フォローの単位切り替え時の小数表示を修正](release-log/unreleased/PR-kenta-timing-fields-unit-1127.md) — 反映履歴、確認 2026-11-27。
