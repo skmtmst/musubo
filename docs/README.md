@@ -24,6 +24,7 @@
 - [飲食店予約の完了画面の修正履歴](release-log/unreleased/PR-kenta-later-cx5-21-1128.md)
 - [予約などの画面を戻るときの手順修正履歴](release-log/unreleased/PR-kenta-later-cx5-22-1128.md)
 - [前回と同じ予約の読み込み修正履歴](release-log/unreleased/PR-kenta-later-cx5-23-1128.md)
+- [フォームの受付条件の修正履歴](release-log/unreleased/PR-kenta-later-cx5-24-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
