@@ -82,13 +82,13 @@ export function WizardSteps({
       readOnly={readOnly}
       steps={STEPS.map((step) => {
         const state = stateOf(step.key)
-        const selectable = state === 'done' && step.key !== current
         return {
           key: step.key,
           label: step.title,
           order: step.no,
           state: state === 'current' ? 'todo' : state,
-          onSelect: onSelect && selectable ? () => onSelect(step.key) : undefined,
+          reachable: Boolean(onSelect) && step.key !== current,
+          onSelect: onSelect && step.key !== current ? () => onSelect(step.key) : undefined,
         }
       })}
     />
