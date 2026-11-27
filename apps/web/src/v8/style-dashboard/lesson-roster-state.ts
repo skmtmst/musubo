@@ -10,9 +10,12 @@ export function isLiveLessonBooking(booking: Pick<EventBookingItem, 'status' | '
 
 export function toLessonRosterMember(booking: EventBookingItem): StyleRoster['members'][number] {
   const cancelled = booking.status === 'cancelled' || Boolean(booking.cancelled_at)
+  const name = typeof booking.friend_display_name === 'string' ? booking.friend_display_name : typeof booking.friend_name === 'string' ? booking.friend_name : '名前なし'
+  const statusNote = Object.hasOwn(STATUS_NOTES, booking.status) ? STATUS_NOTES[booking.status] : null
+  const sub = statusNote ?? (booking.status === 'confirmed' || booking.status === 'attended' ? (booking.is_first_time ? '初めて' : '会員') : '状態を確認できません')
   return {
-    name: booking.friend_display_name ?? booking.friend_name ?? '名前なし',
-    sub: cancelled ? '取消' : STATUS_NOTES[booking.status] ?? (booking.is_first_time ? '初めて' : '会員'),
+    name,
+    sub: cancelled ? '取消' : sub,
     pay: { label: '—', tone: 'neutral' },
     attend: cancelled ? 'cancel' : booking.status === 'attended' ? 'done' : booking.status === 'no_show' ? 'absent' : booking.status === 'confirmed' ? 'button' : 'unavailable',
     bookingId: booking.id, eventId: booking.event_id, startsAt: booking.slot_starts_at,
