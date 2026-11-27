@@ -1442,3 +1442,4 @@
 - [列車11の画面と記録の修正](release-log/unreleased/PR-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
 - [コラム作成の読了後タグ保護とGoogle変更履歴のアカウント切替時クリア](release-log/unreleased/PR-kenta-after243-column-history.md) — 反映履歴、確認 2026-11-27。
 - [投稿画像の登録メディア選択でアカウント切替初期化・適用連打防止・未選択理由表示を追加](release-log/unreleased/PR-kenta-after243-post-media-picker-1127.md) — 反映履歴、確認 2026-11-27。
+- [TapAreaEditor の27番目以降の面ラベル記号化を修正](release-log/unreleased/PR-kenta-after243-tap-area-letter-1127.md) — 反映履歴、確認 2026-11-27。
