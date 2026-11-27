@@ -17,13 +17,25 @@ import styles from './style-dashboard.module.css'
  * 予約を押すと詳細、空きを押すと予約を入れる、日を押すとその日の予約が右に出る。
  */
 
-const toMin = (hm: string) => { const [h, m] = hm.split(':').map(Number); return h * 60 + m }
-const box = (start: string, end: string, day: number, days: number, from: number): CSSProperties => ({
-  insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(toMin(start) - from * 60) / 60} + var(--tpl-sd-board-top))`,
-  blockSize: `calc(var(--tpl-sd-week-hour) * ${(toMin(end) - toMin(start)) / 60} - var(--tpl-sd-entry-gap))`,
-  insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${days} * ${day})`,
-  inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${days})`,
-})
+const toMin = (hm: string): number | null => {
+  const parts = hm.split(':')
+  if (parts.length < 2) return null
+  const h = Number(parts[0])
+  const m = Number(parts[1])
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null
+}
+export const calendarEntryBox = (start: string, end: string, day: number, days: number, from: number): CSSProperties => {
+  const startMin = toMin(start) ?? from * 60
+  const endMin = Math.max(startMin, toMin(end) ?? startMin)
+  const safeDays = Number.isFinite(days) && days > 0 ? days : 1
+  const safeDay = Number.isFinite(day) && day >= 0 ? day : 0
+  return {
+    insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(startMin - from * 60) / 60} + var(--tpl-sd-board-top))`,
+    blockSize: `max(0px, calc(var(--tpl-sd-week-hour) * ${(endMin - startMin) / 60} - var(--tpl-sd-entry-gap)))`,
+    insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${safeDays} * ${safeDay})`,
+    inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${safeDays})`,
+  }
+}
 
 function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: string; onMove: (step: -1 | 0 | 1) => void }) {
   return (
@@ -39,7 +51,7 @@ function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: strin
 export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 'week', empty }: { empty?: ReactNode; period?: 'day' | 'week'; week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
   const timeScale = useCalendarTimeScale(week.entries, week.free, canWrite)
   const axis = calendarTimeRange([...week.entries, ...(canWrite ? week.free : [])])
-  const position = (start: string, end: string, day: number, days: number) => box(start, end, day, days, axis.from)
+  const position = (start: string, end: string, day: number, days: number) => calendarEntryBox(start, end, day, days, axis.from)
   const hours: string[] = []
   for (let h = axis.from; h < axis.to; h += 1) hours.push(`${h}:00`)
   return (
@@ -61,7 +73,7 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 
           ))}
         </div>
         <CalendarTimeEntries days={week.days.map(day => day.date)} entries={week.entries} free={week.free} canWrite={canWrite} position={position} onOpen={onOpen} onSlot={onSlot} hourCount={axis.to - axis.from}>
-          {hours.map((h) => <div key={h} className={styles.boardLine} style={{ insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${toMin(h) / 60 - axis.from} + var(--tpl-sd-board-top))` }}><span className={styles.boardHour}>{h.padStart(5, '0')}</span></div>)}
+          {hours.map((h) => <div key={h} className={styles.boardLine} style={{ insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(toMin(h) ?? axis.from * 60) / 60 - axis.from} + var(--tpl-sd-board-top))` }}><span className={styles.boardHour}>{h.padStart(5, '0')}</span></div>)}
           {week.days.map((d, i) => <span key={d.date} className={styles.boardDivider} data-closed={d.closed || undefined} style={{ insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${week.days.length} * ${i})`, inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${week.days.length})` }}>{d.closed ? <span className={styles.closedLabel}>定休日</span> : null}</span>)}
         </CalendarTimeEntries>
       </div></CalendarPeriod>
@@ -88,8 +100,8 @@ export function DayList({ month, href, canWrite }: { month: StyleMonth; href: st
     <div className={styles.dayList}>
       <div className={styles.dayListHead}><h3 className={styles.sideTitle}>{s.title}</h3><span className={styles.grow} /><span className={styles.cellMuted}>{s.total}</span></div>
       <div className={styles.dayListCard}>
-        {s.rows.map((r) => (
-          <div key={`${r.time}-${r.name}`} className={styles.dayRow}>
+        {s.rows.map((r, index) => (
+          <div key={`${r.time}-${r.name}-${index}`} className={styles.dayRow}>
             <strong className={styles.dayTime}>{r.time}</strong>
             <CalendarPerson href={href} name={r.name} secondary={<span className={styles.cellSub}>{r.sub}</span>} />
             <span className={styles.grow} />
