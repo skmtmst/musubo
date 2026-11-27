@@ -15,6 +15,7 @@
 - [友だち情報欄の分類案内の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-14-1128.md)
 - [アフィリエイトの支払い状況の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-15-1128.md)
 - [オートメーションの実行記録確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-16-1128.md)
+- [友だち追加時の配信の公開確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-17-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
