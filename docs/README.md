@@ -20,6 +20,7 @@
 - [リサーチ画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-08-1128.md)
 - [フォーム送信確認の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-09-1128.md)
 - [フォーム受付と画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-10-1128.md)
+- [業種ごとのイベント画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-11-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
