@@ -2,7 +2,7 @@
 import { knownValue } from '@/lib/known-value'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
@@ -40,6 +40,12 @@ const kindLabel: Record<RestaurantApproval['kind'], string> = {
   menu_change: 'メニュー改定',
 }
 
+const POST_TYPE_LABEL: Record<string, string> = {
+  standard: '通常の投稿',
+  event: 'イベント',
+  offer: 'クーポン',
+}
+
 export const approvalKindWord = (kind: string) => knownValue(kindLabel, kind, '種類を確認できません')
 
 
@@ -66,7 +72,7 @@ function ApprovalContent({ item, data }: { item: RestaurantApproval; data: Resta
     const post = typeof payload.postId === 'string' ? data.posts.find((p) => p.id === payload.postId) : null
     const typeLabel = typeof payload.typeLabel === 'string'
       ? payload.typeLabel
-      : post ? ({ standard: '通常の投稿', event: 'イベント', offer: 'クーポン' }[post.post_type] || post.post_type) : null
+      : post ? knownValue(POST_TYPE_LABEL, post.post_type, '種別を確認できません') : null
     const title = typeof payload.title === 'string' ? payload.title : post?.title
     const body = typeof payload.body === 'string' ? payload.body : post?.body
     if (!typeLabel && !title && !body) return <p className={styles.muted}>投稿の内容を読み込めませんでした。</p>
@@ -154,6 +160,9 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
   onSubmit: (reason: string) => void
 }) {
   const [reason, setReason] = useState('')
+  useEffect(() => {
+    setReason('')
+  }, [item?.id])
   return (
     <Dialog
       open={item !== null}
@@ -199,7 +208,7 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
   const rows = data.approvals.filter((item) => !selectedStoreId || item.store_id === selectedStoreId || item.store_id === null)
   const pending = rows.filter((item) => item.status === 'pending')
   const decide = (id: string, action: 'approve' | 'return', comment?: string) => {
-    if (!selectedAccountId || readOnly) return
+    if (!selectedAccountId || readOnly || busy) return
     void mutate(
       async () => {
         const result = await restaurantTestApi.decideApproval(selectedAccountId, id, action, comment)
@@ -247,10 +256,10 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantContext }) {
         item={returnTarget}
         store={data.stores.find((s) => s.id === returnTarget?.store_id)}
         busy={busy}
-        onCancel={() => setReturnTarget(null)}
+        onCancel={() => { if (!busy) setReturnTarget(null) }}
         onSubmit={(reason) => {
           const target = returnTarget
-          if (!target) return
+          if (!target || busy) return
           setReturnTarget(null)
           decide(target.id, 'return', reason)
         }}
