@@ -217,7 +217,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     }
   }, [groupId, saveErrors])
 
-  useEffect(() => { setProgress(null); setProgressError(false); setRetryTarget(null); setRetryScope(null); setRetrying(false); setFixOpen(false); setFixScope(null); setFixing(false); setUnpublishOpen(false); setUnpublishScope(null); setUnpublishing(false); void loadGroup() }, [loadGroup])
+  useEffect(() => { setProgress(null); setProgressError(false); setChecking(false); setRepublishing(false); setDuplicating(false); setDuplicateOpen(false); setActionError(''); setNotice(''); setDialogError(''); setRetryTarget(null); setRetryScope(null); setRetrying(false); setFixOpen(false); setFixScope(null); setFixing(false); setUnpublishOpen(false); setUnpublishScope(null); setUnpublishing(false); setUnpublishImpact(null); void loadGroup() }, [loadGroup])
   useEffect(() => {
     if (loadState !== 'ready' || !canInspectOperations) return
     void loadProgress()

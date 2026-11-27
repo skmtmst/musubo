@@ -2,7 +2,7 @@
 // @vitest-environment-options { "url": "http://localhost/rich-menus/edit/" }
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({
@@ -12,6 +12,8 @@ const net = vi.hoisted(() => ({
   reconcile: vi.fn(),
   preview: vi.fn(),
   taps: vi.fn(),
+  publish: vi.fn(),
+  duplicate: vi.fn(),
 }))
 
 const account = { id: 'account-1', name: '店A' }
@@ -44,6 +46,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
         previewTargets: net.preview,
         audienceSummary: net.preview,
         tapStats: net.taps,
+        publish: net.publish,
+        duplicate: net.duplicate,
       },
     },
   }
@@ -64,6 +68,8 @@ beforeEach(() => {
   net.reconcile.mockResolvedValue({ success: true, data: { dryRun: true, diffs: [] } })
   net.preview.mockResolvedValue({ success: true, data: { effective: { value: 10 } } })
   net.taps.mockResolvedValue({ success: true, data: { byGroup: [{ groupId: 'g1', taps: 5 }] } })
+  net.publish.mockResolvedValue({ success: true, data: {} })
+  net.duplicate.mockResolvedValue({ success: true, data: { id: 'dup-new' } })
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -135,5 +141,63 @@ describe('RichMenuDetailV8 古い進捗応答破棄・異常件数防御・未�
     expect(screen.queryByText('古いメニューの失敗段')).toBeNull()
     expect(screen.queryByText('古い失敗メッセージ')).toBeNull()
     expect(screen.getByText('新しいメニューの公開段')).toBeTruthy()
+  })
+
+  it('公開中・複製中に別メニューへ切り替え、古い応答が遅れて返っても新しいメニューの公開・複製ボタンが押せる', async () => {
+    let resolveOldPublish!: (v: unknown) => void
+    let resolveOldDuplicate!: (v: unknown) => void
+    net.progress.mockResolvedValue({
+      success: true,
+      data: {
+        steps: [{ key: 's1', label: '登録', status: 'failed' }],
+        run: { status: 'failed' },
+        message: '途中で止まりました',
+      },
+    })
+    net.publish.mockImplementation((id: string) =>
+      id === 'g1'
+        ? new Promise((resolve) => { resolveOldPublish = resolve })
+        : Promise.resolve({ success: true, data: {} }),
+    )
+    net.duplicate.mockImplementation((id: string) =>
+      id === 'g1'
+        ? new Promise((resolve) => { resolveOldDuplicate = resolve })
+        : Promise.resolve({ success: true, data: { id: 'dup-g2' } }),
+    )
+
+    await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+    const g1Republish = await screen.findByRole('button', { name: 'もう一度公開する' })
+    await act(async () => { fireEvent.click(g1Republish) })
+    await waitFor(() => expect(net.publish).toHaveBeenCalledWith('g1', expect.any(String)))
+
+    const moreBtn1 = screen.getByRole('button', { name: 'そのほかの操作' })
+    await act(async () => { fireEvent.click(moreBtn1) })
+    const dupMenuItem1 = await screen.findByRole('menuitem', { name: '複製する' })
+    await act(async () => { fireEvent.click(dupMenuItem1) })
+    const dupConfirm1 = await screen.findByRole('button', { name: '複製する' })
+    await act(async () => { fireEvent.click(dupConfirm1) })
+    await waitFor(() => expect(net.duplicate).toHaveBeenCalledWith('g1', expect.any(String)))
+
+    await act(async () => { root.render(<RichMenuDetailV8 groupId="g2" />) })
+    await screen.findByRole('heading', { name: 'メニュー2' })
+
+    await act(async () => {
+      resolveOldPublish({ success: true, data: {} })
+      resolveOldDuplicate({ success: true, data: { id: 'dup-g1' } })
+    })
+
+    const g2Republish = await screen.findByRole('button', { name: 'もう一度公開する' })
+    expect((g2Republish as HTMLButtonElement).disabled).toBe(false)
+    await act(async () => { fireEvent.click(g2Republish) })
+    await waitFor(() => expect(net.publish).toHaveBeenCalledWith('g2', expect.any(String)))
+
+    const moreBtn2 = screen.getByRole('button', { name: 'そのほかの操作' })
+    await act(async () => { fireEvent.click(moreBtn2) })
+    const dupMenuItem2 = await screen.findByRole('menuitem', { name: '複製する' })
+    await act(async () => { fireEvent.click(dupMenuItem2) })
+    const dupConfirm2 = await screen.findByRole('button', { name: '複製する' })
+    expect((dupConfirm2 as HTMLButtonElement).disabled).toBe(false)
+    await act(async () => { fireEvent.click(dupConfirm2) })
+    await waitFor(() => expect(net.duplicate).toHaveBeenCalledWith('g2', expect.any(String)))
   })
 })
