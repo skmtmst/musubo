@@ -92,7 +92,7 @@ export async function loadFormsPage({ activeFolderId, clearList, fetchQuery, for
       const formsData = formsResult.status === 'fulfilled' && formsResult.value.success
         ? formsResult.value.data
         : null
-      if (formsData === null) {
+      if (formsData === null || (!Array.isArray(formsData) && (!formsData || !Array.isArray(formsData.items)))) {
         setLoadFailure(formsResult.status === 'rejected' ? formsResult.reason : new Error('load_failed'))
         setLoadError('回答フォームを読み込めませんでした。')
         clearList()
