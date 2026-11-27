@@ -31,6 +31,25 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 処理は今の作りと同じ口（change-review-model.ts の写し）。V8 は入力を変えると自動で影響を確かめる。
  */
 
+function validCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
+}
+
+function slotValidationErrors(
+  edit: SlotEdit | null | undefined,
+  impactErrors: readonly string[] | undefined,
+): { startError: string; endError: string; capacityError: string } {
+  if (!edit) return { startError: '', endError: '', capacityError: '' }
+  const startError = !localInputToIso(edit.startsAt) ? '開始日時を選んでください' : ''
+  const endError = !localInputToIso(edit.endsAt) || edit.endsAt <= edit.startsAt ? '終了日時は開始日時より後にしてください' : ''
+  const capacityError = edit.capacity.trim() && (!Number.isInteger(Number(edit.capacity)) || Number(edit.capacity) < 1)
+    ? '定員は1以上の数で入れてください'
+    : impactErrors?.includes('slot_capacity_below_bookings')
+      ? '定員を、すでに申し込まれている人数より下げられません'
+      : ''
+  return { startError, endError, capacityError }
+}
+
 /** datetime-local（日本時間の壁時計）→「10:30」。 */
 function localTime(local: string): string {
   return local.split('T')[1]?.slice(0, 5) ?? emptyValue('unknown')
@@ -77,6 +96,12 @@ function ChangeReview({ eventId }: { eventId: string }) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [reasonError, setReasonError] = useState('')
   const focusTarget = useRef<string | null>(null)
+  useEffect(() => {
+    setSelectedSlotId(null)
+    setVenueOpen(false)
+    setConfirmOpen(false)
+    setReasonError('')
+  }, [eventId, selectedAccountId])
   useEffect(() => {
     const id = focusTarget.current
     if (!id) return
@@ -142,14 +167,21 @@ function ChangeReview({ eventId }: { eventId: string }) {
     ...impact.notices.map((code) => noticeMessage(code)),
   ])
   const reasonMissing = isPublished && !reason.trim()
-  const startError = activeEdit && !localInputToIso(activeEdit.startsAt) ? '開始日時を選んでください' : ''
-  const endError = activeEdit && (!localInputToIso(activeEdit.endsAt) || activeEdit.endsAt <= activeEdit.startsAt) ? '終了日時は開始日時より後にしてください' : ''
-  const capacityError = activeEdit && activeEdit.capacity.trim() && (!Number.isInteger(Number(activeEdit.capacity)) || Number(activeEdit.capacity) < 1)
-    ? '定員は1以上の数で入れてください'
-    : activeSlot && impactBySlot.get(activeSlot.id)?.errors.includes('slot_capacity_below_bookings')
-      ? '定員を、すでに申し込まれている人数より下げられません' : ''
-  const canApply = Boolean(preview && !preview.blocked && !applyBusy && !startError && !endError && !capacityError)
+  const { startError, endError, capacityError } = slotValidationErrors(
+    activeEdit,
+    activeSlot ? impactBySlot.get(activeSlot.id)?.errors : undefined,
+  )
+  const anySlotHasError = slotList.some((slot) => {
+    const edit = edits[slot.id]
+    if (!edit) return false
+    const errs = slotValidationErrors(edit, impactBySlot.get(slot.id)?.errors)
+    return Boolean(errs.startError || errs.endError || errs.capacityError)
+  })
+  const confirmedCount = validCount(preview?.total_confirmed)
+  const waitingCount = validCount(preview?.total_waiting)
+  const canApply = Boolean(preview && !preview.blocked && !applyBusy && !startError && !endError && !capacityError && !anySlotHasError)
   const requestConfirm = () => {
+    if (!canApply) return
     if (reasonMissing) {
       focusTarget.current = 'ev-cr-reason'
       setReasonError('変える理由を入れてください')
@@ -171,7 +203,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
           <>
             <Notice tone={preview.blocked ? "danger" : "warn"} heading={<>{preview.blocked ? 'このままでは変えられません' : moved ? '日時が変わります' : '内容が変わります'}</>}>
               <p className={styles.bandText}>
-                確定した申込 {preview.total_confirmed} 人へ、LINE で新旧の日時をお知らせします。キャンセル待ち {preview.total_waiting} 人は順番のままです。
+                確定した申込 {confirmedCount ?? '—'} 人へ、LINE で新旧の日時をお知らせします。キャンセル待ち {waitingCount ?? '—'} 人は順番のままです。
               </p>
             </Notice>
             {moved ? (
@@ -348,7 +380,7 @@ function ChangeReview({ eventId }: { eventId: string }) {
         confirmIcon={<Send size={16} aria-hidden="true" />}
         title="変更内容を確認"
         cancelLabel="戻って直す"
-        confirmLabel={`変えて ${preview?.total_confirmed ?? 0} 人にお知らせする`}
+        confirmLabel={confirmedCount === null ? '変えてお知らせする' : `変えて ${confirmedCount} 人にお知らせする`}
         busy={applyBusy}
         onConfirm={() => { setConfirmOpen(false); return runApply() }}
         onCancel={() => setConfirmOpen(false)}
@@ -367,11 +399,11 @@ function ChangeReview({ eventId }: { eventId: string }) {
             ) : null}
             <div className={styles.confirmRow}>
               <dt>お知らせする人</dt>
-              <dd>{`確定 ${preview?.total_confirmed ?? 0} 人`}</dd>
+              <dd>{confirmedCount === null ? '人数を確認できません' : `確定 ${confirmedCount} 人`}</dd>
             </div>
             <div className={styles.confirmRow}>
               <dt>キャンセル待ち</dt>
-              <dd>{`${preview?.total_waiting ?? 0} 人（順番はそのまま）`}</dd>
+              <dd>{waitingCount === null ? '人数を確認できません' : `${waitingCount} 人（順番はそのまま）`}</dd>
             </div>
           </dl>
           {sampleText ? <p className={styles.confirmSample}>{sampleText}</p> : null}
