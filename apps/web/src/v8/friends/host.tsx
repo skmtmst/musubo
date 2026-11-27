@@ -10,7 +10,7 @@ import MergedUsersV8 from './merged/merged'
 import DuplicatesListV8 from './duplicates/list'
 
 export default function FriendsHostV8() {
-  const tab = useSearchParams().get('tab') ?? 'list'
+  const tab = useSearchParams()?.get('tab')?.trim() ?? 'list'
   if (tab === 'merged') return <MergedUsersV8 />
   if (tab === 'duplicates') return <DuplicatesListV8 />
   return <FriendsListV8 />
