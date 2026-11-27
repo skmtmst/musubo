@@ -52,6 +52,13 @@ describe('ログインユーザーの無効化と監査記録', () => {
         id TEXT PRIMARY KEY, admin_user_id TEXT, action TEXT NOT NULL, screen TEXT,
         ip TEXT, user_agent TEXT, result TEXT NOT NULL DEFAULT 'ok', created_at TEXT NOT NULL
       );
+      CREATE TABLE auth_trusted_logins (
+        staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+        marker_hash TEXT NOT NULL,
+        ip_prefix TEXT NOT NULL,
+        confirmed_at TEXT NOT NULL,
+        PRIMARY KEY (staff_id, marker_hash, ip_prefix)
+      );
       CREATE TABLE admin_sessions (
         token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL, expires_at TEXT NOT NULL
       );
@@ -96,15 +103,25 @@ describe('ログインユーザーの無効化と監査記録', () => {
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM login_audit WHERE admin_user_id = 'target'`).get()).toEqual({ count: 3 })
   })
 
-  it('権限変更時は対象者のsessionと二段階認証challengeだけを失効する', async () => {
+  it('権限変更時は対象者のsession・二段階認証challenge・信頼済みログインだけを失効する', async () => {
     sqlite.prepare('INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('s-target', 'target', '2099-01-01')
     sqlite.prepare('INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('s-other', 'other', '2099-01-01')
     sqlite.prepare('INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('c-target', 'target', '2099-01-01')
     sqlite.prepare('INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('c-other', 'other', '2099-01-01')
 
+    const addStaff = sqlite.prepare('INSERT INTO staff_members (id, name, role, api_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+    addStaff.run('target', '対象', 'staff', 'target-key', '2026-08-23', '2026-08-23')
+    addStaff.run('other', '別の担当', 'staff', 'other-key', '2026-08-23', '2026-08-23')
+
+    const addTrusted = sqlite.prepare('INSERT INTO auth_trusted_logins (staff_id, marker_hash, ip_prefix, confirmed_at) VALUES (?, ?, ?, ?)')
+    addTrusted.run('target', 'target-device-1', '192.0.2.0/24', '2026-08-23T10:00:00Z')
+    addTrusted.run('target', 'target-device-2', '192.0.2.0/24', '2026-08-23T10:00:00Z')
+    addTrusted.run('other', 'other-device', '192.0.2.0/24', '2026-08-23T10:00:00Z')
+
     await revokeStaffAuthentication(db, 'target')
 
     expect(sqlite.prepare('SELECT token_hash FROM admin_sessions ORDER BY token_hash').all()).toEqual([{ token_hash: 's-other' }])
     expect(sqlite.prepare('SELECT token_hash FROM admin_two_factor_challenges ORDER BY token_hash').all()).toEqual([{ token_hash: 'c-other' }])
+    expect(sqlite.prepare('SELECT staff_id, marker_hash FROM auth_trusted_logins ORDER BY staff_id, marker_hash').all()).toEqual([{ staff_id: 'other', marker_hash: 'other-device' }])
   })
 })
