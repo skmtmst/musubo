@@ -12,6 +12,14 @@ it('初期設定の対象が見つからない場合は止まっていると断�
   net.starterItems.mockResolvedValue({ success: true, data: { items: [{ kind: 'automation', status: 'missing' }] } })
   render(<FirstRunDoneDialog accountId="a" style="standard" minutes={null} steps={[]} onClose={() => {}} />)
   const row = (await screen.findByText('オートメーション')).closest('li')!
-  expect(within(row).getByText('状態を確認できません')).toBeTruthy()
+  expect(within(row).getByText('見つかりません')).toBeTruthy()
   expect(within(row).queryByText('止めています')).toBeNull()
+})
+
+it('同じ種類に停止中と見つからない物があれば両方の案内を出す', async () => {
+  net.starterSet.mockResolvedValue({ success: true, data: { definition: { items: [{ kind: 'automation' }] } } })
+  net.starterItems.mockResolvedValue({ success: true, data: { items: [{ kind: 'automation', status: 'missing' }, { kind: 'automation', status: 'draft' }] } })
+  render(<FirstRunDoneDialog accountId="a" style="standard" minutes={null} steps={[]} onClose={() => {}} />)
+  expect(await screen.findByText('一部見つかりません')).toBeTruthy()
+  expect(screen.getByText(/止めている物は、はじめの質問/)).toBeTruthy()
 })
