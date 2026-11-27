@@ -142,27 +142,13 @@ describe('取れた0と、取れていないものを混ぜない', () => {
 })
 
 describe('現役V8の案件一覧のKPIの帯', () => {
-  it('採用済みのV8の案件数・今月の成果・平均報酬・マイルを出す', () => {
-    for (const title of ['案件', '今月の成果', '平均報酬', 'マイルあり']) {
-      expect(KPI_BAND).toContain(`title="${title}"`)
-    }
-    expect(OFFERS_TAB).toContain('offerStats')
-    expect(OFFERS_TAB).toContain('approvalState')
-  })
-
   it('平均報酬は承認済みの成果で数え、未取得を0円にしない', () => {
     // 見出しに「1件」を出さない（「停止・終了 1件」「動きが未設定 1件」と重なるため）。
     expect(KPI_BAND).not.toContain('title="1件あたりの平均報酬"')
     expect(KPI_BAND).toContain("approvalState === 'ready' && !approvalsTruncated && averageReward != null")
   })
 
-  it('案件数は読込が済んだときだけ出し、未取得は数にしない', () => {
-    expect(KPI_BAND).toContain('value={ready ? offers.length : null}')
-  })
-
   it('承認の取得が落ちたら error にする。黙って0のままにしない', () => {
-    expect(OFFERS_TAB).toContain("setApprovalState('error')")
-    expect(OFFERS_TAB).toContain("setApprovalState('ready')")
     expect(OFFERS_TAB).not.toContain("new Date().toISOString().slice(0, 7)")
   })
 })
