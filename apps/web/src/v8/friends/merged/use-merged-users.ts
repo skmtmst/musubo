@@ -27,9 +27,14 @@ export interface UsersAccountOption {
 export function useMergedUsers(memberAccountId: string | null) {
   const scope = useMemo(() => ({ memberAccountId }), [memberAccountId])
   const currentScope = useRef<typeof scope | null>(scope)
+  const exportControllerRef = useRef<AbortController | null>(null)
   useLayoutEffect(() => {
     currentScope.current = scope
-    return () => { if (currentScope.current === scope) currentScope.current = null }
+    return () => {
+      if (currentScope.current === scope) currentScope.current = null
+      exportControllerRef.current?.abort()
+      exportControllerRef.current = null
+    }
   }, [scope])
   const [loadedScope, setLoadedScope] = useState<typeof scope | null>(null)
   const summaryRequestRef = useRef(0)
@@ -219,9 +224,12 @@ export function useMergedUsers(memberAccountId: string | null) {
    */
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  useEffect(() => { setExporting(false); setExportError('') }, [scope])
   const exportCsv = async () => {
-    if (exporting || !memberAccountId || currentScope.current !== scope || loadedScope !== scope || loading) return
+    if (exportControllerRef.current || !memberAccountId || currentScope.current !== scope || loadedScope !== scope || loading) return
     const exportScope = scope
+    const controller = new AbortController()
+    exportControllerRef.current = controller
     setExporting(true)
     setExportError('')
     try {
@@ -236,14 +244,15 @@ export function useMergedUsers(memberAccountId: string | null) {
       let exportTotal = total
       // 上限は途中で件数が増えても無限に追い続けないための安全弁。
       for (let p = 1; all.length < exportTotal && p <= 500; p += 1) {
-        const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200 })
-        if (currentScope.current !== exportScope) return
+        const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200, signal: controller.signal })
+        if (controller.signal.aborted || currentScope.current !== exportScope) return
         if (!res.success || res.data.memberAccountId !== memberAccountId || res.data.rows.some(row => !row.accounts.some(account => account.accountId === memberAccountId))) throw new Error('fetch failed')
         all.push(...res.data.rows)
         exportTotal = res.data.total
-        if (res.data.rows.length === 0) break
+        if (res.data.rows.length === 0 && all.length < exportTotal) throw new Error('incomplete export')
       }
-      if (currentScope.current !== exportScope) return
+      if (controller.signal.aborted || currentScope.current !== exportScope) return
+      if (all.length < exportTotal) throw new Error('incomplete export')
       const lines = [
         ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(csvCell).join(','),
         ...all.map((row) => [
@@ -261,9 +270,12 @@ export function useMergedUsers(memberAccountId: string | null) {
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
-      if (currentScope.current === exportScope) setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
+      if (!controller.signal.aborted && currentScope.current === exportScope) setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
     } finally {
-      setExporting(false)
+      if (exportControllerRef.current === controller) {
+        exportControllerRef.current = null
+        if (currentScope.current === exportScope) setExporting(false)
+      }
     }
   }
 

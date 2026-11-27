@@ -69,6 +69,7 @@ export const staffMethods = {
       page?: number;
       pageSize?: number;
       forceRefresh?: boolean;
+      signal?: AbortSignal;
     }) => {
       const p = new URLSearchParams();
       if (opts?.q) p.set('q', opts.q);
@@ -105,7 +106,7 @@ export const staffMethods = {
           lastActivityAt: string;
           isDuplicate: boolean;
         }>;
-      }>>(`/api/users-grouped${qs ? `?${qs}` : ''}`);
+      }>>(`/api/users-grouped${qs ? `?${qs}` : ''}`, opts?.signal ? { signal: opts.signal } : undefined);
     },
   },
 }
