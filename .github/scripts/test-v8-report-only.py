@@ -11,7 +11,7 @@ def valid_configuration(gate):
     step = gate['steps'][0]
     mode = step['env']['V8_GUARD_REPORT_ONLY']
     has_dependency = 'v8-screen-guard' in gate['needs']
-    observes_result = step['env'].get('V8_SCREEN_GUARD_RESULT') == '${{ needs.v8-screen-guard.result }}'
+    observes_result = step['env'].get('V8_SCREEN_GUARD_RESULT') == "${{ fromJSON(toJSON(needs))['v8-screen-guard'].result }}"
     checks_result = 'case "$V8_SCREEN_GUARD_RESULT" in' in step['run']
     return observes_result and checks_result and ((mode == 'true' and not has_dependency) or (mode == 'false' and has_dependency))
 
@@ -58,6 +58,8 @@ class GateTest(unittest.TestCase):
             self.check_gate(result, 'false', True)
 
     def test_other_checks_remain_required(self):
+        self.check_gate('', 'true', False, V8_BEHAVIOR_GUARD_RESULT='failure')
+        self.check_gate('', 'true', False, V8_BEHAVIOR_GUARD_RESULT='cancelled')
         self.check_gate('', 'true', False, WORKER_UNIT_RESULT='failure')
         self.check_gate('', 'true', False, WORKER_BUILD_RESULT='cancelled')
         self.check_gate('', 'invalid', False)

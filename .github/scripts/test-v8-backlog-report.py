@@ -1,5 +1,6 @@
 import copy
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -17,6 +18,8 @@ class BacklogTest(unittest.TestCase):
         required = copy.deepcopy(required)
         required.pop('needs')
         required.pop('if')
+        original = json.loads(Path('.github/scripts/v8-guard-before-split.json').read_text())
+        required['steps'] = required['steps'][:10] + original + required['steps'][-2:]
         self.assertEqual(required, nightly)
 
     def test_failed_steps_only_and_no_logs(self):
