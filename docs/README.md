@@ -1442,3 +1442,4 @@
 - [保存した検索と共通情報の読み込みを直した反映履歴](release-log/unreleased/PR-kenta-later-codex51.md) — 反映履歴、確認 2026-11-27。
 - [予約メニューの版の履歴と初期設定の状態表示の修正](release-log/unreleased/PR-kenta-later-codex52.md) — 反映履歴、確認 2026-11-27。
 - [運営お知らせ作成の読み込み失敗復帰と未知プラン名表示](release-log/unreleased/PR-kenta-later-gemini38b-1127.md) — 反映履歴、確認 2026-11-27。
+- [イベントの申込ページの見本の表示を修正](release-log/unreleased/PR-kenta-later-codex53.md) — 反映履歴、確認 2026-11-27。
