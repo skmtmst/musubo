@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import type { ReactElement } from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
-import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { deferImpersonationSnapshot, forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { EmptyBookings } from './empty-bookings'
 
 afterEach(() => {
@@ -95,5 +95,46 @@ describe('EmptyBookings の権限種別理由と代理ログイン・役割未�
     )
     fireEvent.click(screen.getByRole('button', { name: '予約を入れる' }))
     expect(onBook).toHaveBeenCalledTimes(1)
+  })
+
+  it('表示中に閲覧の代理ログインへ切り替わったら即座に灰色＋理由へ更新し、押しても実行しない', () => {
+    const onBook = vi.fn()
+
+    render(
+      <EmptyBookings
+        style="salon"
+        today={{ rows: [] }}
+        canWrite
+        role="admin"
+        onBook={onBook}
+        onCreateClass={vi.fn()}
+      />,
+    )
+
+    const button = screen.getByRole('button', { name: '予約を入れる' })
+    expect(button.getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(button)
+    expect(onBook).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      deferImpersonationSnapshot({ id: 'imp-live', tenantId: 't-1', mode: 'read', piiRevealed: false, startedAt: '' })
+    })
+
+    const lockedButton = screen.getByRole('button', { name: '予約を入れる' })
+    expect(lockedButton.getAttribute('aria-disabled')).toBe('true')
+    expect(lockedButton.hasAttribute('data-permission-locked')).toBe(true)
+    fireEvent.focus(lockedButton)
+    expect(screen.getByRole('tooltip').textContent).toBe(PERMISSION_LOCK_REASON.impersonation)
+    fireEvent.click(lockedButton)
+    expect(onBook).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      forgetSessionSnapshot()
+    })
+
+    const unlockedButton = screen.getByRole('button', { name: '予約を入れる' })
+    expect(unlockedButton.getAttribute('aria-disabled')).toBeNull()
+    fireEvent.click(unlockedButton)
+    expect(onBook).toHaveBeenCalledTimes(2)
   })
 })
