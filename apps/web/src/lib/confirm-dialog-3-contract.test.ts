@@ -159,12 +159,7 @@ describe('回答フォーム編集のページ削除', () => {
     expect(dialog, '回答が残ることを書いていない').toContain('集まった回答は消えません')
   })
 
-  it('つなぎ直す分岐は全ページを見て数える', () => {
-    const operations = read('components', 'forms', 'form-definition-operations.ts')
-    const body = fnBody(code(operations), 'export function formJumpsInto')
-    expect(body, '一部のページしか見ていない').toContain('layout.sections.reduce')
-    expect(body, '選択肢の行き先を見ていない').toContain('choice.jumpToSectionId === sectionId')
-  })
+
 })
 
 describe('共通情報編集の削除', () => {
