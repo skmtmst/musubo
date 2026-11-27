@@ -69,6 +69,7 @@ export async function saveWizardDraft({ autoReplyId, buildInput, createKeyRef, f
       } else {
         const res = await api.autoReplies.createDraft(body, createKeyRef.current)
         if (!res.success) throw new Error(res.error || 'create failed')
+        if (typeof res.data?.autoReplyId !== 'string' || !res.data.autoReplyId.trim() || !Number.isSafeInteger(res.data.versionNumber) || res.data.versionNumber < 1 || !res.data.settings || typeof res.data.settings !== 'object') throw new Error('保存結果を確認できません。画面を読み直してください。')
         savedId = res.data.autoReplyId
         setAutoReplyId(res.data.autoReplyId)
         savedVersionRef.current = res.data.versionNumber
