@@ -301,13 +301,6 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/restaurant/organization/organization-forms.tsx",
-    "fingerprint": "32dbd7c759d8c097",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/v8/settings/emergency/health.tsx",
     "fingerprint": "defbb1e54cc37234",
     "disposition": "error-visible",
