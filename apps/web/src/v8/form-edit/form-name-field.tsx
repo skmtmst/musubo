@@ -16,16 +16,17 @@ export function FormNameField({ value, error, readOnly, onChange, onBlur }: {
   onChange: (name: string) => void
   onBlur?: () => void
 }) {
+  const safeValue = typeof value === 'string' ? value : ''
   if (readOnly) return <dl>
     <div className={styles.field}>
       <dt className={styles.fieldLabel}>フォーム名</dt>
-      <dd>{value || '未設定'}</dd>
+      <dd>{safeValue.trim() ? safeValue : '未設定'}</dd>
     </div>
   </dl>
   return <div className={styles.field}>
     <Field label="フォーム名" htmlFor="fe-name" requirement={formNameRequirement}>
       <SaveErrorField names={['name', 'props.name']}>
-        <TextField id="fe-name" value={value} readOnly={readOnly} invalid={Boolean(error)} onBlur={readOnly ? undefined : onBlur} onChange={event => { if (!readOnly) onChange(event.target.value) }} />
+        <TextField id="fe-name" value={safeValue} readOnly={readOnly} invalid={Boolean(error)} onBlur={readOnly ? undefined : onBlur} onChange={event => { if (!readOnly) onChange(event.target.value) }} />
       </SaveErrorField>
       {error ? <p role="alert" className={styles.fieldError}>{error}</p> : null}
     </Field>
