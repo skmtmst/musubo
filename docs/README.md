@@ -1479,3 +1479,4 @@
 - [ウェビナー参加者の回数と参加経路の表示修正](release-log/unreleased/PR-kenta-later-cx3-17-1128.md) — 反映履歴、確認 2026-11-28。
 - [ウェビナーの案内カードの比較で不正な内容を確認できるように修正](release-log/unreleased/PR-kenta-later-cx3-18-1128.md) — 反映履歴、確認 2026-11-28。
 - [テンプレート一覧の不正な使用数と送信数の表示を修正](release-log/unreleased/PR-kenta-later-cx3-19-1128.md) — 反映履歴、確認 2026-11-28。
+- [テンプレート使用先の配信とリマインダの状態表示を修正](release-log/unreleased/PR-kenta-later-cx3-20-1128.md) — 反映履歴、確認 2026-11-28。
