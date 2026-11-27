@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import EventConfirm from './event-confirm.js';
@@ -28,6 +30,47 @@ function open() {
     <Route path="/events/:id/done" element={<Destination />} />
   </Routes></MemoryRouter>);
 }
+
+const ROOT = join(import.meta.dirname, '..');
+
+function src(...parts: string[]): string {
+  return readFileSync(join(ROOT, ...parts), 'utf8');
+}
+
+const event = src('pages', 'event.tsx');
+const confirm = src('pages', 'event-confirm.tsx');
+const done = src('pages', 'event-done.tsx');
+const bookings = src('pages', 'event-bookings.tsx');
+const offer = src('pages', 'event-waitlist-offer.tsx');
+const EVENT_FILES = [event, confirm, done, bookings, offer];
+
+describe('素の Tailwind 色・16進数・絵文字が無い', () => {
+  it('5画面のどこにも無い', () => {
+    for (const text of EVENT_FILES) {
+      expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+      for (const banned of [
+        'bg-green-',
+        'text-green-',
+        'bg-blue-',
+        'text-blue-',
+        'bg-gray-',
+        'text-gray-',
+        'border-gray-',
+        'bg-red-',
+        'text-red-',
+        '#06c755',
+        '#0b63ce',
+        '📍',
+        '📅',
+        '⏳',
+        '✅',
+      ]) {
+        expect(text).not.toContain(banned);
+      }
+    }
+  });
+});
+
 
 it.each([false, true])('申込結果の待ち=%sに従う行き先へ、同じ枠とアカウントを引き継ぐ', async waitlisted => {
   vi.mocked(api.createEventBooking).mockResolvedValue(waitlisted ? { waitlisted: true, slot_id: 'slot' } : { id: 'booking', status: 'requested' } as Awaited<ReturnType<typeof api.createEventBooking>>);
@@ -67,6 +110,17 @@ it('送信中は連打できず、失敗しても備考を残し同じ鍵で再�
   fireEvent.click(screen.getByRole('button', { name: '申し込む' }));
   await waitFor(() => expect(api.createEventBooking).toHaveBeenCalledTimes(2));
   expect(vi.mocked(api.createEventBooking).mock.calls[0][2]).toBe(vi.mocked(api.createEventBooking).mock.calls[1][2]);
+});
+
+it('イベント画面の禁止の見張りを保つ', () => {
+  expect(event).not.toContain('/confirm?slotId=${s.id}');
+  expect(confirm).not.toContain('予約をリクエスト');
+  expect(confirm).not.toContain('>戻る<');
+  expect(bookings).not.toContain('過去');
+  expect(done).not.toContain('LoadingView');
+  expect(confirm).not.toContain('bg-info-bg');
+  expect(confirm).not.toContain('bg-yellow');
+  expect(event).not.toContain('text-danger');
 });
 
 it('時間を選んだだけでは移動せず、確認を押してから選んだ時間へ進む', async () => {
