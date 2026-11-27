@@ -20,13 +20,13 @@ vi.mock('@/lib/auth-email', async (importOriginal) => {
 })
 
 vi.mock('@/components/auth/turnstile', () => ({
-  default: ({
+  default: function TurnstileStub({
     onToken,
     handleRef,
   }: {
     onToken: (token: string | null) => void
     handleRef?: (handle: { reset: () => void } | null) => void
-  }) => {
+  }) {
     React.useEffect(() => {
       handleRef?.({ reset: mocks.resetTurnstile })
       onToken('turnstile-token-1')

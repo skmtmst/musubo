@@ -85,7 +85,7 @@ function toForm(a: OpsAnnouncement): Form {
 }
 
 function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementChannel[], error: boolean): string {
-  if (error) return '宛先数を取得できませんでした'
+  if (error) return '宛先数を確認できませんでした'
   if (!p) return '宛先を数えています…'
   const words = [`${p.tenants} 件の契約先・${p.staff} 人の権限者`]
   if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked} 人へ届きます`)
@@ -100,7 +100,7 @@ function confirmAudience(form: Form, preview: OpsAudiencePreview | null, preview
       ? `${form.audiencePlans.map((key) => PLANS.find((p) => p.key === key)?.label ?? 'その他のプラン').join('・')}の契約先`
       : '選んだ契約先'
   if (preview) return `${base} ${preview.tenants} 社`
-  return previewError ? `${base}（件数を取得できませんでした）` : `${base}（数えています…）`
+  return previewError ? `${base}（件数を確認できませんでした）` : `${base}（数えています…）`
 }
 
 function confirmChannels(form: Form, preview: OpsAudiencePreview | null, previewError: boolean): string {

@@ -10,7 +10,7 @@ import { TextField } from '@/components/shared/text-field'
 import type { WebinarFolder } from '@/lib/api'
 import { ReadValue } from './parts'
 import styles from './form.module.css'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
@@ -102,7 +102,7 @@ export function BasicForm({
               ? <ReadValue label="フォルダ">{folderOptions.find((option) => option.value === values.folderId)?.label ?? '未分類'}</ReadValue>
               : <SaveErrorField names={["folderId","values.folderId","folder_id","values.folder_id"]}><FolderSelect id={`${idPrefix}-folder`} aria-label="フォルダ" size="full" value={values.folderId} disabled={disabled || folderState !== 'ready'} onChange={(value) => onChange({ folderId: value })} folders={folderOptions.slice(1).map((option) => ({ ...option, color: folders.find((folder) => folder.id === option.value)?.color ?? null }))} onCreate={onCreateFolder} /></SaveErrorField>}
 {folderState === 'error' ? (
-              <p className={styles.help} role="alert">フォルダを読み込めませんでした。<Button size="compact" disabled={disabled} onClick={() => { if (!disabled) onReloadFolders() }}>もう一度読み込む</Button></p>
+              <FieldError id={`${idPrefix}-folder-error`}>フォルダを読み込めませんでした。<Button size="compact" disabled={disabled} onClick={() => { if (!disabled) onReloadFolders() }}>もう一度読み込む</Button></FieldError>
             ) : null}</Field></div>
         </SettingsFormRow>
         <div className={styles.field}><Field label="案内文" htmlFor={`${idPrefix}-description`}><SaveErrorField names={["description","values.description"]}><TextField

@@ -20,8 +20,7 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain('再読み込み')
     expect(source).toContain('見る権限がありません')
     expect(source).toContain("permissionDeniedMessage('store')")
-    // 保存は読み込めているときだけ通す。
-    expect(source).toContain("if (saving || loadState !== 'ready') return")
+    // 読み込み失敗時の保存制御は folder-page-react.test.tsx で確認する。
     expect(source).toContain('sameRequest(activeRef.current, request)')
     expect(source).toContain("setName('')")
   })

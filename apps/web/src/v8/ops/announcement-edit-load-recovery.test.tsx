@@ -117,7 +117,7 @@ describe('OpsAnnouncementEditV8 の読み込み失敗と未知値の扱い', () 
     await screen.findByDisplayValue('重要なお知らせ')
 
     fireEvent.click(screen.getByRole('button', { name: '今すぐ送る' }))
-    expect(await screen.findByText('その他のプランの契約先（件数を取得できませんでした）')).toBeTruthy()
+    expect(await screen.findByText('その他のプランの契約先（件数を確認できませんでした）')).toBeTruthy()
     expect(screen.getByText('画面のお知らせ・メール')).toBeTruthy()
     expect(document.body.textContent).not.toContain('enterprise_legacy')
     expect(document.body.textContent).not.toContain('数えています…')
