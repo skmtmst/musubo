@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 
@@ -283,7 +285,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
           <TextLink href="/restaurant-test/inventory?tab=closures">休業日・貸切へ</TextLink>
         </>}>
           <p className={styles.closureText}>
-            {`${dayTitle(dayClosures.day)}は${dayClosures.closures.map((c) => `${KIND_LABEL[c.kind]}（${scopeText(c, tables)}）`).join('・')}です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。`}
+            {`${dayTitle(dayClosures.day)}は${dayClosures.closures.map((c) => `${knownValue(KIND_LABEL, c.kind, '休みの種類を確認できません')}（${scopeText(c, tables)}）`).join('・')}です。閉じた時間帯は LINE からの予約を受け付けません。入っている予約は取り消していません。`}
           </p>
         </Notice>
       ) : null}

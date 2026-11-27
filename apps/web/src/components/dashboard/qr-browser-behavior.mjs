@@ -223,7 +223,7 @@ try {
   await dialog.getByRole('button', { name: '発行中の追加URL', exact: true }).click()
   const picker = page.getByRole('dialog').filter({ has: page.getByRole('radio', { name: '店頭POP', exact: true }) })
   await picker.getByRole('radio', { name: '店頭POP', exact: true }).check()
-  await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+  await picker.getByRole('button', { name: '選択する', exact: true }).click()
   const [routeDownload] = await Promise.all([
     page.waitForEvent('download'),
     dialog.getByRole('link', { name: '画像をダウンロード' }).click(),

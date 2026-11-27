@@ -235,10 +235,10 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     await openEditor()
     await screen.findByText('個室A')
     // 絵 ：設備は札＋［変える］。窓で足して「選ぶ（2件）」で決める。
-    fireEvent.click(screen.getByRole('button', { name: '使う設備：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '使う設備：変更する' }))
     const picker = await screen.findByRole('dialog')
     fireEvent.click(within(picker).getByRole('checkbox', { name: '席A' }))
-    fireEvent.click(within(picker).getByRole('button', { name: '選ぶ（2件）' }))
+    fireEvent.click(within(picker).getByRole('button', { name: '選択する（2件）' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.change(screen.getByRole('spinbutton', { name: '個室Aの必要数' }), { target: { value: '2' } })
     const saveButton = screen.getByRole('button', { name: '設備の割当を保存する' })
@@ -294,7 +294,7 @@ describe('V8メニュー編集: 共有設備の割当', () => {
     expect(screen.queryByRole('button', { name: '設備の割当を保存する' })).toBeNull()
     // 閲覧のみは札を外せず、欄は「見る」だけ。
     expect(screen.queryByRole('button', { name: '個室Aを外す' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '使う設備：変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '使う設備：変更する' })).toBeNull()
   })
 
   test.each(['', '0', '-1', '1.5', '1001'])('必要数%sは送信せず、入力を残す', async (value) => {

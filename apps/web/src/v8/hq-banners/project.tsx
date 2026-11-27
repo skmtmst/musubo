@@ -643,7 +643,7 @@ function ProjectInner() {
         <Copy aria-hidden="true" className={styles.icon} />複製
       </Button>
       <Button onClick={() => { setFormError(''); setFormOpen(true) }} disabled={busy}>
-        <Pencil aria-hidden="true" className={styles.icon} />名前と説明を変える
+        <Pencil aria-hidden="true" className={styles.icon} />名前と説明を変更する
       </Button>
       {archived ? (
         <Button onClick={() => void patchProject('復元', { archived: false })} disabled={busy}>
@@ -769,7 +769,7 @@ function ProjectInner() {
                 /* 1つの帯：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。上限の枚数は右の欄の知らせと title にあるので、帯では1行に収まる短い形。入らない幅では文の切れ目で2行に折る。 */
                 destructive={selectedImages.length > 0 ? <>
                   <span className={styles.selectionCount} aria-live="polite">{`${formatNumber(selectedImages.length)} 枚を選んでいます`}</span>
-                  <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
+                  <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選択するのをやめる</Button>
                   <Button variant="primary" disabled={busy || archived} onClick={openDistribution}><Send aria-hidden="true" className={styles.icon} />{`${formatNumber(selectedImages.length)} 枚をアカウントへ配る`}</Button>
                 </> : undefined}
                 status={selectedImages.length > 0 ? undefined : running ? `${formatNumber(running.requestedCount)}枚中${doneSoFar}枚できました・今月の残り${usage?.month.remaining ?? emptyValue('unknown')}枚` : usage && input.count > usage.month.remaining

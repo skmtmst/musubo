@@ -14,7 +14,7 @@ import { RadioGroup } from '@/components/shared/radio'
 
 import Notice from '@/components/shared/notice'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarCheck, CalendarX2, Link2, Unplug, Wand2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
@@ -41,7 +41,9 @@ import styles from './staff-calendar.module.css'
  * 閲覧のみは押せるものを置かず、オン・オフと URL を文字で出す。
  */
 
-type Load = { state: 'loading' } | { state: 'ready'; store: BookingCalendarSwitch | null; mine: BookingCalendarSwitch; url: { value: string; saved: string; version: number } | null } | { state: 'error' }
+type ReadError = 'error' | 'forbidden' | null
+type Load = { state: 'loading' } | { state: 'ready'; store: BookingCalendarSwitch | null; storeError: ReadError; mine: BookingCalendarSwitch; url: { value: string; saved: string; version: number } | null; urlError: ReadError } | { state: 'error' }
+const readError = (error: unknown): ReadError => error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error'
 const onOff = (on: boolean | undefined) => (on ? 'オン' : 'オフ')
 
 function saveError(cause: unknown): string {
@@ -66,54 +68,90 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
   const [writeOff, setWriteOff] = useState<'keep' | 'remove' | null>(null)
   const staffId = person?.id ?? null
 
+  const scope = useMemo(() => ({ accountId, staffId }), [accountId, staffId])
+  const scopeRef = useRef(scope); scopeRef.current = scope
+  const alive = useRef(false)
+  const requestRef = useRef(0)
+  const partRef = useRef({ store: 0, url: 0 })
+  const [loadScope, setLoadScope] = useState(scope)
+  useEffect(() => { alive.current = true; return () => { alive.current = false; requestRef.current += 1 } }, [])
   const reload = useCallback(async () => {
     if (!staffId) return
-    setLoad({ state: 'loading' }); setError(null)
+    const ticket = ++requestRef.current
+    const current = () => alive.current && scopeRef.current === scope && requestRef.current === ticket
+    setLoadScope(scope); setLoad({ state: 'loading' }); setError(null)
+    const [mine, store, url] = await Promise.allSettled([
+      bookingCalendarApi.getSwitches(accountId, staffId),
+      bookingCalendarApi.getSwitches(accountId),
+      bookingCalendarApi.getStaffUrl(accountId, staffId),
+    ])
+    if (!current()) return
+    if (mine.status === 'rejected' || !mine.value.success) { setLoad({ state: 'error' }); return }
+    const storeValue = store.status === 'fulfilled' && store.value.success ? store.value.data : null
+    const urlValue = url.status === 'fulfilled' && url.value.success ? url.value.data : null
+    setLoad({ state: 'ready', mine: mine.value.data, store: storeValue,
+      storeError: storeValue ? null : readError(store.status === 'rejected' ? store.reason : null),
+      url: urlValue ? { value: urlValue.url ?? '', saved: urlValue.url ?? '', version: urlValue.version } : null,
+      urlError: urlValue ? null : readError(url.status === 'rejected' ? url.reason : null) })
+  }, [accountId, staffId, scope])
+  useEffect(() => { setBusy(false); setWriteOff(null); void reload(); return () => { requestRef.current += 1 } }, [reload])
+  const retryPart = async (part: 'store' | 'url') => {
+    if (!staffId) return
+    const ticket = ++partRef.current[part]
+    const loadTicket = requestRef.current
+    const current = () => alive.current && scopeRef.current === scope && requestRef.current === loadTicket && partRef.current[part] === ticket
     try {
-      const [mine, store, url] = await Promise.all([
-        bookingCalendarApi.getSwitches(accountId, staffId),
-        Promise.resolve().then(() => bookingCalendarApi.getSwitches(accountId)).then((response) => response.data).catch(() => null),
-        Promise.resolve().then(() => bookingCalendarApi.getStaffUrl(accountId, staffId)).then((response) => response.data).catch(() => null),
-      ])
-      setLoad({ state: 'ready', mine: mine.data, store, url: url ? { value: url.url ?? '', saved: url.url ?? '', version: url.version } : null })
-    } catch {
-      setLoad({ state: 'error' })
+      if (part === 'store') {
+        const response = await bookingCalendarApi.getSwitches(accountId)
+        if (!response.success || !response.data) throw new Error('store unavailable')
+        if (current()) setLoad(prev => prev.state === 'ready' ? { ...prev, store: response.data, storeError: null } : prev)
+      } else {
+        const response = await bookingCalendarApi.getStaffUrl(accountId, staffId)
+        if (!response.success || !response.data) throw new Error('url unavailable')
+        if (current()) setLoad(prev => prev.state === 'ready' ? { ...prev, url: { value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version }, urlError: null } : prev)
+      }
+    } catch (failure) {
+      if (current()) setLoad(prev => prev.state === 'ready' ? part === 'store' ? { ...prev, storeError: readError(failure) } : { ...prev, urlError: readError(failure) } : prev)
     }
-  }, [accountId, staffId])
-  useEffect(() => { void reload() }, [reload])
+  }
 
   async function saveSwitch(next: { readEnabled: boolean; writeEnabled: boolean }, extra?: { removeFutureEvents: boolean }) {
-    if (load.state !== 'ready' || !staffId) return
+    if (load.state !== 'ready' || loadScope !== scope || !staffId) return
     setBusy(true); setError(null)
     try {
       const response = await bookingCalendarApi.saveSwitches(accountId, { ...next, expectedVersion: load.mine.version, ...(extra ? { confirmed: true, removeFutureEvents: extra.removeFutureEvents } : {}) }, staffId)
-      setLoad({ ...load, mine: response.data })
+      if (!alive.current || scopeRef.current !== scope) return
+      setLoad(prev => prev.state === 'ready' ? { ...prev, mine: response.data } : prev)
       setWriteOff(null)
       notifySaved(extra ? '書き込みをオフにしました' : 'カレンダーの設定を保存しました')
     } catch (cause) {
+      if (!alive.current || scopeRef.current !== scope) return
       saveErrors.capture(cause)
       setError(saveError(cause))
     } finally {
-      setBusy(false)
+      if (alive.current && scopeRef.current === scope) setBusy(false)
     }
   }
 
   async function saveUrl() {
-    if (!canEdit || busy || urlInvalid || load.state !== 'ready' || !load.url || !staffId) return
+    if (!canEdit || busy || urlInvalid || load.state !== 'ready' || loadScope !== scope || !load.url || !staffId) return
     setBusy(true); setError(null)
     try {
       const response = await bookingCalendarApi.saveStaffUrl(accountId, staffId, load.url.value.trim() || null, load.url.version)
-      setLoad({ ...load, url: { value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version } })
+      if (!alive.current || scopeRef.current !== scope) return
+      setLoad(prev => prev.state === 'ready' ? { ...prev, url: { value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version } } : prev)
       notifySaved('会議の URL を保存しました')
     } catch (cause) {
+      if (!alive.current || scopeRef.current !== scope) return
       saveErrors.capture(cause)
       setError(saveError(cause))
     } finally {
-      setBusy(false)
+      if (alive.current && scopeRef.current === scope) setBusy(false)
     }
   }
 
-  const ready = load.state === 'ready' ? load : null
+  const visibleLoad: Load = loadScope === scope ? load : { state: 'loading' }
+  const ready = visibleLoad.state === 'ready' ? visibleLoad : null
   const mine = ready?.mine
   const connected = mine?.connected !== false
   const urlInvalid = Boolean(ready?.url && ready.url.value.trim() !== '' && !/^https:\/\/\S+$/.test(ready.url.value.trim()))
@@ -126,12 +164,13 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
     <Drawer open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role}・` : ''}担当メニュー ${menuCount} つ` : undefined}
       width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} dirty={urlDirty} actions={urlDirty ? { primary: <Button variant="primary" busy={busy} disabled={urlInvalid} disabledReason="https:// で始まる URL を入れてください" onClick={() => void saveUrl()}>保存する</Button>, primaryAllowed: canEdit } : {}}>
 <DetailContent>
-      {load.state === 'loading' ? <p className={styles.minor}>読み込んでいます…</p> : null}
-      {load.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
+      {visibleLoad.state === 'loading' ? <p className={styles.minor}>読み込んでいます…</p> : null}
+      {visibleLoad.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
       {ready && mine ? (
         <>
           {error ? <Notice tone="danger">{error}</Notice> : null}
           <DetailSection title="カレンダー">
+            {ready.storeError ? <Notice tone="warn" action={ready.storeError === 'error' ? <Button onClick={() => void retryPart('store')}>店全体の設定を読み直す</Button> : undefined}>{ready.storeError === 'forbidden' ? '店全体の設定を見る権限がありません。' : '店全体の設定を読み込めませんでした。'}</Notice> : null}
             {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)}・書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
             <DataTable aria-label="つなぐカレンダー">
               <thead><TableHeadRow><Th>カレンダー</Th><Th>状態</Th><Th>読み込み</Th><Th>書き込み</Th></TableHeadRow></thead><tbody>
@@ -152,7 +191,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           </DetailSection>
 
           <DetailSection title="会議の URL" help={<HelpTip label="会議の URL の説明">オンラインのメニューで、予約が決まったらお客さまに LINE で送る URL です。担当の固定の URL を先に使い、無いときはメニューの URL を使います。</HelpTip>}>
-            {canEdit ? (
+            {ready.urlError ? <Notice tone="warn" action={ready.urlError === 'error' ? <Button onClick={() => void retryPart('url')}>会議URLを読み直す</Button> : undefined}>{ready.urlError === 'forbidden' ? '会議の URL を見る権限がありません。' : '会議の URL を読み込めませんでした。'}</Notice> : canEdit ? (
               <>
                 <RadioCardGroup legend="会議の URL の出し方" columns={2}>
                   <RadioCard name={`staff-meeting-${person?.id}`} value="manual" icon={<Link2 size={20} />} title="手で入れる" note="決まった URL を毎回使う" checked onChange={() => undefined} />

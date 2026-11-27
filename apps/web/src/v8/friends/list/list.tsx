@@ -1029,7 +1029,7 @@ export default function FriendsListV8() {
           <span className={styles.bulkWrap} data-design="V8BulkBar">
             <BulkBar total={total} onSelectAll={selectAllFriends} count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
-                <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>
+                <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選択する</Button>
               ) : null}
               {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
                 <span className={styles.faint}>一括操作ができるのはオーナーと管理者だけです</span>

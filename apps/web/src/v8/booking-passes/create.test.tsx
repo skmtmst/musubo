@@ -92,7 +92,7 @@ describe('回数券・月謝を作る', () => {
     render(<PassCreateV8 />)
     await screen.findByLabelText('名前')
     const step4 = screen.getByRole('region', { name: '4 LINE で売る' })
-    fireEvent.click(within(step4).getByRole('button', { name: '変える' }))
+    fireEvent.click(within(step4).getByRole('button', { name: '変更する' }))
     expect((await screen.findByRole('dialog')).textContent).toContain('現在準備中です')
   })
 

@@ -231,7 +231,7 @@ export const detailSurfaceCases = [
     "label": "LINE来店フォローの届き方",
     "path": "/restaurant-test/line-followup",
     "kind": "MessagePreview",
-    "actions": ["article[aria-label=\"予約したとき\"] button:has-text(\"変える\")"],
+    "actions": ["article[aria-label=\"予約したとき\"] button:has-text(\"変更する\")"],
     "selector": "aside[aria-label=\"届き方\"]"
   },
   {

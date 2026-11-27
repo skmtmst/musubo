@@ -92,6 +92,13 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [fixing, setFixing] = useState(false)
   const [preview, setPreview] = useState<Pick<RichMenuTargetPreview, 'effective'> | null>(null)
   const [taps, setTaps] = useState<number | null | undefined>(undefined)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const [tapsFailed, setTapsFailed] = useState(false)
+  const [previewRetry, setPreviewRetry] = useState(0)
+  const [tapsRetry, setTapsRetry] = useState(0)
+  const [previewContext, setPreviewContext] = useState('')
+  const [tapsContext, setTapsContext] = useState('')
+  const statsContext = JSON.stringify([groupId, scope.current.generation, role])
 
   const [retryTarget, setRetryTarget] = useState<RichMenuPublishRun | null>(null)
   const [retrying, setRetrying] = useState(false)
@@ -204,17 +211,27 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     void check()
   }, [loadState, canInspectOperations, loadProgress, loadRuns, check])
   useEffect(() => {
-    if (!group || role === null) return
+    if (!group || group.id !== groupId || role === null) return
     let cancelled = false
+    setPreviewContext(statsContext)
     setPreview(null)
+    setPreviewFailed(false)
     const request = aggregateOnly ? api.richMenuGroups.audienceSummary(group.id) : api.richMenuGroups.previewTargets(group.id)
-    void request.then((res) => { if (!cancelled && res.success) setPreview(res.data) }).catch(() => {})
+    void request.then((res) => { if (!cancelled) { if (res.success) setPreview(res.data); else setPreviewFailed(true) } }).catch(() => { if (!cancelled) setPreviewFailed(true) })
+    return () => { cancelled = true }
+  }, [group, groupId, role, aggregateOnly, previewRetry, statsContext])
+  useEffect(() => {
+    if (!group || group.id !== groupId || role === null) return
+    let cancelled = false
+    setTapsContext(statsContext)
+    setTaps(undefined); setTapsFailed(false)
     void api.richMenuGroups.tapStats(group.accountId).then((res) => {
       if (cancelled) return
-      setTaps(res.success ? res.data.byGroup.find((row) => row.groupId === group.id)?.taps ?? 0 : null)
-    }).catch(() => { if (!cancelled) setTaps(null) })
+      if (!res.success) { setTaps(null); setTapsFailed(true); return }
+      setTaps(res.data.byGroup.find((row) => row.groupId === group.id)?.taps ?? 0)
+    }).catch(() => { if (!cancelled) { setTaps(null); setTapsFailed(true) } })
     return () => { cancelled = true }
-  }, [group, role, aggregateOnly])
+  }, [group, groupId, role, tapsRetry, statsContext])
 
   const latestRun = useMemo(() => (runs ?? []).find((run) => run.status !== 'running') ?? null, [runs])
   const latestSucceeded = useMemo(() => (runs ?? []).find((run) => run.status === 'succeeded') ?? null, [runs])
@@ -359,7 +376,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadGroup()} /></SaveErrorScope>
   }
   const backLink = <></>
-  if (!group) return <SaveErrorScope errors={saveErrors}><div className={styles.loadingHead}>{backLink}<DetailLoading /></div></SaveErrorScope>
+  if (!group || group.id !== groupId || groupGeneration.current !== scope.current.generation) return <SaveErrorScope errors={saveErrors}><div className={styles.loadingHead}>{backLink}<DetailLoading /></div></SaveErrorScope>
 
   const audience = audienceOf(group)
   const head = currentPublished ? `公開しました・${runStamp(currentPublished.updatedAt)}` : '公開中'
@@ -393,8 +410,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               <dl className={styles.aboutList}>
                 <div className={styles.aboutRow}><dt>状態</dt><dd><StatusBadge tone="success">公開中</StatusBadge></dd></div>
                 <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
-                <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
-                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
+                <div className={styles.aboutRow}><dt>出る人</dt><dd>{previewContext !== statsContext ? '読み込み中…' : previewFailed ? <>読み込めませんでした <Button variant="text" size="inline" onClick={() => setPreviewRetry((n) => n + 1)}>人数を読み直す</Button></> : preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
+                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{tapsContext !== statsContext ? '読み込み中…' : tapsFailed ? <>読み込めませんでした <Button variant="text" size="inline" onClick={() => setTapsRetry((n) => n + 1)}>回数を読み直す</Button></> : taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
               </dl>
             </section>
 

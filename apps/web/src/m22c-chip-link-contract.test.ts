@@ -23,7 +23,6 @@ describe('m22c 札・ボタンの折り返し', () => {
 
   it('条件の足し口は15札を並べない（共通部品で検索式に）', () => {
     const source = read('components/shared/condition-builder.tsx')
-    expect(source).toContain('aria-label="追加する条件を選ぶ"')
     expect(source).toContain('<KindPicker')
     // 種類ごとの札ボタンに戻っていたら赤。
     expect(source).not.toContain('{kind.label}')

@@ -101,7 +101,7 @@ it.each(['read', 'unknown'] as const)('%sのフォルダ管理は追加・削除
   expect(button.hasAttribute('data-permission-locked')).toBe(state === 'read')
   fireEvent.click(button)
   fireEvent.click(screen.getByRole('button', { name: 'フォルダ「対象」の操作' }))
-  const edit = await screen.findByRole('menuitem', { name: '名前を変える' })
+  const edit = await screen.findByRole('menuitem', { name: '名前を変更する' })
   expect(edit.getAttribute('aria-disabled')).toBe(state === 'read' ? 'true' : null)
   expect((edit as HTMLButtonElement).disabled).toBe(state === 'unknown')
   fireEvent.click(edit)

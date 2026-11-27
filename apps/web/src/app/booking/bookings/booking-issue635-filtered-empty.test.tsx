@@ -97,7 +97,7 @@ async function chooseSelect(label: string, option: string) {
 async function chooseEntitySelect(label: string, option: string) {
   fireEvent.click(screen.getByLabelText(label))
   fireEvent.click(await screen.findByRole('radio', { name: option }))
-  fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '選択する' }))
 }
 
 describe('#635 予約管理一覧の絞り込み0件', () => {

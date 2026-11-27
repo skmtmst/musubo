@@ -304,14 +304,14 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
     expect(document.body.textContent).not.toContain('Demo Person')
     await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '試す流入リンク' })) })
     const route = await findByRole(document.body, 'radio', { name: '紹介QR' })
-    await act(async () => { fireEvent.click(route); fireEvent.click(within(route.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })); fireEvent.change(getByRole(document.body, 'textbox', { name: '想定日時' }), { target: { value: '2026-09-28T10:00' } }) })
+    await act(async () => { fireEvent.click(route); fireEvent.click(within(route.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選択する' })); fireEvent.change(getByRole(document.body, 'textbox', { name: '想定日時' }), { target: { value: '2026-09-28T10:00' } }) })
     api.friends.list.mockResolvedValue({
       success: true,
       data: { items: [{ id: 'friend-1', displayName: '見本 141' }], total: 1 },
     })
-    await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '試す友だち：選ぶ' })) })
+    await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: '試す友だち：選択する' })) })
     const result = await findByRole(document.body, 'radio', { name: '見本 141' })
-    await act(async () => { fireEvent.click(result); fireEvent.click(within(result.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(result); fireEvent.click(within(result.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選択する' })) })
     await act(async () => { fireEvent.click(getByRole(document.body, 'button', { name: 'この条件でテストする' })); await Promise.resolve() })
     expect(host.textContent).toContain('テストで判定が通りました')
     expect(document.body.textContent).not.toContain('Demo Person')

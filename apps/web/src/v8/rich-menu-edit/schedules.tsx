@@ -90,7 +90,7 @@ export default function RichMenuSchedules({ groupId, canOperate, restoreMenus }:
                 <thead><TableHeadRow><Th>開始・終了</Th><Th>状態・戻し先</Th><Th>操作</Th></TableHeadRow></thead>
                 <tbody>{schedules.map(item => <Tr key={item.id}>
                   <Td>{formatDateTime(item.startsAt)}{item.mode === 'period' && item.endsAt ? ` 〜 ${formatDateTime(item.endsAt)}` : ''}</Td>
-                  <Td><p title={item.status === 'failed' ? item.lastErrorCode?.slice(0, 40) : undefined}>{STATUS[item.status] ?? '状態を確認しています'}</p>
+                  <Td><p title={item.status === 'failed' ? item.lastErrorCode?.slice(0, 40) : undefined}>{Object.prototype.hasOwnProperty.call(STATUS, item.status) ? STATUS[item.status] : '状態を確認しています'}</p>
                     {restoreText(item) ? <p className={styles.cardNote}>{restoreText(item)}</p> : null}
                     {item.nextRetryAt ? <p className={styles.cardNote}>次回 {formatDateTime(item.nextRetryAt)}</p> : null}</Td>
                   <Td>{item.status === 'scheduled' ? <PermissionGatedButton allowed={canOperate} type="button" size="compact" disabled={cancellingId !== null} busy={cancellingId === item.id} busyLabel="取消中…" onClick={() => void cancelSchedule(item.id)}>予約を取り消す</PermissionGatedButton> : null}</Td>

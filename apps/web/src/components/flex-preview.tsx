@@ -6,6 +6,8 @@
  * Covers: text, button, separator, image, box, icon, spacer, span.
  */
 
+import { fillPreviewSample } from './shared/preview-sample'
+
 interface FlexNode {
   type: string
   text?: string
@@ -111,7 +113,7 @@ function FlexText({ node }: { node: FlexNode }) {
 
 function FlexButton({ node }: { node: FlexNode }) {
   const isPrimary = node.style === 'primary'
-  const isLink = node.style === 'link'
+  const isLink = !node.style || node.style === 'link'
   const btnColor = node.color || (isPrimary ? 'var(--color-accent)' : undefined)
   const style: React.CSSProperties = {
     display: 'block',
@@ -119,12 +121,12 @@ function FlexButton({ node }: { node: FlexNode }) {
     padding: '10px 16px',
     borderRadius: 'var(--radius-control)',
     fontSize: '14px',
-    fontWeight: 600,
+    fontWeight: isLink ? 400 : 600,
     textAlign: 'center',
     cursor: 'default',
-    border: isPrimary || isLink ? 'none' : '1px solid #ccc',
-    backgroundColor: isPrimary ? btnColor : 'transparent',
-    color: isPrimary ? '#fff' : isLink ? (btnColor || 'var(--color-accent)') : '#333',
+    border: 'none',
+    backgroundColor: isPrimary ? btnColor : isLink ? 'transparent' : '#f5f5f5',
+    color: isPrimary ? '#fff' : isLink ? (btnColor || 'var(--tpl-rt-rich-link)') : '#333',
   }
   return <div style={style}>{node.action?.label || 'Button'}</div>
 }
@@ -224,6 +226,9 @@ function FlexBubble({ bubble, maxWidth }: { bubble: FlexNode; maxWidth?: number 
   return (
     <div style={{
       width: w,
+      maxWidth: '100%',
+      boxSizing: 'border-box',
+      flexShrink: 0,
       backgroundColor: 'var(--color-canvas)',
       borderRadius: 'var(--radius-card)',
       overflow: 'hidden',
@@ -332,7 +337,18 @@ function FlexUnavailable({ raw, parsed }: { raw: string; parsed?: unknown }) {
   )
 }
 
-export default function FlexPreview({ content, maxWidth }: { content: string; maxWidth?: number }) {
+/** 画面に表示する文字だけを置き換え、操作先や元のデータは変えない。 */
+export function sampleFlexText(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sampleFlexText)
+  if (!value || typeof value !== 'object') return value
+  const source = value as Record<string, unknown>
+  return Object.fromEntries(Object.entries(source).map(([key, item]) => [key,
+    typeof item === 'string' && (key === 'text' || key === 'label' || key === 'title')
+      ? fillPreviewSample(item).text : sampleFlexText(item),
+  ]))
+}
+
+export default function FlexPreview({ content, maxWidth, sample = false }: { content: string; maxWidth?: number; sample?: boolean }) {
   let parsed: unknown
   try {
     parsed = JSON.parse(content)
@@ -340,6 +356,7 @@ export default function FlexPreview({ content, maxWidth }: { content: string; ma
     return <FlexUnavailable raw={content} />
   }
 
+  if (sample) parsed = sampleFlexText(parsed)
   const container = normalizeFlexContainer(parsed)
 
   if (container?.type === 'bubble') {

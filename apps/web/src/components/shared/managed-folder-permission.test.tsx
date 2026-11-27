@@ -108,7 +108,7 @@ it.each(['add', 'edit', 'delete'] as const)('開いた%s窓は閲覧者への切
   if (mode === 'add') {
     await act(async () => control.current!.startAdd())
     fireEvent.change(screen.getByRole('textbox', { name: 'フォルダ名' }), { target: { value: '新しいフォルダ' } })
-  } else await menu(mode === 'edit' ? '名前を変える' : '消す')
+  } else await menu(mode === 'edit' ? '名前を変更する' : '消す')
   expect(screen.getByRole(dialogRole)).toBeTruthy()
   if (mode !== 'delete') expect(captures.editor!.canSaveNow).toBeTypeOf('function')
   const held = mode === 'delete' ? captures.confirm!.onConfirm! : captures.editor!.canSaveNow!
@@ -215,7 +215,7 @@ it.each(['auto_reply', 'common_action', 'mileage_reward'])('%sの追加・編集
 
 it.each(['auto_reply', 'common_action', 'mileage_reward'])('%sの行メニューからの編集も未保存の入力を守る', async kind => {
   render(<Rows kind={kind} canWriteNow={() => true} />)
-  await menu('名前を変える')
+  await menu('名前を変更する')
   const input = screen.getByRole('textbox', { name: 'フォルダ名' }) as HTMLInputElement
   fireEvent.change(input, { target: { value: '変更した名前' } })
   await click(screen.getByRole('button', { name: 'キャンセル' }))

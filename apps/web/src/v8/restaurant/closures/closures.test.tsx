@@ -184,7 +184,7 @@ describe('UVnvR 休業日・貸切', () => {
     await waitFor(() => expect(document.querySelector('[data-closure-card="cl-1"]')).not.toBeNull())
     const card = document.querySelector('[data-closure-card="cl-1"]') as HTMLElement
     fireEvent.click(within(card).getByRole('button', { name: /の操作$/ }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: '変える' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '変更する' }))
     const dialog = await waitFor(() => document.querySelector('[data-design-node="nVvXy"]') as HTMLElement)
     await within(dialog).findByText(/予約が 2 件あります（保存しても取り消しません・連絡済み 1 件）/)
     expect(fixture.previewClosure).toHaveBeenCalledWith('account-1', expect.objectContaining({ excludeId: 'cl-1' }))
@@ -234,7 +234,7 @@ describe('UVnvR 休業日・貸切', () => {
     const card = document.querySelector('[data-closure-card="cl-1"]') as HTMLElement
     fireEvent.click(within(card).getByRole('button', { name: /の操作$/ }))
     expect(await screen.findByRole('menuitem', { name: '予約台帳でこの日を見る' })).not.toBeNull()
-    expect(screen.queryByRole('menuitem', { name: '変える' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '変更する' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: '消して開ける' })).toBeNull()
   })
 })

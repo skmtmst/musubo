@@ -44,7 +44,7 @@ async function pick(buttonName: string, optionName: string): Promise<HTMLElement
   fireEvent.click(screen.getByRole('button', { name: buttonName }))
   const dialog = await screen.findByRole('dialog')
   fireEvent.click(within(dialog).getByRole('radio', { name: optionName }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
   return fieldOf(buttonName)
 }
 

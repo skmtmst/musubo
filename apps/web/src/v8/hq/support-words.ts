@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import type { HqSupportKind, HqSupportStatus } from '@/lib/hq-support'
 import { formatDate as polishFormatDate } from '@/lib/format'
 
@@ -7,6 +8,14 @@ export const SUPPORT_STATUS_WORDS: Record<HqSupportStatus, string> = {
   open: '対応中',
   answered: '回答済み',
   closed: '解決済み',
+}
+
+export function supportStatusWord(status: string): string {
+  return knownValue(SUPPORT_STATUS_WORDS, status, '状態を確認できません')
+}
+
+export function supportStatusTone(status: string): 'warning' | 'success' | 'neutral' {
+  return status === 'open' ? 'warning' : status === 'answered' || status === 'closed' ? 'success' : 'neutral'
 }
 
 /** 「9/30 11:00」（日本時間）。読めない値は「—」。 */
@@ -25,5 +34,5 @@ export const SUPPORT_KIND_WORDS: Record<HqSupportKind, string> = {
 
 /** 種類の短い言葉。知らない種類は受け口の言葉のまま。 */
 export function supportKindWord(kind: string | null | undefined, fallback: string): string {
-  return (kind && SUPPORT_KIND_WORDS[kind as HqSupportKind]) || fallback
+  return kind ? knownValue(SUPPORT_KIND_WORDS, kind, fallback) : fallback
 }

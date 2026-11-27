@@ -127,6 +127,8 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
   })
 
   it('作る窓は名前が空のあいだ押せず、作ると新しいプロジェクトを開く', async () => {
+    stats.mockResolvedValueOnce({ success: true, data: { projects: { active: 2, archived: 1 }, deliveredImages: 9, deliveredAccounts: 3 } })
+    stats.mockResolvedValue({ success: true, data: { projects: { active: 3, archived: 1 }, deliveredImages: 9, deliveredAccounts: 3 } })
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
     const projectCount = () => within(host).getByText('プロジェクト').closest('[data-kpi-presentation]')!.querySelector('[data-kpi-number]')?.textContent
@@ -146,6 +148,9 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     act(() => { submit.click() })
     await flush()
     expect(createProject).toHaveBeenCalledWith({ name: '新しい案件', description: null })
+    expect(host.textContent).toContain('新しい案件')
+    const projectKpi = [...host.querySelectorAll('[data-kpi-presentation]')].find(item => item.textContent?.includes('プロジェクト'))
+    expect(projectKpi?.textContent).toMatch(/3\s*件/)
     expect(push).toHaveBeenCalledWith('/hq/banners?highlight=p9')
     expect(host.textContent).toContain('新しい案件')
     expect(projectCount()).toBe('3')
@@ -153,6 +158,24 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(host.textContent).toContain('2周年 春の感謝祭')
     expect(listProjects).toHaveBeenCalledTimes(2)
     expect(stats).toHaveBeenCalledTimes(2)
+  })
+
+  it('作成後の一覧更新が失敗しても新しい案件を残し、読み直せる', async () => {
+    act(() => { root.render(<HqBannersListV8 />) }); await flush()
+    act(() => { buttonNamed('プロジェクトを作る')!.click() }); await flush()
+    fireEvent.change(document.querySelector('input[placeholder="例：春の感謝祭 2周年"]')!, { target: { value: '新しい案件' } })
+    listProjects.mockRejectedValueOnce(new Error('offline'))
+    act(() => { buttonNamed('作って開く')!.click() }); await flush()
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).toContain('一覧を更新できませんでした')
+    listProjects.mockRejectedValueOnce(new Error('offline again'))
+    act(() => { buttonNamed('もう一度読み込む')!.click() }); await flush()
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).toContain('一覧を更新できませんでした')
+    listProjects.mockResolvedValue({ success: true, data: [project('p9', '新しい案件'), project('p1', '秋のキャンペーン')] })
+    act(() => { buttonNamed('もう一度読み込む')!.click() }); await flush()
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).not.toContain('一覧を更新できませんでした')
   })
 
   it('作成前の遅い件数応答で新しい件数を上書きしない', async () => {
@@ -204,6 +227,26 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(document.querySelector('[role="dialog"]')).toBeTruthy()
     expect(listProjects).toHaveBeenCalledTimes(1)
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it.each(['loading', 'error'])('一覧が%sでも作成後に一覧を再取得し、既存の案件を隠さない', async initial => {
+    let resolveOld: ((value: unknown) => void) | undefined
+    if (initial === 'loading') listProjects.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+    else listProjects.mockRejectedValueOnce(new Error('offline'))
+    listProjects.mockResolvedValue({ success: true, data: [project('p1', '既存の案件'), project('p9', '新しい案件')] })
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    act(() => { buttonNamed('プロジェクトを作る')!.click() })
+    await flush()
+    fireEvent.change(document.querySelector('input[placeholder="例：春の感謝祭 2周年"]')!, { target: { value: '新しい案件' } })
+    await flush()
+    act(() => { buttonNamed('作って開く')!.click() })
+    await flush()
+    if (resolveOld) await act(async () => { resolveOld!({ success: true, data: [project('old', '古い結果')] }) })
+    await flush()
+    expect(host.textContent).toContain('既存の案件')
+    expect(host.textContent).toContain('新しい案件')
+    expect(host.textContent).not.toContain('古い結果')
   })
 
   it('星を押すとお気に入りを切り替える', async () => {
@@ -310,3 +353,15 @@ it.each(['', 'tab=library'])('数・タブ・説明とフォルダなしの作�
   expect(frame.querySelector('[data-template-region="heading"] button[aria-label="この画面の説明"]')).toBeTruthy()
   expect(within(frame.querySelector<HTMLElement>('[data-template-region="heading"]')!).getByRole('button', { name: query ? '画像を取り込む' : 'プロジェクトを作る', exact: true })).toBeTruthy()
 })
+
+it('空一覧では閲覧のみのプロジェクト作成を理由付きで止める', async () => {
+    roleBox.role = 'viewer'
+    listProjects.mockResolvedValue({ success: true, data: [] })
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    const b = buttonNamed('最初のプロジェクトを作る')!
+    expect(b.getAttribute('aria-disabled')).toBe('true')
+    expect(host.textContent).toContain('統括の管理権限が必要です')
+    act(() => { b.click() })
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+  })

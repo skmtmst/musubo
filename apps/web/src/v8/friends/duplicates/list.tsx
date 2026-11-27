@@ -22,7 +22,7 @@ import { FriendsTabs } from '../shared/head';
 import { FRIENDS_TAB_NOTES } from '../shared/nav';
 import { csvExportLine } from '../list/csv-export';
 import { CANDIDATE_PAGE_SIZE, useDuplicatesData } from './use-duplicates-data';
-import { CONFIDENCE_WORD, STATUS_FILTERS, STATUS_WORD, confidenceTone, slashDateTime, statusTone } from './words';
+import { candidateStatusWord, confidenceWord, STATUS_FILTERS, confidenceTone, slashDateTime, statusTone } from './words';
 import styles from './list.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
@@ -52,10 +52,10 @@ export default function DuplicatesListV8() {
     const rows = d.candidates.map((candidate) => [
       candidate.left.label,
       candidate.right.label,
-      CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label,
+      confidenceWord(candidate.confidence.label),
       candidate.evidenceSummary.join('・'),
       [candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' ／ '),
-      STATUS_WORD[candidate.status] ?? candidate.status,
+      candidateStatusWord(candidate.status),
       slashDateTime(candidate.reviewedAt ?? candidate.detectedAt),
     ])
     const csv = [header, ...rows].map((row) => csvExportLine(row)).join('\n')
@@ -220,14 +220,14 @@ export default function DuplicatesListV8() {
                     </Td>
                     <Td>
                       <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>
-                        {CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label}
+                        {confidenceWord(candidate.confidence.label)}
                       </span>
                     </Td>
                     <Td className={styles.td}><span className={styles.cellText} title={evidence}>{evidence}</span></Td>
                     <Td className={styles.td}><span className={styles.cellText} title={accounts}>{accounts}</span></Td>
                     <Td className={styles.td}>
                       <StatusBadge tone={statusTone(candidate.status) === 'ok' ? 'success' : statusTone(candidate.status) === 'warn' ? 'warning' : 'neutral'} title={`最終更新 ${slashDateTime(candidate.reviewedAt ?? candidate.detectedAt)}`}>
-                        {STATUS_WORD[candidate.status] ?? candidate.status}
+                        {candidateStatusWord(candidate.status)}
                       </StatusBadge>
                     </Td>
                     <ActionCell>

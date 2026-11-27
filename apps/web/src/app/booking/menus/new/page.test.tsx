@@ -222,7 +222,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     // 本線の300ms検索後の状態待機を、V8の選択窓へ移して残す。
     await waitFor(() => expect(within(dialog).queryAllByRole('radio').map(item => item.getAttribute('aria-label'))).toEqual(['常連さん']))
     fireEvent.click(within(dialog).getByRole('radio', { name: '常連さん' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
     await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0))
     expect(chosenTag()).toContain('常連さん')
     expect(await tagLabels()).toEqual(['予約中', '常連さん'])

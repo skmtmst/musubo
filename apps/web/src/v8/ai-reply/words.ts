@@ -48,7 +48,8 @@ export const HANDOFF_REASON: Record<string, string> = {
 }
 
 export function handoffReasonText(reason: string | null): string {
-  return reason ? HANDOFF_REASON[reason] ?? '人へ回しました' : '—'
+  if (!reason) return '—'
+  return Object.prototype.hasOwnProperty.call(HANDOFF_REASON, reason) ? HANDOFF_REASON[reason] : '人へ回しました'
 }
 
 /** AI の段を変えられる人と、選べる段（要件 §2-6）。 */

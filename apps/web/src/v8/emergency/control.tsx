@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { useEmergencyTarget } from './control-target'
 import { useRunningVersion } from '@/lib/use-running-version'
@@ -100,7 +102,7 @@ const CAPABILITY_SHORT: Partial<Record<keyof typeof CAPABILITY_LABEL, string>> =
   // 上の「何を止めますか」のチェックと同じ短い言い方。
   automation_actions: '自動処理',
 }
-const capabilityShort = (capability: keyof typeof CAPABILITY_LABEL) => CAPABILITY_SHORT[capability] ?? CAPABILITY_LABEL[capability]
+const capabilityShort = (capability: keyof typeof CAPABILITY_LABEL) => knownValue(CAPABILITY_SHORT, capability, knownValue(CAPABILITY_LABEL, capability, '対象を確認できません'))
 /** 記録の表に出す件数。全部は更新履歴のタブで見る。 */
 const RECORD_LIMIT = 10
 
@@ -635,7 +637,7 @@ const EmergencyControlV8 = (
               <p className={styles.stoppedText}>
                 <span className={styles.stoppedDot}>● </span>
                 止めている　{formatStopRange(control.stoppedAt, null)}から・{control.actorId ?? '担当者不明'}・
-                {(stopIncident?.capabilities ?? selectedCapabilities).map((capability) => CAPABILITY_LABEL[capability]).join('・')}
+                {(stopIncident?.capabilities ?? selectedCapabilities).map((capability) => knownValue(CAPABILITY_LABEL, capability, '対象を確認できません')).join('・')}
               </p>
               <Button
                 type="button"
@@ -760,7 +762,7 @@ const EmergencyControlV8 = (
                       </td>
                       {/* 「名前（役割・所属）」は名前だけを出し、全文は title（絵 OHwbU は名前だけ）。 */}
                       <td title={entry.actorId} className={styles.cellTruncate}>{entry.actorId.split('（')[0].trim() || entry.actorId}</td>
-                      <td title={entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')} className={styles.cellTruncate}>
+                      <td title={entry.capabilities.map((capability) => knownValue(CAPABILITY_LABEL, capability, '対象を確認できません')).join('・')} className={styles.cellTruncate}>
                         {entry.capabilities.length > 3 ? `${entry.capabilities.slice(0, 3).map(capabilityShort).join('・')} ほか${entry.capabilities.length - 3}` : entry.capabilities.map(capabilityShort).join('・')}
                       </td>
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>

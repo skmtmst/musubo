@@ -123,7 +123,7 @@ async function changeProvider(view: ReturnType<typeof render>, id: string) {
 async function fillTagRule(name: string) {
   fireEvent.change(screen.getByRole('textbox', { name: '名前', exact: true }), { target: { value: name } })
   fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
-  fireEvent.click(await screen.findByRole('menuitem', { name: '設定を変える' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '設定を変更する' }))
   await pickEntity('自動化で付けるタグ', 'VIP')
   fireEvent.click(screen.getByRole('button', { name: '1つ目の行うことのその他操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '設定を閉じる' }))

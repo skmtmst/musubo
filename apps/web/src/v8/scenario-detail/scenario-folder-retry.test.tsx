@@ -103,7 +103,7 @@ afterEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-describe('シナリオ詳細「名前・説明・置き場を変える」のフォルダ一覧読み込み失敗', () => {
+describe('シナリオ詳細「名前・説明・置き場を変更する」のフォルダ一覧読み込み失敗', () => {
   it('フォルダ取得に失敗しても削除誤案内を出さず、その場でもう一度読み込める', async () => {
     foldersList
       .mockRejectedValueOnce(new Error('network'))
@@ -114,7 +114,7 @@ describe('シナリオ詳細「名前・説明・置き場を変える」のフ�
 
     render(<ScenarioDetailV8 id="sc-1" />)
 
-    const openBtn = await screen.findByRole('button', { name: '名前・説明・置き場を変える' })
+    const openBtn = await screen.findByRole('button', { name: '名前・説明・置き場を変更する' })
     fireEvent.click(openBtn)
 
     const dialog = await screen.findByRole('dialog', { name: '名前・説明・置き場を変える' })

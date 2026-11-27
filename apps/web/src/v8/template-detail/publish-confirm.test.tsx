@@ -43,3 +43,11 @@ it('公開競合の読み直しで版が変わったら同じ確認から再公�
  await act(async()=>{await held({defaultPrevented:false,preventDefault(){},stopPropagation(){},currentTarget:button,target:button})})
  expect(mocks.publish).toHaveBeenCalledTimes(1)
 })
+
+
+it.each(['constructor','toString','__proto__','future'])('未知のテンプレート種類 %s をその他と表示する',async(type)=>{
+ mocks.get.mockResolvedValueOnce({success:true,data:{id:'t-2',name:'流れの型',messageType:type,messageContent:'本文',accountId:'acc-1',folderId:null,category:'',publishedVersion:1,draftRevision:2,usedBy:null,hasDraft:true}})
+ render(<TemplateDetail />)
+ await screen.findByText('流れの型')
+ expect(screen.getAllByText('その他').length).toBeGreaterThan(0)
+})

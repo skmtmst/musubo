@@ -7,7 +7,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/components/shared/allergy-field', () => ({ default: () => null }))
 vi.mock('@/components/shared/media-library-upload', () => ({ uploadToMediaLibrary: data.upload }))
-vi.mock('@/components/shared/registered-image-select', () => ({ default: ({ onSelect }: { onSelect: (item: { id: string; filename: string }) => void }) => <button onClick={() => onSelect({ id: 'existing', filename: 'existing.png' })}>登録メディアから選ぶ</button> }))
+vi.mock('@/components/shared/registered-image-select', () => ({ default: ({ onSelect }: { onSelect: (item: { id: string; filename: string }) => void }) => <button onClick={() => onSelect({ id: 'existing', filename: 'existing.png' })}>登録メディアから選択する</button> }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: data }))
 vi.mock('next/navigation', async load => ({ ...(await load<typeof import('next/navigation')>()), useRouter: () => ({ push: data.push }), useSearchParams: () => new URLSearchParams('id=m2'), usePathname: () => '/restaurant-test/menu/edit' }))
 import MenuEditPage from './edit'
@@ -37,7 +37,7 @@ it('登録に失敗した理由を画像欄に示し、既存画像も選べる'
   await screen.findByLabelText('メニュー名')
   fireEvent.change(view.container.querySelector('input[type=file]')!, { target: { files: [new File(['x'], 'dish.png', { type: 'image/png' })] } })
   await screen.findByText(/通信できませんでした/)
-  fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' }))
   fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
   await waitFor(() => expect(data.updateMenu).toHaveBeenCalledWith('account-1', 'm2', expect.objectContaining({ imageMediaId: 'existing' })))
 })

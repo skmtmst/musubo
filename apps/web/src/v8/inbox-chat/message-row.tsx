@@ -4,6 +4,7 @@ import { InboxFlexContent } from '@/components/shared/inbox-content'
 import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread'
 import type { ChatDetailMessage } from '@/lib/api'
 import { formatDateTime, formatTime } from '@/lib/format'
+import { knownValue } from '@/lib/known-value'
 import { Link2 } from 'lucide-react'
 import AttachmentMessage from './attachment-message'
 import { AUTO_SOURCE_LABEL, formatDayJa, formatYmdSlash, sameYmd } from './inbox-model'
@@ -91,7 +92,7 @@ export function InboxMessageRow({ msg, idx, list, sending, searchHit = null, onQ
             : `[${msg.quoted.messageType}]`}
       </InboxQuotedMessage>
     ) : null
-    const autoLabel = AUTO_SOURCE_LABEL[msg.source ?? ''] ?? null
+    const autoLabel = knownValue(AUTO_SOURCE_LABEL, msg.source ?? '', '') || null
     return <>
       {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
       <InboxMessage sendStatus={isOutgoing ? (isSending ? 'sending' : 'sent') : undefined} outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}

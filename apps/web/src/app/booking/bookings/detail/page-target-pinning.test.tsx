@@ -288,7 +288,7 @@ it('WEB300：保存を待つ間は予約の追加編集を止め、失敗後に�
   m.get.mockResolvedValue({ booking: booking('A', { status: 'confirmed' }) })
   m.update.mockImplementation(() => new Promise((_, no) => { reject = no }))
   render(<Page />); await flush()
-  fireEvent.click(screen.getByRole('button', { name: '内容を変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '内容を変更する' }))
   await flush()
   const reason = screen.getByPlaceholderText('例：お客様の都合で時間変更') as HTMLInputElement
   fireEvent.change(reason, { target: { value: '変更の理由' } })

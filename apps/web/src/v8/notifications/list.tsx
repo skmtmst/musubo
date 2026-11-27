@@ -27,7 +27,8 @@ import { Tabs } from '@/components/shared/tabs'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { runOptimistic } from '@/lib/undoable'
-import { isDashboardNotificationData, notificationTime } from '@/components/dashboard/notification-summary'
+import { isDashboardNotificationData } from '@/components/dashboard/notification-summary'
+import { formatDateTime, formatRelative } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
 import { notificationDestination, notificationLinkLabel } from './destination'
 import {
@@ -262,7 +263,7 @@ export default function NotificationsV8() {
                         {!item.isRead ? <span className="sr-only">（未読）</span> : null}
                       </span>
                       {isLineTokenNotification(item) && item.body ? <span className={styles.noticeBody}>{item.body}</span> : null}
-                      <span className={styles.time}>{notificationTime(item.createdAt)}</span>
+                      <span className={styles.time} title={formatDateTime(item.createdAt, '日時不明')}>{formatRelative(item.createdAt, undefined, '日時不明')}</span>
                     </span>
                     <span className={styles.go}>{`${notificationLinkLabel(item, destinationContext)} →`}</span>
                   </Link>

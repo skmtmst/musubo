@@ -16,7 +16,7 @@ const examples = [
   { name: '印の操作', render: (lockedReason?: string) => <IconButton aria-label="印の操作" lockedReason={lockedReason}><svg /></IconButton> },
   { name: '札を外す', render: (lockedReason?: string) => <TagPill name="札" onRemove={() => {}} lockedReason={lockedReason} /> },
   { name: '並び順', nameTip: false, render: (lockedReason?: string) => <Select aria-label="並び順" iconOnly options={options} value="a" onChange={() => {}} lockedReason={lockedReason} /> },
-  { name: '対象：変える', render: (lockedReason?: string) => <EntityPickerSummary label="対象" noun="対象" name="選択中" onOpen={() => {}} lockedReason={lockedReason} /> },
+  { name: '対象：変更する', render: (lockedReason?: string) => <EntityPickerSummary label="対象" noun="対象" name="選択中" onOpen={() => {}} lockedReason={lockedReason} /> },
   { name: '通知', render: (lockedReason?: string) => <Toggle label="通知" checked onChange={() => {}} lockedReason={lockedReason} /> },
   { name: '札を並び替え。上下キーで移動', render: (lockedReason?: string) => <ReorderHandle label="札" onPointerDown={() => {}} onMove={() => {}} lockedReason={lockedReason} /> },
   { name: '「資料」を選び直す', render: (lockedReason?: string) => <AttachmentRow name="資料" status="error" errorText="読めませんでした" onRetry={() => {}} lockedReason={lockedReason} /> },

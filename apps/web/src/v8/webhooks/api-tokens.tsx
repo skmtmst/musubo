@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -52,7 +53,7 @@ const SCOPE_LABELS: Record<string, string> = {
 }
 
 export function scopeLabel(scope: string): string {
-  return SCOPE_LABELS[scope] ?? scope
+  return knownValue(SCOPE_LABELS, scope, scope)
 }
 
 /** 作った日は「2026/06/02」、最後に使ったは「9/30 10:02」（絵の書き方）。読めない日時は「—」。 */

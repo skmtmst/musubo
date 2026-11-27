@@ -79,7 +79,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
           </ul>
           <div className={styles.actions}>
             <Button variant="primary" onClick={() => onOpen(next.id)}>詳細を見る</Button>
-            {<PermissionGatedButton allowed={canWrite} href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変える</PermissionGatedButton>}
+            {<PermissionGatedButton allowed={canWrite} href={`/booking/bookings/detail?id=${encodeURIComponent(next.id)}`}>日時を変更する</PermissionGatedButton>}
           </div>
         </div>
       </Card> : <ListState kind="empty" title={ready ? '次の予約はありません' : '予約を読み込んでいます'} />}

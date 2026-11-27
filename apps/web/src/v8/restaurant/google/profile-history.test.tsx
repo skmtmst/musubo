@@ -100,3 +100,18 @@ it('失敗した変更の案内は、操作権限や環境に関わらず確認�
   expect(screen.getByText(/失敗した変更は、その画面で内容を確認できます/)).toBeTruthy()
   expect(screen.queryByText(/失敗した変更は、その画面からやり直せます/)).toBeNull()
 })
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の履歴 %s も画面とCSVで確認できる', async value => {
+  mocks.history.mockResolvedValue({ ...data, total: 1, perPage: 20, changes: [{ ...entry, kind: value, status: value }] })
+  const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:history-test')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  await open()
+  expect(screen.getByText('種類を確認できません')).toBeTruthy()
+  expect(screen.getByText('状態を確認できません')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
+  await waitFor(() => expect(createUrl).toHaveBeenCalledTimes(1))
+  const csv = await (createUrl.mock.calls[0][0] as Blob).text()
+  expect(csv).toContain('種類を確認できません')
+  expect(csv).toContain('状態を確認できません')
+})

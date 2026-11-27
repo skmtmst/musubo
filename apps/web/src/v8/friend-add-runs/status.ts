@@ -31,12 +31,12 @@ export const DELIVERY_UNKNOWN_CODE = 'delivery_unknown'
 
 export function routingLabel(status: FriendAddEventRoutingStatus, errorCode: string | null): { label: string; tone: StatusBadgeTone } {
   if (errorCode === DELIVERY_UNKNOWN_CODE) return { label: '送達不明', tone: 'danger' }
-  return ROUTING_LABELS[status] ?? { label: '不明', tone: 'neutral' }
+  return Object.prototype.hasOwnProperty.call(ROUTING_LABELS, status) ? ROUTING_LABELS[status] : { label: '不明', tone: 'neutral' }
 }
 
 export function routingAction(status: FriendAddEventRoutingStatus, errorCode: string | null): string {
   if (errorCode === DELIVERY_UNKNOWN_CODE) return '送達不明・要確認（自動では送り直しません）'
-  return ROUTING_ACTIONS[status] ?? '状態を確認中'
+  return Object.prototype.hasOwnProperty.call(ROUTING_ACTIONS, status) ? ROUTING_ACTIONS[status] : '状態を確認中'
 }
 
 /** DB には JST の時刻をオフセットなしで保存した古い行がある。UTC へ読み替えず、そのまま JST として出す。 */

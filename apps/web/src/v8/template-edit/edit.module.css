@@ -208,11 +208,11 @@
 .composerSplit { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-msg-composer-drawer-side-w); min-height: var(--tpl-msg-composer-fill); }
 .composerContent { min-width: 0; padding: var(--tpl-msg-composer-drawer-content-pad); display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); }
 .composerSide { display: flex; flex-direction: column; gap: var(--tpl-msg-composer-gap); min-width: 0; padding: var(--tpl-msg-composer-drawer-content-pad); border-left: 1px solid var(--color-hairline); }
-.composerFooter { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-msg-composer-gap); flex-wrap: wrap; }
+.composerFooter { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: var(--tpl-msg-composer-gap); flex-wrap: wrap; }
 .composerFooterActions { display: flex; gap: var(--tpl-msg-composer-drawer-actions-gap); }
 @media (width < 1152px) { .composerSplit { grid-template-columns: minmax(0, 1fr); } .composerSide { display: none; } }
 
-.composerFooter > :first-child { flex: 1; min-width: max-content; }
+.composerFooter > :first-child { flex: 1 1 0; min-inline-size: max-content; }
 .composerFooter::after { content: ''; flex: 1; }
 
 .composerTitleAccessories { display: flex; align-items: center; gap: var(--tpl-msg-composer-gap-s); }

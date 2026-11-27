@@ -28,7 +28,7 @@ describe('行うことの共通部品', () => {
     fireEvent.click(screen.getByRole('button', { name: '共通アクションから選ぶ' }))
     const dialog = screen.getByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '予約', exact: true }))
-    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選択する（1件）' }))
     expect(data()).toEqual([{ id: 'tag', text: 't1' }])
   })
   it('対象を確定するまで追加せず、取消でも入力を変えない', () => {
@@ -46,7 +46,7 @@ describe('行うことの共通部品', () => {
     const dialog = screen.getByRole('dialog')
     const checks = within(dialog).getAllByRole('checkbox')
     fireEvent.click(checks.find(input => input.getAttribute('aria-label')?.includes('予約')) ?? checks[0])
-    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選択する（1件）' }))
     expect(data()).toHaveLength(1)
     expect(data()[0].text).toContain('t1')
   })
@@ -61,7 +61,7 @@ describe('行うことの共通部品', () => {
     view.rerender(<ActionAddButton choices={choice('new', '今の店舗')} onAdd={onAdd} />)
     expect(screen.queryByRole('radio', { name: '前の店舗' })).toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: '今の店舗' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '選択する' }))
     expect(onAdd).toHaveBeenCalledWith({ id: 'tag', text: 'new' })
   })
   it('テキストはその場で編集し、開く行は1つだけ', () => {

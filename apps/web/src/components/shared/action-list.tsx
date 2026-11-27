@@ -116,7 +116,7 @@ export function ActionRow({ title, kind, icon: Icon = Zap, number, open, readOnl
         {extra ? <div className={styles.extra} data-action-value title={typeof extra === 'string' ? extra : undefined}>{extra}</div> : null}
       </div>
       {readOnly ? null : <RowActions menuAppearance="box" menuSize="row" subjectName={`${number}つ目の行うこと`} menuItems={[
-        ...(onToggle ? [{ id: 'edit', label: open ? '設定を閉じる' : blocked ? '設定を見る' : '設定を変える', onSelect: onToggle }] : []), ...menuItems,
+        ...(onToggle ? [{ id: 'edit', label: open ? '設定を閉じる' : blocked ? '設定を見る' : '設定を変更する', onSelect: onToggle }] : []), ...menuItems,
       ]} destructiveItem={onRemove ? { id: 'remove', label: '削除する', disabled, lockedReason, onSelect: () => { if (!blockedRef.current) setRemoving(true) } } : undefined} />}
     </div>
     {hint}

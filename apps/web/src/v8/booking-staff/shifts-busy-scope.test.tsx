@@ -116,7 +116,7 @@ test.each(['rules', 'weekly', 'dated'] as const)('%sの保存中に店を切り�
  let old!: (value: unknown) => void, fresh!: (value: unknown) => void
  write.mockImplementationOnce(() => new Promise(resolve => { old = resolve })).mockImplementationOnce(() => new Promise(resolve => { fresh = resolve }))
  const view = render(<StaffShiftsV8 staffId="bs-1" />)
- await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
+ await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選択する' })
  const panel = () => document.querySelector<HTMLElement>(`[data-design="${kind === 'rules' ? 'Week' : kind === 'weekly' ? 'Breaks' : 'Special'}"]`)!
  const prepare = async () => {
   if (kind === 'dated' && !within(panel()).queryByRole('button', { name: '更新する' })) fireEvent.click(within(panel()).getByRole('button', { name: '休憩 13:00〜14:00' }))
@@ -127,7 +127,7 @@ test.each(['rules', 'weekly', 'dated'] as const)('%sの保存中に店を切り�
  expect(action().hasAttribute('disabled')).toBe(true)
  fixture.account = 'account-b'; view.rerender(<StaffShiftsV8 staffId="bs-1" />)
  await waitFor(() => expect(fixture.getBreaks).toHaveBeenLastCalledWith('account-b', 'bs-1'))
- await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
+ await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選択する' })
  await prepare()
  expect(action().hasAttribute('disabled')).toBe(false)
  fireEvent.click(action()); await waitFor(() => expect(write).toHaveBeenCalledTimes(2))

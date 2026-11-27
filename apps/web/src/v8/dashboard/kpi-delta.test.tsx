@@ -20,7 +20,7 @@ describe('差の札', () => {
     expect(chip.querySelector('[aria-hidden="true"]:not(svg)')?.textContent).toBe('+2 件 先週比')
     expect(chip.querySelector('.sr-only')?.textContent).toBe('先週の同じ曜日より 2 件多い')
     expect(chip.title).toBe('先週の同じ曜日より 2 件多い')
-    expect(chip.querySelector('svg')).toBeNull()
+    expect(chip.querySelector('[data-delta-direction="up"]')).not.toBeNull()
   })
 
   it('友だち（増えると良い）が減ると赤、配信の失敗（減ると良い）が減ると緑', () => {
@@ -30,9 +30,11 @@ describe('差の札', () => {
     cleanup()
     const failures = render(<KpiDelta current={1} previous={4} better="low" unit="件" />)
     expect(delta(failures.container)?.dataset.kpiDelta).toBe('good')
+    expect(delta(failures.container)?.querySelector('[data-delta-direction="down"]')).not.toBeNull()
     cleanup()
     const worse = render(<KpiDelta current={4} previous={1} better="low" unit="件" />)
     expect(delta(worse.container)?.dataset.kpiDelta).toBe('bad')
+    expect(delta(worse.container)?.querySelector('[data-delta-direction="up"]')).not.toBeNull()
   })
 
   it('差 0 は灰色の → で「先週の同じ曜日と同じ」。消さない', () => {
@@ -50,7 +52,7 @@ describe('差の札', () => {
     expect(chip.dataset.kpiDelta).toBe('neutral')
     expect(chip.querySelector('[data-tone="neutral"]')).not.toBeNull()
     expect(chip.textContent).toContain('先週の同じ曜日より 6 件多い')
-    expect(chip.querySelector('svg')).toBeNull()
+    expect(chip.querySelector('svg.lucide-arrow-up')).not.toBeNull()
     expect(chip.textContent).toContain('+6 件 先週比')
   })
 

@@ -15,6 +15,14 @@ import {
   updateModeText,
 } from './merged-person-view'
 
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の統合ユーザー情報 %s は案内文にする', (value) => {
+  expect(statusText(value as never)).toBe('状態を確認できません')
+  expect(sourceText(value as never)).toBe('取得元を確認できません')
+  expect(updateModeText(value as never)).toBe('更新方法を確認できません')
+  expect(purposeText(value as never)).toBe('用途を確認できません')
+  expect(eventText(value as never)).toBe('履歴の種類を確認できません')
+})
+
 const priority = (
   purpose: 'broadcast' | 'reminder',
   friendId: string,

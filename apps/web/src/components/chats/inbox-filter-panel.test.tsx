@@ -74,7 +74,7 @@ describe('受信箱の期限と補助操作', () => {
     const picker = screen.getAllByRole('dialog').at(-1)!
     expect(within(picker).getByText(count === null ? '未読 —' : `未読 ${count}件`)).toBeTruthy()
     fireEvent.click(within(picker).getByRole('radio', { name: '未割り当て' }))
-    fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(picker).getByRole('button', { name: '選択する' }))
     expect(JSON.parse(screen.getByLabelText('現在の条件').textContent!)).toEqual({ ...initial, assignee: 'unassigned' })
   })
 

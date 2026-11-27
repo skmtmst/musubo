@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -27,6 +28,10 @@ const REMINDER_KIND_LABELS: Record<string, string> = {
 const REMINDER_STATUS_LABELS: Record<string, string> = {
   pending: '送信予定', sent: '送信済み', cancelled: '停止済み', failed: '失敗', failed_permanent: '失敗',
 }
+
+export const bookingStatusWord = (status: string) => knownValue(STATUS_LABELS, status, '状態は未取得')
+export const bookingReminderKindWord = (kind: string) => knownValue(REMINDER_KIND_LABELS, kind, '通知')
+export const bookingReminderStatusWord = (status: string) => knownValue(REMINDER_STATUS_LABELS, status, '状態を確認できません')
 
 function formatJp(value: string | null | undefined, fallback = '日時未取得') {
   return formatDateTime(value, fallback)
@@ -121,13 +126,13 @@ function Records({ accountId, eventId, occurrenceId, questionsJson, revision, re
                 {booking.customer_note ? <span>備考：{booking.customer_note}</span> : null}
                 {booking.companion_note ? <span>同行者：{booking.companion_note}</span> : null}
               </span>
-              <span role="cell"><StatusBadge tone={booking.status === 'no_show' ? 'danger' : booking.status === 'confirmed' || booking.status === 'attended' ? 'success' : 'neutral'}>{STATUS_LABELS[booking.status] ?? '状態は未取得'}</StatusBadge></span>
+              <span role="cell"><StatusBadge tone={booking.status === 'no_show' ? 'danger' : booking.status === 'confirmed' || booking.status === 'attended' ? 'success' : 'neutral'}>{bookingStatusWord(booking.status)}</StatusBadge></span>
               <span role="cell" className={styles.cellText}>{formatJp(booking.requested_at ?? booking.created_at)}</span>
               <span role="cell">
                 {formatJp(booking.slot_starts_at)}
                 {(booking.reminders ?? []).length ? <ul data-booking-reminders={booking.id}>
                   {(booking.reminders ?? []).map((reminder, index) => <li key={`${reminder.kind}:${reminder.scheduled_at}:${index}`}>
-                    {REMINDER_KIND_LABELS[reminder.kind]}{' '}{formatJp(reminder.scheduled_at)}{' '}{REMINDER_STATUS_LABELS[reminder.status] ?? reminder.status}
+                    {bookingReminderKindWord(reminder.kind)}{' '}{formatJp(reminder.scheduled_at)}{' '}{bookingReminderStatusWord(reminder.status)}
                   </li>)}
                 </ul> : null}
               </span>

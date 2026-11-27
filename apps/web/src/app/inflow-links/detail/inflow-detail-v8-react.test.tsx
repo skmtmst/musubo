@@ -162,5 +162,5 @@ test('v8 の下では Pencil Q5le3 の詳細に切り替わる', async () => {
   expect(host.textContent).toContain('この経路のつながる先')
   expect(host.textContent).toContain('QR コードを保存')
   // 青い帯の操作
-  expect(host.textContent).toContain('することを変える')
+  expect(host.textContent).toContain('することを変更する')
 })

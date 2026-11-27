@@ -348,7 +348,7 @@ function BillingInner() {
                     disabled={busy !== null}
                     className={styles.planButton}
                   >
-                    {currentKey ? 'このプランに変える' : 'このプランにする'}
+                    {currentKey ? 'このプランに変更する' : 'このプランにする'}
                   </Button>
                 ) : isOwner ? (
                   <Button

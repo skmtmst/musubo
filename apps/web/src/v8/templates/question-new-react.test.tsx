@@ -12,6 +12,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const folderFixture = vi.hoisted(() => ({ account: 'account-a', list: vi.fn() }))
 const notifySaved = vi.hoisted(() => vi.fn())
 vi.mock('@/components/shared/toast', async original => ({ ...await original<typeof import('@/components/shared/toast')>(), notifyToast: notifySaved }))
 const navigationPush = vi.hoisted(() => vi.fn())
@@ -24,7 +25,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...api,
       templates: { ...api.templates, ...templatesApi },
-      folders: { ...api.folders, list: async () => ({ success: true, data: [] }) },
+      folders: { ...api.folders, list: folderFixture.list },
       tags: { ...api.tags, list: async () => ({ success: true, data: [] }) },
       scenarios: { ...api.scenarios, list: async () => ({ success: true, data: [] }) },
     },
@@ -38,7 +39,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '然 - NEN -' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: folderFixture.account, accounts: [{ id: folderFixture.account, name: '見本' }], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
@@ -56,6 +57,8 @@ async function frames(count = 3) {
 }
 
 beforeEach(async () => {
+  folderFixture.account = 'account-a'
+  folderFixture.list.mockReset().mockResolvedValue({ success: true, data: [] })
   document.documentElement.setAttribute('data-theme', 'v8')
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -87,7 +90,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     const extra = screen.getAllByRole('button', { name: '押されたときにあわせて行うことを足す' })[0]
     const reply = screen.getAllByLabelText('押したときの返信')[0]
     expect(extra.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '選択肢 1 の押されたら：変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選択肢 1 の押されたら：変更する' })).toBeNull()
   })
 
   it('閉じた動きの欄に保存エラーが返ると、その選択肢だけ開いて理由を出す', async () => {
@@ -127,7 +130,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     expect(screen.getAllByLabelText('ボタンの文字（20文字まで）')).toHaveLength(1)
     expect(name.value).toBe('継続を確認する')
     // 押したときの動きは「押されたら」の欄から窓で開いて決める。
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変更する' })) })
     const message = screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement
     await act(async () => { fireEvent.change(message, { target: { value: '入力を保つ' } }) })
     const hideMessage = screen.getByRole('checkbox', { name: 'ユーザーメッセージを使用しない' })
@@ -140,7 +143,7 @@ describe('質問を作る：保存で欄に知らせる', () => {
     expect(message.value).toBe('入力を保つ')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '決める' })) })
     expect(screen.queryByLabelText('ユーザーメッセージ')).toBeNull()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変える' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選択肢 1 の押されたら：変更する' })) })
     expect((screen.getByLabelText('ユーザーメッセージ') as HTMLInputElement).value).toBe('入力を保つ')
     expect(templatesApi.create).not.toHaveBeenCalled()
   })
@@ -263,4 +266,58 @@ it('公開に失敗しても作成済みの下書きを使い、二重作成せ�
   expect(templatesApi.update).toHaveBeenCalledTimes(1)
   expect(templatesApi.publish).toHaveBeenLastCalledWith('question-1', { expectedVersion: 0, expectedDraftRevision: 2 })
   expect(navigationPush).toHaveBeenCalledWith('/templates?tab=question')
+})
+
+it('質問のフォルダ取得失敗を知らせ、名前を残して読み直せる', async () => {
+  await act(async () => { fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '編集中' } }) })
+  folderFixture.list.mockResolvedValueOnce({ success: false })
+  folderFixture.account = 'account-b'
+  await act(async () => { root.render(<QuestionNewV8 />) })
+  expect(await screen.findByText(/フォルダを読み込めませんでした/)).toBeTruthy()
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(true)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false)
+  expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('編集中')
+  expect(folderFixture.list).toHaveBeenCalledTimes(3)
+})
+it('質問のアカウント切替後は選択したフォルダと分類を外す', async () => {
+  folderFixture.list.mockResolvedValue({ success: true, data: [{ id: 'summer', name: '夏' }] })
+  folderFixture.account = 'account-b'
+  await act(async () => { root.render(<QuestionNewV8 />) })
+  await frames()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+  await act(async () => { fireEvent.click(screen.getByText('夏')) })
+  expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('夏')
+  folderFixture.account = 'account-c'
+  await act(async () => { root.render(<QuestionNewV8 />) })
+  await frames()
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false)
+  expect(screen.getByRole('button', { name: 'フォルダ' }).textContent).toContain('未分類')
+  templatesApi.create.mockResolvedValue({ success: true, data: { id: 'q1', publishedVersion: 0, draftRevision: 1 } })
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '質問' } })
+    fireEvent.change(screen.getByLabelText('質問文（160文字まで）'), { target: { value: '続けますか？' } })
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+  })
+  await frames()
+  expect(templatesApi.create.mock.calls[0][0]).toMatchObject({ accountId: 'account-c', folderId: null, category: '未分類' })
+})
+it('質問の切替前の遅いフォルダ応答を使わない', async () => {
+  let resolveOld!: (value: unknown) => void
+  folderFixture.list.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve }))
+  folderFixture.account = 'account-b'; await act(async () => { root.render(<QuestionNewV8 />) })
+  folderFixture.list.mockResolvedValue({ success: true, data: [{ id: 'new', name: '新しい店' }] })
+  folderFixture.account = 'account-c'; await act(async () => { root.render(<QuestionNewV8 />) })
+  await act(async () => { resolveOld({ success: true, data: [{ id: 'old', name: '前の店' }] }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+  expect(screen.getByText('新しい店')).toBeTruthy()
+  expect(screen.queryByText('前の店')).toBeNull()
+})
+it('統括の質問は親のフォルダを使い取得しない', async () => {
+  folderFixture.list.mockClear()
+  await act(async () => { root.render(<QuestionNewV8 host={{ description: '', folders: [{ value: 'hq', label: '統括フォルダ' }], folder: '', onFolderChange: vi.fn(), busy: false, onSave: vi.fn(), onCancel: vi.fn() }} />) })
+  expect(folderFixture.list).not.toHaveBeenCalled()
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: 'フォルダ' }).disabled).toBe(false)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ' })) })
+  expect(screen.getByText('統括フォルダ')).toBeTruthy()
 })

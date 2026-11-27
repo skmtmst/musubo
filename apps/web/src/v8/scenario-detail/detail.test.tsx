@@ -224,7 +224,7 @@ describe('V8 シナリオ配信の編集', () => {
   it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
     await render(<ScenarioDetailPage />)
     expect(screen.getByText('購読開始から0日後 10:00').closest('[data-page-template="detail"]')).toBeTruthy()
-    for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
+    for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変更する', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(name === '配信結果を見る' ? screen.getByRole('link', { name }) : getPageAction({ name }), name).toBeTruthy()
     }
     expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
@@ -256,7 +256,7 @@ describe('V8 シナリオ配信の編集', () => {
     role.value = 'staff'
     await render()
     expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
-    for (const name of ['まとめてテストを送る', '設定を変える', '一時停止する', '変える', 'このシナリオを削除する', '複製する', '保存する', 'メッセージを追加する', 'テンプレートを追加する', '＋ ここに挿入', '名前・説明・置き場を変える', 'このシナリオのその他操作', '1通目を上へ']) {
+    for (const name of ['まとめてテストを送る', '設定を変更する', '一時停止する', '変える', 'このシナリオを削除する', '複製する', '保存する', 'メッセージを追加する', 'テンプレートを追加する', '＋ ここに挿入', '名前・説明・置き場を変える', 'このシナリオのその他操作', '1通目を上へ']) {
       expect(screen.queryByRole('button', { name }), name).toBeNull()
     }
     // 見る操作は残す。残ったボタンはどれも押せる。
@@ -294,7 +294,7 @@ it('名前の保存中は×・閉じる・Escを止め、入力を残す', async
   let finish!: (value: unknown) => void
   updateScenario.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
   await render()
-  fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変更する' }))
   const dialog = screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })
   fireEvent.change(within(dialog).getByLabelText('シナリオ名'), { target: { value: '変更した名前' } })
   fireEvent.click(within(dialog).getByRole('button', { name: 'この内容で保存する' }))
@@ -336,7 +336,7 @@ it('WEB229：開始のきっかけを保存したら、見出しのきっかけ�
   await render()
   expect(host.textContent).toContain('友だち追加のとき')
   triggerList.mockResolvedValue({ success: true, data: [{ id: 't2', kind: 'form_answer', tagId: null }] })
-  fireEvent.click(screen.getByRole('button', { name: /設定を変える/ }))
+  fireEvent.click(screen.getByRole('button', { name: /設定を変更する/ }))
   fireEvent.click(await screen.findByRole('button', { name: 'きっかけを保存（試験）' }))
   await waitFor(() => expect(host.textContent).toContain('フォームに答えたとき'))
 })
@@ -372,7 +372,7 @@ describe('整理後も保存・開始・停止と通の状態を保つ', () => {
       fields: { name: '同じ名前があります' },
     }))
     await render()
-    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変更する' }))
     const dialog = screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })
     const name = within(dialog).getByLabelText('シナリオ名') as HTMLInputElement
     fireEvent.change(name, { target: { value: '入力した名前' } })

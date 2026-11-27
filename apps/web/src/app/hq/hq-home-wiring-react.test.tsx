@@ -394,7 +394,7 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     await screen.findAllByText('銀座店')
     expect(kpis()).toHaveLength(4)
     await waitFor(() => expect(values()).toEqual(['2', '—', '0', '2']))
-    expect(kpis()[3].textContent).toContain('要確認・未確認 1')
+    expect(kpis()[3].textContent).toContain('要確認 1・未確認 1')
     // 未確認は右上の札にまとめ、2行目（note）を出さない＝ほかの箱と同じ高さ。
     expect(kpis()[3].querySelector('[role="note"]')?.textContent ?? '').toBe('')
     expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(1)
@@ -410,9 +410,9 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
 
 describe('統括の接続問題：分かっている数と未確認を分ける', () => {
   it.each([
-    { statuses: ['warn', 'unknown'], value: '3', detail: '要確認・未確認 1', tab: 2, warning: true },
-    { statuses: ['ok', 'unknown'], value: '—', detail: '未確認 1 件', tab: 1, warning: false },
-    { statuses: ['warn', 'ok'], value: '3', detail: '', tab: 1, warning: true },
+    { statuses: ['warn', 'unknown'], value: '2', detail: '要確認 1・未確認 1', tab: 2, warning: true },
+    { statuses: ['ok', 'unknown'], value: '1', detail: '未確認 1', tab: 1, warning: true },
+    { statuses: ['warn', 'ok'], value: '1', detail: '要確認 1', tab: 1, warning: true },
     { statuses: ['ok', 'ok'], value: '0', detail: '', tab: 0, warning: false },
   ])('$statuses の既知数は $value、要確認は $tab', async ({ statuses, value, detail, tab, warning }) => {
     mocks.attention.mockResolvedValue({ success: true, data: { items: statuses.map((status, index) => ({ accountId: `a${index}`, counts: { connections: status === 'warn' ? 3 : 0, unhandledChats: 8 } })) } })
@@ -426,17 +426,17 @@ describe('統括の接続問題：分かっている数と未確認を分ける'
     if (detail) expect(card.textContent).toContain(detail)
     else expect(card.textContent).not.toContain('未確認')
     expect(card.querySelector('[data-kpi-badge="warning"]') !== null).toBe(warning)
-    expect(screen.getByRole('button', { name: new RegExp(`要確認.*${tab}`) })).toBeTruthy()
+    expect(screen.getByRole('button', { name: new RegExp(`^要確認\\s*${tab}$`) })).toBeTruthy()
   })
 
-  it('attention の一部が欠けた場合は取れた接続件数と未確認を分ける', async () => {
+  it('attention の一部が欠けても接続状態からアカウント数を数える', async () => {
     mocks.list.mockResolvedValue({ success: true, data: [account('a1', '取得済み'), { ...account('a2', '未取得'), connection: { status: 'ok' } }] })
     mocks.attention.mockResolvedValue({ success: true, data: { items: [{ accountId: 'a1', counts: { connections: 4, unhandledChats: 9 } }] } })
     render(<HqHomeV8 />)
     await screen.findAllByText('取得済み')
     const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
-    await waitFor(() => expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('4'))
-    expect(card.textContent).toContain('要確認・未確認 1')
+    await waitFor(() => expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('1'))
+    expect(card.textContent).toContain('要確認 1')
   })
 
   it('停止とアーカイブを要確認の対象へ加えず、未取得の接続は未確認へ数える', async () => {
@@ -449,8 +449,8 @@ describe('統括の接続問題：分かっている数と未確認を分ける'
     render(<HqHomeV8 />)
     await screen.findAllByText('確認対象')
     const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
-    await waitFor(() => expect(card.textContent).toContain('未確認 1 件'))
-    expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+    await waitFor(() => expect(card.textContent).toContain('未確認 1'))
+    expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('1')
     expect(screen.getByRole('button', { name: /要確認.*1/ })).toBeTruthy()
   })
 })

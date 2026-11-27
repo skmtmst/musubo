@@ -460,7 +460,7 @@ describe('アカウント未選択の共通の呼び名', () => {
     const view = render(<StoreSelectionGate><p>個別のデータ</p></StoreSelectionGate>)
     expect(view.getByRole('heading', { name: 'LINE公式アカウントを選んでください' })).toBeTruthy()
     expect(view.getByText('この画面はLINE公式アカウントごとのデータを扱います。統括のアカウント一覧から選んでください。')).toBeTruthy()
-    const action = view.getByRole('link', { name: 'LINE公式アカウントを選ぶ' })
+    const action = view.getByRole('link', { name: 'LINE公式アカウントを選択する' })
     await waitFor(() => expect(action.getAttribute('href')).toBe('/hq?return=%2Ffriends%3Ffolder%3Dfollowup'))
     expect(view.queryByText('個別のデータ')).toBeNull()
     expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()

@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { ListPageStats } from '@/components/templates/list-page'
 
@@ -242,7 +244,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
     setCrossAutoStopped(false); setError(''); setLoading(true); setCrossRecheck((n) => n + 1)
   }
 
-  const axisLabel = (value: string) => value.startsWith('field:') ? `友だち情報 / ${fields.find((field) => `field:${field.id}` === value)?.name ?? '項目'}` : AXIS_LABELS[value] ?? value
+  const axisLabel = (value: string) => value.startsWith('field:') ? `友だち情報 / ${fields.find((field) => `field:${field.id}` === value)?.name ?? '項目'}` : knownValue(AXIS_LABELS, value, value)
   const sameAxis = rowAxis === columnAxis
 
   const runCross = async () => {

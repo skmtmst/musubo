@@ -28,6 +28,7 @@ export function ApprovalRequestFields({
   threshold,
   candidates,
   candidatesState,
+  candidatesErrorMessage = '承認できる人を読み込めませんでした。開き直してください。',
   approverId,
   onApproverChange,
   note,
@@ -40,6 +41,7 @@ export function ApprovalRequestFields({
   threshold: number
   candidates: BroadcastApprovalCandidate[]
   candidatesState: 'loading' | 'ready' | 'error'
+  candidatesErrorMessage?: string
   approverId: string
   onApproverChange: (id: string) => void
   note: string
@@ -64,7 +66,7 @@ export function ApprovalRequestFields({
           {candidatesState === 'loading' ? (
             <p className="text-ink-faint text-xs">読み込んでいます…</p>
           ) : candidatesState === 'error' ? (
-            <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
+            <p className="text-danger text-xs">{candidatesErrorMessage}</p>
           ) : (
             <SaveErrorField names={["approverId","approver_id"]}><EntitySelect
               aria-label="承認をお願いする人"

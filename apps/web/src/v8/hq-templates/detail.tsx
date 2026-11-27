@@ -277,7 +277,7 @@ export default function HqTemplateDetail({
             </>
           ) : <ListEmptyMessage>まだ配っていません</ListEmptyMessage>}
           <div className={styles.moreRow}>
-            <PermissionGatedButton allowed={canEdit} need="tenantWide" variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={16} aria-hidden="true" />配る先を変える</PermissionGatedButton>
+            <PermissionGatedButton allowed={canEdit} need="tenantWide" variant="text" onClick={onDistribute} disabled={busy}><ChevronDown size={16} aria-hidden="true" />配る先を変更する</PermissionGatedButton>
           </div>
         </Card>
 

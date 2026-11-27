@@ -1416,7 +1416,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
         onSavedLeave={discardUnknown ? () => { disarm(); router.push('/rich-menus') } : confirmLeave} onConfirm={createdDraft ? () => void discardCreatedDraft() : confirmLeaveAndDiscard}
         onCancel={() => { setDiscardDraftError(''); setDiscardUnknown(false); cancelLeave() }} />
       <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
-        confirmLabel="順番を変える" onConfirm={() => {
+        confirmLabel="順番を変更する" onConfirm={() => {
           setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))
           setPriorityOpen(false)
         }} onCancel={() => setPriorityOpen(false)}>

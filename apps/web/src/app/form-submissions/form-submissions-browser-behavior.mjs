@@ -738,11 +738,11 @@ try {
     for (const right of await dialog.locator('button').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().right))) {
       assert.ok(right <= 390, `R26: 動作の操作が画面に収まる（右端 ${Math.round(right)}px）`)
     }
-    await dialog.getByRole('button', { name: '選ぶ（1件）', exact: true }).click()
+    await dialog.getByRole('button', { name: '選択する（1件）', exact: true }).click()
     await dialog.waitFor({ state: 'detached' })
     const action = page.locator('[data-action-row]')
     assert.equal(await action.count(), 1, '対象を確定した行だけ追加する')
-    await action.getByRole('button', { name: 'タグ：変える', exact: true }).waitFor()
+    await action.getByRole('button', { name: 'タグ：変更する', exact: true }).waitFor()
     const title = await action.getByRole('button', { name: '「回答済み」', exact: true }).boundingBox()
     assert.ok(title && title.width > 0 && title.x >= 0 && title.x + title.width <= 390,
       'R26: 行の名前も省略できる幅を保って画面内に表示する')

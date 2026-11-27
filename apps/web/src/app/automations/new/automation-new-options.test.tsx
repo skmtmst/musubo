@@ -194,7 +194,7 @@ describe('新規作成の選択可能一覧(#734)', () => {
     await clickButton(document.body, 'シナリオを始める')
     const candidate = Array.from(document.querySelectorAll<HTMLInputElement>('input[type="radio"]')).find(input => input.value === 'scenario-1')!
     await act(async () => { candidate.click() })
-    await clickButton(document.body, '選ぶ')
+    await clickButton(document.body, '選択する')
     // #975 U073: 動かし始める前に確認ダイアログを挟む。
     await clickButton(el, 'つくって動かす')
     await act(async () => { await drainMicrotasks() })

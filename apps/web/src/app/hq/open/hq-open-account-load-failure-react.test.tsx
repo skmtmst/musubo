@@ -119,7 +119,7 @@ describe('hq/open のアカウント読み込み失敗の案内', () => {
   it('正常時は一覧を出し、不正targetは/hqへ戻す', async () => {
     await renderPage()
     expect(host.textContent).toContain('テスト店舗')
-    expect(host.textContent).toContain('このアカウントを選ぶ')
+    expect(host.textContent).toContain('このアカウントを選択する')
   })
 
   it('0件は新規登録の導線を出す', async () => {
@@ -133,7 +133,7 @@ describe('hq/open のアカウント読み込み失敗の案内', () => {
 
   it('アカウントを選ぶと選択を覚え、識別子を住所に付けずに行き先の画面へ移る', async () => {
     await renderPage()
-    const select = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'このアカウントを選ぶ')
+    const select = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'このアカウントを選択する')
     await act(async () => { select!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     expect(accountStore.setSelectedAccountId).toHaveBeenCalledWith('acc-1')
     expect(router.push).toHaveBeenCalledWith('/tags')

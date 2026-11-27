@@ -72,7 +72,7 @@ describe('選ぶ欄の権限理由', () => {
     fireEvent.click(screen.getByRole('button', { name: 'アカウント' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('radio', { name: '移行先' }))
-    const confirm = within(dialog).getByRole('button', { name: '選ぶ' })
+    const confirm = within(dialog).getByRole('button', { name: '選択する' })
     view.rerender(<EntitySelect aria-label="アカウント" value="a" options={options} onChange={change} lockedReason={reason} />)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     fireEvent.click(confirm)
@@ -82,7 +82,7 @@ describe('選ぶ欄の権限理由', () => {
   it('理由の追加でも既存の説明とbuttonRefを保つ', () => {
     const ref = createRef<HTMLButtonElement>(), open = vi.fn()
     render(<><span id="help">元の説明</span><EntityPickerSummary label="物" noun="物" name="選択済み" onOpen={open} buttonRef={ref} describedBy="help" lockedReason={reason} /></>)
-    const trigger = screen.getByRole('button', { name: '物：変える' })
+    const trigger = screen.getByRole('button', { name: '物：変更する' })
     expect(ref.current).toBe(trigger)
     expect(trigger.getAttribute('aria-describedby')!.split(' ')).toContain('help')
     expectLocked(trigger)
@@ -98,7 +98,7 @@ describe('選ぶ欄の権限理由', () => {
     expect(open).toHaveBeenCalledTimes(1)
     fireEvent.click(within(dialog).getByRole('radio', { name: '別の物' }))
     expect(preview).toHaveBeenCalledExactlyOnceWith('b')
-    expect(within(dialog).queryByRole('button', { name: '選ぶ' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: '選択する' })).toBeNull()
     expect(change).not.toHaveBeenCalled()
   })
 

@@ -27,7 +27,7 @@ it('保存中は×・キャンセル・Escを止め、失敗後は閉じられ�
 it('REM3-06 existing staff can choose registered media and save its public URL',async()=>{
  const onSave=vi.fn().mockResolvedValue(undefined)
  render(<StaffEditModal staff={{name:'staff',display_name:'担当者',is_active:1}} onSave={onSave} onClose={()=>{}} />)
- fireEvent.click(screen.getByRole('button',{name:'登録メディアから選ぶ'}))
+ fireEvent.click(screen.getByRole('button',{name:'登録メディアから選択する'}))
  fireEvent.click(await screen.findByRole('option',{name:/人工画像/}))
  fireEvent.click(screen.getByRole('button',{name:'保存する'}))
  await act(async()=>{})

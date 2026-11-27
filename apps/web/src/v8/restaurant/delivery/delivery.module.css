@@ -424,3 +424,6 @@
   align-items: center;
   gap: var(--tpl-rt-dlv-act-gap);
 }
+
+/* 店舗の数が分かるまで操作欄の位置だけを保つ。 */
+.pendingStore { visibility: hidden; }

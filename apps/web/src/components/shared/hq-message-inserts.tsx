@@ -18,7 +18,7 @@ export function HqInsertRow({onInsert,count,max=5000,disabled=false}:{onInsert:(
   <>{([['店名','{{account.name}}','store'],['店の電話番号','{{var.store_phone}}','phone'],['予約ページ','{{var.reservation_url}}','link']] as const).map(([label,token,kind])=><MessageInsertButton key={token} kind={kind} disabled={disabled} label={label} onClick={()=>onInsert(token)}/>)}</>
  }>
   <MessageInsertButton kind="name" disabled={disabled} label="名前" onClick={()=>onInsert('{{name}}')}/>
-  <span ref={anchor}><MessageInsertButton kind="field" disabled={disabled} expanded={open} label="友だち情報" onClick={()=>setOpen(value=>!value)}/><ActionMenu anchorRef={anchor} open={open} ariaLabel="決まった欄から選ぶ" choiceHeading="決まった欄から選ぶ" onClose={()=>setOpen(false)} items={HQ_FRIEND_INSERTS.map(item=>({id:item.token,label:item.label.slice(1,-1),onSelect:()=>{onInsert(item.token);setOpen(false)}}))}/></span>
+  <span ref={anchor}><MessageInsertButton kind="field" disabled={disabled} expanded={open} label="友だち情報" onClick={()=>setOpen(value=>!value)}/><ActionMenu anchorRef={anchor} open={open} ariaLabel="決まった欄から選択する" choiceHeading="決まった欄から選ぶ" onClose={()=>setOpen(false)} items={HQ_FRIEND_INSERTS.map(item=>({id:item.token,label:item.label.slice(1,-1),onSelect:()=>{onInsert(item.token);setOpen(false)}}))}/></span>
  </MessageInsertRow>
 }
 export function insertHqToken(ref:RefObject<InsertTextFieldHandle|HTMLTextAreaElement|null>,value:string,change:(value:string)=>void,token:string,max=5000) {

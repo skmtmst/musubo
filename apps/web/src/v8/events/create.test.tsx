@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const createEvent = vi.hoisted(() => vi.fn())
 const createSlots = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const previewProps = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', () => ({ eventsApi: { createEvent, createSlots }, ApiError: class extends Error {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: React.PropsWithChildren<{ href: string }>) => <a href={href} {...rest}>{children}</a> }))
@@ -14,7 +15,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/use-unsaved-guard', () => ({ useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: vi.fn(), cancelLeave: vi.fn() }) }))
-vi.mock('./application-preview', () => ({ default: () => null }))
+vi.mock('./application-preview', () => ({ default: (props: unknown) => { previewProps(props); return null } }))
 import EventsCreate from './create'
 
 beforeEach(() => {
@@ -23,6 +24,7 @@ beforeEach(() => {
   createEvent.mockReset()
   createSlots.mockReset()
   push.mockReset()
+  previewProps.mockReset()
   Element.prototype.scrollIntoView = vi.fn()
 })
 afterEach(() => { cleanup(); vi.useRealTimers() })
@@ -42,6 +44,24 @@ describe('イベント作成の入力確認', () => {
       fireEvent.change(capacity, { target: { value: '25' } })
       expect(capacity.value).toBe('25')
     } finally { cleanup(); vi.useRealTimers() }
+  })
+
+  it('入力した名前・日付・定員を申込プレビューへ渡す', () => {
+    render(<EventsCreate />)
+    const preview = screen.getByLabelText('申込ページの見え方')
+    expect(within(preview).getByText('イベント名')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '体験会' } })
+    expect(within(preview).getByText('体験会')).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('日付'))
+    fireEvent.click(screen.getByRole('button', { name: '2026年11月2日（月）' }))
+    fireEvent.click(screen.getByRole('button', { name: '確定' }))
+    fireEvent.change(screen.getByLabelText('定員'), { target: { value: '25' } })
+    expect(previewProps.mock.lastCall?.[0]).toEqual(expect.objectContaining({
+      accountId: 'account-a', draft: expect.objectContaining({ name: '体験会' }),
+      date: '2026-11-02', capacity: '25',
+      startTime: (screen.getByLabelText('開始の時刻') as HTMLInputElement).value.replace(/\s/g, ''),
+      endTime: (screen.getByLabelText('終わりの時刻') as HTMLInputElement).value.replace(/\s/g, ''),
+    }))
   })
 
   it('保存前に不足する欄を知らせて名前へ移り、通信しない', () => {

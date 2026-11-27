@@ -45,7 +45,7 @@ export const LOOK_STEP = { key: 'image', short: '見た目' } as const
 
 export const LOOK_CHOICES: ReadonlyArray<{ value: 'keep' | 'change' | 'existing' | 'configured' | 'later'; icon: IconKey; label: string; note: string }> = [
   { value: 'keep', icon: 'sparkles', label: '見本を使う（おすすめ）', note: 'の見本のまま使います。あとで画像だけ変えられます' },
-  { value: 'change', icon: 'image', label: '画像を変える', note: '写真・ロゴを入れる／バナー生成で作る' },
+  { value: 'change', icon: 'image', label: '画像を変更する', note: '写真・ロゴを入れる／バナー生成で作る' },
   { value: 'existing', icon: 'folder', label: '同じアカウントの中にある物を使う', note: '今あるリッチメニュー・テンプレート・画像から選ぶ' },
   { value: 'configured', icon: 'download', label: 'もう設定した物を入れる', note: 'ほかのアカウントで作った物を入れる' },
   { value: 'later', icon: 'hourglass', label: 'あとで設定する', note: '今は入れません。はじめにやることに残ります' },
@@ -283,7 +283,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       action: preparing ? { label: `${featureName(warning.feature)}を設定する`, preparing } : { label: `${featureName(warning.feature)}を設定する`, href: featureHref(warning.feature, warning.href, state.style) },
     })
   }
-  if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: '未選択' }, action: { label: '選ぶ', step: 'style' } })
+  if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: '未選択' }, action: { label: '選択する', step: 'style' } })
   for (const question of questions) {
     if (state.style === 'ec' && question.key === 'stamps') continue
     const answer = answers[question.key]
@@ -307,7 +307,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
     rows.push({key:'initial-menu',title:'最初のメニューの内容を確かめる',note:words.initialMenu,badge:{tone:'neutral',label:'下書き'},action:{label:'確かめる',href:'/getting-started/rich-menu'}})
   }
   if (look?.mode === 'configured' && (look.value === 'keep' || look.value === 'change')) {
-    rows.push({ key: 'images', title: words.images, note: '見本の画像のままです', badge: { tone: 'neutral', label: '見本' }, action: { label: '画像を変える', href: '/rich-menus' } })
+    rows.push({ key: 'images', title: words.images, note: '見本の画像のままです', badge: { tone: 'neutral', label: '見本' }, action: { label: '画像を変更する', href: '/rich-menus' } })
   } else if (look && look.mode !== 'configured') {
     rows.push({ key: 'image', title: 'リッチメニューなどの見た目を決める', note: '見本を使うか、画像を変えるかを選びます', badge: { tone: 'neutral', label: '未設定' }, action: { label: '決める', step: 'image' } })
   }

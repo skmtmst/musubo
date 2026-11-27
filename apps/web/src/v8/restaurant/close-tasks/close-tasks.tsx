@@ -25,7 +25,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '@/v8/restaurant/dashboard/public/summarize/index'
-import { type StoreMedium, loadStoreMedia } from '@/v8/restaurant/dashboard/public/use-store-today/index'
+import { type StoreMedium, loadStoreMedia, selectAccountStore } from '@/v8/restaurant/dashboard/public/use-store-today/index'
 import styles from './close-tasks.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
@@ -80,8 +80,7 @@ export default function CloseTasksPage() {
         restaurantTestApi.listStores(selectedAccountId),
         restaurantTestApi.storeContext(selectedAccountId),
       ])
-      const selected = context?.data.selectedStore?.id
-      const storeId = stores.data.stores.some(s => s.id === selected) ? selected! : stores.data.stores[0]?.id
+      const storeId = selectAccountStore(stores.data.stores, selectedAccountId, context.data.selectedStore?.id)
       if (!storeId) { if (ticket === latest.current) { setTasks([]); setMedia([]) }; return }
       const [list, channels] = await Promise.all([
         restaurantTestApi.channelCloseTasks(selectedAccountId, storeId),
@@ -131,7 +130,7 @@ export default function CloseTasksPage() {
   }
 
   let content
-  if (error) content = <ListState kind="error" error={error} onRetry={() => void load()} />
+  if (error) content = <ListState kind="error" error={error} onRetry={() => void load()} action={canWrite ? <Button href="/settings/booking-media">店舗の選択を確認する</Button> : undefined} description={!canWrite ? '読み直しても解決しない場合は管理者にお問い合わせください。' : undefined} />
   else if (tasks === null) content = <ListState kind="loading" />
   else if (shown.length === 0) {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />

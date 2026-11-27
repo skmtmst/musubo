@@ -50,3 +50,20 @@ it('閲覧のみは候補を比べられるが、3つの判定は灰色で起動
   expect(fixture.decide).not.toHaveBeenCalled()
   expect(screen.queryByLabelText('判定の理由')).toBeNull()
 })
+
+it('未知の項目名と判定状態を受け取っても比較画面と履歴を表示する', () => {
+  const subject = (id: string) => ({ kind: 'friend', id, label: id, detail: null, lineAccountId: id, lineAccountName: '見本', shopKey: null, attributes: [{ label: 'constructor', valuePreview: id, verified: true }] })
+  fixture.detail = {
+    id: 'one', kind: 'friend_duplicate', status: 'pending', version: 1, confidence: { score: 80, label: '__proto__' },
+    left: subject('left'), right: subject('right'), evidence: [{ key: 'ev', label: '根拠の見本', strength: 'constructor' }], impact: [],
+    history: ['constructor', 'toString', '__proto__', 'future'].map((toStatus, i) => ({ id: `h${i}`, toStatus, actorName: '担当', reason: '確認', decidedAt: '2026-10-26T00:00:00Z' })),
+    detectedAt: '2026-10-26T00:00:00Z', reviewedAt: null, canDecide: true, canUndo: false, undoNote: '', profileCandidates: [], tagCandidates: [],
+  } as unknown as IdentityCandidateWithProfiles
+  render(<Compare />)
+  expect(screen.getAllByText('constructor')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: 'left ↔ rightの説明' }))
+  expect(screen.getByText(/確からしさ：未確認/)).toBeTruthy()
+  expect(screen.getByText('根拠の見本').parentElement?.textContent).toContain('未確認')
+  fireEvent.click(screen.getByRole('button', { name: 'あとで決める（保留）' }))
+  expect(screen.getAllByText(/状態を確認できません・担当/)).toHaveLength(4)
+})

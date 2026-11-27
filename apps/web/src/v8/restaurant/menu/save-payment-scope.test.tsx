@@ -62,7 +62,7 @@ it('店舗を替えても元のメニューと支払いを全部保存し、新�
  fixture.updateMenu.mockImplementationOnce(() => new Promise(resolve => { old = resolve })).mockImplementationOnce(() => new Promise(resolve => { fresh = resolve }))
  const view = render(<><MenuEditPage /><ToastHost /></>)
  fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '前の店の名前' } })
- fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変える/ }))
+ fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
  fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
  await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledTimes(1))
  fixture.account = 'account-2'
@@ -91,7 +91,7 @@ it('公開だけ成功し支払いが競合したら、公開済みの状態を�
  const status = await screen.findByLabelText('保存する状態')
  fireEvent.click(status)
  fireEvent.click(within(await screen.findByRole('listbox')).getByRole('button', { name: '公開', exact: true }))
- fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変える/ }))
+ fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
  const confirmation = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
  fireEvent.click(within(confirmation).getByRole('button', { name: '公開して保存する' }))

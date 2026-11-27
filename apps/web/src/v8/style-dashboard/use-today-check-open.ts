@@ -45,13 +45,13 @@ function readStored(key: string | null): string[] | null {
   }
 }
 
-export function useTodayCheckOpen(accountId: string | null, style: IndustryStyle, cards: readonly StyleSideCard[]) {
+export function useTodayCheckOpen(accountId: string | null, style: IndustryStyle, cards: readonly Pick<StyleSideCard, 'id' | 'count'>[], scope = '', defaultOpen?: readonly string[]) {
   const staffId = useStaffIdentity()?.id ?? null
-  const key = staffId && accountId ? todayCheckStorageKey(staffId, accountId, style) : null
+  const key = staffId && accountId ? `${todayCheckStorageKey(staffId, accountId, style)}${scope ? `:${encodeURIComponent(scope)}` : ''}` : null
   const stored = useMemo(() => readStored(key), [key])
   // この画面で押した開き方。覚えられない間も押したとおりに開閉する。鍵が変わったら使わない。
   const [pressed, setPressed] = useState<{ key: string | null; open: string[] } | null>(null)
-  const open = pressed && pressed.key === key ? pressed.open : stored ?? initialTodayCheckOpen(cards)
+  const open = pressed && pressed.key === key ? pressed.open : stored ?? defaultOpen ?? initialTodayCheckOpen(cards)
   const isOpen = useCallback((id: string) => open.includes(id), [open])
   const setOpen = useCallback((id: string, next: boolean) => {
     const updated = next ? [...open.filter((x) => x !== id), id] : open.filter((x) => x !== id)
@@ -64,4 +64,22 @@ export function useTodayCheckOpen(accountId: string | null, style: IndustryStyle
     }
   }, [key, open])
   return { isOpen, setOpen }
+}
+
+/** カード全体の開閉。項目ごとの記録とは別にし、本人・店舗・スタイルを共有する。 */
+export function useTodayCheckFolded(accountId: string | null, style: IndustryStyle, scope = '') {
+  const staffId = useStaffIdentity()?.id ?? null
+  const key = staffId && accountId ? `${todayCheckStorageKey(staffId, accountId, style)}${scope ? `:${encodeURIComponent(scope)}` : ''}:folded` : null
+  const stored = useMemo(() => {
+    if (!key) return false
+    try { return window.localStorage.getItem(key) === '1' } catch { return false }
+  }, [key])
+  const [pressed, setPressed] = useState<{ key: string | null; folded: boolean } | null>(null)
+  const folded = pressed && pressed.key === key ? pressed.folded : stored
+  const toggle = useCallback(() => {
+    const next = !folded
+    setPressed({ key, folded: next })
+    if (key) try { window.localStorage.setItem(key, next ? '1' : '0') } catch { /* 保存できなくても画面では切り替える */ }
+  }, [folded, key])
+  return { folded, toggle }
 }

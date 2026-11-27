@@ -207,10 +207,10 @@ export default function GenerationPanel({
                 ) : <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
                     <Images aria-hidden="true" className="h-4 w-4" />
-                    ライブラリから選ぶ
+                    ライブラリから選択する
                   </Button>
                   <Button disabled={disabled || referenceBusy} onClick={() => fileRef.current?.click()} className="w-full" busy={referenceBusy} busyLabel="取り込んでいます…">
-                    <Upload aria-hidden="true" className="h-4 w-4" />ファイルを選ぶ
+                    <Upload aria-hidden="true" className="h-4 w-4" />ファイルを選択する
                   </Button>
                   <input
                     ref={fileRef}
@@ -547,7 +547,7 @@ function OutputSize({
       <p className="truncate text-caption text-ink" title={selected ? `${presetCardLabel(selected)}・${presetSizeLabel(selected)}` : undefined}>
         {selected ? `${presetCardLabel(selected)}・${presetSizeLabel(selected)}` : '用途と大きさを選んでください'}
       </p>
-      <div className="flex justify-center"><Button disabled={disabled} onClick={() => setOpened(true)}>大きさを変える</Button></div>
+      <div className="flex justify-center"><Button disabled={disabled} onClick={() => setOpened(true)}>大きさを変更する</Button></div>
       <Dialog footerAlign="center" open={opened} title="用途と大きさを選ぶ" onCancel={() => setOpened(false)} cancelLabel="閉じる">
         <SaveErrorField names={["key", "preset.key", "value"]}>
           <RadioCardGroup legend="出力サイズ" columns={2}>

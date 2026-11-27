@@ -11,7 +11,7 @@ function Editor({portable=false,readOnly=false}:{portable?:boolean;readOnly?:boo
 }
 test('店に合わせる初期値・5型＋カスタム・カスタムだけ色の入力',()=>{
  render(<Editor/>);expect(screen.getByText('今：ナチュラル')).toBeTruthy();expect(screen.queryByRole('group',{name:'デザインの型'})).toBeNull();
- fireEvent.click(screen.getByRole('radio',{name:/このフォームだけ変える/}));expect(screen.getAllByRole('radio')).toHaveLength(8);
+ fireEvent.click(screen.getByRole('radio',{name:/このフォームだけ変更する/}));expect(screen.getAllByRole('radio')).toHaveLength(8);
   expect(screen.queryByText('おまかせで組む')).toBeNull();fireEvent.click(screen.getByRole('radio',{name:/^カスタム/}));expect(screen.getByText('おまかせで組む')).toBeTruthy();
  fireEvent.click(screen.getByRole('radio',{name:/モダン/}));expect(screen.queryByText('おまかせで組む')).toBeNull();
 });

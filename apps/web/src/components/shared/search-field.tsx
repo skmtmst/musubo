@@ -34,6 +34,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
 ) {
   const { width: styleWidth, ...inputStyle } = style ?? {}
   const [draft, setDraft] = useState(String(value ?? ''))
+  const lastExternalValue = useRef(String(value ?? ''))
   const callback = useRef(onChange)
   callback.current = onChange
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -44,7 +45,13 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
     if (updateMode === 'immediate') callback.current(next)
     else timer.current = setTimeout(() => { timer.current = null; callback.current(next) }, 300)
   }
-  useEffect(() => { cancel(); setDraft(String(value ?? '')) }, [value])
+  useEffect(() => {
+    const next = String(value ?? '')
+    if (next === lastExternalValue.current) return
+    lastExternalValue.current = next
+    cancel()
+    setDraft(next)
+  }, [value])
   useEffect(() => cancel, [])
   const hasValue = draft.length > 0
   const innerRef = useRef<HTMLInputElement>(null)

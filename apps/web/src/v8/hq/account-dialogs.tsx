@@ -22,7 +22,7 @@ import type { Folder } from '@line-crm/shared'
 import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
 import styles from './account-dialogs.module.css'
-import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
+import { FALLBACK_REASON, connectionReasons, lineHandle } from '@/lib/line-account-connection-reasons'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 

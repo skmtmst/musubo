@@ -113,7 +113,7 @@ it.each([
   const basicProgress = await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })
   /* 済みの「使う機能」は一覧から外れる（承認済み Pen v09）ので、基本は5段＋営業時間の6段になる。 */
   expect(basicProgress.getAttribute('aria-valuenow')).toBe(complete ? '5' : '4')
-  expect(within(guide()).getByRole('button', { name: '開く', exact: true }).getAttribute('aria-expanded')).toBe('false')
+  expect(within(guide()).getByRole('button', { name: 'はじめにやることを開く', exact: true }).getAttribute('aria-expanded')).toBe('false')
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
   await pendingSetup()
   expect(within(guide()).queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
@@ -198,9 +198,9 @@ it('基本の段の進みだけを示し、畳む・開くで一覧だけが切�
   await pendingSetup()
   expect(screen.getAllByRole('progressbar')).toHaveLength(1)
   expect(within(guide()).getByText('5 / 6 済み')).toBeTruthy()
-  fireEvent.click(within(guide()).getByRole('button', { name: '畳む', exact: true }))
+  fireEvent.click(within(guide()).getByRole('button', { name: 'はじめにやることを畳む', exact: true }))
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
-  fireEvent.click(within(guide()).getByRole('button', { name: '開く', exact: true }))
+  fireEvent.click(within(guide()).getByRole('button', { name: 'はじめにやることを開く', exact: true }))
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(false)
   expect(window.localStorage.getItem('lh:v8:first-steps-folded:A')).toBe('0')
 })
@@ -213,6 +213,23 @@ it('基本が全完了で後回しの設定行が無ければカードを隠す'
   await act(async () => { await Promise.resolve() })
   expect(screen.queryByRole('heading', { name: 'はじめにやること', exact: true })).toBeNull()
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
+})
+
+it('標準は全手順が完了していても設定の取得中と失敗時は案内を残し、復旧後に隠す', async () => {
+  let reject!: (reason: Error) => void
+  net.googleHoursComplete = true
+  net.progress.mockResolvedValue(basic(true))
+  net.style.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  render(<DashboardV8 />)
+  await waitFor(() => expect(net.style).toHaveBeenCalled())
+  expect(await screen.findByRole('region', { name: 'はじめにやること', hidden: true })).toBeTruthy()
+  await act(async () => reject(new Error('offline')))
+  expect(await screen.findByText('使い方の設定を確認できませんでした')).toBeTruthy()
+  expect(guide()).toBeTruthy()
+  net.style.mockResolvedValue(style(false))
+  fireEvent.click(retry('使い方の設定を確認できませんでした'))
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'はじめにやること', hidden: true })).toBeNull())
+  expect(net.style).toHaveBeenCalledTimes(2)
 })
 
 it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み、使い方の変更を許可しない', async role => {

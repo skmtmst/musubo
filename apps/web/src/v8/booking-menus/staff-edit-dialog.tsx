@@ -47,6 +47,8 @@ export function StaffEditModal({
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
   // N-411 本人勤務: 予約スタッフをログインユーザーへ紐づけるための一覧。
   const [members, setMembers] = useState<StaffMember[]>([])
+  const [membersStatus, setMembersStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [membersAttempt, setMembersAttempt] = useState(0)
   /* 指名料（B9）。変えられるのはオーナー・管理者だけ。ほかの人の保存には載せない（口が断るため）。 */
   const canEditFee = canManageRole(useStaffRole())
   const savedFee = staff.nomination_fee ?? 0
@@ -54,13 +56,19 @@ export function StaffEditModal({
 
   useEffect(() => {
     let cancelled = false
-    api.staff.list()
+    setMembersStatus('loading')
+    setMembers([])
+    if (!selectedAccountId) return () => { cancelled = true }
+    api.staff.list(selectedAccountId)
       .then((res) => {
-        if (!cancelled && res.success) setMembers(res.data.filter((m) => m.isActive))
+        if (cancelled) return
+        if (!res.success) { setMembersStatus('error'); return }
+        setMembers(res.data.filter((m) => m.isActive))
+        setMembersStatus('ready')
       })
-      .catch(() => { /* 一覧が取れなくても紐づけ以外の編集は続けられる */ })
+      .catch(() => { if (!cancelled) setMembersStatus('error') })
     return () => { cancelled = true }
-  }, [])
+  }, [membersAttempt, selectedAccountId])
 
   function set<K extends keyof BookingStaff>(k: K, v: BookingStaff[K]) {
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -170,13 +178,16 @@ export function StaffEditModal({
               aria-label="ログインユーザーとの紐づけ"
               size="full"
               value={form.staff_member_id ?? ''}
+              disabled={membersStatus !== 'ready'}
               onChange={(v) => set('staff_member_id', v || null)}
               options={[
                 { value: '', label: '紐づけない' },
+                ...(membersStatus !== 'ready' && form.staff_member_id ? [{ value: form.staff_member_id, label: '紐づけ済み（確認中）' }] : []),
                 ...members.map((m) => ({ ...entityOptionMetadata(m), value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
               ]}
             /></SaveErrorField>
-
+            {membersStatus === 'loading' ? <p role="status">ログインユーザーを読み込んでいます。</p> : null}
+            {membersStatus === 'error' ? <><p role="status">ログインユーザーを読み込めませんでした。ほかの項目は編集できます。</p><Button type="button" variant="secondary" onClick={() => setMembersAttempt(value => value + 1)}>ログインユーザーを読み直す</Button></> : null}
           </Field>
           {err && <p className="text-xs text-danger">{err}</p>}
         </div>

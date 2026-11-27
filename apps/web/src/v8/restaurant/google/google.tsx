@@ -5,7 +5,7 @@ export type { GoogleNav } from './navigation-types'
 import { useGooglePermission } from './use-google-permission'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
@@ -86,15 +86,18 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const [data, setData] = useState<GoogleConnectionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const requestId = useRef(0)
 
   const load = useCallback(async () => {
+    const currentRequest = ++requestId.current
     if (!selectedAccountId || switchingToReturnedAccount) { setData(null); setLoading(switchingToReturnedAccount); return }
     setLoading(true)
     setError('')
     try {
       const connection = await restaurantGoogleApi.connection(selectedAccountId)
-      setData(connection)
+      if (currentRequest === requestId.current) setData(connection)
     } catch (err) {
+      if (currentRequest !== requestId.current) return
       const fieldFailure = saveErrors.capture(err)
       setData(null)
       { if (!fieldFailure)
@@ -104,11 +107,11 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         : errorMessage(err, 'Googleビジネスの状態を読み込めませんでした。'))
     }
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }, [selectedAccountId, saveErrors, switchingToReturnedAccount])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); return () => { requestId.current++ } }, [load])
 
   // 旧ブックマークと旧OAuth戻り先は、接続操作のあるSNS連携へ案内する。
   useEffect(() => {
@@ -165,6 +168,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   /* 子板の印（撮影と見張りの試験が読む）。 */
   const boardId = draftOpen ? 'x9HIR'
     : tab === 'posts' ? (postsView === 'list' ? 'Cfed0' : 'T1j2Sw')
+      : tab === 'hours' ? 'tYbl8'
       : tab === 'performance' ? 'SrmVs'
         : tab === 'profile' ? 'JUTGz'
           : 'j0Wcg'
@@ -192,13 +196,11 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     if (error || !data) return <ListState kind="error" title="Googleビジネスを表示できませんでした" description={error} onRetry={() => void load()} />
     const accountId = selectedAccountId
     if (guidingHours && tab === 'hours' && data.connection.status === 'pending_location') return <>
-      {googleTabs}
       <Card className={styles.guideConnection} layout="vertical" gap="normal" padding="spacious">
         <GoogleConnectionSettings key={accountId} accountId={accountId} data={data} onChanged={() => void load()} connectSource="hours" />
       </Card>
     </>
     if (guidingHours && tab === 'hours' && !hoursConnected) return <>
-      {googleTabs}
       <Card className={styles.guideConnection} layout="vertical" gap="normal" padding="spacious">
         <CardHeader size="stacked" title="Googleビジネスプロフィールとつなぐ" />
         <p className={styles.guideText}>お店のGoogleアカウントとつなぐと、営業時間がここに取り込まれ、予約枠の計算に使われます。口コミの確認・返信もできるようになります。</p>
@@ -211,7 +213,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     if (!connected) return <ListState kind="empty" title="Googleビジネスは未接続です" description="設定のSNS連携からGoogleアカウントを接続してください。" action={<Link href="/settings/sns">SNS連携を開く</Link>} />
     return (
       <>
-        {googleTabs}
         {draftOpen && id ? (
           <ReviewDraft key={id} accountId={accountId} reviewId={id} data={data} go={go} onPublished={() => { void load() }} />
         ) : postsView === 'new' || postsView === 'edit' ? (
@@ -237,29 +238,33 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     )
   })()
 
-  if (tab === 'hours' && hoursConnected && selectedAccountId && !loading && !error) {
-    return <SaveErrorScope errors={saveErrors}><HoursPage key={selectedAccountId} accountId={selectedAccountId} tabs={googleTabs} initialMode={searchParams.get('mode')} initialDate={searchParams.get('date')} /></SaveErrorScope>
-  }
 
   return (
-    <SaveErrorScope errors={saveErrors}><RestaurantPage
+    <SaveErrorScope errors={saveErrors}><div data-google-hours-page={tab === 'hours' ? '' : undefined}><RestaurantPage
       boardId={boardId}
       title="Googleビジネス"
       description={draftOpen ? HELP_BASE : TAB_HELP[tab]}
     >
       <div className={styles.noticeStack} data-google-notices>
-        {!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' ? canManage : canEdit)
+        {tab !== 'hours' && !accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' ? canManage : canEdit)
           ? <ReadOnlyNotice need={tab === 'profile' ? 'manager' : 'feature'} /> : null}
         <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} noteAlways={boardId === 'j0Wcg'} />
       </div>
-      {body}
-    </RestaurantPage></SaveErrorScope>
+      {googleTabs}
+      {tab === 'hours' && hoursConnected && selectedAccountId && !loading && !accountLoading && !error
+        ? <HoursPage key={selectedAccountId} accountId={selectedAccountId} tabs={null} embedded initialMode={searchParams.get('mode')} initialDate={searchParams.get('date')} />
+        : body}
+    </RestaurantPage></div></SaveErrorScope>
   )
 }
 
 export default function GoogleV8({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<RestaurantPage boardId="j0Wcg" title="Googleビジネス" description={HELP_BASE}>
+      <BoundaryBanner note={REVIEWS_BANNER_NOTE} noteAlways />
+      <Tabs size="compact" spacing="compact" label="Googleビジネスの機能" items={(Object.keys(TAB_LABELS) as GoogleTab[]).map(key => ({ label: TAB_LABELS[key], current: key === 'reviews', onClick: () => {} }))} />
+      <ListState kind="loading" title="Googleビジネスを読み込んでいます" />
+    </RestaurantPage>}>
       <GoogleInner mediaUpload={mediaUpload} />
     </Suspense>
   )

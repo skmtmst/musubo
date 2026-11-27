@@ -39,6 +39,7 @@ export default function PetsListV8({
   query,
   onQueryChange,
   onKpis,
+  onKpisFailed,
 }: {
   accountId: string
   canEdit: boolean
@@ -46,6 +47,7 @@ export default function PetsListV8({
   onQueryChange: (next: PetsQuery) => void
   /** 数の帯へ渡す。setState をそのまま渡す（毎回作り直さない）。 */
   onKpis: (kpis: NenPetKpis) => void
+  onKpisFailed: (failed: boolean) => void
 }) {
   const [status, setStatus] = useState<ListStatus>('loading')
   const [data, setData] = useState<NenPetListData | null>(null)
@@ -58,6 +60,7 @@ export default function PetsListV8({
   const load = useCallback(async () => {
     const request = ++requestRef.current
     setStatus('loading')
+    onKpisFailed(false)
     try {
       const res = await nenPetsApi.pets(accountId, { ...query, page, pageSize })
       if (request !== requestRef.current) return
@@ -70,12 +73,14 @@ export default function PetsListV8({
       setStatus('ready')
     } catch (caught) {
       if (request !== requestRef.current) return
+      onKpisFailed(true)
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, page, pageSize, onKpis])
+  }, [accountId, query, page, pageSize, onKpis, onKpisFailed])
 
   useEffect(() => {
     void load()
+    return () => { requestRef.current += 1 }
   }, [load])
 
   // 探す欄は打ち終わってから（0.3秒）取り直す。

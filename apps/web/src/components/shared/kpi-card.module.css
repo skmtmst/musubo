@@ -86,6 +86,10 @@
   font-weight: 600;
 }
 
+button.badge { border: 0; cursor: pointer; }
+button.badge:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.badgeActionRow { display: flex; align-items: center; }
+
 .badgeNeutral {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);

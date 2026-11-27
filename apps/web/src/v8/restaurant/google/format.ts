@@ -1,3 +1,4 @@
+import { displayRange } from '@/lib/display-range'
 /*
  * ★V8 Googleビジネスの共通の表示の道具。日時は店舗の時刻（日本時間）で出す。
  */
@@ -78,7 +79,7 @@ export function summarizeWeekly(weekly: Record<GoogleWeekday, GoogleHoursPeriod[
     else groups.push({ days: [day], text })
   }
   return groups
-    .map((g) => `${g.days.length > 2 ? `${WEEKDAY_JA[g.days[0]]}–${WEEKDAY_JA[g.days[g.days.length - 1]]}` : g.days.map((d) => WEEKDAY_JA[d]).join('・')} ${g.text}`)
+    .map((g) => `${g.days.length > 2 ? displayRange(WEEKDAY_JA[g.days[0]], WEEKDAY_JA[g.days[g.days.length - 1]]) : g.days.map((d) => WEEKDAY_JA[d]).join('・')} ${g.text}`)
     .join('、')
 }
 

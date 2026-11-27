@@ -33,7 +33,7 @@ const createReason = 'タグを作れるのはオーナー・管理者です。'
 const props = () => ({ value: ['a'], options: tags, accountId: 'account', onChange: vi.fn() })
 const button = (name: string) => screen.getByRole('button', { name, exact: true }) as HTMLButtonElement
 async function open() {
-  fireEvent.click(button('タグを付ける：変える'))
+  fireEvent.click(button('タグを付ける：変更する'))
   await screen.findByRole('checkbox', { name: '案内B', exact: true })
 }
 function beginCreate() {
@@ -56,7 +56,7 @@ afterEach(() => { cleanup(); vi.resetAllMocks() })
 it('理由付き欄は隠さず灰色・Tab可・説明IDを保ち、焦点で理由1つ、開くGET0', () => {
   const p = props(); const ref = { current: null as HTMLButtonElement | null }
   render(<><p id="help">説明</p><TagPickerField {...p} buttonRef={ref} describedBy="help" lockedReason={reason} canChangeNow={() => false} /></>)
-  const opener = button('タグを付ける：変える')
+  const opener = button('タグを付ける：変更する')
   expect(opener.disabled).toBe(false); expect(opener.tabIndex).toBe(0); expect(opener.getAttribute('aria-disabled')).toBe('true'); expect(ref.current).toBe(opener)
   expect(opener.getAttribute('aria-describedby')?.split(' ')).toContain('help')
   fireEvent.focus(opener); expect(screen.getAllByRole('tooltip')).toHaveLength(1); expect(screen.getByRole('tooltip').textContent).toBe(reason)
@@ -67,22 +67,22 @@ it('理由付き欄は隠さず灰色・Tab可・説明IDを保ち、焦点で�
 it('本人未知は理由なしnative disabledで、再描画前の失効でも開かない', () => {
   const p = props(); let allowed = true
   const view = render(<TagPickerField {...p} canChangeNow={() => allowed} />)
-  allowed = false; fireEvent.click(button('タグを付ける：変える'))
+  allowed = false; fireEvent.click(button('タグを付ける：変更する'))
   expect(screen.queryByRole('dialog')).toBeNull(); expect(mock.list).not.toHaveBeenCalled()
   view.rerender(<TagPickerField {...p} disabled canChangeNow={() => true} />)
-  expect(button('タグを付ける：変える').disabled).toBe(true); expect(document.querySelector('[data-permission-locked]')).toBeNull()
+  expect(button('タグを付ける：変更する').disabled).toBe(true); expect(document.querySelector('[data-permission-locked]')).toBeNull()
   expect(screen.queryByRole('tooltip')).toBeNull()
 })
 
 it('開いた窓を残し、理由付きのチェック・確定・作るを拒み、検索/フォルダGETは維持', async () => {
   const p = props(); const view = render(<TagPickerField {...p} canChangeNow={() => true} />)
-  await open(); const oldCheck = mock.checks.get('案内B')!; const oldConfirm = mock.buttons.get('選ぶ（1件）')!
+  await open(); const oldCheck = mock.checks.get('案内B')!; const oldConfirm = mock.buttons.get('選択する（1件）')!
   view.rerender(<TagPickerField {...p} canChangeNow={() => false} lockedReason={reason} />)
   expect(screen.getByRole('dialog', { name: 'タグを選ぶ' })).toBeTruthy()
   const check = screen.getByRole('checkbox', { name: '案内B', exact: true }) as HTMLInputElement
   expect(check.disabled).toBe(false); expect(check.getAttribute('aria-disabled')).toBe('true'); expect(check.tabIndex).toBe(0)
   fireEvent.focus(check); expect(screen.getByRole('tooltip').textContent).toBe(reason)
-  act(() => { oldCheck(true); oldConfirm() }); fireEvent.click(check); fireEvent.click(button('選ぶ（1件）'))
+  act(() => { oldCheck(true); oldConfirm() }); fireEvent.click(check); fireEvent.click(button('選択する（1件）'))
   expect(p.onChange).not.toHaveBeenCalled(); expect(check.checked).toBe(false)
   expect(button('その場でタグを作る').getAttribute('aria-disabled')).toBe('true')
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '案内B' } })
@@ -93,18 +93,18 @@ it('開いた窓を残し、理由付きのチェック・確定・作るを拒�
 
 it('開いた窓の未知は印0の普通disabled、古い許可と拒否の確定/候補は両方向とも復活しない', async () => {
   const p = props(); const view = render(<TagPickerField {...p} canChangeNow={() => true} />)
-  await open(); const oldYes = mock.buttons.get('選ぶ（1件）')!; const oldCheck = mock.checks.get('案内B')!
+  await open(); const oldYes = mock.buttons.get('選択する（1件）')!; const oldCheck = mock.checks.get('案内B')!
   view.rerender(<TagPickerField {...p} canChangeNow={() => false} />)
-  const oldNo = mock.buttons.get('選ぶ（1件）')!; const oldNoCheck = mock.checks.get('案内B')!
-  expect(screen.getByRole('dialog')).toBeTruthy(); expect(button('選ぶ（1件）').disabled).toBe(true)
-  expect(button('タグを付ける：変える').disabled).toBe(true)
+  const oldNo = mock.buttons.get('選択する（1件）')!; const oldNoCheck = mock.checks.get('案内B')!
+  expect(screen.getByRole('dialog')).toBeTruthy(); expect(button('選択する（1件）').disabled).toBe(true)
+  expect(button('タグを付ける：変更する').disabled).toBe(true)
   expect((screen.getByRole('checkbox', { name: '案内B', exact: true }) as HTMLInputElement).disabled).toBe(true)
   expect(document.querySelector('[data-permission-locked]')).toBeNull()
   act(() => { oldYes(); oldCheck(true) }); expect(p.onChange).not.toHaveBeenCalled()
   view.rerender(<TagPickerField {...p} canChangeNow={() => true} />)
   act(() => { oldNo(); oldNoCheck(true) }); expect(p.onChange).not.toHaveBeenCalled()
   expect((screen.getByRole('checkbox', { name: '案内B', exact: true }) as HTMLInputElement).checked).toBe(false)
-  fireEvent.click(button('選ぶ（1件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a'])
+  fireEvent.click(button('選択する（1件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a'])
 })
 
 it('既存タグを選べる担当者でも作る権限は別の理由で拒み、POST0で選択はできる', async () => {
@@ -115,7 +115,7 @@ it('既存タグを選べる担当者でも作る権限は別の理由で拒み�
   fireEvent.focus(create); expect(screen.getByRole('tooltip').textContent).toBe(createReason)
   fireEvent.click(create); act(() => { mock.buttons.get('その場でタグを作る')!() })
   expect(screen.queryByRole('textbox', { name: '新しいタグの名前' })).toBeNull(); expect(mock.create).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('checkbox', { name: '案内B', exact: true })); fireEvent.click(button('選ぶ（2件）'))
+  fireEvent.click(screen.getByRole('checkbox', { name: '案内B', exact: true })); fireEvent.click(button('選択する（2件）'))
   expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a', 'b'])
 })
 
@@ -125,7 +125,7 @@ it('作成だけ未確定disabledでも、既存選択/確定は通し、作成�
   await open(); expect(button('その場でタグを作る').disabled).toBe(true)
   expect(document.querySelector('[data-permission-locked]')).toBeNull()
   act(() => mock.buttons.get('その場でタグを作る')!()); expect(screen.queryByRole('textbox')).toBeNull()
-  fireEvent.click(button('選ぶ（1件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a'])
+  fireEvent.click(button('選択する（1件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a'])
 })
 
 it('その場作成の直前に権限が切れたらAPI0で、保持した名前変更/作成ボタンも止める', async () => {
@@ -144,7 +144,7 @@ it('理由付きの作成名/作成ボタンは拒み、選ぶ値を変える操
   expect(button('作る').disabled).toBe(false); expect(button('作る').getAttribute('aria-disabled')).toBe('true')
   act(() => { oldCreate(); name({ target: { value: '上書き' } }) }); expect(mock.create).not.toHaveBeenCalled()
   expect((screen.getByRole('textbox', { name: '新しいタグの名前' }) as HTMLInputElement).value).toBe('新しいタグ')
-  fireEvent.click(screen.getByRole('checkbox', { name: '案内B', exact: true })); expect(button('選ぶ（2件）').disabled).toBe(false)
+  fireEvent.click(screen.getByRole('checkbox', { name: '案内B', exact: true })); expect(button('選択する（2件）').disabled).toBe(false)
 })
 
 it('作成中の役割変更後の成功はDB結果を消さず、UI選択/名前/窓を書き換えず、読む操作は残す', async () => {
@@ -155,7 +155,7 @@ it('作成中の役割変更後の成功はDB結果を消さず、UI選択/名�
   await act(async () => deferred.resolve({ success: true, data: { id: 'new', name: '保存済みタグ' } }))
   expect(mock.create).toHaveBeenCalledOnce(); expect(screen.queryByRole('checkbox', { name: '保存済みタグ' })).toBeNull()
   expect((screen.getByRole('textbox', { name: '新しいタグの名前' }) as HTMLInputElement).value).toBe('新しいタグ')
-  expect(button('選ぶ（1件）').getAttribute('aria-disabled')).toBe('true'); expect(p.onChange).not.toHaveBeenCalled()
+  expect(button('選択する（1件）').getAttribute('aria-disabled')).toBe('true'); expect(p.onChange).not.toHaveBeenCalled()
   fireEvent.click(button('キャンセル'))
   const discard = await screen.findByRole('dialog', { name: '入力を破棄しますか？' })
   fireEvent.click(within(discard).getByRole('button', { name: '破棄する' }))
@@ -180,21 +180,21 @@ it('同じ描画で保持した作成を連打しても1回だけ、許可時は
   act(() => { create(); create() }); expect(mock.create).toHaveBeenCalledExactlyOnceWith({ name: '新しいタグ', groupId: null, lineAccountId: 'account' })
   await act(async () => deferred.resolve({ success: true, data: { id: 'new', name: '新しいタグ' } }))
   expect(screen.getByRole('checkbox', { name: '新しいタグ', exact: true })).toBeTruthy(); expect(p.onChange).not.toHaveBeenCalled()
-  fireEvent.click(button('選ぶ（2件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a', 'new'])
+  fireEvent.click(button('選択する（2件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a', 'new'])
 })
 
 it('見つからない既存タグを外す操作もfreshに拒む', async () => {
   const p = { ...props(), value: ['a', 'missing'] }; let allowed = true
   render(<TagPickerField {...p} canChangeNow={() => allowed} />)
   await open(); const remove = mock.checks.get('見つからないタグを外す')!
-  allowed = false; act(() => remove(false)); expect(button('選ぶ（2件）')).toBeTruthy()
+  allowed = false; act(() => remove(false)); expect(button('選択する（2件）')).toBeTruthy()
   expect(p.onChange).not.toHaveBeenCalled()
 })
 
 it('拒否へ切り替わっても失敗一覧の再読込GETを止めない', async () => {
   const p = props(); mock.list.mockRejectedValueOnce(new Error('offline'))
   const view = render(<TagPickerField {...p} canChangeNow={() => true} />)
-  fireEvent.click(button('タグを付ける：変える')); await screen.findByText('タグを読み込めませんでした。')
+  fireEvent.click(button('タグを付ける：変更する')); await screen.findByText('タグを読み込めませんでした。')
   view.rerender(<TagPickerField {...p} canChangeNow={() => false} lockedReason={reason} />)
   fireEvent.click(button('もう一度読み込む')); await screen.findByRole('checkbox', { name: '案内B', exact: true })
   expect(mock.list).toHaveBeenCalledTimes(2); expect(mock.groups).toHaveBeenCalledTimes(2); expect(mock.create).not.toHaveBeenCalled()
@@ -205,12 +205,12 @@ it('理由はcallbackがtrueでも優先し、disabledだけの未知も保持�
   const p = props(); const view = render(<TagPickerField {...p} canChangeNow={() => true} />)
   await open()
   view.rerender(<TagPickerField {...p} canChangeNow={() => true} lockedReason={reason} />)
-  act(() => { mock.checks.get('案内B')!(true); mock.buttons.get('選ぶ（1件）')!(); mock.buttons.get('その場でタグを作る')!() })
+  act(() => { mock.checks.get('案内B')!(true); mock.buttons.get('選択する（1件）')!(); mock.buttons.get('その場でタグを作る')!() })
   expect((screen.getByRole('checkbox', { name: '案内B', exact: true }) as HTMLInputElement).checked).toBe(false)
   expect(screen.queryByRole('textbox', { name: '新しいタグの名前' })).toBeNull(); expect(p.onChange).not.toHaveBeenCalled()
   view.rerender(<TagPickerField {...p} disabled canChangeNow={() => true} />)
-  act(() => { mock.checks.get('案内B')!(true); mock.buttons.get('選ぶ（1件）')!() })
-  expect(button('選ぶ（1件）').disabled).toBe(true); expect(p.onChange).not.toHaveBeenCalled()
+  act(() => { mock.checks.get('案内B')!(true); mock.buttons.get('選択する（1件）')!() })
+  expect(button('選択する（1件）').disabled).toBe(true); expect(p.onChange).not.toHaveBeenCalled()
 })
 
 it('作成のcallbackがtrueでも作成理由は優先し、未知理由なしは普通のdisabled', async () => {
@@ -233,7 +233,7 @@ it('作成のbusy/refは成功後に解除し、同じ窓で2つ目も作って�
   beginCreate(); fireEvent.change(screen.getByRole('textbox', { name: '新しいタグの名前' }), { target: { value: '二つ目のタグ' } }); fireEvent.click(button('作る'))
   await screen.findByRole('checkbox', { name: '二つ目のタグ', exact: true })
   expect(mock.create).toHaveBeenCalledTimes(2); expect(mock.create).toHaveBeenLastCalledWith({ name: '二つ目のタグ', groupId: null, lineAccountId: 'account' })
-  expect(p.onChange).not.toHaveBeenCalled(); fireEvent.click(button('選ぶ（3件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a','first','second'])
+  expect(p.onChange).not.toHaveBeenCalled(); fireEvent.click(button('選択する（3件）')); expect(p.onChange).toHaveBeenCalledExactlyOnceWith(['a','first','second'])
 })
 
 it('作成中に失効した後のsuccess:falseも保存エラーで理由を上書きしない', async () => {

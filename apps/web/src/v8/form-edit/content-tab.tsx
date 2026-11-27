@@ -107,7 +107,7 @@ export function ContentTab(props: Props) {
           {props.readOnly ? null : <RowActions
             subjectName={`ページ「${section?.name ?? ''}」`}
             menuItems={[
-              { id: 'rename', label: '名前を変える', onSelect: () => setRenaming(section?.name ?? '') },
+              { id: 'rename', label: '名前を変更する', onSelect: () => setRenaming(section?.name ?? '') },
               { id: 'duplicate', label: '複製する', onSelect: () => props.onDuplicatePage(page) },
             ]}
             destructiveItem={layout.sections.length > 1 ? {

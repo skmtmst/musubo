@@ -12,5 +12,5 @@ export async function openAffiliateFriendPicker() {
 export async function chooseAffiliateFriend(name: string) {
   const { dialog } = await openAffiliateFriendPicker()
   await act(async () => { fireEvent.click(await within(dialog).findByRole('radio', { name: new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })) })
-  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
 }

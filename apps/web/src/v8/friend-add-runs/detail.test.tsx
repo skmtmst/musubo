@@ -200,3 +200,19 @@ describe('実行の詳細の画面（N43uVX）', () => {
     expect(host.querySelector('a[href^="/chats"]')).toBeNull()
   })
 })
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の処理 %s も詳細画面に安全な言葉で表示する', async value => {
+  detail.actionRuns = [actionRun({ id: 'unknown', stableId: 'v1:0', type: value, status: 'failed', errorCode: 'action_failed', completedAt: null })]
+  expect(actionTitle(detail.actionRuns[0], undefined)).toBe('処理')
+  await render()
+  expect(host.textContent).toContain('処理のところで止まりました。')
+  expect(host.textContent).not.toContain('function Object')
+})
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の案内種類 %s も詳細画面に表示する', async value => {
+  detail.rule = { ...detail.rule!, definition: { messageType: value } as NonNullable<FriendAddRunDetail['rule']>['definition'] }
+  await render()
+  expect(host.textContent).toContain('案内（案内）を送った')
+  expect(host.textContent).not.toContain('function Object')
+})

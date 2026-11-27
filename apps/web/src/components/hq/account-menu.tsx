@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { Building2, ChevronsUpDown, CreditCard, LifeBuoy, LogOut, Users } from 'lucide-react'
 import Link from 'next/link'
@@ -117,7 +119,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
 
   const canReturnToHq = canReturnToHqFrom(role, pathname, hq, staffIdentity?.accountScope)
   const rows = sidebarAccountRows({ hq, role: role ?? '', canReturnToHq }).filter((row) => row !== 'billing' || staffIdentity?.accountScope !== 'accounts')
-  const roleLabel = role ? ROLE_LABELS[role] ?? role : ''
+  const roleLabel = role ? knownValue(ROLE_LABELS, role, role) : ''
   const chip = seesBilling && billing ? billingChip(billing) : null
   const daysLeft = seesBilling && billing ? trialDaysLabel(billing) : null
   const planNote = chip ? `${chip.label}${daysLeft ? ` ${daysLeft}` : ''}` : ''

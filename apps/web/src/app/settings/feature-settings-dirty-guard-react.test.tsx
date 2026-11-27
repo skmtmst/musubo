@@ -134,7 +134,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
   it('dirtyの画面内遷移は確認し、「残る」は編集を保ち「離れる」だけrouterへ進める', async () => {
     await render()
     await makeDirty()
-    await act(async () => { button('並びを変える').click() })
+    await act(async () => { button('並びを変更する').click() })
     expect(host.querySelector('a[href="/accounts"]')).toBeNull()
     expect(host.querySelector('a[href="/line-notifications"]')).toBeNull()
     const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/emergency')

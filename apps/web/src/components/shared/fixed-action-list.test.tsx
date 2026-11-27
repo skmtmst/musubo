@@ -21,7 +21,7 @@ it('種類を選び対象を確定してから固定の保存口へ。取消は�
   open()
   const dialog = screen.getByRole('dialog')
   fireEvent.click(within(dialog).getByRole('radio', { name: /紹介者/ }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する' }))
   expect(select).toHaveBeenCalledWith('tag-1')
   expect(container.querySelectorAll('[data-action-row]')).toHaveLength(1)
   expect(screen.queryByRole('button', { name: /並べ替える/ })).toBeNull()

@@ -53,7 +53,7 @@ export default function CarouselButtons({ actions, selectedIndex, fields, hqHost
       })}
       kinds={kindOptions(action.kind).filter(isTapActionKind)} extraKinds={extraKinds}
       renderBody={kind => kind !== 'action' ? undefined : host ? editActions() : <EntityPickerSummary label="動き" noun="処理" icon={Zap}
-        name={inlineActionsText(action.actions, actionOptions.tags)} ariaLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動きを変える`} onOpen={() => setEditing(editing === ai ? null : ai)} />}
+        name={inlineActionsText(action.actions, actionOptions.tags)} ariaLabel={`カード${selectedIndex + 1}のボタン${ai + 1}の動きを変更する`} onOpen={() => setEditing(editing === ai ? null : ai)} />}
       scope={hqHost ? 'hq' : 'shop'} hasLiff={Boolean(liffId)}
       liffSettingsHref={folderAccountId ? `/accounts/detail?id=${encodeURIComponent(folderAccountId)}` : '/accounts'} sources={sources}
       textMax={MESSAGE_TEXT_MAX}

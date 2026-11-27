@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /**
  * 「数えない条件」の画面側の読み取り(R40)。
  *
@@ -81,7 +82,7 @@ function collectRuleLabels(node: {
 }): string[] {
   const labels: string[] = []
   for (const rule of node.rules ?? []) {
-    const label = typeof rule?.type === 'string' ? (RULE_LABELS[rule.type] ?? '条件') : '条件'
+    const label = typeof rule?.type === 'string' ? (knownValue(RULE_LABELS, rule.type, '条件')) : '条件'
     if (!labels.includes(label)) labels.push(label)
   }
   if (Array.isArray(node.groups)) {

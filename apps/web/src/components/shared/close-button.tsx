@@ -6,11 +6,10 @@ import IconButton from './icon-button'
 export default function CloseButton({
   'aria-label': ariaLabel = '閉じる',
   size = 'small',
-  variant = 'plain',
   ...props
-}: Omit<ComponentProps<typeof IconButton>, 'children' | 'aria-label'> & { 'aria-label'?: string }) {
+}: Omit<ComponentProps<typeof IconButton>, 'children' | 'aria-label' | 'size' | 'variant'> & { 'aria-label'?: string; size?: ComponentProps<typeof IconButton>['size'] | 'standard' }) {
   return (
-    <IconButton aria-label={ariaLabel} size={size} variant={variant} {...props}>
+    <IconButton data-close-control="" aria-label={ariaLabel} size={size === 'standard' ? undefined : size} variant="plain" {...props}>
       <X aria-hidden="true" />
     </IconButton>
   )

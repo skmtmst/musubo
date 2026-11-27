@@ -172,17 +172,21 @@ function OperatorEditInner() {
   const [confirmAccountId, setConfirmAccountId] = useState<string | null>(null)
   useEffect(() => { setConfirmOpen(false); setConfirmAccountId(null) }, [selectedAccountId])
   const [publishing, setPublishing] = useState(false)
-  /* 確認の窓の「役割」の列。宛先の口は役割を返さないので、ログインユーザーの一覧から引く。読めなければ空のまま。 */
+  /* 確認の窓の「役割」はログインユーザーの一覧から引く。 */
   const [staffRoles, setStaffRoles] = useState<Record<string, string>>({})
+  const [rolesFailed, setRolesFailed] = useState(false)
+  const [rolesRetry, setRolesRetry] = useState(0)
   useEffect(() => {
-    if (!confirmOpen) return
+    if (!confirmOpen || confirmAccountId !== selectedAccountId) return
     let active = true
+    setStaffRoles({}); setRolesFailed(false)
     void Promise.resolve().then(() => api.staff.list()).then((result) => {
-      if (!active || !result.success) return
+      if (!active) return
+      if (!result.success) throw new Error('roles unavailable')
       setStaffRoles(Object.fromEntries(result.data.map((member) => [member.id, ROLE_LABELS[member.role] ?? ''])))
-    }).catch(() => undefined)
+    }).catch(() => { if (active) setRolesFailed(true) })
     return () => { active = false }
-  }, [confirmOpen])
+  }, [confirmOpen, confirmAccountId, selectedAccountId, rolesRetry])
   const [preparingPublish, setPreparingPublish] = useState(false)
 
   // 保存ずみのお知らせを全項目そのまま復元する。一部だけ戻すと、保存した時点で初期値へ上書きされる。
@@ -706,6 +710,7 @@ function OperatorEditInner() {
               </span>
             </p>
           </div>
+          {rolesFailed ? <Notice tone="warn" action={<Button onClick={() => setRolesRetry((n) => n + 1)}>役割を読み直す</Button>}>受け取る人の役割を読み込めませんでした。</Notice> : null}
           <DialogRecipientList rows={selectedRecipients.map(recipient => ({
             id: recipient.id, name: String(recipient.name ?? ''), role: recipientRole(recipient, staffRoles),
             channel: <StatusBadge tone={recipient.channels.line ? 'success' : 'neutral'}>{recipient.channels.line ? 'LINE' : '画面だけ'}</StatusBadge>,

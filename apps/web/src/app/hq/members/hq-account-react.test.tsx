@@ -130,7 +130,7 @@ describe('メンバー（36-5）', () => {
     expect(screen.getByRole('button', { name: '役割' }).textContent).toContain('担当者（業務を操作できる）')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '変更を保存する' })) })
     const confirm = document.querySelector('[data-design-node="M4jS9"]')!
-    const go = [...confirm.querySelectorAll('button')].find((button) => (button.textContent ?? '').trim().endsWith('変える'))!
+    const go = [...confirm.querySelectorAll('button')].find((button) => (button.textContent ?? '').trim().endsWith('変更する'))!
     await act(async () => { fireEvent.click(go) })
     await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1))
     expect(mocks.update.mock.calls[0][0]).toBe('stf-staff')

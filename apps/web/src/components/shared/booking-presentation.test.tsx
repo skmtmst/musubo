@@ -36,6 +36,11 @@ it.each([
   expect(screen.queryByRole('button', { name: /に予約を入れる/ })).toBeNull()
 })
 
+it('電話予約の説明に予約元を含める', () => {
+  render(<ReservationBoard entries={[{ ...base, source: 'phone' }]} resources={resources} dates={['2026-10-23']} onOpen={vi.fn()} />)
+  expect(screen.getByRole('button', { name: /予約のお客さま/ }).getAttribute('aria-description')).toContain('電話')
+})
+
 it('月の札にも同じ来店状態を渡し、詳細を開く', () => {
   const open = vi.fn()
   render(<ReservationMonth month="2026-10" entries={[{ ...base, status: 'seated' }]} onOpen={open} />)

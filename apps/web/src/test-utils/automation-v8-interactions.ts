@@ -15,7 +15,7 @@ export async function openFirstAutomationAction(): Promise<void> {
   const menu = document.querySelector<HTMLButtonElement>('[aria-label="1つ目の行うことのその他操作"]')
   if (!menu) throw new Error('先頭の処理の操作がありません')
   await act(async () => { menu.click() })
-  await clickAutomationButton('設定を変える')
+  await clickAutomationButton('設定を変更する')
 }
 
 export async function pickAutomationTag(name: string): Promise<void> {
@@ -25,7 +25,7 @@ export async function pickAutomationTag(name: string): Promise<void> {
   if (!checkbox) throw new Error(`タグが見つかりません: ${name}`)
   const checked = checkbox.getAttribute('aria-checked') === 'true' || (checkbox instanceof HTMLInputElement && checkbox.checked)
   if (!checked) await act(async () => { checkbox.click() })
-  await clickAutomationButton('選ぶ（1件）')
+  await clickAutomationButton('選択する（1件）')
 }
 
 export async function replaceFirstAutomationAction(label: string): Promise<void> {
@@ -45,5 +45,5 @@ export async function pickAutomationTestFriend(id: string): Promise<void> {
   const candidate = [...document.querySelectorAll<HTMLInputElement>('input[type="radio"]')].find(input => input.value === id && !input.closest('[data-closing]'))
   if (!candidate) throw new Error(`友だちが見つかりません: ${id}`)
   await act(async () => { candidate.click() })
-  await clickAutomationButton('選ぶ')
+  await clickAutomationButton('選択する')
 }

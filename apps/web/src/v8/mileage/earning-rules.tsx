@@ -907,6 +907,7 @@ export default function EarningRulesTab() {
       description="どの行動で何マイル付けるかを決めて、友だちにマイルをためます。"
       create={{ label: '最初の決めごとを作る', href: '/mileage/earning-rules/new' }}
       canCreate={!readonly}
+      lockedReason={balanceSource === 'ec' ? 'マイルは EC で管理しています。' : undefined}
       filtered={rules.length > 0}
       onClearFilters={resetAll}
       filteredDescription="名前の検索や絞り込みを外すと、すべて出ます"

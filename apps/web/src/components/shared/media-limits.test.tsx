@@ -15,8 +15,8 @@ it('決まり9：形式と上限の文は部品が出し、表示と受け付け
 })
 it('共通の選ぶ口を外のボタンから開け、複数ファイルを欠かさず渡す', () => {
  const onFiles=vi.fn(), ref={current:null as HTMLInputElement|null}
- render(<MediaSlot kind="file" title="取り込む" fileInputRef={ref} renderTrigger={(choose)=><button onClick={choose}>選ぶ</button>} onFiles={onFiles} />)
- const click=vi.spyOn(ref.current!, 'click'); fireEvent.click(screen.getByRole('button',{name:'選ぶ'})); expect(click).toHaveBeenCalled()
+ render(<MediaSlot kind="file" title="取り込む" fileInputRef={ref} renderTrigger={(choose)=><button onClick={choose}>選択する</button>} onFiles={onFiles} />)
+ const click=vi.spyOn(ref.current!, 'click'); fireEvent.click(screen.getByRole('button',{name:'選択する'})); expect(click).toHaveBeenCalled()
  const files=[new File(['a'],'a.png'),new File(['b'],'b.png')]; fireEvent.change(ref.current!,{target:{files}}); expect(onFiles).toHaveBeenCalledWith(files)
  expect(ref.current?.value).toBe('')
 })

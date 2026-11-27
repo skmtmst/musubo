@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation';
 import { useSearchParams } from 'next/navigation';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Copy, FileText, Send, SquarePen, Tag as TagIcon, Workflow } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Building2, CheckCircle2, Copy, FileText, Send, SquarePen, Tag as TagIcon, Workflow } from 'lucide-react';
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared';
 import ConditionBuilder from '@/components/shared/condition-builder';
 import Dialog from '@/components/shared/dialog';
@@ -734,6 +734,8 @@ export default function HqBroadcastCreate() {
     scheduleDone: when === 'now' || Boolean(scheduledAt),
   })
   const stepIndex = STEP_ORDER.indexOf(step)
+  const nextProblem = problem()
+  const nextReason = nextProblem && STEP_ORDER.indexOf(nextProblem.step) <= stepIndex ? nextProblem.message : step === 'audience' && chosen.length > 0 && tagStatus !== 'ready' ? '配信対象の候補を読み直してください' : null
   const draftLabel = savedAt ? `下書き保存済み・${formatRelative(savedAt)}` : draftState === 'ready' ? '保存済みの下書きを開いています' : '下書き・未保存'
 
   /** ［保存してテンプレートにする］：開いている吹き出しを統括のひな形（メッセージ）として保存する。 */
@@ -812,8 +814,8 @@ export default function HqBroadcastCreate() {
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
-  const messagePreview = <div className={formStyles.phonePreview}>
-              <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
+  const messagePreview = (compact: boolean) => <div className={formStyles.phonePreview}>
+              <LinePreview compact={compact} accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
                   {previewBubbles.map((item, index) => (item ? <BubblePreview key={bubbles[index].id} bubble={item} accountName={exampleStore} composer={step === 'message'} /> : null))}
@@ -825,7 +827,7 @@ export default function HqBroadcastCreate() {
   const previewContent = (inDialog = false) => <>            <div className={formStyles.previewHead}>
               <h3>LINE の見え方</h3>
             </div>
-            {messagePreview}
+            {messagePreview(!inDialog)}
             <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
             <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
               ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
@@ -835,7 +837,7 @@ export default function HqBroadcastCreate() {
             ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
             <div className={formStyles.previewActions}>
               <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={16} aria-hidden /> テストを送る</Button>
-              {!inDialog ? <PreviewLauncher key={previewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview}</PreviewLauncher> : null}
+              {!inDialog ? <PreviewLauncher key={previewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview(false)}</PreviewLauncher> : null}
             </div>
             <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed} disabled={!previewReview.ready} disabledReason="配信イメージを開いて確認してください">{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
 </>
@@ -846,11 +848,10 @@ export default function HqBroadcastCreate() {
         footerActions={(
           <>
             {step === 'basic' ? (checking || sending || composerBusy ? <Button disabled>キャンセル</Button> : <Button href="/hq/broadcasts">キャンセル</Button>) : null}
-            {step === 'confirm' ? <Button type="button" onClick={() => changeStep('schedule')}>戻って修正</Button> : null}
             <Button variant="secondary" className={formStyles.textButton} type="button" disabled={checking || sending || composerBusy} busy={checking && step !== 'confirm'} onClick={() => void saveDraft()}>下書きを保存する</Button>
             {step !== 'confirm' ? (
-              <Button variant="primary" disabled={composerBusy || (step === 'audience' && chosen.length > 0 && tagStatus !== 'ready')} onClick={() => changeStep(STEP_ORDER[Math.min(stepIndex + 1, STEP_ORDER.length - 1)])}>
-                {step === 'message' ? <><span>{nextLabel}</span><ArrowRight size={16} aria-hidden /></> : nextLabel}
+              <Button variant="primary" disabled={composerBusy || Boolean(nextReason)} disabledReason={nextReason} onClick={() => { const next = Math.min(stepIndex + 1, STEP_ORDER.length - 1); changeStep(STEP_ORDER[next]) }}>
+                <span>{nextLabel}</span><ArrowRight size={16} aria-hidden />
               </Button>
             ) : (
               <Button variant="primary" busy={checking || sending} disabled={sending || gate === 'pending'} onClick={() => void askSend()}>
@@ -859,13 +860,14 @@ export default function HqBroadcastCreate() {
             )}
           </>
         )}
+        footerLead={stepIndex > 0 ? <Button type="button" onClick={() => changeStep(STEP_ORDER[stepIndex - 1])}><ArrowLeft size={16} aria-hidden />{steps[stepIndex - 1].label}へ戻る</Button> : null}
         preview={previewContent()}
         previewLabel="LINEの見え方"
         previewToggle={<PreviewLauncher key={previewKey} onOpened={previewOpened}>{previewContent(true)}</PreviewLauncher>}
         status={draftLabel}
          title={<>一括配信を作る</>} headingSize="compact"
         help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"
-        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" steps={steps.map((item) => ({ ...item, onSelect: () => changeStep(item.key) }))} currentKey={step} summaries={{ basic: title.trim(), audience: `${chosen.length}アカウント`, message: `${formatNumber(bubbles.length)}通`, schedule: sendWhenLabel ?? '未設定' }} /></>}
+        steps={<><Steps connectorSize={step === 'message' ? 'short' : undefined} label="配信作成の進み" unavailableReason="前の手順を完了してください" steps={steps.map((item, index) => ({ ...item, anchor: index > stepIndex ? undefined : item.anchor, state: index > stepIndex ? 'todo' as const : index < stepIndex && item.state !== 'done' ? 'attention' as const : item.state, onSelect: index < stepIndex ? () => changeStep(item.key) : undefined }))} currentKey={step} summaries={{ basic: title.trim(), audience: `${chosen.length}アカウント`, message: `${formatNumber(bubbles.length)}通`, schedule: sendWhenLabel ?? '未設定' }} /></>}
         >
         {error ? (
           <Notice
@@ -902,10 +904,10 @@ export default function HqBroadcastCreate() {
                 {/* EpTBB：①は選ぶボタン／選んだ1行だけ。窓の仮選択は確定するまで反映しない。 */}
                 {method === 'template' ? selectedTemplate ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={selectedTemplate.item} folders={selectedTemplate.folders} onChange={() => setBasicPicker('template')} />
-                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('template')}>テンプレートを選ぶ</Button> : null}
+                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('template')}>テンプレートを選択する</Button> : null}
                 {method === 'duplicate' ? copiedRun ? (
                   <SourcePickerSelection buttonRef={basicPickerTrigger} item={broadcastPickerItem(copiedRun)} folders={hqFolders} onChange={() => setBasicPicker('duplicate')} />
-                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選ぶ</Button> : null}
+                ) : <Button ref={basicPickerTrigger} onClick={() => setBasicPicker('duplicate')}>過去の配信を選択する</Button> : null}
                 <Field label="配信名" requirement={fields.requirement('title')} count={{ value: title.trim().length, max: TITLE_MAX }}><SaveErrorField names={["title"]}><SharedTextField {...fields.bind('title')} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={formStyles.textInput} aria-label="配信名" maxLength={TITLE_MAX * 2} /></SaveErrorField>
 <small>友だちには表示されません。一覧で見分けるための名前です</small></Field>
                 {/* 店の一斉配信と同じフォルダ・社内メモ（統括の一括配信のフォルダ。API-18） */}

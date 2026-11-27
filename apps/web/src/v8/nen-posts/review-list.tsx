@@ -198,7 +198,7 @@ export function ReviewListV8(props: ReviewListV8Props) {
             >
               <Check size={16} aria-hidden="true" />まとめて採用
             </Button>
-            <IconButton aria-label="選ぶのをやめる" title="選ぶのをやめる" onClick={props.onClearSelection}><X size={16} aria-hidden="true" /></IconButton>
+            <IconButton aria-label="選択するのをやめる" title="選ぶのをやめる" onClick={props.onClearSelection}><X size={16} aria-hidden="true" /></IconButton>
         </BulkBar>
       ) : null}
     </PageContent>

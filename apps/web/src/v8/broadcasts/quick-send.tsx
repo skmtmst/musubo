@@ -9,6 +9,7 @@ import { ListOrdered, Send, Users } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type BroadcastApprovalCandidate } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
@@ -89,6 +90,8 @@ export default function QuickSendV8({
   const [scheduledValue, setScheduledValue] = useState('')
   const [estimate, setEstimate] = useState<Estimate | null>(null)
   const [estimating, setEstimating] = useState(false)
+  const [estimateFailed, setEstimateFailed] = useState(false)
+  const [estimateRetry, setEstimateRetry] = useState(0)
   const [candidates, setCandidates] = useState<BroadcastApprovalCandidate[]>([])
   const [approverId, setApproverId] = useState('')
   const [approvalConfig, setApprovalConfig] = useState<{threshold: number; singleOperator: boolean} | null>(null)
@@ -137,6 +140,7 @@ export default function QuickSendV8({
   useEffect(() => {
     let cancelled = false
     setEstimating(false)
+    setEstimateFailed(false)
     if (!open || !accountId || !access.preflight) return
     setEstimate(null)
     setCountInput('')
@@ -162,10 +166,10 @@ export default function QuickSendV8({
           })
           if (available() && res.success) {
             setEstimate({ count: res.data.audienceCount, blocked: res.data.hiddenExcluded, remaining: res.data.quota?.remaining ?? null })
-          }
+          } else if (available()) setEstimateFailed(true)
         } catch (saveFailure) {
-          if (available()) saveErrors.capture(saveFailure)
-          // 見積もれなくても入力は続けられる。送る前に止めない。
+          if (available() && !saveErrors.capture(saveFailure)) setEstimateFailed(true)
+          // 人数を確認できるまで送信は止め、入力は保つ。
         } finally {
           if (available()) setEstimating(false)
         }
@@ -176,7 +180,7 @@ export default function QuickSendV8({
       cancelled = true
       if (estimateTimer.current) clearTimeout(estimateTimer.current)
     }
-  }, [open, accountId, text, target, tagId, saveErrors, access.identity, access.session, access.preflight])
+  }, [open, accountId, text, target, tagId, saveErrors, access.identity, access.session, access.preflight, estimateRetry])
 
   const needsCountConfirmation = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && approvalConfig.singleOperator
   const needsApproval = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && !approvalConfig.singleOperator
@@ -210,7 +214,7 @@ export default function QuickSendV8({
         : when === 'scheduled' && !scheduledAt ? '送る日時を選んでください。'
           : needsApproval && !approverId ? '承認を頼む相手を選んでください。'
             : approvalConfig === null ? error ? '配信の承認設定を確認できません。もう一度開き直してください。' : '配信の承認設定を確認しています。'
-              : estimate === null ? error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
+              : estimate === null ? estimateFailed ? '送る相手の人数を読み直してください。' : error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
                 : needsCountConfirmation && !countMatched ? '確認した対象人数を入力してください。'
                   : busy ? '送っています。完了までお待ちください。' : undefined
 
@@ -398,9 +402,10 @@ export default function QuickSendV8({
           <div className={styles.estimate} aria-live="polite">
             <Users size={16} aria-hidden="true" className={styles.estimateIcon} />
             <span>
-              {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : '本文を入力し、送る相手を選ぶと、届く人数の見込みが出ます'}
+              {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : estimateFailed ? '人数を確認できませんでした' : '本文を入力し、送る相手を選ぶと、届く人数の見込みが出ます'}
             </span>
           </div>
+          {estimateFailed && access.preflight ? <Notice tone="danger" action={<Button onClick={() => setEstimateRetry(n => n + 1)}>人数を読み直す</Button>}>送る相手の人数を読み込めませんでした。</Notice> : null}
           {needsCountConfirmation && estimate ? <fieldset className={styles.countFields} disabled={!access.preflight || busy}><SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={value => { if (canUseQuickSendNow('preflight')) setCountInput(value) }} /></fieldset> : null}
           {needsApproval ? (
             <div className={styles.approval}>

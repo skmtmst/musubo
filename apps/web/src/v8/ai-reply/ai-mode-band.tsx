@@ -82,7 +82,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   const action = mode === 'off'
     ? (choices.includes('draft_only') ? <Button onClick={() => choose('draft_only')}>使ってみる</Button> : null)
     : choices.length > 0 && !choosing
-      ? <Button onClick={() => setChoosing(true)}>変える</Button>
+      ? <Button onClick={() => setChoosing(true)}>変更する</Button>
       : null
 
   const choiceValue: Choice = mode === 'suspended' ? 'draft_only' : mode

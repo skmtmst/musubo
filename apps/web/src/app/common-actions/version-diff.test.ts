@@ -49,3 +49,11 @@ test('翌日の時刻と待ち方の変更も、変更前後を履歴に残す',
   expect(describeVersionChanges([next('10:00')], [next('11:30')])).toEqual(['「きっかけの翌日 10:00 まで待つ」から「きっかけの翌日 11:30 まで待つ」にした'])
   expect(describeVersionChanges([wait('w', 30)], [next('10:00')])).toEqual(['「30 分待つ」から「きっかけの翌日 10:00 まで待つ」にした'])
 })
+
+
+test.each(['constructor', 'toString', '__proto__', 'future'])('未知の処理や失敗時の動作 %s を確認できる文にする', (unknown) => {
+  const step = { id: 'x', type: unknown, params: {}, onFailure: unknown } as unknown as CommonActionStep
+  expect(describeVersionChanges([], [step])).toEqual(['「処理」を追加した'])
+  expect(describeVersionChanges([tag('x')], [{ ...tag('x'), onFailure: unknown } as unknown as CommonActionStep]))
+    .toEqual(['「タグを付ける」の失敗時を「止める」から「動作を確認できません」にした'])
+})

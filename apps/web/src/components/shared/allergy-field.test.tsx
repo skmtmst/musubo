@@ -22,7 +22,7 @@ it('登録された候補を選び、既存値を保つ', async () => {
   fireEvent.click(screen.getByRole('button', { name: '選んで足す' }))
   const dialog = screen.getByRole('dialog')
   fireEvent.click(within(dialog).getByText('乳'))
-  fireEvent.click(within(dialog).getByRole('button', { name: /選ぶ（2件）/ }))
+  fireEvent.click(within(dialog).getByRole('button', { name: /選択する（2件）/ }))
   expect(JSON.parse(change.mock.calls[0][0])).toEqual(['卵', '乳'])
 })
 

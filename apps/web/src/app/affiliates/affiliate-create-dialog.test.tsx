@@ -23,7 +23,7 @@ describe('R295 現役V8の友だち選択窓は共通Dialogの動きをする', 
     render(<CreateAffiliateV8 />)
     const { dialog } = await openAffiliateFriendPicker()
     const close = within(dialog).getByRole('button', { name: '閉じる' })
-    const last = within(dialog).getByRole('button', { name: '選ぶ' })
+    const last = within(dialog).getByRole('button', { name: '選択する' })
     last.focus()
     await act(async () => { fireEvent.keyDown(document, { key: 'Tab' }) })
     expect(dialog.contains(document.activeElement)).toBe(true)

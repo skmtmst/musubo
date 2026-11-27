@@ -816,7 +816,7 @@ describe('保持した書込操作の実行直前の判定', () => {
   test('開いたフォルダの編集窓はread代理への切替でも残り、名前を保ち保存0で理由を出す', async () => {
     await mount()
     fireEvent.click(screen.getByRole('button', { name: 'フォルダ「初回案内」の操作', exact: true }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '名前を変える', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '名前を変更する', exact: true }))
     const dialog = await screen.findByRole('dialog', { name: 'フォルダを編集する', exact: true })
     const name = within(dialog).getByRole('textbox', { name: 'フォルダ名', exact: true }) as HTMLInputElement
     fireEvent.change(name, { target: { value: '書きかけの箱' } })

@@ -32,7 +32,7 @@ import { formatDate } from '@/lib/format'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { mcpApi, type McpCallLog, type McpConnection } from './api'
 import { useMcpPermissions } from './section'
-import { CALL_FILTER_OPTIONS, LEVEL_LABEL, callLabel } from './words'
+import { CALL_FILTER_OPTIONS, mcpLevelLabel, callLabel } from './words'
 import styles from './section.module.css'
 
 const PERIOD_OPTIONS = [
@@ -120,7 +120,7 @@ export default function McpLogV8() {
       heightMode="content"
       title="AI の操作の記録"
       help="AI との接続が読んだ・下書きを作った・送る依頼を出した・断ったことを、全部ここに残します。送る依頼は、人が承認するまで送りません。"
-      subtitle={connection ? `${connection.name}・${LEVEL_LABEL[connection.level]}` : undefined}
+      subtitle={connection ? `${connection.name}・${mcpLevelLabel(connection.level)}` : undefined}
       actions={connection && connection.status === 'active' && permissions.stop
         ? <Button variant="danger" onClick={() => { setError(''); setStopTarget({ connection, selectedConnection: url.connection }) }}>この接続を止める</Button>
         : undefined}
