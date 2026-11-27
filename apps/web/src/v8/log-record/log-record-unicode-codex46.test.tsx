@@ -17,7 +17,7 @@ it('長い記録を省略するとき絵文字の途中で切らず、コピー�
     act(() => host.querySelector('button')!.click())
     const displayed = host.querySelector('pre')!.textContent!
     expect(displayed.length).toBe(LOG_RECORD_SHOWN_CHARS - 1)
-    expect(host.textContent).toContain('先頭の 99,999 文字だけ')
+    expect(host.textContent).toContain('先頭の 999 文字だけ')
     expect(/[\uD800-\uDBFF]$/.test(displayed)).toBe(false)
     const copy = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('JSON をコピー'))!
     await act(async () => copy.click())
