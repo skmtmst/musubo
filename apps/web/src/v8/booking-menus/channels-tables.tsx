@@ -32,15 +32,17 @@ function channelMenu(key: string): ActionMenuItem[] {
   ]
 }
 export function formatReadAt(value: string | null) { return formatDate(value, { style: 'list' }) }
+const disconnected = (status: string) => status === 'not_connected' || status === 'disconnected'
+const reconnectable = (status: string) => disconnected(status) || status === 'expired'
 export function StaffStatusChip({ status }: { status: BookingChannelStaff['status'] }) {
   if (status === 'connected') return <StatusBadge tone="success">つながっている</StatusBadge>
   if (status === 'expired') return <StatusBadge tone="danger">期限切れ</StatusBadge>
-  return <StatusBadge tone="neutral">つないでいない</StatusBadge>
+  return <StatusBadge tone="neutral">{disconnected(status) ? 'つないでいない' : '状態を確認できません'}</StatusBadge>
 }
 function ChannelStatusChip({ channel }: { channel: BookingChannel }) {
   if (channel.status === 'active') return <StatusBadge tone="success">使っている</StatusBadge>
   if (channel.status === 'confirm') return <StatusBadge tone="warning">確認中</StatusBadge>
-  return <StatusBadge tone="neutral">まだ届いていない</StatusBadge>
+  return <StatusBadge tone="neutral">{channel.status === 'preparing' ? 'まだ届いていない' : '状態を確認できません'}</StatusBadge>
 }
 function OneLine({ text, tone }: { text: string; tone?: 'name' | 'sub' }) {
   return <span className={tone === 'name' ? `${ch.oneLine} ${ch.name}` : tone === 'sub' ? `${ch.oneLine} ${ch.sub}` : ch.oneLine}><TruncatedText value={text} /></span>
@@ -72,10 +74,10 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
             subjectName={person.displayName}
             detail={person.status === 'connected'
               ? { label: '予定を見る', onClick: () => onDetail(person) }
-              : { label: person.status === 'not_connected' ? 'つなぐ' : 'つなぎ直す', onClick: () => connect(person), disabled: !canEdit, lockedReason: editLock }}
+              : { label: disconnected(person.status) ? 'つなぐ' : 'つなぎ直す', onClick: () => connect(person), disabled: !canEdit || !reconnectable(person.status), lockedReason: !reconnectable(person.status) ? '接続状態を確認してから操作してください' : editLock }}
             menuItems={[person.status === 'connected'
               ? { id: 'calendar', label: '予定を見る', onSelect: () => onDetail(person) }
-              : { id: 'connect', label: person.status === 'not_connected' ? 'つなぐ' : 'つなぎ直す', onSelect: () => connect(person), disabled: !canEdit, lockedReason: editLock }]}
+              : { id: 'connect', label: disconnected(person.status) ? 'つなぐ' : 'つなぎ直す', onSelect: () => connect(person), disabled: !canEdit || !reconnectable(person.status), lockedReason: !reconnectable(person.status) ? '接続状態を確認してから操作してください' : editLock }]}
           /></ActionCell>
         </Tr>)}</tbody>
       </DataTable>
