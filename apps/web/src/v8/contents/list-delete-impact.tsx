@@ -42,7 +42,10 @@ export async function loadMediaDeleteImpact({ deleteRequestRef, impactRequestRef
     try {
       const res = await api.media.deleteImpact(item.id, at.accountId)
       if (!isCurrent()) return
-      if (!res.success) throw new Error('impact_failed')
+      if (!res.success || !res.data || !Array.isArray(res.data.references)
+        || !res.data.references.every(ref => ref !== null && typeof ref === 'object')
+        || !Number.isInteger(res.data.usageCount) || res.data.usageCount < 0
+        || typeof res.data.canDelete !== 'boolean') throw new Error('impact_failed')
       setImpact(res.data)
       setImpactPhase('ready')
     } catch (saveFailure) {
