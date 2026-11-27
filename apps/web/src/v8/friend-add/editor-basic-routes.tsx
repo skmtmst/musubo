@@ -160,7 +160,7 @@ export function RoutesStep({ rule, definition, setDefinition, options, routeUses
   const raw = definition.friendCondition ?? ''
   const parsed = parseFriendConditionJson(raw)
   const legacy = raw.trim() !== '' && parsed === null
-  const conditionLine = conditionSummary(parsed, options.tags)
+  const conditionLine = legacy ? '友だち条件：確認できません' : conditionSummary(parsed, options.tags)
   const conditionName = parsed && parsed.rules.length + (parsed.groups?.length ?? 0) > 0 ? conditionLine.replace(/^友だち条件：/, '') : ''
   const conditions = (<>
       <p className={styles.subDesc}>空のままなら、選んだリンクから来た全員に送ります。</p>
@@ -179,7 +179,7 @@ export function RoutesStep({ rule, definition, setDefinition, options, routeUses
           /></SaveErrorField></Field></div>
       </div>
       {legacy ? (
-        <Notice tone="warn" role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</Notice>
+        <Notice tone="warn" role="alert">保存された条件を表示できません。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
         {<PermissionGatedButton allowed={canEdit} type="button" onClick={() => setConditionOpen(true)}>条件を足す</PermissionGatedButton>}
