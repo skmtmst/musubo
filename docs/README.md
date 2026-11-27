@@ -1435,3 +1435,4 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [受信箱の AI 要約と返信案を直した反映履歴](release-log/unreleased/PR-kenta-later-codex48.md) — 反映履歴、確認 2026-11-27。
+- [運営の二段階認証設定とテンプレート詳細パネルの読み込み失敗時の案内・再読み込み修正](release-log/unreleased/PR-kenta-later-gemini37-1127.md) — 反映履歴、確認 2026-11-27。
