@@ -59,6 +59,7 @@ function safeEqual(a: unknown, b: unknown): boolean {
 }
 
 function waitMinutes(params: Record<string, unknown>): number | null {
+  if (params.mode !== undefined && params.mode !== 'duration') return null
   const value = params.durationMinutes ?? params.minutes
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
 }
@@ -119,8 +120,8 @@ function describeStepChange(oldStep: CommonActionStep, newStep: CommonActionStep
       const oldLabel = automationWaitLabel(oldParams)
       const newLabel = automationWaitLabel(newParams)
       if (oldLabel !== newLabel) lines.push(`「${oldLabel}」から「${newLabel}」にした`)
-    } else if (before !== null && after !== null && before !== after) {
-      lines.push(`「待つ」を${before}分から${after}分にした`)
+    } else if (before !== null && after !== null) {
+      if (before !== after) lines.push(`「待つ」を${before}分から${after}分にした`)
     } else if (!safeEqual(oldParams, newParams)) {
       lines.push('「待つ」の内容を変えた')
     }
@@ -144,6 +145,10 @@ function isStepObject(value: unknown): value is CommonActionStep {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && typeof (value as { id?: unknown }).id === 'string'
 }
 
+function isValidActions(actions: unknown): actions is CommonActionStep[] {
+  return Array.isArray(actions) && actions.every(isStepObject)
+}
+
 /*
  * 2版の処理一覧の変わり方を順に書く。IDで突き合わせ、追加・削除・
  * 順序変更も出す。変わりがなければ「内容の変更はありません」1行。
@@ -152,7 +157,7 @@ export function describeVersionChanges(
   previous: CommonActionStep[],
   current: CommonActionStep[],
 ): string[] {
-  if (!Array.isArray(previous) || !Array.isArray(current) || !previous.every(isStepObject) || !current.every(isStepObject)) {
+  if (!isValidActions(previous) || !isValidActions(current)) {
     return ['変更内容を確認できません']
   }
   const lines: string[] = []
@@ -180,12 +185,14 @@ export function versionChangeLines(
   version: { versionNumber: number; actions: CommonActionStep[] },
   versions: Array<{ versionNumber: number; actions: CommonActionStep[] }>,
 ): string[] {
-  if (!version || !Array.isArray(versions)) return ['変更内容を確認できません']
+  if (!version || !Array.isArray(versions) || !isValidActions(version.actions)) {
+    return ['変更内容を確認できません']
+  }
   const previous = versions
     .filter((item) => item && typeof item.versionNumber === 'number' && Number.isFinite(item.versionNumber) && item.versionNumber < version.versionNumber)
     .sort((left, right) => right.versionNumber - left.versionNumber)[0]
   if (!previous) return ['はじめて公開した']
-  if (!Array.isArray(previous.actions) || !Array.isArray(version.actions)) return ['変更内容を確認できません']
+  if (!isValidActions(previous.actions)) return ['変更内容を確認できません']
   if (previous.actions.length !== version.actions.length) {
     return [`処理を${formatNumber(previous.actions.length)} 個から${formatNumber(version.actions.length)} 個にした`]
   }

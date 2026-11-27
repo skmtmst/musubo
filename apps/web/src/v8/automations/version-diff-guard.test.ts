@@ -52,4 +52,42 @@ describe('version-diff ガード', () => {
     expect(waitLines.join('')).not.toContain('-5分')
     expect(waitLines).toContain('「待つ」の内容を変えた')
   })
+
+  it('旧形式 { minutes: 30 } と新形式 { durationMinutes: 30 } の同じ待機時間は変更なしとして扱う', () => {
+    const legacyWait = { id: 'w1', type: 'wait', onFailure: 'continue', params: { minutes: 30 } } as unknown as CommonActionStep
+    const modernWait = { id: 'w1', type: 'wait', onFailure: 'continue', params: { durationMinutes: 30 } } as unknown as CommonActionStep
+    expect(describeVersionChanges([legacyWait], [modernWait])).toEqual(['内容の変更はありません'])
+  })
+
+  it('初版で actions が不正なときも、件数違いで不正要素を含むときも「変更内容を確認できません」を返す', () => {
+    const validStep = { id: 's1', type: 'add_tag', onFailure: 'continue', params: {} } as unknown as CommonActionStep
+
+    // 初版で actions が null や [null] の場合は「はじめて公開した」と偽らない
+    expect(
+      versionChangeLines(
+        { versionNumber: 1, actions: null as unknown as CommonActionStep[] },
+        [],
+      ),
+    ).toEqual(['変更内容を確認できません'])
+    expect(
+      versionChangeLines(
+        { versionNumber: 1, actions: [null] as unknown as CommonActionStep[] },
+        [],
+      ),
+    ).toEqual(['変更内容を確認できません'])
+
+    // 件数違いでも不正要素を含めば「1個から2個にした」ではなく「変更内容を確認できません」
+    expect(
+      versionChangeLines(
+        { versionNumber: 2, actions: [validStep, null] as unknown as CommonActionStep[] },
+        [{ versionNumber: 1, actions: [validStep] }],
+      ),
+    ).toEqual(['変更内容を確認できません'])
+    expect(
+      versionChangeLines(
+        { versionNumber: 2, actions: [validStep] },
+        [{ versionNumber: 1, actions: [validStep, null] as unknown as CommonActionStep[] }],
+      ),
+    ).toEqual(['変更内容を確認できません'])
+  })
 })
