@@ -27,6 +27,8 @@ export function liffDocumentTitle(title: string): string {
 export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { title: string; onBack?: () => void; backLabel?: string }) {
   const key = accountKey();
   const [loadedName, setLoadedName] = useState<{ key: string; name: string } | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const shopName = loadedName?.key === key ? loadedName.name : cachedShopNames.get(key) ?? null;
 
   // ブラウザ・LINE の上に出る題も、帯の題と同じ画面名にする（「<画面名> | musubo」）。
@@ -37,17 +39,20 @@ export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { ti
   useEffect(() => {
     if (cachedShopNames.has(key)) return;
     let alive = true;
-    api
-      .liffConfig()
+    setFailedKey(null);
+    Promise.resolve()
+      .then(() => api.liffConfig())
       .then((r) => {
-        const name = r.data?.accountName ?? '';
+        const name = r.data?.accountName;
+        if (r.success === false || typeof name !== 'string' || !name.trim()) throw new Error('invalid_account_name');
         if (alive) { cachedShopNames.set(key, name); setLoadedName({ key, name }); }
       })
       .catch((e) => {
         logFailure('liff-config', e);
+        if (alive) setFailedKey(key);
       });
     return () => { alive = false; };
-  }, [key]);
+  }, [key, attempt]);
 
   return (
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">
@@ -77,6 +82,7 @@ export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { ti
               {shopName}
             </p>
           )}
+          {failedKey === key && !shopName && <Button variant="link" type="button" onClick={() => { setFailedKey(null); setAttempt(n => n + 1); }}>店名を確認し直す</Button>}
         </div>
         <span
           className="flex h-10 w-8 shrink-0 items-center justify-center text-ink"
