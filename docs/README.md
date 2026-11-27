@@ -1543,3 +1543,4 @@
 - [デリバリー受注のURL・履歴競合・重複送信防御とGoogle投稿一覧・確認画面の切替修正](release-log/unreleased/PR-kenta-later-gemini115-1127.md) — 反映履歴、確認 2026-11-28。
 - [通知一覧の分類既読・重複表示防御とリマインダ確認画面のフォルダ・件数防御](release-log/unreleased/PR-kenta-later-gemini116-1127.md) — 反映履歴、確認 2026-11-28。
 - [リッチメニュー一覧の競合・異常表示防御とUber Eats接続状態の未知・再選択修正](release-log/unreleased/PR-kenta-later-gemini117-1127.md) — 反映履歴、確認 2026-11-28。
+- [飲食店本日データの切替リセット・媒体応答検証とリマインダ通知編集の時刻クリア・上限防御](release-log/unreleased/PR-kenta-later-gemini118-1127.md) — 反映履歴、確認 2026-11-28。
