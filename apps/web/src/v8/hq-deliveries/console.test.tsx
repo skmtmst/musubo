@@ -59,13 +59,13 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
     fireEvent.click(within(search.closest('[data-template-region="toolbar"]') as HTMLElement).getByRole('button', { name: 'ひな形を作る', exact: true }))
     const save = await findPageAction({ name: '下書きとして保存' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
-    expect(save.title).toBe('統括での名前を入力してください。')
+    expect(screen.getByText('統括での名前を入力してください。')).toBeTruthy()
     fireEvent.click(save)
     expect(calls.create).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText(/^統括での名前/), { target: { value: '予約の返事' } })
     const enabled = getPageAction({ name: '下書きとして保存' }) as HTMLButtonElement
     expect(enabled.disabled).toBe(false)
-    expect(enabled.title).toBe('')
+    expect(screen.queryByText('統括での名前を入力してください。')).toBeNull()
     calls.create.mockResolvedValue({ ...detail, template: { ...detail.template, name: '予約の返事' } })
     fireEvent.click(enabled)
     await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
