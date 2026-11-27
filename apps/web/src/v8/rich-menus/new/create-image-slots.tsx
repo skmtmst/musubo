@@ -45,8 +45,9 @@ export function getSlotImage({ accountId, group, host, imageVersion, pages, pend
     }
     const page = pages[index]
     if (!page?.imageR2Key) return null
+    const baseUrl = host ? host.imageUrl(page.imageR2Key) : api.richMenuGroups.imageUrl(page.imageR2Key)
     return {
-      src: host ? host.imageUrl(page.imageR2Key) : `${api.richMenuGroups.imageUrl(page.imageR2Key)}?v=${imageVersion}`,
+      src: host ? baseUrl : `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${imageVersion}`,
       name: '登録した画像',
       dims: null,
       kb: null,
@@ -72,6 +73,7 @@ export function renderSingleImageSlot({ accountId, busy, clearPendingImage, hand
     const image = slotImage(0)
     const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null
     const canPick = Boolean(accountId) || Boolean(host)
+    const canEdit = canPick && !busy
     return (
       <>
         <div className={styles.imageRow}>
@@ -86,11 +88,11 @@ export function renderSingleImageSlot({ accountId, busy, clearPendingImage, hand
               accept="image/png,image/jpeg"
               maxBytes={1 * 1024 * 1024}
               aspectRatio={`${dims.width} / ${dims.height}`}
-              disabled={!canPick || busy}
+              disabled={!canEdit}
               removable={Boolean(image?.removable)}
-              onFile={(file) => handlePickedFile(file, 0)}
-              onRemove={() => clearPendingImage(0)}
-              onMediaPick={host ? undefined : accountId ? () => { setImagePickTarget(0); setMediaPickerOpen(true) } : undefined}
+              onFile={(file) => { if (canEdit) handlePickedFile(file, 0) }}
+              onRemove={() => { if (canEdit) clearPendingImage(0) }}
+              onMediaPick={host || !accountId || busy ? undefined : () => { if (!busy) { setImagePickTarget(0); setMediaPickerOpen(true) } }}
             /></SaveErrorField>
           </div>
           <div className={styles.imageMeta}>
@@ -155,9 +157,9 @@ export function renderTabSlot({ accountId, busy, clearPendingImage, group, handl
           aspectRatio={`${dims.width} / ${dims.height}`}
           disabled={!canPick}
           removable={Boolean(image?.removable)}
-          onFile={(file) => handlePickedFile(file, index)}
-          onRemove={() => clearPendingImage(index)}
-          onMediaPick={host || !accountId ? undefined : () => { setImagePickTarget(index); setMediaPickerOpen(true) }}
+          onFile={(file) => { if (canPick) handlePickedFile(file, index) }}
+          onRemove={() => { if (canPick) clearPendingImage(index) }}
+          onMediaPick={host || !accountId || !canPick ? undefined : () => { if (canPick) { setImagePickTarget(index); setMediaPickerOpen(true) } }}
         /></SaveErrorField>
         {unsaved ? <p className={styles.fieldHint}>下書きを保存すると、このタブの画像を入れられます。</p> : null}
         {imageOk === false ? (
