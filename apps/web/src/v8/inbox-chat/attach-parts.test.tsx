@@ -33,6 +33,30 @@ describe('左下のクリップ', () => {
     render(<AttachMenu disabled onPick={vi.fn()} />)
     expect((screen.getByRole('button', { name: '添付するものを選択する' }) as HTMLButtonElement).disabled).toBe(true)
   })
+
+  it('添付メニューを開いた後で操作できなくなれば閉じ、解除しても勝手に開かない', () => {
+    const onPick = vi.fn()
+    const view = render(<AttachMenu onPick={onPick} />)
+    fireEvent.click(screen.getByRole('button', { name: '添付するものを選択する' }))
+    expect(screen.getByRole('menuitem', { name: /画像・動画/ })).toBeTruthy()
+    view.rerender(<AttachMenu disabled onPick={onPick} />)
+    expect(screen.queryByRole('menuitem', { name: /画像・動画/ })).toBeNull()
+    view.rerender(<AttachMenu onPick={onPick} />)
+    expect(screen.queryByRole('menuitem', { name: /画像・動画/ })).toBeNull()
+  })
+
+  it('ファイルを選んでいる途中で操作できなくなれば、選択結果を受け取らない', () => {
+    const onPick = vi.fn()
+    const view = render(<AttachMenu onPick={onPick} />)
+    const input = view.container.querySelector<HTMLInputElement>('input[aria-label="ファイルを添付（ファイル）"]')!
+    const file = new File(['%PDF'], '案内.pdf', { type: 'application/pdf' })
+    view.rerender(<AttachMenu disabled onPick={onPick} />)
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(onPick).not.toHaveBeenCalled()
+    view.rerender(<AttachMenu onPick={onPick} />)
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(onPick).toHaveBeenCalledWith(file, 'file')
+  })
 })
 
 describe('書く欄の上の札', () => {
