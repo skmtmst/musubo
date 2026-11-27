@@ -30,10 +30,13 @@ export function InboxMessageRow({ msg, idx, list, sending, searchHit = null, onQ
   const showDateSep = !prevMsg || !sameYmd(prevMsg.createdAt, msg.createdAt)
   const isOutgoing = msg.direction === 'outgoing'
   const isSending = sending
+  const unknownMessage = typeof msg.isUnsent !== 'boolean' || (msg.source !== 'scenario' && !msg.isUnsent && typeof msg.content !== 'string')
 
   // メッセージ表示の分岐
   let bubbleContent: ReactNode
-  if (msg.isUnsent) {
+  if (unknownMessage) {
+    bubbleContent = <span>メッセージを確認できません</span>
+  } else if (msg.isUnsent) {
     bubbleContent = <span className="text-ink-faint">送信を取り消しました</span>
   } else if (msg.messageType === 'flex') {
     bubbleContent = (
@@ -54,7 +57,7 @@ export function InboxMessageRow({ msg, idx, list, sending, searchHit = null, onQ
     bubbleContent = <span>{msg.content}</span>
   }
 
-  if (msg.source === 'scenario') {
+  if (msg.source === 'scenario' && !unknownMessage) {
     const startedAt = formatDateTime(msg.createdAt)
     return (
       <>
@@ -96,8 +99,8 @@ export function InboxMessageRow({ msg, idx, list, sending, searchHit = null, onQ
     return <>
       {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
       <InboxMessage sendStatus={isOutgoing ? (isSending ? 'sending' : 'sent') : undefined} outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}
-        onQuote={msg.isUnsent || isSending || !onQuote ? undefined : () => onQuote(msg)}
-        onCorrect={onCorrect && !isSending && isOutgoing && msg.messageType === 'text' && !msg.isUnsent && msg.source !== 'scenario'
+        onQuote={unknownMessage || msg.isUnsent || isSending || !onQuote ? undefined : () => onQuote(msg)}
+        onCorrect={onCorrect && !unknownMessage && !isSending && isOutgoing && msg.messageType === 'text' && !msg.isUnsent && msg.source !== 'scenario'
           ? () => onCorrect(msg)
           : undefined}>
         {quotedNode}{bubbleContent}
