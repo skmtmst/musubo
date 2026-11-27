@@ -1,11 +1,9 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
-- [一斉配信の削除操作の修正の反映履歴](release-log/unreleased/PR-kenta-broadcast-sent-delete-1128.md)（説明・2026-11-28確認）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
 # 文書の入口
 
-- [クラス一覧の読み込み修正の反映履歴](release-log/unreleased/PR-kenta-later-cx5-02-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
@@ -1443,7 +1441,3 @@
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車11の画面と記録の修正](release-log/unreleased/PR-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
-- [ウェビナー一覧の不正な集計値の表示修正](release-log/unreleased/PR-kenta-later-cx3-04-1128.md) — 反映履歴、確認 2026-11-28。
-- [在庫日付変更の処理中ガードとウェビナー作成手順帯の選択制御](release-log/unreleased/PR-kenta-later-gemini81-1127.md) — 反映履歴、確認 2026-11-27。
-- [予約カレンダーの時刻計算とシナリオ開始前確認の安全判定](release-log/unreleased/PR-kenta-later-gemini86-1127.md) — 反映履歴、確認 2026-11-27。
-- [リッチメニュー優先順の正規化とシナリオ経過時間表示の修正](release-log/unreleased/PR-kenta-later-gemini90-1127.md) — 反映履歴、確認 2026-11-28。
