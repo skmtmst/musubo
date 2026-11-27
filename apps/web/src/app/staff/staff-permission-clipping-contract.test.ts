@@ -50,13 +50,10 @@ describe('LAY-09: 権限の説明が現在の設定と連動する', () => {
     expect(staffSource).not.toContain("'4人', '配信と日々の運用'")
   })
 
-  it('取れない項目は「未確認」と出し、未保存の変更は「変更後の予定」と分かる', () => {
-  })
 })
 
 describe('LAY-10: 「つながる先」は実リンクにする', () => {
   it('リンク外見の p 要素をやめ、href を持つ Link にする', () => {
     expect(staffSource).not.toContain('<p className="font-bold text-action">→')
-
   })
 })
