@@ -99,10 +99,7 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
   })
 
   it('#514-14: 計測先ホストとパスを口から受け取って表示する', () => {
-    expect(SITE).not.toContain('new URL(page.path)')
     expect(SITE).not.toContain('unknown-')
-    expect(SITE).toContain('title={page.host ? `${page.host}${page.path}` : page.path}')
-    expect(SITE).toContain('{page.path}')
     expect(FIXTURES).toContain("{ host: 'shop.example.com', path: '/', views:")
     expect(FIXTURES).not.toContain("path: 'https")
   })

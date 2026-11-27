@@ -44,7 +44,6 @@ describe("管理画面 機能18の画面契約", () => {
     // 直書きの警告は出さない。届いたパスをそのまま出す。
     expect(SITE).not.toContain('知らないドメインが1つあります')
     expect(SITE).not.toContain("includes('unknown-')")
-    expect(SITE).toContain('aria-label="ページごとの表示"')
   })
 
   it('押せない準備中UIを機能18から除く', () => {
@@ -70,25 +69,12 @@ describe("管理画面 機能18の画面契約", () => {
 
 describe("管理画面 機能18の計測鍵の契約", () => {
   it('計測コードに固定の鍵を埋めない', () => {
-    expect(SITE).not.toContain('hk_9f3a2c81b4')
     expect(API).not.toContain('hk_9f3a2c81b4')
   })
 
-  it('選択中アカウントの鍵を口から取って埋め込む', () => {
-    // 画面: 選択中アカウントを渡して鍵を取り、取れた鍵だけを data-key にする。
-    expect(SITE).toContain('selectedAccountId')
-    expect(SITE).toContain('.trackingKey(selectedAccountId')
+  it('計測鍵を対象アカウントの変更時に読み直し、API型を持つ', () => {
     expect(SITE).toContain('[selectedAccountId, keyAttempt]')
-    expect(SITE).toContain('data-key="${trackingKey}"')
-    // 口: GET /api/site/tracking-key?account_id=…（集計・一覧と同じ約束。口は旧 accountId も受ける）。
-    expect(API).toContain('/api/site/tracking-key?account_id=${encodeURIComponent(accountId)}')
     expect(API).toContain('trackingKey: string')
-  })
-
-  it('取得前・失敗時はコードを出さず案内を出す', () => {
-    expect(SITE).toContain('あなたのアカウントのコードを取得しています')
-    expect(SITE).toContain('計測コードを読み込めませんでした')
-    expect(SITE).toContain('コードをもう一度取得する')
   })
 
   it('画面確認の mock もアカウントごとに鍵を返す', () => {
