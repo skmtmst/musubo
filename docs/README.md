@@ -27,6 +27,7 @@
 - [ダッシュボードの読み直し確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-01-1128.md)（説明・2026-11-28確認）
 - [ダッシュボードの編集権限の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-02-1128.md)（説明・2026-11-28確認）
 - [操作を止める理由の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-03-1128.md)（説明・2026-11-28確認）
+- [スマホのメニュー操作の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-04-1128.md)（説明・2026-11-28確認）
 - [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)

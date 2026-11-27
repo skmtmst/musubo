@@ -11,25 +11,8 @@ import { describe, expect, it } from 'vitest'
  */
 
 const COMPONENTS = join(__dirname, '..')
-const sidebar = readFileSync(join(COMPONENTS, 'layout', 'sidebar.tsx'), 'utf8')
 const shell = readFileSync(join(COMPONENTS, 'app-shell.tsx'), 'utf8')
 const shellCss = readFileSync(join(COMPONENTS, 'app-shell.module.css'), 'utf8')
-
-describe('スマホのメニュー', () => {
-  it('閉じている間は inert で、Tab が中へ入らない', () => {
-    expect(sidebar).toMatch(/id="mobile-menu"[\s\S]{0,120}inert=\{!isOpen\}/)
-  })
-
-  it('ハンバーガーが開閉の状態と、開く先を伝える', () => {
-    expect(sidebar).toContain('aria-expanded={isOpen}')
-    expect(sidebar).toContain('aria-controls="mobile-menu"')
-  })
-
-  it('Esc で閉じ、閉じたら焦点をハンバーガーへ戻す', () => {
-    expect(sidebar).toMatch(/event\.key === 'Escape'\) setIsOpen\(false\)/)
-    expect(sidebar).toContain('menuButtonRef.current?.focus()')
-  })
-})
 
 describe('本文へ移動', () => {
   it('シェルの先頭に置き、本文の main へ飛ぶ', () => {
