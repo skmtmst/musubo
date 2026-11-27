@@ -148,7 +148,6 @@ export default function MessageForm({
     void loadReferences()
     return () => { referenceRequest.current++; referencesBusy.current = false }
     // 初回だけ読み込み、終了後の応答は破棄する。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   fields?.define('name', 'ひな形の名前', () => (name.trim() ? null : 'ひな形の名前を入力してください'), { required: true })
