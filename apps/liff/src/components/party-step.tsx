@@ -179,7 +179,12 @@ export function PartyStaffStep({ menu, party, onParty, onLoadState }: {
   useEffect(() => {
     let alive = true;
     setFailed(false);
-    Promise.all(menuIds.map((id) => api.staffOf(id).then((r) => [id, r.staff] as const)))
+    Promise.all(menuIds.map((id) => api.staffOf(id).then((r) => {
+      if (!r || !Array.isArray(r.staff) || !r.staff.every(s => s && typeof s.id === 'string' && s.id.trim() && typeof s.display_name === 'string')) {
+        throw new Error('Invalid party staff response');
+      }
+      return [id, r.staff] as const;
+    })))
       .then((pairs) => { if (alive) setLists(Object.fromEntries(pairs)); })
       .catch((e) => { logFailure('party-staff', e); if (alive) setFailed(true); });
     return () => { alive = false; };
