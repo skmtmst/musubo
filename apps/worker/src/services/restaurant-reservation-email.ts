@@ -1,21 +1,21 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
-import { reconcileRestaurantInventory } from './restaurant-inventory-rules.js';
 import PostalMime from 'postal-mime';
 import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 import { parserFor } from './parsers/index.js';
 import { type ParsedReservationEmail } from './parsers/types.js';
+import {
+  DEFAULT_STAY_MINUTES,
+  commitReservationEmailAtomically,
+  holdInboundReservationEmail,
+  loadStoreMediaEmailImportSnapshot,
+  nextBusinessDayHoldExpiry,
+  quarantineReservationEmailAtomically,
+  type RestaurantMediaRow,
+} from './restaurant-media-email-import.js';
+
+export { DEFAULT_STAY_MINUTES, nextBusinessDayHoldExpiry, type RestaurantMediaRow };
 
 const MAX_PARSE_BYTES = 2 * 1024 * 1024;
-export const DEFAULT_STAY_MINUTES = 120;
-const DEFAULT_HOLD_END_HOUR = 23;
-
-export type RestaurantMediaRow = {
-  id: string;
-  code: 'retty' | 'gurunavi' | 'tabelog' | 'hotpepper';
-  name: string;
-  parser_key: string;
-};
 
 type ProcessInput = {
   env: Env['Bindings'];
@@ -80,26 +80,6 @@ export function validateParsedReservationEmail(
   return { valid: true };
 }
 
-function holdEndHour(env: Env['Bindings']): number {
-  const parsed = Number(env.RESTAURANT_REQUEST_HOLD_END_HOUR);
-  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 23 ? parsed : DEFAULT_HOLD_END_HOUR;
-}
-
-export function nextBusinessDayHoldExpiry(startsFrom: string, endHour = DEFAULT_HOLD_END_HOUR): string {
-  const source = new Date(startsFrom);
-  const jstDate = japanCalendar(source);
-  let year = jstDate.getUTCFullYear();
-  let month = jstDate.getUTCMonth();
-  let day = jstDate.getUTCDate();
-  do {
-    const candidate = new Date(Date.UTC(year, month, day + 1));
-    year = candidate.getUTCFullYear();
-    month = candidate.getUTCMonth();
-    day = candidate.getUTCDate();
-  } while ([0, 6].includes(new Date(Date.UTC(year, month, day)).getUTCDay()));
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(endHour).padStart(2, '0')}:59:59+09:00`;
-}
-
 function htmlToText(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -115,91 +95,64 @@ function htmlToText(html: string): string {
     .replace(/&#39;/gi, "'");
 }
 
-async function markEvent(
-  env: Env['Bindings'],
-  storeId: string,
-  eventId: string,
-  status: 'processed' | 'failed',
-  payload: Record<string, unknown>,
-  errorMessage: string | null,
-): Promise<void> {
-  await dbFor(env, storeId).prepare(`UPDATE rt_sync_events
-    SET status = ?, payload_json = json_patch(payload_json, ?), error_message = ?, processed_at = datetime('now')
-    WHERE id = ?`).bind(status, JSON.stringify(payload), errorMessage, eventId).run();
-  await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails SET status = ?, quarantine_reason = ?
-    WHERE store_id = ? AND message_id = (SELECT external_event_id FROM rt_sync_events WHERE id = ? AND provider = 'email')`)
-    .bind(status === 'failed' ? 'quarantined' : 'received', errorMessage, storeId, eventId).run();
-}
+export type ProcessStoredEmailResult = {
+  outcome: 'processed' | 'held' | 'quarantined' | 'retry_later' | 'skipped';
+};
 
-function endAt(startsAt: string, stayMinutes: number): string {
-  return new Date(new Date(startsAt).getTime() + stayMinutes * 60_000).toISOString();
-}
-
-async function upsertReservation(
+async function settleFailedParse(
   input: ProcessInput,
-  parsed: ParsedReservationEmail,
-  parserVersion: string,
-): Promise<'inserted_or_updated' | 'stale_ignored'> {
-  const stayMinutes = parsed.stayMinutes ?? DEFAULT_STAY_MINUTES;
-  const holdExpiresAt = parsed.kind === 'request'
-    ? nextBusinessDayHoldExpiry(parsed.sourceUpdatedAt!, holdEndHour(input.env))
-    : null;
-  const status = parsed.kind === 'confirmed' ? 'confirmed' : parsed.kind === 'request' ? 'pending' : 'cancelled';
-  const note = parsed.courseName ? `媒体コース: ${parsed.courseName}` : null;
-  const result = await dbFor(input.env, input.storeId).prepare(`INSERT INTO rt_reservations
-    (id, store_id, source, external_id, customer_name, customer_phone, guest_count,
-     starts_at, ends_at, status, note, source_updated_at, media_id, hold_expires_at,
-     cancel_reason, stay_minutes, media_store_code, table_label, inbound_email_id,
-     parser_key, parser_version)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(store_id, source, external_id) DO UPDATE SET confirmation_revision = rt_reservations.confirmation_revision + 1,
-      customer_name = excluded.customer_name,
-      customer_phone = excluded.customer_phone,
-      guest_count = excluded.guest_count,
-      starts_at = excluded.starts_at,
-      ends_at = excluded.ends_at,
-      status = excluded.status,
-      note = excluded.note,
-      source_updated_at = excluded.source_updated_at,
-      media_id = excluded.media_id,
-      hold_expires_at = excluded.hold_expires_at,
-      cancel_reason = excluded.cancel_reason,
-      stay_minutes = excluded.stay_minutes,
-      media_store_code = excluded.media_store_code,
-      table_label = excluded.table_label,
-      inbound_email_id = excluded.inbound_email_id,
-      parser_key = excluded.parser_key,
-      parser_version = excluded.parser_version,
-      updated_at = datetime('now')
-    WHERE excluded.source_updated_at >= COALESCE(rt_reservations.source_updated_at, '')`).bind(
-      crypto.randomUUID(), input.storeId, input.media.code, parsed.externalId,
-      parsed.customerName ?? '(氏名未取得)', parsed.customerPhone ?? null, parsed.guestCount,
-      parsed.startsAt, endAt(parsed.startsAt!, stayMinutes), status, note, parsed.sourceUpdatedAt,
-      input.media.id, holdExpiresAt, parsed.cancelReason ?? null, stayMinutes,
-      parsed.mediaStoreCode ?? null, parsed.tableLabel ?? null, input.inboundEmailId,
-      input.media.parser_key, parserVersion,
-    ).run();
-  if(result.meta.changes) await reconcileRestaurantInventory(input.env,input.storeId);
-  return result.meta.changes ? 'inserted_or_updated' : 'stale_ignored';
+  options: { mode: 'live' | 'resume'; observedVersion?: number; claimToken?: string; now: Date; transient?: boolean },
+  payload: Record<string, unknown>,
+  reason: string,
+): Promise<ProcessStoredEmailResult> {
+  const db = dbFor(input.env, input.storeId);
+  if (options.mode === 'resume' && options.transient) {
+    const released = await db
+      .prepare(`UPDATE rt_held_reservation_emails
+        SET state = 'held', claim_token = NULL, claim_expires_at = NULL, last_error = ?, updated_at = datetime('now')
+        WHERE inbound_email_id = ? AND state = 'processing' AND claim_token = ?
+          AND claim_expires_at IS NOT NULL AND datetime(claim_expires_at) > datetime(?)`)
+      .bind(reason, input.inboundEmailId, options.claimToken ?? '', options.now.toISOString())
+      .run();
+    return { outcome: released.meta.changes ? 'retry_later' : 'skipped' };
+  }
+
+  return { outcome: await quarantineReservationEmailAtomically({ ...input, ...options, payload, reason }) };
 }
 
-async function recordDigest(input: ProcessInput, parsed: ParsedReservationEmail): Promise<void> {
-  await dbFor(input.env, input.storeId).prepare(`INSERT INTO rt_email_digests
-    (id, store_id, media_id, target_date, reported_count, inbound_email_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON CONFLICT(inbound_email_id) DO NOTHING`).bind(
-      crypto.randomUUID(), input.storeId, input.media.id, parsed.targetDate,
-      parsed.reportedCount, input.inboundEmailId,
-    ).run();
-}
+export async function processStoredRestaurantEmail(
+  input: ProcessInput,
+  options: { mode?: 'live' | 'resume'; claimToken?: string; now?: Date; beforeCommitHook?: () => Promise<void> } = {},
+): Promise<ProcessStoredEmailResult> {
+  const mode = options.mode ?? 'live';
+  const now = options.now ?? new Date();
+  const db = dbFor(input.env, input.storeId);
+  let observedVersion = 0;
 
-export async function processStoredRestaurantEmail(input: ProcessInput): Promise<void> {
+  if (mode === 'live') {
+    const observed = await loadStoreMediaEmailImportSnapshot(db, input.storeId, input.media.id);
+    if (!observed.enabled) {
+      await holdInboundReservationEmail(db, {
+        inboundEmailId: input.inboundEmailId,
+        storeId: input.storeId,
+        mediaId: input.media.id,
+        syncEventId: input.eventId,
+        mediaCode: input.media.code,
+        now,
+      });
+      return { outcome: 'held' };
+    }
+    observedVersion = observed.version;
+  }
+
   const parser = parserFor(input.media.parser_key);
   if (!parser) {
-    await markEvent(input.env, input.storeId, input.eventId, 'failed', {
-      media: input.media.code, parserKey: input.media.parser_key,
-    }, 'unprocessed:parser_not_found');
-    return;
+    return settleFailedParse(
+      input,
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
+      { media: input.media.code, parserKey: input.media.parser_key },
+      'unprocessed:parser_not_found',
+    );
   }
 
   let object: R2ObjectBody | null;
@@ -207,23 +160,29 @@ export async function processStoredRestaurantEmail(input: ProcessInput): Promise
     if (!input.env.RAW_MAIL) throw new Error('RAW_MAIL binding is not configured');
     object = await input.env.RAW_MAIL.get(input.objectKey);
   } catch (error) {
-    await markEvent(input.env, input.storeId, input.eventId, 'failed', {
-      media: input.media.code, objectKey: input.objectKey,
-    }, `unprocessed:raw_mail_read_failed:${error instanceof Error ? error.message : String(error)}`);
-    return;
+    return settleFailedParse(
+      input,
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date(), transient: true },
+      { media: input.media.code, objectKey: input.objectKey },
+      'unprocessed:raw_mail_read_failed',
+    );
   }
   if (!object) {
-    await markEvent(input.env, input.storeId, input.eventId, 'failed', {
-      media: input.media.code, objectKey: input.objectKey,
-    }, 'unprocessed:raw_mail_missing');
-    return;
+    return settleFailedParse(
+      input,
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
+      { media: input.media.code, objectKey: input.objectKey },
+      'unprocessed:raw_mail_missing',
+    );
   }
   if (object.size > MAX_PARSE_BYTES) {
     await object.body.cancel('reservation_email_parse_size_limit');
-    await markEvent(input.env, input.storeId, input.eventId, 'failed', {
-      media: input.media.code, objectKey: input.objectKey, rawSize: object.size,
-    }, 'unprocessed:parse_size_limit');
-    return;
+    return settleFailedParse(
+      input,
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
+      { media: input.media.code, objectKey: input.objectKey, rawSize: object.size },
+      'unprocessed:parse_size_limit',
+    );
   }
 
   try {
@@ -242,27 +201,38 @@ export async function processStoredRestaurantEmail(input: ProcessInput): Promise
     const sourceText = `${subject}\n${body}`;
     const validation = validateParsedReservationEmail(parsed, sourceText);
     if (!validation.valid) {
-      await markEvent(input.env, input.storeId, input.eventId, 'failed', {
-        media: input.media.code, kind: parsed.kind, parserVersion: parser.version,
-      }, `unprocessed:${validation.reason}`);
-      return;
+      return settleFailedParse(
+        input,
+        { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
+        { media: input.media.code, kind: parsed.kind, parserVersion: parser.version },
+        `unprocessed:${validation.reason}`,
+      );
     }
 
-    if (parsed.kind === 'digest') {
-      await recordDigest(input, parsed);
-    } else if (parsed.kind !== 'notice') {
-      const outcome = await upsertReservation(input, parsed, parser.version);
-      await markEvent(input.env, input.storeId, input.eventId, 'processed', {
-        media: input.media.code, kind: parsed.kind, parserVersion: parser.version, outcome,
-      }, null);
-      return;
+    if (options.beforeCommitHook) {
+      await options.beforeCommitHook();
     }
-    await markEvent(input.env, input.storeId, input.eventId, 'processed', {
-      media: input.media.code, kind: parsed.kind, parserVersion: parser.version,
-    }, null);
+
+    const committed = await commitReservationEmailAtomically({
+      env: input.env,
+      storeId: input.storeId,
+      inboundEmailId: input.inboundEmailId,
+      eventId: input.eventId,
+      media: input.media,
+      parsed,
+      parserVersion: parser.version,
+      mode,
+      observedVersion,
+      claimToken: options.claimToken,
+      now: options.now ?? new Date(),
+    });
+    return { outcome: committed };
   } catch (error) {
-    await markEvent(input.env, input.storeId, input.eventId, 'failed', {
-      media: input.media.code, parserVersion: parser.version,
-    }, `unprocessed:parse_failed:${error instanceof Error ? error.message : String(error)}`);
+    return settleFailedParse(
+      input,
+      { mode, observedVersion, claimToken: options.claimToken, now: options.now ?? new Date() },
+      { media: input.media.code, parserVersion: parser.version },
+      'unprocessed:parse_failed',
+    );
   }
 }

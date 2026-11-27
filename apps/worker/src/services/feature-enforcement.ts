@@ -73,6 +73,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '登録処理の後半で、個別機能の有効・無効には属さない' },
   },
   {
+    name: 'restaurant held email retention',
+    classification: { kind: 'core', reason: '停止中に受信した予約メールの保管期限を守る' },
+    enforcement: { mode: 'exempt', reason: '飲食店の検証環境でのみ実行し、アカウントの機能オフ後も期限切れ原文を消す' },
+  },
+  {
     name: 'restaurant hold expiry',
     classification: { kind: 'core', reason: '保存済み予約の仮押さえ期限と予約済み価格変更の後始末' },
     enforcement: { mode: 'exempt', reason: '飲食店の検証環境だけ。保存済みの期限と変更を確定し、自動通知はsendAutomaticBookingLineが機能・停止を個別判定する' },

@@ -1464,14 +1464,14 @@ const restaurantClosureContact = (id) => id === 'cl-1'
 const RESTAURANT_CLOSE_NOTIFICATION = { storeId: 'store-sby', notifyReopen: true, recipientMode: 'selected', membershipIds: ['mem-2', 'mem-4'], version: 1 }
 /* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
 const RESTAURANT_CHANNELS = [
-  { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
-  { id: 'media-tb', code: 'tabelog', name: '食べログ', todayCount: 6, lastReceivedAt: restaurantAt(18, 20), unreadableCount: 1, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
-  { id: 'media-gn', code: 'gurunavi', name: 'ぐるなび', todayCount: 3, lastReceivedAt: restaurantAt(16, 5), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
-  { id: 'media-rt', code: 'retty', name: 'Retty', todayCount: 0, lastReceivedAt: restaurantAt(12, 10, -7), unreadableCount: 0, receiveMethod: 'email_forward', status: 'not_receiving', daysWithoutReceipt: 7 },
-  { id: 'restaurant_board', code: 'restaurant_board', name: 'レストランボード', todayCount: 5, lastReceivedAt: restaurantAt(18, 51), unreadableCount: 0, receiveMethod: 'direct', status: 'receiving', daysWithoutReceipt: 0 },
-  { id: 'media-gg', code: 'google', name: 'Google で予約', todayCount: 0, lastReceivedAt: null, unreadableCount: 0, receiveMethod: 'email_forward', status: 'preparing', daysWithoutReceipt: null },
-  { id: 'media-ik', code: 'ikyu', name: '一休.com レストラン', todayCount: 0, lastReceivedAt: null, unreadableCount: 0, receiveMethod: 'email_forward', status: 'preparing', daysWithoutReceipt: null },
-  { id: 'manual', code: 'manual', name: '電話・LINE・店頭', todayCount: 4, lastReceivedAt: restaurantAt(17, 30), unreadableCount: 0, receiveMethod: 'manual', status: 'receiving', daysWithoutReceipt: 0 },
+  { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0, emailImportSupported: true, emailImportEnabled: true, emailImportVersion: 1, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'media-tb', code: 'tabelog', name: '食べログ', todayCount: 6, lastReceivedAt: restaurantAt(18, 20), unreadableCount: 1, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0, emailImportSupported: true, emailImportEnabled: true, emailImportVersion: 1, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'media-gn', code: 'gurunavi', name: 'ぐるなび', todayCount: 3, lastReceivedAt: restaurantAt(16, 5), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0, emailImportSupported: true, emailImportEnabled: true, emailImportVersion: 1, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'media-rt', code: 'retty', name: 'Retty', todayCount: 0, lastReceivedAt: restaurantAt(12, 10, -7), unreadableCount: 0, receiveMethod: 'email_forward', status: 'not_receiving', daysWithoutReceipt: 7, emailImportSupported: false, emailImportEnabled: false, emailImportVersion: 0, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'restaurant_board', code: 'restaurant_board', name: 'レストランボード', todayCount: 5, lastReceivedAt: restaurantAt(18, 51), unreadableCount: 0, receiveMethod: 'direct', status: 'receiving', daysWithoutReceipt: 0, emailImportSupported: false, emailImportEnabled: false, emailImportVersion: 0, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'media-gg', code: 'google', name: 'Google で予約', todayCount: 0, lastReceivedAt: null, unreadableCount: 0, receiveMethod: 'email_forward', status: 'preparing', daysWithoutReceipt: null, emailImportSupported: false, emailImportEnabled: false, emailImportVersion: 0, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'media-ik', code: 'ikyu', name: '一休.com レストラン', todayCount: 0, lastReceivedAt: null, unreadableCount: 0, receiveMethod: 'email_forward', status: 'preparing', daysWithoutReceipt: null, emailImportSupported: false, emailImportEnabled: false, emailImportVersion: 0, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
+  { id: 'manual', code: 'manual', name: '電話・LINE・店頭', todayCount: 4, lastReceivedAt: restaurantAt(17, 30), unreadableCount: 0, receiveMethod: 'manual', status: 'receiving', daysWithoutReceipt: 0, emailImportSupported: false, emailImportEnabled: false, emailImportVersion: 0, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null },
 ]
 const RESTAURANT_INBOUND_EMAILS = [
   { id: 'mail-1', storeId: 'store-sby', receivedAt: restaurantAt(18, 20), status: 'quarantined', reason: '人数の欄が読めませんでした', mediaCode: 'tabelog', mediaName: '食べログ' },
@@ -2146,6 +2146,8 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     const row = RESTAURANT_MEDIA_LINKS.find((m) => m.code === pathname.split('/').pop()) ?? RESTAURANT_MEDIA_LINKS[0]
     return { ...row, storeId: 'store-sby', closeOnBooking: !!row.closeOnBooking, version: row.version + 1 }
   }
+  if (method === 'PUT' && pathname.startsWith('/api/restaurant-test/media-email-import/'))
+    return { storeId: 'store-sby', code: pathname.split('/').pop() ?? 'hotpepper', emailImportSupported: true, emailImportEnabled: true, emailImportVersion: 2, heldCount: 0, expiringHeldCount: 0, nearestHeldExpiresAt: null, daysUntilNearestHeldExpiry: null, importedCount: 0, archivedCount: 0, failedHeldCount: 0 }
   if (method === 'POST' && pathname === '/api/restaurant-test/reservation-link') return RESTAURANT_RESERVATION_LINK
   if (method === 'POST' && pathname === '/api/hq/broadcasts') return { ...HQ_RUN_DRAFT, id: 'hq-run-new', version: 1 }
   /* 下書きを直す（PATCH・版つき）。依頼番号と ID はそのまま、版を1つ上げる。 */
@@ -2645,12 +2647,12 @@ function nenMetricsBody(data, query) {
 
 /* 提案 E-4 予約サイト・グルメ媒体（aSmph）：店ごとの媒体リンク。口（restaurant-test/media-links）と同じ形。 */
 const RESTAURANT_MEDIA_LINKS = [
-  { code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, pageUrl: 'https://hotpepper.jp/strJ001234567/', loginUrl: 'https://manager.hotpepper.jp/', closeOnBooking: 1, version: 3 },
-  { code: 'tabelog', name: '食べログ', acceptsReservations: 1, pageUrl: 'https://tabelog.com/tokyo/A1301/A130101/13250000/', loginUrl: 'https://owner.tabelog.com/', closeOnBooking: 1, version: 2 },
-  { code: 'gurunavi', name: 'ぐるなび', acceptsReservations: 1, pageUrl: 'https://r.gnavi.co.jp/abc1234/', loginUrl: 'https://pro.gnavi.co.jp/', closeOnBooking: 1, version: 1 },
-  { code: 'retty', name: 'Retty', acceptsReservations: 0, pageUrl: 'https://retty.me/area/PRE13/ARE1/SUB101/100001234567/', loginUrl: null, closeOnBooking: 0, version: 1 },
-  { code: 'ikyu', name: '一休', acceptsReservations: 1, pageUrl: 'https://restaurant.ikyu.com/123456/', loginUrl: 'https://admin.restaurant.ikyu.com/', closeOnBooking: 0, version: 1 },
-  { code: 'google', name: 'Google', acceptsReservations: 1, pageUrl: 'https://g.page/nen-ginza', loginUrl: 'https://business.google.com/', closeOnBooking: 0, version: 1 },
+  { code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, emailImportSupported: 1, pageUrl: 'https://hotpepper.jp/strJ001234567/', loginUrl: 'https://manager.hotpepper.jp/', closeOnBooking: 1, version: 3 },
+  { code: 'tabelog', name: '食べログ', acceptsReservations: 1, emailImportSupported: 1, pageUrl: 'https://tabelog.com/tokyo/A1301/A130101/13250000/', loginUrl: 'https://owner.tabelog.com/', closeOnBooking: 1, version: 2 },
+  { code: 'gurunavi', name: 'ぐるなび', acceptsReservations: 1, emailImportSupported: 1, pageUrl: 'https://r.gnavi.co.jp/abc1234/', loginUrl: 'https://pro.gnavi.co.jp/', closeOnBooking: 1, version: 1 },
+  { code: 'retty', name: 'Retty', acceptsReservations: 0, emailImportSupported: 0, pageUrl: 'https://retty.me/area/PRE13/ARE1/SUB101/100001234567/', loginUrl: null, closeOnBooking: 0, version: 1 },
+  { code: 'ikyu', name: '一休', acceptsReservations: 1, emailImportSupported: 0, pageUrl: 'https://restaurant.ikyu.com/123456/', loginUrl: 'https://admin.restaurant.ikyu.com/', closeOnBooking: 0, version: 1 },
+  { code: 'google', name: 'Google', acceptsReservations: 1, emailImportSupported: 0, pageUrl: 'https://g.page/nen-ginza', loginUrl: 'https://business.google.com/', closeOnBooking: 0, version: 1 },
 ]
 const RESTAURANT_RESERVATION_LINK = {
   url: 'https://liff.line.me/2001234567-AbCdEf/booking',
@@ -3044,9 +3046,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/restaurant-test/inbound-emails') {
     return { success: true, data: RESTAURANT_INBOUND_EMAILS, total: RESTAURANT_INBOUND_EMAILS.length }
   }
-  if (method === 'GET' && pathname === '/api/restaurant-test/intake-addresses') {
-    return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
-  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/intake-addresses') return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
   // SNS 連携（y3GGTs）の Google・Instagram の接続と接続一覧は sns-multi-mode.mjs にまとめた。
   if (method === 'GET' && SNS_CONNECTION_PATHS.has(pathname)) return snsConnectionBody(pathname)
   if (method === 'GET' && pathname === '/api/restaurant-test/google/reviews') {

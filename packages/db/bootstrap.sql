@@ -7916,6 +7916,20 @@ CREATE TABLE rt_google_write_log (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , connection_id TEXT REFERENCES rt_google_connections(id) ON DELETE SET NULL);
 
+CREATE TABLE rt_held_reservation_emails (
+  inbound_email_id TEXT PRIMARY KEY REFERENCES rt_inbound_emails(id) ON DELETE CASCADE,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  media_id TEXT NOT NULL REFERENCES rt_media(id),
+  sync_event_id TEXT NOT NULL UNIQUE REFERENCES rt_sync_events(id) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK (state IN ('held', 'processing', 'archived', 'processed', 'expiring', 'expired')),
+  claim_token TEXT UNIQUE,
+  claim_expires_at TEXT,
+  last_error TEXT,
+  held_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_inbound_emails (
   id TEXT PRIMARY KEY,
   message_id TEXT NOT NULL UNIQUE,
@@ -8328,6 +8342,16 @@ CREATE TABLE rt_store_groups (
  id TEXT PRIMARY KEY,
  organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,
  name TEXT NOT NULL
+);
+
+CREATE TABLE rt_store_media_email_settings (
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  media_id TEXT NOT NULL REFERENCES rt_media(id),
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  updated_by TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (store_id, media_id)
 );
 
 CREATE TABLE rt_store_media_links (
@@ -11759,6 +11783,10 @@ CREATE INDEX idx_rt_google_write_log_connection_772
   ON rt_google_write_log(connection_id, created_at DESC);
 
 CREATE INDEX idx_rt_google_write_log_store ON rt_google_write_log(store_id, created_at DESC);
+
+CREATE INDEX idx_rt_held_reservation_emails_expiry ON rt_held_reservation_emails(state, expires_at);
+
+CREATE INDEX idx_rt_held_reservation_emails_media ON rt_held_reservation_emails(store_id, media_id, state, expires_at);
 
 CREATE INDEX idx_rt_inbound_emails_retention
   ON rt_inbound_emails (received_at, status);

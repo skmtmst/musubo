@@ -42,6 +42,7 @@ import { OPERATOR_NOTIFICATION_SWEEP_LIMIT, sweepOperatorNotifications } from '.
 
 import { runIsolatedScheduledJobs, scheduledLane, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
 import { qaEnvironment } from '../services/staging-qa-safety.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 
 import { runFrequentHeavyJobs } from './frequent.js';
 import { runSixHourlyHeavyJobs } from './six-hourly.js';
@@ -56,10 +57,23 @@ export async function scheduled(
   // 重い処理は次の専用tickで処理単位ごとに再試行され、通知tickを占有しない。
   if (event.cron === STAGING_LINE_TOKEN_REFRESH_CRON) {
     if (qaEnvironment(env)) {
-      await refreshLineAccessTokens(env.DB, {
-        credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
-        syncProfiles: false,
-      });
+      try {
+        await refreshLineAccessTokens(env.DB, {
+          credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+          syncProfiles: false,
+        });
+      } finally {
+        if (restaurantTestEnabled(env)) {
+          await runIsolatedScheduledJobs([{
+            name: 'restaurant held email retention',
+            run: async () => {
+              const { expireHeldReservationEmails } = await import('../services/restaurant-media-email-import.js');
+              const result = await expireHeldReservationEmails(env, { now: new Date(event.scheduledTime), maxPerRun: 200 });
+              if (result.failed) throw new Error('restaurant_held_email_retention_retry_required');
+            },
+          }]);
+        }
+      }
     }
     return;
   }

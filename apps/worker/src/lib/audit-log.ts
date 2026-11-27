@@ -189,6 +189,9 @@ export type AuditAction =
   | 'restaurant.delivery.menu.resume'
   | 'restaurant.delivery.intake.stop'
   | 'restaurant.delivery.intake.resume'
+  | 'restaurant.media_email_import.stop'
+  | 'restaurant.media_email_import.resume'
+  | 'restaurant.media_email_import.held_expired'
   // 履歴CSVの書き出し（注文番号・金額が店舗の外へ出るため、他の出力と同じく残す）。
   | 'restaurant.delivery.history.export'
   // Uber Eats のログイン連携。店舗の代理で使えるトークンを得る操作なので必ず残す。
@@ -256,7 +259,7 @@ export function auditLog(
   c: Context<Env>,
   action: AuditAction,
   target?: { id?: string | null; kind?: string },
-  opts?: { result?: 'success' | 'denied' | 'failed'; lineAccountId?: string | null },
+  opts?: { result?: 'success' | 'denied' | 'failed'; lineAccountId?: string | null; after?: Record<string, unknown> | null },
 ): void {
   const staff = c.get('staff');
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
@@ -279,6 +282,7 @@ export function auditLog(
     targetKind: target?.kind ?? null,
     targetId: target?.id ?? null,
     result: opts?.result ?? 'success',
+    after: opts?.after,
     requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),

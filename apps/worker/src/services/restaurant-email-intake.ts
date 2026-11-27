@@ -7,6 +7,7 @@ import {
   processStoredRestaurantEmail,
   type RestaurantMediaRow,
 } from './restaurant-reservation-email.js';
+import { expireHeldReservationEmails } from './restaurant-media-email-import.js';
 
 const LOCAL_PART_PREFIX = 'r-';
 const RANDOM_LENGTH = 32;
@@ -330,6 +331,7 @@ async function storeRestaurantReservationEmail(
         rawSize: message.rawSize,
         recipient: message.to,
         media: media.code,
+        dateHeader: message.headers.get('date') ?? null,
       }),
     ).run();
 
@@ -405,7 +407,7 @@ function rawMailRetentionDays(env: Env['Bindings']): number {
   return parsed;
 }
 
-/** 6時間cronから呼び、期限超過の原文だけをR2から破棄する。 */
+/** 6時間cronから呼び、期限超過の保留メールと原文をR2から破棄する。 */
 export async function deleteExpiredRestaurantRawEmails(
   env: Env['Bindings'],
   options: { now?: Date; maxPerRun?: number } = {},
@@ -415,17 +417,27 @@ export async function deleteExpiredRestaurantRawEmails(
   const cutoff = new Date(now.getTime() - retentionDays * 86_400_000).toISOString();
   const maxPerRun = Math.max(1, Math.min(options.maxPerRun ?? RETENTION_MAX_PER_RUN, RETENTION_MAX_PER_RUN));
   const db = dbFor(env);
-  let checked = 0;
-  let deleted = 0;
-  let failed = 0;
+
+  const heldExpired = await expireHeldReservationEmails(env, { now, maxPerRun });
+  let checked = heldExpired.checked;
+  let deleted = heldExpired.deleted;
+  let failed = heldExpired.failed;
+  if (failed > 0) {
+    return { checked, deleted, failed, retentionDays };
+  }
 
   while (checked < maxPerRun) {
     const limit = Math.min(RETENTION_BATCH_SIZE, maxPerRun - checked);
-    // 機能オフ中の店舗分は消さずに残す。持ち主不明(storeなし)は従来どおり消す。
+    // 30日期限の管理台帳がある原文は、専用の削除処理と監査が完了するまで他の経路で消さない。
     const { results } = await db.prepare(`SELECT e.id, e.r2_key
       FROM rt_inbound_emails e LEFT JOIN rt_stores st ON st.id = e.store_id
       WHERE e.r2_key <> '' AND datetime(e.received_at) < datetime(?)
         AND NOT ${accountFeatureOffExclusionSql('st.line_account_id', 'restaurant_test')}
+        AND NOT EXISTS (
+          SELECT 1 FROM rt_held_reservation_emails h
+          WHERE h.inbound_email_id = e.id
+            AND h.state <> 'expired'
+        )
       ORDER BY e.received_at, e.id
       LIMIT ?`).bind(cutoff, limit).all<{ id: string; r2_key: string }>();
     if (results.length === 0) break;

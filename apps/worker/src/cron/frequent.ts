@@ -369,6 +369,14 @@ export async function runFrequentHeavyJobs(
 
   if (restaurantTestEnabled(env)) {
     jobs.push({
+      name: 'restaurant held email retention',
+      run: async () => {
+        const { expireHeldReservationEmails } = await import('../services/restaurant-media-email-import.js');
+        const result = await expireHeldReservationEmails(env, { now: new Date(event.scheduledTime), maxPerRun: 200 });
+        if (result.failed) throw new Error('restaurant_held_email_retention_retry_required');
+      },
+    });
+    jobs.push({
       name: 'restaurant hold expiry',
       run: async () => {
         const { expireRestaurantHolds, applyDueRestaurantMenuPrices } = await import('../services/restaurant-booking.js');

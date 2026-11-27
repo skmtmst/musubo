@@ -3,9 +3,12 @@ import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { restaurantRotation } from '../services/restaurant-rotation.js';
 import { validRestaurantFloor, saveRestaurantFloor } from '../services/restaurant-floor.js';
 import { seatBoardEntry } from '@line-crm/shared';
-import { inputError } from '../lib/input-errors.js';
+import { inputError, validatedInputBody } from '../lib/input-errors.js';
 import { publicClosure, closurePreview, openSeatTables, type ClosureRow } from '../services/restaurant-closures.js';
 import { safeRestaurantHttpsUrl, restaurantReservationEmbed } from '../services/restaurant-media-links.js';
+import { isReservationEmailMedia } from '../services/restaurant-media-email-import.js';
+import { saveStoreMediaEmailImportSetting, type HeldEmailResumeAction } from '../services/restaurant-media-email-resume.js';
+import { auditLog } from '../lib/audit-log.js';
 import { getRestaurantInventoryRules, getRestaurantInventoryRuleState, saveRestaurantInventoryRules, validateRestaurantInventoryRules, listRestaurantCloseTasks } from '@line-crm/db';
 
 import type { Env } from '../worker-env.js';
@@ -212,10 +215,78 @@ export const post__api_restaurant_test_media_10 = async (c: Context<Env, "/api/r
 export const get__api_restaurant_test_media_links_11 = async (c: Context<Env, "/api/restaurant-test/media-links">) => {
   const org=await organizationFor(c),storeId=c.req.query('storeId')||'';
   if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,code:'restaurant_store_mismatch',error:'店舗を確認してください'},400);
-  const data=await dbFor(c.env,storeId).prepare(`SELECT m.code,m.name,m.accepts_reservations AS acceptsReservations,
+  const rows=await dbFor(c.env,storeId).prepare(`SELECT m.code,m.name,m.is_active,m.accepts_reservations,
     l.page_url AS pageUrl,l.login_url AS loginUrl,COALESCE(l.close_on_booking,0) AS closeOnBooking,COALESCE(l.version,0) AS version
-    FROM rt_media m LEFT JOIN rt_store_media_links l ON l.media_id=m.id AND l.store_id=? ORDER BY m.name`).bind(storeId).all();
-  return c.json({success:true,data:data.results});
+    FROM rt_media m LEFT JOIN rt_store_media_links l ON l.media_id=m.id AND l.store_id=? ORDER BY m.name`).bind(storeId)
+    .all<{code:string;name:string;is_active:number;accepts_reservations:number;pageUrl:string|null;loginUrl:string|null;closeOnBooking:number;version:number}>();
+  return c.json({success:true,data:rows.results.map(({is_active,accepts_reservations,...row})=>({
+    ...row,
+    acceptsReservations:accepts_reservations,
+    emailImportSupported:isReservationEmailMedia({code:row.code,is_active,accepts_reservations})?1:0,
+  }))});
+};
+
+export const put__api_restaurant_test_media_email_import_code_12b = async (c: Context<Env, "/api/restaurant-test/media-email-import/:code">) => {
+  const b = (validatedInputBody(c) ?? await c.req.json().catch(() => null)) as { storeId?: unknown; enabled?: unknown; expectedVersion?: unknown; heldAction?: unknown } | null;
+  const code = c.req.param('code');
+  const requestedAction = b?.enabled === true ? 'restaurant.media_email_import.resume' : 'restaurant.media_email_import.stop';
+  const staff = c.get('staff');
+  if (staff?.readOnly) {
+    auditLog(c, requestedAction, { id: `${String(b?.storeId ?? '')}:${code}`, kind: 'rt_store_media_email' }, { result: 'denied' });
+    return c.json({ success: false, error: '閲覧専用のため変更できません' }, 403);
+  }
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const org = await organizationFor(c);
+  const storeId = typeof b?.storeId === 'string' ? b.storeId : '';
+  if (!b || !org || !storeId || (org.scopedStoreId && org.scopedStoreId !== storeId) || !await storeBelongsTo(c, org.id, storeId)) {
+    auditLog(c, requestedAction, { id: `${storeId}:${code}`, kind: 'rt_store_media_email' }, { result: 'denied' });
+    return inputError(c, { success: false, code: 'restaurant_store_mismatch', error: '店舗を確認してください' }, 400, ['storeId']);
+  }
+  if (typeof b.enabled !== 'boolean' || typeof b.expectedVersion !== 'number' || !Number.isSafeInteger(b.expectedVersion) || b.expectedVersion < 0) {
+    return inputError(c, { success: false, error: '取込設定と版を確認してください' }, 400, ['enabled', 'expectedVersion']);
+  }
+  const heldAction = b.heldAction === 'import' || b.heldAction === 'archive' ? (b.heldAction as HeldEmailResumeAction) : undefined;
+  if (b.enabled && !heldAction) {
+    return inputError(c, { success: false, error: '保留中のメールの扱いを選んでください' }, 400, ['heldAction']);
+  }
+
+  const saved = await saveStoreMediaEmailImportSetting({
+    env: c.env,
+    storeId,
+    mediaCode: code,
+    enabled: b.enabled,
+    expectedVersion: b.expectedVersion,
+    heldAction,
+    actorId: staff?.id ?? 'admin',
+  });
+
+  if (!saved.ok) {
+    auditLog(c, requestedAction, { id: `${storeId}:${code}`, kind: 'rt_store_media_email' }, { result: 'failed' });
+    if (saved.status === 400) {
+      return inputError(c, { success: false, error: saved.error }, 400, ['code']);
+    }
+    return c.json({ success: false, code: saved.code, error: saved.error }, saved.status);
+  }
+
+  auditLog(
+    c,
+    requestedAction,
+    { id: `${storeId}:${code}`, kind: 'rt_store_media_email' },
+    {
+      result: 'success',
+      after: {
+        storeId,
+        mediaCode: code,
+        enabled: saved.data.emailImportEnabled,
+        version: saved.data.emailImportVersion,
+        heldAction: heldAction ?? null,
+        importedCount: saved.data.importedCount,
+        archivedCount: saved.data.archivedCount,
+        failedHeldCount: saved.data.failedHeldCount,
+      },
+    },
+  );
+  return c.json({ success: true, data: saved.data });
 };
 
 export const put__api_restaurant_test_media_links_code_12 = async (c: Context<Env, "/api/restaurant-test/media-links/:code">) => {
