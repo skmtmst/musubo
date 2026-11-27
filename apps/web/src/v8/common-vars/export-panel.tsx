@@ -79,6 +79,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   const [dismissedJobId, setDismissedJobId] = useState<string | null>(null)
   const [requesting, setRequesting] = useState(false)
   const [error, setError] = useState('')
+  const [historyFailed, setHistoryFailed] = useState(false)
   /** 遅れて返った別アカウントの結果を映さないための世代番号。 */
   const generationRef = useRef(0)
 
@@ -86,11 +87,15 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
     try {
       const res = await api.commonVars.listExports(targetAccountId)
       if (generationRef.current !== generation) return
-      if (res.success) setJobs(res.data)
+      if (!res.success || !Array.isArray(res.data)) throw new Error('history_failed')
+      setJobs(res.data)
+      setActive(current => current ?? res.data[0] ?? null)
+      setHistoryFailed(false)
     } catch (saveFailure) {
-      if (generationRef.current === generation) saveErrors.capture(saveFailure)
-
-      /* 履歴が読めなくても書き出し自体は止めない */
+      if (generationRef.current === generation) {
+        saveErrors.capture(saveFailure)
+        setHistoryFailed(true)
+      }
     }
   }, [saveErrors])
 
@@ -102,20 +107,22 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
     setActive(null)
     setRequesting(false)
     setError('')
+    setHistoryFailed(false)
     if (!accountId) return
     void (async () => {
       try {
         const res = await api.commonVars.listExports(accountId)
         if (generationRef.current !== generation) return
-        if (res.success) {
-          setJobs(res.data)
-          const latest = res.data[0]
-          if (latest) setActive(latest)
-        }
+        if (!res.success || !Array.isArray(res.data)) throw new Error('history_failed')
+        setJobs(res.data)
+        const latest = res.data[0]
+        if (latest) setActive(latest)
+        setHistoryFailed(false)
       } catch (saveFailure) {
-        if (generationRef.current === generation) saveErrors.capture(saveFailure)
-
-        /* 表示は一覧の下に出る補助。読めないときは何も出さない */
+        if (generationRef.current === generation) {
+          saveErrors.capture(saveFailure)
+          setHistoryFailed(true)
+        }
       }
     })()
   }, [accountId, saveErrors])
@@ -221,8 +228,9 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
       disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
     </Button>
   )
-  const status = error || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
+  const status = error || historyFailed || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
     <SaveErrorScope errors={saveErrors}>
+      {historyFailed ? <Notice tone="warn" action={<Button type="button" variant="text" onClick={() => { if (accountId) void refresh(accountId, generationRef.current) }}>もう一度読み込む</Button>}>書き出し履歴を読み込めませんでした。</Notice> : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {!error && active && active.id !== dismissedJobId ? (
         <Notice
