@@ -42,6 +42,9 @@ export default function Done({
   // search を維持しないと「予約の履歴を見る」→ WebView 再読み込みで liffId が失われる。
   const { search } = useLocation();
   const navigate = useNavigate();
+  const knownStatus = status === 'confirmed' || status === 'requested';
+  const date = typeof slot.date === 'string' ? new Date(`${slot.date}T00:00:00Z`) : new Date(NaN);
+  const validSlot = Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === slot.date && typeof slot.start === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(slot.start);
   /** お支払いへ進む：starting | phone（決済が無い店）| failed。 */
   const [payState, setPayState] = useState<'idle' | 'starting' | 'phone' | 'failed'>('idle');
 
@@ -70,10 +73,10 @@ export default function Done({
           className="mt-3.5 flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
           aria-hidden="true"
         >
-          <Icon name="check" className="h-9 w-9" />
+          <Icon name={knownStatus ? 'check' : 'alert-triangle'} className="h-9 w-9" />
         </span>
         <p className="mt-3.5 text-xl font-bold text-ink">
-          {status === 'confirmed' ? '予約が確定しました' : 'リクエストを受け付けました'}
+          {status === 'confirmed' ? '予約が確定しました' : status === 'requested' ? 'リクエストを受け付けました' : '予約の状態を確認できません'}
         </p>
         <p className="mt-3.5 text-[13px] leading-[21px] text-pretty text-liff-sub">
           {status === 'confirmed' ? (
@@ -82,13 +85,13 @@ export default function Done({
               <br />
               この画面は閉じてかまいません。
             </>
-          ) : (
+          ) : status === 'requested' ? (
             <>
               {`${words.contact}が確かめたら、LINE でお知らせします。`}
               <br />
               この画面は閉じてかまいません。
             </>
-          )}
+          ) : '予約の履歴をご確認ください。'}
         </p>
       </div>
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
@@ -96,7 +99,7 @@ export default function Done({
           <dt className="w-18 shrink-0 text-xs text-liff-sub">日時</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
             {/* 終わりの時刻まで出す（★V8 sjkwK・I5hxa）。所要時間が分からないときは始まりだけ。 */}
-            {`${formatJpLong(slot.date)}${slot.start}〜${durationMinutes ? addMinutesHm(slot.start, durationMinutes) : ''}`}
+            {validSlot ? `${formatJpLong(slot.date)}${slot.start}〜${durationMinutes && Number.isFinite(durationMinutes) && durationMinutes > 0 ? addMinutesHm(slot.start, durationMinutes) : ''}` : '予約日時を確認できません'}
           </dd>
         </div>
         <div className="flex h-10 items-start gap-2 py-2.5">
@@ -108,7 +111,7 @@ export default function Done({
         <div className="flex h-10 items-start gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">状態</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
-            {status === 'confirmed' ? '確定' : words.approvalPending}
+            {status === 'confirmed' ? '確定' : status === 'requested' ? words.approvalPending : '確認できません'}
           </dd>
         </div>
       </dl>
