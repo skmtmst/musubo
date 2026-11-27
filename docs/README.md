@@ -1458,3 +1458,4 @@
 - [予約媒体の店舗選択の確認を修正](release-log/unreleased/PR-kenta-later-cx3-39-1128.md) — 反映履歴、確認 2026-11-28。
 - [カルーセル画像の登録結果の確認を修正](release-log/unreleased/PR-kenta-later-cx3-40-1128.md) — 反映履歴、確認 2026-11-28。
 - [友だち情報欄の保存結果の確認を修正](release-log/unreleased/PR-kenta-later-cx3-41-1128.md) — 反映履歴、確認 2026-11-28。
+- [はじめの設定の状態と理由の表示を修正](release-log/unreleased/PR-kenta-later-cx3-42-1128.md) — 反映履歴、確認 2026-11-28。
