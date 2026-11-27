@@ -39,7 +39,15 @@ export default function RecurringCard({ menu, staff, startsAt, onChange }: {
     let alive = true;
     setList(null); setFailed(false); onChange('checking');
     api.seriesPreview({ menu_id: menu.id, staff_id: staff.id, starts_at: startsAt, freq: 'weekly', count })
-      .then((r) => { if (alive) { setList(r.occurrences); setPicks({}); } })
+      .then((r) => {
+        if (!r || !Array.isArray(r.occurrences) || !r.occurrences.every(o => o &&
+          Number.isInteger(o.index) && typeof o.available === 'boolean' &&
+          typeof o.starts_at === 'string' && Number.isFinite(Date.parse(o.starts_at)) &&
+          Array.isArray(o.alternatives) && o.alternatives.every(a => typeof a === 'string' && Number.isFinite(Date.parse(a))))) {
+          throw new Error('Invalid recurring preview response');
+        }
+        if (alive) { setList(r.occurrences); setPicks({}); }
+      })
       .catch((e) => { logFailure('series-preview', e); if (alive) setFailed(true); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

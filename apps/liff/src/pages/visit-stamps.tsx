@@ -150,6 +150,12 @@ export default function VisitStamps() {
       const account = config.data.accountId;
       setAccountId(account); setShopName(config.data.accountName ?? '');
       const list = await visitStampsApi.cards(account);
+      if (!Array.isArray(list?.data) || !list.data.every(item => item?.card && item.wallet &&
+        typeof item.card.id === 'string' && typeof item.card.name === 'string' &&
+        item.card.settings && Array.isArray(item.card.settings.rewards) &&
+        typeof item.wallet.balance === 'number' && Number.isFinite(item.wallet.balance))) {
+        throw new Error('Invalid stamp cards response');
+      }
       const wanted = new URLSearchParams(window.location.search).get('card');
       const found = currentStampCard(list.data, wanted);
       setEntry(found);
@@ -164,7 +170,7 @@ export default function VisitStamps() {
     if (!accountId || !entry) return;
     const generation = ++requestsGeneration.current;
     setRequests(null); setRequestsFailed(false);
-    try { const response = await visitStampsApi.paperRequests(accountId, entry.card.id); if (generation === requestsGeneration.current) setRequests(response.data); }
+    try { const response = await visitStampsApi.paperRequests(accountId, entry.card.id); if (!Array.isArray(response?.data)) throw new Error('Invalid paper requests response'); if (generation === requestsGeneration.current) setRequests(response.data); }
     catch (e) { logFailure('visit-stamps-paper-requests', e); if (generation === requestsGeneration.current) setRequestsFailed(true); }
   }, [accountId, entry]);
   useEffect(() => { void loadRequests(); return () => { requestsGeneration.current++; }; }, [loadRequests]);

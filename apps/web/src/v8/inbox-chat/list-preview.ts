@@ -6,5 +6,7 @@ import type { ChatListItem } from '@/lib/api'
  * （絵文字は付けない）。PC の受信箱と電話の画面で同じ言葉にする。
  */
 export function chatListPreview(chat: Pick<ChatListItem, 'lastMessageType' | 'lastMessageContent'>): string {
-  return lineMessagePreview(chat.lastMessageType, chat.lastMessageContent).replace(/\n+/g, ' ').slice(0, 60)
+  if (chat.lastMessageType != null && typeof chat.lastMessageType !== 'string') return 'メッセージを確認できません'
+  const preview = lineMessagePreview(chat.lastMessageType, chat.lastMessageContent)
+  return typeof preview === 'string' ? preview.replace(/\n+/g, ' ').slice(0, 60) : 'メッセージを確認できません'
 }

@@ -110,6 +110,7 @@ export function stepWhenLabel(mode: DeliveryMode, step: ScenarioStep, index: num
   if (mode !== 'absolute_time') return formatScheduleLabel(mode, step)
   if (!step.deliveryTime) return '時刻を入力してください'
   const days = step.offsetDays ?? 0
+  if (!Number.isSafeInteger(days) || days < 0) return '配信時刻を確認できません'
   return index === 0 ? `購読開始から${days}日後 ${step.deliveryTime}` : `${days}日後 ${step.deliveryTime}`
 }
 
@@ -119,6 +120,7 @@ export function formatScheduleLabel(mode: DeliveryMode | undefined, step: Scenar
   if (m === 'elapsed') {
     const days = step.offsetDays ?? 0
     const mins = step.offsetMinutes ?? 0
+    if (!Number.isSafeInteger(days) || days < 0 || !Number.isSafeInteger(mins) || mins < 0) return '配信時刻を確認できません'
     const h = Math.floor(mins / 60)
     const r = mins % 60
     if (days === 0 && mins === 0) return '即時（購読開始）'
@@ -128,9 +130,11 @@ export function formatScheduleLabel(mode: DeliveryMode | undefined, step: Scenar
     if (r > 0) parts.push(`${r}分`)
     return `購読開始から${parts.join('')}後`
   }
+  if (m !== 'absolute_time') return '配信時刻を確認できません'
   // absolute_time
   // R235: 時刻を消したまま「○日後の 」と出すと、設定が済んだように見える。未設定とはっきり言う。
   if (!step.deliveryTime) return '時刻を入力してください'
+  if (!Number.isSafeInteger(step.offsetDays ?? 0) || (step.offsetDays ?? 0) < 0) return '配信時刻を確認できません'
   return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime}`
 }
 

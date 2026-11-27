@@ -14,6 +14,7 @@ export function BoundaryBanner({ note, noteAlways = false }: { note?: string; no
     }).catch(() => { if (active) setStaging(false) })
     return () => { active = false }
   }, [])
-  if (!staging && !(noteAlways && note)) return null
-  return <Notice tone="info">{staging ? <span>検証環境です。予約サイトへは送りません{note ? '。' : null}</span> : null}{note && (staging || noteAlways) ? <span>{staging ? ' ' : null}{note}</span> : null}</Notice>
+  const trimmedNote = typeof note === 'string' ? note.trim() : ''
+  if (!staging && !(noteAlways && trimmedNote)) return null
+  return <Notice tone="info">{staging ? <span>検証環境です。予約サイトへは送りません{trimmedNote ? '。' : null}</span> : null}{trimmedNote && (staging || noteAlways) ? <span>{staging ? ' ' : null}{trimmedNote}</span> : null}</Notice>
 }

@@ -53,7 +53,8 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
   const [applied, setApplied] = useState('')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(20)
-  const [data, setData] = useState<GoogleHistoryData | null>(null)
+  const [loaded, setLoaded] = useState<{ accountId: string; data: GoogleHistoryData } | null>(null)
+  const data = loaded?.accountId === accountId ? loaded.data : null
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [exporting, setExporting] = useState(false)
@@ -64,7 +65,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
     setError('')
     try {
       const response = await restaurantGoogleApi.history(accountId, { kind, result, days: Number.parseInt(days, 10), q: applied || undefined, page, perPage })
-      if (version === requestVersion.current) setData(response)
+      if (version === requestVersion.current) setLoaded({ accountId, data: response })
     } catch (err) {
       if (version === requestVersion.current) setError(errorMessage(err, '変更履歴を読み込めませんでした。'))
     } finally {
@@ -72,6 +73,9 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
     }
   }, [accountId, applied, days, kind, page, perPage, result])
 
+  useEffect(() => {
+    setLoaded((current) => (current?.accountId === accountId ? current : null))
+  }, [accountId])
   useEffect(() => { void load(); return () => { requestVersion.current += 1 } }, [load])
   useEffect(() => {
     if (search === applied) return

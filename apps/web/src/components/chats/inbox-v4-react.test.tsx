@@ -80,7 +80,7 @@ function respond(method: string, url: URL, body: unknown): Response | Promise<Re
   if (path === '/api/friends/friend-a') {
     return json({ success: true, data: {
       id: 'friend-a', displayName: '表示名の人', pictureUrl: null, isFollowing: true, metadata: {}, lineAccountId: 'account-a',
-      realName: '山本 恭平', systemDisplayName: null, refCode: null, createdAt: at, tags: [], formSubmissions: [], support: null,
+      realName: '山本 恭平', systemDisplayName: null, refCode: null, createdAt: at, updatedAt: at, tags: [], formSubmissions: [], support: null,
     } })
   }
   if (path.endsWith('/read')) return json({ success: true, data: { isUnread: false } })

@@ -6,11 +6,15 @@ export function useUrlStep<T extends string>(initial: T, options?: {
   write: (search: URLSearchParams, replace: boolean) => void;
 }) {
   const [step, setValue] = useState(initial);
+  const current = useRef(step);
+  current.current = step;
   const visited = useRef(new Set<string>([initial]));
   const writer = useRef(options);
   writer.current = options;
   const read = () => new URLSearchParams(writer.current?.search ?? window.location.search).get('step');
   const setStep = useCallback((next: T) => {
+    if (current.current === next) return;
+    current.current = next;
     visited.current.add(next);
     setValue(next);
     const query = new URLSearchParams(writer.current?.search ?? window.location.search);
@@ -21,7 +25,9 @@ export function useUrlStep<T extends string>(initial: T, options?: {
   useEffect(() => {
     const next = read();
     if (next && visited.current.has(next)) setValue(next as T);
-    else if (next) {
+    else {
+      setValue(initial);
+      if (!next) return;
       const query = new URLSearchParams(writer.current?.search ?? window.location.search);
       query.set('step', initial);
       if (writer.current) writer.current.write(query, true);

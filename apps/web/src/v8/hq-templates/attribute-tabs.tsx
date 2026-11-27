@@ -1,5 +1,7 @@
 'use client'
 
+import { isKnownCount } from './store-list-stats'
+
 /*
  * ★V8 統括のタグの上のタブ（絵の。店のタグ src/v8/tags/list.tsx と同じ4つ）。
  *   タグ（統括のタグのひな形の一覧）・友だち情報欄・対応マーク・保存した検索。
@@ -16,7 +18,6 @@ import { hqOpenHref } from '@/lib/hq-navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { Tabs } from '@/components/shared/tabs'
-import styles from '../templates/list.module.css'
 import ListState from '@/components/shared/list-state'
 
 export const ATTRIBUTE_TABS = [
@@ -106,13 +107,13 @@ function nameKey(name: string): string {
  * 店の「どこにも使っていない」（配信・フォームでの使われ方）は統括の一覧に無いので見ない。
  */
 export function unusedTagCount(rows: Pick<HqTemplate, 'friend_count'>[]): number | null {
-  if (rows.some((row) => row.friend_count == null)) return null
+  if (rows.some((row) => !isKnownCount(row.friend_count))) return null
   return rows.filter((row) => row.friend_count === 0).length
 }
 
 /** 整理の候補＝未使用か、ほかのタグと名前が重なっているタグ。人数を数えていない行があれば null。 */
 export function cleanupTagCount(rows: Pick<HqTemplate, 'friend_count' | 'name'>[]): number | null {
-  if (rows.some((row) => row.friend_count == null)) return null
+  if (rows.some((row) => !isKnownCount(row.friend_count))) return null
   const seen = new Map<string, number>()
   for (const row of rows) seen.set(nameKey(row.name), (seen.get(nameKey(row.name)) ?? 0) + 1)
   return rows.filter((row) => row.friend_count === 0 || (seen.get(nameKey(row.name)) ?? 0) > 1).length
@@ -132,7 +133,7 @@ export function assignmentMethods(rows: Pick<HqTemplate, 'assignment_method'>[])
 
 export type TagUsageFilter = 'all' | 'used' | 'unused'
 export function matchesTagFilters(row: Pick<HqTemplate, 'friend_count' | 'assignment_method'>, usage: TagUsageFilter, method: string): boolean {
-  if (usage === 'used' && !((row.friend_count ?? 0) > 0)) return false
+  if (usage === 'used' && (!isKnownCount(row.friend_count) || row.friend_count === 0)) return false
   if (usage === 'unused' && row.friend_count !== 0) return false
   if (method !== 'all' && row.assignment_method !== method) return false
   return true

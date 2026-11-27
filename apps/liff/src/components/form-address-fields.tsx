@@ -73,6 +73,14 @@ function AddressFields({
       if (!stillCurrent()) return;
       if (!res.success) throw new Error('postal_code_search_failed');
       const data = res.data;
+      if (!data || !['invalid', 'none', 'matched', 'multiple'].includes(data.status) ||
+          !Array.isArray(data.candidates) ||
+          (data.status === 'matched' && data.candidates.length !== 1) ||
+          (data.status === 'multiple' && data.candidates.length < 2) ||
+          !data.candidates.every(c => c && typeof c.postalCode === 'string' &&
+            typeof c.prefecture === 'string' && typeof c.city === 'string' && typeof c.town === 'string')) {
+        throw new Error('postal_code_search_invalid_response');
+      }
       if (data.status === 'matched' && data.candidates.length === 1) {
         applyCandidate(data.candidates[0]);
         return;

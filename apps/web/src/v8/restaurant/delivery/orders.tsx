@@ -191,9 +191,10 @@ function ServiceCard({
   const stopped = state.intakeStatus === 'stopped'
   const actionReason = unavailable ? '読み込み中です' : intakeDisabledReason ?? intakeActionReason(state, stopped ? 'resume' : 'stop')
   /* 絵（kDQHr）の札は1行。いつまで止めているかは札の説明に入れ、行を増やさない。 */
-  const stopNote = stopped && state.stopUntil ? `${formatClock(state.stopUntil)} まで停止` : undefined
+  const stopClock = stopped && state.stopUntil ? formatClock(state.stopUntil) : DASH
+  const stopNote = stopClock !== DASH ? `${stopClock} まで停止` : undefined
   /* 数は推測しない。取れないときは「—」で、単位も出さない（D021/D024）。 */
-  const hasCount = typeof state.todayCount === 'number' && Number.isFinite(state.todayCount)
+  const hasCount = typeof state.todayCount === 'number' && Number.isFinite(state.todayCount) && state.todayCount >= 0
   return (
     <Card appearance="outlined" layout="vertical" gap="tight" className={styles.serviceCard} aria-label={unavailable ? undefined : label}>
       {/* 1段目：印・名前・操作。2段目：札・数。狭い幅でも札と数が重ならないよう、2段に分ける。 */}
@@ -535,10 +536,12 @@ export default function OrdersBoard({
   onPerPage,
 }: OrdersBoardProps) {
   const total = data.tabCounts[data.tab]
-  const pageCount = Math.max(1, Math.ceil(data.orders.length / perPage))
-  const currentPage = Math.min(page, pageCount)
-  const firstIndex = (currentPage - 1) * perPage
-  const visible = data.orders.slice(firstIndex, firstIndex + perPage)
+  const safePerPage = Number.isFinite(perPage) && perPage >= 1 ? Math.trunc(perPage) : 20
+  const pageCount = Math.max(1, Math.ceil(data.orders.length / safePerPage))
+  const safePage = Number.isFinite(page) ? Math.trunc(page) : 1
+  const currentPage = Math.max(1, Math.min(safePage, pageCount))
+  const firstIndex = (currentPage - 1) * safePerPage
+  const visible = data.orders.slice(firstIndex, firstIndex + safePerPage)
   /*
    * 「まとめて受け付ける」は新着だけを相手にする。
    * まとめ送りの口はWorkerに無いので、親が1件ずつ順に送る（絵の操作は変えない）。

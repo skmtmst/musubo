@@ -14,7 +14,7 @@ const LABELS: Record<(typeof STYLE_METRIC_IDS)[number], string> = {
 
 /** 指標の画面の名前。スタイル体験の見本も同じ名前を使う。 */
 export function styleMetricLabel(id: string, style: IndustryStyle) {
-  return id === 'visits' ? style === 'consult' ? '実施数' : style === 'lesson' ? '出席数' : '来店数' : LABELS[id as keyof typeof LABELS] ?? '表示できない項目'
+  return id === 'visits' ? style === 'consult' ? '実施数' : style === 'lesson' ? '出席数' : '来店数' : Object.hasOwn(LABELS, id) ? LABELS[id as keyof typeof LABELS] : '表示できない項目'
 }
 
 export function metricOptions(defaults: StyleKpi[], style: IndustryStyle) {
@@ -28,12 +28,12 @@ export function selectedKpis(style: IndustryStyle, snapshot: StyleSnapshot, rang
   return ids.map(id => {
     const existing = defaults.get(id)
     if (existing) return existing
-    const metric = snapshot.metrics[id], value = metricValue(metric)
+    const metric = Object.hasOwn(snapshot.metrics, id) ? snapshot.metrics[id] : undefined, value = metricValue(metric)
     const label = styleMetricLabel(id, style)
     return {
       id, metricId: id, title: label, value: value.value, valueText: value.valueText, unit: value.unit,
       detail: metric ? value.reason : 'まだ取得できていません',
-      help: metric?.formula || 'この項目の集計はまだ取得できていません。',
+      help: typeof metric?.formula === 'string' && metric.formula ? metric.formula : 'この項目の集計はまだ取得できていません。',
       delta: metricDelta(metric, snapshot.previous[id], id === 'noShowRate' || id === 'cancelRate'),
     }
   })

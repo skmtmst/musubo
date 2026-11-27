@@ -1,5 +1,5 @@
 /** Read existing content and spacing; only the name column receives spare width. */
-export function fitListColumns(frame) {
+export function fitListColumns(frame, deferCommit = false) {
   const table = frame?.querySelector('table')
   const rows = table ? [...table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr')].filter(row => !row.querySelector('[colspan]') && row.getBoundingClientRect().width) : []
   const body = rows.find(row => row.parentElement.tagName === 'TBODY')
@@ -11,47 +11,87 @@ export function fitListColumns(frame) {
   const cols = [...table.querySelectorAll(':scope > colgroup > col')]
   for (const col of cols) if (col.listColumnOriginalWidth === undefined) col.listColumnOriginalWidth = col.style.width
   if (frame.listColumnScope !== scope) {
-    for (const col of cols) col.style.width = col.listColumnOriginalWidth
-    for (const row of rows) for (const cell of row.children) {
-      cell.removeAttribute('data-content-name-column')
-      cell.removeAttribute('data-content-support-column')
-      cell.style.removeProperty('--list-content-column-width')
+    if (!flexibleContent) {
+      for (const col of cols) if (col.style.width !== col.listColumnOriginalWidth) col.style.width = col.listColumnOriginalWidth
+      for (const row of rows) for (const cell of row.children) {
+        if (cell.hasAttribute('data-content-name-column')) cell.removeAttribute('data-content-name-column')
+        if (cell.hasAttribute('data-content-support-column')) cell.removeAttribute('data-content-support-column')
+        if (cell.style.getPropertyValue('--list-content-column-width')) cell.style.removeProperty('--list-content-column-width')
+      }
+      frame.listColumnCeilings = [...body.children].map(cell => cell.getBoundingClientRect().width)
     }
     frame.listColumnScope = scope
-    frame.listColumnCeilings = [...body.children].map((cell, index) => flexibleContent ? Math.max(...rows.map(row => row.children[index]?.getBoundingClientRect().width ?? 0)) : cell.getBoundingClientRect().width)
   }
   const controlsOnly = frame.dataset.columnSizing === 'controls'
   const number = value => parseFloat(value) || 0
+  const doc = frame.ownerDocument || document
+  const textCache = new Map()
+  const fontKeys = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing']
+  const measureIsolatedProbe = (text, css) => {
+    const cacheKey = `${fontKeys.map(key => css[key]).join('|')}\0${text}`
+    if (textCache.has(cacheKey)) return textCache.get(cacheKey)
+    let probe = doc.__listColumnProbe
+    if (!probe || !probe.isConnected) {
+      const host = doc.createElement('div')
+      host.setAttribute('data-column-probe-host', '')
+      host.setAttribute('aria-hidden', 'true')
+      host.setAttribute('inert', '')
+      host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;contain:strict'
+      probe = doc.createElement('span')
+      probe.setAttribute('data-column-probe', '')
+      probe.style.cssText = 'position:fixed;top:0;left:0;white-space:pre;visibility:hidden;pointer-events:none'
+      host.append(probe)
+      doc.documentElement.append(host)
+      doc.__listColumnProbe = probe
+    }
+    for (const key of fontKeys) {
+      if (probe.style[key] !== css[key]) probe.style[key] = css[key]
+    }
+    probe.textContent = text
+    const width = probe.getBoundingClientRect().width
+    textCache.set(cacheKey, width)
+    return width
+  }
   const textWidth = node => {
     const css = getComputedStyle(node.nodeType === 3 ? node.parentElement : node)
-    const range = document.createRange()
+    const range = doc.createRange()
     range.selectNodeContents(node)
     const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
     if (rects.length <= 1) return range.getBoundingClientRect().width
-    const probe = document.createElement('span')
-    probe.style.cssText = 'position:fixed;visibility:hidden;white-space:pre;pointer-events:none'
-    for (const key of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing']) probe.style[key] = css[key]
-    probe.textContent = node.textContent.trim()
-    document.body.append(probe)
-    try { return probe.getBoundingClientRect().width } finally { probe.remove() }
+    const text = node.textContent.trim()
+    if (!text) return 0
+    return measureIsolatedProbe(text, css)
   }
+  const intrinsicCache = new Map()
   const intrinsic = node => {
-    if (node.nodeType === 3) return node.textContent.trim() ? textWidth(node) : 0
-    if (node.nodeType !== 1) return 0
-    const css = getComputedStyle(node)
-    if (css.display === 'none' || css.visibility === 'hidden' || node.matches('.sr-only, [hidden], [role="menu"], [role="tooltip"]')) return 0
-    if (node.matches('button, input, svg, img, video, [role="button"]') && !node.matches('[data-part="row-name"]')) return node.getBoundingClientRect().width
-    const pseudo = position => {
-      const style = getComputedStyle(node, position)
-      return style.content === 'none' || style.content === 'normal' || style.display === 'none' ? 0 : number(style.width)
+    if (intrinsicCache.has(node)) return intrinsicCache.get(node)
+    let result = 0
+    if (node.nodeType === 3) result = node.textContent.trim() ? textWidth(node) : 0
+    else if (node.nodeType === 1) {
+      const css = getComputedStyle(node)
+      if (css.display !== 'none' && css.visibility !== 'hidden' && !node.matches('.sr-only, [hidden], [role="menu"], [role="tooltip"]')) {
+        if (node.matches('button, input, svg, img, video, [role="button"]') && !node.matches('[data-part="row-name"]')) {
+          result = node.getBoundingClientRect().width
+        } else {
+          const pseudo = position => {
+            const style = getComputedStyle(node, position)
+            return style.content === 'none' || style.content === 'normal' || style.display === 'none' ? 0 : number(style.width)
+          }
+          const textOnly = node.childElementCount === 0 && node.textContent.trim()
+          const sizes = [pseudo('::before'), ...(textOnly ? [textWidth(node)] : [...node.childNodes].map(intrinsic)), pseudo('::after')].filter(size => size > 0)
+          if (!sizes.length && !node.textContent.trim()) {
+            result = controlsOnly && number(css.flexGrow) > 0 ? 0 : node.getBoundingClientRect().width
+          } else {
+            const inline = css.display === 'inline' || css.display === 'inline-flex' || (css.display === 'flex' && css.flexDirection === 'row')
+            const gapItems = controlsOnly ? [...node.childNodes].filter(child => child.nodeType === 3 ? child.textContent.trim() : child.nodeType === 1 && getComputedStyle(child).display !== 'none').length + Number(pseudo('::before') > 0) + Number(pseudo('::after') > 0) : sizes.length
+            const content = inline ? sizes.reduce((sum, size) => sum + size, 0) + number(css.columnGap) * Math.max(0, gapItems - 1) : Math.max(0, ...sizes)
+            result = content + number(css.paddingLeft) + number(css.paddingRight) + number(css.borderLeftWidth) + number(css.borderRightWidth)
+          }
+        }
+      }
     }
-    const textOnly = node.childElementCount === 0 && node.textContent.trim()
-    const sizes = [pseudo('::before'), ...(textOnly ? [textWidth(node)] : [...node.childNodes].map(intrinsic)), pseudo('::after')].filter(size => size > 0)
-    if (!sizes.length && !node.textContent.trim()) return controlsOnly && number(css.flexGrow) > 0 ? 0 : node.getBoundingClientRect().width
-    const inline = css.display === 'inline' || css.display === 'inline-flex' || (css.display === 'flex' && css.flexDirection === 'row')
-    const gapItems = controlsOnly ? [...node.childNodes].filter(child => child.nodeType === 3 ? child.textContent.trim() : child.nodeType === 1 && getComputedStyle(child).display !== 'none').length + Number(pseudo('::before') > 0) + Number(pseudo('::after') > 0) : sizes.length
-    const content = inline ? sizes.reduce((sum, size) => sum + size, 0) + number(css.columnGap) * Math.max(0, gapItems - 1) : Math.max(0, ...sizes)
-    return content + number(css.paddingLeft) + number(css.paddingRight) + number(css.borderLeftWidth) + number(css.borderRightWidth)
+    intrinsicCache.set(node, result)
+    return result
   }
   const widths = [...body.children].map((cell, index) => {
     // 割合を指定した列は、残りを割合で分け合う列。中身で測らない。
@@ -64,7 +104,8 @@ export function fitListColumns(frame) {
     const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, a, input, [data-design-node="xRvDB"], [data-list-date-time]'))
     return Math.ceil(unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
-  frame.removeAttribute('data-content-stacked')
+  if (frame.hasAttribute('data-content-stacked')) frame.removeAttribute('data-content-stacked')
+  let mustStack = false
   if (flexibleContent && !controlsOnly && ![...body.children].some(cell => cell.hasAttribute('data-cell-weight'))) {
     const header = rows.find(row => row.parentElement.tagName === 'THEAD')
     const shortContentWidth = cell => {
@@ -88,8 +129,7 @@ export function fitListColumns(frame) {
     const nameBudget = Math.max(nameMinimum, Math.min(nameContent, contentBudget - controls - minimumTotal))
     const available = Math.max(0, contentBudget - nameBudget - controls)
     const total = widths.reduce((sum, width, index) => sum + (fixed[index] ? 0 : width ?? 0), 0)
-    const mustStack = minimumTotal + controls + nameMinimum > contentBudget
-    frame.toggleAttribute('data-content-stacked', mustStack)
+    mustStack = minimumTotal + controls + nameMinimum > contentBudget
     if (mustStack) {
       widths.forEach((width, index) => { if (width !== null && !fixed[index]) widths[index] = minimum[index] })
     } else if (total > available) {
@@ -110,23 +150,34 @@ export function fitListColumns(frame) {
     const room = Math.max(0, table.getBoundingClientRect().width - fixed)
     weights.forEach((weight, index) => { if (weight > 0 && body.children[index].getBoundingClientRect().width) widths[index] = Math.floor(room * weight / weightTotal) })
   }
-  if (frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')) {
-    const columns = widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ')
-    frame.style.setProperty('--table-content-columns', columns)
-  }
-  // A native fixed-layout table reads <col> before the first row's cell width.
-  // Keep its column model in sync with the same measured content budget.
-  if (getComputedStyle(body).display !== 'flex') {
-    for (const [index, col] of [...table.querySelectorAll(':scope > colgroup > col')].entries()) {
-      col.style.width = widths[index] != null ? `${widths[index]}px` : col.listColumnOriginalWidth
+  const bodyIsFlex = getComputedStyle(body).display === 'flex'
+  const commit = () => {
+    if (frame.hasAttribute('data-content-stacked') !== mustStack) frame.toggleAttribute('data-content-stacked', mustStack)
+    if (frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')) {
+      const columns = widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ')
+      if (frame.style.getPropertyValue('--table-content-columns') !== columns) frame.style.setProperty('--table-content-columns', columns)
+    }
+    // A native fixed-layout table reads <col> before the first row's cell width.
+    // Keep its column model in sync with the same measured content budget.
+    if (!bodyIsFlex) {
+      for (const [index, col] of cols.entries()) {
+        const nextWidth = widths[index] != null ? `${widths[index]}px` : col.listColumnOriginalWidth
+        if (col.style.width !== nextWidth) col.style.width = nextWidth
+      }
+    }
+    for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
+      const isName = index === nameIndex
+      const isSupport = widths[index] !== null && widths[index] !== undefined
+      if (cell.hasAttribute('data-content-name-column') !== isName) cell.toggleAttribute('data-content-name-column', isName)
+      if (cell.hasAttribute('data-content-support-column') !== isSupport) cell.toggleAttribute('data-content-support-column', isSupport)
+      if (isSupport) {
+        const value = `${widths[index]}px`
+        if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
+      } else if (cell.style.getPropertyValue('--list-content-column-width')) {
+        cell.style.removeProperty('--list-content-column-width')
+      }
     }
   }
-  for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
-    cell.toggleAttribute('data-content-name-column', index === nameIndex)
-    cell.toggleAttribute('data-content-support-column', widths[index] !== null && widths[index] !== undefined)
-    if (widths[index] !== null && widths[index] !== undefined) {
-      const value = `${widths[index]}px`
-      if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
-    }
-  }
+  if (deferCommit) return commit
+  commit()
 }

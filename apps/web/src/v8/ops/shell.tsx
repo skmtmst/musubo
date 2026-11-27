@@ -47,13 +47,24 @@ export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutD
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 
+function normalizeOpsPath(pathname: string): string {
+  const withoutQuery = pathname.split(/[?#]/)[0] ?? ''
+  const trimmed = withoutQuery.replace(/\/+$/, '')
+  return trimmed || '/'
+}
+
+function pathMatches(cleanPath: string, href: string): boolean {
+  return cleanPath === href || cleanPath.startsWith(`${href}/`)
+}
+
 /** 道から画面名を引く（パンくずの最後の段）。 */
 export function opsTitleForPath(pathname: string): string {
+  const clean = normalizeOpsPath(pathname)
+  if (pathMatches(clean, '/ops/tenants/detail')) return '契約先の詳細'
+  if (pathMatches(clean, '/ops/applications/detail')) return '申込アカウント › 詳細'
   const all = [...OPS_MENU, { href: '/ops/members', label: 'メンバー管理' }, { href: '/ops/invite', label: 'メンバーの招待' }, { href: '/ops/two-factor', label: '二段階認証' }]
-  const hit = all.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+  const hit = all.filter((item) => pathMatches(clean, item.href))
     .sort((a, b) => b.href.length - a.href.length)[0]
-  if (pathname.startsWith('/ops/tenants/detail')) return '契約先の詳細'
-  if (pathname.startsWith('/ops/applications/detail')) return '申込アカウント › 詳細'
   return hit?.label ?? ''
 }
 
@@ -95,8 +106,13 @@ function OpsShellFrame({
   }, [])
   useEffect(() => { setDrawer(false) }, [pathname])
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
+  const cleanPath = normalizeOpsPath(pathname)
+  const isActive = (href: string) => pathMatches(cleanPath, href)
   const title = opsTitleForPath(pathname)
+  const subTitle = pageChrome.title?.trim() ?? ''
+  const topBarTitle = title
+    ? `運営 › ${title}${subTitle && subTitle !== title ? ` › ${subTitle}` : ''}`
+    : subTitle ? `運営 › ${subTitle}` : '運営'
 
   const menu = (
     <>
@@ -174,7 +190,7 @@ function OpsShellFrame({
         <div className={`${shellStyles.side} ${styles.side}`}>
           <div className="hidden xl:block v8-topbar-wrap">
             <TopBar
-              title={title ? `運営 › ${title}${pageChrome.title ? ` › ${pageChrome.title}` : ''}` : '運営'}
+              title={topBarTitle}
               manualHref={null}
               accounts={[{ id: 'ops', label: '運営コンソール', mark: 'm' }]}
               selectedAccountId="ops"

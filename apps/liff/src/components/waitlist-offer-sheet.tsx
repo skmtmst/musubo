@@ -14,7 +14,11 @@ export default function WaitlistOfferSheet({ id, seat = false, decline = false, 
   const key = useRef(crypto.randomUUID());
   const busy = useRef(false);
   const [readAttempt, setReadAttempt] = useState(0);
-  useEffect(() => { let alive = true; setEntry(null); setError(null); const request = seat ? api.seatWaitlists(id) : api.bookingWaitlists(id); request.then(r => { if (!alive) return; const own = r.waitlist.find(w => w.id === id); if (own) setEntry(own); else setError('この案内が見つかりません。'); }).catch(() => { if (alive) setError('案内を読み込めません。もう一度お試しください。'); }); const timer = setInterval(() => setNow(Date.now()), 1000); return () => { alive = false; clearInterval(timer); }; }, [id, seat, readAttempt]);
+  useEffect(() => { let alive = true; setEntry(null); setError(null); const request = seat ? api.seatWaitlists(id) : api.bookingWaitlists(id); request.then(r => { if (!alive) return; const own = r.waitlist.find(w => w.id === id); if (own) {
+    if (!['waiting', 'invited', 'converted', 'cancelled', 'finished'].includes(own.status) ||
+        !Number.isFinite(Date.parse(own.starts_at))) throw new Error('Invalid waitlist offer');
+    setEntry(own);
+  } else setError('この案内が見つかりません。'); }).catch(() => { if (alive) setError('案内を読み込めません。もう一度お試しください。'); }); const timer = setInterval(() => setNow(Date.now()), 1000); return () => { alive = false; clearInterval(timer); }; }, [id, seat, readAttempt]);
   const active = entry?.status === 'invited' && !!entry.hold_expires_at && Date.parse(entry.hold_expires_at) > now;
   const title = outcome ? '予約の状態をご確認ください' : message ? '手続きが完了しました' : working ? '手続き中です' : error ? (entry ? '手続きを完了できませんでした' : '案内を確認できません') : !entry ? '案内を確認しています' : active ? (decline ? '今回は見送る' : '空きが出ました') : entry.status === 'waiting' ? '空きの案内を待っています' : entry.status === 'converted' ? 'この案内は予約になりました' : 'この待ちは終了しました';
   const remaining = Math.max(0, Math.ceil(((entry?.hold_expires_at ? Date.parse(entry.hold_expires_at) : now) - now) / 1000));

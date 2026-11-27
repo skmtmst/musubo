@@ -126,12 +126,16 @@ export default function EventConfirm() {
       );
       if (!request.isCurrent(generation)) return;
       const startsAt = `startsAt=${encodeURIComponent(slot?.starts_at ?? '')}`;
-      if ('waitlisted' in res) {
+      if (res && 'waitlisted' in res && res.waitlisted === true && typeof res.slot_id === 'string' && res.slot_id === slotId) {
         // 完了画面で自分の待ち (順番・やめる) を探すため、待ちに入った枠を渡す。
         goDone(`status=waitlisted&waitSlot=${encodeURIComponent(res.slot_id)}&${startsAt}`);
         return;
       }
-      goDone(`bookingId=${res.id}&status=${res.status}&${startsAt}`);
+      if (res && 'id' in res && typeof res.id === 'string' && res.id.trim() && (res.status === 'confirmed' || res.status === 'requested')) {
+        goDone(`bookingId=${encodeURIComponent(res.id)}&status=${res.status}&${startsAt}`);
+        return;
+      }
+      setSubmitError(`申し込みの結果を確認できませんでした。${words.myEvents}でも状態を確認してください。`);
     } catch (err) {
       if (!request.isCurrent(generation)) return;
       logFailure('create-event-booking', err);

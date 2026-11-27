@@ -107,7 +107,7 @@ function DeliveryInner() {
 
   /* ── URL から今の見た目を決める ───────────────────────────── */
   const requestedView = searchParams.get('view')
-  const view: DeliveryView = requestedView && requestedView in VIEW_BOARDS
+  const view: DeliveryView = requestedView && Object.prototype.hasOwnProperty.call(VIEW_BOARDS, requestedView)
     ? (requestedView as DeliveryView)
     : 'orders'
   const requestedTab = searchParams.get('tab') as DeliveryOrderTab | null
@@ -157,6 +157,7 @@ function DeliveryInner() {
     setIntakeJobs(new Map(intakeBusy.current))
   }, [])
   const [bulkBusy, setBulkBusy] = useState(false)
+  const bulkBusyRef = useRef(false)
 
   /* ── 注文の詳細（hjdqV）とキャンセル（dgeTy） ─────────────── */
   const [detail, setDetail] = useState<DeliveryOrderDetailData | null>(null)
@@ -174,6 +175,7 @@ function DeliveryInner() {
 
   /* ── 注文履歴・売上（OzHLO） ─────────────────────────────── */
   const [history, setHistory] = useState<DeliveryHistoryData | null>(null)
+  const historyRequestId = useRef(0)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyDate, setHistoryDate] = useState(() => storeToday())
@@ -181,6 +183,7 @@ function DeliveryInner() {
   const [historyPage, setHistoryPage] = useState(1)
   const [historyPerPage, setHistoryPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [csvBusy, setCsvBusy] = useState(false)
+  const csvBusyRef = useRef(false)
   const [csvNote, setCsvNote] = useState<string | null>(null)
 
   /* ── 品切れ一括設定（h7OeT） ─────────────────────────────── */
@@ -343,7 +346,14 @@ function DeliveryInner() {
   const currentDetail = detailAccountId === selectedAccountId ? detail : null
 
   const loadHistory = useCallback(async () => {
-    if (!selectedAccountId) return
+    const requestId = ++historyRequestId.current
+    setCsvNote(null)
+    if (!selectedAccountId) {
+      setHistory(null)
+      setHistoryError(null)
+      setHistoryLoading(false)
+      return
+    }
     setHistoryLoading(true)
     setHistoryError(null)
     try {
@@ -352,19 +362,22 @@ function DeliveryInner() {
         to: historyDate,
         ...(historyService ? { service: historyService } : {}),
       })
+      if (requestId !== historyRequestId.current) return
       setHistory(next)
       setHistoryPage(1)
     } catch (err) {
+      if (requestId !== historyRequestId.current) return
       setHistory(null)
       setHistoryError(errorMessage(err, '注文履歴を読み込めませんでした。'))
     } finally {
-      setHistoryLoading(false)
+      if (requestId === historyRequestId.current) setHistoryLoading(false)
     }
   }, [selectedAccountId, historyDate, historyService])
 
   useEffect(() => {
     if (view !== 'history') return
     void loadHistory()
+    return () => { historyRequestId.current += 1 }
   }, [view, loadHistory])
 
   const loadItems = useCallback(async () => {
@@ -488,36 +501,45 @@ function DeliveryInner() {
    * 途中で失敗しても残りは続け、終わったあとに数で伝える。
    */
   const bulkAccept = useCallback(async () => {
+    if (bulkBusyRef.current || currentIntake.current.scope !== intakeScope || !currentIntake.current.canManage) return
     if (!canManage || !selectedAccountId || selected.length === 0) return
     const targets = (data?.orders ?? []).filter(
       (order) => order.status === 'new' && order.service !== 'ubereats' && selected.includes(order.id),
     )
     if (targets.length === 0) return
+    bulkBusyRef.current = true
     setBulkBusy(true)
     setNotice(null)
     let done = 0
     let failed = 0
-    for (const order of targets) {
-      try {
-        if (!Number.isSafeInteger(order.version)) throw new Error('注文の版を読み直してください')
-        await restaurantDeliveryApi.accept(selectedAccountId, order.id, order.version)
-        done += 1
-      } catch {
-        failed += 1
+    try {
+      for (const order of targets) {
+        if (!intakeMounted.current || currentIntake.current.scope !== intakeScope || !currentIntake.current.canManage) return
+        try {
+          if (!Number.isSafeInteger(order.version)) throw new Error('注文の版を読み直してください')
+          await restaurantDeliveryApi.accept(selectedAccountId, order.id, order.version)
+          done += 1
+        } catch {
+          failed += 1
+        }
       }
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
+      setSelected([])
+      await loadOrders(true)
+      if (!intakeMounted.current || currentIntake.current.scope !== intakeScope) return
+      if (failed === 0) {
+        setNotice({ tone: 'success', text: `${done}件の注文を受け付けました。` })
+      } else {
+        setNotice({
+          tone: 'warn',
+          text: `${done}件を受け付けました。${formatNumber(failed)}件は受け付けられませんでした。もう一度お試しください。`,
+        })
+      }
+    } finally {
+      bulkBusyRef.current = false
+      if (intakeMounted.current) setBulkBusy(false)
     }
-    setSelected([])
-    setBulkBusy(false)
-    await loadOrders(true)
-    if (failed === 0) {
-      setNotice({ tone: 'success', text: `${done}件の注文を受け付けました。` })
-    } else {
-      setNotice({
-        tone: 'warn',
-        text: `${done}件を受け付けました。${formatNumber(failed)}件は受け付けられませんでした。もう一度お試しください。`,
-      })
-    }
-  }, [canManage, selectedAccountId, selected, data, loadOrders])
+  }, [canManage, intakeScope, selectedAccountId, selected, data, loadOrders])
 
   const submitCancel = useCallback(async () => {
     const order = cancelTarget
@@ -683,7 +705,9 @@ function DeliveryInner() {
 
   /* ── CSVで保存 ─────────────────────────────────────────── */
   const saveCsv = useCallback(async () => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || csvBusyRef.current) return
+    const requestScope = currentIntake.current.scope
+    csvBusyRef.current = true
     setCsvBusy(true)
     setCsvNote(null)
     setNotice(null)
@@ -693,15 +717,18 @@ function DeliveryInner() {
         to: historyDate,
         ...(historyService ? { service: historyService } : {}),
       })
+      if (!intakeMounted.current || currentIntake.current.scope !== requestScope) return
       if (result.truncated) {
         setCsvNote(`上限のため${result.returnedCount ?? 0}件まで保存しました（全${result.totalCount ?? 0}件）。期間やサービスを絞ってもう一度保存してください。`)
       } else {
         setNotice({ tone: 'success', text: 'CSVを保存しました。' })
       }
     } catch (err) {
+      if (!intakeMounted.current || currentIntake.current.scope !== requestScope) return
       setNotice({ tone: 'danger', text: errorMessage(err, 'CSVを保存できませんでした。') })
     } finally {
-      setCsvBusy(false)
+      csvBusyRef.current = false
+      if (intakeMounted.current) setCsvBusy(false)
     }
   }, [selectedAccountId, historyDate, historyService])
 

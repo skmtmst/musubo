@@ -89,8 +89,14 @@ export function mergeMediaLinks(media: StoreMedium[], links: MediaLinkRow[]): St
 export async function loadStoreMedia(accountId: string, storeId: string): Promise<StoreMedium[]> {
   const [channels, links] = await Promise.all([
     fetchApi<{ success: true; data: ChannelRow[] }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`)
-      .then((res) => toMedia(res.data)),
-    Promise.resolve().then(() => restaurantTestApi.mediaLinks(accountId, storeId)).then((res) => res.data as MediaLinkRow[]),
+      .then((res) => {
+        if (!Array.isArray(res?.data)) throw new Error('invalid_channels_response')
+        return toMedia(res.data)
+      }),
+    Promise.resolve().then(() => restaurantTestApi.mediaLinks(accountId, storeId)).then((res) => {
+      if (!Array.isArray(res?.data)) throw new Error('invalid_media_links_response')
+      return res.data as MediaLinkRow[]
+    }),
   ])
   return mergeMediaLinks(channels, links)
 }
@@ -138,7 +144,19 @@ export function useStoreToday(accountId: string | null): StoreToday {
     const request = ++snapshotRequest.current
     storeRequest.current += 1
     const definitionRequest = begin(accountId)
-    if (!accountId) { setSnapshot(null); setLoading(false); return }
+    if (!accountId) {
+      setSnapshot(null)
+      setStoreSelection(null)
+      setToday(null)
+      setRotation(null)
+      setMedia(null)
+      setCloseTasks(null)
+      setHours(null)
+      setError(null)
+      setUpdatedAt(null)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const [snapshotResult, contextResult] = await Promise.allSettled([
@@ -182,15 +200,31 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   }, [accountId, storeId])
 
-  useEffect(() => { void loadSnapshot() }, [loadSnapshot])
+  useEffect(() => {
+    setSnapshot(null)
+    setStoreSelection(null)
+    setError(null)
+    setUpdatedAt(null)
+    void loadSnapshot()
+  }, [loadSnapshot])
 
   useEffect(() => {
     let current = true
+    let hoursSeq = 0
+    setToday(null)
+    setRotation(null)
+    setMedia(null)
+    setCloseTasks(null)
+    setHours(null)
+    setUpdatedAt(null)
     if (!accountId || !storeId) return
     void loadStore()
-    const loadHours = () => restaurantTestApi.openingHours(accountId, storeId, toYmd(new Date()))
-      .then((res) => { if (current) setHours(res.data.hours ?? null) })
-      .catch(() => { if (current) setHours(null) })
+    const loadHours = () => {
+      const seq = ++hoursSeq
+      return restaurantTestApi.openingHours(accountId, storeId, toYmd(new Date()))
+        .then((res) => { if (current && seq === hoursSeq) setHours(res.data.hours ?? null) })
+        .catch(() => { if (current && seq === hoursSeq) setHours(null) })
+    }
     void loadHours()
     const timer = setInterval(() => { void loadStore(); void loadHours() }, 30_000)
     return () => { current = false; clearInterval(timer) }
@@ -198,6 +232,9 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   useEffect(() => {
     let current = true
+    setGoogle(null)
+    setLatestReview(null)
+    setOldestReview(null)
     if (!accountId) return
     void restaurantGoogleApi.connection(accountId).then((res) => {
       if (!current) return

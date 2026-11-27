@@ -12,7 +12,7 @@ export function fieldOf(detail: Extract<HqFriendAttributeDetail, { definition: H
     ecFieldPath: field.ecFieldPath ?? null, ecIsMaster: field.ecIsMaster ?? false,
     isPersonal: field.isPersonal ?? false, isStarred: field.isStarred ?? false, displayOrder: field.displayOrder ?? 0,
     createdAt: '', updatedAt: detail.template.updated_at, version: detail.template.revision,
-    ...(count == null ? {} : { usageCount: count }),
+    ...(typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? { usageCount: count } : {}),
   }
 }
 export function markOf(detail: HqFriendAttributeDetail, count?: number | null): SupportMarkListItem {

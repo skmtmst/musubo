@@ -66,6 +66,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage, dialogO
     void api.entryRoutes.list(selectedAccountId)
       .then((res) => {
         if (!res.success) throw new Error('routes_unavailable')
+        if (!Array.isArray(res.data) || res.data.some((route) => !route || typeof route.id !== 'string' || typeof route.name !== 'string' || typeof route.refCode !== 'string' || typeof route.isActive !== 'boolean')) throw new Error('invalid_routes')
         if (!cancelled) setRoutesSnapshot({ accountId: selectedAccountId, items: res.data.filter((route) => route.isActive), error: false })
       })
       .catch(() => { if (!cancelled) setRoutesSnapshot({ accountId: selectedAccountId, items: null, error: true }) })

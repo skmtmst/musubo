@@ -136,6 +136,8 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
     fireEvent.click(screen.getByRole('button', { name: '設定：変えられる（変更できる）' }))
 
     await waitFor(() => expect(screen.getByText('変更後の予定')).toBeTruthy())
+    expect(screen.getByRole('button', { name: '見せる範囲を保存する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'キャンセル' })).toBeTruthy()
     expect(screen.getByText(/いまの設定から変わるのは1項目/)).toBeTruthy()
     expect(screen.getAllByText(/出さない項目はありません/).length).toBeGreaterThan(0)
   })
@@ -150,6 +152,16 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
     expect(screen.queryByText(/変わる項目の内訳は未確認です/)).toBeNull()
     expect(screen.getByText(/いまの設定と同じ内容です/)).toBeTruthy()
     expect(screen.queryByText('変更後の予定')).toBeNull()
+  })
+
+  it('保存済みの内訳が不明な個別設定は未確認と伝える', async () => {
+    const originalMembers = state.members
+    state.users[0] = accessUser({ roleBundle: 'custom' })
+    state.members = originalMembers.filter((member) => member.id === 'me')
+    try {
+      await openPermissionView()
+      expect(screen.getByText(/項目ごとの内訳は取得できていません（未確認）/)).toBeTruthy()
+    } finally { state.members = originalMembers }
   })
 
   it('「つながる先」は実リンクで遷移先を持つ', async () => {

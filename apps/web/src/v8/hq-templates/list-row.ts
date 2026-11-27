@@ -7,7 +7,11 @@ import type { HqTemplate } from '@/lib/hq-templates-api'
  * 名前の下は内容の要約（例「本文・画像 1」）。要約が無い古い返事・読めない内容は今までどおり説明か種類名。
  */
 export function templateSubLine(row: Pick<HqTemplate, 'content_summary' | 'description'>, typeLabel: string): string {
-  return row.content_summary || row.description || typeLabel
+  const summary = row.content_summary
+  if (summary != null && typeof summary !== 'string') return '内容を確認できません'
+  const description = row.description
+  if (!summary && description != null && typeof description !== 'string') return '内容を確認できません'
+  return summary || description || typeLabel
 }
 
 /**
@@ -16,8 +20,10 @@ export function templateSubLine(row: Pick<HqTemplate, 'content_summary' | 'descr
  */
 export function distributedAccountsLine(row: Pick<HqTemplate, 'distributed_account_names' | 'distributed_account_more'>): string | null {
   const names = row.distributed_account_names ?? []
-  if (names.length === 0) return null
+  if (!Array.isArray(names) || names.some((name) => typeof name !== 'string')) return '配布先を確認できません'
   const more = row.distributed_account_more ?? 0
+  if (typeof more !== 'number' || !Number.isSafeInteger(more) || more < 0) return '配布先を確認できません'
+  if (names.length === 0) return more > 0 ? '配布先を確認できません' : null
   return more > 0 ? `${names.join('・')} ほか ${more}` : names.join('・')
 }
 

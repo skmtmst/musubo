@@ -32,10 +32,12 @@ export default function VideoMetadata({ webinar, children }: { webinar: Webinar;
   }, [mediaId, accountId, retry])
   const hasVideo = Boolean(webinar.videoPrefix || mediaId)
   const name = media?.filename ?? (hasVideo ? '設定済みの動画' : '—（未設定）')
-  const description = media ? [media.filename, KIND_LABEL[media.kind], media.durationMs && media.durationMs > 0 ? fmtSec(Math.round(media.durationMs / 1000)) : null].filter(Boolean).join('・') : name
+  const kindLabel = media && Object.hasOwn(KIND_LABEL, media.kind) ? KIND_LABEL[media.kind] : '種類を確認できません'
+  const duration = Number.isFinite(webinar.durationSeconds) && webinar.durationSeconds >= 0 ? fmtJaDuration(webinar.durationSeconds) : '再生時間を確認できません'
+  const description = media ? [media.filename, kindLabel, media.durationMs && media.durationMs > 0 ? fmtSec(Math.round(media.durationMs / 1000)) : null].filter(Boolean).join('・') : name
   const metadata = <>
     <span className={styles.videoName} title={description}>{name}</span>
-    <span className={styles.videoMeta}>{hasVideo ? `${fmtJaDuration(webinar.durationSeconds)}・16:9・自動再生なし` : '差し替えるから登録メディアの動画を選びます'}</span>
+    <span className={styles.videoMeta}>{hasVideo ? `${duration}・16:9・自動再生なし` : '差し替えるから登録メディアの動画を選びます'}</span>
   </>
   return <>
     {children ? children(metadata) : metadata}

@@ -10,17 +10,26 @@ import LoadingView from '../components/loading-view.js';
 import StatusView from '../components/ui/status-view.js';
 
 type Catalog=Awaited<ReturnType<typeof api.listEvents>>;
+function checkedCatalog(value: Catalog): Catalog {
+ if (!value || !Array.isArray(value.items) || !(value.nextCursor === null || typeof value.nextCursor === 'string') ||
+     !value.items.every(item => item && typeof item.id === 'string' && item.id.trim() !== '' &&
+       typeof item.name === 'string' && typeof item.nextStartsAt === 'string' && Number.isFinite(Date.parse(item.nextStartsAt)) &&
+       (item.venue_name === null || typeof item.venue_name === 'string'))) {
+  throw new Error('Invalid event catalog response');
+ }
+ return value;
+}
 export default function EventCatalog() {
  const [data,setData]=useState<Catalog|null>(null),[error,setError]=useState(false),[busy,setBusy]=useState(false),[tick,setTick]=useState(0),[moreError,setMoreError]=useState(false);
  const generation=useRef(0),pending=useRef(false);
  const navigate=useNavigate(),{search}=useLocation();
- useEffect(()=>{const scope=generation.current+1;generation.current=scope;pending.current=false;setBusy(false);setMoreError(false);setError(false);setData(null);void api.listEvents().then(data=>{if(generation.current===scope)setData(data)}).catch(()=>{if(generation.current===scope)setError(true)});return ()=>{generation.current=scope+1}},[tick]);
+ useEffect(()=>{const scope=generation.current+1;generation.current=scope;pending.current=false;setBusy(false);setMoreError(false);setError(false);setData(null);void api.listEvents().then(checkedCatalog).then(data=>{if(generation.current===scope)setData(data)}).catch(()=>{if(generation.current===scope)setError(true)});return ()=>{generation.current=scope+1}},[tick]);
  const more=async()=>{
   if(!data?.nextCursor||pending.current)return;
   const cursor=data.nextCursor,scope=generation.current;
   pending.current=true;setBusy(true);
   try{
-   const next=await api.listEvents(cursor);
+   const next=checkedCatalog(await api.listEvents(cursor));
    if(generation.current!==scope)return;
    setData(current=>{
     if(!current||current.nextCursor!==cursor)return current;

@@ -38,13 +38,25 @@ const TEAR_SHORT: Record<string, string> = { normal: 'なし', mild: '少し', c
 const STOOL_OK = new Set(['normal'])
 const APPETITE_OK = new Set(['normal', 'good'])
 
+function parseHealthDate(value: string): Date {
+  const trimmed = typeof value === 'string' ? value.trim() : ''
+  if (!trimmed) return new Date(Number.NaN)
+  const normalized = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmed) && !/Z$|[+-]\d{2}:?\d{2}$/i.test(trimmed)
+    ? `${trimmed.replace(' ', 'T')}Z`
+    : trimmed
+  return new Date(normalized)
+}
+
 /** 「こむぎ（犬・柴・4歳）・見本 太郎さん・9/1〜9/30」。 */
 function petLine(summary: NenHealthSummaryData): string {
   const kind = petAnimalTypeLabel(summary.pet.animalType)
   const parts = [kind, summary.pet.breed, summary.pet.ageLabel === '—' ? '' : summary.pet.ageLabel].filter(Boolean).join('・')
-  const end = new Date(summary.generatedAt)
-  const start = new Date(end.getTime() - (summary.summary.days - 1) * 86_400_000)
-  const range = Number.isNaN(end.getTime()) ? '' : `・${polishFormatDate(start, { style: 'list-day' })}〜${polishFormatDate(end, { style: 'list-day' })}`
+  const end = parseHealthDate(summary.generatedAt)
+  const validDays = Number.isFinite(summary.summary.days) && summary.summary.days >= 1
+  const start = validDays ? new Date(end.getTime() - (summary.summary.days - 1) * 86_400_000) : null
+  const range = !Number.isNaN(end.getTime()) && start && !Number.isNaN(start.getTime())
+    ? `・${polishFormatDate(start, { style: 'list-day' })}〜${polishFormatDate(end, { style: 'list-day' })}`
+    : ''
   return `${summary.pet.name || summary.pet.callName}（${parts}）・${withHonorific(summary.owner.name)}${range}`
 }
 
@@ -72,8 +84,11 @@ export default function SummaryDrawerV8({
   onPrint: () => void
 }) {
   const s = summary?.summary
-  const weightDelta = s?.weight ? s.weight.last - s.weight.first : null
-  const weightPercent = s?.weight && s.weight.first !== 0 && weightDelta !== null ? Math.round((weightDelta / s.weight.first) * 100) : null
+  const hasValidWeight = Boolean(s?.weight && Number.isFinite(s.weight.first) && Number.isFinite(s.weight.last))
+  const weightDelta = hasValidWeight && s?.weight ? s.weight.last - s.weight.first : null
+  const weightPercent = hasValidWeight && s?.weight && s.weight.first > 0 && weightDelta !== null
+    ? Math.round((weightDelta / s.weight.first) * 100)
+    : null
   const notes = new Map((s?.notes ?? []).map((note) => [note.loggedOn, note.note]))
 
   return (
@@ -130,7 +145,7 @@ export default function SummaryDrawerV8({
                 <tbody>{s.logs.map(log => (
                   <Tr key={log.loggedOn}>
                     <Td><TruncatedText value={md(log.loggedOn)} /></Td>
-                    <Td><TruncatedText value={log.weightKg == null ? emptyValue('unknown') : `${log.weightKg}kg`} /></Td>
+                    <Td><TruncatedText value={log.weightKg == null || !Number.isFinite(log.weightKg) ? emptyValue('unknown') : `${log.weightKg}kg`} /></Td>
                     <Td><TruncatedText tone={STOOL_OK.has(log.stool) ? undefined : 'warning'} value={summary.labels.stool[log.stool] ?? log.stool} /></Td>
                     <Td><TruncatedText tone={APPETITE_OK.has(log.appetite) ? undefined : 'warning'} value={summary.labels.appetite[log.appetite] ?? log.appetite} /></Td>
                     <Td><TruncatedText value={log.skin ? knownValue(SKIN_LABELS, log.skin, log.skin) : emptyValue('unknown')} /></Td>
@@ -159,9 +174,11 @@ export default function SummaryDrawerV8({
 function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string }) {
   const byDay = new Map<string, number>()
   for (const log of logs) {
-    if (log.weightKg != null && !byDay.has(log.loggedOn)) byDay.set(log.loggedOn, log.weightKg)
+    if (typeof log.weightKg === 'number' && Number.isFinite(log.weightKg) && log.weightKg >= 0 && !byDay.has(log.loggedOn)) {
+      byDay.set(log.loggedOn, log.weightKg)
+    }
   }
-  const base = new Date(generatedAt)
+  const base = parseHealthDate(generatedAt)
   const end = Number.isNaN(base.getTime()) ? new Date() : base
   const days: Array<{ key: string; value: number | null }> = []
   for (let i = 29; i >= 0; i--) {

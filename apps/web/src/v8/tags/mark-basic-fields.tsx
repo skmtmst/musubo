@@ -19,14 +19,22 @@ const COLORS = [
 ] as const
 
 export default function MarkBasicFields({ name, color, onName, onColor, nameDuplicates = [], disabled = false, error, nameRef }: { name: string; color: string; onName: (name: string) => void; onColor: (color: string) => void; nameDuplicates?: string[]; disabled?: boolean; error?: string; nameRef?: Ref<HTMLInputElement> }) {
+  const handleName = (next: string) => {
+    if (disabled) return
+    onName(next)
+  }
+  const handleColor = (next: string | null) => {
+    if (disabled || !next) return
+    onColor(next)
+  }
   return (
             <Card variant="form" gap="normal" aria-labelledby="mark-basic">
               <CardHeader size="stacked" titleId="mark-basic" title="基本" />
-              <Field requirement={markNameRequirement} error={error} label="マーク名"><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} value={name} onChange={(event) => onName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
+              <Field requirement={markNameRequirement} error={error} label="マーク名"><SaveErrorField names={["name"]}><TextField ref={nameRef} aria-label="マーク名" invalid={Boolean(error)} disabled={disabled} value={name} onChange={(event) => handleName(event.target.value)} placeholder="例：要確認" /></SaveErrorField>
 <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" /></Field>
               <div className={styles.colorField} role="group" aria-labelledby="mark-color">
                 <span className={styles.labelStrong} id="mark-color">色</span>
-                <FolderColorButton appearance="palette" label="マークの色" colors={COLORS} value={color} disabled={disabled} onChange={next => { if (next) onColor(next) }} />
+                <FolderColorButton appearance="palette" label="マークの色" colors={COLORS} value={color} disabled={disabled} onChange={handleColor} />
                 <p className={styles.keyNote}>赤・オレンジ・緑・青・紫・グレー（色と名前の両方で見分ける）</p>
               </div>
             </Card>

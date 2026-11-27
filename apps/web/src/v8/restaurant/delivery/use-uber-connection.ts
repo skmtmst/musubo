@@ -8,14 +8,25 @@ export function useUberConnection(accountId: string | null): DeliveryConnectionS
   const [connection, setConnection] = useState<{ accountId: string; status: DeliveryConnectionStatus } | null>(null)
   useEffect(() => {
     let current = true
+    setConnection(null)
     if (!accountId) return
-    void restaurantDeliveryApi.ubereatsConnection(accountId).then(({ connection }) => {
+    void restaurantDeliveryApi.ubereatsConnection(accountId).then((res) => {
       if (!current) return
-      const unknown = connection.lastError === 'pos_activation_started' || connection.lastError === 'pos_activation_unknown'
-      const status: DeliveryConnectionStatus = unknown || connection.status === 'expired' || connection.status === 'no_permission'
-        ? 'error'
-        : connection.status === 'connected' ? 'connected' : 'disconnected'
-      setConnection({ accountId, status })
+      const conn = res?.connection
+      if (!conn || typeof conn !== 'object') {
+        setConnection(null)
+        return
+      }
+      const unknown = conn.lastError === 'pos_activation_started' || conn.lastError === 'pos_activation_unknown'
+      let status: DeliveryConnectionStatus | null = null
+      if (unknown || conn.status === 'expired' || conn.status === 'no_permission') {
+        status = 'error'
+      } else if (conn.status === 'connected') {
+        status = 'connected'
+      } else if (conn.status === 'disconnected' || conn.status === 'pending_store') {
+        status = 'disconnected'
+      }
+      setConnection(status ? { accountId, status } : null)
     }).catch(() => {
       if (current) setConnection(null)
     })

@@ -1,6 +1,6 @@
 export function scenarioReachCountLabel(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0
-    ? `${Math.floor(value)} 人`
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? `${value} 人`
     : '—'
 }
 

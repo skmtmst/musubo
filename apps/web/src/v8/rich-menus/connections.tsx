@@ -94,6 +94,7 @@ function Connections() {
   const [group, setGroup] = useState<RichMenuGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
 
@@ -112,6 +113,7 @@ function Connections() {
     setLoading(true)
     setGroup(null)
     setError('')
+    setLoadError(null)
     setMissing(false)
     try {
       const response = await api.richMenuGroups.get(groupId)
@@ -126,6 +128,7 @@ function Connections() {
         setMissing(true)
         return
       }
+      setLoadError(caught)
       setError('切替のつながりを表示できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
       if (!stale()) setLoading(false)
@@ -148,13 +151,17 @@ function Connections() {
     return <TargetMissing kind="not-found" title="このメニューは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" backHref="/rich-menus" backLabel="メニュー一覧へ戻る" />
   }
   if (error || !group || !analysis) {
-    return <TargetMissing kind="error" title="切替のつながりを表示できませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
+    return <TargetMissing kind="error" title="切替のつながりを表示できませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" error={loadError ?? undefined} onRetry={() => void load()} />
   }
   if (group.accountId !== selectedAccountId) {
     return <ListState kind="forbidden" title="選択中のアカウントでは表示できません" description="このメニューが所属するLINE公式アカウントへ切り替えてください。" />
   }
 
-  const pages = [...group.pages].sort((a, b) => a.orderIndex - b.orderIndex)
+  const pages = [...group.pages].sort((a, b) => {
+    const aIdx = Number.isFinite(a.orderIndex) ? a.orderIndex : Number.MAX_SAFE_INTEGER
+    const bIdx = Number.isFinite(b.orderIndex) ? b.orderIndex : Number.MAX_SAFE_INTEGER
+    return aIdx - bIdx
+  })
   const entryId = analysis.entryPageId ?? pages[0]?.id ?? ''
   const entry = pages.find((page) => page.id === entryId) ?? null
   const others = pages.filter((page) => page.id !== entryId)
@@ -164,8 +171,10 @@ function Connections() {
   const noReturn = others.filter((page) => analysis.cannotReturnPageIds.has(page.id))
   const draftTargets = group.status === 'published' ? others.filter((page) => !page.lineRichmenuId) : []
   const audienceText = group.isDefaultForAll || !group.targetingEnabled || !group.targetingCondition ? 'すべての友だち（既定）' : '条件で出し分け'
-  const reach = group.monthlyStats?.uniqueAudience?.value ?? group.audienceCount ?? null
-  const taps = group.monthlyStats?.taps ?? null
+  const rawReach = group.monthlyStats?.uniqueAudience?.value ?? group.audienceCount ?? null
+  const reach = typeof rawReach === 'number' && Number.isFinite(rawReach) && rawReach >= 0 ? rawReach : null
+  const rawTaps = group.monthlyStats?.taps ?? null
+  const taps = typeof rawTaps === 'number' && Number.isFinite(rawTaps) && rawTaps >= 0 ? rawTaps : null
 
   const menuItems: ActionMenuItem[] = [
     ...(pages.length >= MAX_PAGES ? [{ id: 'buttons', label: 'ボタンの動きを直す', ...(canEdit ? { href: buttonsHref, onSelect: () => router.push(buttonsHref) } : { lockedReason: editReason, disabled: !editReason }) }] : []),

@@ -6,6 +6,9 @@ import { SIZE_LABEL } from './create-options'
 export function imageUploadErrorText(err: unknown): string {
   const fallback = '画像を読み込めませんでした。もう一度お試しください。'
   if (!(err instanceof ApiError)) return fallback
+  if (err.status === 413) return '画像が大きすぎます。1MB以下の画像を選んでください。'
+  if (err.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
+  if (err.status === 429) return '操作が混み合っています。少し待ってから、もう一度お試しください。'
   const message =
     err.status === 400 && err.message && !/^API error: /.test(err.message) ? err.message : ''
   if (!message) return fallback

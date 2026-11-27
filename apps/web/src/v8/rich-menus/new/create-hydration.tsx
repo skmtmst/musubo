@@ -30,7 +30,26 @@ type HydrateMenuDraftContext = {
   setTemplateKey: Dispatch<SetStateAction<string>>
 }
 
+const MAX_MENU_PAGES = 3
+
+/** 保存済みのメニュー定義が編集画面で扱える形かを確かめる。壊れた値を既定値で置き換えない。 */
+function isHydratableGroup(g: Group): boolean {
+  if (!g || typeof g !== 'object') return false
+  if (g.size !== 'large' && g.size !== 'compact') return false
+  if (!Array.isArray(g.pages) || g.pages.length < 1 || g.pages.length > MAX_MENU_PAGES) return false
+  return g.pages.every(
+    (page) =>
+      Boolean(page) &&
+      typeof page === 'object' &&
+      Array.isArray(page.areas) &&
+      page.areas.every((area) => Boolean(area) && typeof area === 'object'),
+  )
+}
+
 export function hydrateMenuDraft({ host, setActivePageId, setAudience, setBaselineSignature, setChatBarText, setDefaultOpen, setFolderId, setGroup, setName, setPages, setSelectedAreaId, setSize, setTabCount, setTargetingCondition, setTargetingPriority, setTemplateKey }: HydrateMenuDraftContext, g: Group) {
+    if (!isHydratableGroup(g)) {
+      throw new Error('このメニューは読み込めませんでした')
+    }
     setGroup(g)
     setSize(g.size)
     setTabCount(Math.max(0, g.pages.length - 1))

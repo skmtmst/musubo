@@ -36,7 +36,7 @@ export function usageRowsOf(usedIn: SavedSearch['usedIn']): Array<{ label: strin
     .filter((kind) => kind === 'broadcast' || kind === 'automation' || (usedIn ?? []).some((usage) => usage.kind === kind))
     .map((kind) => {
       if (usedIn === undefined) return { label: KIND_LABELS[kind], value: '—' }
-      const names = usedIn.filter((usage) => usage.kind === kind).map((usage) => `${usage.name}${usage.mode === 'live' ? '' : '（固定）'}`)
+      const names = usedIn.filter((usage) => usage.kind === kind).map((usage) => `${usage.name}${usage.mode === 'live' ? '' : usage.mode === 'fixed' ? '（固定）' : '（固定か確認できません）'}`)
       return { label: KIND_LABELS[kind], value: names.length ? names.join('・') : 'なし' }
     })
 }

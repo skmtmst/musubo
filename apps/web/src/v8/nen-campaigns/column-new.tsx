@@ -87,9 +87,16 @@ export default function ColumnNew() {
   }, [selectedAccountId, tagRetry])
   // 候補が取得できた時だけ、現在のアカウントにない選択を外す。
   useEffect(() => {
-    if (!tagsReady || draft.targetMode !== 'tag' || !draft.targetTagId) return
-    if (!visibleAccountTags(tags, selectedAccountId).some(tag => tag.id === draft.targetTagId)) {
-      setDraft(current => ({ ...current, targetTagId: '' }))
+    if (!tagsReady) return
+    const validTags = visibleAccountTags(tags, selectedAccountId)
+    const dropTarget = draft.targetMode === 'tag' && Boolean(draft.targetTagId) && !validTags.some(tag => tag.id === draft.targetTagId)
+    const dropCompletion = Boolean(draft.completionTagId) && !validTags.some(tag => tag.id === draft.completionTagId)
+    if (dropTarget || dropCompletion) {
+      setDraft(current => ({
+        ...current,
+        ...(dropTarget ? { targetTagId: '' } : {}),
+        ...(dropCompletion ? { completionTagId: '' } : {}),
+      }))
       setTagPruneNotice('選んでいたタグは、今のアカウントにないため外しました。選び直してください。')
     }
     // 候補の取得やアカウント変更時だけ、既存の選択を見直す。
@@ -132,7 +139,9 @@ export default function ColumnNew() {
   const errors = validateDraft(draft)
   const errorFor = (field: keyof ColumnDraft) => (touched ? errors.find((e) => e.field === field)?.message : undefined)
   const accountTags = tagsReady ? visibleAccountTags(tags, selectedAccountId) : []
-  const targetReady = tagsReady && (draft.targetMode !== 'tag' || !draft.targetTagId || accountTags.some(tag => tag.id === draft.targetTagId))
+  const targetReady = tagsReady
+    && (draft.targetMode !== 'tag' || !draft.targetTagId || accountTags.some(tag => tag.id === draft.targetTagId))
+    && (!draft.completionTagId || accountTags.some(tag => tag.id === draft.completionTagId))
   const set = (patch: Partial<ColumnDraft>) => setDraft((current) => ({ ...current, ...patch }))
   const hasImage = draft.imageUrl.trim() !== ''
   const longTitle = draft.title.trim().length > TITLE_NOTICE_LENGTH ? titleNotice(draft.title) : null
@@ -312,6 +321,7 @@ export default function ColumnNew() {
             <span className={styles.labelSmall}>読了後に付けるタグ</span>
             <SaveErrorField names={["completionTagId","draft.completionTagId"]}><EntityKindField
               kind="tag"
+              disabled={!tagsReady}
               label="読了後に付けるタグ"
               value={draft.completionTagId}
               clearable

@@ -371,13 +371,6 @@
     "reason": "B-246：失敗は保存の知らせへ表示。空配列は完了した工程の記録で、取得データを空にしていない。"
   },
   {
-    "filename": "src/v8/restaurant/google/post-media-picker-dialog.tsx",
-    "fingerprint": "060b670e3d817c47",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "登録メディアの取得失敗は候補を空にしたうえで窓の中に失敗文を出し、件数は不明（null）にする。古い要求の応答は request の世代で捨てる。空の正常結果には見せない。"
-  },
-  {
     "filename": "src/v8/friend-detail/delivery-consent.tsx",
     "fingerprint": "60237edef46bb3a0",
     "disposition": "error-visible",

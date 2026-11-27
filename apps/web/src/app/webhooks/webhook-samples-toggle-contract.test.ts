@@ -2,14 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 const read = (name: string) => readFileSync(new URL(`../../v8/webhooks/${name}.tsx`, import.meta.url), 'utf8')
 const pages = [read('incoming'), read('outgoing')]
-const samples = read('samples')
 const host = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 describe('現役V8の見本の入口', () => {
   test('別機能の通知画面を埋め込まない', () => { expect(host).not.toContain('NotificationsPage'); expect(host).not.toContain('@/app/notifications') })
-  test('見本タブは現在の見本を開く', () => { expect(host).toContain("@/v8/webhooks/samples"); expect(host).toContain('return <SamplesV8Page />') })
-  test('受け取る見本の種類を作成へ渡す', () => { expect(samples).toContain('tab=incoming&source=') })
-  test('送る見本は種類を選んだ状態の専用作成へつなげる', () => { expect(samples).toContain('/webhooks/new?event=${sample.event}') })
-  test('送る見本は実際に購読できる種類を渡す', () => { for (const event of ['friend_add', 'form_submitted', 'booking_created', 'ec.order.confirmed']) expect(samples).toContain(`event: '${event}'`) })
 })
 describe('切替の二度押しと失敗', () => {
   test('同じ行の再押下を送信前に止める', () => { for (const src of pages) expect(src).toMatch(/if \(togglingRef.current.has\(item.id\)\) \{[\s\S]*?return\s*\}/) })

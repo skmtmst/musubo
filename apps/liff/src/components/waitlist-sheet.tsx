@@ -59,6 +59,9 @@ export default function WaitlistSheet({
     api
       .waitlistMine(staff.id, menu.id, startsAt)
       .then((res) => {
+        if (!res || !(res.entry === null || (res.entry && typeof res.entry.id === 'string' && res.entry.id.trim()))) {
+          throw new Error('Invalid waitlist lookup response');
+        }
         if (alive) setEntryId(res.entry?.id ?? null);
       })
       .catch((e) => {
@@ -77,6 +80,10 @@ export default function WaitlistSheet({
     setFailed(false);
     try {
       const res = await api.registerWaitlist({ staff_id: staff.id, menu_id: menu.id, starts_at: startsAt });
+      if (!res || typeof res.id !== 'string' || !res.id.trim()) {
+        setEntryId(undefined); setFailed(true);
+        return;
+      }
       setEntryId(res.id);
       setDoneMessage('登録しました。空いたらLINEで知らせます。');
     } catch (e) {
@@ -87,6 +94,7 @@ export default function WaitlistSheet({
       if ((e as { status?: number }).status === 409) {
         try {
           const mine = await api.waitlistMine(staff.id, menu.id, startsAt);
+          if (!mine || !mine.entry || typeof mine.entry.id !== 'string' || !mine.entry.id.trim()) throw new Error('Invalid waitlist lookup response');
           setEntryId(mine.entry?.id ?? null);
           if (!mine.entry) setFailed(true);
         } catch (retryError) {

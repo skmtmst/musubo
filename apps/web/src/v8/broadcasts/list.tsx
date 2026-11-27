@@ -824,7 +824,7 @@ export default function BroadcastListV8() {
         setMenuMoveFor(broadcast.id)
       },
     })
-    items.push({
+    if (broadcast.status === 'draft' || broadcast.status === 'scheduled') items.push({
       id: 'delete',
       label: '削除する',
       tone: 'danger',
@@ -1299,7 +1299,7 @@ secondary: ((canResume) ? <Button
                     編集を続ける
                   </Button> : null),
 menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
-...((!(fromHq)) ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
+...(canResume ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
              status={<StatusBadge broadcast={panelRow} />}>
 <DetailContent>
 <DetailField label={panelRow.status === 'sent' ? '送信日時' : '送る日時'}>{panelRow.status === 'sent' ? (panelRow.sentAt ? formatDateTime(panelRow.sentAt) : '送信済み') : (panelRow.scheduledAt ? formatDateTime(panelRow.scheduledAt) : '下書き')}</DetailField>
