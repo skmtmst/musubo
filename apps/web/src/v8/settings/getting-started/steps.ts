@@ -375,7 +375,9 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     const server = byKey.get(base.key)
     if (!server) return { ...base, state: 'unknown', action: null, blockedReason: '状態を読み込めませんでした' }
 
-    const state = server.state
+    const knownState = Object.hasOwn(STEP_STATE_LABEL, server.state)
+    const state: StepState = knownState ? server.state : 'unknown'
+    const reason = typeof server.reason === 'string' ? server.reason : null
     const nextByState: Record<GettingStartedStep['key'], Partial<Record<StepState, string>>> = {
       featureSet: { done: '終わっています。機能設定で見直せます。', todo: '業種に合わせて使う機能を選び、保存してください。' },
       accounts: {
@@ -388,18 +390,18 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       },
       friendAdd: {
         done: '終わっています。振り分けを見直したいときはこちらから。',
-        stalled: server.reason ?? '下書きのルールがありますが、まだ公開していません。公開すると動きはじめます。',
+        stalled: reason ?? '下書きのルールがありますが、まだ公開していません。公開すると動きはじめます。',
         todo: '友だちが増えたときに何をするかを決めて、公開します。',
       },
       scenario: {
         done: '終わっています。中身を直すときはこちらから。',
-        stalled: server.reason ?? 'シナリオはありますが、段4のルールから始まるものがまだありません。',
+        stalled: reason ?? 'シナリオはありますが、段4のルールから始まるものがまだありません。',
         todo: 'レシピから作ると、7通ぶんの下書きが一度にできます。',
       },
       firstMessage: {
         done: '終わっています。最初の配信を見直すときはこちらから。',
         todo: 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
-        unknown: server.reason ?? '届いたかどうかを確かめられません。受信箱で確認してください。',
+        unknown: reason ?? '届いたかどうかを確かめられません。受信箱で確認してください。',
         forbidden: 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
       },
     }
@@ -417,14 +419,14 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     if (base.key === 'scenario' && state === 'todo') href = '/recipes'
     // 送信ボタンではなく、既存のQR・シナリオのテスト送信までの道順を開く。
     if (base.key === 'firstMessage' && href) href = '/getting-started#first-message'
-    const action = href && state !== 'forbidden' ? { label: labels[server.key], href } : null
+    const action = knownState && href && state !== 'forbidden' ? { label: labels[server.key], href } : null
 
     return {
       ...base,
       state,
-      next: nextByState[server.key][state] ?? server.reason ?? '状態を確認してください。',
+      next: nextByState[server.key][state] ?? reason ?? '状態を確認してください。',
       action,
-      blockedReason: action ? null : server.reason,
+      blockedReason: action ? null : knownState ? reason : '状態を確認できません',
     }
     }))
 }
