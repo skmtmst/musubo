@@ -1450,3 +1450,4 @@
 - [対応マーク基本設定とスタイル選択ボタンの無効ガード修正](release-log/unreleased/PR-kenta-later-gemini80-1127.md) — 反映履歴、確認 2026-11-27。
 - [リッチメニュー見本プレビュー寸法整合とGoogle営業予定カレンダーの無効ガード](release-log/unreleased/PR-kenta-later-gemini82-1127.md) — 反映履歴、確認 2026-11-27。
 - [友だち情報欄の並び替え保護とテンプレート吹き出し表示の修正](release-log/unreleased/PR-kenta-later-gemini83-1127.md) — 反映履歴、確認 2026-11-27。
+- [コラム配信見本とスタイル選択デモの安全表示の修正](release-log/unreleased/PR-kenta-later-gemini84-1127.md) — 反映履歴、確認 2026-11-27。

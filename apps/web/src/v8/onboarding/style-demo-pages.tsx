@@ -56,43 +56,44 @@ export default function StyleDemoPages({ accountName, viewing, page, onPage, cho
   onChoose: (style: AccountStyle) => void; disabled: boolean
 }) {
   const labels = labelsFor(viewing)
+  const safePage = Number.isFinite(page) ? Math.min(labels.length - 1, Math.max(0, Math.trunc(page))) : 0
   const look = STYLE_EXPERIENCE_SCRIPT.styles[viewing]
   const text = content[viewing]
-  const message = page === 1 ? text.setting : page === 2 ? text.operation : page === 3 ? text.after : text.feature
+  const message = safePage === 1 ? text.setting : safePage === 2 ? text.operation : safePage === 3 ? text.after : text.feature
   return <section className={styles.root} aria-label={`${look.label}のデモ`}>
-    <Steps label="デモのページ" currentKey={String(page)} steps={labels.map((label, index) => ({
-      key: String(index), label, state: index === page ? 'current' : index < page ? 'done' : 'todo', reachable: true, onSelect: () => onPage(index),
+    <Steps label="デモのページ" currentKey={String(safePage)} steps={labels.map((label, index) => ({
+      key: String(index), label, state: index === safePage ? 'current' : index < safePage ? 'done' : 'todo', reachable: !disabled, onSelect: () => { if (disabled) return; onPage(index) },
     }))} />
-    <p className={styles.counter}>{`${page + 1} / ${labels.length}`}</p>
-    <div><h3 data-demo-heading tabIndex={-1} className={styles.heading}>{headings[viewing][page]}</h3><p className={styles.description}>{page === 0 ? 'できることを、見本で紹介します。' : message}</p></div>
-    {page === 0 ? <>
+    <p className={styles.counter}>{`${safePage + 1} / ${labels.length}`}</p>
+    <div><h3 data-demo-heading tabIndex={-1} className={styles.heading}>{headings[viewing][safePage]}</h3><p className={styles.description}>{safePage === 0 ? 'できることを、見本で紹介します。' : message}</p></div>
+    {safePage === 0 ? <>
       <ul className={styles.can}>{look.can.map(item => <li key={item.text}><Check aria-hidden="true" className={styles.check} />{item.text}</li>)}</ul>
       <StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={STYLE_EXPERIENCE_SCRIPT} style={viewing} switcher="external" variant="minimal" data="sample" />
     </> : <>
-      {page === 1 ? <StyleSettingDemo key={viewing} style={viewing} /> : page === 2 && viewing === 'restaurant'
+      {safePage === 1 ? <StyleSettingDemo key={viewing} style={viewing} /> : safePage === 2 && viewing === 'restaurant'
         ? <FollowupDemoPlayer />
-        : page === 2 && viewing === 'salon' ? <SalonOperationDemo />
-        : page === 2 && viewing === 'consult' ? <ConsultOperationDemo />
-        : page === 2 && viewing === 'lesson' ? <LessonOperationDemo />
-        : page === 2 && viewing === 'ec' ? <EcOperationDemo />
-        : page === 3 && viewing === 'restaurant' ? <RestaurantAfterDemo />
-        : page === 3 && viewing === 'salon' ? <SalonAfterDemo />
-        : page === 3 && viewing === 'consult' ? <ConsultAfterDemo />
-        : page === 3 && viewing === 'lesson' ? <LessonAfterDemo />
-        : page === 3 && viewing === 'standard' ? <StandardAfterDemo />
-        : page === 3 && viewing === 'ec' ? <EcAfterDemo />
-        : page === 4 ? <Card layout="vertical" padding="default" gap="normal" aria-label="見本から始める案内">
+        : safePage === 2 && viewing === 'salon' ? <SalonOperationDemo />
+        : safePage === 2 && viewing === 'consult' ? <ConsultOperationDemo />
+        : safePage === 2 && viewing === 'lesson' ? <LessonOperationDemo />
+        : safePage === 2 && viewing === 'ec' ? <EcOperationDemo />
+        : safePage === 3 && viewing === 'restaurant' ? <RestaurantAfterDemo />
+        : safePage === 3 && viewing === 'salon' ? <SalonAfterDemo />
+        : safePage === 3 && viewing === 'consult' ? <ConsultAfterDemo />
+        : safePage === 3 && viewing === 'lesson' ? <LessonAfterDemo />
+        : safePage === 3 && viewing === 'standard' ? <StandardAfterDemo />
+        : safePage === 3 && viewing === 'ec' ? <EcAfterDemo />
+        : safePage === 4 ? <Card layout="vertical" padding="default" gap="normal" aria-label="見本から始める案内">
           <strong>{styleTerm(viewing, 'V01')}のメニュー</strong>
           {look.richMenu?.length ? <ul className={styles.can}>{look.richMenu.map(item => <li key={item.label}>{item.label}</li>)}</ul> : <p className={styles.description}>メニューの内容を確認できません。</p>}
           <p className={styles.note}>このスタイルを選んだあと、見本の内容を確認できます。</p>
         </Card>
-        : page === 2 && viewing === 'standard' ? <Card layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
+        : safePage === 2 && viewing === 'standard' ? <Card layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
           <strong>一斉配信</strong><Field label="本文"><TextInput value="営業時間のお知らせ" readOnly /></Field><p className={styles.note}>お知らせの文の見本です。</p>
         </Card> : <Card layout="vertical" padding="default" gap="normal" aria-label="使い方の見本">
-          <strong>{page === 2 ? '操作の見本' : page === 3 ? '利用の流れ' : '基本の機能'}</strong>
-          <p className={styles.description}>{page === 4 ? '配信・タグ・自動応答などの基本も使えます。' : message}</p>
+          <strong>{safePage === 2 ? '操作の見本' : safePage === 3 ? '利用の流れ' : '基本の機能'}</strong>
+          <p className={styles.description}>{safePage === 4 ? '配信・タグ・自動応答などの基本も使えます。' : message}</p>
         </Card>}
-      {page === 2 && viewing === 'restaurant' ? <p className={styles.note}>実際の初期セットとは異なります。送り始めるにはテスト送信と承認が必要です。</p> : null}
+      {safePage === 2 && viewing === 'restaurant' ? <p className={styles.note}>実際の初期セットとは異なります。送り始めるにはテスト送信と承認が必要です。</p> : null}
     </>}
 
   </section>
