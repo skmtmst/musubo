@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { resolveLook, type LiffCalendarMode } from '../lib/liff-look.js';
-import { jstToday, addDays, formatJpLong, formatWeekday, addMinutesHm } from '../lib/datetime.js';
+import { jstToday, addDays, formatJpLong, addMinutesHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from './load-error-view.js';
@@ -10,6 +10,7 @@ import WaitlistSheet from './waitlist-sheet.js';
 import Icon from './ui/icon.js';
 import BottomBar from './ui/bottom-bar.js';
 import Button from './ui/button/index.js';
+import { BookingDateViews, BookingDayChoice } from './booking-date-parts.js';
 
 /**
  * 選んだ枠。date・start は店の暦日・壁時刻（表示用）。startUtc・timeZone は
@@ -177,14 +178,6 @@ function stateOf(date: string, open: Record<string, true>, limited: Record<strin
   if (limited[date]) return 'few';
   if (full[date]) return 'full';
   return 'empty';
-}
-
-/** 週の日セルの短い印。空き・わずか・満・休み。枠の無い日は「満」に寄せる。 */
-function weekMark(state: DayState): string {
-  if (state === 'open') return '空き';
-  if (state === 'few') return 'わずか';
-  if (state === 'closed') return '休み';
-  return '満';
 }
 
 /** 時刻の札から選んだ枠を作る。開始の瞬間と店のタイムゾーンを持って運ぶ。 */
@@ -646,22 +639,6 @@ export default function DateTimePicker({
   const slotEnd =
     selected && addMinutesHm(selected.start, staff.duration_minutes + additionalDurationMinutes);
 
-  const toggleButton = (target: DateView, label: string) => {
-    const active = view === target;
-    return (
-      <Button variant="tab" selected={active}
-        key={target}
-        ref={target === 'list' ? listButtonRef : calendarButtonRef}
-        type="button"
-        role="radio"
-        aria-checked={active}
-        onClick={() => switchView(target)}
-      >
-        {label}
-      </Button>
-    );
-  };
-
   /** 下の帯。「担当を選び直す」の戻るを添える。 */
   const bar = (
     <BottomBar>
@@ -702,15 +679,7 @@ export default function DateTimePicker({
       {hint && <p className="text-xs leading-5 text-liff-sub">{hint}</p>}
       {/* 週だけ・月だけの店では切り替えを出さない (見せ方が1つに決まる)。 */}
       {allowedViews(settings.calendarMode).length > 1 && (
-        <div
-          role="radiogroup"
-          aria-label="表示の切り替え"
-          onKeyDown={moveViewKey}
-          className="flex gap-1 rounded-(--liff-radius) bg-liff-chip p-[3px]"
-        >
-          {toggleButton('list', '週で見る')}
-          {toggleButton('calendar', 'カレンダー')}
-        </div>
+        <BookingDateViews view={view} onChange={switchView} onKeyDown={moveViewKey} listRef={listButtonRef} calendarRef={calendarButtonRef} />
       )}
 
       {view === 'list' ? (
@@ -772,41 +741,7 @@ export default function DateTimePicker({
                   const pressable = selectable || state === 'full';
                   const active = d === listDay;
                   return (
-                    <Button variant="day" selected={active} unavailable={state === 'closed' || state === 'empty'}
-                      key={d}
-                      type="button"
-                      onClick={() => {
-                        userPickedDayRef.current = true;
-                        setListDay(d);
-                      }}
-                      disabled={!pressable}
-                      aria-pressed={active}
-                      aria-label={dayStateLabel(d, state)}
-                      title={dayStateLabel(d, state)}
-                    >
-                      <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
-                      <span
-                        className={`liff-num text-base font-bold ${active ? 'text-liff-primary' : selectable || state === 'full' ? 'text-ink' : 'text-liff-off-ink'}`}
-                      >
-                        {Number(d.slice(8, 10))}
-                      </span>
-                      {/* 空きの点。消す設定のときは印を出さない (読み上げは残す)。 */}
-                      {settings.vacancyDots && (
-                        <span
-                          className={`text-[9px] ${
-                            active || open
-                              ? 'text-liff-primary'
-                              : state === 'few'
-                                ? 'text-liff-dot-few'
-                                : state === 'full'
-                                  ? 'text-liff-full'
-                                  : 'text-liff-off-ink'
-                          }`}
-                        >
-                          {weekMark(state)}
-                        </span>
-                      )}
-                    </Button>
+                    <BookingDayChoice key={d} date={d} state={state} active={active} disabled={!pressable} showMarks={settings.vacancyDots} label={dayStateLabel(d,state)} onClick={() => { userPickedDayRef.current = true; setListDay(d); }} />
                   );
                 })}
               </div>
@@ -913,36 +848,13 @@ export default function DateTimePicker({
                       today,
                       windowEnd,
                     );
-                    const dayNum = Number(d.slice(8, 10));
                     // 残りわずかの日も押せる (金の点だけ付ける)。
                     const selectable = state === 'open' || state === 'few';
                     // 満席の日も押せる（週の時刻へ移ると、鈴から空いたら知らせるを登録できる）。
                     const pressable = selectable || state === 'full';
                     const active = d === calDay;
                     return (
-                      <Button variant="calendarDay" selected={active} unavailable={!selectable} full={state === 'full'}
-                        key={d}
-                        type="button"
-                        onClick={() => {
-                          userPickedDayRef.current = true;
-                          setCalDay(d);
-                        }}
-                        disabled={!pressable}
-                        aria-pressed={active}
-                        aria-label={dayStateLabel(d, state)}
-                      >
-                        <span className="liff-num text-sm leading-tight">{dayNum}</span>
-                        <span className="flex min-h-1.5 items-center text-[11px] leading-none">
-                          {state === 'off' ? '受付外' : null}
-                          {/* 空きの点 (緑＝空き・金＝残りわずか)。消す設定では点を出さない。 */}
-                          {settings.vacancyDots && (state === 'open' || state === 'few') && (
-                            <span
-                              className={`block h-[5px] w-[5px] rounded-full ${state === 'few' ? 'bg-liff-dot-few' : 'bg-liff-primary'}`}
-                              aria-hidden="true"
-                            />
-                          )}
-                        </span>
-                      </Button>
+                      <BookingDayChoice calendar key={d} date={d} state={state} active={active} disabled={!pressable} showMarks={settings.vacancyDots} label={dayStateLabel(d,state)} onClick={() => { userPickedDayRef.current = true; setCalDay(d); }} />
                     );
                   })}
                 </div>

@@ -1,4 +1,3 @@
-import Card from '../../components/ui/card.js';
 import { TextInput, FieldLabel, FieldCount } from '../../components/forms/controls.js';
 import Button from '../../components/ui/button/index.js';
 import { useEffect, useState } from 'react';
@@ -77,9 +76,10 @@ export default function SeatConfirm({
 
   const p = zonedParts(startsAt, timeZone);
   const rows: Array<[string, string]> = [
+    ...(storeName.trim() ? [['お店',storeName] as [string,string]] : []),
     ['日時', `${longDate(p.date)}${p.hm}〜${stayText(startsAt, endsAt)}`],
     ['人数', `${guestCount}名`],
-    ...(courseName ? [['コース',courseName] as [string,string]] : []),
+    ['コース',courseName ?? '席のみ'],
     ['お席', seat],
     ...(reschedule?[[definition.fields.find(f=>f.id==='name')!.label,withHonorific(customerName,'さま',{space:true})] as [string,string]]:[]),
   ];
@@ -87,29 +87,18 @@ export default function SeatConfirm({
   const field=(id:string)=>definition.fields.find(item=>item.id===id)!;
   return (
     <div className="space-y-3.5" data-design-node="B3oGt3">
-      <Card className="space-y-4 p-6">
-        <h2 className="text-[15px] leading-[23px] font-bold text-ink">{reschedule ? 'この内容に変更します' : 'ご予約の内容'}</h2>
-        <div className="space-y-2.5">
-          {storeName.trim() ? <p className="break-words text-[13px] leading-5 font-semibold text-ink" title={storeName}>お店：{storeName}</p> : null}
-          <p className="text-[13px] leading-5 font-semibold text-ink">{p.date.slice(5).replace('-','/')}（{new Intl.DateTimeFormat('ja-JP',{timeZone,weekday:'short'}).format(new Date(startsAt))}）{p.hm}・{guestCount}名</p>
-          <p className="truncate text-xs leading-[18px] text-liff-sub" title={`コース：${courseName??'席のみ'}${stayText(startsAt,endsAt)}`}>コース：{courseName??'席のみ'}{stayText(startsAt,endsAt)}</p>
-          <p className="text-xs leading-[18px] text-liff-sub">お席はお店が決めます</p>
-        </div>
-      </Card>
-      <p className="text-[13px] leading-5 text-liff-sub">受け付けたら「受け付けました」と表示します。</p>
-      <details open={definition.fields.some(field=>field.required&&['phone','allergy','note'].includes(field.id))||!reschedule}>
-      <summary className="liff-hit cursor-pointer text-xs leading-[18px] text-liff-sub">連絡先・ご要望・予約の決まり</summary>
-      <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-3 gap-y-2.5 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
+      <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
+      <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
         {rows.map(([k, v]) => (
-          <div key={k} className="contents">
+          <div key={k} className="flex items-start justify-between gap-3 py-3">
             <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">{k}</dt>
-            <dd className="min-w-0 flex-1 truncate text-[13px] leading-5 font-semibold text-ink" title={v}>
+            <dd className="min-w-0 text-right text-[13px] leading-5 font-semibold text-ink" title={v}>
               {v}
             </dd>
           </div>
         ))}
-        {!reschedule&&<div className="contents"><dt className="shrink-0 text-[13px] leading-5 text-liff-sub"><FieldLabel htmlFor="seat-name" required>{field('name').label}</FieldLabel></dt><dd className="min-w-0 flex-1"><TextInput id="seat-name" value={customerName} maxLength={100} required onChange={e=>onName?.(e.target.value)} autoComplete="name" /></dd></div>}
-        {field('phone').enabled&&<div className="contents">
+        {!reschedule&&<div className="flex items-start justify-between gap-3 py-3"><dt className="shrink-0 text-[13px] leading-5 text-liff-sub"><FieldLabel htmlFor="seat-name" required>{field('name').label}</FieldLabel></dt><dd className="min-w-0 flex-1"><TextInput id="seat-name" value={customerName} maxLength={100} required onChange={e=>onName?.(e.target.value)} autoComplete="name" /></dd></div>}
+        {field('phone').enabled&&<div className="flex items-start justify-between gap-3 py-3">
           <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">
             <FieldLabel htmlFor="seat-phone" required={field('phone').required}>{field('phone').label}</FieldLabel>
           </dt>
@@ -132,7 +121,7 @@ export default function SeatConfirm({
             {!reschedule && <FieldCount value={phone} max={50} />}
           </dd>
         </div>}
-        {field('allergy').enabled&&<div className="contents"><dt className="shrink-0 text-[13px] leading-5 text-liff-sub"><FieldLabel htmlFor="seat-allergy" required={field('allergy').required}>{field('allergy').label}</FieldLabel></dt><dd className="min-w-0 flex-1">{reschedule?<span>{allergy||'なし'}</span>:<TextInput id="seat-allergy" value={allergy} maxLength={200} required={field('allergy').required} onChange={e=>onAllergy?.(e.target.value)} placeholder="例：乳製品（ない場合は「なし」）" />}</dd></div>}
+        {field('allergy').enabled&&<div className="flex items-start justify-between gap-3 py-3"><dt className="shrink-0 text-[13px] leading-5 text-liff-sub"><FieldLabel htmlFor="seat-allergy" required={field('allergy').required}>{field('allergy').label}</FieldLabel></dt><dd className="min-w-0 flex-1">{reschedule?<span>{allergy||'なし'}</span>:<TextInput id="seat-allergy" value={allergy} maxLength={200} required={field('allergy').required} onChange={e=>onAllergy?.(e.target.value)} placeholder="例：乳製品（ない場合は「なし」）" />}</dd></div>}
       </dl>
       {field('note').enabled&&<div className="flex flex-col gap-1.5">
         <FieldLabel htmlFor="seat-note" required={field('note').required}>{field('note').label}</FieldLabel>
@@ -157,7 +146,6 @@ export default function SeatConfirm({
         <li>{`・${changeRule(startsAt, cancelDeadlineMinutesBefore, timeZone, now)}`}</li>
         <li>{`・${late}`}</li>
       </ul>
-      </details>
       {left !== null && (
         <p className="text-xs leading-[18px] text-liff-wait-ink" role="timer" aria-live="off">
           {left > 0

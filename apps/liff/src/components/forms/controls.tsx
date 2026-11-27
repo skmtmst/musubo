@@ -289,15 +289,26 @@ export function HiddenDateInput(props: Omit<InputHTMLAttributes<HTMLInputElement
 }
 
 /** 空き時刻の選択。読み上げと選択状態を共通ボタンへ渡す。 */
+/** お客さまの人数選択。5名以上は人数を選び直せる。 */
+export function RestaurantGuestChoices({label, value, onChange}: {label:string; value:number; onChange:(n:number)=>void}) {
+  return <>
+    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={label}>
+      {[1,2,3,4].map(n => <Button key={n} variant="chip" selected={value===n} role="radio" aria-checked={value===n} onClick={() => onChange(n)}>{n}名</Button>)}
+      <Button variant="chip" selected={value>=5} role="radio" aria-checked={value>=5} onClick={() => onChange(5)}>5名以上</Button>
+    </div>
+    {value>=5 && <div><FieldLabel htmlFor="seat-more-guests" required>人数を選ぶ</FieldLabel><FormSelectControl id="seat-more-guests" aria-label="5名以上の人数" value={value} onChange={e => onChange(Number(e.target.value))}>{Array.from({length:Math.max(20,value)-4}, (_,i)=>i+5).map(n=><option key={n} value={n}>{n}名</option>)}</FormSelectControl></div>}
+  </>
+}
+
 export function RestaurantTimeChoices({ options, value, onChange }: {
   options: { value: string; label: string; accessibleLabel: string; available: boolean }[];
   value: string | null;
   onChange: (value: string) => void;
 }) {
-  return <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="時刻">{options.map(option =>
-    <Button variant="restaurant-time" key={option.value} role="radio" aria-checked={option.value === value}
+  return <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="時刻">{options.map(option =>
+    <Button variant="time" key={option.value} role="radio" aria-checked={option.value === value}
       aria-label={option.accessibleLabel} selected={option.value === value} disabled={!option.available}
-      onClick={() => onChange(option.value)}>{option.label}</Button>
+      onClick={() => onChange(option.value)}><span className="flex flex-col"><span>{option.label}</span><span>{option.accessibleLabel.slice(option.label.length).trim()}</span></span></Button>
   )}</div>
 }
 

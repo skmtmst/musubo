@@ -70,13 +70,14 @@ async function open(entry: 'apps' | 'worker', query: string) {
 for (const entry of ['apps', 'worker'] as const) {
   it(`${entry}の実入口からコース・仮押さえ失敗・同じ操作の再送・確定まで届く`, async () => {
     await open(entry, 'page=restaurant&token=tok');
-    fireEvent.click(await screen.findByRole('button', { name: /コース：/ }));
-    fireEvent.click(await screen.findByRole('radio', { name: /夕食コース/ }));
     fireEvent.click(await screen.findByRole('radio', { name: /18:00 (空きあり|残りわずか)/ }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    fireEvent.click(await screen.findByRole('button', { name: /夕食コース/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'コースを選んで進む' })).toHaveProperty('disabled', false));
+    fireEvent.click(screen.getByRole('button', { name: 'コースを選んで進む' }));
     await screen.findByText(/送信できませんでした/);
-    failHold = false; fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('ご予約の内容');
+    failHold = false; fireEvent.click(screen.getByRole('button', { name: 'コースを選んで進む' }));
+    await screen.findByText('内容を確かめてください');
     const profileName = entry === 'worker' ? 'Workerの本人' : '予約の本人';
     expect(screen.getByRole('textbox', { name: /お名前/ })).toHaveProperty('value', profileName);
     expect(screen.getByRole('textbox', { name: /お名前/ })).toHaveProperty('required', true);

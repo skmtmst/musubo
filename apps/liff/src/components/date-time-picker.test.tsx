@@ -504,7 +504,8 @@ describe('選んだ日は遅れて届く応答で上書きしない', () => {
     // 自動選択で一番早い日 (10/16) に戻されることはない。
     const group = await screen.findByRole('radiogroup', { name: '表示の切り替え' });
     fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
-    await screen.findByText('2026年10月');
+    const calendar = await screen.findByLabelText('2026年10月の日付');
+    expect(within(calendar).getByRole('button', { name: '10月20日 空きあり', pressed: true })).toBeTruthy();
     fireEvent.click(within(group).getByRole('radio', { name: '週で見る' }));
     expect(await screen.findByText('10月20日（火）の空き')).toBeTruthy();
     expect(screen.queryByText('10月16日（金）の空き')).toBeNull();

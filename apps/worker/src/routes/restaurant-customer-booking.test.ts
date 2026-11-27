@@ -35,7 +35,7 @@ const start = '2027-10-01T03:00:00.000Z';
 function app() {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => {
-    c.env = { DB: db.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
+    c.env = { DB: db.db, IMAGES: { head: async () => ({ etag: 'etag-one', size: 17 }) } as unknown as R2Bucket, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'];
     await next();
   });
   a.route('/', restaurantCustomerBooking);
@@ -450,6 +450,38 @@ it('来店の返事はLIFF本人・予約版で受け、未認証・他人・型
  expect(db.raw.prepare("SELECT customer_version,status FROM rt_reservations WHERE id='confirmed'").get()).toEqual({customer_version:1,status:'confirmed'});
  const unauthenticated=await app().request(path+'?liffId=liff1',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:1,response:'going'})});
  expect(unauthenticated.status).toBe(401);
+});
+
+describe('お客さまのコース写真', () => {
+  function photo(id: string, key: string, account = 'a1') {
+    db.raw.prepare(`INSERT INTO media(id,kind,filename,mime_type,size_bytes,r2_key,line_account_id,width,height) VALUES(?,'image','photo.png','image/png',17,?,?,600,400)`).run(id,key,account);
+    db.raw.prepare(`INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,width,height,etag,scan_status,published_at) VALUES(?,?,1,?,'image/png',17,600,400,'etag-one','verified','2026-10-01')`).run(`v-${id}`,id,key);
+    db.raw.prepare(`INSERT INTO media_file_scans(id,line_account_id,subject_kind,subject_id,media_id,filename,mime_type,size_bytes,status) VALUES(?,?,'media',?,?,'photo.png','image/png',17,'clean'),(?,?,'media_version',?,?,'photo.png','image/png',17,'clean')`).run(`p-${id}`,account,id,id,`s-${id}`,account,`v-${id}`,id);
+  }
+  it('公開可能な表紙だけ返し、写真なし・非公開・他アカウントは null', async () => {
+    photo('public-photo','media/a1/final/public.png');
+    photo('private-photo','form-uploads/friend/private.png');
+    photo('other-photo','media/a2/final/other.png','a2');
+    db.raw.exec(`INSERT INTO rt_menu_items(id,store_id,kind,name,price,duration_minutes,image_media_id,status) VALUES
+      ('public','store','course','公開',100,60,'public-photo','active'),
+      ('none','store','course','写真なし',200,60,NULL,'active'),
+      ('private','store','course','非公開',300,60,'private-photo','active'),
+      ('foreign-image','store','course','別アカウント',400,60,'other-photo','active'),
+      ('draft','store','course','下書き',500,60,'public-photo','draft')`);
+    const response=await request('/api/liff/restaurant/courses?storeId=store');
+    expect(response.status).toBe(200);
+    const data=(await response.json() as {data:Array<{id:string;photoUrl:string|null}>}).data;
+    expect(data.find(x=>x.id==='public')?.photoUrl).toMatch(/\/media\/public-photo\/content$/);
+    for (const id of ['none','private','foreign-image']) expect(data.find(x=>x.id===id)?.photoUrl).toBeNull();
+    expect(data.find(x=>x.id==='draft')).toBeUndefined();
+    db.raw.prepare("UPDATE booking_settings SET store_photo_media_id='public-photo' WHERE id='bs'").run();
+    const privateStore=(await (await request('/api/liff/restaurant/courses?storeId=store')).json() as {data:Array<{id:string;photoUrl:string|null}>}).data;
+    expect(privateStore.find(x=>x.id==='public')?.photoUrl).toBeNull();
+    db.raw.prepare("UPDATE booking_settings SET store_photo_media_id=NULL WHERE id='bs'").run();
+    db.raw.prepare("UPDATE media_file_scans SET status='quarantined' WHERE subject_kind='media' AND subject_id='public-photo'").run();
+    const blocked=(await (await request('/api/liff/restaurant/courses?storeId=store')).json() as {data:Array<{id:string;photoUrl:string|null}>}).data;
+    expect(blocked.find(x=>x.id==='public')?.photoUrl).toBeNull();
+  });
 });
 
 describe('飲食4：コース・フォーム・系列店',()=>{

@@ -1,3 +1,4 @@
+import { restaurantCoursePhoto } from '../services/restaurant-course-photo.js';
 import { readRestaurantCustomerReservationForm,RestaurantReservationFormError } from '../services/restaurant-reservation-form.js';
 import { restaurantReservationAnswerError } from '@line-crm/shared';
 import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
@@ -446,7 +447,12 @@ restaurantCustomerBooking.get('/api/liff/restaurant/courses', async c => {
   const store=await storeFor(c,self.accountId,c.req.query('storeId')); if(!store)return liffBookingJson(c, {success:false,error:'not_found'},404);
   const db=dbFor(c.env,store.id);
   const rows=await db.prepare("SELECT id FROM rt_menu_items WHERE store_id=? AND kind='course' AND status='active' AND duration_minutes BETWEEN 1 AND 1440 ORDER BY price,id").bind(store.id).all<{id:string}>();
-  return liffBookingJson(c, {success:true,timezone:store.timezone,data:await Promise.all(rows.results.map(r=>customerCourse(db,store.id,r.id)))});
+  return liffBookingJson(c, {success:true,timezone:store.timezone,data:await Promise.all(rows.results.map(async r=> {
+    const course = await customerCourse(db,store.id,r.id);
+    if (!course) return null;
+    const photoUrl = await restaurantCoursePhoto(c.env,self.accountId,store.id,r.id,c.env.WORKER_URL || new URL(c.req.url).origin);
+    return { ...course, photoUrl };
+  }))});
 });
 
 restaurantCustomerBooking.get('/api/liff/restaurant/referrals',async c=>{

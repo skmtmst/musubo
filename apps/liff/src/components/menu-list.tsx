@@ -6,7 +6,7 @@ import { api, type MenuItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from './load-error-view.js';
 import LoadingView from './loading-view.js';
-import Icon from './ui/icon.js';
+import MenuChoiceCard from './menu-choice-card.js';
 
 const ALL_CATEGORY = 'すべて';
 
@@ -92,38 +92,10 @@ export default function MenuList({
           const selected = m.id === selectedId;
           return (
             <li key={m.id}>
-              <Button variant="option" selected={selected}
-                type="button"
-                onClick={() => onSelect(m)}
-                aria-pressed={selected}
-              >
-                {m.photo_url ? <img src={m.photo_url} alt="" className="h-14 w-14 shrink-0 rounded-[10px] object-cover" /> : <span
-                  className="h-14 w-14 shrink-0 rounded-[10px] bg-liff-photo"
-                  aria-hidden="true"
-                />}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] leading-[22px] font-bold text-ink" title={m.name}>
-                    {m.name}
-                  </span>
-                  {m.description ? <span
-                    className="mt-[3px] block truncate text-[11.5px] leading-[17px] text-liff-sub"
-                    title={m.description ?? undefined}
-                  >
-                    {m.description}
-                  </span> : null}
-                  <span className="mt-[3px] block text-xs">
-                    <span className="font-semibold text-ink">{m.duration_minutes}分</span>
-                    <span className="ml-2 font-bold text-liff-primary">
-                      {bookingPriceText(m.base_price, m.price_mode)}
-                    </span>
-                  </span>
-                </span>
-                {selected ? (
-                  <Icon name="circle-check" className="h-[22px] w-[22px] shrink-0 text-liff-primary" />
-                ) : (
-                  <Icon name="chevron-right" className="h-[18px] w-[18px] shrink-0 text-liff-idle" />
-                )}
-              </Button>
+              <MenuChoiceCard name={m.name} description={m.description} imageUrl={m.photo_url} selected={selected} onSelect={() => onSelect(m)} details={<>
+                <span className="font-semibold text-ink">{m.duration_minutes}分</span>
+                <span className="ml-2 font-bold text-liff-primary">{bookingPriceText(m.base_price, m.price_mode)}</span>
+              </>} />
             </li>
           );
         })}

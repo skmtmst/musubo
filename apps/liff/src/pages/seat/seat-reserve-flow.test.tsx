@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { defaultRestaurantReservationForm,type RestaurantCustomerBooking,type RestaurantCustomerSlot } from '@line-crm/shared';
 
@@ -109,8 +109,9 @@ describe('席の予約の流れ', () => {
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     expect(screen.getByRole('radio', { name: '19:30 満席' })).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('ご予約の内容');
-    expect(screen.getByText('コース：席のみ（2時間）')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
+    await screen.findByText('内容を確かめてください');
+    expect(screen.getByText('席のみ')).toBeTruthy();
     const body = vi.mocked(seat.hold).mock.calls[0]![0];
     expect(body).toMatchObject({ storeId: 'st', startsAt: new Date('2026-10-07T19:00:00+09:00').toISOString(), guestCount: 2 });
     expect(body.requestId).toMatch(/^[a-zA-Z0-9_-]{8,128}$/);
@@ -140,7 +141,8 @@ describe('席の予約の流れ', () => {
     expect(await screen.findByText('10/9（金）は臨時休業のため選べません')).toBeTruthy();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('ご予約の内容');
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
+    await screen.findByText('内容を確かめてください');
     expect(screen.getByText('テーブル席（お店で決めます）')).toBeTruthy();
     expect(screen.getByText('・15分を過ぎてご連絡がない場合は、取り消しになることがあります')).toBeTruthy();
     fireEvent.change(screen.getByLabelText(/ご要望/), { target: { value: '記念日です' } });
@@ -161,7 +163,8 @@ describe('席の予約の流れ', () => {
     open();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('ご予約の内容');
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
+    await screen.findByText('内容を確かめてください');
     fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: 'でんわ' } });
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     expect(await screen.findByText('電話番号は0から始まる10〜11桁の数字で入れてください。')).toBeTruthy();
@@ -175,15 +178,17 @@ describe('席の予約の流れ', () => {
     open();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
     await screen.findByText(/送信できませんでした/);
-    fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    fireEvent.click(screen.getByRole('button', { name: 'コースを選んで進む' }));
     await screen.findByText(/ほかの方の予約で埋まりました/);
     const ids = vi.mocked(seat.hold).mock.calls.map((c) => c[0].requestId);
     expect(ids[0]).toBe(ids[1]);
     vi.mocked(seat.hold).mockResolvedValueOnce({ success: true, data: held() });
     fireEvent.click(await screen.findByRole('radio', { name: '18:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-    await screen.findByText('ご予約の内容');
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
+    await screen.findByText('内容を確かめてください');
     expect(vi.mocked(seat.hold).mock.calls[2]![0].requestId).not.toBe(ids[1]);
   });
 
@@ -193,6 +198,7 @@ describe('席の予約の流れ', () => {
     open();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
     fireEvent.click(await screen.findByRole('button', { name: '予約を確定する' }));
     await screen.findAllByText(/お取りしていた時間が過ぎました/);
     expect(screen.getByRole('button', { name: '予約を確定する' })).toHaveProperty('disabled', true);
@@ -211,12 +217,13 @@ describe('席の予約の流れ', () => {
     open();
     fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
     await screen.findByRole('button', { name: 'お取りしています…' });
-    // 送信中に別の時刻を押す。
-    fireEvent.click(screen.getByRole('radio', { name: '18:00 空きあり' }));
-    expect(screen.getByRole('radio', { name: '19:00 空きあり' }).getAttribute('aria-checked')).toBe('true');
+    // 送信中は日時に戻れず、コースも変更できない。
+    expect(screen.getByRole('button', { name: /日時を選び直す/ })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: /席のみ/ })).toHaveProperty('disabled', true);
     resolveHold({ success: true, data: held() });
-    await screen.findByText('ご予約の内容');
+    await screen.findByText('内容を確かめてください');
     expect(screen.queryByText(/18:00/)).toBeNull();
     expect(screen.getAllByText(/19:00/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
@@ -233,8 +240,8 @@ it('XL-01: 席予約の確定中に戻ると古い成功で完了画面へ進ま
   vi.mocked(seat.cancel).mockResolvedValue({success:true,data:held({status:'cancelled'})});
   open();
   fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));
-  fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));
-  await screen.findByText('ご予約の内容');
+  fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));fireEvent.click(await screen.findByRole('button',{name:'コースを選んで進む'}));
+  await screen.findByText('内容を確かめてください');
   fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));
   fireEvent.click(screen.getByRole('button',{name:/時刻を選び直す/}));
   await screen.findByRole('radio',{name:'19:00 空きあり'});
@@ -287,7 +294,7 @@ it('店の必須項目と完了文を使い、入力した名前とアレルギ�
  definition.fields=definition.fields.map(field=>field.id==='allergy'?{...field,label:'食べられない物',required:true}:field.id==='phone'?{...field,enabled:false}:field);
  vi.mocked(seat.link).mockResolvedValue({success:true,data:{id:'st',name:'食堂',timezone:'Asia/Tokyo',reservationForm:{version:8,definition}}});
  vi.mocked(seat.hold).mockResolvedValue({success:true,data:held()});vi.mocked(seat.confirm).mockResolvedValue({success:true,data:held({status:'confirmed',version:4})});
- open();fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));await screen.findByText('ご予約の内容');
+ open();fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));fireEvent.click(await screen.findByRole('button',{name:'コースを選んで進む'}));await screen.findByText('内容を確かめてください');
  expect(screen.queryByLabelText(/電話番号/)).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));expect(await screen.findByText('食べられない物を入れてください')).toBeTruthy();expect(seat.confirm).not.toHaveBeenCalled();
  fireEvent.change(screen.getByRole('textbox',{name:/お名前/}),{target:{value:'予約する方'}});fireEvent.change(screen.getByRole('textbox',{name:/食べられない物/}),{target:{value:'乳製品'}});
@@ -299,7 +306,7 @@ it('フォームが途中で変わったら読み直し、仮押さえと入力�
  vi.mocked(seat.link).mockResolvedValue({success:true,data:{id:'st',name:'食堂',timezone:'Asia/Tokyo',reservationForm:{version:1,definition}}});
  vi.mocked(seat.hold).mockResolvedValue({success:true,data:held()});
  vi.mocked(seat.confirm).mockRejectedValueOnce(err(409,'reservation_form_changed')).mockResolvedValue({success:true,data:held({status:'confirmed',version:4})});
- open();fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));await screen.findByText('ご予約の内容');
+ open();fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));fireEvent.click(await screen.findByRole('button',{name:'コースを選んで進む'}));await screen.findByText('内容を確かめてください');
  fireEvent.change(screen.getByRole('textbox',{name:/お名前/}),{target:{value:'予約する方'}});
  vi.mocked(seat.link).mockResolvedValue({success:true,data:{id:'st',name:'食堂',timezone:'Asia/Tokyo',reservationForm:{version:2,definition}}});
  fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));await screen.findByText('予約フォームが更新されました。項目を確認して、もう一度予約してください');
@@ -320,14 +327,10 @@ it.each([
   open(`/restaurant/reserve/tok${store.referralId ? `?referralId=${store.referralId}` : ''}`);
   fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
   fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-  const heading = await screen.findByRole('heading', { name: 'ご予約の内容' });
-  const details = heading.closest('[data-design-node]')!.querySelector('details')!;
-  expect(details.open).toBe(true);
-  details.open = false;
-  fireEvent(details, new Event('toggle'));
-  expect(heading.closest('[data-liff-card]')?.textContent).toContain(store.name);
-  expect(details.textContent).not.toContain(store.name);
-  expect(seat.hold).toHaveBeenCalledWith(expect.objectContaining({ storeId: store.id, startsAt: '2026-10-07T10:00:00.000Z', guestCount: 2 }));
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
+  const heading = await screen.findByRole('heading', { name: '内容を確かめてください' });
+  const summary = heading.parentElement!.querySelector('[data-liff-card]')!;
+  expect(summary.textContent).toContain(store.name);
   fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
   await screen.findByText('ご予約を受け付けました');
   expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null, customerName: '見本 143', allergyNote: null, expectedFormVersion: 7, ...(store.referralId ? { referralId: store.referralId } : {}) });
@@ -342,12 +345,89 @@ it('変更予約もリンクの店名を折り畳み外に出し、仮押さえ�
   fireEvent.click(await screen.findByRole('button', { name: '日時・人数を変える' }));
   fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
   fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
-  const heading = await screen.findByRole('heading', { name: 'この内容に変更します' });
-  expect(heading.closest('[data-design-node]')!.querySelector('details')?.open).toBe(false);
-  expect(heading.closest('[data-liff-card]')?.textContent).toContain('然 - NEN - 東口店');
+    fireEvent.click(await screen.findByRole('button', { name: 'コースを選んで進む' }));
+  const heading = await screen.findByRole('heading', { name: '内容を確かめてください' });
+  expect(heading.parentElement!.querySelector('[data-liff-card]')?.textContent).toContain('然 - NEN - 東口店');
   expect(seat.hold).not.toHaveBeenCalled();
   expect(seat.confirm).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'この内容に変える' }));
   await screen.findByText('ご予約を変更しました');
   expect(seat.reschedule).toHaveBeenCalledWith('booking-east', { expectedVersion: 9, startsAt: '2026-10-08T10:00:00.000Z', guestCount: 2, courseId: null });
+});
+
+it('日時のあと写真付きコースを選び、選択後の空きを確認して仮押さえする', async () => {
+  vi.mocked(seat.courses).mockResolvedValue({success:true,data:[{id:'c1',name:'見本コース',durationMinutes:90,price:3000,allergens:[],photoUrl:'https://example.test/course.png'}]});
+  vi.mocked(seat.hold).mockResolvedValue({success:true,data:held({courseId:'c1',courseName:'見本コース'})});
+  open();
+  fireEvent.click(await screen.findByRole('radio', {name:'19:00 空きあり'}));
+  fireEvent.click(screen.getByRole('button', {name:'この時刻で進む'}));
+  expect(seat.hold).not.toHaveBeenCalled();
+  const course=screen.getByRole('button',{name:/見本コース/});
+  expect(course.querySelector('img')?.getAttribute('src')).toBe('https://example.test/course.png');
+  fireEvent.click(course);
+  await waitFor(() => expect(screen.getByRole('button',{name:'コースを選んで進む'})).toHaveProperty('disabled',false));
+  fireEvent.click(screen.getByRole('button',{name:'コースを選んで進む'}));
+  await screen.findByText('内容を確かめてください');
+  expect(seat.hold).toHaveBeenCalledWith(expect.objectContaining({courseId:'c1'}));
+});
+
+it('コースを選んだ後に時刻が満席なら仮押さえせず日時を選び直す', async () => {
+  vi.mocked(seat.courses).mockResolvedValue({success:true,data:[{id:'c1',name:'見本コース',durationMinutes:90,price:3000,allergens:[],photoUrl:null}]});
+  vi.mocked(seat.availability).mockImplementation(async (_s,date,guestCount,courseId) => ({success:true,data:{storeId:'st',date,guestCount,slots:slots(date).map(x => courseId ? {...x,available:false,remainingTables:0} : x),cancelDeadlineMinutesBefore:120,cutoffMinutesBefore:60}}));
+  open();
+  fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));
+  fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));
+  fireEvent.click(screen.getByRole('button',{name:/見本コース/}));
+  expect(await screen.findByText(/このコースでは選んだ時刻を利用できません/)).toBeTruthy();
+  expect(screen.getByRole('button',{name:'コースを選んで進む'})).toHaveProperty('disabled',true);
+  expect(seat.hold).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:/日時を選び直す/}));
+  expect(screen.getByRole('radiogroup',{name:'人数'})).toBeTruthy();
+});
+
+it('人数と日付の札を選び、休みの札は選べない', async () => {
+  vi.mocked(seat.availability).mockImplementation(async (_s, date, guestCount) => ({success:true,data:{storeId:'st',date,guestCount,slots:date === '2026-10-09' ? [] : slots(date),unavailableReason:date === '2026-10-09' ? 'temporary_closed' : undefined,cancelDeadlineMinutesBefore:120,cutoffMinutesBefore:60}}));
+  open();
+  fireEvent.click(await screen.findByRole('radio', {name:'5名以上'}));
+  fireEvent.change(screen.getByRole('combobox',{name:'5名以上の人数'}),{target:{value:'7'}});
+  await waitFor(() => expect(seat.availability).toHaveBeenCalledWith('st',expect.any(String),7,null));
+  expect(await screen.findByText('10/9（金）は臨時休業のため選べません')).toBeTruthy();
+  expect(screen.getByRole('button',{name:/10月9日 お休み/})).toHaveProperty('disabled',true);
+});
+
+it('週とカレンダーを切り替え、日付の空きを読んで選べる', async () => {
+  open();
+  expect(await screen.findByRole('heading',{name:'人数と日時を選んでください'})).toBeTruthy();
+  expect(screen.getByRole('radio',{name:'週で見る'}).getAttribute('aria-checked')).toBe('true');
+  fireEvent.click(screen.getByRole('radio',{name:'カレンダー'}));
+  const day=await screen.findByRole('button',{name:'10月8日 空きあり'});
+  fireEvent.click(day);
+  expect(screen.getByRole('radio',{name:'週で見る'}).getAttribute('aria-checked')).toBe('true');
+  fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));
+  fireEvent.click(screen.getByRole('button',{name:'この時刻で進む'}));
+  expect(screen.getByRole('button',{name:/席のみ/}).querySelector('img')).toBeNull();
+  expect(screen.getByRole('button',{name:/席のみ/}).querySelector('[aria-hidden="true"]')?.tagName.toLowerCase()).toBe('svg');
+});
+
+it('次の週では新しい日を読み、前の週の時刻を残さない', async () => {
+  open();
+  fireEvent.click(await screen.findByRole('radio',{name:'19:00 空きあり'}));
+  fireEvent.click(screen.getByRole('button',{name:'次の週'}));
+  await waitFor(()=>expect(seat.availability).toHaveBeenCalledWith('st','2026-10-12',2,null));
+  await waitFor(()=>expect(screen.getByRole('radio',{name:'19:00 空きあり'}).getAttribute('aria-checked')).toBe('false'));
+});
+
+it('別の週の空きの読み込みに失敗したら、その週を読み直せる', async () => {
+  let fail=true;
+  vi.mocked(seat.availability).mockImplementation(async (_s,date,guestCount) => {
+    if(date==='2026-10-12' && fail) throw err(500,'unavailable');
+    return {success:true,data:{storeId:'st',date,guestCount,slots:slots(date),cancelDeadlineMinutesBefore:120,cutoffMinutesBefore:60}};
+  });
+  open();
+  await screen.findByRole('radio',{name:'19:00 空きあり'});
+  fireEvent.click(screen.getByRole('button',{name:'次の週'}));
+  expect(await screen.findByText(/日付の空きを読み込めませんでした/)).toBeTruthy();
+  fail=false;
+  fireEvent.click(screen.getByRole('button',{name:'もう一度読み込む'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'10月12日 空きあり'})).toHaveProperty('disabled',false));
 });
