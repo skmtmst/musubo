@@ -29,7 +29,11 @@ export function useOpsReadOnlyState(): 'unknown' | 'readonly' | 'writer' {
       call = null
     }
     if (!call) return () => { active = false }
-    void opsCall(call).then((res) => { if (active && res.success) setState(res.data.readOnly ? 'readonly' : 'writer') })
+    void opsCall(call).then((res) => {
+      if (!active || !res.success) return
+      const readOnly = (res.data as { readOnly?: unknown } | null | undefined)?.readOnly
+      if (typeof readOnly === 'boolean') setState(readOnly ? 'readonly' : 'writer')
+    })
     return () => { active = false }
   }, [])
   return state
