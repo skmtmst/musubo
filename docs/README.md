@@ -1423,3 +1423,4 @@
 - [メディアと友だち情報の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex35.md)
 - [安全確認と自動応答の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex36.md)
 - [流入リンクとスマホの対応画面の反映履歴](release-log/unreleased/PR-kenta-later-codex37.md)
+- [統括の配信候補と画像プロジェクトの反映履歴](release-log/unreleased/PR-kenta-later-codex38.md)

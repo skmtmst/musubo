@@ -11,6 +11,7 @@ test('作成窓は入力を本文幅へ渡し、名前必須・説明・Enterの
   const dialog = screen.getByRole('dialog', { name: 'プロジェクトを作る' })
   expect(dialog.querySelector('[data-content-layout="form"]')).toBeTruthy()
   expect((screen.getByRole('button', { name: '作って開く' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByText('プロジェクト名を入力してください')).toBeTruthy()
   fireEvent.change(screen.getByRole('textbox', { name: /プロジェクト名/ }), { target: { value: ' 春のご案内 ' } })
   fireEvent.change(screen.getByRole('textbox', { name: /説明/ }), { target: { value: ' 予約のお知らせ ' } })
   fireEvent.submit(dialog.querySelector('form')!)
