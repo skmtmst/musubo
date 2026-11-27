@@ -89,7 +89,7 @@ export function toV06CheckRows(connection: LineAccountConnectData | null, view: 
 
 /** 次に出す行。今の行が通っていれば1つ進める。止まった行で演出を終える。 */
 export function nextCursor(rows: V06CheckRow[], cursor: number): number | null {
-  if (cursor >= rows.length) return null
+  if (!Array.isArray(rows) || !Number.isInteger(cursor) || cursor < 0 || cursor >= rows.length) return null
   return rows[cursor].phase === 'error' ? null : cursor + 1
 }
 
@@ -196,8 +196,15 @@ export function latestFollowerImportState<T extends {
   profilesProcessed: number
   profilesUpdated: number
 }>(current: T | null, next: T): T {
+  const rank: Record<'not_started' | 'importing_ids' | 'hydrating_profiles' | 'completed', number> = { not_started: 0, importing_ids: 1, hydrating_profiles: 2, completed: 3 }
+  const isValid = (state: T) =>
+    Object.prototype.hasOwnProperty.call(rank, state.phase)
+    && Number.isFinite(state.received) && state.received >= 0
+    && Number.isFinite(state.profilesProcessed) && state.profilesProcessed >= 0
+    && Number.isFinite(state.profilesUpdated) && state.profilesUpdated >= 0
   if (!current) return next
-  const rank = { not_started: 0, importing_ids: 1, hydrating_profiles: 2, completed: 3 }
+  if (!isValid(next)) return current
+  if (!isValid(current)) return next
   if (rank[next.phase] < rank[current.phase]) return current
   if (next.received < current.received || next.profilesProcessed < current.profilesProcessed || next.profilesUpdated < current.profilesUpdated) return current
   return next
