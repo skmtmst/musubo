@@ -15,6 +15,7 @@
 - [スマートフォンの予約台帳入口の反映履歴](release-log/unreleased/PR-kenta-later-cx2-27-1128.md)（説明・2026-11-28確認）
 - [運用者通知の宛先の読み直しの反映履歴](release-log/unreleased/PR-kenta-later-cx2-28-1128.md)（説明・2026-11-28確認）
 - [一括配信のテンプレート選択の反映履歴](release-log/unreleased/PR-kenta-later-cx2-29-1128.md)（説明・2026-11-28確認）
+- [ひな形の版比較の反映履歴](release-log/unreleased/PR-kenta-later-cx2-30-1128.md)（説明・2026-11-28確認）
 - [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
