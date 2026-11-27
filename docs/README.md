@@ -1427,3 +1427,4 @@
 - [イベントと配布結果の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex39.md)
 - [共通情報と配布結果の案内の反映履歴](release-log/unreleased/PR-kenta-later-codex40.md)
 - [統括の自動応答の設定表示の反映履歴](release-log/unreleased/PR-kenta-later-codex41.md)
+- [予約経路タブ・飲食店組織管理の読み込み失敗表示と再試行（gemini28）](release-log/unreleased/PR-kenta-later-gemini28-1127.md) — 反映履歴、確認 2026-11-27。
