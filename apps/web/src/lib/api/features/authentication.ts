@@ -9,6 +9,7 @@ export const authenticationMethods = {
       fetchApi<ApiResponse<{ status: 'ok' }>>('/api/health'),
   },
   auth: {
+    trustCurrentLogin: (token: string) => fetchApi<ApiResponse<null>>('/api/auth/sessions/trust-current', { method: 'POST', headers: { 'X-Step-Up-Token': token }, body: '{}' }),
     /** 切替後の本人確認方式・代理モードを、使い回さずに確かめ直す。 */
     session: () => fetchApi<ApiResponse<{
       impersonation: OpsImpersonation | null

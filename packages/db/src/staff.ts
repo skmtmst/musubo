@@ -667,15 +667,16 @@ export async function deleteOtherAdminSessions(
   db: D1Database,
   staffId: string,
   keepTokenHash: string,
+  keepTrust?: { markerHash: string; ipPrefix: string } | null,
 ): Promise<number> {
-  await db.prepare(`DELETE FROM platform_settings WHERE key IN
+  const result = await db.batch([
+    db.prepare(`DELETE FROM platform_settings WHERE key IN
     (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=? AND token_hash<>?)`)
-    .bind(staffId, keepTokenHash).run();
-  const result = await db
-    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
-    .bind(staffId, keepTokenHash)
-    .run();
-  return result.meta.changes ?? 0;
+    .bind(staffId, keepTokenHash),
+    db.prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?').bind(staffId, keepTokenHash),
+    db.prepare('DELETE FROM auth_trusted_logins WHERE staff_id = ? AND NOT (marker_hash = ? AND ip_prefix = ?)').bind(staffId, keepTrust?.markerHash ?? '', keepTrust?.ipPrefix ?? ''),
+  ]);
+  return result[1]?.meta.changes ?? 0;
 }
 
 export async function getStaffByAdminSession(
@@ -727,6 +728,7 @@ export async function revokeStaffAuthentication(db: D1Database, staffId: string)
     db.prepare("DELETE FROM platform_settings WHERE key IN (SELECT 'auth.mfa.session:'||token_hash FROM admin_sessions WHERE staff_id=?)").bind(staffId),
     db.prepare('DELETE FROM admin_sessions WHERE staff_id = ?').bind(staffId),
     db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId),
+    db.prepare('DELETE FROM auth_trusted_logins WHERE staff_id = ?').bind(staffId),
   ]);
 }
 

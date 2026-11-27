@@ -57,6 +57,7 @@ const processors = vi.hoisted(() => Object.fromEntries([
   "processGoogleBusinessDailyMetrics",
   "processTenantDataPurge",
   "purgeExpiredRegistrationApplications",
+  "purgeExpiredTrustedLogins",
   "processDueReminders",
   "processDueEventReminders",
   "processDueMeetConsultationReminders",
@@ -192,6 +193,7 @@ vi.mock('@line-crm/db',async original=>({
   enqueueFollowingMileageMilestones:processors.enqueueFollowingMileageMilestones,
   applyDueCommonVarSchedules:processors.applyDueCommonVarSchedules,
 }));
+vi.mock('./services/trusted-login-retention.js', () => ({ purgeExpiredTrustedLogins: processors.purgeExpiredTrustedLogins }));
 const processorCases = [
   ["action score inactivity", "processActionScoreInactivity", "frequentHeavy"],
   ["friend bulk runs", "processDueFriendBulkRuns", "frequentHeavy"],
@@ -218,6 +220,7 @@ const processorCases = [
   ["google business metrics", "processGoogleBusinessDailyMetrics", "sixHourlyHeavy"],
   ["tenant data retention purge", "processTenantDataPurge", "sixHourlyHeavy"],
   ["registration application retention", "purgeExpiredRegistrationApplications", "sixHourlyHeavy"],
+  ["expired trusted logins", "purgeExpiredTrustedLogins", "sixHourlyHeavy"],
   ["booking reminders", "processDueReminders", "delivery"],
   ["event reminders", "processDueEventReminders", "delivery"],
   ["meet consultation reminders", "processDueMeetConsultationReminders", "delivery"],
@@ -254,7 +257,10 @@ async function invoke(cron: string, scheduledTime=Date.parse('2026-10-19T15:01:0
       const first=processors[name]!.mock.calls[0]?.[0];
       expect(first&&typeof first==='object'&&'DB' in first?first.DB:first,name).toBe(fixture.db);
     }
-    if (lane === 'sixHourlyHeavy') expect(processors.purgeExpiredRegistrationApplications).toHaveBeenCalledWith(fixture.db, new Date(scheduledTime));
+    if (lane === 'sixHourlyHeavy') {
+      expect(processors.purgeExpiredRegistrationApplications).toHaveBeenCalledWith(fixture.db, new Date(scheduledTime));
+      expect(processors.purgeExpiredTrustedLogins).toHaveBeenCalledWith(fixture.db, new Date(scheduledTime));
+    }
     expect(network).not.toHaveBeenCalled();
     return { jobs:observed.jobs.map(job=>job.name), deliveries:[...observed.deliveries], scheduledTime };
   } finally { await Promise.allSettled(pending); fixture.raw.close(); }
@@ -266,7 +272,7 @@ test('設定済みのCron式は実際のレーンを呼び、通知は重いレ�
   expect(new Set(crons)).toEqual(new Set(Object.values(SCHEDULED_CRONS)));
   const expected = {
     frequentHeavy: ['friend bulk runs','analytics cross','mileage projection','ad conversion outbox retry','analytics url exposure projection','analytics projection','account health','broadcast insights','NEN rich menu jobs','support email sync','friend field reminders','google business resync'],
-    sixHourlyHeavy: ['NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge','registration application retention'],
+    sixHourlyHeavy: ['expired trusted logins','NEN tag refresh','analytics retention purge','friend snapshot','media usage scan','following mileage','booking expirer','event booking expirer','billing invoice sync','restaurant raw mail retention','google business metrics','tenant data retention purge','registration application retention'],
   };
   const classified=new Set(FEATURE_JOB_MANIFEST.map(job=>job.name));
   for (const lane of ['frequentHeavy','sixHourlyHeavy'] as const) {

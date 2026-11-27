@@ -31,6 +31,9 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
+import TrustCurrentLogin from '@/components/trust-current-login';
+import TrustedLogins from './trusted-logins';
+import { readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot';
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
@@ -171,6 +174,12 @@ type StepUpRequest = SharedStepUpRequest
 
 /** 本人がいまログインしている端末の一覧と失効（N-427）。 */
 function SessionsCard() {
+  const [unfamiliar, setUnfamiliar] = useState(() => Boolean(readSessionSnapshot()?.unfamiliarAt))
+  useEffect(() => {
+    const update = () => setUnfamiliar(Boolean(readSessionSnapshot()?.unfamiliarAt))
+    window.addEventListener(SESSION_SNAPSHOT_CHANGED, update)
+    return () => window.removeEventListener(SESSION_SNAPSHOT_CHANGED, update)
+  }, [])
   const [sessions, setSessions] = useState<Array<{ id: string; current: boolean; createdAt: string; expiresAt: string; userAgent: string | null; ipPrefix: string | null }> | null>(null)
   const [error, setError] = useState('')
   const [revokingId, setRevokingId] = useState<string | null>(null), [confirmCurrent, setConfirmCurrent] = useState(false), [confirmOthers, setConfirmOthers] = useState(false)
@@ -203,6 +212,7 @@ function SessionsCard() {
       if (!res.success) throw new Error(res.error)
       setConfirmOthers(false)
       if (res.success) { notifyToast(res.data.revoked > 0 ? `この端末以外の ${res.data.revoked} 件のログインを終了しました` : '他にログイン中の端末はありませんでした') }
+      window.dispatchEvent(new Event('lh-trusted-logins-changed'))
       await load()
       return true
     } catch (caught) { setError(messageOf(caught)); return false } finally { setRevokingId(null) }
@@ -222,10 +232,12 @@ function SessionsCard() {
         {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="min-w-0"><p className="truncate text-sm font-medium text-ink" title={session.userAgent ?? undefined}>{deviceLabel(session.userAgent)}{session.current && <span className="ml-2 rounded-pill bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">この端末</span>}</p>
             <p className="mt-0.5 text-xs text-ink-faint">ログイン：{formatStaffDate(session.createdAt)}{session.ipPrefix ? `・接続元：${session.ipPrefix}` : ''}</p></div>
+          {session.current && unfamiliar && <TrustCurrentLogin onSuccess={() => void load()} />}
           <Button variant="secondary" disabled={revokingId === session.id} onClick={() => { setError(''); if (session.current) setConfirmCurrent(true); else void revoke(session.id, false) }} busy={revokingId === session.id} busyLabel="終了中…">ログインを終了</Button>
         </li>)}
       </ul>
     )}
+    <TrustedLogins />
     <ConfirmDialog
       open={confirmCurrent}
       title="この端末のログインを終了しますか？"

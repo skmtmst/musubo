@@ -487,6 +487,15 @@
       "parentColumn": "id"
     }
   },
+  "auth_trusted_logins": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
   "auth_email_tokens": {
     "category": "global"
   },

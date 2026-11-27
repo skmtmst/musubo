@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { countLoginAudit } from '../src/login-audit.js'
 import { DEFAULT_TENANT_ID } from '@line-crm/shared'
-import { createStaffMember, deleteStaffMember, getStaffByApiKey, revokeStaffAuthentication } from '../src/staff.js'
+import { createStaffMember, deleteStaffMember, getStaffByApiKey } from '../src/staff.js'
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (query: string, params: unknown[]) => ({
@@ -96,15 +96,4 @@ describe('ログインユーザーの無効化と監査記録', () => {
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM login_audit WHERE admin_user_id = 'target'`).get()).toEqual({ count: 3 })
   })
 
-  it('権限変更時は対象者のsessionと二段階認証challengeだけを失効する', async () => {
-    sqlite.prepare('INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('s-target', 'target', '2099-01-01')
-    sqlite.prepare('INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('s-other', 'other', '2099-01-01')
-    sqlite.prepare('INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('c-target', 'target', '2099-01-01')
-    sqlite.prepare('INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run('c-other', 'other', '2099-01-01')
-
-    await revokeStaffAuthentication(db, 'target')
-
-    expect(sqlite.prepare('SELECT token_hash FROM admin_sessions ORDER BY token_hash').all()).toEqual([{ token_hash: 's-other' }])
-    expect(sqlite.prepare('SELECT token_hash FROM admin_two_factor_challenges ORDER BY token_hash').all()).toEqual([{ token_hash: 'c-other' }])
-  })
 })

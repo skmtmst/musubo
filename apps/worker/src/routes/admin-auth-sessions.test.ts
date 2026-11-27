@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { getStaffByAdminSession } from '@line-crm/db';
+import { getStaffByAdminSession, revokeStaffAuthentication } from '@line-crm/db';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { adminAuth } from './admin-auth.js';
 
@@ -155,6 +155,22 @@ describe('DELETE /api/auth/sessions/:tokenHash', () => {
 });
 
 describe('POST /api/auth/sessions/revoke-others', () => {
+  it('現在の端末と接続元を残し、他の信頼を削除する', async () => {
+    const marker = 'marker_abcdefghijklmnopqrstuvwx';
+    const markerHash = await sha256Hex(`login-device:${marker}`);
+    await seedSession('token-current', 'staff-1', { ip: '203.0.*.*' });
+    await seedSession('token-other', 'staff-1');
+    for (const [id, hash, ip] of [['staff-1', markerHash, '203.0.*.*'], ['staff-1', 'other', '198.51.*.*'], ['staff-2', 'other', '198.51.*.*']]) testDb.raw.prepare('INSERT INTO auth_trusted_logins VALUES (?, ?, ?, ?)').run(id, hash, ip, NOW);
+    const res = await app().request('/api/auth/sessions/revoke-others', { method: 'POST', headers: { cookie: `lh_admin_session=token-current; lh_login_device=${marker}`, 'cf-connecting-ip': '203.0.113.4' } }, bindings());
+    expect(res.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT staff_id, marker_hash FROM auth_trusted_logins ORDER BY staff_id').all()).toEqual([{ staff_id: 'staff-1', marker_hash: markerHash }, { staff_id: 'staff-2', marker_hash: 'other' }]);
+  });
+
+  it('強制ログアウトは本人の信頼だけ削除する', async () => {
+    for (const id of ['staff-1', 'staff-2']) testDb.raw.prepare('INSERT INTO auth_trusted_logins VALUES (?, ?, ?, ?)').run(id, 'marker-hash', '203.0.*.*', NOW);
+    await revokeStaffAuthentication(testDb.db, 'staff-1');
+    expect(testDb.raw.prepare('SELECT staff_id FROM auth_trusted_logins').all()).toEqual([{ staff_id: 'staff-2' }]);
+  });
   it('今のセッション以外をまとめて失効し、監査イベントを残す', async () => {
     await seedSession('token-current', 'staff-1');
     await seedSession('token-old-phone', 'staff-1');
@@ -175,6 +191,27 @@ describe('POST /api/auth/sessions/revoke-others', () => {
     expect(audit?.risk_level).toBe('high');
     expect(audit?.actor_principal_id).toBe('staff-1');
   });
+});
+
+it('本人の有効な信頼だけを表示し、CSRFを確認して1件だけ取り消す', async () => {
+  await seedSession('token-current', 'staff-1', { ip: '203.0.*.*' });
+  const marker = 'marker_abcdefghijklmnopqrstuvwx';
+  const hash = await sha256Hex(`login-device:${marker}`);
+  for (const [staff, markerHash, ip, date] of [['staff-1', hash, '203.0.*.*', NOW], ['staff-1', 'other', '198.51.*.*', NOW], ['staff-1', 'expired', '192.0.*.*', '2020-01-01T00:00:00.000Z'], ['staff-2', 'private', '198.51.*.*', NOW]]) testDb.raw.prepare('INSERT INTO auth_trusted_logins VALUES (?, ?, ?, ?)').run(staff, markerHash, ip, date);
+  const headers = { cookie: `lh_admin_session=token-current; lh_csrf=csrf; lh_login_device=${marker}`, 'x-csrf-token': 'csrf', 'cf-connecting-ip': '203.0.113.4' };
+  const listed = await app().request('/api/auth/trusted-logins', { headers }, bindings());
+  const body = await listed.json() as { data: Array<{ id: string; current: boolean; ipPrefix: string }> };
+  expect(body.data).toHaveLength(2);
+  const current = body.data.find(row => row.current)!;
+  expect(current.ipPrefix).toBe('203.0.*.*');
+  expect(JSON.stringify(body)).not.toContain(hash);
+  const anotherId = await sha256Hex(JSON.stringify(['trusted-login', 'staff-2', 'private', '198.51.*.*']));
+  expect((await app().request(`/api/auth/trusted-logins/${anotherId}`, { method: 'DELETE', headers }, bindings())).status).toBe(404);
+  const url = `/api/auth/trusted-logins/${current.id}`;
+  expect((await app().request(url, { method: 'DELETE', headers: { ...headers, 'x-csrf-token': 'bad' } }, bindings())).status).toBe(403);
+  expect((await app().request(url, { method: 'DELETE', headers }, bindings())).status).toBe(200);
+  expect(testDb.raw.prepare('SELECT staff_id, marker_hash FROM auth_trusted_logins ORDER BY marker_hash').all()).toEqual([{ staff_id: 'staff-1', marker_hash: 'expired' }, { staff_id: 'staff-1', marker_hash: 'other' }, { staff_id: 'staff-2', marker_hash: 'private' }]);
+  expect(testDb.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='auth.login_trust_removed'").get()).toEqual({ n: 1 });
 });
 
 it('mixed Cookie/Bearer requests manage the same session selected by authentication', async () => {

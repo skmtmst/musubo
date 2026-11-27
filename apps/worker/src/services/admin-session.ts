@@ -167,6 +167,10 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     if (familiarity.hasBaseline && (!familiarity.deviceKnown || !familiarity.ipKnown)) {
       unfamiliarAt = new Date().toISOString();
     }
+    if (unfamiliarAt && ipPrefix) {
+      const trusted = await c.env.DB.prepare("SELECT 1 AS found FROM auth_trusted_logins WHERE staff_id = ? AND marker_hash = ? AND ip_prefix = ? AND datetime(confirmed_at) > datetime('now', '-90 days')").bind(staffId, knownDeviceHash, ipPrefix).first();
+      if (trusted) unfamiliarAt = null;
+    }
   } catch (error) {
     unfamiliarAt = new Date().toISOString();
     logger.error("admin_session.check_device_familiarity_failed");

@@ -35,6 +35,7 @@ vi.mock('@/lib/api', () => ({
   api: { auth: { stepUp: (...args: unknown[]) => fixture.authStepUp(...args) } },
 }))
 vi.mock('@/lib/session-snapshot', () => ({
+  SESSION_SNAPSHOT_CHANGED: 'lh-session-snapshot-changed',
   readSessionSnapshot: () => fixture.snapshot,
 }))
 vi.mock('next/link', () => ({

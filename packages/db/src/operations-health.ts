@@ -1099,6 +1099,7 @@ export async function consumeStepUpGrant(
     `UPDATE auth_step_up_grants SET consumed_at = ?
       WHERE token_hash = ? AND staff_id = ? AND purpose = ?
         AND consumed_at IS NULL AND expires_at > ?
+        AND (purpose <> 'auth.login.trust' OR (session_token_hash IS NOT NULL AND session_token_hash = ?))
         AND (session_token_hash IS NULL OR session_token_hash = ?)
         AND (session_token_hash IS NULL OR EXISTS (
           SELECT 1 FROM admin_sessions
@@ -1106,7 +1107,7 @@ export async function consumeStepUpGrant(
             AND staff_id = auth_step_up_grants.staff_id))
         AND (issued_policy_version IS NULL OR issued_policy_version = (
           SELECT policy_version FROM staff_members WHERE id = auth_step_up_grants.staff_id))`,
-  ).bind(now, input.tokenHash, input.staffId, input.purpose, now, input.sessionTokenHash ?? null).run();
+  ).bind(now, input.tokenHash, input.staffId, input.purpose, now, input.sessionTokenHash ?? null, input.sessionTokenHash ?? null).run();
   return Number(result.meta?.changes ?? 0) === 1;
 }
 

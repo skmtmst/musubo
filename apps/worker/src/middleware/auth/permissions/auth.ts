@@ -167,6 +167,8 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
   ['GET', '/api/auth/sessions'],
   ['POST', '/api/auth/sessions/revoke-others'],
+  ['POST', '/api/auth/sessions/trust-current'],
+  ['GET', '/api/auth/trusted-logins'],
   ['GET', '/api/staff/me'],
   ['GET', '/api/tenants/me'],
   // 自社の表示設定だけ読む。PUTは会社全体のowner/adminに限定する。
@@ -199,6 +201,7 @@ const STAFF_SELF_ROUTE_TEMPLATES: Array<[method: string, path: string]> = [
   ['POST', '/api/staff/:id/two-factor/confirm'],
   ['DELETE', '/api/staff/:id/two-factor'],
   ['DELETE', '/api/auth/sessions/:tokenHash'],
+  ['DELETE', '/api/auth/trusted-logins/:id'],
 ];
 
 export function isStaffSelfRouteTemplate(method: string, path: string): boolean {
@@ -228,6 +231,7 @@ const STAFF_SELF_PATH_PATTERNS: Array<[method: string, pattern: RegExp]> = [
  */
 const STAFF_SELF_SCOPED_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['DELETE', /^\/api\/auth\/sessions\/[^/]+$/],
+  ['DELETE', /^\/api\/auth\/trusted-logins\/[a-f0-9]{64}$/],
 ];
 
 export function isStaffSelfEndpoint(method: string, path: string, staffId?: string): boolean {
