@@ -1463,3 +1463,4 @@
 - [飲食メニューの再開ガードとリッチメニュー公開時のエラー案内を修正](release-log/unreleased/PR-kenta-later-gemini48-1127.md) — 反映履歴、確認 2026-11-27。
 - [外部リッチメニュー取り込みの読み込み中・未読取ガードと業種デモ動画の切替リセット](release-log/unreleased/PR-kenta-later-gemini49-1127.md) — 反映履歴、確認 2026-11-27。
 - [LINE来店フォローの時期数値・単位追従と運営招待の重複応答・二重送信ガード](release-log/unreleased/PR-kenta-later-gemini50-1127.md) — 反映履歴、確認 2026-11-27。
+- [見本リッチメニューの未選択時読み込み停止と運営ログインの二重送信ガード](release-log/unreleased/PR-kenta-later-gemini51-1127.md) — 反映履歴、確認 2026-11-27。

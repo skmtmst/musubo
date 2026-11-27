@@ -26,5 +26,5 @@ export function useStarterMenu(accountId: string | null, style: AccountStyle) {
     return () => { active = false }
   }, [accountId, style, tick])
   const current = snapshot?.accountId === accountId && snapshot.style === style ? snapshot : null
-  return { imageUrl:current?.imageR2Key===null?null:current?.imageR2Key?api.richMenuGroups.imageUrl(current.imageR2Key):undefined,imageHeight:current?.imageHeight,buttons: current?.buttons ?? [], loading: !current, error: current?.error ?? null, reload: () => setTick(n => n + 1) }
+  return { imageUrl:current?.imageR2Key===null?null:current?.imageR2Key?api.richMenuGroups.imageUrl(current.imageR2Key):undefined,imageHeight:current?.imageHeight,buttons: current?.buttons ?? [], loading: Boolean(accountId) && !current, error: current?.error ?? null, reload: () => setTick(n => n + 1) }
 }
