@@ -48,7 +48,7 @@ export function DetailHead({
       <PageHeading title={title} explanationKey={`webinar:${current}`} help={<>{subtitle}{current === 'participants' ? <p>「見ていない」は申込だけで入場の記録がない人です。「入場のみ」は入場したが再生を確かめられなかった人です。</p> : null}</>} actions={actions || menuActions ? <>{actions}{menuActions}</> : undefined} />
       <div className={styles.tabsRow}>
         <Tabs label="設定・参加者・分析・コメント演出" items={DETAIL_TABS.map((tab) => ({
-          label: tab.key === 'participants' && participantsCount !== null ? `${tab.label} ${participantsCount}` : tab.label,
+          label: tab.key === 'participants' && participantsCount !== null && Number.isFinite(participantsCount) ? `${tab.label} ${participantsCount}` : tab.label,
           current: tab.key === current,
           onClick: () => { if (tab.key !== current) onSelect(tab.key) },
         }))} />
@@ -82,12 +82,13 @@ export function WizardSteps({
       readOnly={readOnly}
       steps={STEPS.map((step) => {
         const state = stateOf(step.key)
+        const selectable = state === 'done' && step.key !== current
         return {
           key: step.key,
           label: step.title,
           order: step.no,
           state: state === 'current' ? 'todo' : state,
-          onSelect: onSelect ? () => onSelect(step.key) : undefined,
+          onSelect: onSelect && selectable ? () => onSelect(step.key) : undefined,
         }
       })}
     />
