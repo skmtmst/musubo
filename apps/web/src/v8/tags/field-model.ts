@@ -59,6 +59,10 @@ export interface SentFieldContent {
  * 「違う」に倒す（保存済みと言い切らない）。
  */
 export function isSameFieldContent(sent: SentFieldContent, latest: FriendField): boolean {
+  if ((latest.options !== null && (!Array.isArray(latest.options) || !latest.options.every((option) => typeof option === 'string')))
+    || (latest.defaultValue !== null && typeof latest.defaultValue !== 'string')) {
+    throw new Error('最新の情報欄を確認できませんでした。')
+  }
   if (sent.name !== latest.name) return false
   if ((sent.folderId ?? null) !== (latest.folderId ?? null)) return false
   if (JSON.stringify(sent.options ?? null) !== JSON.stringify(latest.options ?? null)) return false
