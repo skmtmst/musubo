@@ -1443,3 +1443,4 @@
 - [予約メニューの版の履歴と初期設定の状態表示の修正](release-log/unreleased/PR-kenta-later-codex52.md) — 反映履歴、確認 2026-11-27。
 - [運営お知らせ作成の読み込み失敗復帰と未知プラン名表示](release-log/unreleased/PR-kenta-later-gemini38b-1127.md) — 反映履歴、確認 2026-11-27。
 - [イベントの申込ページの見本の表示を修正](release-log/unreleased/PR-kenta-later-codex53.md) — 反映履歴、確認 2026-11-27。
+- [API接続の鍵発行とWebhook送り先作成のアカウント切替時ガード修正](release-log/unreleased/PR-kenta-later-gemini40-1127.md) — 反映履歴、確認 2026-11-27。
