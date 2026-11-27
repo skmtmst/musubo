@@ -1419,14 +1419,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 
-- [ファイル登録とごはんの目安の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex34.md)
-- [メディアと友だち情報の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex35.md)
-- [安全確認と自動応答の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex36.md)
-- [流入リンクとスマホの対応画面の反映履歴](release-log/unreleased/PR-kenta-later-codex37.md)
-- [統括の配信候補と画像プロジェクトの反映履歴](release-log/unreleased/PR-kenta-later-codex38.md)
-- [イベントと配布結果の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex39.md)
-- [共通情報と配布結果の案内の反映履歴](release-log/unreleased/PR-kenta-later-codex40.md)
-- [統括の自動応答の設定表示の反映履歴](release-log/unreleased/PR-kenta-later-codex41.md)
-- [予約経路タブ・飲食店組織管理の読み込み失敗表示と再試行（gemini28）](release-log/unreleased/PR-kenta-later-gemini28-1127.md) — 反映履歴、確認 2026-11-27。
-- [お客さまの画面のデザインとコース写真選択の読み込み失敗・再読み込み修正](release-log/unreleased/PR-kenta-later-gemini30-1127.md) — 反映履歴、確認 2026-11-27。
-- [デリバリー連携の接続状態再読み込みとウェビナー編集の読み込み失敗表示修正](release-log/unreleased/PR-kenta-later-gemini31-1127.md) — 反映履歴、確認 2026-11-27。
+- [夜の画面の直し（列車8）](release-log/unreleased/PR-kenta-train-night8-1127.md) — 反映履歴、確認 2026-11-27。
