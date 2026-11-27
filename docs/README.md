@@ -1485,3 +1485,4 @@
 - [ウェビナー動画の不正な時間と種類の表示を修正](release-log/unreleased/PR-kenta-later-cx3-23-1128.md) — 反映履歴、確認 2026-11-28。
 - [タグの使用先の不正な件数とリンク情報の表示を修正](release-log/unreleased/PR-kenta-later-cx3-24-1128.md) — 反映履歴、確認 2026-11-28。
 - [Google Sheets の同期結果と記録の不明な状態を表示](release-log/unreleased/PR-kenta-later-cx3-25-1128.md) — 反映履歴、確認 2026-11-28。
+- [テンプレートの見本を取得できないときの再読み込みを修正](release-log/unreleased/PR-kenta-later-cx3-26-1128.md) — 反映履歴、確認 2026-11-28。
