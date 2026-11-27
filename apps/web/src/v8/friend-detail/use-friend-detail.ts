@@ -271,6 +271,7 @@ export function useFriendDetail(friendId: string, selectedAccountId: string | nu
       )
       if (req !== historyReqRef.current || isStale(generation, requestedAccountId)) return
       if (res.success) {
+        if (!Array.isArray(res.data?.items) || res.data.items.some(item => !item || typeof item.id !== 'string' || typeof item.type !== 'string' || typeof item.occurredAt !== 'string' || typeof item.summary !== 'string')) throw new Error('invalid history')
         setHistoryItems((prev) => {
           if (!cursor) return res.data.items
           // IDEA-03「重複なし」: 同じ元の行は足さない。
