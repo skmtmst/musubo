@@ -34,6 +34,7 @@
 - [マイページのキャンセル待ちとスタンプの修正履歴](release-log/unreleased/PR-kenta-later-cx5-31-1128.md)
 - [予約日時の変更時の空き表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-32-1128.md)
 - [フォーム送信結果の修正履歴](release-log/unreleased/PR-kenta-later-cx5-33-1128.md)
+- [ファイル表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-34-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
