@@ -1,4 +1,4 @@
-import { formReferenceImage } from '../features/forms/form-public-references.js';
+import { formReferenceImage } from '../features/forms/index.js';
 import type { Env } from '../worker-env.js';
 
 /** 公開フォームと同じ門番で、店の現在の表紙だけをお客さまに渡す。 */
