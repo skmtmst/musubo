@@ -40,10 +40,41 @@ describe('共通の「送る前の確かめ」窓（U1）', () => {
   it('数えられなかったとき・0 人のときは主ボタンを押せない', () => {
     const { rerender } = render(<SendConfirmDialog {...base} state="error" recipients={null} />)
     expect(screen.getByText('人数を数えられませんでした')).toBeTruthy()
-    expect((screen.getAllByRole('button', { name: '1,272 人に送る' })[0] as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(true)
     rerender(<SendConfirmDialog {...base} recipients={0} />)
     expect(screen.getByText('送る相手が 0 人です')).toBeTruthy()
     expect((screen.getAllByRole('button', { name: '1,272 人に送る' })[0] as HTMLButtonElement).disabled).toBe(true)
+  })
+  it.each([null, -1, 1.5, NaN, Infinity])('人数が不正な %s のときは送信を止めて数え直せる', (recipients) => {
+    const onConfirm = vi.fn()
+    const onRetry = vi.fn()
+    render(<SendConfirmDialog {...base} recipients={recipients} onConfirm={onConfirm} onRetry={onRetry} />)
+    expect(screen.getByText('人数を数えられませんでした')).toBeTruthy()
+    const button = screen.getByRole('button', { name: '送る' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.click(button)
+    expect(onConfirm).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度数える' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+  it.each([
+    [[{ name: '店', recipients: 1272, stopped: NaN }]],
+    [[{ name: '店', recipients: 1272, stopped: -1 }]],
+    [[{ name: '店', recipients: 1.5, stopped: 0 }]],
+    [[{ name: '店', recipients: 1, stopped: 0 }]],
+  ])('店ごとの人数が不正または合計と違えば送信を止める', (perAccount) => {
+    render(<SendConfirmDialog {...base} perAccount={perAccount} accountCount={1} />)
+    expect(screen.getByText('人数を数えられませんでした')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+  it('承認が必要で人数を確認できないときは承認の依頼を押せない', () => {
+    render(<SendConfirmDialog {...base} recipients={null} approval={{ note: '承認が必要です' }} primaryLabel="承認を依頼する" />)
+    expect((screen.getByRole('button', { name: '承認を依頼する' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+  it('予約時は予約する前の確認と表示する', () => {
+    render(<SendConfirmDialog {...base} scheduled recipients={null} />)
+    expect(screen.getByRole('dialog', { name: '予約する前の確かめ' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: '予約する' }) as HTMLButtonElement).disabled).toBe(true)
   })
   it('権限が無い・代理ログイン中は主ボタンを出さず理由を出す', () => {
     const { rerender } = render(<SendConfirmDialog {...base} block="no-permission" />)

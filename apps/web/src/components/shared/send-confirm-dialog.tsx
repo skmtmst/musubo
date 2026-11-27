@@ -129,8 +129,11 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   } = props
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
+  const validCount = typeof recipients === 'number' && Number.isSafeInteger(recipients) && recipients >= 0
+  const validBreakdown = !perAccount?.length || (perAccount.every(row => Number.isSafeInteger(row.recipients) && row.recipients >= 0 && Number.isSafeInteger(row.stopped) && row.stopped >= 0) && perAccount.reduce((total, row) => total + row.recipients, 0) === recipients)
+  const countError = state === 'error' || (state === 'ready' && (!validCount || !validBreakdown))
   const zero = state === 'ready' && recipients === 0
-  const canPress = state === 'ready' && !zero && !block && !busy && !primaryDisabled
+  const canPress = state === 'ready' && validCount && validBreakdown && !zero && !block && !busy && !primaryDisabled
   const [accountsOpen, setAccountsOpen] = useState(true)
 
   const confirm = async () => {
@@ -152,11 +155,11 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   return (
     <ConfirmDialog
       open={open}
-      title="送る前の確かめ"
+      title={scheduled ? '予約する前の確かめ' : '送る前の確かめ'}
       titleIcon={false}
       confirmIcon={<Send size={16} aria-hidden="true" />}
       description={subtitle}
-      confirmLabel={primaryLabel}
+      confirmLabel={countError ? (approval ? '承認を依頼する' : scheduled ? '予約する' : '送る') : primaryLabel}
       busyLabel="送っています…"
       cancelLabel="戻る"
       busy={busy}
@@ -172,7 +175,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
     >
       <dl className={styles.rows} aria-busy={state === 'loading' || undefined}>
         <Row label="送る相手">
-          {state === 'loading' ? <Skeleton width={96} height={18} /> : state === 'error' ? (
+          {state === 'loading' ? <Skeleton width={96} height={18} /> : countError ? (
             <div className={styles.stack}>
               <strong className={styles.strong}>人数を数えられませんでした</strong>
               <span className={styles.note}>通信を確かめて、もう一度数えてください</span>
