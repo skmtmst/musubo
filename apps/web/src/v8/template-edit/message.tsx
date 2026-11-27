@@ -185,7 +185,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setFolderState({ account: editorAccountId, status: 'loading' })
     void api.folders.list('template', editorAccountId).then(res => {
       if (cancelled) return
-      if (!res.success) throw new Error('folders unavailable')
+      if (!res.success || !Array.isArray(res.data)) throw new Error('folders unavailable')
       setFolders(res.data)
       setFolderState({ account: editorAccountId, status: 'ready' })
     }).catch(() => { if (!cancelled) setFolderState({ account: editorAccountId, status: 'error' }) })
