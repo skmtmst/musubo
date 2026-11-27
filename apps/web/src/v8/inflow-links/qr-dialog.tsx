@@ -2,6 +2,9 @@
 
 /** ：流入・クーポンも正本のQR窓を使う。停止経路は保存を止める。 */
 import DashboardQrDialog from '@/components/dashboard/qr-dialog'
+import QrRoutePicker from '@/components/dashboard/qr-route-picker'
+import Dialog from '@/components/shared/dialog'
+import ListState from '@/components/shared/list-state'
 import { api } from '@/lib/api'
 import { useState } from 'react'
 
@@ -23,13 +26,21 @@ export interface QrRoute {
 export default function QrDialog({ route: initialRoute, routes, onClose }: { route: QrRoute; routes?: QrRoute[]; onClose: () => void }) {
   const [selectedRef, setSelectedRef] = useState(initialRoute.refCode)
   const route = routes?.find(item => item.refCode === selectedRef) ?? initialRoute
-  const options = [route, ...(routes ?? []).filter(item => item.isActive && item.refCode !== route.refCode)]
-    .map(item => ({ value: item.refCode, label: item.name, disabled: item.isActive === false, description: item.isActive === false ? '停止中の経路は使えません' : undefined }))
+  const activeRoutes = (routes ?? []).filter(item => item.isActive === true && item.refCode !== route.refCode)
+  const unknown = route.isActive !== true && route.isActive !== false && route.isActive !== null
+  const options = [route, ...activeRoutes].map(item => ({ value: item.refCode, label: item.name,
+    disabled: item.isActive !== true && item.isActive !== null,
+    description: item.isActive === false ? '停止中の経路は使えません' : item.isActive !== true && item.isActive !== null ? '状態を確認できません' : undefined }))
+  const selectActive = (value: string) => { if (routes?.some(item => item.refCode === value && item.isActive === true)) setSelectedRef(value) }
+  if (unknown) return <Dialog open title={`${route.name} の QR コード`} onCancel={onClose}>
+    {activeRoutes.length ? <QrRoutePicker value={route.refCode} options={options} onChange={selectActive} /> : null}
+    <ListState kind="error" title="経路の状態を確認できません" description="一覧を再読み込みしてから、もう一度お試しください。" />
+  </Dialog>
   return <DashboardQrDialog key={route.refCode} open onClose={onClose} accountName={route.name}
     disabledReason={route.isActive === false ? 'この経路は停止中です。再開するまでQRコードは使えません。' : undefined}
     baseLink={referralUrl(route.refCode)} routes={[]}
     resource={{
-      routePicker: routes?.some(item => item.isActive) ? { value: route.refCode, options, onChange: value => { if (routes.some(item => item.refCode === value && item.isActive)) setSelectedRef(value) } } : undefined,
+      routePicker: routes?.some(item => item.isActive === true) ? { value: route.refCode, options, onChange: selectActive } : undefined,
       url: referralUrl(route.refCode), title: `${route.name} の QR コード`,
       stopped: route.isActive === false, stoppedPresentation: 'notice',
       description: 'チラシ・店頭POPに印刷して使えます。読み取るとこの経路の画面が開きます。',
