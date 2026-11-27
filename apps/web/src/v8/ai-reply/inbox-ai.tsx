@@ -56,18 +56,25 @@ export function useInboxAi(chatIdIn: string | null, accountIdIn: string | null, 
   const [dismissed, setDismissed] = useState<Record<string, string | null>>({})
   const chatRef = useRef(chatId)
   chatRef.current = chatId
+  const scope = useRef({ chatId, accountId })
+  if (scope.current.chatId !== chatId || scope.current.accountId !== accountId) scope.current = { chatId, accountId }
+  const summarySeq = useRef(0)
+  useEffect(() => () => { summarySeq.current += 1 }, [])
 
   const loadSummary = useCallback(async (refresh: boolean) => {
     if (!chatId) return
     const mine = chatId
+    const requestScope = scope.current
+    const seq = ++summarySeq.current
+    const current = () => scope.current === requestScope && summarySeq.current === seq
     setSummary((current) => ({ kind: 'loading', prev: current.kind === 'ready' ? current.data : current.kind === 'loading' ? current.prev : null }))
     try {
       const res = await aiReplyApi.summary(mine, refresh)
-      if (chatRef.current === mine) setSummary({ kind: 'ready', data: res.data })
+      if (current()) setSummary({ kind: 'ready', data: res.data })
     } catch (error) {
-      if (chatRef.current === mine) setSummary({ kind: 'error', ...failureText(error, '要約') })
+      if (current()) setSummary({ kind: 'error', ...failureText(error, '要約') })
     }
-  }, [chatId])
+  }, [chatId, accountId])
 
   const loadDraft = useCallback(async () => {
     if (!chatId) return
@@ -87,7 +94,7 @@ export function useInboxAi(chatIdIn: string | null, accountIdIn: string | null, 
     setSummary({ kind: 'idle' })
     setDraft({ kind: 'idle' })
     setSummaryOpen(true)
-  }, [chatId])
+  }, [chatId, accountId])
 
   useEffect(() => {
     if (!chatId || !active || !ai.permissions.seeSummary) return
