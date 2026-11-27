@@ -1442,3 +1442,4 @@
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車11の画面と記録の修正](release-log/unreleased/270-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
+- [予約設定プレビューの指名なし空き枠統合と成果地点の重複日数表示の安全化](release-log/unreleased/PR-kenta-later-gemini150-1127.md) — 反映履歴、確認 2026-11-28。
