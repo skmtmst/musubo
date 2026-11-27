@@ -34,14 +34,23 @@ export const isIndustryStyle = (style: AccountStyle): style is IndustryStyle => 
 
 const COMMON_LABEL: Record<CommonMetricId, string> = { friends: '友だち', unreplied: '返していない', deliveries: '今月の配信', orders: '今日の注文' }
 
-/** 「何日後・何時」を日本時間の瞬間（ISO）へ。 */
+/** 「何日後・何時」を日本時間の瞬間（ISO）へ。読めない日時は例外を投げず空文字を返す。 */
 export function relativeIso(at: RelativeTime, base: Date): string {
-  return new Date(`${jstDateOffset(at.day, base)}T${at.time}:00+09:00`).toISOString()
+  if (!(base instanceof Date) || !Number.isFinite(base.getTime())) return ''
+  if (!Number.isFinite(at.day) || typeof at.time !== 'string') return ''
+  const match = /^(\d{1,2}):(\d{2})$/.exec(at.time.trim())
+  if (!match) return ''
+  const h = Number(match[1])
+  const m = Number(match[2])
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 23 || m < 0 || m > 59) return ''
+  const date = new Date(`${jstDateOffset(Math.trunc(at.day), base)}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`)
+  return Number.isFinite(date.getTime()) ? date.toISOString() : ''
 }
 
 function relativeLabel(at: RelativeTime, base: Date) {
   const iso = relativeIso(at, base)
-  return `${formatDate(iso, { style: 'day', now: base })} ${at.time}`
+  if (!iso) return '日時を確認できません'
+  return `${formatDate(iso, { style: 'day', now: base })} ${at.time.trim()}`
 }
 
 /* ── 左：お客さまのスマホ ───────────────────────────────── */

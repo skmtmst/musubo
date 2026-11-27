@@ -1550,3 +1550,4 @@
 - [予約空き時刻・卓候補の計算とリッチメニュー公開予定下書き保存の修正](release-log/unreleased/PR-kenta-later-gemini96-1127.md) — 反映履歴、確認 2026-11-28。
 - [検証環境お知らせ帯の空白表示とリマインダ競合比較の修正](release-log/unreleased/PR-kenta-later-gemini97-1127.md) — 反映履歴、確認 2026-11-28。
 - [リッチメニュー切替診断と写真審査一覧取得URLの修正](release-log/unreleased/PR-kenta-later-gemini98-1127.md) — 反映履歴、確認 2026-11-28。
+- [スタイル体験の見本日時表示と統括リッチメニュー初期構成作成の修正](release-log/unreleased/PR-kenta-later-gemini99-1127.md) — 反映履歴、確認 2026-11-28。
