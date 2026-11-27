@@ -283,6 +283,8 @@ export function useScenarioPicker(
       busy={busy}
       error={error}
       confirmLabel="このシナリオに登録する"
+      confirmDisabled={listStatus !== 'ready' || !active.some((scenario) => scenario.id === pick)}
+      confirmDisabledReason={listStatus === 'loading' || listStatus === 'idle' ? 'シナリオを読み込んでいます。' : listStatus === 'error' ? 'シナリオを読み直してください。' : active.length === 0 ? '登録できるシナリオがありません。' : !active.some((scenario) => scenario.id === pick) ? '登録するシナリオを選んでください。' : undefined}
       onConfirm={() => enroll()}
       onCancel={() => setOpen(false)}
     >
