@@ -337,7 +337,7 @@ export function TimingEditor({
   base: Date
   onChange: (patch: Partial<ReminderDraftStep>) => void
 }) {
-  const dayWritten = mode === 'time' && step.offsetDays != null && step.sendAtTime != null
+  const dayWritten = mode === 'time' && step.offsetDays != null
   const rawMinutes = step.offsetMinutes ?? 0
   const minutes = Number.isFinite(rawMinutes) ? rawMinutes : 0
   const rawDays = step.offsetDays ?? 0
@@ -351,7 +351,7 @@ export function TimingEditor({
   /** 数・単位・前後から、保存する形（日で書く／分で書く）を作る。 */
   const build = (n: number, u: TimingUnit, isAfter: boolean): Partial<ReminderDraftStep> => {
     if (mode === 'time' && u === 'day') {
-      return { offsetDays: sign(n, isAfter), sendAtTime: step.sendAtTime ?? '09:00', offsetMinutes: 0 }
+      return { offsetDays: sign(n, isAfter), sendAtTime: step.sendAtTime ?? (dayWritten ? null : '09:00'), offsetMinutes: 0 }
     }
     const per = u === 'day' ? 1440 : u === 'hour' ? 60 : 1
     return { offsetDays: null, sendAtTime: null, offsetMinutes: sign(n * per, isAfter) }
@@ -397,12 +397,16 @@ export function TimingEditor({
             aria-label="送る時刻"
             className={styles.timingTime}
             value={step.sendAtTime ?? ''}
-            onChange={(next) => onChange({ sendAtTime: next })}
+            onChange={(next) => onChange({ sendAtTime: next || null })}
           /></SaveErrorField>
         </>
       ) : null}
       <span className={styles.spacer} aria-hidden="true" />
-      <span className={styles.timingExample}>{`例：${formatShort(base)} の予約 → ${formatShort(example)} に届く`}</span>
+      <span className={styles.timingExample}>
+        {dayWritten && !step.sendAtTime
+          ? '例：送る時刻を入力すると届く日時が出ます'
+          : `例：${formatShort(base)} の予約 → ${formatShort(example)} に届く`}
+      </span>
     </div>
   )
 }

@@ -37,14 +37,17 @@ vi.mock('next/navigation', () => ({
 
 import { MessagesStageV8, TimingEditor } from './edit-messages'
 
-function TimingHarness({ initial }: { initial: ReminderDraftStep }) {
+function TimingHarness({ initial, onPatch }: { initial: ReminderDraftStep; onPatch?: (patch: Partial<ReminderDraftStep>) => void }) {
   const [step, setStep] = useState<ReminderDraftStep>(initial)
   return (
     <TimingEditor
       step={step}
       mode="time"
       base={new Date('2026-12-01T14:00:00+09:00')}
-      onChange={(patch) => setStep((prev) => ({ ...prev, ...patch }))}
+      onChange={(patch) => {
+        onPatch?.(patch)
+        setStep((prev) => ({ ...prev, ...patch }))
+      }}
     />
   )
 }
@@ -105,11 +108,16 @@ describe('edit-messages 時刻クリア時の日数保持・上限防御・友�
     expect(onChange).not.toHaveBeenCalled()
 
     cleanup()
-    render(<TimingHarness initial={baseSettings.steps[0]!} />)
+    const patches: Array<Partial<ReminderDraftStep>> = []
+    render(<TimingHarness initial={baseSettings.steps[0]!} onPatch={(patch) => patches.push(patch)} />)
     const timeInput = screen.getByLabelText('送る時刻') as HTMLInputElement
+    fireEvent.focus(timeInput)
     fireEvent.change(timeInput, { target: { value: '' } })
+    fireEvent.blur(timeInput)
+    expect(patches).toEqual([{ sendAtTime: null }])
     expect((screen.getByLabelText('基準日からの数') as HTMLInputElement).value).toBe('3')
     expect(screen.getByLabelText('送る時刻')).toBeTruthy()
+    expect(screen.getByText('例：送る時刻を入力すると届く日時が出ます')).toBeTruthy()
   })
 
   it('MessagesStageV8 で友だち情報の応答が配列でない不正形ならクラッシュせず警告を出す', async () => {
