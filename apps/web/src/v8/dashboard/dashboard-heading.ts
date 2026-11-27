@@ -15,9 +15,10 @@ export function canEditDashboardLayout(role: string | null): boolean {
 
 /** 時間帯のあいさつ（日本時間）。 */
 export function greeting(name: string | null, now = new Date()): string {
-  const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Tokyo' }).format(now))
+  const safeNow = now instanceof Date && Number.isFinite(now.getTime()) ? now : new Date()
+  const hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Tokyo' }).format(safeNow))
   const word = hour >= 4 && hour < 10 ? 'おはようございます' : hour >= 10 && hour < 18 ? 'こんにちは' : 'こんばんは'
-  const first = name?.trim().split(/\s+/)[0]
+  const first = typeof name === 'string' ? name.trim().split(/\s+/)[0] : ''
   return first ? `${word}、${first} さん` : word
 }
 
