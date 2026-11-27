@@ -120,4 +120,90 @@ describe('AssignMatrixV8 ガード', () => {
       expect((screen.getByRole('checkbox', { name: '支店カット を 佐藤 が受ける' }) as HTMLInputElement).disabled).toBe(false)
     })
   })
+
+  it('一括応答で一部担当者の matrix が不正（null）でも空割当へ潰さず個別取得へ切り替え、既存割当と個別時間・料金を保って保存する', async () => {
+    fx.listMenus.mockResolvedValue({
+      menus: [{ id: 'm-1', name: 'カット', sort_order: 1, duration_minutes: 60, base_price: 5000, price_mode: 'fixed' }],
+    })
+    fx.listStaff.mockResolvedValue({
+      staff: [
+        { id: 's-1', name: '田中', display_name: '田中', is_active: true, is_designation_optional: 0 },
+        { id: 's-2', name: '佐藤', display_name: '佐藤', is_active: true, is_designation_optional: 0 },
+      ],
+    })
+    // s-1 の matrix が null（不正）
+    fx.listStaffMenusBulk.mockResolvedValue({
+      staff: [
+        { staff_id: 's-1', matrix: null },
+        { staff_id: 's-2', matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 0, override_duration_minutes: null, override_price: null }] },
+      ],
+    })
+    // 個別取得では s-1 の本来の割当・個別時間・個別料金が返る
+    fx.getStaffMenus.mockImplementation(async (_acc: string, staffId: string) => {
+      if (staffId === 's-1') {
+        return {
+          matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 1, override_duration_minutes: 90, override_price: 7500 }],
+        }
+      }
+      return {
+        matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 0, override_duration_minutes: null, override_price: null }],
+      }
+    })
+    fx.putStaffMenusBulk.mockResolvedValue({ ok: true })
+
+    render(<AssignMatrixV8 />)
+
+    await waitFor(() => {
+      expect((screen.getByRole('checkbox', { name: 'カット を 田中 が受ける' }) as HTMLInputElement).checked).toBe(true)
+    })
+
+    // 佐藤だけを変更して保存しても、田中の既存割当・個別時間・個別料金が消えない
+    fireEvent.click(screen.getByRole('checkbox', { name: 'カット を 佐藤 が受ける' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+
+    await waitFor(() => {
+      expect(fx.putStaffMenusBulk).toHaveBeenCalledTimes(1)
+    })
+    expect(fx.putStaffMenusBulk).toHaveBeenCalledWith('acc-a', [
+      {
+        staff_id: 's-1',
+        menus: [{ menu_id: 'm-1', is_offered: true, override_duration_minutes: 90, override_price: 7500 }],
+      },
+      {
+        staff_id: 's-2',
+        menus: [{ menu_id: 'm-1', is_offered: true, override_duration_minutes: null, override_price: null }],
+      },
+    ])
+  })
+
+  it('一括応答で必要な担当者が欠けており個別取得も失敗した場合は読み込み失敗で止め、空割当で保存できない', async () => {
+    fx.listMenus.mockResolvedValue({
+      menus: [{ id: 'm-1', name: 'カット', sort_order: 1, duration_minutes: 60, base_price: 5000, price_mode: 'fixed' }],
+    })
+    fx.listStaff.mockResolvedValue({
+      staff: [
+        { id: 's-1', name: '田中', display_name: '田中', is_active: true, is_designation_optional: 0 },
+        { id: 's-2', name: '佐藤', display_name: '佐藤', is_active: true, is_designation_optional: 0 },
+      ],
+    })
+    // s-1 が欠損している一括応答
+    fx.listStaffMenusBulk.mockResolvedValue({
+      staff: [
+        { staff_id: 's-2', matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 0, override_duration_minutes: null, override_price: null }] },
+      ],
+    })
+    fx.getStaffMenus.mockRejectedValue(new Error('network error'))
+
+    render(<AssignMatrixV8 />)
+
+    await waitFor(() => {
+      expect(screen.getByText('表示できませんでした')).toBeTruthy()
+    })
+
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    const saveBtn = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+    expect(saveBtn.disabled).toBe(true)
+    fireEvent.click(saveBtn)
+    expect(fx.putStaffMenusBulk).not.toHaveBeenCalled()
+  })
 })

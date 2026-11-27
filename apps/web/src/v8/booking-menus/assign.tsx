@@ -170,10 +170,17 @@ export default function AssignMatrixV8() {
         if (!mountedRef.current || seq !== loadSeqRef.current) return
         if (!Array.isArray(bulk?.staff)) throw new Error('一括割り当ての形式が正しくありません')
         for (const entry of bulk.staff) {
-          if (entry && Array.isArray(entry.matrix)) matrices.set(entry.staff_id, entry.matrix)
+          if (!entry || typeof entry.staff_id !== 'string' || !Array.isArray(entry.matrix)) {
+            throw new Error('一括割り当ての形式が正しくありません')
+          }
+          matrices.set(entry.staff_id, entry.matrix)
+        }
+        for (const s of staffRes.staff) {
+          if (!matrices.has(s.id)) throw new Error('一括割り当てに不足があります')
         }
       } catch (saveFailure) {
         if (!mountedRef.current || seq !== loadSeqRef.current) return
+        matrices.clear()
         saveErrors.capture(saveFailure)
         await Promise.all(
           staffRes.staff.map(async (s) => {
@@ -187,10 +194,11 @@ export default function AssignMatrixV8() {
       }
       const next: Record<string, Record<string, StaffMenuMatrix>> = {}
       for (const s of staffRes.staff) {
-        const matrix = matrices.get(s.id) ?? []
+        const matrix = matrices.get(s.id)
+        if (!matrix) throw new Error('担当メニューの割り当てが不足しています')
         const byMenu: Record<string, StaffMenuMatrix> = {}
         for (const m of menusRes.menus) {
-          byMenu[m.id] = matrix.find((x) => x.menu_id === m.id) ?? {
+          byMenu[m.id] = matrix.find((x) => x && x.menu_id === m.id) ?? {
             menu_id: m.id,
             name: m.name,
             is_offered: 0,

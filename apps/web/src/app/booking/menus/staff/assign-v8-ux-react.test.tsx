@@ -47,7 +47,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     bookingApi: {
       listMenus: (...args: unknown[]) => fixture.listMenus!(...(args as [])),
       listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
-      listStaffMenusBulk: async () => ({ staff: [] }),
+      listStaffMenusBulk: async () => ({ staff: [{ staff_id: 'staff-a', matrix: [] }] }),
       putStaffMenusBulk: (...args: unknown[]) => fixture.putBulk!(...(args as [])),
     },
   }
