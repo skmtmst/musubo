@@ -18,18 +18,19 @@ export function canWriteRole(role: string | null): boolean {
 export type TodaySummary = {
   /** 取消・無断・押さえを除いた今日の予約の組数。 */
   groups: number
-  /** その人数の合計。 */
-  guests: number
+  /** その人数の合計。人数が不明な予約が混ざるときは確定値にせず null。 */
+  guests: number | null
   line: number
   phone: number
   walkIn: number
   media: number
-  /** いちばん人が多い時（00分の1時間ごと）。予約が無ければ null。 */
+  /** いちばん人が多い時（00分の1時間ごと）。予約が無い、または時刻・人数が不明な予約が混ざるときは null。 */
   peak: { label: string; guests: number } | null
   /** いま空いている卓（動いている卓のうち、いま予約が重なっていない卓）。 */
   freeTables: number
   totalTables: number
-  counterSeats: number
+  /** カウンター席数の合計。席数が不明な卓が混ざるときは確定値にせず null。 */
+  counterSeats: number | null
 }
 
 function isHold(r: RestaurantReservation): boolean {
@@ -40,8 +41,15 @@ export function liveReservations(rows: RestaurantReservation[]): RestaurantReser
   return rows.filter((r) => !INACTIVE.includes(r.status) && !isHold(r))
 }
 
-function safeCount(value: number): number {
-  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0
+function isValidCount(value: number): boolean {
+  return Number.isFinite(value) && value >= 0
+}
+
+function parseStartsAt(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const iso = /Z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value.replace(' ', 'T')}Z`
+  const parsed = Date.parse(iso)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 export function summarizeToday(rows: RestaurantReservation[], tables: RestaurantTable[], now: number): TodaySummary {
@@ -49,24 +57,33 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
   const walkIn = live.filter(isWalkIn).length
   const line = live.filter((r) => r.source === 'line').length
   const phone = live.filter((r) => r.source === 'phone' || (r.source === 'manual' && !isWalkIn(r))).length
+  const guestsKnown = live.every((r) => isValidCount(r.guest_count))
   const byHour = new Map<number, number>()
+  let timesKnown = true
   for (const r of live) {
     // 表の時刻（lib/format）と同じく、時差の無い文字は UTC として読む。ブラウザの時計で読むと日本では 9 時間ずれる。
-    if (typeof r.starts_at !== 'string' || !r.starts_at.trim()) continue
-    const iso = /Z$|[+-]\d{2}:?\d{2}$/i.test(r.starts_at) ? r.starts_at : `${r.starts_at.replace(' ', 'T')}Z`
-    const parsed = Date.parse(iso)
-    if (!Number.isFinite(parsed)) continue
-    const hour = japanCalendar(new Date(parsed)).getUTCHours()
-    byHour.set(hour, (byHour.get(hour) ?? 0) + safeCount(r.guest_count))
+    const parsed = parseStartsAt(r.starts_at)
+    if (parsed === null) {
+      timesKnown = false
+      continue
+    }
+    if (guestsKnown) {
+      const hour = japanCalendar(new Date(parsed)).getUTCHours()
+      byHour.set(hour, (byHour.get(hour) ?? 0) + Math.trunc(r.guest_count))
+    }
   }
   let peak: TodaySummary['peak'] = null
-  for (const [hour, guests] of [...byHour.entries()].sort((a, b) => a[0] - b[0])) {
-    if (!peak || guests > peak.guests) peak = { label: `${pad2(hour)}:00`, guests }
+  if (guestsKnown && timesKnown) {
+    for (const [hour, guests] of [...byHour.entries()].sort((a, b) => a[0] - b[0])) {
+      if (!peak || guests > peak.guests) peak = { label: `${pad2(hour)}:00`, guests }
+    }
   }
   const active = tables.filter((t) => t.is_active)
+  const counters = active.filter((t) => t.seat_type === 'counter')
+  const counterSeatsKnown = counters.every((t) => isValidCount(t.max_capacity))
   return {
     groups: live.length,
-    guests: live.reduce((sum, r) => sum + safeCount(r.guest_count), 0),
+    guests: guestsKnown ? live.reduce((sum, r) => sum + Math.trunc(r.guest_count), 0) : null,
     line,
     phone,
     walkIn,
@@ -74,7 +91,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
     peak,
     freeTables: active.filter((t) => !tableBusy(t.id, now, now + 1, rows, now)).length,
     totalTables: active.length,
-    counterSeats: active.filter((t) => t.seat_type === 'counter').reduce((sum, t) => sum + safeCount(t.max_capacity), 0),
+    counterSeats: counterSeatsKnown ? counters.reduce((sum, t) => sum + Math.trunc(t.max_capacity), 0) : null,
   }
 }
 
@@ -160,6 +177,7 @@ export function reasonText(group: Pick<CloseGroup, 'reason' | 'remainingSeats'>)
   if (group.reason === 'full') return '満席になりました'
   if (group.reason === 'table_conflict') return '卓が重なる予約が届きました'
   if (group.reason === 'closure') return '臨時休業・貸切で閉じました'
-  if (group.remainingSeats === null || !Number.isFinite(group.remainingSeats)) return 'LINE・電話で予約が入りました'
+  if (group.remainingSeats === null) return 'LINE・電話で予約が入りました'
+  if (!Number.isFinite(group.remainingSeats)) return '残り席数を確認できません'
   return `残り ${Math.max(0, Math.trunc(group.remainingSeats))}席になりました`
 }

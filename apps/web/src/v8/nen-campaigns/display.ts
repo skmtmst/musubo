@@ -48,7 +48,7 @@ export function formatCampaignTiming(setting: Pick<NenCampaignSetting, 'campaign
   const days = Math.trunc(setting.delayDays)
   const time = typeof setting.deliveryTime === 'string' ? setting.deliveryTime.trim() : ''
   const dayLabel = days === 0 ? '発送当日' : `発送から${days}日後`
-  return time ? `${dayLabel} ${time}` : dayLabel
+  return time ? `${dayLabel} ${time}` : `${dayLabel}（配信時刻を確認できません）`
 }
 
 const audienceByCampaign: Record<string, string> = {
