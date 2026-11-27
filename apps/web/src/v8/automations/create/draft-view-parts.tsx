@@ -1,3 +1,4 @@
+import { AUTOMATION_ACTION_LABELS } from '@line-crm/shared'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { FieldError, RequiredBadge } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -20,7 +21,11 @@ export function actionRowTitle(type: string): string {
   if (type === 'common_action') return '共通アクションを実行'
   if (type === 'notify_staff') return '担当へ知らせる'
   if (type === 'wait') return '待つ'
-  return 'メッセージを送る'
+  if (type === 'send_message') return 'メッセージを送る'
+  if (typeof type === 'string' && Object.prototype.hasOwnProperty.call(AUTOMATION_ACTION_LABELS, type)) {
+    return AUTOMATION_ACTION_LABELS[type]
+  }
+  return '登録した処理'
 }
 
 /* することで使う選択肢の行（タグ・シナリオ・共通アクション）。選ぶ窓で1つ選ぶ。 */
