@@ -39,6 +39,9 @@ export function buildWizardInput({ accounts, form, matchedAccountId, selectedAcc
     if (!Array.isArray(form.receiveSources) || form.receiveSources.some((source) => !isKnownReceiveSource(source))) {
       return { error: '受信元を確認できません。選び直してください', step: 'trigger' }
     }
+    if (form.receiveSources.length === 0) {
+      return { error: '受信元を1つ以上選んでください', step: 'trigger' }
+    }
     const conditionIssue = findConditionDraftIssue(
       form.friendTarget === 'filtered' ? form.friendConditions : null,
     )
@@ -91,7 +94,7 @@ export function buildWizardInput({ accounts, form, matchedAccountId, selectedAcc
         form.messageKinds.length === 0 || form.messageKinds.length === MESSAGE_KIND_WORDS.length
           ? null
           : form.messageKinds,
-      receiveSources: form.receiveSources.length > 0 ? form.receiveSources : ['line'],
+      receiveSources: form.receiveSources,
       friendConditions:
         form.friendTarget === 'filtered'
           ? (form.friendConditions as Record<string, unknown> | null)

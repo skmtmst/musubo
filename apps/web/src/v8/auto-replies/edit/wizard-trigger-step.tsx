@@ -179,27 +179,25 @@ export function WizardTriggerStep({ disabled = false, lockedReason, effectiveKey
                       受け取る場所
                       <Checkbox disabled={disabled}
                       checked={form.receiveSources.includes('line')}
-                      onCheckedChange={(on) => {
-                        const known = form.receiveSources.filter(isKnownReceiveSource)
+                      onCheckedChange={(on) =>
                         patch({
                           receiveSources: on
-                            ? [...new Set([...known, 'line' as const])]
-                            : known.filter((s) => s !== 'line'),
+                            ? [...new Set([...form.receiveSources.filter(isKnownReceiveSource), 'line' as const])]
+                            : form.receiveSources.filter((s) => s !== 'line'),
                         })
-                      }}
+                      }
                     >
                       LINE
                     </Checkbox>
                     <Checkbox disabled={disabled}
                       checked={form.receiveSources.includes('email')}
-                      onCheckedChange={(on) => {
-                        const known = form.receiveSources.filter(isKnownReceiveSource)
+                      onCheckedChange={(on) =>
                         patch({
                           receiveSources: on
-                            ? [...new Set([...known, 'email' as const])]
-                            : known.filter((s) => s !== 'email'),
+                            ? [...new Set([...form.receiveSources.filter(isKnownReceiveSource), 'email' as const])]
+                            : form.receiveSources.filter((s) => s !== 'email'),
                         })
-                      }}
+                      }
                     >
                       メール
                     </Checkbox>
