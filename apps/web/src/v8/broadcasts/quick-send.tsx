@@ -95,6 +95,8 @@ export default function QuickSendV8({
   const [candidates, setCandidates] = useState<BroadcastApprovalCandidate[]>([])
   const [approverId, setApproverId] = useState('')
   const [approvalConfig, setApprovalConfig] = useState<{threshold: number; singleOperator: boolean} | null>(null)
+  const [configLoadFailed, setConfigLoadFailed] = useState(false)
+  const [configRetry, setConfigRetry] = useState(0)
   const [countInput, setCountInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +112,7 @@ export default function QuickSendV8({
     let cancelled = false
     if (!open) return
     setApprovalConfig(null)
+    setConfigLoadFailed(false)
     setCountInput('')
     setTags([])
     setCandidates([])
@@ -132,9 +135,28 @@ export default function QuickSendV8({
     void api.broadcasts.approval.candidates(accountId).then((res) => {
       if (!cancelled && res.success) setCandidates(res.data)
     }).catch(() => undefined)
-    void api.broadcasts.approval.config(accountId).then((res) => { if (cancelled) return; if (res.success) setApprovalConfig(res.data); else setError('承認の設定を読み込めませんでした。開き直してください。') }).catch(() => { if (!cancelled) setError('承認の設定を読み込めませんでした。開き直してください。') })
     return () => { cancelled = true }
   }, [open, accountId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!open || !accountId) return
+    setConfigLoadFailed(false)
+    void api.broadcasts.approval.config(accountId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setApprovalConfig(res.data)
+          setConfigLoadFailed(false)
+        } else {
+          setConfigLoadFailed(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setConfigLoadFailed(true)
+      })
+    return () => { cancelled = true }
+  }, [open, accountId, configRetry])
 
   // 本文・相手が変わったら人数を見積もる（少し待ってから1回だけ）。
   useEffect(() => {
@@ -213,218 +235,3 @@ export default function QuickSendV8({
       : target === 'tag' && !tagId ? '送る相手のタグを選んでください。'
         : when === 'scheduled' && !scheduledAt ? '送る日時を選んでください。'
           : needsApproval && !approverId ? '承認を頼む相手を選んでください。'
-            : approvalConfig === null ? error ? '配信の承認設定を確認できません。もう一度開き直してください。' : '配信の承認設定を確認しています。'
-              : estimate === null ? estimateFailed ? '送る相手の人数を読み直してください。' : error ? '送る相手の人数を確認できません。本文や宛先を確認してください。' : '送る相手の人数を確認しています。'
-                : needsCountConfirmation && !countMatched ? '確認した対象人数を入力してください。'
-                  : busy ? '送っています。完了までお待ちください。' : undefined
-
-  /** 差し込む：今のカーソルの位置に {{name}} を入れる（送るときに名前へ置き換わる形。{名前} は置き換わらずに届いていた）。 */
-  const insertName = () => {
-    if (!canUseQuickSendNow('create')) return
-    const el = textRef.current
-    const token = QUICK_SEND_NAME_TOKEN
-    if (!el) return setText((prev) => `${prev}${token}`)
-    const start = el.selectionStart ?? text.length
-    const end = el.selectionEnd ?? text.length
-    setText(`${text.slice(0, start)}${token}${text.slice(end)}`)
-  }
-
-  async function handleSend() {
-    if (target === 'unselected' || when === 'unselected' || !canSend || latestSelection.current !== selectionKey || !accountId || sendingRef.current) return
-    const current = renderedContext
-    const token = {}
-    const permitted = captureQuickSendAccess()
-    const isCurrent = () => current === context.current && current.active && current.open
-    if (!isCurrent()) return
-    const requireAccess = (action: QuickSendOperation) => {
-      if (!isCurrent()) throw new QuickSendContextChanged()
-      if (!permitted(action)) throw new QuickSendPermissionChanged()
-    }
-    sendingRef.current = token
-    setBusy(true)
-    setError(null)
-    try {
-      requireAccess(operation)
-      let attempt = pendingRef.current
-      if (!attempt) requireAccess('create')
-      if (attempt) {
-        // 応答だけを失った場合は実物を読み、既に始まった送信・承認依頼を繰り返さない。
-        const existing = await api.broadcasts.get(attempt.id)
-        requireAccess(operation)
-        if (!existing.success) throw new Error(existing.error ?? '配信の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
-        if (existing.data.status === 'sent' || existing.data.status === 'sending'
-          || (attempt.needsApproval && existing.data.approvalStatus === 'pending')) {
-          notifyToast(existing.data.approvalStatus === 'pending' ? '配信の承認を頼みました' : existing.data.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
-          guard.disarm()
-          onSent()
-          onClose()
-          return
-        }
-      }
-      if (needsCountConfirmation) {
-        requireAccess('preflight')
-        const current = await api.broadcasts.preflight({
-          targetType: target,
-          targetTagId: target === 'tag' ? tagId : null,
-          lineAccountId: accountId,
-          messageContent: text,
-          messageCount: 1,
-        })
-        requireAccess('preflight')
-        if (!current.success) throw new Error(current.error || '現在の人数を確認できませんでした。時間をおいて、もう一度お試しください。')
-        if (current.data.audienceCount !== Number(countInput)) {
-          setEstimate({ count: current.data.audienceCount, blocked: current.data.hiddenExcluded, remaining: current.data.quota?.remaining ?? null })
-          setCountInput('')
-          setError('対象人数が変わりました。現在の人数を確認して、もう一度入力してください。')
-          return
-        }
-      }
-      if (!attempt) {
-        requireAccess('create')
-        requireAccess(operation)
-        const created = await api.broadcasts.create({
-          title: text.trim().slice(0, 20) || 'かんたん送信',
-          messageType: 'text',
-          messageContent: text,
-          targetType: target,
-          targetTagId: target === 'tag' ? tagId : null,
-          scheduledAt,
-          status: scheduledAt ? 'scheduled' : 'draft',
-          lineAccountId: accountId,
-          ...(needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : {}),
-        })
-        if (!isCurrent()) throw new QuickSendContextChanged()
-        if (!created.success) throw new Error(created.error ?? '作れませんでした')
-        attempt = { id: created.data.id, scheduledAt, needsApproval }
-        pendingRef.current = attempt
-        setPending(true)
-      }
-      const id = attempt.id
-      if (attempt.needsApproval) {
-        requireAccess('approval')
-        const requested = await api.broadcasts.approval.request(id, { approverStaffId: approverId })
-        requireAccess('approval')
-        if (!requested.success) throw new Error(requested.error)
-        notifyToast('配信の承認を頼みました')
-      } else if (!attempt.scheduledAt) {
-        requireAccess('send')
-        const sent = await api.broadcasts.send(id, needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : undefined)
-        requireAccess('send')
-        if (!sent.success) throw new Error(sent.error)
-        notifyToast(sent.data?.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
-      } else {
-        requireAccess('schedule')
-        notifyToast('配信を予約しました')
-      }
-      guard.disarm()
-      onSent()
-      onClose()
-    } catch (e) {
-      if (!isCurrent()) return
-      if (e instanceof QuickSendPermissionChanged) setError(describeApiFailure(e, '配信の変更'))
-      else if (!saveErrors.capture(e)) setError(describeApiFailure(e, '保存'))
-    } finally {
-      if (sendingRef.current === token) sendingRef.current = null
-      if (isCurrent()) setBusy(false)
-    }
-  }
-
-  const sendLabel = operation === 'approval' ? '承認を頼む' : operation === 'schedule' ? '予約する' : '送る'
-
-  return (
-    <SaveErrorScope errors={saveErrors}><>
-    <Dialog
-      open={open}
-      confirmation
-      designNode="P6vbxn"
-      designWidth={720}
-      title="かんたんに送る"
-      error={error ?? undefined}
-      busy={busy}
-      onCancel={() => { if (!busy) onClose() }}
-      footer={(<DialogActions align="center" leadingAction={access.create ? <Button variant="text" size="field" href="/broadcasts/new">
-            <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
-          </Button> : <Button type="button" variant="text" size="field" disabled lockedReason={editReason}>
-            <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
-          </Button>}>
-
-
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} lockedReason={operationReason} disabledReason={!operationReason && access.known ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
-            <Send size={16} aria-hidden="true" />{sendLabel}
-          </Button>
-
-          {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・送るを窓の真ん中に置く。 */}
-
-        </DialogActions>)}
-    >
-      <div className={styles.body}><OperationTargetSummary accounts={[{ id: accountId ?? '' }]} />{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
-          id="quick-send-v8-text"
-          ref={textRef}
-          className={styles.textarea}
-          value={text}
-          maxLength={TEXT_LIMIT}
-          disabled={busy || pending || !access.create}
-          onValueChange={changeInput(setText)}
-        />
-          <MessageInsertRow count={`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}>
-            <MessageInsertButton kind="name" label="名前" lockedReason={editReason} disabled={busy || pending || !access.create} onClick={insertName} />
-          </MessageInsertRow>
-        </MessageBody></SaveErrorField></Field>
-
-<p className={styles.label} id="quick-send-v8-target">送る相手</p>
-<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
-          {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
-            <QuickSendChoice key={value} lockedReason={editReason} type="button" role="radio" disabled={busy || pending || !access.create} aria-checked={target === value} className={styles.chip} onClick={() => { if (canUseQuickSendNow('create')) setTarget(value) }}>
-              {label}
-            </QuickSendChoice>
-          ))}
-          {target === 'tag' ? (
-            <div className={styles.tagPick}>
-              <SaveErrorField names={["tagId"]}><EntityKindField kind="tag" label="タグ" disabled={busy || pending || !access.create} value={tagId} onChange={changeInput(setTagId)} options={tags} /></SaveErrorField>
-            </div>
-          ) : null}
-        </div>
-<p className={styles.label} id="quick-send-v8-when">いつ</p>
-<div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
-          {([['now', '今すぐ'], ['scheduled', '日時を決める']] as const).map(([value, label]) => (
-            <QuickSendChoice key={value} lockedReason={editReason} type="button" role="radio" disabled={busy || pending || !access.create} aria-checked={when === value} className={styles.chip} onClick={() => { if (canUseQuickSendNow('create')) setWhen(value) }}>
-              {label}
-            </QuickSendChoice>
-          ))}
-          {when === 'scheduled' ? (
-            <div className={styles.whenPick}>
-              <SaveErrorField names={["scheduledValue","scheduled_value"]}><DateTimeField disabled={busy || pending || !access.create} value={scheduledValue} onChange={changeInput(setScheduledValue)} aria-label="送る日時" /></SaveErrorField>
-            </div>
-          ) : null}
-        </div>
-<div className={styles.estimateBox}>
-          <div className={styles.estimate} aria-live="polite">
-            <Users size={16} aria-hidden="true" className={styles.estimateIcon} />
-            <span>
-              {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : estimateFailed ? '人数を確認できませんでした' : '本文を入力し、送る相手を選ぶと、届く人数の見込みが出ます'}
-            </span>
-          </div>
-          {estimateFailed && access.preflight ? <Notice tone="danger" action={<Button onClick={() => setEstimateRetry(n => n + 1)}>人数を読み直す</Button>}>送る相手の人数を読み込めませんでした。</Notice> : null}
-          {needsCountConfirmation && estimate ? <fieldset className={styles.countFields} disabled={!access.preflight || busy}><SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={value => { if (canUseQuickSendNow('preflight')) setCountInput(value) }} /></fieldset> : null}
-          {needsApproval ? (
-            <div className={styles.approval}>
-              <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)} 人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
-              <SaveErrorField names={["approverId","approverStaffId","approver_id"]}><EntitySelect
-                aria-label="承認する人"
-                size="full"
-                value={approverId}
-                onChange={value => { if (canUseQuickSendNow('approval')) setApproverId(value) }}
-                disabled={!access.preflight || busy}
-                lockedReason={access.reason('approval')}
-                options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name, hint: ROLE_LABELS[item.role] }))]}
-              /></SaveErrorField>
-              <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>
-            </div>
-          ) : null}
-        </div></div>
-    </Dialog>
-    <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-    </></SaveErrorScope>
-  )
-}

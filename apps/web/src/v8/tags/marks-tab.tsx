@@ -97,6 +97,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
+  const statsGateRef = useRef(createResponseGate())
   const accountRef = useRef(accountId)
   accountRef.current = accountId
   const archiveScope = useRef<{ accountId: string | null; generation: number }>({ accountId, generation: 0 })
@@ -107,6 +108,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
 
   useEffect(() => {
     gateRef.current.invalidate()
+    statsGateRef.current.invalidate()
     restoreScopeRef.current = null
     setRestoreTarget(null)
     setRestoreError('')
@@ -142,33 +144,49 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       setStatus('ready')
     } catch (reason) {
       if (!gateRef.current.current(token) || accountRef.current !== account) return
-      setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+      if (reason instanceof ApiError && reason.status === 403) {
+        setStatus('forbidden')
+      } else {
+        setStatus('error')
+        setError(describeApiFailure(reason, '対応マークの読み込み'))
+      }
     }
   }, [accountId, host, setItems])
   useEffect(() => { if (!host) void load() }, [load, host])
   useEffect(() => { if (host) { setItems(host.items); setStatus(host.status); setError(host.error ?? '') } }, [host])
 
-  /* 帯の人数は受信箱の集計（/api/list-stats）から。一覧とは別の要求。 */
-  useEffect(() => {
+  /* 帯の人数は受信箱の集計（/api/list-stats）から。一覧とは別の要求。失敗時はその場から読み直せる。 */
+  const loadStats = useCallback(async () => {
     if (host) return
-    if (!accountId) {
+    const account = accountId
+    const token = statsGateRef.current.begin()
+    if (!account) {
+      setStats(null)
       setStatsStatus('error')
       return
     }
-    let cancelled = false
     setStats(null)
     setStatsStatus('loading')
-    void api.listStats.get(accountId).then((res) => {
-      if (cancelled) return
-      if (res.success) { setStats(res.data); setStatsStatus('ready') }
-      else { setStats(null); setStatsStatus('error') }
-    }, (reason) => {
-      if (cancelled) return
-      setStats(null)
+    try {
+      const res = await api.listStats.get(account)
+      if (!statsGateRef.current.current(token) || accountRef.current !== account) return
+      if (res.success) {
+        setStats(res.data)
+        setStatsStatus('ready')
+      } else {
+        setStats(null)
+        setStatsStatus('error')
+      }
+    } catch (reason) {
+      if (!statsGateRef.current.current(token) || accountRef.current !== account) return
       setStatsStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
-    })
-    return () => { cancelled = true }
+    }
   }, [accountId, host])
+  useEffect(() => {
+    if (host) return
+    void loadStats()
+    return () => { statsGateRef.current.invalidate() }
+  }, [loadStats, host])
 
   const visible = useMemo(() => items.filter((mark) => {
     if (!host && Boolean(mark.archivedAt) !== onlyArchived) return false
@@ -371,6 +389,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       value: listReady ? items.length : null,
       unit: '種類',
       detail: listReady ? `使っている ${inUseCount}` : (status === 'forbidden' ? STATE_TEXT.forbiddenView : status === 'loading' ? STATE_TEXT.loading : STATE_TEXT.error),
+      loading: status === 'loading' && !loaded,
     },
     {
       title: '未対応',
@@ -378,9 +397,10 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       value: stats?.marks.unanswered ?? null,
       unit: '人',
       detail: statsReason ?? (inboxTotal > 0 ? `受信箱の ${Math.round((stats!.marks.unanswered / inboxTotal) * 1000) / 10}%` : '受信箱の —'),
+      loading: statsStatus === 'loading',
     },
-    { title: '対応中', icon: Loader, value: stats?.marks.inProgress ?? null, unit: '人', detail: statsReason ?? '担当が付いている' },
-    { title: '過去7日の変更', icon: History, value: stats?.marks.changedLast7 ?? null, unit: '回', detail: statsReason ?? '手動・自動' },
+    { title: '対応中', icon: Loader, value: stats?.marks.inProgress ?? null, unit: '人', detail: statsReason ?? '担当が付いている', loading: statsStatus === 'loading' },
+    { title: '過去7日の変更', icon: History, value: stats?.marks.changedLast7 ?? null, unit: '回', detail: statsReason ?? '手動・自動', loading: statsStatus === 'loading' },
   ]
 
   const filterActive = Boolean(query || usage !== 'all' || onlyArchived)
@@ -389,7 +409,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="対応マークを見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : status === 'error' ? (
-    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
+    <ListState kind="error" title="対応マークを読み込めませんでした" description={error || '再読み込みしても直らない場合はエラー報告へ。'}  action={<><Button type="button" onClick={() => { void load(); if (statsStatus === 'error') void loadStats() }} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : listReady && items.length === 0 ? (
     <ListState kind="empty" title="まだ対応マークはありません" description="受信箱で、対応の進み具合を見分ける印です。"  icon={<Flag className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href={host ? undefined : "/tags/marks/new"} onClick={host?.onCreate} variant="primary">マークを作る</Button> : null}</>} />
   ) : listReady && visible.length === 0 ? (
@@ -505,7 +525,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
             value={kpi.value}
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
-            loading={statsStatus === 'loading'}
+            loading={kpi.loading}
           />
         ))}
       </KpiBand>}
@@ -557,6 +577,14 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
           </ListToolbarEnd>
         </>}
       >
+        {!host && statsStatus === 'error' && status === 'ready' ? (
+          <Notice tone="danger">
+            受信箱の集計を読み込めませんでした。
+            <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadStats()}>
+              もう一度読み込む
+            </Button>
+          </Notice>
+        ) : null}
         {actionError ? (
           <Notice tone="danger" >{actionError}{retryOrder ? (
               <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</Button>

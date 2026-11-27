@@ -1,4 +1,5 @@
 'use client'
+import { notifySaved } from '@/components/shared/toast'
 import { jstDate } from '@/lib/jst-datetime'
 import { closedOn, closedRanges } from '../lib/closed-ranges'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -89,6 +90,10 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   /* WEB055：削除の失敗は、開いている削除の確認の中に出す（閉じた編集の窓へ書かない）。 */
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const inFlightRef = useRef(false)
+  useEffect(() => {
+    setEditing(null); setBusy(false); inFlightRef.current = false
+    setDeleteTarget(null); setDeleteScope(null)
+  }, [accountId])
 
   const closedExceptions = useMemo(
     () => exceptions.filter((item) => item.kind === 'closed').sort((a, b) => (a.dateFrom || '').localeCompare(b.dateFrom || '')),
@@ -130,7 +135,8 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   }
 
   async function save() {
-    if (inFlightRef.current) return
+    if (inFlightRef.current || !editing || !canEditRef.current || renderedScope !== scope.current) return
+    const current = () => alive.current && renderedScope === scope.current
     const from = holidayRequirements.from.check(editFrom) ?? undefined
     const to = holidayRequirements.to.check(editTo) ?? (editFrom && editTo < editFrom ? '終了日は開始日以降にしてください。' : undefined)
     setDateErrors({ from, to })
@@ -148,6 +154,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           intervals: [],
           reason: editReason.trim() || null,
         })
+        if (!current()) return
         if (!response.success) throw new Error(response.error)
         if (settings) onSaved({ ...settings, exceptions: [...settings.exceptions, response.data] })
       } else if (editing) {
@@ -157,18 +164,20 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           dateTo: editTo,
           reason: editReason.trim() || null,
         })
+        if (!current()) return
         if (!response.success) throw new Error(response.error)
         if (settings) onSaved({ ...settings, exceptions: settings.exceptions.map((entry) => entry.id === editing.id ? response.data : entry) })
       }
+      notifySaved(editing === 'new' ? '休業日を登録しました。' : '休業日を保存しました。')
       setEditing(null)
     } catch (cause) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
       setEditError(exceptionFailureMessage(cause, '保存')) }
     } finally {
-      inFlightRef.current = false
-      setBusy(false)
+      if (current()) { inFlightRef.current = false; setBusy(false) }
     }
   }
 
@@ -192,8 +201,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
       // 先に変えられていた（409）ときは、今の休業日を読み直す。確認の窓は開いたまま。
       if (cause instanceof ApiError && cause.status === 409) onReload()
     } finally {
-      inFlightRef.current = false
-      setBusy(false)
+      if (alive.current && deleteScope.generation === scope.current.generation) { inFlightRef.current = false; setBusy(false) }
     }
   }
 

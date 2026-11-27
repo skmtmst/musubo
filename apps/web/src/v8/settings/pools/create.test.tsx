@@ -50,6 +50,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 
 import PoolNewV8 from './create'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import PoolNewPage from '@/app/pools/new/page'
 
 
@@ -78,6 +79,7 @@ afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
   document.body.innerHTML = ''
+  clearToastsForTest()
 })
 
 async function flush() {
@@ -87,7 +89,7 @@ async function flush() {
 }
 
 async function renderV8() {
-  await act(async () => { root.render(<PoolNewV8 />) })
+  await act(async () => { root.render(<><PoolNewV8 /><ToastHost /></>) })
   await flush()
 }
 
@@ -187,6 +189,7 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     expect(poolsCreate).toHaveBeenCalledWith({ name: '渋谷エリア', slug: 'shibuya', activeAccountId: 'a1', accountIds: ['a1', 'a2'] })
     expect(poolsAccountsAdd).not.toHaveBeenCalled()
     expect(routerPush, '保存できたら一覧へ進む').toHaveBeenCalled()
+    expect(document.body.textContent).toContain('プールを作成しました。')
   })
 
   it('保存失敗時は入力を残して再試行できる', async () => {

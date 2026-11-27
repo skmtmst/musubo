@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -14,6 +14,7 @@ import CommonActionEditor from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { notifySaved } from '@/components/shared/toast'
 import { describeApiFailure, isSaveConflict } from '@/components/shared/api-error-message'
 import { Field } from '@/components/shared/form-controls'
 import { CreatePage } from '@/components/templates'
@@ -53,6 +54,14 @@ function EditCommonActionInner() {
   const [loadFailure, setLoadFailure] = useState<'missing' | 'forbidden' | 'no-draft' | 'error' | null>(null)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
+  const saveScope = useRef({ accountId: selectedAccountId, id, active: true })
+  if (saveScope.current.accountId !== selectedAccountId || saveScope.current.id !== id) saveScope.current = { accountId: selectedAccountId, id, active: true }
+  useEffect(() => {
+    const scope = saveScope.current
+    scope.active = true
+    setSaving(false)
+    return () => { scope.active = false }
+  }, [selectedAccountId, id])
 
   useEffect(() => {
     // U096: 対象が無いURLでは取りに行かない。無いまま叩くと
@@ -128,25 +137,31 @@ function EditCommonActionInner() {
       setError(!name.trim() ? '共通アクション名を入力してください' : '処理を1つ以上追加してください')
       return
     }
+    const scope = saveScope.current
+    const current = () => scope.active && saveScope.current === scope
     setSaving(true)
     setError('')
     setSaveConflict(false)
     try {
-      await api.commonActions.updateDraft(id, selectedAccountId, {
+      const response = await api.commonActions.updateDraft(id, selectedAccountId, {
         expectedDraftVersionId: draftVersionId,
         expectedDraftRevision: draftRevision,
         name: name.trim(),
         description: description.trim() || null,
         actions,
       })
+      if (!current()) return
+      if (!response.success) throw new Error(response.error)
+      notifySaved('共通アクションの下書きを保存しました。')
       router.push(`/common-actions/versions?id=${encodeURIComponent(id)}`)
     } catch (caught) {
+      if (!current()) return
       saveErrors.capture(caught)
       setError(describeApiFailure(caught, '保存'))
       // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
       if (isSaveConflict(caught)) setSaveConflict(true)
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 

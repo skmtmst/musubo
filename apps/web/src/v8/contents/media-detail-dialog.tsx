@@ -12,6 +12,7 @@ import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
+import { notifySaved } from '@/components/shared/toast'
 import { isSaveConflict, SaveConflictBand } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
@@ -143,6 +144,15 @@ export default function MediaDetailDialog({
   onItemUpdated?: (item: MediaItem) => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const saveContext = useRef({ accountId, itemId: item?.id, active: true })
+  if (saveContext.current.accountId !== accountId || saveContext.current.itemId !== item?.id) {
+    saveContext.current = { accountId, itemId: item?.id, active: true }
+  }
+  useEffect(() => {
+    const context = saveContext.current
+    context.active = true
+    return () => { context.active = false }
+  }, [accountId, item?.id])
 
   const fileInputId = useId()
   const requestRef = useRef(0)
@@ -256,17 +266,22 @@ export default function MediaDetailDialog({
     }
     setTermsBusy(true)
     setTermsError('')
+    const context = saveContext.current
+    const current = () => context.active && saveContext.current === context
     try {
       const response = await api.media.update(item.id, accountId, {
         expectedRevision: item.revision,
         usageExpiresAt: termsExpiresAt || null,
         usageConsentNote: termsConsentNote.trim() || null,
       })
+      if (!current()) return
       if (!response.success) throw new Error(response.error)
       setTermsEditing(false)
       setTermsConflict(false)
       onItemUpdated?.(response.data)
+      notifySaved('利用期限と同意の記録を保存しました。')
     } catch (caught) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(caught)
 
       if (isSaveConflict(caught)) {
@@ -276,7 +291,7 @@ export default function MediaDetailDialog({
         setTermsError(describeApiFailure(caught, '保存'))
       }
     } finally {
-      setTermsBusy(false)
+      if (current()) setTermsBusy(false)
     }
   }
 
@@ -373,11 +388,12 @@ export default function MediaDetailDialog({
     setDownloadingVersion(null)
     setVersionDownloadError('')
     setTermsEditing(false)
+    setTermsBusy(false)
     setTermsError('')
     setTermsConflict(false)
     setVersionNotice('')
     setPendingVersionMessage(null)
-  }, [item?.id])
+  }, [accountId, item?.id])
 
   function chooseVersionFile(file: File | null) {
     setVersionPreview(null)
