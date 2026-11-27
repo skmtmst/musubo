@@ -68,6 +68,10 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
   // 保存検索一覧の取得がどのアカウントに向けたものか。切替中に遅れて届いた
   // 旧アカウントの応答で、新しいアカウントの一覧を上書きしない(N-021)。
   const savedViewsRequestAccountRef = useRef<string | null>(null)
+  const savedViewsRequestSeq = useRef(0)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
+  useEffect(() => () => { savedViewsRequestSeq.current += 1 }, [])
 
   /*
    * 処理済みのURL savedView値。router.replace の反映より描画が先に走る
@@ -118,8 +122,10 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
 
   const loadSavedViews = useCallback(async () => {
     const accountId = selectedAccountId
-    // 切替中に前のアカウントの応答が遅れて届いても、新しい一覧を上書きしない。
+    const seq = ++savedViewsRequestSeq.current
+    // 切替や再読み込み後の古い応答では、新しい一覧を上書きしない。
     savedViewsRequestAccountRef.current = accountId
+    const current = () => savedViewsRequestSeq.current === seq && savedViewsRequestAccountRef.current === accountId && selectedAccountRef.current === accountId
     if (!accountId) {
       setSavedViews([])
       setSavedViewsAccountId(null)
@@ -127,7 +133,7 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     }
     try {
       const response = await api.chats.savedViews.list(accountId)
-      if (savedViewsRequestAccountRef.current !== accountId) return
+      if (!current()) return
       if (response.success) {
         setSavedViews(response.data.map((view) => ({
           ...view,
@@ -136,7 +142,7 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
         setSavedViewsAccountId(accountId)
       }
     } catch {
-      if (savedViewsRequestAccountRef.current !== accountId) return
+      if (!current()) return
       setSavedViewError('保存した検索を読み込めませんでした')
     }
   }, [selectedAccountId])
