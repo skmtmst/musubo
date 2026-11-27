@@ -1292,7 +1292,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
             unit=""
             loading={loading || reportLoading}
             detail={reportFailed && !loadFailed
-              ? '集計を読み込めませんでした'
+              ? <span title={`${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>集計を読み込めませんでした</span>
               : <span title={listUnavailable ? '金額の内訳を読み込めませんでした' : `${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>{listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}</span>}
             onRetry={reportFailed && !loadFailed && !reportLoading ? () => void reloadReport() : undefined}
           />
