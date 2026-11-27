@@ -410,7 +410,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.queryByRole('link', { name: '登録したアカウントを見る' })).toBeNull()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: {
-      state: { capability: 'available', phase: 'completed', received: 10, imported: 10 },
+      state: { capability: 'available', phase: 'completed', received: 10, imported: 10, profilesProcessed: 10, profilesUpdated: 10 },
       busy: false, profilesFetched: 10,
     } })
     await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })

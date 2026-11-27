@@ -66,6 +66,10 @@ function stubFetch() {
     if (url.includes('/api/line-accounts')) {
       return new Response(JSON.stringify({ success: true, data: ACCOUNTS }), { status: 200 })
     }
+    // スタイルの入口は不正な応答だと自分の再読み込みを出すので、本物の形で返す。
+    if (url.includes('/api/dashboard/style')) {
+      return new Response(JSON.stringify({ success: true, data: { style: 'restaurant', styleSelected: true } }), { status: 200 })
+    }
     return new Response(JSON.stringify({ success: true, data: [] }), { status: 200 })
   }) as typeof globalThis.fetch
 }

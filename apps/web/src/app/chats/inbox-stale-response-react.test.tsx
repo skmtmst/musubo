@@ -118,6 +118,7 @@ function chatMessage(id: string, content: string, createdAt = '2026-09-09T00:00:
     id,
     direction: 'incoming',
     messageType: 'text',
+    isUnsent: false,
     content,
     source: 'line',
     originKind: null,
