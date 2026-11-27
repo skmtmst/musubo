@@ -127,6 +127,9 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
 
         <Card variant="form" gap="normal">
           <SectionHeader title="足りないもの" help="配る前に、この画面で分かる足りないものです。アカウントごとに無いタグ・テンプレートなどは、保存したあとの配る前の確認で一覧にします。" helpLabel="足りないものの説明" />
+          {!sizeKnown ? (
+            <Notice tone="danger">メニューのサイズを確認できないため配布できません。</Notice>
+          ) : null}
           <ul className={styles.checkList}>
             {missingRows.length > 0 ? (
               <li className={styles.checkRow}>

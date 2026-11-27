@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:9'
@@ -296,5 +298,68 @@ describe('create-publish-step / MenuContent 実物描画での未知サイズ・
     const publishBtn = screen.getByRole('button', { name: '公開する' }) as HTMLButtonElement
     expect(publishBtn.disabled).toBe(true)
     expect(publishBtn.title).toContain('サイズを確認できないため公開できません')
+  })
+
+  it('実画面の統括（host）側でサイズが不明なとき、配るボタンを止めて理由を出し onSave を呼ばない', async () => {
+    const onSave = vi.fn()
+    const hqHost: RichMenuCreateHost = {
+      backHref: '/hq/rich-menus',
+      onCancel: vi.fn(),
+      canOperate: true,
+      folders: [],
+      references: { tags: [], templates: [], forms: [] },
+      initial: {
+        name: '統括メニュー',
+        chatBarText: 'メニュー',
+        size: 'extra_large' as 'large',
+        folderId: null,
+        defaultOpen: true,
+        displayAudience: 'all',
+        displayTagName: null,
+        pages: [{
+          name: 'トップ',
+          aliasId: 'a-top',
+          imageR2Key: 'img-1',
+          imageContentType: 'image/jpeg',
+          areas: [{
+            boundsX: 0,
+            boundsY: 0,
+            boundsWidth: 100,
+            boundsHeight: 100,
+            actionType: 'message',
+            actionData: { text: 'hello' },
+            intent: 'message',
+            label: 'ボタン1',
+          }],
+        }],
+      } as unknown as HqRichMenuSeed,
+      uploadImage: vi.fn(),
+      imageUrl: (key) => `https://example.test/${key}`,
+      distribute: <div data-testid="hq-distribute" />,
+      selectedCount: 2,
+      selectedIds: ['acc-1', 'acc-2'],
+      friendTotal: 100,
+      busy: false,
+      onSave,
+    }
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: [] }),
+    })))
+
+    render(<RichMenuCreateV8 host={hqHost} initialStep="publish" />)
+
+    await waitFor(() => {
+      expect(screen.getAllByText('サイズを確認できません').length).toBeGreaterThan(0)
+    })
+    expect(screen.getByText('メニューのサイズを確認できないため配布できません。')).toBeTruthy()
+    const distributeBtn = screen.getByRole('button', { name: '2 アカウントへ配る' }) as HTMLButtonElement
+    expect(distributeBtn.disabled).toBe(true)
+    expect(distributeBtn.title).toContain('サイズを確認できないため配布できません')
+
+    fireEvent.click(distributeBtn)
+    expect(onSave).not.toHaveBeenCalled()
   })
 })

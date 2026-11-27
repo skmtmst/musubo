@@ -1199,6 +1199,10 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
   /** 統括：画面の中の下書きを一度に保存する（手順の途中でも同じ）。 */
   async function hostSave(distribute: boolean) {
     if (!host || saving) return
+    if (!publishSizeKnown) {
+      setError('メニューのサイズを確認できないため保存・配布できません。画面を読み直すか新しく作り直してください。')
+      return
+    }
     setError(null)
     if (!group) {
       setSaving(true)
@@ -1258,17 +1262,39 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
               {step === 'publish' ? (
                 <>
-                  <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
+                  <Button
+                    type="button"
+                    disabled={busy || !host.canOperate || !publishSizeKnown}
+                    title={!publishSizeKnown ? 'メニューのサイズを確認できないため保存できません。画面を読み直すか新しく作り直してください' : undefined}
+                    busy={saving || host.busy}
+                    busyLabel="保存中…"
+                    onClick={() => void hostSave(false)}
+                  >
                     下書きを保存
                   </Button>
-                  <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配る前の確認へ進みます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={busy || !host.canOperate || !publishSizeKnown}
+                    title={!publishSizeKnown ? 'メニューのサイズを確認できないため配布できません。画面を読み直すか新しく作り直してください' : '保存したあとに、配る前の確認へ進みます'}
+                    busy={saving || host.busy}
+                    busyLabel="保存しています…"
+                    onClick={() => void hostSave(true)}
+                  >
                     <Upload size={16} aria-hidden="true" />
                     {host.selectedCount > 0 ? `${formatNumber(host.selectedCount)} アカウントへ配る` : 'アカウントへ配る'}
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button type="button" disabled={busy || !host.canOperate} busy={saving} busyLabel="保存中…" onClick={() => void hostSave(false)}>
+                  <Button
+                    type="button"
+                    disabled={busy || !host.canOperate || !publishSizeKnown}
+                    title={!publishSizeKnown ? 'メニューのサイズを確認できないため保存できません。画面を読み直すか新しく作り直してください' : undefined}
+                    busy={saving}
+                    busyLabel="保存中…"
+                    onClick={() => void hostSave(false)}
+                  >
                     下書きを保存
                   </Button>
                   <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
