@@ -41,8 +41,8 @@ function httpsUrl(value: unknown): string | null {
 export function bubbleThumbOf(input: { messageType: string; content: string; question: TemplateQuestion | null }): BubbleThumb {
   if (input.question) {
     const question = text(input.question.text) || text(input.question.intro)
-    if (!question) return { kind: 'unavailable' }
-    return { kind: 'question', text: question, choices: Array.isArray(input.question.choices) ? input.question.choices.length : 0 }
+    if (!question || !Array.isArray(input.question.choices)) return { kind: 'unavailable' }
+    return { kind: 'question', text: question, choices: input.question.choices.length }
   }
   const content = typeof input.content === 'string' ? input.content.trim() : ''
   if (input.messageType === 'text') {
@@ -67,7 +67,7 @@ export function bubbleThumbOf(input: { messageType: string; content: string; que
   }
   if (input.messageType === 'carousel') {
     const columns = Array.isArray(parsed) ? parsed : obj?.columns
-    if (!Array.isArray(columns) || columns.length === 0) return { kind: 'unavailable' }
+    if (!Array.isArray(columns) || columns.length === 0 || columns.some(column => !record(column))) return { kind: 'unavailable' }
     const first = record(columns[0])
     return { kind: 'carousel', title: text(obj?.altText) || text(first?.title) || text(first?.text), count: columns.length }
   }
