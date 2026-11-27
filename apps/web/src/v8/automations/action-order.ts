@@ -11,19 +11,27 @@ import type { CommonActionStep } from '@/lib/api'
  * - 追加・並べ替え：編集側の順序を枠に流し込む。分岐は動かさない
  *   （分岐をまたぐ移動はこの画面ではできない。順序変更は明示操作に限る）
  */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 export function mergeOrderedActions(
   current: CommonActionStep[],
   nextPlain: CommonActionStep[],
 ): CommonActionStep[] {
+  const safeCurrent = Array.isArray(current)
+    ? current.filter((step): step is CommonActionStep => Boolean(step) && typeof step === 'object')
+    : []
+  const safeNext = Array.isArray(nextPlain)
+    ? nextPlain.filter((step): step is CommonActionStep => Boolean(step) && typeof step === 'object')
+    : []
   const branchAt = new Set<number>()
-  current.forEach((step, index) => {
+  safeCurrent.forEach((step, index) => {
     if (step.type === 'branch') branchAt.add(index)
   })
-  const queue = [...nextPlain]
+  const queue = [...safeNext]
   const merged: CommonActionStep[] = []
-  for (let index = 0; index < current.length; index++) {
+  for (let index = 0; index < safeCurrent.length; index++) {
     if (branchAt.has(index)) {
-      merged.push(current[index])
+      merged.push(safeCurrent[index])
       continue
     }
     const next = queue.shift()
@@ -37,7 +45,11 @@ export function mergeOrderedActions(
 /* 全体の実行順での番号表。分岐の見出しと通常処理の番号を一致させる。 */
 export function stepNumbers(steps: CommonActionStep[]): Record<string, number> {
   const numbers: Record<string, number> = {}
+  if (!Array.isArray(steps)) return numbers
   steps.forEach((step, index) => {
+    if (!step || typeof step !== 'object' || typeof step.id !== 'string' || !step.id || FORBIDDEN_KEYS.has(step.id)) {
+      return
+    }
     numbers[step.id] = index + 1
   })
   return numbers
