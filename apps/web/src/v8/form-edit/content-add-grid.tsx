@@ -32,6 +32,7 @@ import type { ReactNode } from 'react'
 import styles from './edit.module.css'
 import { ADD_GROUPS } from './model'
 export function blockIcon(block: FormBlock): ReactNode {
+  if (!block || typeof block !== 'object') return <HelpCircle size={16} aria-hidden="true" />
   switch (block.kind) {
     case 'image': return <ImageIcon size={16} aria-hidden="true" />
     case 'heading': return <Heading size={16} aria-hidden="true" />
@@ -47,14 +48,17 @@ export function blockIcon(block: FormBlock): ReactNode {
   }
 }
 
-export const ADD_CARD_ICONS: Record<string, ReactNode> = Object.fromEntries(Object.entries({
-  radio: CircleDot, checkbox: SquareCheck, select: ChevronDown, rating: Star,
-  text: Minus, textarea: Pilcrow, contact: Mail, tel: Phone, address: MapPin,
-  name: User, kana: Languages, birthday: Cake, age: Hash, allergy: ShieldAlert,
-  anniversary: Gift, seat_preference: Armchair,
-  date: Calendar, time: AlarmClock, booking: CalendarCheck, file: Paperclip,
-  image: ImageIcon, heading: Heading, 'text-deco': Type, button: MousePointerClick,
-}).map(([key, Icon]) => [key, <Icon key={key} size={16} aria-hidden="true" />]))
+export const ADD_CARD_ICONS: Record<string, ReactNode> = Object.assign(
+  Object.create(null) as Record<string, ReactNode>,
+  Object.fromEntries(Object.entries({
+    radio: CircleDot, checkbox: SquareCheck, select: ChevronDown, rating: Star,
+    text: Minus, textarea: Pilcrow, contact: Mail, tel: Phone, address: MapPin,
+    name: User, kana: Languages, birthday: Cake, age: Hash, allergy: ShieldAlert,
+    anniversary: Gift, seat_preference: Armchair,
+    date: Calendar, time: AlarmClock, booking: CalendarCheck, file: Paperclip,
+    image: ImageIcon, heading: Heading, 'text-deco': Type, button: MousePointerClick,
+  }).map(([key, Icon]) => [key, <Icon key={key} size={16} aria-hidden="true" />])),
+)
 
 export function AddGrid({ onAdd, hide, note }: { onAdd: (make: (count: number) => FormBlock) => void; hide?: ReadonlySet<string>; note?: string }) {
   return (
