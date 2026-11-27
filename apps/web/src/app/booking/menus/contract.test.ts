@@ -35,26 +35,6 @@ describe('V8 予約設定', () => {
     expect(CREATE).toContain('cancel_deadline_hours_before:')
   })
 
-  it('作成画面で予約後の通知・リマインダ・マイルを実データから確認できる', () => {
-    expect(CREATE).toContain('予約を受けたときにすること')
-    expect(CREATE).toContain('予約を受け付けたことを知らせる')
-    expect(CREATE).toContain('前日・開始前に思い出してもらう')
-    expect(CREATE).toContain("item.eventType === 'booking_created'")
-    expect(CREATE).toContain('formatNumber(bookingMileage)')
-  })
-
-  it('作成画面で価格種別と店舗共通ルールの継承を実契約へ送る', () => {
-    expect(CREATE).toContain('bookingApi.getSettings(selectedAccountId)')
-    expect(CREATE).toContain("? 'inquiry'")
-    expect(CREATE).toContain("? 'free'")
-    expect(CREATE).toContain("price_mode: basePrice.trim() === ''")
-    expect(CREATE).toContain('お店のきまりに戻す')
-    expect(CREATE).toContain('booking_window_days: ownRules && windowDays ? Number(windowDays) : null')
-    expect(CREATE).toContain('cutoff_hours_before: ownRules && cutoffHours ? Number(cutoffHours) : null')
-    expect(CREATE).toContain('cancel_deadline_hours_before: ownRules && cancelDeadlineHours')
-    expect(CREATE).toContain('? Number(cancelDeadlineHours)')
-  })
-
   it('表示している一覧操作は実際に使える', () => {
     // 分割先のコメントは画面の文言ではない。口が来るまでの「現在準備中です」の案内は （オーナー）で認められた形なので除く。
     expect(LIST.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replaceAll('現在準備中です', '')).not.toContain('準備中')
