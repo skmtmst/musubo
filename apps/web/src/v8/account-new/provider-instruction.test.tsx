@@ -8,7 +8,7 @@ afterEach(cleanup)
 
 it('プロバイダーは自動判定したと見せず、利用者に確認を依頼する', () => {
   render(<Step2Connect sub={2} badge="Step 2 / 4" values={{channelId:'',channelSecret:'',providerId:'',loginChannelId:'',loginChannelSecret:''}} fieldErrors={{}} touchedFields={{}} acks={{}} onUpdate={vi.fn()} onTouchField={vi.fn()} onValidateField={vi.fn()} onToggleAck={vi.fn()} onBackTo={vi.fn()} />)
-  const instruction = 'Step 1で使ったプロバイダーをLINE Developersで確認してください。'
+  const instruction = 'Messaging APIチャネルのプロバイダーIDを入力します。'
   expect(screen.getByText(instruction)).toBeTruthy()
   expect(screen.getByLabelText(instruction)).toBeTruthy()
   expect(screen.queryByText('Messaging APIとLINEログインを同じプロバイダーにつなぎます。')).toBeNull()
