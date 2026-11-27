@@ -1477,3 +1477,4 @@
 - [カルーセルのボタンの不明な動きの表示修正](release-log/unreleased/PR-kenta-later-cx3-15-1128.md) — 反映履歴、確認 2026-11-28。
 - [ホームの不明な指標と説明の表示修正](release-log/unreleased/PR-kenta-later-cx3-16-1128.md) — 反映履歴、確認 2026-11-28。
 - [ウェビナー参加者の回数と参加経路の表示修正](release-log/unreleased/PR-kenta-later-cx3-17-1128.md) — 反映履歴、確認 2026-11-28。
+- [ウェビナーの案内カードの比較で不正な内容を確認できるように修正](release-log/unreleased/PR-kenta-later-cx3-18-1128.md) — 反映履歴、確認 2026-11-28。
