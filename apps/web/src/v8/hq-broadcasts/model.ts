@@ -127,6 +127,7 @@ export function resultBadge(t: ResultTarget): { label: string; tone: StatusBadge
     const why = excludedReason(t)
     return { label: why ? `外した（${why}）` : '外した', tone: 'neutral' }
   }
+  if (!['cancelled', 'draft', 'prepared', 'scheduled', 'sending', 'sent', 'failed', 'partial_failed'].includes(t.status)) return { label: '状態を確認できません', tone: 'neutral' }
   if (t.status === 'cancelled') return { label: '取り消した', tone: 'neutral' }
   if (t.stopped && t.status !== 'sent') return { label: '止めた', tone: 'neutral' }
   /* 送り終えた店は「送れた」。届かなかった人の数は失敗の列に太字で出す（絵 xOXuY）。 */
@@ -166,7 +167,9 @@ export function runBadge(run: Pick<HqBroadcastRun, 'status' | 'targets'>): { lab
   if (run.status === 'prepared') return { label: '下書き', tone: 'neutral' }
   if (run.status === 'cancelled') return { label: '取り消した', tone: 'neutral' }
   if (run.status === 'stopped') return { label: '止めた', tone: 'warning' }
+  if (run.status !== 'scheduled') return { label: '状態を確認できません', tone: 'neutral' }
   const live = run.targets.filter((t) => !t.excluded)
+  if (live.some((t) => !['draft', 'prepared', 'scheduled', 'sending', 'sent', 'failed', 'partial_failed', 'cancelled'].includes(t.status))) return { label: '状態を確認できません', tone: 'neutral' }
   if (live.length > 0 && live.every((t) => t.status === 'sent')) {
     return live.some((t) => failedCount(t) > 0) ? { label: '一部失敗', tone: 'warning' } : { label: '送信済み', tone: 'success' }
   }
