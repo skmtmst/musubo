@@ -19,9 +19,19 @@ export function bookingMenuNameError(name: unknown): string | null {
   return null
 }
 
+function parseStrictNumber(value: unknown, allowEmptyAsZero = false): number {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (trimmed === '') return allowEmptyAsZero ? 0 : Number.NaN
+    return Number(trimmed)
+  }
+  return Number.NaN
+}
+
 /** かかる時間1欄の直し方。欄を離れたときに出す文。保存時と同じ文。 */
 export function bookingMenuDurationError(durationMinutes: unknown): string | null {
-  const duration = Number(durationMinutes)
+  const duration = parseStrictNumber(durationMinutes)
   if (!Number.isInteger(duration) || duration < 1 || duration > 1440) {
     return '所要時間は1〜1440分の整数で入力してください'
   }
@@ -30,7 +40,7 @@ export function bookingMenuDurationError(durationMinutes: unknown): string | nul
 
 /** 後の空き時間1欄の直し方。欄を離れたときに出す文。保存時と同じ文。 */
 export function bookingMenuBufferError(bufferAfterMinutes: unknown): string | null {
-  const buffer = bufferAfterMinutes === undefined ? 0 : Number(bufferAfterMinutes)
+  const buffer = bufferAfterMinutes === undefined ? 0 : parseStrictNumber(bufferAfterMinutes, true)
   if (!Number.isInteger(buffer) || buffer < 0 || buffer > 1440) {
     return '後の空き時間は0〜1440分の整数で入力してください'
   }
@@ -39,17 +49,18 @@ export function bookingMenuBufferError(bufferAfterMinutes: unknown): string | nu
 
 /** 作成画面と編集窓で同じ基準を使い、保存前に直せる入力不備を出す。 */
 export function bookingMenuError(draft: BookingMenuBaseDraft): string | null {
+  if (!draft || typeof draft !== 'object') return 'メニュー名を入力してください'
   const nameError = bookingMenuNameError(draft.name)
   if (nameError !== null) return nameError
   const durationError = bookingMenuDurationError(draft.durationMinutes)
   if (durationError !== null) return durationError
   const bufferError = bookingMenuBufferError(draft.bufferAfterMinutes)
   if (bufferError !== null) return bufferError
-  const sortOrder = draft.sortOrder === undefined ? 0 : Number(draft.sortOrder)
+  const sortOrder = draft.sortOrder === undefined ? 0 : parseStrictNumber(draft.sortOrder, true)
   if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 1_000_000) {
     return '並び順は0〜1000000の整数で入力してください'
   }
-  const assignedStaffCount = Number(draft.assignedStaffCount)
+  const assignedStaffCount = parseStrictNumber(draft.assignedStaffCount)
   if (!Number.isInteger(assignedStaffCount) || assignedStaffCount < 1) {
     return '担当できる人を1人以上選んでください。0人だと予約画面に枠が出ません'
   }
