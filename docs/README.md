@@ -1419,3 +1419,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [シナリオ詳細の設定保存・開始停止・複製削除の切替時ガード修正](release-log/unreleased/PR-kenta-later-gemini42-1127.md) — 反映履歴、確認 2026-11-27。
+- [シナリオ通の並べ替え保護とペット編集の保存中切替ガード](release-log/unreleased/PR-kenta-scenario-step-reorder-1127.md) — 反映履歴、確認 2026-11-27。
