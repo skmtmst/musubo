@@ -46,6 +46,17 @@ type Group = {
   confirmationRevision?: number
 }
 
+function isValidCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function runStatusLabel(status: string): string {
+  if (status === 'succeeded') return '成功'
+  if (status === 'failed') return '失敗'
+  if (status === 'running') return '実行中'
+  return '状態を確認できません'
+}
+
 export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
@@ -144,12 +155,15 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   }, [groupId, samePageUrl, saveErrors]);
 
   const loadProgress = useCallback(async () => {
+    const generation = scope.current.generation
     try {
       const res = await api.richMenuGroups.publishProgress(groupId)
+      if (!alive.current || generation !== scope.current.generation) return
       if (!res.success || !res.data || !Array.isArray(res.data.steps)) throw new Error('progress')
       setProgress({ steps: res.data.steps, message: res.data.message, failed: res.data.run?.status === 'failed', completed: res.data.run?.status === 'succeeded' || res.data.run?.status === 'done' })
       setProgressError(false)
     } catch (caught) {
+      if (!alive.current || generation !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (!(caught instanceof ApiError && caught.status === 403)) { if (!fieldFailure) setProgressError(true)
@@ -203,7 +217,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
     }
   }, [groupId, saveErrors])
 
-  useEffect(() => { setRetryTarget(null); setRetryScope(null); setRetrying(false); setFixOpen(false); setFixScope(null); setFixing(false); setUnpublishOpen(false); setUnpublishScope(null); setUnpublishing(false); void loadGroup() }, [loadGroup])
+  useEffect(() => { setProgress(null); setProgressError(false); setChecking(false); setRepublishing(false); setDuplicating(false); setDuplicateOpen(false); setActionError(''); setNotice(''); setDialogError(''); setRetryTarget(null); setRetryScope(null); setRetrying(false); setFixOpen(false); setFixScope(null); setFixing(false); setUnpublishOpen(false); setUnpublishScope(null); setUnpublishing(false); setUnpublishImpact(null); void loadGroup() }, [loadGroup])
   useEffect(() => {
     if (loadState !== 'ready' || !canInspectOperations) return
     void loadProgress()
@@ -246,15 +260,18 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
   /* 公開が途中で止まったときの「もう一度公開する」。保存済みの下書きのまま公開し直す。 */
   const republish = async () => {
-    if (republishing) return
+    if (!alive.current || !canOperate || republishing) return
+    const generation = scope.current.generation
     setRepublishing(true)
     setActionError('')
     try {
       const res = await api.richMenuGroups.publish(groupId, crypto.randomUUID())
+      if (!alive.current || generation !== scope.current.generation) return
       if (!res.success) throw new Error(res.error)
       setNotice('もう一度公開しました。公開の進みを確かめてください。')
       await reloadAll()
     } catch (caught) {
+      if (!alive.current || generation !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
@@ -262,7 +279,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
         ? 'ほかの人が先に公開・編集しました。読み直してから、もう一度お試しください。'
         : '公開できませんでした。時間をおいてもう一度お試しください。') }
     } finally {
-      setRepublishing(false)
+      if (alive.current && generation === scope.current.generation) setRepublishing(false)
     }
   }
 
@@ -345,22 +362,25 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   }
 
   const duplicate = async () => {
-    if (duplicating) return
+    if (!alive.current || !canOperate || duplicating) return
+    const generation = scope.current.generation
     setDuplicating(true)
     setDialogError('')
     try {
       const res = await api.richMenuGroups.duplicate(groupId, crypto.randomUUID())
+      if (!alive.current || generation !== scope.current.generation) return
       if (!res.success) throw new Error(res.error)
       setDuplicateOpen(false)
       notifySaved('下書きを複製しました')
       router.push(`/rich-menus/edit?id=${encodeURIComponent(res.data.id)}&step=shape`)
     } catch (caught) {
+      if (!alive.current || generation !== scope.current.generation) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
       setDialogError(richMenuErrorAll(caught, 'duplicate')) }
     } finally {
-      setDuplicating(false)
+      if (alive.current && generation === scope.current.generation) setDuplicating(false)
     }
   }
 
@@ -410,8 +430,8 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               <dl className={styles.aboutList}>
                 <div className={styles.aboutRow}><dt>状態</dt><dd><StatusBadge tone="success">公開中</StatusBadge></dd></div>
                 <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
-                <div className={styles.aboutRow}><dt>出る人</dt><dd>{previewContext !== statsContext ? '読み込み中…' : previewFailed ? <>読み込めませんでした <Button variant="text" size="inline" onClick={() => setPreviewRetry((n) => n + 1)}>人数を読み直す</Button></> : preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
-                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{tapsContext !== statsContext ? '読み込み中…' : tapsFailed ? <>読み込めませんでした <Button variant="text" size="inline" onClick={() => setTapsRetry((n) => n + 1)}>回数を読み直す</Button></> : taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
+                <div className={styles.aboutRow}><dt>出る人</dt><dd>{previewContext !== statsContext ? '読み込み中…' : previewFailed ? <>読み込めませんでした <Button variant="text" size="inline" onClick={() => setPreviewRetry((n) => n + 1)}>人数を読み直す</Button></> : !isValidCount(preview?.effective.value) ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
+                <div className={styles.aboutRow}><dt>今月押された</dt><dd>{tapsContext !== statsContext ? '読み込み中…' : tapsFailed ? <>読み込めませんでした <Button variant="text" size="inline" onClick={() => setTapsRetry((n) => n + 1)}>回数を読み直す</Button></> : taps === undefined ? '読み込み中…' : !isValidCount(taps) ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>
               </dl>
             </section>
 
@@ -485,7 +505,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
                         <button type="button" className={styles.linkButton} onClick={() => { if (!group || group.id !== groupId || !group.accountId || groupGeneration.current !== scope.current.generation || runsGeneration.current !== scope.current.generation || !operationPermission.current) return; setDialogError(''); retryTicket.current = { context: confirmationContext.current }; setRetryScope({ groupId, accountId: group.accountId, generation: scope.current.generation }); setRetryTarget(run) }}>失敗だけやり直す</button>
                       ) : null}
                       <span className={run.status === 'succeeded' ? styles.stateOk : run.status === 'failed' ? styles.stateNg : styles.stateQuiet}>
-                        {run.status === 'succeeded' ? '成功' : run.status === 'failed' ? '失敗' : '実行中'}
+                        {runStatusLabel(run.status)}
                       </span>
                     </div>
                   ))}
