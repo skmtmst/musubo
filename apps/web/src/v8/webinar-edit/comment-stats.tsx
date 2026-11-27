@@ -24,6 +24,6 @@ export default function CommentViewerStats({ analytics, state, onRetry }: {
     <KpiBand data-template-region="stats">
       {metrics.map(metric => <KpiCard key={metric.title} presentation="band" title={metric.title} icon={<metric.icon size={16} aria-hidden="true" />} help={metric.help} value={metric.value} unit={metric.value === null ? '' : '人'} detail={metric.detail} />)}
     </KpiBand>
-    {state === 'error' ? <Notice tone="info" action={<Button onClick={onRetry}>もう一度読み込む</Button>}>視聴の集計を読み込めませんでした。コメントの入力は続けられます。</Notice> : null}
+    {state === 'error' ? <Notice tone="danger" action={<Button onClick={onRetry}>もう一度読み込む</Button>}>視聴の集計を読み込めませんでした。コメントの入力は続けられます。</Notice> : null}
   </>
 }

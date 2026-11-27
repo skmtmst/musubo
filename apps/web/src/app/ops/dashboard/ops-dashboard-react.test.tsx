@@ -80,6 +80,21 @@ async function flush() {
   for (let i = 0; i < 6; i += 1) await act(async () => { await Promise.resolve() })
 }
 
+describe('売上の前月比', () => {
+  it.each([[59600, 'good', '+59,600 円 前月比'], [-9800, 'bad', '−9,800 円 前月比'], [0, 'flat', '0 円 前月比']] as const)('差 %s を画面に表示する', async (delta, tone, label) => {
+    const original = payload.kpis.revenueDelta
+    payload.kpis.revenueDelta = delta
+    try {
+      await act(async () => { root.render(<OpsDashboardPage />) })
+      await flush()
+      const chip = host.querySelector(`[data-kpi-delta="${tone}"]`)
+      expect(chip?.textContent).toContain(label)
+      if (delta !== 0) expect(chip?.parentElement?.querySelector(delta > 0 ? '.lucide-arrow-up' : '.lucide-arrow-down')).toBeTruthy()
+      expect(host.textContent).toContain('9月17日 10:00時点')
+    } finally { payload.kpis.revenueDelta = original }
+  })
+})
+
 describe('表記の決まり', () => {
   it('前月比・所要時間・目盛り・容量', () => {
     expect(deltaLabel(59_600)).toBe('前月比 ＋¥59,600')

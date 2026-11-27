@@ -99,7 +99,7 @@ export function validateDraft(draft: ColumnDraft): FieldError[] {
   if (draft.publishedAt.trim() && publishedAtIso(draft.publishedAt) === null) {
     errors.push({ field: 'publishedAt', message: '公開日時は日付と時刻の両方を選んでください。' })
   }
-  if (draft.targetMode === 'tag' && !draft.targetTagId) {
+  if (draft.targetMode === 'tag' && !draft.targetTagId.trim()) {
     errors.push({ field: 'targetTagId', message: '配信対象のタグを選んでください。' })
   }
   if (draft.scheduledAt.trim() && publishedAtIso(draft.scheduledAt) === null) {
@@ -125,9 +125,18 @@ export function publishedAtIso(value: string): string | null {
   */
   const raw = value.trim()
   if (!raw) return null
-  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2})?$/.exec(raw)
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(raw)
   if (!match) return null
-  return `${match[1]}T${match[2]}${match[3] ?? ':00'}+09:00`
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = match[6] ? Number(match[6]) : 0
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) return null
+  const check = new Date(Date.UTC(year, month - 1, day))
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null
+  return `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6] ?? '00'}+09:00`
 }
 
 /*
@@ -151,7 +160,7 @@ export function toCreateInput(draft: ColumnDraft): NenColumnCreateInput {
     imageUrl: optional(draft.imageUrl) ?? null,
     publishedAt: publishedAtIso(draft.publishedAt),
     targetMode: draft.targetMode,
-    targetTagId: draft.targetMode === 'tag' ? draft.targetTagId : null,
+    targetTagId: draft.targetMode === 'tag' ? optional(draft.targetTagId) ?? null : null,
     scheduledAt: publishedAtIso(draft.scheduledAt),
     completionEventName: optional(draft.completionEventName) ?? null,
     completionTagId: optional(draft.completionTagId) ?? null,

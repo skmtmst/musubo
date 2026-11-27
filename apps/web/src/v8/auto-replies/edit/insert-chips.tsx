@@ -11,6 +11,8 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import ActionMenu from '@/components/shared/action-menu'
+import Notice from '@/components/shared/notice'
+import styles from './insert-chips.module.css'
 import { EMPTY_REFERENCES, loadTemplateReferences, type TemplateReferences } from '@/v8/template-edit/public/core/index'
 import { MessageInsertButton } from '@/components/shared/message-insert-row'
 
@@ -59,7 +61,7 @@ export default function AutoReplyInsertChips({
     setState('loading')
     load(accountId)
       .then((next) => { if (alive) { setReferences(next); setState('ready') } })
-      .catch(() => { if (alive) { setReferences(EMPTY_REFERENCES); setState('failed') } })
+      .catch(() => { if (alive) setState('failed') })
     return () => { alive = false }
   }, [accountId, load, providedReferences])
 
@@ -73,19 +75,20 @@ export default function AutoReplyInsertChips({
 
   return (
     <>
+      {state === 'failed' ? <div className={styles.notice}><Notice tone="danger" message="差し込み項目を読み込めませんでした。画面を再読み込みしてください。" /></div> : null}
       <MessageInsertButton disabled={disabled} lockedReason={lockedReason} kind="name" label="名前" title="名前を差し込む" onClick={() => pick(NAME_TOKEN)} />
       <MessageInsertButton kind="field" label="友だち情報" ref={fieldRef} title={why(fieldsReady, '友だち情報')} expanded={menu === 'field'} disabled={disabled || !fieldsReady} lockedReason={lockedReason} onClick={() => setMenu(m => m === 'field' ? null : 'field')} />
       <MessageInsertButton kind="var" label="共通情報" ref={varRef} title={why(varsReady, '共通情報')} expanded={menu === 'var'} disabled={disabled || !varsReady} lockedReason={lockedReason} onClick={() => setMenu(m => m === 'var' ? null : 'var')} />
       <MessageInsertButton kind="date" label="予約日時" disabled lockedReason={lockedReason} title="自動応答では予約日時を差し込めません" onClick={() => {}} />
       <ActionMenu
-        open={!disabled && !lockedReason && menu === 'field'}
+        open={state === 'ready' && !disabled && !lockedReason && menu === 'field'}
         anchorRef={fieldRef}
         ariaLabel="差し込む友だち情報"
         onClose={() => setMenu(null)}
         items={references.friendFields.map((field) => ({ id: field.fieldKey, label: field.name, onSelect: () => pick(`{{field.${field.fieldKey}}}`) }))}
       />
       <ActionMenu
-        open={!disabled && !lockedReason && menu === 'var'}
+        open={state === 'ready' && !disabled && !lockedReason && menu === 'var'}
         anchorRef={varRef}
         ariaLabel="差し込む共通情報"
         onClose={() => setMenu(null)}

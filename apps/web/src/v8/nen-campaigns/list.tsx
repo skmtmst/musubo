@@ -172,12 +172,27 @@ function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] 
   )
 }
 
+function paginateState(total: number, page: number, size: number) {
+  const safeTotal = Number.isFinite(total) && total > 0 ? Math.floor(total) : 0
+  const safeSize = Number.isFinite(size) && size >= 1 ? Math.floor(size) : 20
+  const pageCount = Math.max(1, Math.ceil(safeTotal / safeSize))
+  const safePage = Number.isFinite(page) ? Math.max(1, Math.min(Math.floor(page), pageCount)) : 1
+  return {
+    total: safeTotal,
+    size: safeSize,
+    page: safePage,
+    pageCount,
+    first: safeTotal === 0 ? 0 : (safePage - 1) * safeSize + 1,
+    last: Math.min(safeTotal, safePage * safeSize),
+  }
+}
+
 /** 表の下の件数とページ送り。2ページ以上は共通のページ送り（件数の文つき）、1ページでも件数は出す。 */
 export function Pager({ total, page, size, onPage }: { total: number; page: number; size: number; onPage: (page: number) => void }) {
-  const pageCount = Math.max(1, Math.ceil(total / size))
+  const state = paginateState(total, page, size)
   return (
     <div className={styles.pagerRow}>
-      <Pagination page={page} pageCount={pageCount} onPageChange={onPage} range={{ total, first: total === 0 ? 0 : (page - 1) * size + 1, last: Math.min(total, page * size) }} />
+      <Pagination page={state.page} pageCount={state.pageCount} onPageChange={onPage} range={{ total: state.total, first: state.first, last: state.last }} />
     </div>
   )
 }
@@ -327,9 +342,9 @@ function AutoTab(props: NenCampaignsListProps & { canEdit: boolean; autoSettings
       // 今月多く送った順（絵の並び）。同じ数は名前順。
       .sort((a, b) => (sentByKey.get(b.campaignKey) ?? 0) - (sentByKey.get(a.campaignKey) ?? 0) || a.label.localeCompare(b.label, 'ja'))
   }, [autoSettings, pausedOnly, filter, saved, query, sentByKey])
-  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
-  const safePage = Math.min(page, pageCount)
-  const rows = visible.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const pagination = paginateState(visible.length, page, pageSize)
+  const safePage = pagination.page
+  const rows = visible.slice((safePage - 1) * pagination.size, safePage * pagination.size)
   const filtering = query !== '' || filter !== '' || saved !== ''
   const monthLabel = kpis?.monthLabel ?? ''
 
@@ -661,9 +676,9 @@ function ColumnsTab(props: NenCampaignsListProps & { canEdit: boolean }) {
       return true
     })
   }, [columns, filter, category, topCategory, query])
-  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
-  const safePage = Math.min(page, pageCount)
-  const rows = visible.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const pagination = paginateState(visible.length, page, pageSize)
+  const safePage = pagination.page
+  const rows = visible.slice((safePage - 1) * pagination.size, safePage * pagination.size)
   const filtering = query !== '' || filter !== '' || category !== ''
 
   const menuFor = (column: NenColumn): ActionMenuItem[] => canEdit ? [

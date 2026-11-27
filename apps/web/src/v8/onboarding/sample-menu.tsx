@@ -14,7 +14,7 @@ import type { StarterButton } from './use-starter-menu'
  * 2 列 × 2 段のボタン。保存済みの画像・座標があるときは、その内容を表示する。
  */
 
-export function SampleMenuTiles({ style, buttons, selected, warned = [], onSelect, size = 'panel', label, imageUrl, imageHeight=1686 }: {
+export function SampleMenuTiles({ style, buttons, selected, warned = [], onSelect, size = 'panel', label, imageUrl: rawImageUrl, imageHeight: rawImageHeight=1686 }: {
   imageUrl?:string|null
   imageHeight?:number
   style: AccountStyle
@@ -29,16 +29,19 @@ export function SampleMenuTiles({ style, buttons, selected, warned = [], onSelec
 }) {
   const menu = sampleMenuFor(style)
   const tiles:Array<StarterButton & {icon:string}> = buttons ? buttons.map(button => ({ ...button, icon: menu.tiles.find(tile => tile.feature === button.feature)?.icon ?? 'file' })) : menu.tiles
-  const initial=imageUrl!==null&&tiles.length===4&&tiles.every((tile,index)=>tile.label===INITIAL_MENUS[style].buttons[index]!.label)
+  const imageUrl = typeof rawImageUrl === 'string' && rawImageUrl.trim() ? rawImageUrl.trim() : null
+  const imageHeight = Number.isFinite(rawImageHeight) && rawImageHeight > 0 ? rawImageHeight : 1686
+  const initial=rawImageUrl!==null&&tiles.length===4&&tiles.every((tile,index)=>tile.label===INITIAL_MENUS[style].buttons[index]!.label)
   const tone = { '--sample-bg': menu.tone.bg, '--sample-ink': menu.tone.ink } as CSSProperties
   return (
-    <div className={styles.grid} data-size={size} style={{...tone,...(imageUrl||initial?{backgroundImage:`url(${imageUrl??initialMenuImageDataUri(style)})`,aspectRatio:`2500 / ${imageHeight}`}:{})}} data-initial={initial||undefined} data-image={imageUrl?true:undefined} role={onSelect ? 'group' : undefined} aria-label={label ?? '見本のリッチメニュー'}>
+    <div className={styles.grid} data-size={size} style={{...tone,...(imageUrl||initial?{backgroundImage:`url(${JSON.stringify(imageUrl??initialMenuImageDataUri(style))})`,aspectRatio:`2500 / ${imageHeight}`}:{})}} data-initial={initial||undefined} data-image={imageUrl?true:undefined} role={onSelect ? 'group' : undefined} aria-label={label ?? '見本のリッチメニュー'}>
       {tiles.map((tile, index) => {
         const body = <><SetupIcon name={tile.icon} className={styles.icon} /><span className={styles.label}>{tile.label}</span></>
+        const tileKey = `${tile.feature}-${index}`
         return onSelect ? (
-          <button key={tile.label} type="button" className={styles.tile} style={imageUrl&&tile.bounds?{position:'absolute',left:`${tile.bounds.x/25}%`,top:`${tile.bounds.y/imageHeight*100}%`,width:`${tile.bounds.width/25}%`,height:`${tile.bounds.height/imageHeight*100}%`}:undefined} data-selected={selected === index || undefined} data-warned={warned.includes(tile.feature) || undefined} onClick={() => onSelect(index)} aria-label={tile.label}>{(initial||imageUrl)?<span className="sr-only">{tile.label}</span>:body}</button>
+          <button key={tileKey} type="button" className={styles.tile} style={imageUrl&&tile.bounds?{position:'absolute',left:`${tile.bounds.x/25}%`,top:`${tile.bounds.y/imageHeight*100}%`,width:`${tile.bounds.width/25}%`,height:`${tile.bounds.height/imageHeight*100}%`}:undefined} data-selected={selected === index || undefined} data-warned={warned.includes(tile.feature) || undefined} onClick={() => onSelect(index)} aria-label={tile.label}>{(initial||imageUrl)?<span className="sr-only">{tile.label}</span>:body}</button>
         ) : (
-          <span key={tile.label} className={styles.tile} style={imageUrl&&tile.bounds?{position:'absolute',left:`${tile.bounds.x/25}%`,top:`${tile.bounds.y/imageHeight*100}%`,width:`${tile.bounds.width/25}%`,height:`${tile.bounds.height/imageHeight*100}%`}:undefined} data-selected={selected === index || undefined}>{(initial||imageUrl)?<span className="sr-only">{tile.label}</span>:body}</span>
+          <span key={tileKey} className={styles.tile} style={imageUrl&&tile.bounds?{position:'absolute',left:`${tile.bounds.x/25}%`,top:`${tile.bounds.y/imageHeight*100}%`,width:`${tile.bounds.width/25}%`,height:`${tile.bounds.height/imageHeight*100}%`}:undefined} data-selected={selected === index || undefined}>{(initial||imageUrl)?<span className="sr-only">{tile.label}</span>:body}</span>
         )
       })}
     </div>

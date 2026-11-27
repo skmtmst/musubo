@@ -30,6 +30,7 @@ export function useAiSettings(accountId: string | null) {
     try {
       const res = await aiReplyApi.settings(accountId)
       if (mine !== generation.current || accountScope.current !== scope) return
+      if (!res?.success || !res.data || !['off', 'draft_only', 'auto_qa', 'suspended'].includes(res.data.mode)) throw new Error('invalid_ai_mode')
       setSettings(res.data)
       setStatus('ready')
       setLoadedScope(scope)

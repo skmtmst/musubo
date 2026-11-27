@@ -33,6 +33,7 @@ export default function EventDone() {
 
   const isWaitlisted = status === 'waitlisted';
   const isPending = status === 'requested';
+  const isConfirmed = status === 'confirmed';
 
   // 箱の「イベント」の行に出す名前。読めなければ行ごと出さない。
   const [eventName, setEventName] = useState<string | null>(null);
@@ -91,11 +92,13 @@ export default function EventDone() {
     }
   }
 
-  const title = isWaitlisted ? 'キャンセル待ちに入りました' : isPending ? '受付しました' : '申し込みが確定しました';
+  const title = isWaitlisted ? 'キャンセル待ちに入りました' : isPending ? '受付しました' : isConfirmed ? '申し込みが確定しました' : '申し込みの状態を確認してください';
   const body = isWaitlisted
     ? 'いまは満席です。空きが出たら、LINEでお知らせします。お知らせから24時間以内に「この席を取る」を押すと予約になります。'
     : isPending
       ? `${words.contact}の確認をお待ちください。確定すると LINE でお知らせします。`
+      : !isConfirmed
+        ? '自分のイベントから申し込みの状態を確認してください。'
       : startsAt
         ? `${formatJstEventAt(startsAt)}にお待ちしています。\n前日に LINE でお知らせします。`
         : '予約が確定しました。LINE で詳細をお送りしました。';
@@ -112,7 +115,7 @@ export default function EventDone() {
           <StatusView
             large
             icon={isWaitlisted || isPending ? 'hourglass' : 'calendar'}
-            tone={isWaitlisted || isPending ? 'wait' : 'success'}
+            tone={isConfirmed ? 'success' : 'wait'}
             title={title}
             body={body}
           >

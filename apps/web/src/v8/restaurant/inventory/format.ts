@@ -35,8 +35,8 @@ export function formatTime(value: string | null | undefined, timezone?: string):
 
 /** 「見本 30」→「見本さん」 */
 export function sanName(name: string | null | undefined): string {
-  if (!name) return 'ほかの担当者'
-  return `${name.split(/\s+/)[0]}さん`
+  const first = name?.trim().split(/\s+/)[0]
+  return first ? `${first}さん` : 'ほかの担当者'
 }
 
 const SEAT_ORDER: Record<string, number> = { private_room: 0, table: 1, counter: 2, terrace: 3 }
@@ -50,25 +50,26 @@ export function tableOrder(a: RestaurantTable, b: RestaurantTable): number {
  * 同じ頭の連番が3つ以上続くときは「T1〜T4」と縮める（2つまでは「T3・T4」）。
  */
 export function joinTableCodes(tables: RestaurantTable[]): string {
-  const sorted = [...tables].sort(tableOrder)
+  const sorted = tables.filter((table) => table.code.trim().length > 0).sort(tableOrder)
   const parts: string[] = []
   let i = 0
   while (i < sorted.length) {
-    const head = /^(.*?)(\d+)$/.exec(sorted[i].code)
+    const firstCode = sorted[i].code.trim()
+    const head = /^(.*?)(\d+)$/.exec(firstCode)
     let j = i
     if (head) {
       while (j + 1 < sorted.length) {
-        const next = /^(.*?)(\d+)$/.exec(sorted[j + 1].code)
-        const cur = /^(.*?)(\d+)$/.exec(sorted[j].code)
+        const next = /^(.*?)(\d+)$/.exec(sorted[j + 1].code.trim())
+        const cur = /^(.*?)(\d+)$/.exec(sorted[j].code.trim())
         if (!next || !cur || next[1] !== head[1] || Number(next[2]) !== Number(cur[2]) + 1) break
         j += 1
       }
     }
     if (j - i >= 2) {
-      parts.push(`${sorted[i].code}〜${sorted[j].code}`)
+      parts.push(`${firstCode}〜${sorted[j].code.trim()}`)
       i = j + 1
     } else {
-      parts.push(sorted[i].code)
+      parts.push(firstCode)
       i += 1
     }
   }

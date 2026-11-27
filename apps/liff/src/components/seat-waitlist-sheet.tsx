@@ -17,6 +17,10 @@ export default function SeatWaitlistSheet({ storeId, storeName, startsAt, guestC
     let live = true;
     setEntryId(undefined); setError(null);
     api.seatWaitlists().then(result => {
+      if (!result || !Array.isArray(result.waitlist) || !result.waitlist.every(row => row &&
+        ['waiting', 'invited', 'converted', 'cancelled', 'finished'].includes(row.status))) {
+        throw new Error('Invalid seat waitlist response');
+      }
       if (live) setEntryId(result.waitlist.find(row => row.store_id === storeId && Date.parse(row.starts_at) === Date.parse(startsAt) && row.guest_count === guestCount && (row.status === 'waiting' || row.status === 'invited'))?.id ?? null);
     }).catch(() => { if (live) setError('待ちの情報を読み込めませんでした。もう一度お試しください。'); });
     return () => { live = false; };
@@ -29,6 +33,10 @@ export default function SeatWaitlistSheet({ storeId, storeName, startsAt, guestC
         await api.cancelSeatWaitlist(entryId); setEntryId(null); setMessage('取り消しました。');
       } else {
         const result = await api.registerSeatWaitlist({ store_id: storeId, starts_at: startsAt, guest_count: guestCount });
+        if (!result || typeof result.id !== 'string' || !result.id.trim()) {
+          setEntryId(undefined); setError('登録結果を確認できませんでした。もう一度読み込んでください。');
+          return;
+        }
         setEntryId(result.id); setMessage('登録しました。空いたらLINEで知らせます。');
       }
     } catch (cause) {

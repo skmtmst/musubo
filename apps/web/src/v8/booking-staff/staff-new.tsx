@@ -135,7 +135,12 @@ export default function StaffNewV8() {
       .list()
       .then((res) => {
         if (!alive) return
-        if (res.success) setMembers(res.data.filter((m) => m.isActive))
+        if (!res.success) {
+          setMembersError(new Error(res.error || 'ログインユーザーを読み込めませんでした'))
+          setMembersLoading(false)
+          return
+        }
+        setMembers(res.data.filter((m) => m.isActive))
         setMembersError(null)
         setMembersLoading(false)
       })
@@ -151,7 +156,10 @@ export default function StaffNewV8() {
 
   /* 見本の取得失敗と空を分ける。登録中の入力は残して読み直す。 */
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setStaffPreviewLoading(false)
+      return
+    }
     let alive = true
     setStaffPreviewError(false)
     setStaffPreviewLoading(true)

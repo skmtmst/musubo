@@ -325,7 +325,8 @@ describe('下書きの任意の保存直前確認', () => {
     expect(get).toHaveBeenCalledTimes(1)
     expect(save).not.toHaveBeenCalled(); expect(del).not.toHaveBeenCalled()
     expect(localStorage.getItem(LEGACY)).toBe(raw)
-    expect(hook?.pending?.value).toBe('ブラウザの下書き')
+    expect(hook?.pending).toBeNull()
+    expect(hook?.loadFailed).toBe(true)
   })
 
   it('GET中に拒否と許可を挟んでも古い移行を再開しない', async () => {

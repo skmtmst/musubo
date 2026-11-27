@@ -5,7 +5,7 @@
  * 口は既存の applicationPreview。APIが見本として返した情報を表示する。
  * 見本を作るだけで、申し込みや公開はしない。
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { EventApplicationPreview } from '@line-crm/shared'
 import { eventsApi, type EventDetail } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -32,23 +32,47 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
   const [data, setData] = useState<EventApplicationPreview | null>(null)
   const [error, setError] = useState('')
   const generation = useRef(0)
+  const scope = JSON.stringify([accountId, draft, date, startTime, endTime, capacity])
+  const currentScope = useRef(scope)
+  currentScope.current = scope
+  const [openedScope, setOpenedScope] = useState(scope)
+
+  useEffect(() => {
+    setOpen(false)
+    return () => { generation.current += 1 }
+  }, [scope])
 
   async function load() {
     const seq = ++generation.current
+    const requestScope = scope
+    const current = () => seq === generation.current && requestScope === currentScope.current
+    setOpenedScope(requestScope)
     setOpen(true)
     setBusy(true)
     setError('')
     setData(null)
+    if (capacity.trim() !== '' && (!Number.isSafeInteger(Number(capacity)) || Number(capacity) < 1)) {
+      setError('定員は1以上の整数で入力してください。')
+      setBusy(false)
+      return
+    }
     try {
       const result = await eventsApi.applicationPreview(accountId, {
         ...draft,
         slot: { starts_at: jstToUtcIso(date, startTime), ends_at: jstToUtcIso(date, endTime), capacity: Number(capacity) || 1 },
       })
-      if (seq === generation.current) setData(result)
+      if (!result || typeof result.name !== 'string' || typeof result.startsAt !== 'string' || typeof result.endsAt !== 'string'
+        || typeof result.capacity !== 'number' || !Number.isFinite(result.capacity) || typeof result.requiresApproval !== 'boolean'
+        || !Array.isArray(result.questions) || result.questions.some((q) => !q || typeof q.id !== 'string' || typeof q.label !== 'string' || typeof q.required !== 'boolean')
+        || [result.venueName, result.venueUrl, result.venueAddress, result.description].some((value) => value != null && typeof value !== 'string')) {
+        if (current()) setError('見本の内容を確認できませんでした。もう一度お試しください。')
+        return
+      }
+      if (current()) setData(result)
     } catch {
-      if (seq === generation.current) setError('見本を開けませんでした。入力を確かめて、もう一度お試しください。')
+      if (current()) setError('見本を開けませんでした。入力を確かめて、もう一度お試しください。')
     } finally {
-      if (seq === generation.current) setBusy(false)
+      if (current()) setBusy(false)
     }
   }
   const close = () => {
@@ -59,7 +83,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
   return (
     <div className={styles.linkRow}>
       <Button variant="text" onClick={() => void load()}>プレビューを開く →</Button>
-      <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} >
+      <Dialog open={open && openedScope === scope} title="お客さまの申込ページの見本" onCancel={close} >
         {busy ? <ListState kind="loading" /> : error ? (
           <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : data ? (
@@ -71,7 +95,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
               : data.venueName}</p> : null}
             {data.venueAddress ? <p>{data.venueAddress}</p> : null}
             {data.description ? <p className={styles.previewText}>{data.description}</p> : null}
-            <p>残り {data.capacity} 席</p>
+            <p>{capacity.trim() === '' ? '定員なし' : `残り ${data.capacity} 席`}</p>
             {data.questions.map((question) => (
               <Field key={question.id} label={question.label} required={question.required}><TextField disabled aria-label={question.label} /></Field>
             ))}

@@ -6,6 +6,7 @@
  * 失敗は理由と［もう一度試す］。送っている間は × を押せない。
  */
 import { FileText, Film, RotateCw, X } from 'lucide-react'
+import { useRef } from 'react'
 import { formatSize } from './attachments'
 import styles from './inbox-chat.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -30,6 +31,12 @@ export default function AttachmentChip({
   onRemove: () => void
   onRetry: () => void
 }) {
+  const retrying = useRef(false)
+  const retry = () => {
+    if (busy || retrying.current) return
+    retrying.current = true
+    try { onRetry() } finally { queueMicrotask(() => { retrying.current = false }) }
+  }
   const Icon = item.kind === 'video' ? Film : FileText
   const sub = item.status === 'uploading'
     ? `${formatSize(item.size)}・準備しています…`
@@ -53,7 +60,7 @@ export default function AttachmentChip({
         </span>
       </span>
       {item.status === 'failed' ? (
-        <button type="button" className={styles.attachChipRetry} onClick={onRetry}>
+        <button type="button" className={styles.attachChipRetry} disabled={busy} onClick={retry}>
           <RotateCw aria-hidden className={styles.attachChipRetryIcon} />
           もう一度試す
         </button>

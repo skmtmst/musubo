@@ -26,31 +26,42 @@ export default function StyleSettingDemo({ style }: { style: AccountStyle }) {
   const reduced = useReducedMotion()
   const inView = useInView(root)
   const visible = useTabVisible()
-  const [step, setStep] = useState(0)
+  const [step, setStep] = useState(() => (reduced ? example.steps.length - 1 : 0))
   const [paused, setPaused] = useState(false)
+  const [seenStyle, setSeenStyle] = useState(style)
   const [seenReduced, setSeenReduced] = useState(reduced)
-  if (seenReduced !== reduced) { setSeenReduced(reduced); if (reduced) setStep(example.steps.length - 1) }
+  if (seenStyle !== style || seenReduced !== reduced) {
+    const styleChanged = seenStyle !== style
+    if (styleChanged) {
+      setSeenStyle(style)
+      setPaused(false)
+    }
+    if (seenReduced !== reduced) setSeenReduced(reduced)
+    if (reduced) setStep(example.steps.length - 1)
+    else if (styleChanged) setStep(0)
+  }
+  const safeStep = Math.min(step, example.steps.length - 1)
   useEffect(() => {
     if (reduced || !inView || !visible || paused) return
     const timer = window.setTimeout(() => { setStep(current => (current + 1) % example.steps.length) }, 2800)
     return () => window.clearTimeout(timer)
-  }, [step, paused, reduced, inView, visible, example.steps.length])
+  }, [safeStep, paused, reduced, inView, visible, example.steps.length])
 
-  const editing = step >= 2
-  const saving = step === example.steps.length - 1
+  const editing = safeStep >= 2
+  const saving = safeStep === example.steps.length - 1
   return <section ref={root} className={styles.root} aria-label="設定操作の見本">
     <p className={styles.note}>画面と操作の見本です。実際の入力や保存は行いません。{style === 'lesson' ? '保存にはほかの項目も入力します。' : ''}</p>
-    <div className={styles.toolbar}><strong>{example.steps[step]}</strong>{!reduced && <Button onClick={() => setPaused(value => !value)}>{paused ? '再生する' : '止める'}</Button>}</div>
-    <progress className={styles.progress} aria-label="操作の進み" value={step + 1} max={example.steps.length} />
+    <div className={styles.toolbar}><strong>{example.steps[safeStep]}</strong>{!reduced && <Button onClick={() => setPaused(value => !value)}>{paused ? '再生する' : '止める'}</Button>}</div>
+    <progress className={styles.progress} aria-label="操作の進み" value={safeStep + 1} max={example.steps.length} />
     <Card layout="vertical" padding="compact">
     <Card surface="muted" layout="vertical" padding="default" gap="normal">
       <div className={styles.canvas} aria-hidden="true" inert>
-        <aside className={styles.sidebar}><strong>musubo</strong><div><LayoutDashboard size={15} /> ダッシュボード</div>{style !== 'standard' && style !== 'ec' && <div><CalendarDays size={15} /> 予約</div>}<div><Users size={15} /> 友だち</div><div className={`${styles.menuItem} ${step === 0 ? styles.active : ''}`}>{example.area}{step === 0 && <Hand className={styles.hand} size={22} />}</div></aside>
-        <div className={styles.screen}><header className={styles.screenHead}><div><small>設定</small><h4>{example.area}</h4></div><div className={step === 1 ? styles.active : ''}><Button variant="primary">{example.open}</Button>{step === 1 && <Hand className={styles.hand} size={22} />}</div></header>
+        <aside className={styles.sidebar}><strong>musubo</strong><div><LayoutDashboard size={15} /> ダッシュボード</div>{style !== 'standard' && style !== 'ec' && <div><CalendarDays size={15} /> 予約</div>}<div><Users size={15} /> 友だち</div><div className={`${styles.menuItem} ${safeStep === 0 ? styles.active : ''}`}>{example.area}{safeStep === 0 && <Hand className={styles.hand} size={22} />}</div></aside>
+        <div className={styles.screen}><header className={styles.screenHead}><div><small>設定</small><h4>{example.area}</h4></div><div className={safeStep === 1 ? styles.active : ''}><Button variant="primary">{example.open}</Button>{safeStep === 1 && <Hand className={styles.hand} size={22} />}</div></header>
           <div className={styles.board}><strong>{example.area}</strong><p>設定した内容をここで確認できます。</p>
           {editing && <div className={styles.form}><strong>{style === 'restaurant' ? '新しい卓' : style === 'lesson' ? 'イベントを作る' : (style === 'ec' || style === 'standard') ? 'タグを作る' : '予約メニューを直す'}</strong>
-            {style === 'restaurant' && <div className={step === 2 ? styles.active : ''}><Field label="卓番" required><TextInput value="1" readOnly /></Field>{step === 2 && <Hand className={styles.hand} size={22} />}</div>}
-            <div className={!saving && (style !== 'restaurant' || step === 3) ? styles.active : ''}><Field label={example.field} required><TextInput value={step >= (style === 'restaurant' ? 3 : 2) ? example.value : ''} readOnly /></Field>{!saving && (style !== 'restaurant' || step === 3) && <Hand className={styles.hand} size={22} />}</div>
+            {style === 'restaurant' && <div className={safeStep === 2 ? styles.active : ''}><Field label="卓番" required><TextInput value="1" readOnly /></Field>{safeStep === 2 && <Hand className={styles.hand} size={22} />}</div>}
+            <div className={!saving && (style !== 'restaurant' || safeStep === 3) ? styles.active : ''}><Field label={example.field} required><TextInput value={safeStep >= (style === 'restaurant' ? 3 : 2) ? example.value : ''} readOnly /></Field>{!saving && (style !== 'restaurant' || safeStep === 3) && <Hand className={styles.hand} size={22} />}</div>
             <div className={`${styles.buttonTarget} ${saving ? styles.active : ''}`}><Button variant="primary">{example.save}</Button>{saving && <Hand className={styles.hand} size={22} />}</div>
           </div>}
           </div>

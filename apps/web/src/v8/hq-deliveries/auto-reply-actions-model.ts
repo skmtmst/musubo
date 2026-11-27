@@ -40,5 +40,5 @@ export function actionResourceIds(action: HqSavedAction): string[] {
   return action.actionType === 'scenario' && typeof action.config.scenarioId === 'string' ? [action.config.scenarioId] : []
 }
 export function selectableAction(action: unknown): action is HqSavedAction {
-  return object(action) && object(action.config) && (action.actionType === 'tag' || (action.actionType === 'scenario' && action.config.op === 'start'))
+  return object(action) && object(action.config) && (action.onFailure === undefined || action.onFailure === 'stop' || action.onFailure === 'continue') && ((action.actionType === 'tag' && (action.config.op === undefined || action.config.op === 'add' || action.config.op === 'remove')) || (action.actionType === 'scenario' && action.config.op === 'start'))
 }

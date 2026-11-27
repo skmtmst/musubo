@@ -37,7 +37,7 @@ export default function StaffAssetList({ kind }: { kind: BroadcastAssetKind }) {
     try {
       const res = await api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined, kind })
       if (!gate.current(token)) return
-      if (!res.success) {
+      if (!res?.success || !Array.isArray(res.data)) {
         setState('error')
         return
       }

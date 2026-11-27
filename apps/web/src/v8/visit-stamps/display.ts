@@ -159,9 +159,9 @@ export function historyRows(entries: VisitStampEntry[], name: (id: string) => st
     .sort((a, b) => b.at.localeCompare(a.at))
 }
 
-const KIND_LABEL: Record<string, string> = {
+const KIND_LABEL: Record<string, string> = Object.assign(Object.create(null), {
   visit: '来店', manual: '店で手入力', paper: '紙のカードから移行', redeem: '特典を使った', restore: '取り消しを戻した', expire: '期限切れ',
-}
+})
 
 /** 手入力の理由。紙のカードからのものは台帳で「紙」として残す（source: paper）。 */
 export const MANUAL_REASONS = [

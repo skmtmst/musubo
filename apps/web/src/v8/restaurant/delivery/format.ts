@@ -22,9 +22,9 @@ export const DASH = '—'
  * 取り込み元によって `#` が付く相手と付かない相手がいるので、ここでそろえる（`##` を出さない）。
  */
 export function formatOrderNumber(value: string | null | undefined): string {
-  const text = (value ?? '').trim()
+  const text = (value ?? '').trim().replace(/^#+/, '').trim()
   if (!text) return DASH
-  return text.startsWith('#') ? text : `#${text}`
+  return `#${text}`
 }
 
 /* 相手ごとの色（絵のとおり Uber Eats は緑・出前館は赤・ロケットナウは青）。 */
@@ -34,10 +34,21 @@ export const SERVICE_TONES: Record<DeliveryService, StatusBadgeTone> = {
   rocketnow: 'info',
 }
 
+function parseStoreDate(value: string | null | undefined): Date | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  // SQLite のオフセットなし日時は UTC。端末の時間帯に左右されないよう補う。
+  const normalized = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmed) && !/Z$|[+-]\d{2}:?\d{2}$/i.test(trimmed)
+    ? `${trimmed.replace(' ', 'T')}Z`
+    : trimmed
+  const date = new Date(normalized)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 function parts(value: string | null | undefined) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
+  const date = parseStoreDate(value)
+  if (!date) return null
   const map = Object.fromEntries(
     new Intl.DateTimeFormat('ja-JP', {
       timeZone: STORE_TIME_ZONE,
@@ -51,11 +62,12 @@ function parts(value: string | null | undefined) {
       .formatToParts(date)
       .map((part) => [part.type, part.value]),
   )
+  const rawHour = (map.hour ?? '').padStart(2, '0')
   return {
     y: map.year,
     m: Number(map.month),
     d: Number(map.day),
-    hh: (map.hour ?? '').padStart(2, '0'),
+    hh: rawHour === '24' ? '00' : rawHour,
     mm: (map.minute ?? '').padStart(2, '0'),
   }
 }
@@ -80,6 +92,7 @@ export function formatDetailStamp(value: string | null | undefined, now?: string
  * 注文履歴の日付欄の初めの値と「本日」の出し分けに使う。端末の時間帯では数えない。
  */
 export function storeToday(nowMs?: number): string {
+  if (nowMs !== undefined && !Number.isFinite(nowMs)) return ''
   const date = nowMs === undefined ? new Date() : new Date(nowMs)
   const map = Object.fromEntries(
     new Intl.DateTimeFormat('ja-JP', {
@@ -105,9 +118,9 @@ export function formatElapsed(
   receivedAt: string | null | undefined,
   nowMs: number,
 ): string {
-  if (!receivedAt) return DASH
-  const received = new Date(receivedAt).getTime()
-  if (Number.isNaN(received)) return DASH
+  if (!Number.isFinite(nowMs)) return DASH
+  const received = parseStoreDate(receivedAt)?.getTime()
+  if (received === undefined) return DASH
   const minutes = Math.max(0, Math.floor((nowMs - received) / 60000))
   // 23：長い経過は日に直す（共通の日・時間・分）。短い表示は今までどおり。
   return formatDurationMinutes(minutes)

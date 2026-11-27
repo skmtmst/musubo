@@ -47,7 +47,11 @@ export function conflictMessage(code: 'idempotency_content_mismatch' | 'idempote
 
 export function decideFormSubmitStep(attempt: FormSubmitAttempt): FormSubmitDecision {
   const { status, body } = attempt;
-  if (status === 200 || status === 201) return { action: 'done' };
+  if (status === 200 || status === 201) {
+    if (body?.success !== true) return { action: 'fail', message: '送信結果を確認できませんでした。' };
+    if (body.data?.complete === false) return { action: 'fail', message: FORM_SUBMIT_INCOMPLETE_MESSAGE };
+    return { action: 'done' };
+  }
   if (status === 202) {
     if (body?.retryable) return { action: 'poll-same' };
     return { action: 'fail', message: FORM_SUBMIT_INCOMPLETE_MESSAGE };

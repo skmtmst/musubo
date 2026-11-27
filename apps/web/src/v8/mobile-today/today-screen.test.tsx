@@ -128,3 +128,30 @@ it('取得中に権限を失うと、遅れて返った予約は表示しない'
  await act(async () => { complete({ timeline: [row] }) })
  expect(screen.queryByText('見本 太郎')).toBeNull()
 })
+
+it('店舗の所属が不正なら店舗なしと決めつけず、読み直せる', async () => {
+ fixture.style = 'restaurant'
+ fixture.listStores.mockResolvedValueOnce({ success: true, data: { stores: [{ id: 's1', name: '本店', status: 'active' }] } }).mockResolvedValueOnce({ success: true, data: { stores: [] } })
+ render(<MobileTodayScreen />)
+ expect(await screen.findByText('今日の予約を読み込めませんでした')).toBeTruthy()
+ expect(screen.queryByText('このアカウントの店舗はまだありません')).toBeNull()
+ fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
+ expect(await screen.findByText('このアカウントの店舗はまだありません')).toBeTruthy()
+})
+
+it('アカウント未所属の店舗はこれまでどおり対象外にする', async () => {
+ fixture.style = 'restaurant'
+ fixture.listStores.mockResolvedValue({ success: true, data: { stores: [{ id: 's1', name: '未所属', line_account_id: null, status: 'active' }] } })
+ render(<MobileTodayScreen />)
+ expect(await screen.findByText('このアカウントの店舗はまだありません')).toBeTruthy()
+ expect(fixture.reservationsDay).not.toHaveBeenCalled()
+})
+
+it('知らない種類の予約を担当者の予約として表示しない', async () => {
+ fixture.getToday.mockResolvedValueOnce({ timeline: [{ ...row, kind: 'unknown' }] }).mockResolvedValueOnce({ timeline: [row] })
+ render(<MobileTodayScreen />)
+ expect(await screen.findByText('今日の予約を読み込めませんでした')).toBeTruthy()
+ expect(screen.queryByText('見本 太郎')).toBeNull()
+ fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
+ expect(await screen.findByText('見本 太郎')).toBeTruthy()
+})

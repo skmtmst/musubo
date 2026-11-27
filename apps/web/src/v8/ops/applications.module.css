@@ -25,7 +25,7 @@
 .filters button { height: var(--ap-filter-h); padding: 0 calc(var(--space-16) + 1px); border: 1px solid var(--ap-chip-line); border-radius: var(--ap-filter-radius); background: white; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; cursor: pointer; }
 .filters button[data-active] { border-color: var(--ap-brand); background: var(--ap-ok-bg); color: var(--color-success); }
 .tableScroll { overflow-x: auto; }
-.tableScroll table { width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-body); }
+.tableScroll table { table-layout: fixed; width: 100%; border-collapse: collapse; text-align: left; font-size: var(--text-body); }
 .tableScroll th { height: var(--ap-head-h); border-bottom: 1px solid var(--ap-line); color: var(--ap-muted); font-size: var(--text-caption); font-weight: 700; }
 .tableScroll th:nth-child(1) { width: 24%; } .tableScroll th:nth-child(2) { width: 11%; } .tableScroll th:nth-child(3) { width: 25%; } .tableScroll th:nth-child(4) { width: 15%; } .tableScroll th:nth-child(5) { width: 15%; }
 .tableScroll td { height: var(--ap-cell-h); padding-right: var(--space-12); border-bottom: 1px solid var(--ap-line); vertical-align: middle; overflow-wrap: anywhere; }

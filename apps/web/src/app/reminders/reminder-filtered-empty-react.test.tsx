@@ -13,6 +13,9 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
+const role = vi.hoisted(() => ({ value: 'owner' }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...(await original<typeof import('@/lib/staff-role')>()), useStaffRole: () => role.value }))
+vi.mock('@/lib/use-feature-access', () => ({ useFeatureAccess: () => role.value !== 'viewer' }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -43,6 +46,8 @@ vi.mock('@/components/shared/list-kpis', () => ({
 }))
 
 import RemindersPage from './page'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -64,6 +69,7 @@ function listCalls() {
 }
 
 beforeEach(() => {
+  role.value = 'owner'
   calls.length = 0
   fetchApi.mockImplementation(async (url: string) => {
     calls.push(url)
@@ -82,6 +88,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  forgetStaffIdentity()
   act(() => root.unmount())
   host.remove()
 })
@@ -141,4 +148,33 @@ describe('リマインダ一覧の絞り込み0件 (#635)', () => {
     expect(listCalls().at(-1)).not.toContain('q=')
     expect(host.textContent).toContain('予約前のお知らせ')
   })
+})
+
+it('登録が0件なら未作成の案内を表示する', async () => {
+  fetchApi.mockImplementation(async (url: string) => {
+    if (url.startsWith('/api/folders')) return { success: true, data: [], unfiledCount: 0 }
+    return { success: true, data: { items: [], total: 0, limit: 20, sort: [] } }
+  })
+  await act(async () => { root.render(<RemindersPage />) }); await flush()
+  expect(host.textContent).toContain('まだリマインダがありません')
+  expect(host.textContent).not.toContain('条件に合うものがありません')
+  expect(host.textContent).not.toContain('リマインダを読み込めませんでした')
+})
+
+
+it('読み込みが続く間はスケルトンを表示する', async () => {
+  fetchApi.mockImplementation(() => new Promise(() => {}))
+  await act(async () => { root.render(<RemindersPage />) }); await flush()
+  expect(host.querySelector('[data-skeleton]')).not.toBeNull()
+  expect(host.textContent).not.toContain('まだリマインダがありません')
+})
+
+it('閲覧のみの人には閲覧中の案内を表示する', async () => {
+  rememberStaffIdentity({ role: 'owner' } as StaffMember)
+  await act(async () => { root.render(<RemindersPage />) }); await flush()
+  expect(host.querySelector('[data-design-node="a5C1p"]')).toBeNull()
+  role.value = 'viewer'
+  rememberStaffIdentity({ role: 'viewer' } as StaffMember)
+  await act(async () => { root.render(<RemindersPage />) }); await flush()
+  expect(host.querySelector('[data-design-node="a5C1p"]')?.textContent).toContain('閲覧のみで見ています')
 })

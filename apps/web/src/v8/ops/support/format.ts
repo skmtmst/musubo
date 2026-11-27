@@ -1,6 +1,6 @@
 export function elapsedLabel(iso: string, now = Date.now()): string {
   const t = new Date(iso).getTime()
-  if (Number.isNaN(t)) return '—'
+  if (Number.isNaN(t) || !Number.isFinite(now)) return '—'
   const minutes = Math.max(0, Math.round((now - t) / 60000))
   if (minutes < 1) return 'たった今'
   if (minutes < 60) return `${minutes}分前`
@@ -22,8 +22,8 @@ export function durationLabel(minutes: number | null): string {
 
 /** 先月との比べ方。時間は短いほど良い、割合は高いほど良い。 */
 export function compareLabel(current: number | null, previous: number | null, kind: 'time' | 'rate'): string {
-  if (current === null) return '今月の記録なし'
-  if (previous === null || previous === 0) return '先月の記録なし'
+  if (current === null || !Number.isFinite(current)) return '今月の記録なし'
+  if (previous === null || !Number.isFinite(previous) || previous === 0 || (kind === 'time' && previous < 0)) return '先月の記録なし'
   const diff = kind === 'time' ? ((previous - current) / previous) * 100 : current - previous
   const rounded = Math.round(Math.abs(diff))
   if (Math.abs(diff) < 3) return '先月とほぼ同じ'

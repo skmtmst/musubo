@@ -174,7 +174,7 @@ export default function HealthV8({
   const pending = kpis === null && !kpiError
   const stats = accountId ? (
     <><KpiBand data-design="KPIs" aria-label="健康日記の数の帯">
-      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={16} aria-hidden="true" />} value={kpis?.petsWithRecords ?? null} unit="匹" loading={pending} detail={kpis ? `登録 ${kpis.petsTotal} 匹のうち` : pending ? '読み込んでいます' : undefined} />
+      <KpiCard presentation="band" title="記録のあるペット" icon={<History size={16} aria-hidden="true" />} value={kpis?.petsWithRecords ?? null} unit="匹" loading={pending} detail={kpis ? `登録 ${kpis.petsTotal} 匹のうち` : pending ? '読み込んでいます' : '読み込めませんでした'} />
       <KpiCard presentation="band" title="気になる変化" icon={<Activity size={16} aria-hidden="true" />} value={kpis?.concerning ?? null} unit="匹" loading={pending} detail="体重 ±10%（8週）など" />
       <KpiCard presentation="band" title="今週の記録" icon={<CalendarCheck size={16} aria-hidden="true" />} value={kpis?.recordsThisWeek ?? null} unit="件" loading={pending} detail="直近7日に付いた記録" />
       <KpiCard presentation="band" title="30日 記録なし" icon={<PawPrint size={16} aria-hidden="true" />} value={kpis?.silent30 ?? null} unit="匹" loading={pending} detail="声をかけられます" />
@@ -266,6 +266,7 @@ function HealthListV8({
       if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       setData(res.data)
+      onKpiError(false)
       onKpis(res.data.kpis)
       setStatus('ready')
     } catch (caught) {
@@ -351,7 +352,7 @@ function HealthListV8({
       {status === 'loading' && !data ? (
         <ListState kind="loading" title="健康日記を読み込んでいます" />
       ) : status === 'forbidden' ? (
-        <ListState kind="forbidden" />
+        <ListState kind="forbidden" onRetry={() => void load()} />
       ) : status === 'error' ? (
         <ListState kind="error" title="健康日記を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
       ) : data && data.items.length === 0 ? (

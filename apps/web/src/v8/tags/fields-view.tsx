@@ -1,4 +1,5 @@
 'use client'
+import { useEffect, useRef, useState } from 'react'
 import { DetailContent, DetailFields, DetailInlineEdit } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 
@@ -30,6 +31,12 @@ import FieldsTable from './fields-table'
 
 export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
   const { accountId, canEdit, host, explanation, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton, detailGuard } = model
+  const [savedNotice, setSavedNotice] = useState('')
+  useEffect(() => { setSavedNotice('') }, [accountId, activeField?.id])
+  const currentScope = useRef({ accountId, fieldId: activeField?.id })
+  currentScope.current = { accountId, fieldId: activeField?.id }
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const deleteLockedReason = usePermissionLockReason(canEdit)
   const table = <FieldsTable {...model} />
   const operationHelp = canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'
@@ -120,6 +127,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
     menuItems: [], primaryAllowed: canEdit, secondaryAllowed: canEdit }}
       >
 <DetailContent>
+        {savedNotice ? <Notice tone="success" role="status">{savedNotice}</Notice> : null}
         {activeField ? (
           <DetailFields>
             <div>
@@ -131,10 +139,14 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
                     maxLength={40}
                     disabled={!accountId || activeField.isInherited}
                     onSave={async (next) => {
+                      setSavedNotice('')
                       if (!accountId) throw new Error('no account')
                       const res = await api.friendFields.update(activeField.id, accountId, { name: next })
                       if (!res.success) throw new Error(res.error)
-                      void load()
+                      if (mounted.current && currentScope.current.accountId === accountId && currentScope.current.fieldId === activeField.id) {
+                        setSavedNotice('友だち情報欄の名前を保存しました。')
+                        void load()
+                      }
                     }}
                   />
               </dd>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -124,21 +124,67 @@ export function AllocationDialog({ scope, dateLabel, time, allocation, totalSeat
     : scope === 'day' ? `${dateLabel}の各枠に適用します。個別に変更した時間帯の配分はそのままです。`
       : `${dateLabel} ${time}の枠に適用します。`
   const label = scope === 'standard' ? '基本配分を保存' : scope === 'day' ? 'この日だけ保存' : 'この時間帯だけ保存'
-  const valid = validAllocation(totalSeats, allocation)
+  const [drafts, setDrafts] = useState<Partial<Record<keyof Alloc, string>>>({})
+  const prevAllocationRef = useRef(allocation)
+  useEffect(() => {
+    setDrafts({})
+  }, [scope, dateLabel, time])
+  useEffect(() => {
+    const prev = prevAllocationRef.current
+    prevAllocationRef.current = allocation
+    setDrafts((current) => {
+      let changed = false
+      const next = { ...current }
+      for (const [key] of dialogFields) {
+        if (!Object.is(prev[key], allocation[key]) && key in next) {
+          delete next[key]
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [allocation])
+  const hasIncompleteDraft = dialogFields.some(([key]) => drafts[key] !== undefined)
+  const valid = !hasIncompleteDraft && validAllocation(totalSeats, allocation)
+  const saveDisabledReason = reload
+    ? '最新の配分を確認してから保存してください。'
+    : !valid
+      ? 'すべての項目に0以上の整数を入力し、合計を総数以内にしてください。'
+      : undefined
   const allocationErrorId = useId()
   return (
     <Dialog open title={title} description={description} designWidth={560} designLayout="stacked" designMinHeight={407} onCancel={onClose} busy={busy}
       footer={<DialogActions align="center" layout="inline">
         <Button disabled={busy} onClick={onClose}>キャンセル</Button>
-        <Button variant="primary" disabled={!valid || Boolean(reload)} busy={busy} onClick={onSave}>{label}</Button>
+        <Button variant="primary" disabled={!valid || Boolean(reload)} disabledReason={saveDisabledReason} busy={busy} onClick={onSave}>{label}</Button>
       </DialogActions>}>
       <div className={styles.allocationDialogBody}>
         <div className={styles.totalLine}><p className={styles.totalValue}>1枠の総数 {totalSeats}席</p></div>
         <div className={styles.allocationFields}>
           {dialogFields.map(([key, label]) => <Field key={key} label={label} optional={false} labelWrap>
-            <NumberField aria-label={label} min={0} max={totalSeats} value={String(allocation[key])} unit="席" note={false}
+            <NumberField aria-label={label} min={0} max={totalSeats}
+              value={drafts[key] ?? (Number.isFinite(allocation[key]) ? String(allocation[key]) : '')} unit="席" note={false}
               aria-describedby={valid ? undefined : allocationErrorId}
-              invalid={!valid} disabled={busy} onChange={event => onChange({ ...allocation, [key]: Number(event.currentTarget.value) })} />
+              invalid={!valid} disabled={busy} onChange={event => {
+                const raw = event.currentTarget.value
+                const trimmed = raw.trim()
+                if (trimmed === '') {
+                  setDrafts((current) => ({ ...current, [key]: raw }))
+                  return
+                }
+                const parsed = Number(trimmed)
+                if (!Number.isFinite(parsed)) {
+                  setDrafts((current) => ({ ...current, [key]: raw }))
+                  return
+                }
+                setDrafts((current) => {
+                  if (!(key in current)) return current
+                  const next = { ...current }
+                  delete next[key]
+                  return next
+                })
+                onChange({ ...allocation, [key]: parsed })
+              }} />
           </Field>)}
           <div className={styles.allocField}>
             <span className={styles.allocLabel}>電話・店頭の取り置き</span>

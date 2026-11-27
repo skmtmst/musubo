@@ -62,6 +62,8 @@ export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defa
     /* タブの数（ページの数）。作った後はページの数、作る前は①で選んだ数。 */
     const slotCount = group ? pages.length : tabCount + 1
     const hasTabs = slotCount > 1
+    const tabValue = String(Math.max(0, Math.min(group ? pages.length - 1 : tabCount, MAX_TAB_PAGES - 1)))
+    const shapeLocked = locked || busy
 
     return (
       <>
@@ -95,8 +97,9 @@ export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defa
           <SaveErrorField names={["rich-menu-size","value","opt.value","size"]}><RadioCardGroup legend="大きさ" className="grid grid-cols-2 gap-3">
             {SIZE_OPTIONS.map((opt) => <RadioCard key={opt.value} name="rich-menu-size" value={opt.value}
               title={`${opt.label} ${opt.dims}`} note={opt.hint} icon={<opt.icon size={16} aria-hidden="true" />} checked={size === opt.value}
-              disabled={locked}
+              disabled={shapeLocked}
               onChange={() => {
+                if (shapeLocked) return
                 setSize(opt.value)
                 const first = V8_LAYOUT_KEYS[opt.value][0]
                 if (first) setTemplateKey(first)
@@ -110,8 +113,13 @@ export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defa
             <SaveErrorField names={["length","pages.length","tabCount","MAX_TAB_PAGES"]}><SegmentedControl
               aria-label="切替タブの数"
               options={TAB_COUNT_OPTIONS}
-              value={String(Math.min(group ? pages.length - 1 : tabCount, MAX_TAB_PAGES - 1))}
-              onChange={(v) => requestTabCount(Number(v))}
+              value={tabValue}
+              onChange={(v) => {
+                if (busy) return
+                const next = Number(v)
+                if (!Number.isInteger(next) || next < 0) return
+                requestTabCount(next)
+              }}
               disabled={busy}
             /></SaveErrorField>
             <span className={styles.segHint}>タブで別のメニューへ移れます</span>
@@ -152,12 +160,12 @@ export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defa
             <p className={styles.cardNote}>押せるところをいくつに分けるか。あとで区切り直せます</p>
           </div>
           <LayoutPicker
-            value={templateKey} onChange={setTemplateKey} disabled={locked}
+            value={templateKey} onChange={(next) => { if (!shapeLocked) setTemplateKey(next) }} disabled={shapeLocked}
             preview={size === 'compact' ? 'compact-menu' : 'menu'}
             options={shownLayouts.map((item) => ({
               value: item.key, label: V8_LAYOUT_LABEL[item.key] ?? item.label,
               areas: item.areas.map((area, index) => ({
-                label: String.fromCharCode(65 + index),
+                label: index < 26 ? String.fromCharCode(65 + index) : String(index + 1),
                 x: area.x / RICH_MENU_DIMENSIONS[size].width * 100,
                 y: area.y / RICH_MENU_DIMENSIONS[size].height * 100,
                 width: area.w / RICH_MENU_DIMENSIONS[size].width * 100,

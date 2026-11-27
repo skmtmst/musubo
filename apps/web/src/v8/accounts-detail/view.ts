@@ -119,12 +119,12 @@ export function skippedKindLabel(kind: string): string {
 }
 
 /** アーカイブできない理由（API の blockers）を、運用者の言葉で。 */
-export const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = {
+export const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = Object.assign(Object.create(null), {
   account_active: '送受信がまだ動いています。先に「送受信を止める」で止めてください',
   default_account: '既定のアカウントです。先にほかのアカウントを既定にしてください',
   delivery_job_running: '予約・送信中の配信があります。終わるか取り消してからアーカイブしてください',
   traffic_pool_member: 'アクセス振り分けの組に入っています。組から外してからアーカイブしてください',
-}
+})
 
 /** アーカイブを押せない理由。押せるなら null。 */
 export function archiveBlockedReason(account: AccountDetailView): string | null {

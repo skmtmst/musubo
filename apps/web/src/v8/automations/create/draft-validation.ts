@@ -1,4 +1,6 @@
 import type { ActionDraft } from './action-draft'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import { hasUnknownCondition, UNKNOWN_CONDITION_REASON } from './draft-conditions'
 import { b244Requirements } from './draft-model'
 import { normalizeFriendIds, normalizeWeekdays } from './trigger-helpers'
 import { parseAutomationWait } from '@line-crm/shared'
@@ -10,11 +12,12 @@ export interface AutomationInputProblem {
 }
 
 /** 下書きでは未選択のタグを残せるが、公開前には必ず選ぶ。 */
-export function validateAutomationInput({ name, eventType, triggerConfig, conditionUnreadable, actions, forPublish = true }: {
+export function validateAutomationInput({ name, eventType, triggerConfig, conditionUnreadable, condition, actions, forPublish = true }: {
   name: string
   eventType: string
   triggerConfig: Record<string, unknown>
   conditionUnreadable: boolean
+  condition?: SegmentCondition | null
   actions: ActionDraft[]
   forPublish?: boolean
 }): AutomationInputProblem | null {
@@ -31,6 +34,7 @@ export function validateAutomationInput({ name, eventType, triggerConfig, condit
     if (conditionUnreadable) {
       return invalid('v8-repair-condition', '保存されていた「だれに」の条件を付け直してください（読めない古い形のままでは保存できません）')
     }
+    if (forPublish && hasUnknownCondition(condition)) return invalid('v8-target-label', UNKNOWN_CONDITION_REASON)
     // 時刻・日時のきっかけは対象の友だちが必須（サーバの検証と同じ条件）。
     if (eventType === 'datetime' && !String(triggerConfig.at ?? '').trim()) return invalid('v8-trigger-at', '実行日時を入力してください')
     if ((eventType === 'daily' || eventType === 'weekly') && !String(triggerConfig.time ?? '').trim()) return invalid('v8-trigger-time', '実行時刻を入力してください')

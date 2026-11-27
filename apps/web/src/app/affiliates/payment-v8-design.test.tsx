@@ -6,7 +6,7 @@
  * - 頭：銀行用 CSV…・支払明細をまとめて出す
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AffiliateShell } from '@/v8/affiliates/frame'
 
 const fixture = vi.hoisted(() => ({
@@ -65,8 +65,8 @@ afterEach(() => {
 })
 
 
-function renderTab() {
-  fixture.previewImpl = () => Promise.resolve({ success: true, data: PREVIEW })
+function renderTab(previewImpl: () => Promise<unknown> = () => Promise.resolve({ success: true, data: PREVIEW })) {
+  fixture.previewImpl = previewImpl
   const { container } = render(
     <AffiliateShell.Provider value={{ tab: 'payment', readonly: false, narrow: false, accountId: 'acc-1', counts: {}, setCount: () => {}, focusAffiliateId: null }}><PaymentTabV8 /></AffiliateShell.Provider>,
   )
@@ -128,3 +128,38 @@ describe('aINnz 支払いタブの絵合わせ', () => {
   expect(screen.getByText('0人')).toBeTruthy()
   expect(screen.queryByRole('navigation', { name: 'ページ送り' })).toBeNull()
  })
+
+
+test('未取得の支払日と年間合計は数字を作らず、理由を示す', async () => {
+  renderTab()
+  await screen.findAllByText('¥70,400')
+  const next = screen.getByText('次の支払日').closest('[data-kpi-presentation]')!
+  const yearly = screen.getByText('今年 払った合計').closest('[data-kpi-presentation]')!
+  expect(next.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+  expect(next.textContent).toContain('支払日はアフィリエイターごとの取り決めです')
+  expect(yearly.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+  expect(yearly.textContent).toContain('振込の記録がつながると出ます')
+})
+
+test('読込中と失敗は金額を0にせず、再読込で実額に戻す', async () => {
+  let reject!: (reason: unknown) => void
+  renderTab(() => new Promise((_resolve, fail) => { reject = fail }))
+  const amount = screen.getByText('今回 払う額').closest('[data-kpi-presentation]')!
+  expect(amount.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+  expect(document.querySelector('[data-list-state="loading"]')).toBeTruthy()
+  await act(async () => { reject(new Error('private error')) })
+  expect(await screen.findByText('支払いの集計を読み込めませんでした')).toBeTruthy()
+  expect(amount.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+  expect(screen.getByText('数の帯は「—」にしています。道具はそのまま使えます。')).toBeTruthy()
+  expect(screen.queryByText('private error')).toBeNull()
+  fixture.previewImpl = () => Promise.resolve({ success: true, data: PREVIEW })
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  expect((await screen.findAllByText('¥70,400')).length).toBeGreaterThan(0)
+})
+
+test('取得できた空の一覧は、今回の報酬なしと0円を表示する', async () => {
+  renderTab(() => Promise.resolve({ success: true, data: { ...PREVIEW, affiliates: [], totalAmount: 0, conversionCount: 0 } }))
+  expect(await screen.findByText('今回締められる報酬はありません')).toBeTruthy()
+  const amount = screen.getByText('今回 払う額').closest('[data-kpi-presentation]')!
+  expect(amount.querySelector('[data-kpi-number]')?.textContent).toBe('¥0')
+})

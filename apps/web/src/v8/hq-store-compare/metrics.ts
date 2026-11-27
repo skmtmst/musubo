@@ -29,11 +29,13 @@ const COUNT_KEYS: ReadonlySet<StoreComparisonKey> = new Set(['friendChange', 'bo
 
 export type MetricValue = StoreComparisonRow['metrics'][StoreComparisonKey]
 
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+
 const nf = new Intl.NumberFormat('ja-JP')
 const one = new Intl.NumberFormat('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 
 export function formatMetric(key: StoreComparisonKey, value: number | null): string {
-  if (value === null) return '—'
+  if (!isFiniteNumber(value)) return '—'
   if (key === 'friendChange') return `${value > 0 ? '+' : value < 0 ? '−' : ''}${nf.format(Math.abs(value))} 人`
   if (key === 'blockRate' || key === 'clickRate' || key === 'noShowRate') return `${one.format(value)}%`
   if (key === 'responseMinutes') return `${nf.format(Math.round(value))} 分`
@@ -49,7 +51,7 @@ export function displayedDiffIsZero(key: StoreComparisonKey, diff: number): bool
 
 /** 札に出る差があるか。札（formatDiff・diffTone）と「N つが違う」の数え方は、この 1 つを読む。 */
 export function hasDiff(key: StoreComparisonKey, diff: number | null): diff is number {
-  return diff !== null && diff !== 0 && !displayedDiffIsZero(key, diff)
+  return isFiniteNumber(diff) && diff !== 0 && !displayedDiffIsZero(key, diff)
 }
 
 /** 平均との差（「−2.1 pt」「+3 件」）。差が無い・取れないときは null。 */
@@ -82,10 +84,11 @@ export type StoreAverage = Record<StoreComparisonKey, number | null>
 export function averageDiff(row: StoreComparisonRow, average: StoreAverage, key: StoreComparisonKey): number | null {
   const metric = row.metrics[key]
   const base = average[key]
-  if (!metric?.available || metric.value === null || base === null || base === undefined) return null
+  if (!metric?.available || !isFiniteNumber(metric.value) || !isFiniteNumber(base)) return null
   /* 件数は、期間の全部の日がそろった店だけが平均と比べられる（口の差・平均と同じ条件）。 */
   if (COUNT_KEYS.has(key) && row.coveredDays !== row.periodDays) return null
-  return metric.value - base
+  const diff = metric.value - base
+  return isFiniteNumber(diff) ? diff : null
 }
 
 /**
@@ -137,7 +140,7 @@ export function formatAverage(key: StoreComparisonKey, value: number | null): st
 
 /** 札の全文（「平均より 2.1 pt 高い」）。 */
 export function diffTitle(key: StoreComparisonKey, diff: number | null, compare: 'previous' | 'average'): string | undefined {
-  if (diff === null || diff === 0) return undefined
+  if (!isFiniteNumber(diff) || diff === 0) return undefined
   const base = compare === 'average' ? '全店の平均' : '前の期間'
   const abs = Math.abs(diff)
   const amount = key === 'blockRate' || key === 'clickRate' || key === 'noShowRate' ? `${one.format(abs)} pt` : key === 'friendChange' ? `${nf.format(Math.round(abs))} 人` : key === 'responseMinutes' ? `${nf.format(Math.round(abs))} 分` : `${nf.format(Math.round(abs))} 件`

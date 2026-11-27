@@ -11,7 +11,8 @@ import styles from './console.module.css'
 import { formatNumber } from '@/lib/format'
 
 export function resultSentence(store: DistributionResult['stores'][number]): string {
-  if (store.status !== 'succeeded') return '配っています'
+  if (store.status === 'pending' || store.status === 'staged') return '配っています'
+  if (store.status !== 'succeeded') return '配布結果を確認できません。結果を再確認してください。'
   if (store.counts.aliased > 0) return store.createdName ? `同じ名前があったため「${store.createdName}」で作りました` : '同じ名前があったため、別名で作りました'
   if (store.counts.overwritten > 0) return '上書きしました'
   if (store.counts.created > 0) return '新しく作りました'
@@ -35,6 +36,7 @@ export default function DistributionResultDialog({ open, title, summary, rows, t
     <div className={styles.resultList}>
       {rows.map(({ key, name, tag: rowTag, store }) => {
         const failed = failedStatus(store.status)
+        const pending = store.status === 'pending' || store.status === 'staged'
         const resultTag = rowTag ?? tag
         const sentence = resultTag && store.status === 'succeeded' && store.counts.aliased > 0 && store.createdName
           ? <>同じ名前があったため「<TagPill name={store.createdName} color={resultTag.color} size="sm" />」で作りました</>
@@ -42,7 +44,7 @@ export default function DistributionResultDialog({ open, title, summary, rows, t
         return <div key={key} className={styles.resultRow}>
           <span className={styles.resultName} title={name}>{rowTag ? <><TagPill {...rowTag} size="sm" /> · {store.accountName ?? name}</> : name}</span>
           <span className={styles.resultText}>{failed ? (store.reason || '配布できませんでした。アカウントの現在版を再確認してください。') : sentence}</span>
-          <StatusBadge size="compact" tone={store.status === 'succeeded' ? 'success' : failed ? 'danger' : 'neutral'}>{store.status === 'succeeded' ? '成功' : failed ? '失敗' : '作成中'}</StatusBadge>
+          <StatusBadge size="compact" tone={store.status === 'succeeded' ? 'success' : failed ? 'danger' : 'neutral'}>{store.status === 'succeeded' ? '成功' : failed ? '失敗' : pending ? '作成中' : '未確認'}</StatusBadge>
         </div>
       })}
     </div>

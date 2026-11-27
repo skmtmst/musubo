@@ -113,6 +113,8 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [forbidden, setForbidden] = useState(false)
+  const [labelsLoading, setLabelsLoading] = useState(false)
+  const [labelsFailed, setLabelsFailed] = useState(false)
   // 並び替え・削除・複製の失敗。読み込みの失敗は loadError。
   const [error, setError] = useState('')
   const [retryOrder, setRetryOrder] = useState<SavedSearch[] | null>(null)
@@ -135,24 +137,32 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   const { id: activeSearchId, setId: setActiveSearchId } = detailGuard
   const openSearchDetail = (id: string) => withViewTransition(() => setActiveSearchId(current => current === id ? null : id))
   const loadSequence = useRef(0)
+  const loadInFlight = useRef(false)
+  const labelsSequence = useRef(0)
+  const labelsInFlight = useRef(false)
 
-  const load = useCallback(async () => {
-    const sequence = ++loadSequence.current
-    setLoading(true)
-    setLoadError('')
-    setForbidden(false)
-    if (!accountId) {
-      setLoading(false)
-      return
-    }
-    /* 補助取得（タグ名・マーク名・シナリオ名・項目名）は一覧とは別に待つ（PERF-14）。 */
-    void Promise.allSettled([
-      api.tags.list({ accountId }),
-      api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
-      api.scenarios.list({ accountId }),
-      api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
-    ]).then(([tagResult, markResult, scenarioResult, fieldResult]) => {
-      if (sequence !== loadSequence.current) return
+  const fetchLabels = useCallback(async (targetAccountId: string, { userInitiated = false } = {}) => {
+    if (userInitiated && labelsInFlight.current) return
+    const seq = ++labelsSequence.current
+    labelsInFlight.current = true
+    setLabelsLoading(true)
+    try {
+      /* 補助取得（タグ名・マーク名・シナリオ名・項目名）は一覧とは別に待つ（PERF-14）。 */
+      const [tagResult, markResult, scenarioResult, fieldResult] = await Promise.allSettled([
+        api.tags.list({ accountId: targetAccountId }),
+        api.supportMarks.list(targetAccountId, { suppressFeatureDisabledEvent: true }),
+        api.scenarios.list({ accountId: targetAccountId }),
+        api.friendFields.list(targetAccountId, undefined, { suppressFeatureDisabledEvent: true }),
+      ])
+      if (seq !== labelsSequence.current || currentAccount.current !== targetAccountId) return
+      const isOptionalDisabled = (result: PromiseSettledResult<unknown>) =>
+        result.status === 'rejected' && result.reason instanceof ApiError && (result.reason.status === 403 || result.reason.status === 404)
+      const ok = (result: PromiseSettledResult<{ success: boolean }>) => result.status === 'fulfilled' && result.value.success
+      const anyFailed =
+        !ok(tagResult) ||
+        (!ok(markResult) && !isOptionalDisabled(markResult)) ||
+        !ok(scenarioResult) ||
+        (!ok(fieldResult) && !isOptionalDisabled(fieldResult))
       if (tagResult.status === 'fulfilled' && tagResult.value.success) setTags(tagResult.value.data)
       setConditionLabels({
         marks: markResult.status === 'fulfilled' && markResult.value.success
@@ -165,7 +175,34 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
           ? Object.fromEntries(fieldResult.value.data.map((field) => [field.fieldKey, field.name]))
           : {},
       })
-    })
+      setLabelsFailed(anyFailed)
+    } finally {
+      if (seq === labelsSequence.current) {
+        labelsInFlight.current = false
+        setLabelsLoading(false)
+      }
+    }
+  }, [setTags, setConditionLabels])
+
+  const reloadLabels = useCallback(async () => {
+    if (!accountId) return
+    await fetchLabels(accountId, { userInitiated: true })
+  }, [accountId, fetchLabels])
+
+  const load = useCallback(async ({ userInitiated = false } = {}) => {
+    if (userInitiated && loadInFlight.current) return
+    const sequence = ++loadSequence.current
+    loadInFlight.current = true
+    setLoading(true)
+    setLoadError('')
+    setForbidden(false)
+    setLabelsFailed(false)
+    if (!accountId) {
+      loadInFlight.current = false
+      setLoading(false)
+      return
+    }
+    void fetchLabels(accountId)
     try {
       const savedSearches = await api.savedSearches.list(accountId, { limit: MAX_SAVED })
       if (sequence !== loadSequence.current) return
@@ -180,9 +217,12 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         else { if (!fieldFailure) setLoadError(describeApiFailure(reason, '保存した検索の読み込み')) }
       }
     } finally {
-      if (sequence === loadSequence.current) setLoading(false)
+      if (sequence === loadSequence.current) {
+        loadInFlight.current = false
+        setLoading(false)
+      }
     }
-  }, [accountId, saveErrors, setItems, setSummary, setTags, setConditionLabels])
+  }, [accountId, fetchLabels, saveErrors, setItems, setSummary])
   useEffect(() => { void load() }, [load])
 
   /* アカウントが変わったら、前のアカウントの削除確認を閉じる。 */
@@ -193,6 +233,10 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
     setRetryOrder(null)
     setPage(1)
     setOpenMenuId(null)
+    return () => {
+      labelsSequence.current += 1
+      labelsInFlight.current = false
+    }
   }, [accountId])
 
   const confirmRemove = async (search: SavedSearch) => {
@@ -346,11 +390,14 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
     }))
 
   const sharedCount = items.filter((item) => item.isShared).length
+  const kpiLoading = Boolean(accountId) && !loaded && !loadError && !forbidden
+  const kpiError = Boolean(loadError)
+  const kpiUnavailableDetail = forbidden ? '権限がありません' : kpiError ? '読み込めませんでした' : kpiLoading ? '読み込んでいます' : null
   const kpiCards = [
-    { title: '保存した条件', icon: Bookmark, value: kpis.total, unit: '件', detail: ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : emptyValue('unknown') },
-    { title: '配信で使っている', icon: Send, value: kpis.usedInBroadcasts, unit: '件', detail: '一斉配信・自動処理' },
-    { title: '該当なし', icon: CircleDashed, value: kpis.zeroMatches, unit: '件', detail: '条件が古いかも' },
-    { title: '今月の利用', icon: MousePointerClick, value: kpis.callsThisMonth, unit: '回', detail: kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数' },
+    { title: '保存した条件', icon: Bookmark, value: forbidden || kpiError ? null : kpis.total, unit: '件', detail: kpiUnavailableDetail ?? (ready ? `自分 ${items.length - sharedCount}・共有 ${sharedCount}` : emptyValue('unknown')) },
+    { title: '配信で使っている', icon: Send, value: forbidden || kpiError ? null : kpis.usedInBroadcasts, unit: '件', detail: kpiUnavailableDetail ?? '一斉配信・自動処理' },
+    { title: '該当なし', icon: CircleDashed, value: forbidden || kpiError ? null : kpis.zeroMatches, unit: '件', detail: kpiUnavailableDetail ?? '条件が古いかも' },
+    { title: '今月の利用', icon: MousePointerClick, value: forbidden || kpiError ? null : kpis.callsThisMonth, unit: '回', detail: kpiUnavailableDetail ?? (kpis.callsThisMonth === null ? '利用の記録は未接続' : '友だち一覧で開いた回数') },
   ]
 
   const filterActive = Boolean(query || usageFilter !== 'all' || matchFilter !== 'all')
@@ -360,7 +407,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
   ) : forbidden ? (
     <ListState kind="error" title="保存した検索を見る権限がありません" description={permissionDeniedMessage('store')}  />
   ) : loadError ? (
-    <ListState kind="error" title="保存した検索を読み込めませんでした" description={loadError}  action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
+    <ListState kind="error" title="保存した検索を読み込めませんでした" description={loadError}  action={<><Button type="button" onClick={() => void load({ userInitiated: true })} disabled={loading} busy={loading} busyLabel="読み込んでいます…">もう一度読み込む</Button></>} />
   ) : ready && items.length === 0 ? (
     <ListState kind="empty" title="まだ保存した検索はありません" description="友だち一覧で条件を絞り、「この条件を保存」を押すとここに追加されます。"  icon={<Filter className={styles.stateIcon} aria-hidden="true" />} action={<>{canEdit ? <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button> : null}</>} />
   ) : ready && visible.length === 0 ? (
@@ -459,7 +506,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
             value={kpi.value}
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
-            loading={Boolean(accountId) && !loaded && !loadError && !forbidden}
+            loading={kpiLoading}
           />
         ))}
       </KpiBand>
@@ -505,6 +552,18 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
           </ListPager>
         ) : undefined}
       >
+        {ready && labelsFailed ? (
+          <Notice
+            tone="warn"
+            action={
+              <Button variant="secondary" type="button" onClick={() => void reloadLabels()} disabled={labelsLoading} busy={labelsLoading} busyLabel="読み込んでいます…">
+                条件名を読み直す
+              </Button>
+            }
+          >
+            条件に使うタグやシナリオなどの名前の一部を読み込めませんでした。一覧の確認や操作は続けられます。
+          </Notice>
+        ) : null}
         {error ? (
           <Notice tone="danger" >{error}{retryOrder ? (
               <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</Button>

@@ -21,17 +21,20 @@ export function useInboxSubscription({ refreshChatDetailQuietly, channel, loadCh
   const [chatPollRetryKey, setChatPollRetryKey] = useState(0)
 
   useEffect(() => {
+    let active = true
     setChatPollStalled(false)
     const poll = startVisiblePoll({
       work: async () => {
         const detailOk = await refreshChatDetailQuietly()
+        if (!active) return
         const listOk = channel === 'email' ? true : await loadChatsQuietly()
+        if (!active) return
         if (!detailOk || !listOk) throw new Error('inbox poll failed')
       },
-      onGiveUp: () => setChatPollStalled(true),
-      onRecovered: () => setChatPollStalled(false),
+      onGiveUp: () => { if (active) setChatPollStalled(true) },
+      onRecovered: () => { if (active) setChatPollStalled(false) },
     })
-    return () => poll.stop()
+    return () => { active = false; poll.stop() }
   }, [refreshChatDetailQuietly, loadChatsQuietly, channel, chatPollRetryKey])
   return { chatPollStalled, setChatPollRetryKey }
 }

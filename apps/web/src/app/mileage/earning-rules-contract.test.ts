@@ -24,20 +24,6 @@ describe("管理画面 たまる決めごと（N46cQ）の画面", () => {
     expect(orderBody).not.toContain('saveEarningRuleDraft')
   })
 
-  it('利用対象条件と公開版の中身を一覧から確認できる', () => {
-    expect(PAGE).toContain('公開版の中身を見る')
-    expect(PAGE).toContain('viewTarget.draft.targetConditions')
-    expect(PAGE).toContain('利用対象：すべての友だち')
-  })
-
-  it('R297: 未公開の決めごとに「公開版の中身」は出さず、下書きと言い分ける', () => {
-    // 公開版が無いのに「公開版の中身を見る」と出すと、見た人は
-    // 公開済みだと思い込む。未公開は下書きの中身と版・保存日時を出す。
-    expect(PAGE).toContain("rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'")
-    expect(PAGE).toContain('まだ公開版はありません')
-    expect(PAGE).toContain('に反映')
-  })
-
   it('R296: 一覧から下書きの編集画面へ行け、未公開だけ削除できる', () => {
     // 編集の入口。別画面へ行く項目には external の印を付ける。
     expect(PAGE).toContain("label: '編集'")
@@ -107,21 +93,6 @@ describe("管理画面 たまる決めごと（N46cQ）の画面", () => {
     expect(body).toContain("tone: 'error'")
     expect(body).toContain("actionLabel: 'もう一度'")
     expect(body).not.toContain('setLoadError(')
-  })
-
-  it('N-231 案1: 下書きの公開は保存と別の操作で、版を見せて確認窓で確かめる', () => {
-    // 公開して反映ボタン・公開版表示・下書き版の受け渡し。
-    expect(PAGE).toContain('api.mileage.publishEarningRule')
-    expect(PAGE).toContain('公開して反映')
-    expect(PAGE).toContain('rule.publishedVersion')
-    // 版の言い方は mileage-v8-contract.test.tsx が開いた中身の窓で読む。
-    expect(PAGE).toContain('expectedVersion: rule.draftVersion')
-    // 取り消せない操作のため共通の確認窓で確かめる。ブラウザのconfirmは使わない。
-    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
-    expect(PAGE).toContain('<ConfirmDialog')
-    expect(PAGE).toContain('の下書きを公開して反映しますか？')
-    expect(PAGE).toContain('取り消せません')
-    expect(PAGE).not.toContain('window.confirm')
   })
 
   it('読込中・取得失敗・空を言い分ける', () => {

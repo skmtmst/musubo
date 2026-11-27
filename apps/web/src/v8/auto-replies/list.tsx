@@ -120,6 +120,8 @@ export default function AutoRepliesListV8() {
   const [templateListAvailable, setTemplateListAvailable] = useState(true)
   const [conflictCount, setConflictCount] = useState<number | null>(null)
   const [dispatchStopped, setDispatchStopped] = useState<boolean | null>(null)
+  const [summaryFailed, setSummaryFailed] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
   const { folders, reload: loadFolders } = useManagedFolders('auto_reply', selectedAccountId)
@@ -175,27 +177,34 @@ export default function AutoRepliesListV8() {
   selectedAccountIdRef.current = selectedAccountId
   const canRunList = () => mounted.current && canEditAutoReplyListNow() && renderedScope === accountScope.current && loadedScope.current === renderedScope && selectedAccountIdRef.current === selectedAccountId
   useEffect(() => {
+    summaryGenerationRef.current += 1
     setSelectedIds(new Set()); setOpenMenuId(null); setCreateMenuOpen(false); setDragId(null)
   }, [selectedAccountId])
   const loadGenerationRef = useRef(0)
+  const summaryGenerationRef = useRef(0)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null | undefined>(undefined)
 
   const load = useCallback(async () => {
     const requestAccountId = selectedAccountId
     const requestScope = renderedScope
     const requestGeneration = ++loadGenerationRef.current
+    summaryGenerationRef.current += 1
     setLoadState('loading')
     setLoadError(null)
     setConflictCount(null)
     setDispatchStopped(null)
+    setSummaryFailed(false)
+    setSummaryLoading(Boolean(selectedAccountId))
     try {
-      const [arRes, tplRes, summaryRes] = await Promise.all([
+      const [arSettled, tplSettled, summarySettled] = await Promise.allSettled([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
         api.templates.list(undefined, selectedAccountId || undefined),
         selectedAccountId
-          ? api.autoReplies.summary(selectedAccountId).catch(() => null)
+          ? api.autoReplies.summary(selectedAccountId)
           : Promise.resolve(null),
       ])
+      if (arSettled.status === 'rejected') throw arSettled.reason
+      const arRes = arSettled.value
       if (!isCurrentAutoReplyLoad(
         requestAccountId,
         selectedAccountIdRef.current,
@@ -217,8 +226,22 @@ export default function AutoRepliesListV8() {
         } : current)
         savedReorder.current = null
       }
-      setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
-      setDispatchStopped(summaryRes?.success ? summaryRes.data.dispatchStopped ?? null : null)
+      if (!selectedAccountId) {
+        setConflictCount(null)
+        setDispatchStopped(null)
+        setSummaryFailed(false)
+      } else if (summarySettled.status === 'fulfilled' && summarySettled.value?.success) {
+        setConflictCount(summarySettled.value.data.conflictCount)
+        setDispatchStopped(summarySettled.value.data.dispatchStopped ?? null)
+        setSummaryFailed(false)
+      } else {
+        setConflictCount(null)
+        setDispatchStopped(null)
+        setSummaryFailed(true)
+      }
+      const tplRes = tplSettled.status === 'fulfilled'
+        ? tplSettled.value
+        : { success: false as const, error: 'templates_failed' }
       setTemplateListAvailable(tplRes.success)
       setTemplates(tplRes.success
         ? tplRes.data.map((t) => ({
@@ -244,8 +267,47 @@ export default function AutoRepliesListV8() {
       { if (!fieldFailure)
       setLoadState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }
+  } finally {
+      if (isCurrentAutoReplyLoad(
+        requestAccountId,
+        selectedAccountIdRef.current,
+        requestGeneration,
+        loadGenerationRef.current,
+      )) {
+        setSummaryLoading(false)
+      }
+    }
   }, [selectedAccountId, saveErrors])
+
+  const reloadSummary = useCallback(async () => {
+    if (!selectedAccountId) return
+    const requestAccountId = selectedAccountId
+    const requestGeneration = ++summaryGenerationRef.current
+    setSummaryLoading(true)
+    setSummaryFailed(false)
+    try {
+      const summaryRes = await api.autoReplies.summary(requestAccountId)
+      if (summaryGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      if (summaryRes.success) {
+        setConflictCount(summaryRes.data.conflictCount)
+        setDispatchStopped(summaryRes.data.dispatchStopped ?? null)
+        setSummaryFailed(false)
+      } else {
+        setConflictCount(null)
+        setDispatchStopped(null)
+        setSummaryFailed(true)
+      }
+    } catch {
+      if (summaryGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
+      setConflictCount(null)
+      setDispatchStopped(null)
+      setSummaryFailed(true)
+    } finally {
+      if (summaryGenerationRef.current === requestGeneration && selectedAccountIdRef.current === requestAccountId) {
+        setSummaryLoading(false)
+      }
+    }
+  }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
 
@@ -951,16 +1013,43 @@ export default function AutoRepliesListV8() {
         {lockedReason && (
           <div className={styles.viewerBand}><ReadOnlyNotice need="feature" role="status" data-design-node="Q5lOCc"></ReadOnlyNotice></div>
         )}
-        {ready ? <Notice tone={dispatchStopped ? 'warn' : 'info'} role="status" message={dispatchStopped === true
-          ? '停止中です。いま自動応答は送られません。'
-          : selectedAccountId && dispatchStopped === null ? '自動応答全体の送信状態を確認できません。'
-          : rules.some((rule) => rule.isActive)
-          ? '確認できる自動応答に、有効なルールがあります。'
-          : '確認できる自動応答に、有効なルールはありません。'} /> : null}
+        {ready ? <Notice
+          tone={dispatchStopped ? 'warn' : 'info'}
+          role="status"
+          action={selectedAccountId && (summaryFailed || dispatchStopped === null) ? (
+            <Button
+              type="button"
+              onClick={() => void reloadSummary()}
+              disabled={summaryLoading}
+              busy={summaryLoading}
+              busyLabel="確認中…"
+            >
+              状態を確認し直す
+            </Button>
+          ) : undefined}
+          message={dispatchStopped === true
+            ? '停止中です。いま自動応答は送られません。'
+            : selectedAccountId && dispatchStopped === null ? '自動応答全体の送信状態を確認できません。'
+            : rules.some((rule) => rule.isActive)
+            ? '確認できる自動応答に、有効なルールがあります。'
+            : '確認できる自動応答に、有効なルールはありません。'}
+        /> : null}
         {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} detailLayout={kpi.key === 'actions' ? 'single' : undefined} action={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? { label: '重なりを見る', onClick: () => { setConflictOnly(true); setPage(1) } } : undefined} />
+            <KpiCard
+              key={kpi.key}
+              presentation="band"
+              title={kpi.title}
+              icon={<kpi.icon size={16} aria-hidden="true" />}
+              value={kpi.value}
+              unit={kpi.value == null ? '' : kpi.unit}
+              detail={kpi.detail}
+              detailLayout={kpi.key === 'actions' ? 'single' : undefined}
+              loading={visibleLoadState === 'loading' || (kpi.key === 'conflict' && summaryLoading)}
+              onRetry={kpi.key === 'conflict' && ready && selectedAccountId && summaryFailed && !summaryLoading ? () => void reloadSummary() : undefined}
+              action={kpi.key === 'conflict' && ready && (conflictCount ?? 0) > 0 ? { label: '重なりを見る', onClick: () => { setConflictOnly(true); setPage(1) } } : undefined}
+            />
           ))}
         </KpiBand>
       </>}

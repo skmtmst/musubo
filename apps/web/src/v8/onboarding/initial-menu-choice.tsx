@@ -34,14 +34,16 @@ export function InitialMenuPhone({style}:{style:AccountStyle}) {
 /** 登録・はじめの質問・設定の選び直しで、同じ4面画像と行き先を使う。 */
 export function InitialMenuChoice({accountId,style,value,onChange,disabled=false,disabledReason='保存中は変更できません'}:{accountId:string;style:AccountStyle;value:InitialMenuSelection;onChange:(next:InitialMenuSelection)=>void;disabled?:boolean;disabledReason?:string}) {
  const [resources,setResources]=useState<{accountId:string;items:Array<{id:string;name:string;kind:string}>}|null>(null)
- const [error,setError]=useState<unknown>(null),[tick,setTick]=useState(0)
+ const [errorState,setErrorState]=useState<{accountId:string;error:unknown}|null>(null),[tick,setTick]=useState(0)
  useEffect(()=>{
-  if(value.value!=='existing')return
-  let active=true;setError(null)
-  void styleApi.resources(accountId).then(res=>{if(!res.success)throw new Error('メニューを読み込めませんでした');if(active)setResources({accountId,items:res.data.items.filter(item=>item.kind==='rich_menu')})}).catch(error=>{if(active)setError(error)})
+  if(value.value!=='existing'){setErrorState(null);return}
+  let active=true
+  setErrorState(prev=>prev?.accountId===accountId?null:prev)
+  void styleApi.resources(accountId).then(res=>{if(!res.success)throw new Error('メニューを読み込めませんでした');if(active)setResources({accountId,items:res.data.items.filter(item=>item.kind==='rich_menu')})}).catch(caught=>{if(active)setErrorState({accountId,error:caught})})
   return ()=>{active=false}
  },[accountId,value.value,tick])
  const items=resources?.accountId===accountId?resources.items:null
+ const error=value.value==='existing'&&errorState?.accountId===accountId?errorState.error:null
  const menu=INITIAL_MENUS[style]
  return <>
   <SaveErrorField names={['image','answers.image','confirmInitialMenu']}><RadioCardGroup legend="使うメニュー" columns={3}>

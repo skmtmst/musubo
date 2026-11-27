@@ -5,6 +5,7 @@ import { api, type OpsApplication } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
+import TruncatedText from '@/components/shared/truncated-text'
 import { PageFrame } from '@/components/templates/page-frame'
 import styles from './applications.module.css'
 
@@ -57,7 +58,7 @@ export default function OpsApplications() {
         : visible.length === 0 ? <ListState kind="empty" title="該当する申し込みがありません" />
         : <div className={styles.tableScroll}><table aria-label="申込アカウント"><thead><tr><th>会社名</th><th>担当者</th><th>連絡先</th><th>きっかけ</th><th>状態</th><th>受付日</th></tr></thead><tbody>{visible.map((row) => {
           const href = `/ops/applications/detail?id=${encodeURIComponent(row.id)}`
-          return <tr key={row.id}><td><a href={href}>{row.company_name}</a></td><td>{row.contact_name}</td><td>{row.email}<small>{row.phone}</small></td><td>{row.referral_source}</td><td><span className={styles.badge} data-status={row.status}>{STATUS[row.status]}</span></td><td>{new Date(row.created_at).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}</td></tr>
+          return <tr key={row.id}><td><a href={href}>{row.company_name}</a></td><td>{row.contact_name}</td><td><TruncatedText value={row.email} /><small>{row.phone}</small></td><td>{row.referral_source}</td><td><span className={styles.badge} data-status={row.status}>{Object.prototype.hasOwnProperty.call(STATUS, row.status) ? STATUS[row.status] : '状態不明'}</span></td><td>{new Date(row.created_at).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}</td></tr>
         })}</tbody></table></div>}
       <footer className={styles.footer}><span>{visible.length ? `1–${visible.length}` : '0'} / {visible.length}件</span><span>申込を選ぶと詳細が開きます。</span></footer>
     </article>

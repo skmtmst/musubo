@@ -25,14 +25,14 @@ export function EmergencyControlFeedback({ message, needsReload, reloading, stop
         <SaveConflictBar
           message={message?.text ?? '最新の状態を読み直してから、もう一度確認してください。'}
           actionLabel={reloading ? '読み直しています…' : '最新の状態を読み直す'}
-          onAction={() => onReload()}
+          onAction={() => { if (!reloading) onReload() }}
           actionQa="emergency-reload"
         />
       ) : null}
 
       {stopBlockers.length > 0 ? (
       <Notice tone="warn" role="status" action={<>
-        {stopBlockers.includes('unavailable') ? (
+        {stopBlockers.includes('unavailable') && !needsReload ? (
           <Button type="button" onClick={() => onReload()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">
             最新の状態を読み直す
           </Button>
@@ -42,7 +42,7 @@ export function EmergencyControlFeedback({ message, needsReload, reloading, stop
       </Notice>
       ) : null}
 
-      {message ? (
+      {message && (!needsReload || message.tone === 'success') ? (
       <Notice tone={message.tone === "warning" ? "warn" : message.tone} role={message.tone === 'success' ? 'status' : 'alert'} action={<>
         {message.tone !== 'success' && needsReload ? (
           <Button type="button" onClick={() => onReload()} disabled={reloading} busy={reloading} busyLabel="読み直しています…">

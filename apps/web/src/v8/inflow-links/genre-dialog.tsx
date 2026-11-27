@@ -6,10 +6,11 @@
  * 作る `api.entryRouteGenres.create(name)`、変える `api.entryRouteGenres.update(id, name)`。
  * 409 は「同じ名前がある」。見た目だけ共通の窓（Dialog）にした。
  */
-import { useContext, useId, useState } from 'react'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
 import type { EntryRouteGenre } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
+import { notifySaved } from '@/components/shared/toast'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { focusField } from './focus-field'
@@ -29,6 +30,10 @@ export default function GenreDialog({
   onSaved: (genre: EntryRouteGenre, previousName: string | null) => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const scope = genre?.id ?? null
+  const currentScope = useRef({ scope, mounted: true })
+  currentScope.current.scope = scope
+  useEffect(() => { currentScope.current.mounted = true; return () => { currentScope.current.mounted = false } }, [])
   const [name, setName] = useState(genre?.name ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -49,14 +54,17 @@ export default function GenreDialog({
       const response = genre
         ? await api.entryRouteGenres.update(genre.id, normalized)
         : await api.entryRouteGenres.create(normalized)
+      if (!currentScope.current.mounted || currentScope.current.scope !== scope) return
       if (!response.success) {
         setSubmitting(false)
         setError(response.error || 'フォルダを保存できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       guard.disarm()
+      notifySaved(genre ? 'フォルダ名を変更しました。' : 'フォルダを作りました。')
       onSaved(response.data, genre?.name ?? null)
     } catch (err) {
+      if (!currentScope.current.mounted || currentScope.current.scope !== scope) return
       const fieldFailure = saveErrors.capture(err)
       setSubmitting(false)
       if (err instanceof ApiError && err.status === 409) {

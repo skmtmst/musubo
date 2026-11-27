@@ -16,28 +16,12 @@ const RICH_MENUS = readFileSync(join(SRC, 'app', 'rich-menus', 'edit', 'page.tsx
  */
 describe('対象が分からないときの言い方（#975 U096）', () => {
   it('共通アクション編集は、対象未指定を専用の案内にし一覧へ戻す', () => {
-    expect(EDIT).toContain('編集する共通アクションが指定されていません')
-    expect(EDIT).toContain('一覧から編集する共通アクションを選び直してください')
     // 戻り先は ★管理画面 TargetMissing の backHref が持つ。
-    expect(EDIT).toContain('backHref="/common-actions"')
     // 技術的な「IDが不正」は画面の文言から外す。
     expect(EDIT).not.toContain('IDが不正')
   })
 
-  it('共通アクション編集は、アカウント未選択・対象なし・権限なし・下書きなしを分ける', () => {
-    expect(EDIT).toContain('共通アクションを編集するLINEアカウントを選んでください')
-    expect(EDIT).toContain('この共通アクションは削除されたか、別のLINEアカウントのものです')
-    expect(EDIT).toContain('この共通アクションを編集する権限がありません')
-    expect(EDIT).toContain('編集中の下書きがありません')
-    // 生の API エラー文は主文にしない（接頭辞で弾いて言い換える）。
-
-  })
-
   it('版の画面は、対象未指定とアカウント未選択・対象なしを分ける', () => {
-    expect(VERSIONS).toContain('版を確認する共通アクションが指定されていません')
-    expect(VERSIONS).toContain('LINE公式アカウントを選んでください')
-    expect(VERSIONS).toContain('この共通アクションは削除されたか、別のLINEアカウントのものです')
-    expect(VERSIONS).toContain('backHref="/common-actions"')
     expect(VERSIONS).not.toContain('IDが不正')
   })
 

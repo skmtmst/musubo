@@ -70,6 +70,34 @@ describe('数の書き方', () => {
 })
 
 describe('店の比較の表', () => {
+  it('不正な数値は取得できない数として表示する', async () => {
+    const badRow = { ...DATA.rows[0], metrics: { ...DATA.rows[0].metrics, bookings: { ...DATA.rows[0].metrics.bookings, value: '12', diff: null } } }
+    api.get.mockResolvedValue({ success: true, data: { ...DATA, rows: [badRow] } })
+    render(<StoreComparisonList />)
+    const tableRow = (await screen.findByText('大宮店')).closest('tr')!
+    expect(within(tableRow).queryByText('12 件')).toBeNull()
+    expect(within(tableRow).getAllByRole('cell')[4].textContent).toBe('—')
+  })
+
+  it('値が不正なら正常な差の札も表示しない', async () => {
+    const badRow = { ...DATA.rows[0], metrics: { ...DATA.rows[0].metrics, bookings: { ...DATA.rows[0].metrics.bookings, value: 'bad', diff: 25 } } }
+    api.get.mockResolvedValue({ success: true, data: { ...DATA, rows: [badRow] } })
+    render(<StoreComparisonList />)
+    const tableRow = (await screen.findByText('大宮店')).closest('tr')!
+    expect(within(tableRow).getAllByRole('cell')[4].textContent).toBe('—')
+    expect(within(tableRow).queryByText('+25')).toBeNull()
+  })
+
+  it('不正な差や平均を差として数えない', async () => {
+    const badRow = { ...DATA.rows[0], metrics: { ...DATA.rows[0].metrics, bookings: { ...DATA.rows[0].metrics.bookings, diff: 'bad' } } }
+    api.get.mockResolvedValue({ success: true, data: { ...DATA, rows: [badRow], average: { ...DATA.average, bookings: 'bad' } } })
+    render(<StoreComparisonList />)
+    const tableRow = (await screen.findByText('大宮店')).closest('tr')!
+    expect(within(tableRow).getByText('12 件')).toBeTruthy()
+    expect(within(tableRow).queryByText('−NaN')).toBeNull()
+    expect(within(tableRow).getByText('5/5項目が違う')).toBeTruthy()
+  })
+
   it('保存した並びを読み直す間、遅れて届いた古い結果を表示しない', async () => {
     rememberStaffIdentity({ id: 'staff-a', tenantId: 'tenant-a', role: 'owner' } as Parameters<typeof rememberStaffIdentity>[0])
     localStorage.setItem(columnPreferenceKey('tenant-a', 'staff-a', 'a'), JSON.stringify(['visits']))

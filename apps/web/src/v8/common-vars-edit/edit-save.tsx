@@ -96,7 +96,7 @@ export async function saveCommonVar({ changeReason, expiryBehavior, fallbackValu
       }
       if (accountAtRequest !== latestAccountRef.current)
  return
-      if (!preview || !preview.success) {
+      if (!preview?.success || typeof preview.data?.impactProof !== 'string' || !preview.data.impactProof.trim()) {
         setError('影響を確認できませんでした。しばらく待って保存し直してください')
         return
       }

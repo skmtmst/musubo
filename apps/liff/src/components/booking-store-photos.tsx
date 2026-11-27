@@ -15,7 +15,12 @@ export default function BookingStorePhotos() {
   useEffect(() => {
     let alive = true;
     setFailed(false);
-    api.storePhotos().then(rows => { if (alive) setPhotos(rows); })
+    api.storePhotos().then(rows => {
+      if (!Array.isArray(rows) || !rows.every(row => row && Object.hasOwn(labels, row.slot) && typeof row.url === 'string' && row.url.trim())) {
+        throw new Error('Invalid store photos response');
+      }
+      if (alive) setPhotos(rows);
+    })
       .catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
   }, [revision]);

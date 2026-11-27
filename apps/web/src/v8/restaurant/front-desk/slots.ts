@@ -19,13 +19,25 @@ export function toYmd(day: Date): string {
   return jstDate(day)
 }
 
+function parseClockMinutes(time: string): number | null {
+  if (typeof time !== 'string') return null
+  const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim())
+  if (!match) return null
+  const h = Number(match[1])
+  const m = Number(match[2])
+  if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || h > 47 || m < 0 || m > 59) return null
+  return h * 60 + m
+}
+
 export function toMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0)
 }
 
 export function slotLabel(minutes: number): string {
-  return `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`
+  if (!Number.isFinite(minutes) || minutes < 0) return '—'
+  const whole = Math.floor(minutes)
+  return `${pad2(Math.floor(whole / 60))}:${pad2(whole % 60)}`
 }
 
 /** 卓の並び（コードの数の順）。 */
@@ -44,9 +56,15 @@ export function tableBusy(tableId: string, start: number, end: number, rows: Res
 
 /** その日・その時刻から2時間、人数が入る空いた卓（席の余りが少ない順）。 */
 export function freeTables(tables: RestaurantTable[], guests: number, start: number, rows: RestaurantReservation[], now = Date.now()): RestaurantTable[] {
+  if (!Number.isFinite(guests) || guests <= 0 || !Number.isFinite(start)) return []
   const end = start + STAY_MINUTES * 60_000
   return tables
-    .filter((t) => t.is_active && t.min_capacity <= guests && t.max_capacity >= guests && !tableBusy(t.id, start, end, rows, now))
+    .filter((t) => t.is_active
+      && Number.isFinite(t.min_capacity)
+      && Number.isFinite(t.max_capacity)
+      && t.min_capacity <= guests
+      && t.max_capacity >= guests
+      && !tableBusy(t.id, start, end, rows, now))
     .sort((a, b) => (a.max_capacity - guests) - (b.max_capacity - guests) || byCode(a, b))
 }
 
@@ -60,13 +78,16 @@ export function startOf(date: string, time: string): number {
  */
 export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, now = new Date()): string[] {
   const [y, m, d] = date.split('-').map(Number)
-  const weekday = y && m && d ? new Date(Date.UTC(y, m - 1, d)).getUTCDay() : -1
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d) || !Number.isFinite(now.getTime())) return []
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
   const periods = hours?.find((day) => day.weekday === weekday)?.periods
   const list: number[] = []
   if (periods && periods.length > 0) {
     for (const period of periods) {
-      const start = toMinutes(period.opensAt)
-      const close = toMinutes(period.closesAt) + (toMinutes(period.closesAt) < start ? 1440 : 0)
+      const start = parseClockMinutes(period.opensAt)
+      const closeRaw = parseClockMinutes(period.closesAt)
+      if (start === null || closeRaw === null) continue
+      const close = closeRaw + (closeRaw < start ? 1440 : 0)
       for (let t = start; t < 1440 && t + STAY_MINUTES <= close; t += 30) list.push(t)
     }
   }
@@ -78,6 +99,10 @@ export function openTimes(date: string, hours: RestaurantOpeningDay[] | null, no
 
 /** 卓の説明（「4名席・窓側」の形。窓側などの印は卓の名前から）。 */
 export function tableNote(table: RestaurantTable): string {
-  const seats = table.seat_type === 'counter' ? `カウンター ${table.max_capacity}席` : `${table.max_capacity}名席`
-  return table.label && table.label !== table.code ? `${seats}・${table.label}` : seats
+  const capacity = Number.isFinite(table.max_capacity) && table.max_capacity > 0 ? Math.trunc(table.max_capacity) : null
+  const seats = capacity === null
+    ? (table.seat_type === 'counter' ? 'カウンター席' : '座席')
+    : (table.seat_type === 'counter' ? `カウンター ${capacity}席` : `${capacity}名席`)
+  const label = typeof table.label === 'string' ? table.label.trim() : ''
+  return label && label !== table.code ? `${seats}・${label}` : seats
 }

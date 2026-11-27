@@ -17,7 +17,8 @@ export function choiceActionText(choice: QuestionChoice, tags: Array<Pick<Tag, '
   const behavior: Partial<Record<QuestionChoice['behavior'], string>> = {
     url: 'URLを開く', tel: '電話をかける', add_friend: '友だち追加へ', mail: 'メールを送る', form: '回答フォームを開く',
   }
-  if (behavior[choice.behavior]) parts.push(behavior[choice.behavior] as string)
+  if (Object.hasOwn(behavior, choice.behavior) && behavior[choice.behavior]) parts.push(behavior[choice.behavior] as string)
+  if ((choice.scenario && choice.scenario.op !== 'start' && choice.scenario.op !== 'stop') || (choice.behavior === 'scenario' && !choice.scenario) || !['none', 'url', 'tel', 'add_friend', 'mail', 'form', 'scenario'].includes(choice.behavior)) parts.push('動きを確認できません')
   return parts.length ? parts.join('・') : '何もしない'
 }
 

@@ -16,8 +16,10 @@ import { api, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
 import { Tabs } from '@/components/shared/tabs'
+import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 import styles from './shell.module.css'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -75,27 +77,32 @@ export function useWebhookOverview() {
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
   const generationRef = useRef(0)
+  const summaryGenerationRef = useRef(0)
   const [outgoing, setOutgoing] = useState<OutgoingWebhookOverview[]>([])
   const [outgoingStatus, setOutgoingStatus] = useState<LoadStatus>('loading')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [incomingStatus, setIncomingStatus] = useState<LoadStatus>('loading')
   const [summary, setSummary] = useState<WebhookInteractionSummary | null>(null)
+  const [summaryStatus, setSummaryStatus] = useState<LoadStatus>('loading')
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const generation = ++generationRef.current
+    const summaryGeneration = ++summaryGenerationRef.current
     const accountId = selectedAccountId
     setLoadedAccountId(null)
+    setOutgoing([])
+    setIncoming([])
+    setSummary(null)
     if (!accountId) {
-      setOutgoing([])
-      setIncoming([])
-      setSummary(null)
       setOutgoingStatus('ready')
       setIncomingStatus('ready')
+      setSummaryStatus('ready')
       return
     }
     setOutgoingStatus('loading')
     setIncomingStatus('loading')
+    setSummaryStatus('loading')
     const [outgoingResult, incomingResult, interactionsResult] = await Promise.allSettled([
       api.webhooks.outgoing.list(accountId),
       api.webhooks.incoming.list(accountId),
@@ -106,22 +113,47 @@ export function useWebhookOverview() {
       setOutgoing(outgoingResult.value.data)
       setOutgoingStatus('ready')
     } else {
-      setOutgoing([])
       setOutgoingStatus('error')
     }
     if (incomingResult.status === 'fulfilled' && incomingResult.value.success) {
       setIncoming(incomingResult.value.data)
       setIncomingStatus('ready')
     } else {
-      setIncoming([])
       setIncomingStatus('error')
     }
-    setSummary(
-      interactionsResult.status === 'fulfilled' && interactionsResult.value.success && interactionsResult.value.data?.summary
-        ? interactionsResult.value.data.summary
-        : null,
-    )
+    if (summaryGenerationRef.current === summaryGeneration) {
+      if (interactionsResult.status === 'fulfilled' && interactionsResult.value.success && interactionsResult.value.data?.summary) {
+        setSummary(interactionsResult.value.data.summary)
+        setSummaryStatus('ready')
+      } else {
+        setSummaryStatus('error')
+      }
+    }
     setLoadedAccountId(accountId)
+  }, [selectedAccountId])
+
+  const reloadSummary = useCallback(async () => {
+    const summaryGeneration = ++summaryGenerationRef.current
+    const accountId = selectedAccountId
+    setSummary(null)
+    if (!accountId) {
+      setSummaryStatus('ready')
+      return
+    }
+    setSummaryStatus('loading')
+    try {
+      const res = await api.webhooks.interactions.list(accountId, { periodDays: 30, page: 1, limit: 1 })
+      if (summaryGenerationRef.current !== summaryGeneration || accountRef.current !== accountId) return
+      if (res.success && res.data?.summary) {
+        setSummary(res.data.summary)
+        setSummaryStatus('ready')
+      } else {
+        setSummaryStatus('error')
+      }
+    } catch {
+      if (summaryGenerationRef.current !== summaryGeneration || accountRef.current !== accountId) return
+      setSummaryStatus('error')
+    }
   }, [selectedAccountId])
 
   useEffect(() => { void load() }, [load])
@@ -132,8 +164,10 @@ export function useWebhookOverview() {
     incoming,
     incomingStatus,
     summary,
+    summaryStatus,
     loadedAccountId,
     reload: load,
+    reloadSummary,
     outgoingCount: outgoingStatus === 'ready' && selectedAccountId ? outgoing.length : null,
     incomingCount: incomingStatus === 'ready' && selectedAccountId ? incoming.length : null,
   }
@@ -146,6 +180,7 @@ export interface BandCell {
   value: number | null
   unit: string
   detail: ReactNode
+  loading?: boolean
 }
 
 /*
@@ -156,8 +191,11 @@ export function overviewBandCells(args: {
   outgoing: OutgoingWebhookOverview[] | null
   incomingCount: number | null
   summary: WebhookInteractionSummary | null
+  outgoingLoading?: boolean
+  incomingLoading?: boolean
+  summaryLoading?: boolean
 }): BandCell[] {
-  const { outgoing, incomingCount, summary } = args
+  const { outgoing, incomingCount, summary, outgoingLoading = false, incomingLoading = false, summaryLoading = false } = args
   const active = outgoing === null ? null : outgoing.filter((item) => item.isActive).length
   return [
     {
@@ -166,7 +204,8 @@ export function overviewBandCells(args: {
       icon: <ListChecks size={16} aria-hidden="true" />,
       value: outgoing === null ? null : outgoing.length,
       unit: '件',
-      detail: outgoing === null || active === null ? '読み込めませんでした' : `有効 ${active}・停止中 ${outgoing.length - active}`,
+      detail: outgoingLoading ? '読み込んでいます' : outgoing === null || active === null ? '読み込めませんでした' : `有効 ${active}・停止中 ${outgoing.length - active}`,
+      loading: outgoingLoading,
     },
     {
       key: 'sent',
@@ -174,7 +213,8 @@ export function overviewBandCells(args: {
       icon: <Send size={16} aria-hidden="true" />,
       value: summary ? summary.outgoing : null,
       unit: '回',
-      detail: summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))} 回` : '集計を読み込めませんでした',
+      detail: summaryLoading ? '読み込んでいます' : summary ? `成功 ${formatNumber(Math.max(0, summary.outgoing - summary.outgoingFailed))} 回` : '集計を読み込めませんでした',
+      loading: summaryLoading,
     },
     {
       key: 'failed',
@@ -182,7 +222,8 @@ export function overviewBandCells(args: {
       icon: <TriangleAlert size={16} aria-hidden="true" />,
       value: summary ? summary.failed : null,
       unit: '件',
-      detail: summary ? '「やり取りの記録」からやり直せます' : '集計を読み込めませんでした',
+      detail: summaryLoading ? '読み込んでいます' : summary ? '「やり取りの記録」からやり直せます' : '集計を読み込めませんでした',
+      loading: summaryLoading,
     },
     {
       key: 'incoming',
@@ -190,26 +231,46 @@ export function overviewBandCells(args: {
       icon: <Inbox size={16} aria-hidden="true" />,
       value: incomingCount,
       unit: '件',
-      detail: summary ? `直近30日 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',
+      detail: summaryLoading ? '読み込んでいます' : summary ? `直近30日 ${formatNumber(summary.incoming)} 回` : '集計を読み込めませんでした',
+      loading: incomingLoading,
     },
   ]
 }
 
-export function WebhookBand({ cells }: { cells: BandCell[] }) {
+export function WebhookBand({
+  cells,
+  summaryError = false,
+  onRetrySummary,
+}: {
+  cells: BandCell[]
+  summaryError?: boolean
+  onRetrySummary?: () => void
+}) {
   return (
-    <KpiBand border="inset-top" aria-label="外部連携の数の帯">
-      {cells.map((cell) => (
-        <KpiCard
-          key={cell.key}
-          presentation="band"
-          title={cell.title}
-          icon={cell.icon}
-          value={cell.value}
-          unit={cell.value === null ? '' : cell.unit}
-          detail={cell.detail}
-        />
-      ))}
-    </KpiBand>
+    <>
+      <KpiBand border="inset-top" aria-label="外部連携の数の帯">
+        {cells.map((cell) => (
+          <KpiCard
+            key={cell.key}
+            presentation="band"
+            title={cell.title}
+            icon={cell.icon}
+            value={cell.value}
+            unit={cell.value === null ? '' : cell.unit}
+            detail={cell.detail}
+            loading={cell.loading}
+          />
+        ))}
+      </KpiBand>
+      {summaryError && onRetrySummary ? (
+        <Notice tone="danger">
+          直近30日のやり取り集計を読み込めませんでした。
+          <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={onRetrySummary}>
+            もう一度読み込む
+          </Button>
+        </Notice>
+      ) : null}
+    </>
   )
 }
 

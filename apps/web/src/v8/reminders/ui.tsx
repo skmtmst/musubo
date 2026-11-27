@@ -146,17 +146,35 @@ export function WizardFooterV8({
   nextDisabled?: boolean
   nextBusy?: boolean
 }) {
+  const anyBusy = draftBusy || nextBusy
+  const cancelOff = cancelDisabled || anyBusy
+  const draftOff = draftBusy || nextBusy
+  const nextOff = nextDisabled || anyBusy
+  const handleCancel = () => {
+    if (cancelOff) return
+    return onCancel()
+  }
+  const handleDraft = onDraft
+    ? () => {
+        if (draftOff) return
+        return onDraft()
+      }
+    : undefined
+  const handleNext = () => {
+    if (nextOff) return
+    return onNext()
+  }
   return (
     <>
-      <Button type="button" onClick={onCancel} disabled={cancelDisabled}>
+      <Button type="button" onClick={handleCancel} disabled={cancelOff}>
         キャンセル
       </Button>
-      {onDraft ? (
-        <Button type="button" variant="secondary" onClick={onDraft} disabled={draftBusy} busy={draftBusy} busyLabel="保存中…">
+      {handleDraft ? (
+        <Button type="button" variant="secondary" onClick={handleDraft} disabled={draftOff} busy={draftBusy} busyLabel="保存中…">
           {draftLabel}
         </Button>
       ) : null}
-      <Button type="button" variant="primary" onClick={onNext} disabled={nextDisabled || nextBusy} busy={nextBusy} busyLabel="処理中…">
+      <Button type="button" variant="primary" onClick={handleNext} disabled={nextOff} busy={nextBusy} busyLabel="処理中…">
         {nextLabel}
         {nextIcon}
       </Button>

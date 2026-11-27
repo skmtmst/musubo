@@ -71,7 +71,8 @@ export function checkAttachment(file: Pick<File, 'name' | 'type' | 'size'>, slot
   const mimeType = mimeOf(file)
   const isImage = mimeType === 'image/jpeg' || mimeType === 'image/png'
   const isVideo = mimeType === 'video/mp4'
-  const isFile = mimeType in CHAT_FILE_TYPES
+  const isFile = Object.prototype.hasOwnProperty.call(CHAT_FILE_TYPES, mimeType)
+  if (!Number.isSafeInteger(file.size)) return { ok: false, reason: `「${file.name}」の大きさを確認できません。選び直してください` }
   if (file.size <= 0) return { ok: false, reason: `「${file.name}」は中身が空です` }
   if (slot !== 'file' && isImage) {
     if (file.size > CHAT_IMAGE_PICK_MAX_BYTES) return { ok: false, reason: `画像は1MBまでです（「${file.name}」は${formatSize(file.size)}）` }

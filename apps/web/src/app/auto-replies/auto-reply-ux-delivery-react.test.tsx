@@ -155,8 +155,6 @@ test('読み込み中は出来上がりと同じ形の骨組みを出す', async
   listReplies.mockImplementation(() => new Promise(() => undefined) as unknown as Promise<never>)
   renderPage()
   await eventually(() => {
-    const busy = host.querySelector('[aria-busy="true"]')
-    if (!busy) throw new Error('no busy container yet')
-    if (!busy.querySelector('[data-skeleton]')) throw new Error('no skeleton yet')
+    if (!host.querySelector('[aria-busy="true"] [data-skeleton]')) throw new Error('no skeleton yet')
   }, 8000)
 })

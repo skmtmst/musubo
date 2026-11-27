@@ -71,6 +71,13 @@ export default function Event() {
           api.getEventSlots(id!),
         ]);
         if (cancelled) return;
+        if (!e || typeof e.id !== 'string' || e.id !== id || typeof e.name !== 'string' ||
+            !s || !Array.isArray(s.items) || !s.items.every(slot => slot &&
+              typeof slot.id === 'string' && slot.id.trim() !== '' &&
+              typeof slot.starts_at === 'string' && Number.isFinite(Date.parse(slot.starts_at)) &&
+              typeof slot.ends_at === 'string' && Number.isFinite(Date.parse(slot.ends_at)))) {
+          throw new Error('Invalid event detail response');
+        }
         setEvent(e);
         setSlots(s.items);
         setSelectedId(null);

@@ -80,7 +80,35 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const lock = useRef(false)
   const requestId = useRef(0)
   const formRequestId = useRef(0)
+  const webinarScope = useRef({ webinarId, generation: 0 })
+  if (webinarScope.current.webinarId !== webinarId) {
+    webinarScope.current = { webinarId, generation: webinarScope.current.generation + 1 }
+  }
+  const prevWebinarIdRef = useRef(webinarId)
   const onCtasReport = ctx.onCtasReport
+
+  useEffect(() => {
+    const scope = webinarScope.current
+    if (prevWebinarIdRef.current !== webinarId) {
+      prevWebinarIdRef.current = webinarId
+      setConflict(false)
+      setLatest(null)
+      setCompareOpen(false)
+      setReading(false)
+      setReplaceConfirm(false)
+      setRegistrationError('')
+      setMessage(null)
+      setSavedForm(editor.registrationFormId ?? '')
+      setRegistrationFormId(editor.registrationFormId ?? '')
+    }
+    return () => {
+      if (webinarScope.current === scope) {
+        webinarScope.current = { webinarId: scope.webinarId, generation: scope.generation + 1 }
+      }
+    }
+    // webinarId が変わったときだけ前のウェビナーの競合・比較・フォーム選択を初期化する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [webinarId])
 
   const loadCtas = useCallback(async () => {
     const id = ++requestId.current
@@ -156,9 +184,13 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const saveCards = async (): Promise<boolean> => {
     if (ctas === null) return false
     if (fields.submit().length > 0) { setMessage(null); return false }
+    const targetWebinarId = webinarId
+    const targetGeneration = webinarScope.current.generation
+    const isSameWebinar = () => webinarScope.current.webinarId === targetWebinarId && webinarScope.current.generation === targetGeneration
     const next = ctas.map((card, i) => ({ ...card, atSeconds: parseMinSec(times[i]) ?? 0 }))
     try {
-      await webinarApi.saveCtas(webinarId, next)
+      await webinarApi.saveCtas(targetWebinarId, next)
+      if (!isSameWebinar()) return false
       setCtas(next)
       setTimes(next.map((card) => fmtMinSec(card.atSeconds)))
       setSavedCards(JSON.stringify([next, next.map((card) => fmtMinSec(card.atSeconds))]))
@@ -166,6 +198,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       onCtasReport(next)
       return true
     } catch (cause) {
+      if (!isSameWebinar()) return false
       const fieldFailure = saveErrors.capture(cause);
 
       if (isConflict(cause)) { setConflictScope('cards'); setConflict(true); setLatest(null); return false }
@@ -177,17 +210,22 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const saveForm = async (): Promise<boolean> => {
     if (forms.state !== 'ready') { setRegistrationError('回答フォームの候補を読み込んでから保存してください。'); return false }
     if (registrationFormId && !published.some((item) => item.id === registrationFormId)) { setRegistrationError('選んだ申込フォームは今の候補にありません。公開中のフォームを選び直してください。'); return false }
+    const targetWebinarId = webinarId
+    const targetGeneration = webinarScope.current.generation
+    const isSameWebinar = () => webinarScope.current.webinarId === targetWebinarId && webinarScope.current.generation === targetGeneration
     setRegistrationError('')
     try {
-      const response = await webinarApi.saveEditor(webinarId, {
+      const response = await webinarApi.saveEditor(targetWebinarId, {
         expectedVersion: editor.version,
         ...(editor.updatedAt ? { expectedUpdatedAt: editor.updatedAt } : null),
         registrationFormId: registrationFormId || null,
       })
+      if (!isSameWebinar()) return false
       ctx.onEditorChange(response.data)
       setSavedForm(registrationFormId)
       return true
     } catch (cause) {
+      if (!isSameWebinar()) return false
       const fieldFailure = saveErrors.capture(cause);
 
       if (isConflict(cause)) { setConflictScope('form'); setConflict(true); setLatest(null); return false }
@@ -227,22 +265,31 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   /* 同時編集：申込フォームだけの競合ではカードの入力を残す。カード自体の競合は確認して最新版へ置き換える。 */
   const readLatest = async () => {
     if (reading) return
+    const targetWebinarId = webinarId
+    const targetGeneration = webinarScope.current.generation
+    const isSameWebinar = () => webinarScope.current.webinarId === targetWebinarId && webinarScope.current.generation === targetGeneration
     setReading(true)
     try {
-      const [editorRes, ctasRes] = await Promise.all([webinarApi.editor(webinarId), webinarApi.ctas(webinarId).catch(() => null)])
+      const [editorRes, ctasRes] = await Promise.all([webinarApi.editor(targetWebinarId), webinarApi.ctas(targetWebinarId).catch(() => null)])
+      if (!isSameWebinar()) return
       setLatest({ editor: editorRes.data, ctas: ctasRes && Array.isArray(ctasRes.data) ? ctasRes.data : null })
       setCompareOpen(true)
     } catch (saveFailure) {
+      if (!isSameWebinar()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setRegistrationError('最新版を読み込めませんでした。入力は残っています。もう一度お試しください。') }
     } finally {
-      setReading(false)
+      if (isSameWebinar()) setReading(false)
     }
   }
   const acceptLatest = async () => {
-    const next = latest ?? await webinarApi.editor(webinarId).then((res) => ({ editor: res.data, ctas: null })).catch(() => null)
+    const targetWebinarId = webinarId
+    const targetGeneration = webinarScope.current.generation
+    const isSameWebinar = () => webinarScope.current.webinarId === targetWebinarId && webinarScope.current.generation === targetGeneration
+    const next = latest ?? await webinarApi.editor(targetWebinarId).then((res) => ({ editor: res.data, ctas: null })).catch(() => null)
+    if (!isSameWebinar()) return false
     if (!next) { setRegistrationError('最新版を読み込めませんでした。もう一度お試しください。'); return false }
     ctx.onEditorChange(next.editor)
     setRegistrationFormId(next.editor.registrationFormId ?? '')

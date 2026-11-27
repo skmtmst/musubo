@@ -1420,3 +1420,40 @@ it('状態の切り替えは件数とAPI条件を保ち、矢印で1つだけ選
   expect(options[5].getAttribute('aria-pressed')).toBe('true')
   expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'failed,partial_failed', cursor: 0 }))
 })
+
+describe('配信状態ごとの削除入口', () => {
+  const statuses = [
+    ['draft', true], ['scheduled', true], ['sending', false], ['sent', false], ['failed', false],
+  ] as const
+  function givenStatus(status: string) {
+    listBroadcasts.mockImplementation(async () => ({
+      success: true, data: [{ ...base, id: 'status-row', status, displayStatus: status }],
+      kpis: {}, statusCounts: { all: 1 }, pagination: { total: 1, limit: 20, cursor: 0, nextCursor: null },
+    }))
+  }
+  it.each(statuses)('行メニュー: %s は削除入口 %s', async (status, allowed) => {
+    resetUrl(); givenStatus(status)
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    const trigger = host.querySelector<HTMLButtonElement>('tr[data-row-id="status-row"] button[aria-haspopup="menu"]')!
+    expect(trigger).toBeTruthy()
+    act(() => trigger.click()); await flush()
+    const menu = document.querySelector('[role="menu"]')!
+    expect(menu).toBeTruthy()
+    expect([...menu.querySelectorAll('[role="menuitem"]')].some(item => item.textContent?.trim() === '削除する')).toBe(allowed)
+  })
+  it.each(statuses)('詳細パネル: %s は削除入口 %s', async (status, allowed) => {
+    resetUrl(); givenStatus(status)
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    const row = host.querySelector<HTMLElement>('tr[data-row-id="status-row"]')!
+    expect(row).toBeTruthy()
+    act(() => row.click()); await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')!
+    expect(panel).toBeTruthy()
+    const trigger = panel.querySelector<HTMLButtonElement>('footer [data-row-menu]')!
+    expect(trigger).toBeTruthy()
+    act(() => trigger.click()); await flush()
+    const menu = document.querySelector('[role="menu"]')!
+    expect(menu).toBeTruthy()
+    expect([...menu.querySelectorAll('[role="menuitem"]')].some(item => item.textContent?.trim() === '削除する')).toBe(allowed)
+  })
+})

@@ -31,23 +31,42 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
   const busyChange = useRef(onBusyChange)
   busyChange.current = onBusyChange
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [scopedState, setScopedState] = useState<{ scope: string; error: string; file: File | null }>({
+    scope,
+    error: '',
+    file: null,
+  })
+  const error = scopedState.scope === scope ? scopedState.error : ''
+  const file = scopedState.scope === scope ? scopedState.file : null
   useEffect(() => { alive.current = true; return () => { alive.current = false; busyChange.current(false) } }, [])
   const send = async (selected: File) => {
     if (disabled || locked.current) return
-    setFile(selected); setError('')
-    const invalid = validateCarouselImage(selected, maxMB)
-    if (invalid) { setError(invalid); return }
     const requestedScope = scope
+    setScopedState({ scope: requestedScope, file: selected, error: '' })
+    const invalid = validateCarouselImage(selected, maxMB)
+    if (invalid) { setScopedState({ scope: requestedScope, file: selected, error: invalid }); return }
     locked.current = true; setBusy(true); busyChange.current(true)
     try {
       const nextUrl = await upload(selected)
       if (!alive.current) return
-      if (latestScope.current !== requestedScope) { setError('編集中のカードかアカウントが変わったため、画像を反映しませんでした。選び直してください。'); return }
-      onUploaded(nextUrl); setFile(null)
+      if (latestScope.current !== requestedScope) {
+        setScopedState({
+          scope: latestScope.current,
+          file: null,
+          error: '編集中のカードかアカウントが変わったため、画像を反映しませんでした。選び直してください。',
+        })
+        return
+      }
+      onUploaded(nextUrl)
+      setScopedState({ scope: requestedScope, file: null, error: '' })
     } catch (caught) {
-      if (alive.current) setError(uploadReasonOf(caught) || '画像を登録できませんでした。時間をおいて、もう一度お試しください。')
+      if (alive.current && latestScope.current === requestedScope) {
+        setScopedState({
+          scope: requestedScope,
+          file: selected,
+          error: uploadReasonOf(caught) || '画像を登録できませんでした。時間をおいて、もう一度お試しください。',
+        })
+      }
     } finally {
       locked.current = false
       if (alive.current) { setBusy(false); busyChange.current(false) }
@@ -65,7 +84,11 @@ export default function CarouselImage({ url, disabled, maxMB = 10, upload, onUpl
         error={error}
         disabled={disabled}
         onFile={(chosen) => void send(chosen)}
-        onRemove={() => onUploaded('')}
+        onRemove={() => {
+          if (disabled || locked.current) return
+          setScopedState({ scope, file: null, error: '' })
+          onUploaded('')
+        }}
         onMediaPick={onMediaPick}
         onUrl={onUrl}
       /></SaveErrorField>

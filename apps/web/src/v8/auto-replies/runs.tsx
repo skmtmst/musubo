@@ -187,6 +187,9 @@ export default function AutoReplyRunsV8() {
   const [actionMessage, setActionMessage] = useState('')
   const [stopOpen, setStopOpen] = useState(false)
   const [stopAccount, setStopAccount] = useState<{ ruleId: string; accountId: string | null; version: number } | null>(null)
+  const [stopLoadError, setStopLoadError] = useState('')
+  const [stopLoading, setStopLoading] = useState(false)
+  const [stopLoadAttempt, setStopLoadAttempt] = useState(0)
   const [stopReason, setStopReason] = useState('')
   const [stopping, setStopping] = useState(false)
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -195,6 +198,8 @@ export default function AutoReplyRunsV8() {
   const [menuId, setMenuId] = useState<string | null>(null)
   const exportCancelledRef = useRef(false)
   const loadSeqRef = useRef(0)
+  const loadInFlightRef = useRef(false)
+  const stopInFlightRef = useRef(false)
 
   usePageTitle(data ? `${data.rule.name}・実行結果` : '自動応答・実行結果')
 
@@ -213,9 +218,11 @@ export default function AutoReplyRunsV8() {
     return { from: periodFrom(period, new Date()) ?? undefined, to: undefined }
   }, [period, dateFrom, dateTo])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ userInitiated = false } = {}) => {
+    if (userInitiated && loadInFlightRef.current) return
     const seq = loadSeqRef.current + 1
     loadSeqRef.current = seq
+    loadInFlightRef.current = true
     setLoading(true)
     setError('')
     try {
@@ -238,7 +245,10 @@ export default function AutoReplyRunsV8() {
       setData(null)
       setError('実行結果を読み込めませんでした。時間を置いてもう一度お試しください。')
     } finally {
-      if (loadSeqRef.current === seq) setLoading(false)
+      if (loadSeqRef.current === seq) {
+        loadInFlightRef.current = false
+        setLoading(false)
+      }
     }
   }, [page, pageSize, requestedRuleId, range])
 
@@ -248,14 +258,34 @@ export default function AutoReplyRunsV8() {
     const ruleId = data?.rule.id
     if (!stopOpen || !ruleId) return
     let active = true
+    stopInFlightRef.current = true
     setStopAccount(null)
+    setStopLoadError('')
+    setStopLoading(true)
     void api.autoReplies.get(ruleId).then(response => {
-      if (active && response.success && response.data.id === ruleId && (response.data.lineAccountId === null || typeof response.data.lineAccountId === 'string') && Number.isSafeInteger(response.data.confirmationRevision) && response.data.confirmationRevision >= 1) {
+      if (!active) return
+      if (response.success && response.data.id === ruleId && (response.data.lineAccountId === null || typeof response.data.lineAccountId === 'string') && Number.isSafeInteger(response.data.confirmationRevision) && response.data.confirmationRevision >= 1) {
         setStopAccount({ ruleId, accountId: response.data.lineAccountId, version: response.data.confirmationRevision })
+      } else {
+        setStopLoadError('確認する内容を読み込めませんでした。通信を確かめて、もう一度読み込んでください。')
       }
-    }).catch(() => {})
+    }).catch(() => {
+      if (active) setStopLoadError('確認する内容を読み込めませんでした。通信を確かめて、もう一度読み込んでください。')
+    }).finally(() => {
+      if (active) {
+        stopInFlightRef.current = false
+        setStopLoading(false)
+      }
+    })
     return () => { active = false }
-  }, [stopOpen, data?.rule.id])
+  }, [stopOpen, data?.rule.id, stopLoadAttempt])
+
+  const retryStopLoad = () => {
+    if (stopInFlightRef.current) return
+    stopInFlightRef.current = true
+    setStopLoading(true)
+    setStopLoadAttempt((count) => count + 1)
+  }
 
   const total = data?.pagination.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -452,6 +482,9 @@ export default function AutoReplyRunsV8() {
 
   const filteredEmpty = filter !== 'all' || Boolean(search.trim() || dateFrom || dateTo) || period !== 'month'
   const clearEmptyFilters = () => { setFilter('all'); setSearch(''); setPeriod('month'); setDateFrom(''); setDateTo(''); setPage(1) }
+  const kpiLoading = loading && !data
+  const kpiError = Boolean(error) && !data
+  const kpiStatusDetail = kpiError ? '読み込めませんでした' : kpiLoading ? '読み込んでいます' : null
 
   return (
     <DetailPage
@@ -460,7 +493,7 @@ export default function AutoReplyRunsV8() {
       help="いつ・誰に・何を返したか、失敗した処理を見ます。"
       identity={<></>}
       actions={<div className={styles.headActions}>
-          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) { setActionMessage(''); setStopAccount(null); setStopOpen(true) } }} disabled={!canChange || !isActiveRule || stopping}>
+          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) { setActionMessage(''); setStopLoadError(''); setStopAccount(null); setStopOpen(true) } }} disabled={!canChange || !isActiveRule || stopping}>
             <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
         {data?.rule.id ? (
@@ -482,15 +515,15 @@ export default function AutoReplyRunsV8() {
 
       <div className={styles.kpis}>
       <KpiBand data-design="KPIs">
-        <KpiCard presentation="band" icon={<MessageSquare size={16} aria-hidden="true" />} title="今月当たった" value={data ? data.summary.monthHits : null} unit="回"
-          detail={`累計 ${data ? formatNumber(data.summary.totalHits) : emptyValue('unknown')}回`} />
-        <KpiCard presentation="band" icon={<Users size={16} aria-hidden="true" />} title="担当者へ引き継ぎ" value={data ? data.summary.handovers : null} unit="件"
-          detail={`確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
-        <KpiCard presentation="band" icon={<TriangleAlert size={16} aria-hidden="true" />} title="失敗した処理" value={data ? failedCount : null} unit="件"
-          detail={failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です'} />
-        <KpiCard presentation="band" icon={<Timer size={16} aria-hidden="true" />} title="平均で返すまで"
+        <KpiCard presentation="band" icon={<MessageSquare size={16} aria-hidden="true" />} title="今月当たった" loading={kpiLoading} value={data ? data.summary.monthHits : null} unit="回"
+          detail={kpiStatusDetail ?? `累計 ${data ? formatNumber(data.summary.totalHits) : emptyValue('unknown')}回`} />
+        <KpiCard presentation="band" icon={<Users size={16} aria-hidden="true" />} title="担当者へ引き継ぎ" loading={kpiLoading} value={data ? data.summary.handovers : null} unit="件"
+          detail={kpiStatusDetail ?? `確認待ち ${data ? formatNumber(data.handovers.waiting) : emptyValue('unknown')}件`} />
+        <KpiCard presentation="band" icon={<TriangleAlert size={16} aria-hidden="true" />} title="失敗した処理" loading={kpiLoading} value={data ? failedCount : null} unit="件"
+          detail={kpiStatusDetail ?? (failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です')} />
+        <KpiCard presentation="band" icon={<Timer size={16} aria-hidden="true" />} title="平均で返すまで" loading={kpiLoading}
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
-          detail={`最後に動いた ${data ? polishFormatListDateTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
+          detail={kpiStatusDetail ?? `最後に動いた ${data ? polishFormatListDateTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>
       </div>
 
@@ -545,7 +578,7 @@ export default function AutoReplyRunsV8() {
         {loading ? (
           <ListState kind="loading" />
         ) : error ? (
-          <ListState kind="error" description={error} onRetry={() => void load()} />
+          <ListState kind="error" description={error} onRetry={() => void load({ userInitiated: true })} />
         ) : items.length === 0 ? (
           <ListState kind="empty" emptyPreset={filteredEmpty ? 'filtered' : 'readonly'} title={filteredEmpty ? '条件に合う記録はありません' : '実行結果はまだありません'} description={filteredEmpty ? undefined : '自動応答が動くと、ここに結果が残ります。'} action={filteredEmpty ? <Button onClick={clearEmptyFilters}>条件を外す</Button> : undefined} />
         ) : visibleItems.length === 0 ? (
@@ -619,7 +652,7 @@ export default function AutoReplyRunsV8() {
 
       <DashboardColumns layout="cards">{[
         <CreateSummaryCard key="triggers" title="言葉ごとの当たった回数" variant="record" rows={data ? data.triggerBreakdown.map(item => ({ key: item.trigger, label: item.trigger, value: `${formatNumber(item.count)} 回${item.share === null ? '' : `（${(item.share * 100).toFixed(1)}%）`}` })) : []}>
-          {loading ? <ListState kind="loading" /> : !data || data.triggerBreakdown.length === 0 ? <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、きっかけごとの件数が分かります。" /> : null}
+          {loading ? <ListState kind="loading" /> : error && !data ? <ListState kind="error" title="内訳を読み込めませんでした" description="時間を置いてもう一度お試しください。" onRetry={() => void load({ userInitiated: true })} /> : !data || data.triggerBreakdown.length === 0 ? <ListState kind="empty" title="内訳はまだありません" description="実行結果がたまると、きっかけごとの件数が分かります。" /> : null}
         </CreateSummaryCard>,
         <CreateSummaryCard key="handovers" title="担当者への引き継ぎ" variant="record" rows={[
           { label: '確認待ち', value: data ? `${formatNumber(data.handovers.waiting)}件` : emptyValue('unknown') },
@@ -639,11 +672,23 @@ export default function AutoReplyRunsV8() {
         destructive
         busy={stopping}
         confirmDisabled={!stopAccount || stopAccount.ruleId !== data?.rule.id}
-        confirmDisabledReason="確認する内容を読み込んでください。"
+        confirmDisabledReason={stopLoadError ? '最新の状態を読み直してからお試しください。' : '確認する内容を読み込んでください。'}
         designNode="i8F12"
         error={actionMessage || undefined} onSuccess={() => setStopOpen(false)} onConfirm={() => stopRule()}
-        onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
+        onCancel={() => { if (!stopping) { setStopOpen(false); setStopLoadError(''); setStopReason('') } }}
       >
+        {stopLoadError ? (
+          <Notice
+            tone="danger"
+            action={
+              <Button type="button" variant="secondary" onClick={retryStopLoad} disabled={stopLoading} busy={stopLoading} busyLabel="読み込んでいます…">
+                もう一度読み込む
+              </Button>
+            }
+          >
+            {stopLoadError}
+          </Notice>
+        ) : null}
         <OperationTargetSummary allAccounts={Boolean(stopAccount && stopAccount.ruleId === data?.rule.id && stopAccount.accountId === null)} accounts={stopAccount && stopAccount.ruleId === data?.rule.id && stopAccount.accountId === null ? [] : [{ id: stopAccount && stopAccount.ruleId === data?.rule.id ? stopAccount.accountId ?? '' : '' }]} />
         <SaveErrorField names={["stopReason","reason","stop_reason"]}><SharedTextField
           type="text"

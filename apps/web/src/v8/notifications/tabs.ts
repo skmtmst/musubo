@@ -42,7 +42,7 @@ export function notificationTabCount(counts: NotificationCenterData['counts'], t
 
 /** LINE の鍵（チャネルアクセストークン）の知らせ。行き先はそのアカウントの接続の設定。 */
 export function isLineTokenNotification(item: Pick<NotificationCenterItem, 'eventType'>): boolean {
-  return item.eventType.startsWith('line_token_')
+  return typeof item.eventType === 'string' && item.eventType.startsWith('line_token_')
 }
 
 /** 行の印。システムの知らせは三角、それ以外は光。 */

@@ -67,6 +67,7 @@ export function BasicsStageV8({
   const appliedTemplate = reminderTemplatesV8.find((template) => template.id === appliedTemplateId) ?? null
 
   function requestTemplate(template: ReminderTemplateV8) {
+    if (busy) return
     const hasInputsToReplace =
       (appliedTemplateId !== null && appliedTemplateId !== template.id) ||
       value.triggerFieldId !== '' ||
@@ -119,11 +120,11 @@ export function BasicsStageV8({
         <WizardFooterV8
           onCancel={onCancel}
           cancelDisabled={busy}
-          onDraft={() => onSaveDraft(value)}
+          onDraft={() => { if (!busy) onSaveDraft(value) }}
           draftBusy={busy}
           nextLabel="次へ：対象者と止める条件"
           nextIcon={<ArrowRight size={16} aria-hidden="true" />}
-          onNext={() => onSave(value)}
+          onNext={() => { if (!candidatesPending && !busy && value.name.trim()) onSave(value) }}
           nextDisabled={candidatesPending || busy || !value.name.trim()}
         />
       )} dirty={false}
@@ -144,11 +145,13 @@ export function BasicsStageV8({
         title="ひな形の内容で上書きしますか？"
         description="基準日・繰り返し・通知日時・本文をひな形の内容に置き換えます。いまの通知は残りません。"
         confirmLabel="このひな形を使う"
+        busy={busy}
         onConfirm={() => {
+          if (busy) return
           if (pendingTemplate) applyTemplate(pendingTemplate)
           setPendingTemplate(null)
         }}
-        onCancel={() => setPendingTemplate(null)}
+        onCancel={() => { if (!busy) setPendingTemplate(null) }}
       />
     </CreatePage>
   )

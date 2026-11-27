@@ -78,19 +78,29 @@ export default function NewReminderV8() {
    * 以前は保存の直前に最新を読み直して重ねていたので、相手の基本設定を黙って上書きしていた。
    */
   const [savedDraft, setSavedDraft] = useState<ReminderDraftVersion | null>(null)
+  const accountScope = useRef({ accountId: selectedAccountId, generation: 0 })
+  if (accountScope.current.accountId !== selectedAccountId) {
+    accountScope.current = { accountId: selectedAccountId, generation: accountScope.current.generation + 1 }
+  }
+  const prevAccountRef = useRef(selectedAccountId)
   const saveConflict = useSaveConflict<ReminderDraftSettings>({
     fetchLatest: async () => {
       if (!savedId) return null
+      const scope = accountScope.current
       const response = await api.reminders.getDraft(savedId)
+      if (accountScope.current.accountId !== scope.accountId || accountScope.current.generation !== scope.generation) return null
       if (!response.success || response.data.reminderId !== savedId) return null
       return response.data.settings
     },
     // 「最新を読み込んで続ける」。入力中の基本設定は最新の版で置き換わる。
     reload: async () => {
       if (!savedId) return
+      const scope = accountScope.current
+      const sameAccount = () => accountScope.current.accountId === scope.accountId && accountScope.current.generation === scope.generation
       setError('')
       try {
         const response = await api.reminders.getDraft(savedId)
+        if (!sameAccount()) return
         if (!response.success) throw new Error(response.error)
         setSavedDraft(response.data)
         setValue(basicsFromDraft(response.data.settings))
@@ -98,6 +108,7 @@ export default function NewReminderV8() {
         saveConflict.clear()
         notifyToast('最新の内容を読み込みました')
       } catch (saveFailure) {
+        if (!sameAccount()) return
         const fieldFailure = saveErrors.capture(saveFailure)
 
         { if (!fieldFailure) setError('最新の内容を読み込めませんでした。もう一度お試しください。') }
@@ -127,6 +138,20 @@ export default function NewReminderV8() {
   savedIdRef.current = savedId
   const savedDraftRef = useRef(savedDraft)
   savedDraftRef.current = savedDraft
+
+  useEffect(() => {
+    if (prevAccountRef.current === selectedAccountId) return
+    prevAccountRef.current = selectedAccountId
+    savedIdRef.current = null
+    savedDraftRef.current = null
+    setSavedId(null)
+    setSavedDraft(null)
+    setSavedFingerprint(null)
+    setSaving('idle')
+    setError('')
+    saveConflict.clear()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId])
 
   const appliedTemplate = reminderTemplatesV8.find((template) => template.id === appliedTemplateId) ?? null
 
@@ -196,12 +221,16 @@ export default function NewReminderV8() {
       }
       return null
     }
+    const requestAccountId = selectedAccountId!
+    const requestGeneration = accountScope.current.generation
+    const stillSameAccount = () => accountScope.current.accountId === requestAccountId && accountScope.current.generation === requestGeneration
     if (!silent) {
       setSaving('saving')
       setError('')
       saveConflict.clear()
     }
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
+    if (!stillSameAccount()) return null
     const savedId = savedIdRef.current
     const savedDraft = savedDraftRef.current
     const sentFingerprint = fingerprint
@@ -215,11 +244,13 @@ export default function NewReminderV8() {
           if (!current.success) throw new Error(current.error)
           return current.data
         })()
+        if (!stillSameAccount()) return null
         const res = await api.reminders.saveDraft(
           savedId,
           basicsToDraft(base.settings, value),
           { expectedVersionId: base.versionId, expectedUpdatedAt: base.updatedAt },
         )
+        if (!stillSameAccount()) return null
         if (!res.success) throw new Error(res.error)
         savedDraftRef.current = res.data
         setSavedDraft(res.data)
@@ -245,7 +276,7 @@ export default function NewReminderV8() {
       const settings: ReminderDraftSettings = {
         name: value.name.trim(),
         description: value.description.trim() || null,
-        lineAccountId: selectedAccountId!,
+        lineAccountId: requestAccountId,
         folderId: value.folderId || null,
         triggerType: value.triggerType,
         deliveryMode: 'time',
@@ -261,6 +292,7 @@ export default function NewReminderV8() {
         steps: firstStep ? [firstStep] : [],
       }
       const res = await api.reminders.createDraft(settings)
+      if (!stillSameAccount()) return null
       if (!res.success) throw new Error(res.error)
       savedIdRef.current = res.data.reminderId
       savedDraftRef.current = res.data
@@ -271,6 +303,7 @@ export default function NewReminderV8() {
       if (!silent) notifyToast('下書きを保存しました')
       return res.data.reminderId
     } catch (caught) {
+      if (!stillSameAccount()) return null
       const fieldFailure = saveErrors.capture(caught)
 
       if (!silent) setSaving('failed')

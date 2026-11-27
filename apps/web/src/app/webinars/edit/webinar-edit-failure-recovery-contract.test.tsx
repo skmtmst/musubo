@@ -128,10 +128,10 @@ async function flush(): Promise<void> {
   useEffect が走る前の画面をそのまま写す。ここに前のウェビナーの中身が
   写っていたら、利用者は一瞬でもそれを見て触れることになる。
 */
-type Frame = { text: string; options: string[]; inputs: string[] }
+type Frame = { text: string; options: string[]; inputs: string[]; loading: boolean }
 
 function frameOf(container: FakeElement): Frame {
-  return { text: container.textContent, options: optionLabels(container), inputs: inputValues(container) }
+  return { text: container.textContent, options: optionLabels(container), inputs: inputValues(container), loading: Boolean(container.querySelector('[data-list-state="loading"][aria-busy="true"]')) }
 }
 
 async function mount(element: ReactElement) {
@@ -145,7 +145,7 @@ async function mount(element: ReactElement) {
     container,
     /* 返すのは切替の一コマ目。反映後の画面は container から読む。 */
     rerender: async (next: ReactElement): Promise<Frame> => {
-      let firstFrame: Frame = { text: '', options: [], inputs: [] }
+      let firstFrame: Frame = { text: '', options: [], inputs: [], loading: false }
       await act(async () => {
         flushSync(() => { root.render(next) })
         firstFrame = frameOf(container)
@@ -330,18 +330,18 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     apiMocks.get.mockImplementation((id: string) => (id === 'webinar-a' ? loadA.promise : loadB.promise))
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('読み込み中…')
+    expect(view.container.querySelector('[data-list-state="loading"][aria-busy="true"]')).toBeTruthy()
 
     navigationMocks.query = 'id=webinar-b&pane=review'
     const frame = await view.rerender(<EditWebinarPage />)
     /* 切替の一コマ目から、前のウェビナーの中身を出さない。 */
-    expect(frame.text).toContain('読み込み中…')
+    expect(frame.loading).toBe(true)
 
     /* 前のウェビナーの応答が先に届く。 */
     loadA.resolve({ data: { ...webinar, id: 'webinar-a', title: '前のウェビナーA' } })
     await flush()
     expect(view.container.textContent).not.toContain('前のウェビナーA')
-    expect(view.container.textContent).toContain('読み込み中…')
+    expect(view.container.querySelector('[data-list-state="loading"][aria-busy="true"]')).toBeTruthy()
 
     loadB.resolve({ data: { ...webinar, id: 'webinar-b', title: '後のウェビナーB' } })
     await flush()
@@ -363,7 +363,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     navigationMocks.query = 'id=webinar-b&pane=review'
     const frame = await view.rerender(<EditWebinarPage />)
     /* 切替の一コマ目に前の失敗文を持ち越さない。 */
-    expect(frame.text).toContain('読み込み中…')
+    expect(frame.loading).toBe(true)
     expect(frame.text).not.toContain('このウェビナーは見つかりません')
     expect(view.container.textContent).toContain('後のウェビナーB')
     expect(view.container.textContent).not.toContain('このウェビナーは見つかりません')

@@ -44,6 +44,7 @@ vi.mock('@/lib/api', async (original) => {
 })
 
 import SearchEdit from './search-edit'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 type Usage = { kind: 'broadcast' | 'automation' | 'scenario' | 'other'; id: string; name: string; mode: 'live' | 'fixed' }
 function detail(overrides: { usedIn?: Usage[] | undefined; canDelete?: boolean; matchCount?: number | null } = {}) {
@@ -69,6 +70,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  clearToastsForTest()
   vi.clearAllMocks()
 })
 
@@ -161,4 +163,37 @@ describe('保存した検索の編集', () => {
     expect(net.remove).toHaveBeenCalledWith('s1', 'acc')
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/tags?tab=searches'))
   })
+})
+
+
+it('検索条件の保存が完了したら知らせる', async () => {
+  render(<><SearchEdit /><ToastHost /></>)
+  const name = await screen.findByDisplayValue('VIPかつ未契約')
+  fireEvent.change(name, { target: { value: '新しい条件名' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
+  expect(await screen.findByText('検索条件を保存しました。')).toBeTruthy()
+})
+
+it('検索条件の保存が失敗したら完了を知らせない', async () => {
+  net.update.mockResolvedValueOnce({ success: false, error: '保存に失敗しました' })
+  render(<><SearchEdit /><ToastHost /></>)
+  const name = await screen.findByDisplayValue('VIPかつ未契約')
+  fireEvent.change(name, { target: { value: '新しい条件名' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
+  expect(screen.queryByText('検索条件を保存しました。')).toBeNull()
+  expect(screen.getByText('保存に失敗しました')).toBeTruthy()
+})
+
+it('アカウントを切り替えた後は、前の保存完了を知らせない', async () => {
+  let complete!: (value: unknown) => void
+  net.update.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve }))
+  const view = render(<><SearchEdit /><ToastHost /></>)
+  const name = await screen.findByDisplayValue('VIPかつ未契約')
+  fireEvent.change(name, { target: { value: '新しい条件名' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
+  expect(net.update).toHaveBeenCalledOnce()
+  account.id = 'another'
+  view.rerender(<><SearchEdit /><ToastHost /></>)
+  await act(async () => { complete({ success: true, data: detail() }) })
+  expect(screen.queryByText('検索条件を保存しました。')).toBeNull()
 })

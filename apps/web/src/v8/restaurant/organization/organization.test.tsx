@@ -180,9 +180,10 @@ it('WEB169：店舗編集のタイムゾーンは日本時間の表示だけ', a
 it('login candidate failure shows retry rather than an empty selector',async()=>{
  fixture.loginMembers.mockRejectedValueOnce(new Error('人工取得失敗'))
  render(<OrganizationV8 />)
- const error=await screen.findByText('ログインメンバーを読み込めませんでした')
- fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
- await waitFor(()=>expect(screen.queryByText('ログインメンバーを読み込めませんでした')).toBeNull())
+ await screen.findByText(/ログインメンバーを読み込めませんでした/)
+ fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+ await waitFor(()=>expect(screen.queryByText(/ログインメンバーを読み込めませんでした/)).toBeNull())
+ expect(fixture.loginMembers).toHaveBeenCalledTimes(2)
 })
 
 it('未発行の取り込みアドレスは未設定で表示し、発行の操作を保つ', async () => {

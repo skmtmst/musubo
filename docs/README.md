@@ -1,7 +1,9 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
+
 # 文書の入口
+
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
@@ -16,6 +18,8 @@
 - [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
+- [画面の読み込みと案内の修正の反映履歴](release-log/unreleased/266-kenta-train-night3-1127.md)（説明・2026-11-27確認）
+- [夜の列車3〜8の画面の修正の反映履歴](release-log/unreleased/270-kenta-train-a-1127.md)（説明・2026-11-27確認）
 - [EC連携の未対応の出来事の反映履歴](release-log/unreleased/259-kenta-ec-unknown-event.md)（説明・2026-11-27確認）
 - [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
@@ -1433,5 +1437,8 @@
 - [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
-- [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
+- [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
+- [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
+- [列車11の画面と記録の修正](release-log/unreleased/270-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
+- [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。

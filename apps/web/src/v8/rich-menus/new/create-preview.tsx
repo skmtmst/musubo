@@ -10,7 +10,7 @@ import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 export function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | undefined }) {
   if (!metric) return <>—</>
-  if (metric.state !== 'available' || metric.value === null) {
+  if (metric.state !== 'available' || metric.value === null || !Number.isFinite(metric.value)) {
     return <>数えられません</>
   }
   return <>{formatNumber(metric.value)}人</>
@@ -41,6 +41,7 @@ export function MenuContent({
   activePageId: string | null
 }) {
   const dims = RICH_MENU_DIMENSIONS[size]
+  const pct = (value: number, base: number) => (Number.isFinite(value) && base > 0 ? Math.max(0, Math.min(100, (value / base) * 100)) : 0)
   const areaBoxes = areas && areas.length > 0 ? (
     <div className={styles.previewMenuAreas} aria-hidden="true">
       {areas.map((a, i) => (
@@ -48,10 +49,10 @@ export function MenuContent({
           key={i}
           className={styles.previewMenuAreaBox}
           style={{
-            left: `${(a.x / dims.width) * 100}%`,
-            top: `${(a.y / dims.height) * 100}%`,
-            width: `${(a.w / dims.width) * 100}%`,
-            height: `${(a.h / dims.height) * 100}%`,
+            left: `${pct(a.x, dims.width)}%`,
+            top: `${pct(a.y, dims.height)}%`,
+            width: `${pct(a.w, dims.width)}%`,
+            height: `${pct(a.h, dims.height)}%`,
           }}
         >{a.label ? <><AreaIcon intent={a.intent} size={16} presentation="preview" /><span className={styles.previewMenuAreaName}>{a.label}</span></> : null}</span>
       ))}
@@ -72,7 +73,7 @@ export function MenuContent({
         /* 枠の比は大きさ（大 2500×1686・小 2500×843）で決める。画像が別の比・読み途中でも高さが潰れない。 */
         <div className={styles.previewMenuImage} data-rich-menu-size={size} style={{ aspectRatio: `${dims.width} / ${dims.height}` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
-          <img width={2500} height={1686} src={imageUrl} alt="メニューの画像" />
+          <img width={dims.width} height={dims.height} src={imageUrl} alt="メニューの画像" />
           {areaBoxes}
         </div>
       ) : (

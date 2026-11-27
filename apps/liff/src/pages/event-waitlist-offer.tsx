@@ -22,7 +22,7 @@ export function searchWithoutOfferToken(search: string): string {
   return rest ? `?${rest}` : '';
 }
 
-type State = 'loading' | 'loadError' | 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error';
+type State = 'loading' | 'loadError' | 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 'error' | 'uncertain';
 
 /**
  * キャンセル待ちの繰上げ承諾。LINE の案内から token で開く。
@@ -65,7 +65,12 @@ function EventWaitlistOfferCard({ token }: { token: string }) {
     try {
       const res = await api.eventWaitlistOffer(token);
       if (!mounted.current || mine !== generation.current) return;
-      if (!res?.data) throw new Error('Offer detail is missing');
+      if (!res?.data || typeof res.data.eventName !== 'string' ||
+          typeof res.data.startsAt !== 'string' || !Number.isFinite(Date.parse(res.data.startsAt)) ||
+          !Number.isInteger(res.data.partySize) || res.data.partySize < 1 ||
+          !(res.data.venueName === null || typeof res.data.venueName === 'string')) {
+        throw new Error('Offer detail is invalid');
+      }
       const remaining = Number.isFinite(res.data.remainingSeconds) ? Math.max(0, res.data.remainingSeconds) : 0;
       deadline.current = Date.now() + remaining * 1000;
       setRemainingSeconds(remaining);
@@ -109,12 +114,17 @@ function EventWaitlistOfferCard({ token }: { token: string }) {
   }, [offer, state]);
 
   const accept = async () => {
-    if (!mounted.current || !detail.current || (phase.current !== 'ready' && phase.current !== 'error')) return;
+    if (!mounted.current || !detail.current || (phase.current !== 'ready' && phase.current !== 'error' && phase.current !== 'uncertain')) return;
     const mine = generation.current;
     changeState('submitting');
     try {
-      await api.acceptEventWaitlistOffer(token);
+      const response = await api.acceptEventWaitlistOffer(token);
       if (!mounted.current || mine !== generation.current) return;
+      if (response?.success !== true || response.data?.status !== 'confirmed' ||
+          typeof response.data.bookingId !== 'string' || !response.data.bookingId.trim()) {
+        changeState('uncertain');
+        return;
+      }
       changeState('confirmed');
     } catch (error) {
       if (!mounted.current || mine !== generation.current) return;
@@ -178,12 +188,12 @@ function EventWaitlistOfferCard({ token }: { token: string }) {
               {`${words.myEvents}を見る`}
             </Button>
           </div>
-        ) : state === 'error' ? (
+        ) : state === 'error' || state === 'uncertain' ? (
           <div className="space-y-4">
             <StatusView
               icon="cloud-off"
-              title="送信できませんでした"
-              body="通信に失敗しました。時間を置いて、もう一度お試しください。"
+              title={state === 'uncertain' ? '予約の状態を確認できませんでした' : '送信できませんでした'}
+              body={state === 'uncertain' ? `${words.myEvents}でも予約の状態を確認できます。` : '通信に失敗しました。時間を置いて、もう一度お試しください。'}
             />
             <Button variant="secondary" onClick={accept}>
               <Icon name="rotate-cw" className="h-4 w-4" />

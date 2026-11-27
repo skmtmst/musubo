@@ -39,11 +39,12 @@ export function ReservationFormEditor({definition,storeName,pageDirty,pageBusy,o
   current.current.target=null
   pageGuard.disarm();pageGuard.confirmLeave()
  }
- const change=(id:string,update:Partial<RestaurantReservationForm['fields'][number]>)=>setDraft(prev=>({...prev,fields:prev.fields.map(field=>field.id===id?{...field,...update}:field)}))
- return <><Dialog open size="wide" title="予約の回答フォームを変える" dirty={localDirty} onCancel={onCancel} confirmLabel="この内容にする" error={error} onConfirm={()=>{const parsed=parseRestaurantReservationForm(draft);if(!parsed.ok){setError(parsed.error);return}onConfirm(parsed.value)}}>
+ const updateDraft=(updater:(prev:RestaurantReservationForm)=>RestaurantReservationForm)=>{setError('');setDraft(updater)}
+ const change=(id:string,update:Partial<RestaurantReservationForm['fields'][number]>)=>updateDraft(prev=>({...prev,fields:prev.fields.map(field=>field.id===id?{...field,...update}:field)}))
+ return <><Dialog open size="wide" title="予約の回答フォームを変える" dirty={localDirty} busy={pageBusy} onCancel={onCancel} confirmLabel="この内容にする" error={error} onConfirm={()=>{if(pageBusy)return;const parsed=parseRestaurantReservationForm(draft);if(!parsed.ok){setError(parsed.error);return}setError('');onConfirm(parsed.value)}}>
   <DetailColumns asideLabel="予約フォームの見え方" expanded={expanded} onExpandedChange={setExpanded} aside={<ReservationFormSample definition={draft} storeName={storeName}/>}>
    <div className={styles.stack}>
-    <Field label="題名" required><SaveErrorField names={["definition","title","definition.title"]}><TextField value={draft.title} maxLength={80} onChange={e=>setDraft({...draft,title:e.target.value})}/></SaveErrorField></Field>
+    <Field label="題名" required><SaveErrorField names={["definition","title","definition.title"]}><TextField value={draft.title} maxLength={80} onChange={e=>updateDraft(prev=>({...prev,title:e.target.value}))}/></SaveErrorField></Field>
     <Field label="聞く項目" note="お名前・日時・人数は予約に必要なため外せません。日時と人数は最初の手順で選びます。">
      {draft.fields.map((field,index)=>{const fixed=RESTAURANT_RESERVATION_REQUIRED_FIELDS.includes(field.id);return <SettingsFormRow key={field.id} layout="columns" columns={3}>
       <SaveErrorField names={[`definition.fields.${index}.label`]}><TextField aria-label={`${field.label}の項目名`} value={field.label} maxLength={50} onChange={e=>change(field.id,{label:e.target.value})}/></SaveErrorField>
@@ -51,7 +52,7 @@ export function ReservationFormEditor({definition,storeName,pageDirty,pageBusy,o
       <ToggleField aria-label={`${field.label}を必須にする`} checked={field.required} locked={fixed} disabled={!field.enabled} onChange={required=>change(field.id,{required})}>必須にする</ToggleField>
      </SettingsFormRow>})}
     </Field>
-    <Field label="完了後の文" required><SaveErrorField names={["completionMessage","definition.completionMessage"]}><TextArea value={draft.completionMessage} maxLength={500} onChange={e=>setDraft({...draft,completionMessage:e.target.value})}/></SaveErrorField></Field>
+    <Field label="完了後の文" required><SaveErrorField names={["completionMessage","definition.completionMessage"]}><TextArea value={draft.completionMessage} maxLength={500} onChange={e=>updateDraft(prev=>({...prev,completionMessage:e.target.value}))}/></SaveErrorField></Field>
    </div>
   </DetailColumns>
  </Dialog><OverlayDepthContext.Provider value={depth+1}><UnsavedLeaveDialog open={pageGuard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={discardAndLeave} onCancel={pageGuard.cancelLeave} busy={pageBusy}/></OverlayDepthContext.Provider></>

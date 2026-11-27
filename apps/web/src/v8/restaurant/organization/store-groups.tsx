@@ -86,13 +86,19 @@ function MemberEditor({ target, onClose, onReload, onSave }: {
   </SaveErrorScope>
 }
 
+type StoreGroupsLoadState =
+  | { accountId: string; status: 'loading' }
+  | { accountId: string; status: 'ready'; groups: RestaurantStoreGroup[] }
+  | { accountId: string; status: 'error'; error: unknown }
+
 /** 既存の店の組を読む。変更の単位はAPIと同じ店舗1件。 */
 export default function StoreGroups({ accountId, stores, readOnly }: {
   accountId: string; stores: RestaurantStore[]; readOnly: boolean
 }) {
-  const [groups, setGroups] = useState<RestaurantStoreGroup[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<unknown>(null)
+  const [loadState, setLoadState] = useState<StoreGroupsLoadState>(() => ({
+    accountId,
+    status: 'loading',
+  }))
   const [retry, setRetry] = useState(0)
   const [target, setTarget] = useState<Target | null>(null)
   const storesKey = JSON.stringify(stores.map(store => [store.id, store.line_account_id]))
@@ -102,13 +108,21 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
   useEffect(() => { if (target) notifyToast('アカウントが変わったため、前の確認を閉じました。'); setTarget(null) }, [accountId])
   useEffect(() => {
     const request = ++generation.current
-    setLoading(true); setLoadError(null)
+    setLoadState({ accountId, status: 'loading' })
     void restaurantTestApi.storeGroups(accountId).then(res => {
-      if (request === generation.current) setGroups(res.data)
-    }).catch(error => { if (request === generation.current) setLoadError(error) })
-      .finally(() => { if (request === generation.current) setLoading(false) })
+      if (request !== generation.current) return
+      const failed = !res || (res as { success?: boolean }).success === false
+      if (failed || !Array.isArray(res.data)) throw new Error('店の組を読み込めませんでした')
+      setLoadState({ accountId, status: 'ready', groups: res.data })
+    }).catch(error => {
+      if (request === generation.current) setLoadState({ accountId, status: 'error', error })
+    })
     return () => { generation.current++ }
   }, [accountId, retry])
+  const scoped = loadState.accountId === accountId ? loadState : null
+  const loading = !scoped || scoped.status === 'loading'
+  const loadError = scoped?.status === 'error' ? scoped.error : null
+  const groups = scoped?.status === 'ready' ? scoped.groups : []
   const save = async (settings: Settings) => {
     const currentStore = target && stores.find(store => store.id === target.store.id)
     if (!target || readOnly || target.epoch !== scope.current.epoch || !currentStore || currentStore.line_account_id !== target.store.line_account_id || !Number.isSafeInteger(target.member.version) || target.member.version < 1) return
@@ -116,11 +130,14 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
     await restaurantTestApi.updateStoreGroupMember(accountId, target.group.id, target.member.store_id, { ...settings, expectedVersion: target.member.version })
     if (request !== generation.current) return
     // PATCHが成功した値を保ち、読取りの失敗を「保存失敗」と取り違えない。
-    setGroups(current => current.map(group => group.id !== target.group.id ? group : {
-      ...group, members: group.members.map(member => member.store_id !== target.member.store_id ? member : {
-        ...member, referral_enabled: settings.referralEnabled ? 1 : 0, max_distance: settings.maxDistance, version: target.member.version + 1,
+    setLoadState(current => current.accountId !== accountId || current.status !== 'ready' ? current : {
+      ...current,
+      groups: current.groups.map(group => group.id !== target.group.id ? group : {
+        ...group, members: group.members.map(member => member.store_id !== target.member.store_id ? member : {
+          ...member, referral_enabled: settings.referralEnabled ? 1 : 0, max_distance: settings.maxDistance, version: target.member.version + 1,
+        }),
       }),
-    }))
+    })
     notifySaved(`${target.store.name}の案内設定を保存しました。`)
     setRetry(current => current + 1)
     return true

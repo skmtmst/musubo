@@ -32,8 +32,10 @@ export const PHOTO_PAGE_SIZE = 200
 
 export function photoPagePath(accountId: string, offset: number, q = ''): string {
   const params = new URLSearchParams({ accountId, limit: String(PHOTO_PAGE_SIZE) })
-  if (offset > 0) params.set('offset', String(offset))
-  if (q) params.set('q', q)
+  const safeOffset = Number.isFinite(offset) ? Math.trunc(offset) : 0
+  if (safeOffset > 0) params.set('offset', String(safeOffset))
+  const query = typeof q === 'string' ? q.trim() : ''
+  if (query) params.set('q', query)
   return `/api/nen-members/photos?${params.toString()}`
 }
 
