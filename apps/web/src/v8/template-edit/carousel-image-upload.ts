@@ -23,9 +23,9 @@ export async function uploadCarouselImage(file: File, accountId: string): Promis
   const etag = await putMediaFile(session, file, () => {})
   const completed = await api.media.completeUpload(session.id, { accountId, etag })
   if (!completed.success) throw new Error(completed.error || '画像の登録を完了できませんでした。時間をおいて、もう一度お試しください。')
-  if (completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('画像の登録を完了できませんでした。時間をおいて、もう一度お試しください。')
+  if (completed.data?.status !== 'completed' || typeof completed.data.mediaId !== 'string' || !completed.data.mediaId.trim()) throw new Error('画像の登録を完了できませんでした。時間をおいて、もう一度お試しください。')
   const media = await api.media.detail(completed.data.mediaId, accountId)
   if (!media.success) throw new Error(media.error || '登録した画像を確認できませんでした。登録メディアから選び直してください。')
-  if (media.data.item.kind !== 'image' || !media.data.item.url) throw new Error('登録した画像を確認できませんでした。登録メディアから選び直してください。')
+  if (media.data?.item?.kind !== 'image' || typeof media.data.item.url !== 'string' || !media.data.item.url.trim()) throw new Error('登録した画像を確認できませんでした。登録メディアから選び直してください。')
   return media.data.item.url
 }
