@@ -1455,3 +1455,6 @@
 - [フォルダ配布の確認できない結果を再確認できるよう修正](release-log/unreleased/PR-kenta-later-cx2-16-1128.md) — 反映履歴、確認 2026-11-28。
 - [受信箱の会話一覧で確認できないメッセージを表示](release-log/unreleased/PR-kenta-later-cx2-17-1128.md) — 反映履歴、確認 2026-11-28。
 - [統括バナーで確認できない用途と比率の表示を修正](release-log/unreleased/PR-kenta-later-cx2-18-1128.md) — 反映履歴、確認 2026-11-28。
+- [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
+- [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
+- [受信箱で確認できない添付の準備を止める修正](release-log/unreleased/PR-kenta-later-cx2-19-1128.md) — 反映履歴、確認 2026-11-28。
