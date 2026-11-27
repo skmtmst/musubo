@@ -65,7 +65,7 @@ export function BannerImageDetailV8({
   const [selected, setSelected] = useState<string[]>([])
   const [confirmRemove, setConfirmRemove] = useState(false)
   // 読めない画像は壊れた印を出さず、地の色のままにする。
-  const [previewFailed, setPreviewFailed] = useState(false)
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState<string | null>(null)
 
   // アーカイブしたアカウントへは渡さない（受け取る口が止まっている）。
   const targets = useMemo(() => accounts.filter((a) => !a.archivedAt), [accounts])
@@ -128,9 +128,9 @@ export function BannerImageDetailV8({
         <div className={styles.top}>
           <div className={styles.left}>
             <div className={styles.preview}>
-              {previewFailed ? null : (
+              {failedPreviewUrl === image.media.url ? null : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img width={1200} height={628} src={image.media.url} alt="" onError={() => setPreviewFailed(true)} />
+                <img width={1200} height={628} src={image.media.url} alt="" onError={() => setFailedPreviewUrl(image.media.url)} />
               )}
             </div>
             <div className={styles.buttons}>
