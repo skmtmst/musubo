@@ -97,6 +97,7 @@ export function useInboxDraft({ selectedAccountId, selectedChatId }: Options) {
       reportError('画像を添付できませんでした。選び直してください')
     } finally {
       setImageBusyKeys((prev) => {
+        if (imageJobGenRef.current.get(ownerKey) !== generation) return prev
         const next = new Set(prev)
         next.delete(ownerKey)
         return next
