@@ -1473,3 +1473,4 @@
 - [ウェビナーの案内カード保存時の確認修正](release-log/unreleased/PR-kenta-later-cx3-11-1128.md) — 反映履歴、確認 2026-11-28。
 - [シナリオの変更後の試算結果の表示修正](release-log/unreleased/PR-kenta-later-cx3-12-1128.md) — 反映履歴、確認 2026-11-28。
 - [教室の名簿で読み取れない参加者情報の表示修正](release-log/unreleased/PR-kenta-later-cx3-13-1128.md) — 反映履歴、確認 2026-11-28。
+- [日別分析グラフの不正な集計と日付の表示修正](release-log/unreleased/PR-kenta-later-cx3-14-1128.md) — 反映履歴、確認 2026-11-28。
