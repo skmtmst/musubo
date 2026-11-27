@@ -13,6 +13,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
 import SegmentedControl from '@/components/shared/segmented'
 import TimeField from '@/components/shared/time-field-v8'
@@ -25,8 +26,7 @@ import {
   KIND_LABEL, KIND_ORDER, clock, conflictsOf, dayOfIso, dayShort, emptyInput, inputError, inputOf, overlapMessage, overlapping, sourceLabel,
 } from './format'
 import styles from './closures.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatNumber } from '@/lib/format'
 import { withHonorific } from '@line-crm/shared'
@@ -96,6 +96,11 @@ export default function ClosureDialog({
   const [pickTables, setPickTables] = useState(false)
   const [google, setGoogle] = useState(true)
   const [preview, setPreview] = useState<{ rows: Row[]; waitlist: number; contacted: number; overlap: string; snapshot?: string } | null>(null)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const [previewError, setPreviewError] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewAttempt, setPreviewAttempt] = useState(0)
+  const previewLoadingRef = useRef(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const seq = useRef(0)
@@ -113,6 +118,11 @@ export default function ClosureDialog({
     setPickTables(next.tableIds !== undefined && next.tableIds.length > 0)
     setGoogle(target.mode === 'add')
     setPreview(null)
+    setPreviewFailed(false)
+    setPreviewError('')
+    setPreviewLoading(false)
+    setPreviewAttempt(0)
+    previewLoadingRef.current = false
     setError(''); setFieldErrors({})
   }, [target, storeId])
 
@@ -121,16 +131,30 @@ export default function ClosureDialog({
 
   /*
    * 重なる予約。preview の口（電話番号・LINE の友だちか・連絡済みも返る）。
-   * 変える窓は自分自身を除く（excludeId）。口が読めないときは画面が読んだ予約から数える。
+   * 変える窓は自分自身を除く（excludeId）。口が読めないときは失敗を知らせて再読み込みできるようにする。
    */
   useEffect(() => {
-    if (!open || problem || !accountId) { seq.current += 1; setPreview(null); return }
+    if (!open || problem || !accountId) {
+      seq.current += 1
+      previewLoadingRef.current = false
+      setPreview(null)
+      setPreviewFailed(false)
+      setPreviewError('')
+      setPreviewLoading(false)
+      return
+    }
     const id = ++seq.current
-    const timer = setTimeout(() => {
+    const run = () => {
+      previewLoadingRef.current = true
+      setPreviewLoading(true)
       const fallback = () => rowsFromLedger(overlapping(input, reservations, timezone))
       void restaurantTestApi.previewClosure(accountId, editing ? { ...input, excludeId: editing.id } : input)
         .then((res) => {
           if (id !== seq.current) return
+          previewLoadingRef.current = false
+          setPreviewLoading(false)
+          setPreviewFailed(false)
+          setPreviewError('')
           const conflicts = res.data.conflicts ?? []
           setPreview({
             rows: rowsFromPreview(res.data, reservations), waitlist: res.data.waitlistCount, contacted: res.data.contactedCount ?? 0,
@@ -139,14 +163,34 @@ export default function ClosureDialog({
         })
         .catch((caught) => {
           if (id !== seq.current) return
+          previewLoadingRef.current = false
+          setPreviewLoading(false)
           const overlap = caught instanceof ApiError && caught.code === 'closure_overlap' ? overlapMessage(conflictsOf(caught.data)) : ''
+          if (overlap) {
+            setPreviewFailed(false)
+            setPreviewError('')
+          } else {
+            setPreviewFailed(true)
+            setPreviewError(describeApiFailure(caught, '重なる予約の確認'))
+          }
           setPreview({ rows: fallback(), waitlist: 0, contacted: 0, overlap })
         })
-    }, 300)
-    return () => { clearTimeout(timer); if (seq.current === id) seq.current += 1 }
-  }, [open, problem, accountId, input, editing, reservations, timezone])
+    }
+    if (previewAttempt > 0) {
+      run()
+      return () => { if (seq.current === id) seq.current += 1; previewLoadingRef.current = false }
+    }
+    const timer = setTimeout(run, 300)
+    return () => { clearTimeout(timer); if (seq.current === id) seq.current += 1; previewLoadingRef.current = false }
+  }, [open, problem, accountId, input, editing, reservations, timezone, previewAttempt])
 
-  const set = (patch: Partial<RestaurantClosureInput>) => { seq.current += 1; setPreview(null); setInput((current) => ({ ...current, ...patch })); setError(''); setFieldErrors({}) }
+  const retryPreview = () => {
+    if (previewLoadingRef.current) return
+    setError('')
+    setPreviewAttempt((n) => n + 1)
+  }
+
+  const set = (patch: Partial<RestaurantClosureInput>) => { seq.current += 1; previewLoadingRef.current = false; setPreview(null); setPreviewFailed(false); setPreviewError(''); setPreviewLoading(false); setPreviewAttempt(0); setInput((current) => ({ ...current, ...patch })); setError(''); setFieldErrors({}) }
 
   const save = async () => {
     const errors: typeof fieldErrors = {}
@@ -285,6 +329,11 @@ export default function ClosureDialog({
           <p className={styles.hint} aria-live="polite">{`${days}の予約を調べています。`}</p>
         ) : (
           <>
+            {previewFailed ? (
+              <Notice tone="danger" action={<Button onClick={retryPreview} disabled={previewLoading} busy={previewLoading}>もう一度読み込む</Button>}>
+                {previewError ? `重なる予約を確認できませんでした（${previewError}）。確認できるまで保存できません。` : '重なる予約を確認できませんでした。確認できるまで保存できません。'}
+              </Notice>
+            ) : null}
             {preview.overlap ? (
               <p className={styles.overlap} role="alert">{preview.overlap}</p>
             ) : null}
@@ -312,9 +361,9 @@ export default function ClosureDialog({
                 ))}
                 {preview.waitlist > 0 ? <p className={styles.hint}>{`キャンセル待ちの ${preview.waitlist} 件には、閉じた時間帯の空きを案内しません。`}</p> : null}
               </div>
-            ) : (
+            ) : !previewFailed ? (
               <p className={styles.hint}>{`${days}の予約はありません。`}</p>
-            )}
+            ) : null}
           </>
         )}
 
