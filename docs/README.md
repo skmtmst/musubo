@@ -1418,3 +1418,4 @@
 - [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
+- [既存リッチメニュー選択と投稿画像の切り取り確認窓を修正](release-log/unreleased/PR-kenta-later-gemini47-1127.md) — 反映履歴、確認 2026-11-27。
