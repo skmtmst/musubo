@@ -57,20 +57,45 @@ function isFreq(value: string): value is RecurringFreq {
   return RECURRING_FREQS.some((item) => item.value === value)
 }
 
+function normalizeMaxCount(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= RECURRING_COUNT_MIN && raw <= RECURRING_COUNT_MAX) {
+    return raw
+  }
+  return RECURRING_COUNT_MAX
+}
+
+function parseMaxCountText(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!/^\d+$/.test(trimmed)) return null
+  const count = Number(trimmed)
+  if (!Number.isInteger(count) || count < RECURRING_COUNT_MIN || count > RECURRING_COUNT_MAX) return null
+  return count
+}
+
+function normalizePartySize(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isInteger(n)) return 1
+  return Math.min(PARTY_SIZE_MAX, Math.max(1, n))
+}
+
+function uniqueStrings<T extends string>(values: readonly T[]): T[] {
+  return Array.from(new Set(values))
+}
+
 /** 保存済みの値。作る画面は既定値。繰り返しが返っていなければ null（＝読めない）。 */
 export function readCustomerBooking(menu: BookingMenu | null): CustomerBookingValues {
   if (!menu) return { recurring: DEFAULT_RECURRING, maxPartySize: 1, addonMenuIds: [], addonOnly: false }
   const wide = menu as WideMenu
   const known = wide.customer_recurring_enabled !== undefined && wide.customer_recurring_enabled !== null
-  const freqs = storedStringList(wide.recurring_freqs_json).filter(isFreq)
+  const freqs = uniqueStrings(storedStringList(wide.recurring_freqs_json).filter(isFreq))
   return {
     recurring: known ? {
       enabled: Boolean(wide.customer_recurring_enabled),
       freqs: freqs.length ? freqs : ['weekly'],
-      maxCount: String(wide.recurring_max_count ?? RECURRING_COUNT_MAX),
+      maxCount: String(normalizeMaxCount(wide.recurring_max_count)),
     } : null,
-    maxPartySize: Math.min(PARTY_SIZE_MAX, Math.max(1, Number(wide.max_party_size) || 1)),
-    addonMenuIds: storedStringList(wide.addon_menu_ids_json),
+    maxPartySize: normalizePartySize(wide.max_party_size),
+    addonMenuIds: uniqueStrings(storedStringList(wide.addon_menu_ids_json)),
     addonOnly: Boolean(wide.addon_only),
   }
 }
@@ -84,8 +109,7 @@ function sameRecurring(a: Recurring | null, b: Recurring | null) {
 export function recurringError(recurring: Recurring | null): string | null {
   if (!recurring || !recurring.enabled) return null
   if (recurring.freqs.length === 0) return '選べる間隔を1つ以上選んでください。'
-  const count = Number(recurring.maxCount)
-  if (!Number.isInteger(count) || count < RECURRING_COUNT_MIN || count > RECURRING_COUNT_MAX) return `最大の回数は${RECURRING_COUNT_MIN}〜${RECURRING_COUNT_MAX}の整数で入力してください。`
+  if (parseMaxCountText(recurring.maxCount) === null) return `最大の回数は${RECURRING_COUNT_MIN}〜${RECURRING_COUNT_MAX}の整数で入力してください。`
   return null
 }
 
@@ -100,18 +124,34 @@ export function useMenuCustomerBooking(canManage: boolean) {
   }, [])
   const recurringChanged = values.recurring !== null && !sameRecurring(values.recurring, saved.recurring)
   const addonsChanged = [...values.addonMenuIds].sort().join(',') !== [...saved.addonMenuIds].sort().join(',')
-  const dirty = canManage && (recurringChanged || addonsChanged || values.maxPartySize !== saved.maxPartySize || values.addonOnly !== saved.addonOnly)
-  const error = canManage ? recurringError(values.recurring) : null
+  const dirty = canManage && (
+    values.addonOnly
+      ? values.addonOnly !== saved.addonOnly
+      : (recurringChanged || addonsChanged || values.maxPartySize !== saved.maxPartySize || values.addonOnly !== saved.addonOnly)
+  )
+  const error = canManage && !values.addonOnly ? recurringError(values.recurring) : null
+  const recurringPayload = (): NonNullable<Gap2MenuWrite['recurring']> | null => {
+    if (!recurringChanged || !values.recurring) return null
+    const validFreqs = uniqueStrings(values.recurring.freqs.filter(isFreq))
+    const fallbackFreqs = saved.recurring?.freqs.length ? saved.recurring.freqs : DEFAULT_RECURRING.freqs
+    const parsedMaxCount = parseMaxCountText(values.recurring.maxCount)
+    const fallbackMaxCount = saved.recurring ? (parseMaxCountText(saved.recurring.maxCount) ?? RECURRING_COUNT_MAX) : RECURRING_COUNT_MAX
+    return {
+      enabled: values.recurring.enabled,
+      freqs: validFreqs.length > 0 ? validFreqs : fallbackFreqs,
+      maxCount: parsedMaxCount ?? fallbackMaxCount,
+    }
+  }
   /** メニューの保存に足す項目。変えた物だけ・変えられる人だけ。 */
   const body = (): Partial<Gap2MenuWrite> => {
     if (!canManage) return {}
     const out: Partial<Gap2MenuWrite> = {}
-    if (recurringChanged && values.recurring) {
-      out.recurring = { enabled: values.recurring.enabled, freqs: values.recurring.freqs, maxCount: Number(values.recurring.maxCount) }
-    }
+    if (values.addonOnly !== saved.addonOnly) out.addonOnly = values.addonOnly
+    if (values.addonOnly) return out
+    const nextRecurring = recurringPayload()
+    if (nextRecurring) out.recurring = nextRecurring
     if (values.maxPartySize !== saved.maxPartySize) out.maxPartySize = values.maxPartySize as Gap2MenuWrite['maxPartySize']
     if (addonsChanged) out.addonMenuIds = values.addonMenuIds
-    if (values.addonOnly !== saved.addonOnly) out.addonOnly = values.addonOnly
     return out
   }
   return {
@@ -122,12 +162,33 @@ export function useMenuCustomerBooking(canManage: boolean) {
     body,
     load,
     /** 保存できたら、いまの入力を保存済みにする（繰り返しが読めない口でも、送った値を覚える）。 */
-    markSaved: () => setSaved(values),
-    setRecurring: (patch: Partial<Recurring>) => setValues((current) => ({ ...current, recurring: { ...(current.recurring ?? DEFAULT_RECURRING), ...patch } })),
+    markSaved: () => {
+      if (values.addonOnly) {
+        setSaved((prev) => ({ ...prev, addonOnly: true }))
+        return
+      }
+      const nextRecurring = recurringPayload()
+      const synced: CustomerBookingValues = nextRecurring
+        ? {
+            ...values,
+            recurring: { enabled: nextRecurring.enabled, freqs: nextRecurring.freqs, maxCount: String(nextRecurring.maxCount) },
+          }
+        : values
+      setSaved(synced)
+      if (nextRecurring) setValues(synced)
+    },
+    setRecurring: (patch: Partial<Recurring>) => setValues((current) => {
+      const base = current.recurring ?? DEFAULT_RECURRING
+      const nextFreqs = patch.freqs ? uniqueStrings(patch.freqs.filter(isFreq)) : base.freqs
+      return { ...current, recurring: { ...base, ...patch, freqs: nextFreqs } }
+    }),
     /** 読めなかった繰り返しの設定を入れ直す（初めはオフ）。 */
     startRecurring: () => setValues((current) => ({ ...current, recurring: DEFAULT_RECURRING })),
-    setMaxPartySize: (size: number) => setValues((current) => ({ ...current, maxPartySize: size })),
-    setAddonMenuIds: (ids: string[]) => setValues((current) => ({ ...current, addonMenuIds: ids })),
+    setMaxPartySize: (size: number) => {
+      if (!Number.isInteger(size) || size < 1 || size > PARTY_SIZE_MAX) return
+      setValues((current) => ({ ...current, maxPartySize: size }))
+    },
+    setAddonMenuIds: (ids: string[]) => setValues((current) => ({ ...current, addonMenuIds: uniqueStrings(ids) })),
     setAddonOnly: (addonOnly: boolean) => setValues((current) => ({ ...current, addonOnly })),
   }
 }
@@ -142,12 +203,16 @@ function recurringText(recurring: Recurring | null): string {
   if (!recurring) return 'この画面では読み出せません'
   if (!recurring.enabled) return 'お客さまは繰り返しで予約できません'
   const freqs = RECURRING_FREQS.filter((item) => recurring.freqs.includes(item.value)).map((item) => item.label).join('・')
-  return `${freqs}・最大${recurring.maxCount}回`
+  const count = parseMaxCountText(recurring.maxCount)
+  if (!freqs && count === null) return '設定を確認してください'
+  if (!freqs) return `最大${count}回`
+  if (count === null) return freqs
+  return `${freqs}・最大${count}回`
 }
 
 /** 追加メニューに選べるのは、固定の料金のほかのメニューだけ（口と同じ条件）。 */
 export function addonCandidates(menus: readonly BookingMenu[], selfId: string | null) {
-  return menus.filter((menu) => menu.id !== selfId && (menu.price_mode ?? 'fixed') === 'fixed' && menu.base_price > 0)
+  return menus.filter((menu) => menu.id !== selfId && (menu.price_mode ?? 'fixed') === 'fixed' && Number.isFinite(menu.base_price) && menu.base_price > 0)
 }
 
 export function CustomerBookingCard({ state, menus, selfId, readOnly }: {
@@ -160,7 +225,12 @@ export function CustomerBookingCard({ state, menus, selfId, readOnly }: {
   const { values } = state
   const candidates = addonCandidates(menus, selfId)
   const pickerItems = [
-    ...candidates.map((menu) => ({ id: menu.id, name: `${menu.name}${menu.is_active ? '' : '（受付停止中）'}`, meta: `${menu.duration_minutes}分・¥${formatNumber(menu.base_price)}` })),
+    ...candidates.map((menu) => {
+      const durationLabel = Number.isFinite(menu.duration_minutes) && menu.duration_minutes > 0
+        ? `${formatNumber(menu.duration_minutes)}分`
+        : '時間未設定'
+      return { id: menu.id, name: `${menu.name}${menu.is_active ? '' : '（受付停止中）'}`, meta: `${durationLabel}・¥${formatNumber(menu.base_price)}` }
+    }),
     ...values.addonMenuIds.filter((id) => !candidates.some((menu) => menu.id === id)).map((id) => ({ id, name: '使えなくなったメニュー', disabled: true })),
   ]
   const addonNames = values.addonMenuIds.map((id) => menus.find((menu) => menu.id === id)?.name ?? '使えなくなったメニュー')
