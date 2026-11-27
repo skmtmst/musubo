@@ -28,12 +28,12 @@ export function cancelFailureMessage(code: string | undefined): string {
 /** 日時変更の失敗の1文。 */
 export function changeFailureMessage(code: string | undefined): string {
   switch (code) {
-    case 'slot_not_available':
     case 'slot_conflict': return '選んだ日時は埋まりました。別の日時を選んでください。';
+    case 'slot_not_available': return '選んだ日時では予約できません。別の日時を選んでください。';
     case 'self_deadline_passed': return '変更の期限を過ぎています。トークでご連絡ください。';
     case 'past_cutoff':
-    case 'past_datetime':
-    case 'invalid_starts_at': return '選んだ日時は受付を終えています。別の日時を選んでください。';
+    case 'past_datetime': return '選んだ日時は受付を終えています。別の日時を選んでください。';
+    case 'invalid_starts_at': return '選んだ日時を確認できません。別の日時を選んでください。';
     case 'version_conflict':
     case 'not_editable':
     case 'booking_not_found': return '予約の内容が変わっていました。一覧を読み直してから、もう一度お試しください。';
