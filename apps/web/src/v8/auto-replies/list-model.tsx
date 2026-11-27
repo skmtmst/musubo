@@ -102,19 +102,22 @@ export const SAVED_FILTER_OPTIONS = [
  * 応答したときに行うことを、短い言葉で並べる（管理画面 page.tsx の actionSummary と同じ）。
  */
 export function actionSummary(rule: { actions: unknown[] | null }): string[] {
-  if (!Array.isArray(rule.actions)) return []
+  if (!rule || typeof rule !== 'object' || !Array.isArray(rule.actions)) return []
   return rule.actions.flatMap((item): string[] => {
     if (!item || typeof item !== 'object') return []
     const r = item as Record<string, unknown>
     const type = r.actionType ?? r.action_type
-    if (typeof type !== 'string') return []
+    if (typeof type !== 'string' || !type.trim()) return []
     return [actionShortWord(type)]
   })
 }
 
 /** 行の表示名。名前があればそれ、無ければキーワード。一律応答はキーワードが無い。 */
 export function displayName(r: AutoReply): string {
-  return r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)
+  if (!r || typeof r !== 'object') return ''
+  if (typeof r.name === 'string' && r.name.trim()) return r.name
+  if (r.respondToAll) return 'すべてのメッセージ'
+  return typeof r.keyword === 'string' ? r.keyword : ''
 }
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
