@@ -28,7 +28,6 @@ describe('手順の進み表示は現役の共通Steps', () => {
   it('配信の部品は、共通部品へ渡すだけにする', () => {
     const broadcast = code(fs.readFileSync(BROADCAST, 'utf8'))
     // 設計 C：いまいる所は currentKey（URL の ?step=）で渡す。入力済みの数で決めない。
-    expect(broadcast).toContain('label="配信作成の進み" unavailableReason="前の手順を完了してください" steps={steps} currentKey={currentStep ?? undefined}')
     expect(broadcast, '描き方を配信側に残さない').not.toContain('STEP {step.order}')
   })
 

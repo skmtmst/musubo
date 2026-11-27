@@ -18,8 +18,8 @@ it.each(['toString', 'constructor', '__proto__'])('未対応の処理と条件 %
   expect(ACTION_LABELS[type] ?? '処理').toBe('処理')
 })
 
-it.each(['toString', 'constructor', '__proto__'])('変更履歴で未対応の失敗時設定 %s をそのまま示す', (mode) => {
+it.each(['toString', 'constructor', '__proto__'])('変更履歴で未対応の失敗時設定 %s は確認できないことを示す', (mode) => {
   const before = { id: 'step', type: 'add_tag', params: {}, onFailure: mode } as unknown as CommonActionStep
   const after = { ...before, onFailure: 'continue' } as CommonActionStep
-  expect(describeVersionChanges([before], [after])).toEqual([`「タグを付ける」の失敗時を「${mode}」から「次へ進む」にした`])
+  expect(describeVersionChanges([before], [after])).toEqual([`「タグを付ける」の失敗時を「動作を確認できません」から「次へ進む」にした`])
 })

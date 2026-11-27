@@ -61,6 +61,13 @@ beforeEach(() => {
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
 describe('V8の5手順で送信を確定する', () => {
+  it('配信画面に5段の進みと現在の段を表示する', async () => {
+    await render('audience')
+    const nav = container.querySelector('[aria-label="配信作成の進み"]') as HTMLElement
+    expect(nav).toBeTruthy()
+    expect(nav.querySelectorAll('li')).toHaveLength(5)
+    expect(nav.querySelector('[aria-current="step"]')?.textContent).toContain('配信対象')
+  })
   it('最終確認へ直接来ても未選択のままなら理由1行で止まり保存・送信しない', async () => {
     await render('confirm', false, false)
     expect(button('送信設定を確認する', container).disabled).toBe(true)

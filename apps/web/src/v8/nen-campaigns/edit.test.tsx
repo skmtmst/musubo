@@ -181,6 +181,15 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     expect(host.textContent).not.toContain('テスト送信先を読み込めませんでした')
     expect(button('Kentaへテストを送る')).toBeTruthy()
   })
+  it('連携済みのログインユーザーを初期のテスト送信先にする', async () => {
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    expect(calls.loginUsers).toHaveBeenCalledWith('account-a')
+    const send = button('Kentaへテストを送る') as HTMLButtonElement
+    expect(send).toBeTruthy()
+    expect(send.disabled).toBe(false)
+    await act(async () => { fireEvent.click(send) }); await flush()
+    expect(calls.testSend).toHaveBeenCalled()
+  })
   it('切替前の送信操作を保持しても前のアカウントに送れない', async () => {
     await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
     const send = button('Kentaへテストを送る')!
@@ -201,6 +210,12 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
     await act(async () => { resolve({ success: true }) }); await flush()
     expect(host.textContent).not.toContain('テスト送信しました')
+  })
+  it('送信先の名前を選択中アカウントで検索する', async () => {
+    await act(async () => { root.render(<CampaignEdit campaignKey="review_request" />) }); await flush()
+    const search = host.querySelector('input[aria-label="テスト送信の相手を名前で探す"]')!
+    await act(async () => { fireEvent.keyDown(search, { key: 'Enter' }) }); await flush()
+    expect(calls.friends).toHaveBeenCalledWith({ search: '', accountId: 'account-a', limit: 5 })
   })
   it('検索に失敗しても元の送信先を維持する', async () => {
     calls.friends.mockResolvedValueOnce({ success: false })

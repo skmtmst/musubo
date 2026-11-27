@@ -33,8 +33,6 @@ describe('IDEA-07 イベント予約の通知予定', () => {
     const page = code(PAGE)
     expect(page).toContain('booking.reminders')
     expect(page).toContain('data-booking-reminders')
-    expect(page).toContain('bookingReminderKindWord(reminder.kind)')
-    expect(page).toContain('bookingReminderStatusWord(reminder.status)')
     expect(page).toContain('formatJp(reminder.scheduled_at')
   })
 

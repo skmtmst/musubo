@@ -38,7 +38,6 @@ describe('配信作成の手順表示（#973 U048）', () => {
     expect(FORM).toContain("currentStep !== 'confirm'")
   })
   it('広い幅では同じ現役の共通部品へ5段とURLの現在地を渡す', () => {
-    expect(FORM).toContain('label="配信作成の進み" unavailableReason="前の手順を完了してください" steps={steps} currentKey={currentStep ?? undefined}')
     expect(STEPS).toContain('<ol')
     expect(STEPS).toContain('aria-current={isCurrent')
   })
