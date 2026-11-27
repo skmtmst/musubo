@@ -218,7 +218,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
       variant="secondary"
       widthReserve="idle"
       onClick={() => void start()}
-      disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
+      disabled={!accountId || requesting || running} disabledReason={!accountId ? '上のバーでLINE公式アカウントを選んでください。' : undefined} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
     </Button>
   )
   const status = error || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (

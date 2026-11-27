@@ -61,38 +61,54 @@ export default function PoolsV8() {
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [accountsError, setAccountsError] = useState(false)
   // どこも無効と確定したときは口を呼ばず、案内だけ出す（403 自体が console error になるため・#703）。
   const [featureOff, setFeatureOff] = useState(false)
+  const loadSeqRef = useRef(0)
+  const loadInFlightRef = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current) return
+    const seq = ++loadSeqRef.current
+    loadInFlightRef.current = true
     setLoading(true)
     setError('')
+    setAccountsError(false)
     setFeatureOff(false)
     if (!(await isPoolsFeatureAvailable())) {
+      if (seq !== loadSeqRef.current) return
+      loadInFlightRef.current = false
       setPools([])
       setFeatureOff(true)
       setLoading(false)
       return
     }
-    try {
-      const [poolsRes, accRes] = await Promise.all([api.pools.list(), api.lineAccounts.list()])
-      if (poolsRes.success) setPools(poolsRes.data)
-      else setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
-      if (accRes.success) setAccounts(accRes.data as AccountWithStats[])
-    } catch (err) {
+    const [poolsRes, accRes] = await Promise.allSettled([api.pools.list(), api.lineAccounts.list()])
+    if (seq !== loadSeqRef.current) return
+    loadInFlightRef.current = false
+    if (poolsRes.status === 'fulfilled' && poolsRes.value.success) {
+      setPools(poolsRes.value.data)
+    } else if (poolsRes.status === 'rejected' && poolsRes.reason instanceof ApiError && poolsRes.reason.code === 'FEATURE_DISABLED') {
       // FEATURE_DISABLED は共通ゲートが案内へ切り替える。それ以外だけここで伝える。
-      if (err instanceof ApiError && err.code === 'FEATURE_DISABLED') {
-        setFeatureOff(true)
-      } else {
-        setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
-      }
-    } finally {
-      setLoading(false)
+      setFeatureOff(true)
+    } else {
+      setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
     }
+    if (accRes.status === 'fulfilled' && accRes.value.success) {
+      setAccounts(accRes.value.data as AccountWithStats[])
+      setAccountsError(false)
+    } else {
+      setAccountsError(true)
+    }
+    setLoading(false)
   }, [])
 
   useEffect(() => {
-    void load()
+    void load({ force: true })
+    return () => {
+      loadSeqRef.current += 1
+      loadInFlightRef.current = false
+    }
   }, [load])
 
   if (featureOff) {
@@ -135,9 +151,14 @@ export default function PoolsV8() {
           />
         ) : (
           <>
+            {accountsError ? (
+              <Notice tone="danger" action={<Button onClick={() => void load()} disabled={loading} busy={loading} busyLabel="読み込み中…">もう一度読み込む</Button>}>
+                LINEアカウント一覧を読み込めませんでした。アカウント名・友だち数や追加候補を表示できないため、もう一度読み込んでください。
+              </Notice>
+            ) : null}
             <div className={styles.cards}>
               {ordered.map((pool) => (
-                <PoolCard key={pool.id} pool={pool} accounts={accounts} canManage={canManage} onChange={() => void load()} />
+                <PoolCard key={pool.id} pool={pool} accounts={accounts} canManage={canManage} onChange={() => void load({ force: true })} />
               ))}
             </div>
             {/* 決まり2: 外した時の説明は帯にせず、題の横の「？」（explanation）へ入れる。 */}
@@ -344,14 +365,19 @@ function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
   const [removing, setRemoving] = useState(false)
   const [removeError, setRemoveError] = useState('')
   const [listError, setListError] = useState('')
+  const [membersLoading, setMembersLoading] = useState(true)
+  const reloadInFlightRef = useRef(false)
   const [addOpen, setAddOpen] = useState(false)
   const addRef = useRef<HTMLButtonElement>(null)
 
   // 読み直しの失敗は握りつぶさない（空のままだと「所属なし」と読み違える）。
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (options?: { force?: boolean }) => {
     if (!alive.current || renderedScope !== poolScope.current) return
+    if (!options?.force && reloadInFlightRef.current) return
     loadedScope.current = null
     const sequence = ++request.current
+    reloadInFlightRef.current = true
+    setMembersLoading(true)
     const current = () => alive.current && renderedScope === poolScope.current && request.current === sequence
     try {
       const res = await api.pools.accounts.list(poolId)
@@ -365,11 +391,20 @@ function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
       }
     } catch {
       if (current()) setListError('所属アカウントを読み込めませんでした。もう一度お試しください。')
+    } finally {
+      if (current()) {
+        reloadInFlightRef.current = false
+        setMembersLoading(false)
+      }
     }
   }, [poolId, renderedScope])
 
   useEffect(() => {
-    void reload()
+    void reload({ force: true })
+    return () => {
+      request.current += 1
+      reloadInFlightRef.current = false
+    }
   }, [reload])
 
   const memberIds = new Set(members.map((m) => m.lineAccountId))
@@ -379,7 +414,7 @@ function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
     try {
       const res = await api.pools.accounts.add(poolId, lineAccountId)
       if (!res.success) throw new Error(res.error)
-      await reload()
+      await reload({ force: true })
       onChange()
     } catch {
       setListError('このアカウントをプールに追加できませんでした。もう一度お試しください。')
@@ -398,7 +433,7 @@ function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
       if (!res.success) throw new Error(res.error)
       ticketRef.current = null
       setRemoveTarget(null)
-      await reload()
+      await reload({ force: true })
       if (alive.current && manageRef.current && removeTarget.scope === poolScope.current) onChange()
     } catch {
       if (current()) setRemoveError('このアカウントをプールから外せませんでした。状態を読み直してから、もう一度お試しください。')
@@ -426,10 +461,10 @@ function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
             </Card></li>
           )
         })}
-        {members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
+        {membersLoading && members.length === 0 ? <li><ListState kind="loading" title="所属アカウントを読み込んでいます…" /></li> : members.length === 0 && !listError ? <li><ListState kind="empty" title="所属アカウントなし" description="" /></li> : null}
       </ul>
       {listError ? (
-        <Notice tone="danger" >{listError}{' '}<Button type="button" variant="text" onClick={() => void reload()}>もう一度読み込む</Button></Notice>
+        <Notice tone="danger" >{listError}{' '}<Button type="button" variant="text" disabled={membersLoading} busy={membersLoading} busyLabel="読み込み中…" onClick={() => void reload()}>もう一度読み込む</Button></Notice>
       ) : null}
       {canManage && candidates.length > 0 ? (
         <div className={styles.menuBox}>
