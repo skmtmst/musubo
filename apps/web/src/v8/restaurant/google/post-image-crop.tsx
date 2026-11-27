@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './post-image-crop.module.css'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { ApiError } from '@/lib/api'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 
 export type CropTarget = 'google' | 'instagram'
 export type CropSource = { file?: File; url?: string; name: string; mediaId?: string }
@@ -33,12 +34,32 @@ export function PostImageCrop({ target, source, onClose, onConfirm }: {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const mountedRef = useRef(true)
+  const busyRef = useRef(false)
+  const sourceRef = useRef(source)
+  if (sourceRef.current !== source) {
+    sourceRef.current = source
+    busyRef.current = false
+  }
   const ratio = target === 'google' ? 4 / 3 : 4 / 5
   const title = target === 'google' ? 'Google用画像の切り取り位置を確認' : 'Instagram用画像の切り取り位置を確認'
 
   useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      busyRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
     const next = source.file ? URL.createObjectURL(source.file) : source.url ?? ''
     setSrc(next)
+    setDimensions({ width: 0, height: 0 })
+    setZoom(1)
+    setOffset({ x: 0, y: 0 })
+    setError('')
+    setBusy(false)
     return () => { if (source.file) URL.revokeObjectURL(next) }
   }, [source])
 
@@ -76,7 +97,10 @@ export function PostImageCrop({ target, source, onClose, onConfirm }: {
 
   const applyCrop = async () => {
     const img = image.current
-    if (!img || !img.naturalWidth || !frameSize.width || busy) return
+    if (!img || !img.naturalWidth || !frameSize.width || busy || busyRef.current) return
+    const activeSource = sourceRef.current
+    const isCurrent = () => mountedRef.current && sourceRef.current === activeSource
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -93,12 +117,21 @@ export function PostImageCrop({ target, source, onClose, onConfirm }: {
       const sourceY = (img.naturalHeight - sourceHeight) / 2 - offset.y * img.naturalHeight / (baseHeight * zoom)
       context.drawImage(img, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height)
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+      if (!isCurrent()) return
       if (!blob) throw new Error('画像を保存できませんでした。')
       await onConfirm(new File([blob], outputName(source.name, target), { type: 'image/jpeg' }))
     } catch (cause) {
-      setError(japaneseDetailOf(cause) || '画像を保存できませんでした。')
+      if (!isCurrent()) return
+      setError(
+        cause instanceof ApiError && (cause.status === 403 || cause.status === 429)
+          ? describeApiFailure(cause, '画像の保存')
+          : japaneseDetailOf(cause) || '画像を保存できませんでした。',
+      )
     } finally {
-      setBusy(false)
+      if (isCurrent()) {
+        busyRef.current = false
+        setBusy(false)
+      }
     }
   }
 
