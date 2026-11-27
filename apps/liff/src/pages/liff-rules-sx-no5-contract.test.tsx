@@ -30,4 +30,3 @@ it.each([['メニュー', '担当', '日時', '確認'], ['メニュー', '担�
   view.rerender(<Stepper steps={steps} current={3} />);
   expect(list.querySelector('[aria-current="step"]')?.textContent).toBe('4 確認');
 });
-
