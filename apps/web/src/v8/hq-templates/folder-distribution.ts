@@ -21,7 +21,7 @@ export function assertResult(run: FolderRun, result: DistributionResult) {
   }
 }
 export const failedStatus = (status: DistributionResult['stores'][number]['status']) => ['failed', 'version_conflict', 'unsupported'].includes(status)
-export const settledResult = (result?: DistributionResult) => Boolean(result && result.status !== 'running' && result.stores.every((store) => store.status === 'succeeded' || failedStatus(store.status)))
+export const settledResult = (result?: DistributionResult) => Boolean(result && ['completed', 'partial', 'failed'].includes(result.status) && Array.isArray(result.stores) && result.stores.length > 0 && result.stores.every((store) => store && (store.status === 'succeeded' || failedStatus(store.status))))
 
 /** ひな形を順に配る。POST前に番号を記録し、応答不明や実行中はGETだけで確認する。 */
 export async function distributeFolder(runs: FolderRun[], update: (runs: FolderRun[]) => void) {
@@ -54,7 +54,8 @@ export function folderResultRows(runs: FolderRun[]) {
   const rows = new Map<string, { template: HqTemplate; accountId: string; runId?: string; store?: DistributionResult['stores'][number] }>()
   for (const run of runs) for (const accountId of run.accountIds) {
     const key = `${run.template.id}:${accountId}`
-    const store = run.result?.stores.find((item) => item.accountId === accountId)
+    const stores = run.result?.stores
+    const store = Array.isArray(stores) ? stores.find((item) => item && item.accountId === accountId) : undefined
     rows.set(key, { template: run.template, accountId, runId: run.runId, store })
   }
   return [...rows.values()]
