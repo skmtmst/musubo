@@ -38,7 +38,11 @@ type RenderWizardPreviewContext = {
   triggerSamples: { text: string; hit: boolean; }[]
 }
 
-export function renderWizardPreview({ conflictsReadable = true, acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }: RenderWizardPreviewContext, withPhone: boolean) { return (<>
+export function renderWizardPreview({ conflictsReadable = true, acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }: RenderWizardPreviewContext, withPhone: boolean) {
+  const safeTriggerSamples = Array.isArray(triggerSamples) ? triggerSamples : []
+  const firstSampleText = safeTriggerSamples[0]?.text ?? ''
+  const validMatched28 = typeof matchedLast28Days === 'number' && Number.isInteger(matchedLast28Days) && matchedLast28Days >= 0
+  return (<>
           {step === 'basic' && (
             <CreateSummaryCard rows={[
               { label: '状態', value: '停止中' },
@@ -56,12 +60,12 @@ export function renderWizardPreview({ conflictsReadable = true, acknowledged, au
                 title="過去28日で当たった数"
                 leading={<>
                   <p className={styles.countRow} aria-label="当たった受信（過去28日）">
-                    <span className={styles.countNum}>{matchedLast28Days == null ? emptyValue('unknown') : formatNumber(matchedLast28Days)}</span>
+                    <span className={styles.countNum}>{validMatched28 ? formatNumber(matchedLast28Days) : emptyValue('unknown')}</span>
                     <span className={styles.countUnit}>件</span>
                   </p>
                   <p className={styles.sideHint}>いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。</p>
                 </>}
-                rows={triggerSamples.map(sample => ({
+                rows={safeTriggerSamples.map(sample => ({
                   key: sample.text, label: `「${sample.text}」`,
                   value: <span className={sample.hit ? styles.sampleHit : styles.sampleMiss}>{sample.hit ? '当たる' : '当たらない'}</span>,
                 }))}
@@ -69,7 +73,7 @@ export function renderWizardPreview({ conflictsReadable = true, acknowledged, au
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">
-                    {triggerSamples[0].text}
+                    {firstSampleText}
                   </LinePreviewMessage>
                 </div>
               </LinePreview> : null}
@@ -93,7 +97,7 @@ export function renderWizardPreview({ conflictsReadable = true, acknowledged, au
               />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
-                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{firstSampleText}</LinePreviewMessage>
                   {form.mode === 'inline-image' && imageContent ? (
                     <img
                       src={imageContent.previewImageUrl}
@@ -147,24 +151,36 @@ export function renderWizardPreview({ conflictsReadable = true, acknowledged, au
                   })
                 )}
                 <p className={`${styles.conflictDesc} ${styles.conflictResult}`}>
-                  試した結果：{!conflictsReadable ? emptyValue('unknown') : dryRun ? (dryRun.draftWon ? 'このルールが返す' : `「${dryRun.winner?.name ?? '別のルール'}」が先に動く → このルールは見送り`) : 'まだ試していません'}
+                  試した結果：{!conflictsReadable
+                    ? emptyValue('unknown')
+                    : dryRun
+                      ? (dryRun.draftWon
+                        ? 'このルールが返す'
+                        : dryRun.winner
+                          ? `「${dryRun.winner.name}」が先に動く → このルールは見送り`
+                          : 'どのルールにも当たりませんでした')
+                      : 'まだ試していません'}
                 </p>
               </section>
               <CreateSummaryCard
                 title="重なりの確認"
                 rows={[
                   { label: '同時に当たるルール', value: !conflictsReadable ? emptyValue('unknown') : conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
-                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? emptyValue('unknown') : `${formatNumber(matchedLast28Days)}件` },
-                  { label: '試した結果', value: !conflictsReadable ? emptyValue('unknown') : dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
+                  { label: '当たる受信（過去28日）', value: validMatched28 ? `${formatNumber(matchedLast28Days)}件` : emptyValue('unknown') },
+                  { label: '試した結果', value: !conflictsReadable ? emptyValue('unknown') : dryRun ? (dryRun.draftWon ? 'このルールが返す' : dryRun.winner ? '見送り' : 'どのルールにも該当なし') : 'まだ試していません' },
                 ]}
               />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
-                  <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
-                    {(conflictsReadable && dryRun?.winner?.responseContent) || replyPreviewText}
-                  </LinePreviewMessage>
-                  {!conflictsReadable ? <p className={styles.bubbleMeta}>設定した返信のプレビューです</p> : dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
+                  {!(conflictsReadable && dryRun && !dryRun.draftWon && !dryRun.winner) ? (
+                    <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
+                      {(conflictsReadable && dryRun?.winner?.responseContent) || replyPreviewText}
+                    </LinePreviewMessage>
+                  ) : null}
+                  {!conflictsReadable ? <p className={styles.bubbleMeta}>設定した返信のプレビューです</p> : dryRun && !dryRun.draftWon && !dryRun.winner ? (
+                    <p className={styles.bubbleMeta}>どのルールにも当たりませんでした</p>
+                  ) : dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
                     <p className={styles.bubbleMeta}>「{dryRun.winner.name}」が返します</p>
                   ) : (
                     <p className={styles.bubbleMeta}>このルールが返します</p>
@@ -183,7 +199,7 @@ export function renderWizardPreview({ conflictsReadable = true, acknowledged, au
               ]} />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
-                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{triggerSamples[0].text}</LinePreviewMessage>
+                  <LinePreviewMessage direction="outgoing" accountName={previewAccountName} avatar={null} time="">{firstSampleText}</LinePreviewMessage>
                   <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">{replyPreviewText}</LinePreviewMessage>
                 </div>
               </LinePreview> : null}

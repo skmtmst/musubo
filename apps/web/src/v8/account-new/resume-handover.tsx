@@ -75,16 +75,21 @@ function FollowerHandover({ accountId }: { accountId: string }) {
     setState(null)
     setReadError(false)
     setStepError(false)
+    setRefreshing(false)
     void refresh()
     const timer = setInterval(() => void refresh(), 5000)
     return () => { clearInterval(timer); refreshSequence.current += 1; refreshPending.current = null }
   }, [refresh])
 
   useEffect(() => {
+    setStyleLabel('')
     if (!accountId) return
     let active = true
     void styleApi.get(accountId).then((response) => {
-      if (active && response.success) setStyleLabel(STYLE_LABELS[response.data.style] ?? '')
+      if (active && response.success) {
+        const key = response.data.style
+        setStyleLabel(Object.prototype.hasOwnProperty.call(STYLE_LABELS, key) ? STYLE_LABELS[key] : '')
+      }
     }).catch(() => undefined)
     return () => { active = false }
   }, [accountId])
@@ -119,7 +124,10 @@ function FollowerHandover({ accountId }: { accountId: string }) {
     return () => clearInterval(timer)
   }, [])
 
-  const idleSeconds = state?.updatedAt ? Math.max(0, Math.floor((now - Date.parse(state.updatedAt)) / 1000)) : 0
+  const parsedUpdatedAt = state?.updatedAt ? Date.parse(state.updatedAt) : Number.NaN
+  const idleSeconds: number | null = state?.updatedAt
+    ? (Number.isFinite(parsedUpdatedAt) ? Math.max(0, Math.floor((now - parsedUpdatedAt) / 1000)) : null)
+    : null
   const progress = useMemo(() => handoverProgress({
     phase: state?.phase ?? 'importing_ids', received: state?.received ?? 0,
     imported: state?.imported ?? 0, alreadyPresent: state?.alreadyPresent ?? 0,
@@ -154,7 +162,7 @@ function FollowerHandover({ accountId }: { accountId: string }) {
           importRunning={running || !state} importFriends={!skipped} importState={state} handover={progress}
           idleSeconds={idleSeconds} requestError={readError || stepError} onRefresh={() => void refresh()} refreshing={refreshing} />}
       <StickyBar presentation="account-registration" actions={<>
-        {(readError || stepError || (running && idleSeconds >= 60)) && <Button type="button" variant="primary" busy={refreshing} busyLabel="確認中…" onClick={() => void refresh()}>状態を再確認</Button>}
+        {(readError || stepError || (running && (idleSeconds === null || idleSeconds >= 60))) && <Button type="button" variant="primary" busy={refreshing} busyLabel="確認中…" onClick={() => void refresh()}>状態を再確認</Button>}
         {complete && <Button type="button" variant="primary" onClick={enter}>アカウントに入る</Button>}
         <Button href="/hq" variant={complete || readError || stepError ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
       </>} />
