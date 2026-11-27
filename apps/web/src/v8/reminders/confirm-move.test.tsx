@@ -89,7 +89,7 @@ vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () =
 vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }] }) }))
 
 it('一件の停止確認は選択中ではなく記録の所属先を示す', async () => {
-  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: 'account-b' })), total: 2, limit: 20, sort: [] } })
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: 'account-b', lineAccount: { id: 'account-b', name: '二号店' } })), total: 2, limit: 20, sort: [] } })
   render(<RemindersList />)
   await screen.findByText('お知らせ1')
   fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
@@ -101,15 +101,26 @@ it('一件の停止確認は選択中ではなく記録の所属先を示す', a
   expect(net.update).toHaveBeenCalledWith('r1', { isActive: false })
 })
 
+it('名前が取得できない所属先は不明、未所属は所属なしと示す', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map((row, i) => ({ ...row, lineAccountId: i ? null : 'account-b', lineAccount: i ? null : { id: 'account-b', name: null } })), total: 2, limit: 20, sort: [] } })
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
+  fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByText('不明')).toBeTruthy()
+  expect(within(dialog).getByText('所属なし')).toBeTruthy()
+})
+
 it('一括停止は選んだ各記録の所属先を示し、未取得を選択中の店で補わない', async () => {
-  net.read.mockResolvedValue({ success: true, data: { items: rows.map((row, i) => ({ ...row, lineAccountId: i ? null : 'account-b' })), total: 2, limit: 20, sort: [] } })
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map((row, i) => ({ ...row, lineAccountId: i ? null : 'account-b', lineAccount: i ? null : { id: 'account-b', name: '二号店' } })), total: 2, limit: 20, sort: [] } })
   render(<RemindersList />)
   await screen.findByText('お知らせ1')
   rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
   fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
   const dialog = await screen.findByRole('dialog', { name: '2 件のリマインダを停止しますか？' })
   expect(await within(dialog).findByText('二号店')).toBeTruthy()
-  expect(within(dialog).getByText('不明')).toBeTruthy()
+  expect(within(dialog).getByText('所属なし')).toBeTruthy()
   expect(within(dialog).queryByText('本店')).toBeNull()
 })
 
@@ -155,6 +166,7 @@ it('一件停止の窓はアカウントを切り替えたら閉じる', async (
 })
 
 it('一括停止の窓は操作先を示し、アカウント切替で閉じて古い対象を送らない', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccount: { id: 'account-a', name: '本店' } })), total: 2, limit: 20, sort: [] } })
   const view = render(<RemindersList />)
   await screen.findByText('お知らせ1')
   rows.forEach(row => fireEvent.click(within(screen.getByText(row.name).closest('tr')!).getByRole('checkbox')))
@@ -186,6 +198,22 @@ it('一件の停止窓は所属不明と環境を示し、切替後の古い確�
   await act(async () => old())
   expect(net.update).not.toHaveBeenCalled()
 })
+it('未所属なら停止と削除のどちらにも所属なしを示す', async () => {
+  net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: null, lineAccount: null })), total: 2, limit: 20, sort: [] } })
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  const open = async (name: string) => {
+    fireEvent.click(screen.getByRole('button', { name: 'リマインダ「お知らせ1」の操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name }))
+  }
+  await open('一時停止する')
+  expect(within(await screen.findByRole('dialog')).getByText('所属なし')).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'キャンセル' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  await open('削除する')
+  expect(within(await screen.findByRole('alertdialog')).getByText('所属なし')).toBeTruthy()
+})
+
 it('削除の窓は選択中ではなく記録の所属先を示す', async () => {
   net.read.mockResolvedValue({ success: true, data: { items: rows.map(row => ({ ...row, lineAccountId: 'account-b' })), total: 2, limit: 20, sort: [] } })
   render(<RemindersList />)

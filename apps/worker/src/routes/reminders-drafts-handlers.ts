@@ -47,6 +47,18 @@ export const patch__api_reminders_reorder_1 = async (c: Context<Env, "/api/remin
   }
 };
 
+async function reminderAccounts(db: D1Database, rows: Array<{ line_account_id: string | null }>) {
+  const ids = [...new Set(rows.map(row => row.line_account_id).filter((id): id is string => Boolean(id)))];
+  if (!ids.length) return new Map<string, string>();
+  const result = await db.prepare(`SELECT id, name FROM line_accounts WHERE id IN (SELECT value FROM json_each(?))`)
+    .bind(JSON.stringify(ids)).all<{ id: string; name: string }>();
+  return new Map(result.results.map(row => [row.id, row.name]));
+}
+
+function reminderAccount(id: string | null, names: Map<string, string>) {
+  return id === null ? null : { id, name: names.get(id) ?? null };
+}
+
 export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
@@ -136,13 +148,14 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
         .all<ReminderListRow>();
       // REMINDER-10: 下書き版がある行は版の実値から日時・通数を組み立てる。
       const summaries = await loadReminderListSummaries(c.env.DB, result.results);
+      const accountNames = await reminderAccounts(c.env.DB, result.results);
       const management=await readRestaurantFollowupResourceManagement(c.env.DB,'reminder',result.results.map(row=>({id:row.id,lineAccountId:row.line_account_id})));
       return c.json({
         success: true,
         data: buildOffsetListResponse({
           items: result.results.map((row) => {
             const summary = summaries.get(row.id);
-            return {...publicReminder(row, summary?.stepCount, undefined, summary?.timingSummary ?? null),...(management.has(row.id)?{followupManagement:management.get(row.id)}:{})};
+            return {lineAccount: reminderAccount(row.line_account_id ?? null, accountNames), ...publicReminder(row, summary?.stepCount, undefined, summary?.timingSummary ?? null),...(management.has(row.id)?{followupManagement:management.get(row.id)}:{})};
           }),
           total: Number(totalRow?.total ?? 0),
           paging,
@@ -205,10 +218,11 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
 
     // REMINDER-10: 旧配列応答も、版を持つ行は版の実値で要約する。
     const summaries = await loadReminderListSummaries(c.env.DB, items);
+    const accountNames = await reminderAccounts(c.env.DB, items);
     const management=await readRestaurantFollowupResourceManagement(c.env.DB,'reminder',items.map(row=>({id:row.id,lineAccountId:row.line_account_id})));
     const publicItems = items.map((r) => {
       const summary = summaries.get(r.id);
-      return {...publicReminder(
+      return {lineAccount: reminderAccount(r.line_account_id ?? null, accountNames), ...publicReminder(
         r,
         summary?.stepCount ?? stepCounts.get(r.id) ?? 0,
         failedReminderIds.has(r.id),
@@ -256,12 +270,14 @@ export const get__api_reminders_id_4 = async (c: Context<Env, "/api/reminders/:i
     ]);
     if (!reminder) return fail(c, 404, 'REMINDER_NOT_FOUND');
     const management=await readRestaurantFollowupResourceManagement(c.env.DB,'reminder',[{id:reminder.id,lineAccountId:reminder.line_account_id}]);
+    const accountNames = await reminderAccounts(c.env.DB, [reminder]);
     return c.json({
       success: true,
       data: {
         ...(management.has(reminder.id)?{followupManagement:management.get(reminder.id)}:{}),
         id: reminder.id,
         lineAccountId: reminder.line_account_id ?? null,
+        lineAccount: reminderAccount(reminder.line_account_id ?? null, accountNames),
         name: reminder.name,
         description: reminder.description,
         isActive: Boolean(reminder.is_active),

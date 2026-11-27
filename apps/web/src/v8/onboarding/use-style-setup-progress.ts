@@ -4,14 +4,28 @@ import type { AccountStyle } from '@line-crm/shared'
 import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
 import { FEATURE_SETTINGS_UPDATED_EVENT, type FeatureSettingsUpdate } from '@/lib/feature-settings-event'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
-import { loadStyleSetupProgress, unknownStyleSetupProgress } from './style-setup-progress'
+import {
+  clearPreloadedStyleSetupEvidence,
+  loadStyleSetupProgress,
+  preloadStyleSetupEvidence,
+  unknownStyleSetupProgress,
+} from './style-setup-progress'
 
 type Revalidation =
   | { scope: string; status: 'loading'; error: null }
   | { scope: string; status: 'error'; error: unknown }
 
 /** 店とスタイルを切り替えた直後に、前の設定を「済み」として見せない。 */
-export function useStyleSetupProgress(accountId: string | null, style: AccountStyle | null, enabled = true, storeId?: string | null, cacheScope?: string) {
+export function useStyleSetupProgress(
+  accountId: string | null,
+  style: AccountStyle | null,
+  enabled = true,
+  storeId?: string | null,
+  cacheScope?: string,
+  preloadOptions?: { preload?: boolean; canPreloadRestaurant?: boolean },
+) {
+  const preload = Boolean(preloadOptions?.preload)
+  const canPreloadRestaurant = Boolean(preloadOptions?.canPreloadRestaurant)
   const scope = JSON.stringify([accountId, style, storeId, cacheScope])
   const activeScope = enabled && accountId && style ? scope : null
   const [snapshot, setSnapshot] = useState<{ scope: string; progress: StyleSetupProgress } | null>(null)
@@ -20,18 +34,30 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
   const generation = useRef(0)
   const pendingReload = useRef(false)
   const cached = useRef<{ scope: string; progress: StyleSetupProgress } | null>(null)
+  const inFlight = useRef<{ scope: string; promise: Promise<StyleSetupProgress> } | null>(null)
   const needsRefresh = useRef(false)
   const wasDisabled = useRef(!activeScope)
   const markStale = useCallback(() => {
     needsRefresh.current = true
+    inFlight.current = null
+    clearPreloadedStyleSetupEvidence(accountId)
     if (!activeScope) return
     generation.current += 1
     setRevalidation({ scope: activeScope, status: 'loading', error: null })
-  }, [activeScope])
-  const invalidate = useCallback(() => { generation.current += 1; cached.current = null; setRevalidation(null); setSnapshot(null) }, [])
+  }, [accountId, activeScope])
+  const invalidate = useCallback(() => {
+    generation.current += 1
+    inFlight.current = null
+    cached.current = null
+    clearPreloadedStyleSetupEvidence(accountId)
+    setRevalidation(null)
+    setSnapshot(null)
+  }, [accountId])
   const reload = useCallback(() => { pendingReload.current = true; invalidate(); setTick(value => value + 1) }, [invalidate])
   const refresh = useCallback(() => {
     needsRefresh.current = true
+    inFlight.current = null
+    clearPreloadedStyleSetupEvidence(accountId)
     if (!enabled || !accountId || !style || pendingReload.current) return
     const currentScope = scope
     const at = ++generation.current
@@ -54,6 +80,26 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
     if (!activeScope || !accountId || !style) {
       wasDisabled.current = true
       if (enabled && (!accountId || !style)) cached.current = null
+      if (preload && accountId && !pendingReload.current && !needsRefresh.current) {
+        if (!style) {
+          preloadStyleSetupEvidence(accountId, canPreloadRestaurant)
+        } else if (cached.current?.scope !== scope && inFlight.current?.scope !== scope) {
+          const promise = loadStyleSetupProgress(accountId, style, storeId)
+          const currentFlight = { scope, promise }
+          inFlight.current = currentFlight
+          void promise.then(
+            progress => {
+              if (inFlight.current === currentFlight) {
+                inFlight.current = null
+                cached.current = { scope, progress }
+              }
+            },
+            () => {
+              if (inFlight.current === currentFlight) inFlight.current = null
+            },
+          )
+        }
+      }
       return
     }
     wasDisabled.current = false
@@ -61,11 +107,16 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
       setSnapshot(cached.current)
       return () => { active = false; generation.current += 1 }
     }
+    const flight = !pendingReload.current && !needsRefresh.current && inFlight.current?.scope === activeScope ? inFlight.current : null
+    if (pendingReload.current || needsRefresh.current) clearPreloadedStyleSetupEvidence(accountId)
     pendingReload.current = false
     setRevalidation(null)
     setSnapshot(null)
     cached.current = null
-    void loadStyleSetupProgress(accountId, style, storeId).then(progress => {
+    const promise = flight ? flight.promise : loadStyleSetupProgress(accountId, style, storeId)
+    if (!flight) inFlight.current = null
+    void promise.then(progress => {
+      if (inFlight.current === flight) inFlight.current = null
       if (active && generation.current === at) {
         needsRefresh.current = false
         cached.current = { scope: activeScope, progress }
@@ -73,13 +124,14 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
         setSnapshot(cached.current)
       }
     }).catch(() => {
+      if (inFlight.current === flight) inFlight.current = null
       if (active && generation.current === at) {
         setRevalidation(null)
         setSnapshot({ scope: activeScope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
       }
     })
     return () => { active = false; generation.current += 1 }
-  }, [accountId, style, enabled, activeScope, tick, storeId])
+  }, [accountId, style, enabled, preload, canPreloadRestaurant, activeScope, scope, tick, storeId])
   useEffect(() => {
     const onStyleOrVisible = (event: Event) => {
       if (event.type === 'visibilitychange' ? document.visibilityState === 'visible' : (event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) refresh()

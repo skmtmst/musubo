@@ -15,6 +15,8 @@ vi.hoisted(() => {
 const state = vi.hoisted(() => ({
   accountId: 'account-a',
   ownerId: 'account-a' as string | null,
+  unassigned: false,
+  getFails: false,
   role: 'owner' as string,
   tab: '' as string,
   updates: [] as Array<Record<string, unknown>>,
@@ -87,7 +89,7 @@ vi.mock('@/lib/api', () => {
             pagination: { total: params?.status === 'planned' ? state.plannedTotal : state.onlyPlanned ? 40 : 2, limit: 100, offset: 0 },
           },
         })),
-        get: vi.fn(async () => ({ success: true, data: { id: 'reminder-1', name: '予約前日のご案内', isActive: true, triggerType: 'booking', deliveryMode: 'time', ...(state.management?{followupManagement:{storeId:'store',storeName:'食堂',effectiveSendingStatus:'stopped',reason:'内容が変わったため、止まっています',path:'/restaurant-test/line-followup?store_id=store'}}:{}), createdAt: '', updatedAt: '2026-09-28T01:00:00Z', steps: [{ id: 'st1', reminderId: 'reminder-1', offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '', createdAt: '' }] } })),
+        get: vi.fn(async () => { if (state.getFails) return { success: false, error: '取得失敗' }; return { success: true, data: { id: 'reminder-1', lineAccountId: state.ownerId, lineAccount: state.unassigned ? null : state.ownerId ? { id: state.ownerId, name: state.ownerId === 'account-b' ? 'API 二号店' : '本店' } : undefined, name: '予約前日のご案内', isActive: true, triggerType: 'booking', deliveryMode: 'time', ...(state.management?{followupManagement:{storeId:'store',storeName:'食堂',effectiveSendingStatus:'stopped',reason:'内容が変わったため、止まっています',path:'/restaurant-test/line-followup?store_id=store'}}:{}), createdAt: '', updatedAt: '2026-09-28T01:00:00Z', steps: [{ id: 'st1', reminderId: 'reminder-1', offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '', createdAt: '' }] } } }),
         update: vi.fn(async (_id: string, body: Record<string, unknown>) => {
           state.updates.push(body)
           return { success: true, data: null }
@@ -119,6 +121,8 @@ let host: HTMLDivElement
 beforeEach(() => {
   state.accountId = 'account-a'
   state.ownerId = 'account-a'
+  state.unassigned = false
+  state.getFails = false
   document.documentElement.dataset.theme = 'v8'
   state.role = 'owner'
   state.tab = ''
@@ -335,6 +339,30 @@ describe('V8 リマインダの詳細', () => {
 
   it('一時停止の対象は選択中の店ではなくリマインダの所属先を示す', async () => {
     state.ownerId = 'account-b'
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    const dialog = document.querySelector('[data-design-node="RwVo5"]')
+    await waitFor(() => expect(dialog?.textContent).toContain('API 二号店'))
+    expect(dialog?.textContent).not.toContain('本店')
+  })
+
+  it('未所属なら停止と削除のどちらにも所属なしを示す', async () => {
+    state.ownerId = null
+    state.unassigned = true
+    await render()
+    await act(async () => { buttonByText('一時停止する')!.click() })
+    expect(document.querySelector('[data-design-node="RwVo5"]')?.textContent).toContain('所属なし')
+    await act(async () => { buttonByText('キャンセル')!.click() })
+    const more = [...document.querySelectorAll('button')].find(el => el.getAttribute('aria-label')?.includes('その他の操作')) as HTMLButtonElement
+    await act(async () => { more.click() })
+    const remove = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('削除する')) as HTMLElement
+    await act(async () => { remove.click() })
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('所属なし')
+  })
+
+  it('詳細の取得に失敗しても実行結果の所属IDから店名を補う', async () => {
+    state.ownerId = 'account-b'
+    state.getFails = true
     await render()
     await act(async () => { buttonByText('一時停止する')!.click() })
     const dialog = document.querySelector('[data-design-node="RwVo5"]')

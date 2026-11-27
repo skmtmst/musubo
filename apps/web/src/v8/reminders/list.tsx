@@ -109,6 +109,7 @@ interface ReminderRow {
   followupManagement?:import('@line-crm/shared').RestaurantFollowupManagement
   id: string
   lineAccountId?: string | null
+  lineAccount?: { id: string; name: string | null } | null
   name: string
   description: string | null
   isActive: boolean
@@ -131,6 +132,12 @@ interface ReminderRow {
   baseDateSummary?: string | null
   createdAt: string
   updatedAt: string
+}
+
+function accountTarget(row: Pick<ReminderRow, 'lineAccount' | 'lineAccountId'> | null | undefined) {
+  if (row?.lineAccount === null) return { id: '', name: '所属なし' }
+  if (row?.lineAccount) return { id: row.lineAccount.id, name: row.lineAccount.name?.trim() || '不明' }
+  return { id: row?.lineAccountId ?? '', name: row?.lineAccountId ? undefined : '不明' }
 }
 
 type StatusKey = 'draft' | 'stopped' | 'active'
@@ -1131,7 +1138,7 @@ export default function RemindersListV8() {
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => { setBulkPauseAccountId(selectedAccountId); setBulkPauseGeneration(pauseContext.current.generation); setBulkPauseAccounts([...new Set(selectedRows.filter(row => stoppableIds.includes(row.id)).map(row => row.lineAccountId ?? ''))].map(id => ({ id, name: id ? undefined : '不明' }))); setBulkPauseIds(stoppableIds) }}
+              onClick={() => { setBulkPauseAccountId(selectedAccountId); setBulkPauseGeneration(pauseContext.current.generation); setBulkPauseAccounts(Array.from(new Map(selectedRows.filter(row => stoppableIds.includes(row.id)).map(row => { const target = accountTarget(row); return [`${target.id}:${target.name}`, target] })).values())); setBulkPauseIds(stoppableIds) }}
             >
               <Square size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -1224,7 +1231,7 @@ export default function RemindersListV8() {
           pauseRef.current = null; setPauseTarget(null)
               }}
       >
-        <OperationTargetSummary accounts={[{ id: pauseTarget?.lineAccountId ?? '', name: pauseTarget?.lineAccountId ? undefined : '不明' }]} externalTarget={{ label: '対象件数', name: '1件' }} />
+        <OperationTargetSummary accounts={[accountTarget(pauseTarget)]} externalTarget={{ label: '対象件数', name: '1件' }} />
         {pauseTarget && (
           <Notice tone="warn" icon={<TriangleAlert size={16} aria-hidden="true" />}>
             {pauseTarget.plannedDeliveries != null && pauseTarget.plannedDeliveries > 0
@@ -1281,7 +1288,7 @@ export default function RemindersListV8() {
             ) : null}
           </>
         )}
-      ><OperationTargetSummary accounts={[{ id: deleteTarget?.lineAccountId ?? '', name: deleteTarget?.lineAccountId ? undefined : '不明' }]} /></SheetDialog>
+      ><OperationTargetSummary accounts={[accountTarget(deleteTarget)]} /></SheetDialog>
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
       <></>
