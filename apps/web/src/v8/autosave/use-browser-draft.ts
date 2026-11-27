@@ -34,12 +34,28 @@ export function browserDraftKey(parts: Array<string | null | undefined>): string
   return PREFIX + parts.map((part) => part || '-').join(':')
 }
 
+function safeJsonStringify(value: unknown): string | null {
+  try {
+    return JSON.stringify(value) ?? null
+  } catch {
+    return null
+  }
+}
+
 export function readBrowserDraft<T>(key: string): Stored<T> | null {
   try {
     const raw = globalThis.localStorage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<Stored<T>> | null
-    if (!parsed || typeof parsed.savedAt !== 'number' || !('value' in parsed)) return null
+    if (
+      !parsed
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || typeof parsed.savedAt !== 'number'
+      || !Number.isFinite(parsed.savedAt)
+      || parsed.savedAt <= 0
+      || !('value' in parsed)
+    ) return null
     return { savedAt: parsed.savedAt, value: parsed.value as T }
   } catch {
     return null
@@ -76,9 +92,9 @@ export interface BrowserDraftOptions<T> {
 }
 
 export function useBrowserDraft<T>({ storageKey, value, baseline, active = true }: BrowserDraftOptions<T>) {
-  const valueJson = JSON.stringify(value)
-  const baselineJson = JSON.stringify(baseline)
-  const dirty = valueJson !== baselineJson
+  const valueJson = safeJsonStringify(value)
+  const baselineJson = safeJsonStringify(baseline)
+  const dirty = valueJson !== null && baselineJson !== null && valueJson !== baselineJson
   const [pending, setPending] = useState<Stored<T> | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -91,6 +107,7 @@ export function useBrowserDraft<T>({ storageKey, value, baseline, active = true 
     if (!active || !storageKey) {
       checkedKeyRef.current = null
       setPending(null)
+      setSavedAt(null)
       return
     }
     if (checkedKeyRef.current === storageKey) return
@@ -101,7 +118,7 @@ export function useBrowserDraft<T>({ storageKey, value, baseline, active = true 
       setPending(null)
       return
     }
-    if (JSON.stringify(stored.value) === baselineRef.current) {
+    if (baselineRef.current !== null && safeJsonStringify(stored.value) === baselineRef.current) {
       // 保存済みと同じなら戻すものは無い。
       removeBrowserDraft(storageKey)
       setPending(null)
@@ -112,7 +129,7 @@ export function useBrowserDraft<T>({ storageKey, value, baseline, active = true 
 
   // 入力が止まって2秒で書く。戻すか捨てるかを決める前は上書きしない（前の入力を消さない）。
   useEffect(() => {
-    if (!active || !storageKey || pending || checkedKeyRef.current !== storageKey) return
+    if (!active || !storageKey || pending || checkedKeyRef.current !== storageKey || valueJson === null) return
     if (!dirty) {
       if (savedAt !== null) {
         removeBrowserDraft(storageKey)
@@ -138,10 +155,11 @@ export function useBrowserDraft<T>({ storageKey, value, baseline, active = true 
 
   /** 「前の入力を戻す」。戻した値を返す（画面が自分の state へ入れる）。 */
   const restore = useCallback((): T | null => {
+    if (!active) return null
     const stored = pending
     setPending(null)
     return stored ? stored.value : null
-  }, [pending])
+  }, [active, pending])
 
   /** 「捨てる」・保存できたあと。残っている書きかけを消す。 */
   const clear = useCallback(() => {
