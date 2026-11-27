@@ -53,6 +53,14 @@ const COLOR_ROLES: { key: ColorKey; label: string }[] = [
 const FONT_LABEL: Record<FormFontFamily, string> = { sans: 'ゴシック', serif: '明朝' }
 const RADIUS_LABEL: Record<FormCornerRadius, string> = { none: '角ばった', medium: 'やや丸い', round: '丸い' }
 
+function lookupOwn(table: Record<string, string>, key: string, fallback: string): string {
+  return Object.prototype.hasOwnProperty.call(table, key) ? table[key] : fallback
+}
+
+function validPositiveInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1
+}
+
 type Props = {
   readOnly?: boolean
   options: FormOptions
@@ -81,7 +89,14 @@ export function AppearanceTab(props: Props) {
   const mode = options.customerDesign?.mode ?? (options.theme ? 'fixed' : 'account')
   const preset = options.customerDesign?.preset ?? (options.theme ? 'custom' : 'line')
   const theme = resolveCustomerFormTheme(options,props.accountLook ?? DEFAULT_CUSTOMER_LOOK)
-  const accountLabel = CUSTOMER_DESIGNS.find(design=>design.id===props.accountLook?.preset)?.label ?? (props.accountLook?.preset === 'custom'?'カスタム':'読み込み中')
+  const accountLabel = CUSTOMER_DESIGNS.find(design=>design.id===props.accountLook?.preset)?.label
+    ?? (props.accountLook?.preset === 'custom' ? 'カスタム' : props.accountLookError ? '確認できません' : '読み込み中')
+  const rawLimitMax = options.totalLimit?.max
+  const resolvedLimitMax = rawLimitMax === undefined || rawLimitMax === null
+    ? 300
+    : validPositiveInt(rawLimitMax)
+      ? rawLimitMax
+      : null
   const contrastError = formThemeContrastError(normalizeFormTheme(theme))
   const [pickerFor, setPickerFor] = useState<'background' | 'ogImage' | null>(null)
   const [linkOpen, setLinkOpen] = useState(false)
@@ -97,13 +112,13 @@ export function AppearanceTab(props: Props) {
       ['受付の開始', '公開したときから'],
       ['受付の終了', deadlineOn ? options.deadline?.endsAt || '期限なし' : '期限なし'],
       ['1人1回だけ答えられる', options.oncePerFriend?.enabled ? 'オン' : 'オフ'],
-      ['答えの数の上限', options.totalLimit?.enabled ? String(options.totalLimit.max ?? '—') : '制限なし'],
+      ['答えの数の上限', options.totalLimit?.enabled ? (validPositiveInt(options.totalLimit.max) ? polishFormatNumber(options.totalLimit.max) : '—') : '制限なし'],
       ['前回の答えを最初から入れておく', options.restorePrevious ? 'オン' : 'オフ'],
       ['送る前に確認の画面', options.confirmDialog?.enabled ? 'オン' : 'オフ'],
       ['期限を過ぎた人に出す文', options.deadline?.message || '受付は終了しました'],
       ['ページの題名', options.pageTitle || '回答フォーム'],
-      ['書体', FONT_LABEL[theme.fontFamily]],
-      ['角の丸み', RADIUS_LABEL[theme.cornerRadius]],
+      ['書体', lookupOwn(FONT_LABEL, theme.fontFamily, '確認できません')],
+      ['角の丸み', lookupOwn(RADIUS_LABEL, theme.cornerRadius, '確認できません')],
       ...COLOR_ROLES.map(({ key, label }) => [label, theme[key]]),
       ['背景の画像', theme.backgroundImageUrl || '未設定'],
       ['カードの見出し', props.ogTitle || '自動で作る'],
@@ -146,10 +161,10 @@ export function AppearanceTab(props: Props) {
           <SaveErrorField names={["enabled","options.oncePerFriend?.enabled","oncePerFriend?.enabled","options.once_per_friend?.enabled","once_per_friend?.enabled"]}><Toggle checked={options.oncePerFriend?.enabled ?? false} onChange={(enabled) => onChangeOptions({ oncePerFriend: { ...options.oncePerFriend, enabled } })} label="1人1回だけ答えられる" /></SaveErrorField>
         </div>
         <div className={styles.toggleRow}>
-          <span>{`答えの数が ${polishFormatNumber(options.totalLimit?.max ?? 300)}件 になったら締め切る`}</span>
+          <span>{`答えの数が ${resolvedLimitMax === null ? '—' : polishFormatNumber(resolvedLimitMax)}件 になったら締め切る`}</span>
           <SaveErrorField names={["enabled","options.totalLimit?.enabled","totalLimit?.enabled","options.total_limit?.enabled","total_limit?.enabled"]}><Toggle
             checked={options.totalLimit?.enabled ?? false}
-            onChange={(enabled) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled, max: options.totalLimit?.max ?? 300 } })}
+            onChange={(enabled) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled, max: resolvedLimitMax ?? 300 } })}
             label="答えの数が上限になったら締め切る"
           /></SaveErrorField>
         </div>
@@ -159,8 +174,12 @@ export function AppearanceTab(props: Props) {
               type="number"
               min={1}
               className={styles.limitInput}
-              value={String(options.totalLimit?.max ?? 300)}
-              onChange={(e) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled: true, max: Math.max(1, Number(e.target.value) || 1) } })}
+              value={resolvedLimitMax === null ? '' : String(resolvedLimitMax)}
+              onChange={(e) => {
+                const parsed = Number(e.target.value)
+                const nextMax = Number.isFinite(parsed) && parsed >= 1 ? Math.trunc(parsed) : 1
+                onChangeOptions({ totalLimit: { ...options.totalLimit, enabled: true, max: nextMax } })
+              }}
             /></SaveErrorField></Field></div>
         ) : null}
         {/* 受付のきまりは1枚のカードにまとめる（つづきで割らない）。 */}
