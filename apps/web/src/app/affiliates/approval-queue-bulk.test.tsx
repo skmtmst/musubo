@@ -150,6 +150,7 @@ describe('一括承認の確認と結果表示', () => {
     expect(within(dialog).getByText('利用者1／紹介者1／案件A')).toBeTruthy()
     expect(within(dialog).getByText('利用者2／紹介者1／案件A')).toBeTruthy()
     expect(fixture.bulkDecideCalls).toHaveLength(0)
+    expect(new Set(fixture.listCalls.map(call => call.status))).toEqual(new Set(['pending', 'approved', 'rejected']))
   })
 
   test('キャンセルではrequestが出ず、確定で1本だけ出る', async () => {
@@ -506,6 +507,7 @@ describe('IDEA-16: 注文根拠の表示と要確認の拡大', () => {
     })
     // 要確認の行はチェックを付けられない（まとめて承認から外れる）。
     expect((screen.getByLabelText('利用者1の成果を選ぶ') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.getByLabelText('利用者1の成果を選ぶ').getAttribute('title')).toBe('確認が必要な成果はまとめて認められません')
     expect((screen.getByLabelText('利用者2の成果を選ぶ') as HTMLInputElement).disabled).toBe(true)
     expect((screen.getByLabelText('利用者3の成果を選ぶ') as HTMLInputElement).disabled).toBe(false)
     expect(screen.getAllByText('要確認')).toHaveLength(2)
