@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InboxSavedView, SAVED_VIEW_URL_KEY, StatusFilter, buildInboxUrl } from './inbox-model';
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types';
 
+export const SAVED_VIEWS_LOAD_ERROR = '保存した検索を読み込めませんでした'
+
 type Options = {
   operators: { id: string; name: string; }[]
   setNameQuery: Dispatch<SetStateAction<string>>
@@ -42,6 +44,8 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
   const [savedViewName, setSavedViewName] = useState('')
 
   const [savedViewError, setSavedViewError] = useState('')
+  const [failedAccountId, setFailedAccountId] = useState<string | null>(null)
+  const loadError = selectedAccountId && failedAccountId === selectedAccountId ? SAVED_VIEWS_LOAD_ERROR : ''
 
   const [savingView, setSavingView] = useState(false)
 
@@ -134,16 +138,18 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     try {
       const response = await api.chats.savedViews.list(accountId)
       if (!current()) return
+      if (!response.success) throw new Error('saved_views_load_failed')
       if (response.success) {
         setSavedViews(response.data.map((view) => ({
           ...view,
           conditions: normalizeSavedViewConditions(view.conditions),
         })))
         setSavedViewsAccountId(accountId)
+        setFailedAccountId(null)
       }
     } catch {
       if (!current()) return
-      setSavedViewError('保存した検索を読み込めませんでした')
+      setFailedAccountId(accountId)
     }
   }, [selectedAccountId])
 
@@ -235,5 +241,5 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     router.push(buildInboxUrl(nextChannel, view.id))
     setSavedViewsOpen(false)
   }
-  return { saveDialogOpen, setSaveDialogOpen, savedViews, savedViewsOpen, setSavedViewsOpen, savedViewMenuId, setSavedViewMenuId, setSavedViewName, savedViewError, setSavedViewError, savingView, savedViewSuccess, setSavedViewSuccess, savedViewNotice, operatorNames, dropSavedViewParam, loadSavedViews, currentSavedViewConditions, savedViewName, setSavingView, applySavedView }
+  return { saveDialogOpen, setSaveDialogOpen, savedViews, savedViewsOpen, setSavedViewsOpen, savedViewMenuId, setSavedViewMenuId, setSavedViewName, savedViewError: savedViewError || loadError, setSavedViewError, savingView, savedViewSuccess, setSavedViewSuccess, savedViewNotice, operatorNames, dropSavedViewParam, loadSavedViews, currentSavedViewConditions, savedViewName, setSavingView, applySavedView }
 }

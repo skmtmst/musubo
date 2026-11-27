@@ -1455,3 +1455,5 @@
 - [リマインダ人数・時刻表示と在庫担当者・卓番号表記の修正](release-log/unreleased/PR-kenta-later-gemini87-1127.md) — 反映履歴、確認 2026-11-27。
 - [お知らせ公開日時の実在検査とカルーセル順チップの安全表示](release-log/unreleased/PR-kenta-later-gemini88-1127.md) — 反映履歴、確認 2026-11-27。
 - [コラム下書き日時検査と来店フォロー時刻表記の安全化](release-log/unreleased/PR-kenta-later-gemini89-1127.md) — 反映履歴、確認 2026-11-28。
+- [保存した検索と共通情報の読み込みを直した反映履歴](release-log/unreleased/PR-kenta-later-codex51.md) — 反映履歴、確認 2026-11-27。
+- [保存した検索の読み込み失敗と再読み込みの案内](release-log/unreleased/PR-kenta-inbox-saved-views-failure.md) — 反映履歴、確認 2026-11-27。

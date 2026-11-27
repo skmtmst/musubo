@@ -1,4 +1,5 @@
 'use client'
+import { SAVED_VIEWS_LOAD_ERROR } from './use-inbox-saved-views'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { formatNumber } from '@/lib/format'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
@@ -189,7 +190,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             <SavedSearchMenuSurface data-saved-views-panel>
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
-                {savedViews.length === 0 ? (
+                {savedViews.length === 0 ? savedViewError === SAVED_VIEWS_LOAD_ERROR ? null : (
                   <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-3 text-xs">
                     まだ保存した検索はありません。
                   </p>
@@ -260,6 +261,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   今の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
+                {savedViewError === SAVED_VIEWS_LOAD_ERROR ? <Button variant="text" onClick={() => void loadSavedViews()}>もう一度読み込む</Button> : null}
               </div>
             </SavedSearchMenuSurface>
           </MenuPortal>
