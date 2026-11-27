@@ -102,8 +102,19 @@ export default function AssignMatrixV8() {
   /** 保存が終わった直後の1.2秒だけ、保存ボタンに完了（✓）を出す。 */
   const [saveDone, setSaveDone] = useState(false)
   const saveDoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => {
-    if (saveDoneTimerRef.current !== null) clearTimeout(saveDoneTimerRef.current)
+  const mountedRef = useRef(true)
+  const loadSeqRef = useRef(0)
+  const saveSeqRef = useRef(0)
+  const savingRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      loadSeqRef.current += 1
+      saveSeqRef.current += 1
+      savingRef.current = false
+      if (saveDoneTimerRef.current !== null) clearTimeout(saveDoneTimerRef.current)
+    }
   }, [])
   const [error, setError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -114,7 +125,23 @@ export default function AssignMatrixV8() {
   const role = useStaffRole()
 
   const load = useCallback(async () => {
-    if (!selectedAccountId) return
+    const seq = ++loadSeqRef.current
+    saveSeqRef.current += 1
+    savingRef.current = false
+    setSaving(false)
+    setSaveDone(false)
+    if (!selectedAccountId) {
+      setLoading(false)
+      setError(null)
+      setLoadError(null)
+      setMenus([])
+      setStaff([])
+      setGrid({})
+      setSavedGrid(null)
+      setSelected(null)
+      return
+    }
+    const accountId = selectedAccountId
     setLoading(true)
     setError(null)
     setLoadError(null)
@@ -125,9 +152,13 @@ export default function AssignMatrixV8() {
     setSelected(null)
     try {
       const [menusRes, staffRes] = await Promise.all([
-        bookingApi.listMenus(selectedAccountId),
-        bookingApi.listStaff(selectedAccountId),
+        bookingApi.listMenus(accountId),
+        bookingApi.listStaff(accountId),
       ])
+      if (!mountedRef.current || seq !== loadSeqRef.current) return
+      if (!Array.isArray(menusRes?.menus) || !Array.isArray(staffRes?.staff)) {
+        throw new Error('データの形式が正しくありません')
+      }
       // お客さまの画面・メニュー一覧と同じ並び（sort_order）で並べる。
       setMenus([...menusRes.menus].sort((a, b) => a.sort_order - b.sort_order))
       setStaff(staffRes.staff)
@@ -135,16 +166,24 @@ export default function AssignMatrixV8() {
       /* #1060 と同じ：一括口が無い Worker ではスタッフごとの取得へ退く。 */
       const matrices = new Map<string, StaffMenuMatrix[]>()
       try {
-        const bulk = await bookingApi.listStaffMenusBulk(selectedAccountId)
-        for (const entry of bulk.staff) matrices.set(entry.staff_id, entry.matrix)
+        const bulk = await bookingApi.listStaffMenusBulk(accountId)
+        if (!mountedRef.current || seq !== loadSeqRef.current) return
+        if (!Array.isArray(bulk?.staff)) throw new Error('一括割り当ての形式が正しくありません')
+        for (const entry of bulk.staff) {
+          if (entry && Array.isArray(entry.matrix)) matrices.set(entry.staff_id, entry.matrix)
+        }
       } catch (saveFailure) {
+        if (!mountedRef.current || seq !== loadSeqRef.current) return
         saveErrors.capture(saveFailure)
         await Promise.all(
           staffRes.staff.map(async (s) => {
-            const r = await bookingApi.getStaffMenus(selectedAccountId, s.id)
+            const r = await bookingApi.getStaffMenus(accountId, s.id)
+            if (!mountedRef.current || seq !== loadSeqRef.current) return
+            if (!Array.isArray(r?.matrix)) throw new Error('担当メニューの形式が正しくありません')
             matrices.set(s.id, r.matrix)
           }),
         )
+        if (!mountedRef.current || seq !== loadSeqRef.current) return
       }
       const next: Record<string, Record<string, StaffMenuMatrix>> = {}
       for (const s of staffRes.staff) {
@@ -164,6 +203,7 @@ export default function AssignMatrixV8() {
       setGrid(next)
       setSavedGrid(next)
     } catch (e) {
+      if (!mountedRef.current || seq !== loadSeqRef.current) return
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
@@ -180,7 +220,9 @@ export default function AssignMatrixV8() {
       }
     }
     } finally {
-      setLoading(false)
+      if (mountedRef.current && seq === loadSeqRef.current) {
+        setLoading(false)
+      }
     }
   }, [selectedAccountId, saveErrors])
 
@@ -189,16 +231,22 @@ export default function AssignMatrixV8() {
   }, [load])
 
   function update(staffId: string, menuId: string, patch: Partial<StaffMenuMatrix>) {
-    setGrid((cur) => ({
-      ...cur,
-      [staffId]: { ...cur[staffId], [menuId]: { ...cur[staffId][menuId], ...patch } },
-    }))
+    if (!canEditMenus || savingRef.current) return
+    setGrid((cur) => {
+      const staffRow = cur[staffId]
+      const cell = staffRow?.[menuId]
+      if (!staffRow || !cell) return cur
+      return {
+        ...cur,
+        [staffId]: { ...staffRow, [menuId]: { ...cell, ...patch } },
+      }
+    })
   }
 
   /** 表1枚ぶんを一括の口へ流す。 */
-  async function putGrid(next: Record<string, Record<string, StaffMenuMatrix>>) {
+  async function putGrid(accountId: string, next: Record<string, Record<string, StaffMenuMatrix>>) {
     await bookingApi.putStaffMenusBulk(
-      selectedAccountId!,
+      accountId,
       staff.map((s) => ({
         staff_id: s.id,
         menus: menus.map((m) => {
@@ -217,20 +265,29 @@ export default function AssignMatrixV8() {
   function flashDone() {
     setSaveDone(true)
     if (saveDoneTimerRef.current !== null) clearTimeout(saveDoneTimerRef.current)
-    saveDoneTimerRef.current = setTimeout(() => setSaveDone(false), 1600)
+    saveDoneTimerRef.current = setTimeout(() => {
+      if (mountedRef.current) setSaveDone(false)
+    }, 1600)
   }
 
   async function saveAll() {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !canEditMenus || savingRef.current || loading || savedGrid === null) return
+    const accountId = selectedAccountId
+    const saveSeq = ++saveSeqRef.current
+    const loadSeq = loadSeqRef.current
+    const snapshot = grid
+    savingRef.current = true
     setSaving(true)
     setSaveDone(false)
     setError(null)
     try {
-      await putGrid(grid)
-      setSavedGrid(grid)
+      await putGrid(accountId, snapshot)
+      if (!mountedRef.current || saveSeq !== saveSeqRef.current || loadSeq !== loadSeqRef.current) return
+      setSavedGrid(snapshot)
       flashDone()
       notifySaved('保存しました')
     } catch (e) {
+      if (!mountedRef.current || saveSeq !== saveSeqRef.current || loadSeq !== loadSeqRef.current) return
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
@@ -239,7 +296,10 @@ export default function AssignMatrixV8() {
         `${withPermissionFailure(e, describeSaveFailure(e), 'store')}（保存は取り消されました。画面を再読み込みして最新の状態を確認してください）`,
       ) }
     } finally {
-      setSaving(false)
+      if (saveSeq === saveSeqRef.current) {
+        savingRef.current = false
+        if (mountedRef.current) setSaving(false)
+      }
     }
   }
 
@@ -436,7 +496,7 @@ export default function AssignMatrixV8() {
                                 <span className={styles.cellBox}>
                                   <SaveErrorField names={["offered"]}><Checkbox
                                     checked={offered}
-                                    disabled={!canEditMenus}
+                                    disabled={!canEditMenus || saving}
                                     onCheckedChange={(checked) =>
                                       update(s.id, m.id, { is_offered: checked ? 1 : 0 })
                                     }
@@ -464,14 +524,17 @@ export default function AssignMatrixV8() {
                     <Field fill label="このスタッフの所要時間" help={`メニューは ${selectedMenu.duration_minutes} 分`}><SaveErrorField names={["override_duration_minutes","selectedRow.override_duration_minutes","selected_row.override_duration_minutes"]}><NumberInput unit="分"
                           type="number"
                           min={1}
-                          disabled={!canEditMenus || !selectedRow.is_offered}
+                          disabled={!canEditMenus || saving || !selectedRow.is_offered}
                           value={selectedRow.override_duration_minutes ?? ''}
-                          onChange={(e) =>
-                            update(selectedStaff.id, selectedMenu.id, {
-                              override_duration_minutes:
-                                e.target.value === '' ? null : Number(e.target.value),
-                            })
-                          }
+                          onChange={(e) => {
+                            if (e.target.value === '') {
+                              update(selectedStaff.id, selectedMenu.id, { override_duration_minutes: null })
+                              return
+                            }
+                            const nextVal = Number(e.target.value)
+                            if (!Number.isFinite(nextVal)) return
+                            update(selectedStaff.id, selectedMenu.id, { override_duration_minutes: nextVal })
+                          }}
                           placeholder={String(selectedMenu.duration_minutes)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の所要時間`}
                         /></SaveErrorField>
@@ -479,21 +542,24 @@ export default function AssignMatrixV8() {
                     <Field fill label="このスタッフの料金" help={`メニューは ${menuPriceLabel(selectedMenu)}`}><SaveErrorField names={["override_price","selectedRow.override_price","selected_row.override_price"]}><NumberInput unit="円"
                           type="number"
                           min={0}
-                          disabled={!canEditMenus || !selectedRow.is_offered}
+                          disabled={!canEditMenus || saving || !selectedRow.is_offered}
                           value={selectedRow.override_price ?? ''}
-                          onChange={(e) =>
-                            update(selectedStaff.id, selectedMenu.id, {
-                              override_price:
-                                e.target.value === '' ? null : Number(e.target.value),
-                            })
-                          }
+                          onChange={(e) => {
+                            if (e.target.value === '') {
+                              update(selectedStaff.id, selectedMenu.id, { override_price: null })
+                              return
+                            }
+                            const nextVal = Number(e.target.value)
+                            if (!Number.isFinite(nextVal)) return
+                            update(selectedStaff.id, selectedMenu.id, { override_price: nextVal })
+                          }}
                           placeholder={formatNumber(selectedMenu.base_price)}
                           aria-label={`${staffLabel(selectedStaff)} の ${selectedMenu.name} の料金`}
                         /></SaveErrorField>
                         </Field>
                     <span className={styles.overrideClear}>
                       <Button
-                        disabled={!canEditMenus || !selectedOverridden}
+                        disabled={!canEditMenus || saving || !selectedOverridden}
                         onClick={() =>
                           update(selectedStaff.id, selectedMenu.id, {
                             override_duration_minutes: null,
