@@ -1527,3 +1527,4 @@
 - [タグとフォルダの一覧取得に失敗したときの表示を修正](release-log/unreleased/PR-kenta-later-cx3-33-1128.md) — 反映履歴、確認 2026-11-28。
 - [写真審査の画像URL検査とリッチメニュー下書き復元の修正](release-log/unreleased/PR-kenta-later-gemini100-1127.md) — 反映履歴、確認 2026-11-28。
 - [写真審査の受信日時補正と見つからないページのURL表示修正の反映履歴](release-log/unreleased/PR-kenta-later-gemini101-1127.md) — 反映履歴、確認 2026-11-28。
+- [リッチメニュー複製エラー案内と予約確認窓のスクロール案内修正の反映履歴](release-log/unreleased/PR-kenta-later-gemini102-1127.md) — 反映履歴、確認 2026-11-28。
