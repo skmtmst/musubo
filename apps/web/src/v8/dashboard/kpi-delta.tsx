@@ -29,6 +29,7 @@ export default function KpiDelta({ current, previous, better, unit, basis = SAME
   unit: string
   basis?: KpiDeltaBasis
 }) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return <StatusBadge tone="neutral" size="compact" dot={false}>比較を確認できません</StatusBadge>
   const diff = current - previous
   const tone = kpiChangeTone(better, diff)
   const text = kpiDeltaText(diff, unit, basis)
