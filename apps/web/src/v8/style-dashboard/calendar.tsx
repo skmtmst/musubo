@@ -24,14 +24,14 @@ const toMin = (hm: string): number | null => {
   const m = Number(parts[1])
   return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null
 }
-const box = (start: string, end: string, day: number, days: number, from: number): CSSProperties => {
+export const calendarEntryBox = (start: string, end: string, day: number, days: number, from: number): CSSProperties => {
   const startMin = toMin(start) ?? from * 60
   const endMin = Math.max(startMin, toMin(end) ?? startMin)
   const safeDays = Number.isFinite(days) && days > 0 ? days : 1
   const safeDay = Number.isFinite(day) && day >= 0 ? day : 0
   return {
     insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(startMin - from * 60) / 60} + var(--tpl-sd-board-top))`,
-    blockSize: `calc(var(--tpl-sd-week-hour) * ${(endMin - startMin) / 60} - var(--tpl-sd-entry-gap))`,
+    blockSize: `max(0px, calc(var(--tpl-sd-week-hour) * ${(endMin - startMin) / 60} - var(--tpl-sd-entry-gap)))`,
     insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${safeDays} * ${safeDay})`,
     inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${safeDays})`,
   }
@@ -51,7 +51,7 @@ function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: strin
 export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 'week', empty }: { empty?: ReactNode; period?: 'day' | 'week'; week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
   const timeScale = useCalendarTimeScale(week.entries, week.free, canWrite)
   const axis = calendarTimeRange([...week.entries, ...(canWrite ? week.free : [])])
-  const position = (start: string, end: string, day: number, days: number) => box(start, end, day, days, axis.from)
+  const position = (start: string, end: string, day: number, days: number) => calendarEntryBox(start, end, day, days, axis.from)
   const hours: string[] = []
   for (let h = axis.from; h < axis.to; h += 1) hours.push(`${h}:00`)
   return (
