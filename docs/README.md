@@ -1462,3 +1462,4 @@
 - [統括の配信先と情報欄の確認できない人数の表示を修正](release-log/unreleased/PR-kenta-later-cx2-21-1128.md) — 反映履歴、確認 2026-11-28。
 - [流入経路の状態が不明なときの QR 表示を修正](release-log/unreleased/PR-kenta-later-cx2-22-1128.md) — 反映履歴、確認 2026-11-28。
 - [初期セットの確認できない項目を外す操作を修正](release-log/unreleased/PR-kenta-later-cx2-23-1128.md) — 反映履歴、確認 2026-11-28。
+- [配布先のフォルダ所属を確認できないときの選択を修正](release-log/unreleased/PR-kenta-later-cx2-24-1128.md) — 反映履歴、確認 2026-11-28。
