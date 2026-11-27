@@ -4,14 +4,15 @@ export function trackPendingApiRequests(page) {
   const orphans = []
   Object.defineProperty(pending, 'orphans', { value: orphans })
   let navigation = null, documentOrigin = null
-  const bounded = check => new Promise(resolve => {
-    const timer = setTimeout(resolve, 1000)
+  const bounded = (check, onTimeout) => new Promise(resolve => {
+    const timer = setTimeout(() => { onTimeout(); resolve() }, 1000)
     void check.finally(() => { clearTimeout(timer); resolve() })
   })
   // 読み込み済みの文書で追跡を始めた場合にも、移動前の文書を識別する。
+  let initialExpired = false
   let documentChecks = bounded(page.mainFrame().evaluate(() => performance.timeOrigin).then(origin => {
-    if (documentOrigin === null && navigation === null) documentOrigin = origin
-  }).catch(() => {}))
+    if (!initialExpired && documentOrigin === null && navigation === null) documentOrigin = origin
+  }).catch(() => {}), () => { initialExpired = true })
   const goto = page.goto.bind(page)
   page.goto = async (...args) => {
     // 前の文書の識別を済ませてから次の遷移を始める。
@@ -40,15 +41,17 @@ export function trackPendingApiRequests(page) {
   })
   page.on('framenavigated', frame => {
     if (frame !== page.mainFrame()) return
-    const candidate = navigation, frameUrl = frame.url()
-    // URL が変わっても pushState/hash なら同じ文書。文書開始時刻で区別する。
+    const candidate = navigation, frameUrl = frame.url(), previousOrigin = documentOrigin
+    // 確認が終わるまで時刻は不明扱いにする。古い時刻で同一文書を誤判定しない。
+    documentOrigin = null
+    const url = value => { const parsed = new URL(value); parsed.hash = ''; return parsed.href }
+    const responseMatches = candidate?.responseUrl && url(frameUrl) === url(candidate.responseUrl)
+    // URL の一致はイベント時点で確かめる。直後の replaceState は文書の変更ではない。
+    let expired = false
     const check = frame.evaluate(() => performance.timeOrigin).then(origin => {
-      if (navigation !== candidate || frame.url() !== frameUrl) return
-      const previousOrigin = documentOrigin
+      if (expired || navigation !== candidate) return
       documentOrigin = origin
-      if (!candidate?.responseUrl || previousOrigin === null || origin === previousOrigin) return
-      const url = value => { const parsed = new URL(value); parsed.hash = ''; return parsed.href }
-      if (url(frameUrl) !== url(candidate.responseUrl)) return
+      if (!responseMatches || previousOrigin === null || origin === previousOrigin) return
       // 移動先の応答後に始まった API は安全側で待ち続ける。
       for (const request of candidate.snapshot) {
         if (pending.delete(request)) {
@@ -58,9 +61,13 @@ export function trackPendingApiRequests(page) {
         }
       }
       navigation = null
-    }).catch(() => { /* 判別できないときは要求を残す。 */ })
+    }).catch(() => { console.log('[v8-guard] 文書を識別できません。未完了要求を保持します。') })
     // 識別できなければ要求を残して従来どおり失敗させる。照会の停止で遷移を無期限に止めない。
-    documentChecks = Promise.all([documentChecks, bounded(check)]).then(() => {})
+    documentChecks = Promise.all([documentChecks, bounded(check, () => {
+      expired = true
+      documentOrigin = null
+      console.log('[v8-guard] 文書識別の時間切れ。未完了要求を保持します。')
+    })]).then(() => {})
   })
   page.on('requestfinished', request => pending.delete(request))
   page.on('requestfailed', request => {

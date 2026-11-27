@@ -159,6 +159,77 @@ test('別の移動の応答待ち中に同じURLへ pushState しても、同一
 }))
 
 
+test('新文書の直後に replaceState しても前文書の要求を分ける', async () => scenario(async ({ page, pending, base }) => {
+  const old = unresolvedOldRequest(page)
+  const frame = page.mainFrame(), evaluate = frame.evaluate.bind(frame)
+  let release, started, first = true
+  const paused = new Promise(resolve => { started = resolve })
+  frame.evaluate = async (...args) => {
+    if (first && String(args[0]).includes('performance.timeOrigin')) {
+      first = false
+      started()
+      await new Promise(resolve => { release = resolve })
+    }
+    return evaluate(...args)
+  }
+  const moving = page.goto(base + '/next')
+  await paused
+  await page.evaluate(() => history.replaceState({}, '', '/replaced'))
+  await new Promise(resolve => setTimeout(resolve, 50))
+  release()
+  await moving
+  assert.equal(pending.has(old), false)
+  await waitForNavigationContent(page, pending, 1500)
+}))
+
+test('前文書の時刻照会が遅れても同じ文書の要求を消さない', async () => scenario(async ({ page, pending, base }) => {
+  const frame = page.mainFrame(), evaluate = frame.evaluate.bind(frame)
+  let release, started, first = true
+  const paused = new Promise(resolve => { started = resolve })
+  frame.evaluate = async (...args) => {
+    if (first && String(args[0]).includes('performance.timeOrigin')) {
+      first = false
+      started()
+      await new Promise(resolve => { release = resolve })
+    }
+    return evaluate(...args)
+  }
+  const moving = page.goto(base + '/next')
+  await paused
+  const current = unresolvedOldRequest(page)
+  const navigation = { url: () => base + '/same-race', isNavigationRequest: () => true, frame: () => frame, redirectedFrom: () => null }
+  page.emit('request', navigation)
+  page.emit('response', { request: () => navigation, status: () => 200, url: () => base + '/same-race' })
+  await page.evaluate(() => history.pushState({}, '', '/same-race'))
+  release()
+  await moving
+  await new Promise(resolve => setTimeout(resolve, 50))
+  assert.ok(pending.has(current))
+  await mustStillWait(page, pending)
+}))
+
+test('文書識別が時間切れなら遅れて返った結果で要求を消さない', async () => scenario(async ({ page, pending, base }) => {
+  const old = unresolvedOldRequest(page)
+  const frame = page.mainFrame(), evaluate = frame.evaluate.bind(frame)
+  let release, started
+  const paused = new Promise(resolve => { started = resolve })
+  frame.evaluate = async (...args) => {
+    if (String(args[0]).includes('performance.timeOrigin')) {
+      started()
+      await new Promise(resolve => { release = resolve })
+    }
+    return evaluate(...args)
+  }
+  const moving = page.goto(base + '/next')
+  await paused
+  await moving
+  assert.ok(pending.has(old))
+  release()
+  await new Promise(resolve => setTimeout(resolve, 50))
+  assert.ok(pending.has(old))
+  await mustStillWait(page, pending)
+}))
+
 test('リダイレクトを伴う文書移動でも前の要求を診断へ分ける', async () => scenario(async ({ page, pending, base }) => {
   const old = unresolvedOldRequest(page)
   await page.goto(base + '/redirect')
