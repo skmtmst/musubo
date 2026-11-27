@@ -122,8 +122,8 @@ export default function TemplateDetailV8() {
     try {
       const res = await api.templates.versions(id)
       if (!mounted.current || renderedScope !== scope.current) return
-      if (res.success) setVersions(res.data)
-      else setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。')
+      if (res.success && Array.isArray(res.data)) setVersions(res.data)
+      else { setVersions(null); setVersionsError('版の履歴を読み込めませんでした。もう一度お試しください。') }
     } catch (saveFailure) {
       if (!mounted.current || renderedScope !== scope.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
@@ -150,8 +150,7 @@ export default function TemplateDetailV8() {
       const detail = await api.templates.get(id)
       if (!current()) return
       if (detail.success && isTemplateDetailData(detail.data)) { loadedScope.current = renderedScope; setTemplate(detail.data) }
-      else if (!detail.success) setError('テンプレートを読み込めませんでした。もう一度お試しください。')
-      else setMissing(true)
+      else setError('テンプレートを読み込めませんでした。もう一度お試しください。')
     } catch (caught) {
       if (!current()) return
       const fieldFailure = saveErrors.capture(caught);
