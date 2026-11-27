@@ -38,7 +38,8 @@ import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
 import { gap2Respond } from './mock-gap2.mjs'
 import { eventBookingsPage } from './event-bookings-mock.mjs'
-import { VISUAL_QA_PASSKEYS, conversionReportForPeriod } from './mock-small-responses.mjs'
+import { conversionReportForPeriod } from './mock-small-responses.mjs'
+import { trustedLoginAuthRead } from './mock-api-trusted-login.mjs'
 import { listedFormResponse, listedCommonVarResponse } from './mock-listed-details.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
@@ -3135,12 +3136,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       orders: rows,
     }
   }
-  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items')
+  if (method === 'GET' && pathname === '/api/restaurant-test/delivery/menu-items') {
     return { success: true, store: DELIVERY_STORE, items: DELIVERY_MENU_ITEMS }
-  if (method === 'GET' && pathname === '/api/auth/trusted-logins') return { success: true, data: [] }
-  if (method === 'GET' && pathname === '/api/auth/two-factor/policy') return { success: true, data: { required: true, canEdit: true, configured: true, notice: null, registered: 4, total: 6 } }
-  if (method === 'GET' && pathname === '/api/auth/two-factor/self') return { success: true, data: { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining: 8, total: 8, canEdit: true, configured: true, notice: null } }
-  if (method === 'GET' && pathname === '/api/auth/passkeys/self') return { success: true, data: VISUAL_QA_PASSKEYS }
+  }
+  const authSettings = trustedLoginAuthRead(method, pathname)
+  if (authSettings) return authSettings
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
