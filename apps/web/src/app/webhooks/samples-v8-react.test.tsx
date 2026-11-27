@@ -97,3 +97,28 @@ test('旧テーマ属性でも現役の見本タブが出て SAUCs が出る', a
   expect(host.querySelector('[data-design-node="SAUCs"]')).not.toBeNull()
   expect(host.textContent).toContain('こちらで受け取る')
 })
+
+test('受け取る見本と送る見本は、それぞれの内容を選んだ作成先へ進む', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="SAUCs"]')!
+  const incoming = [
+    ['LINE公式アカウント', 'line'], ['予約サービス', 'booking'], ['アンケートツール', 'form'], ['ECサイト', 'ec'], ['決済サービス', 'payment'],
+  ]
+  const outgoing = [
+    ['友だちが追加されたとき', 'friend_add'], ['フォームが送られたとき', 'form_submitted'], ['予約が入ったとき', 'booking_created'], ['注文が確定したとき', 'ec.order.confirmed'],
+  ]
+  for (const [name, source] of incoming) {
+    const card = [...board.querySelectorAll('li')].find(item => item.textContent?.includes(name))!
+    expect(card).toBeTruthy()
+    expect(card.querySelector('a')?.getAttribute('href')).toBe(`/webhooks?tab=incoming&source=${source}`)
+  }
+  const booking = [...board.querySelectorAll('li')].find(item => item.textContent?.includes('予約サービス'))!
+  expect(booking.textContent).toContain('予約の確定・変更・取り消しを受け取ります')
+  for (const [name, event] of outgoing) {
+    const card = [...board.querySelectorAll('li')].find(item => item.textContent?.includes(name))!
+    expect(card).toBeTruthy()
+    expect(card.textContent).toContain(event)
+    expect(card.querySelector('a')?.getAttribute('href')).toBe(`/webhooks/new?event=${event}`)
+  }
+})
