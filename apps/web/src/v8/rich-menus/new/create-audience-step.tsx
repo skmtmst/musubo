@@ -136,6 +136,8 @@ type RenderAudienceStepContext = {
 
 export function renderAudienceStep({ aggregateOnly, audience, canOperate, conditionCount, conditionEmpty, conditionUnsaved, currentDefaultMenu, defaultOpen, editGroupId, host, orderRows, renderHqAudience, setAudience, setDefaultOpen, setPriorityInput, setPriorityOpen, setTargetingCondition, setTargetingPriority, targetedMenus, targetingCondition, targetingPriority }: RenderAudienceStepContext) {
     if (host) return renderHqAudience()
+    const validConditionCount = Number.isInteger(conditionCount) && conditionCount >= 0 ? conditionCount : null
+    const validPriority = Number.isInteger(targetingPriority) && targetingPriority >= 0 ? targetingPriority : null
     return (
       <>
         {/* 出す相手 */}
@@ -204,7 +206,11 @@ export function renderAudienceStep({ aggregateOnly, audience, canOperate, condit
               />
               </fieldset>
               {editGroupId && !conditionEmpty ? (
-                <p className={styles.fieldHint}>{conditionUnsaved ? `条件 ${formatNumber(conditionCount)}件（未保存）` : `保存済み条件 ${formatNumber(conditionCount)}件`}</p>
+                <p className={styles.fieldHint}>
+                  {validConditionCount === null
+                    ? (conditionUnsaved ? '条件数を確認できません（未保存）' : '保存済みの条件数を確認できません')
+                    : (conditionUnsaved ? `条件 ${formatNumber(validConditionCount)}件（未保存）` : `保存済み条件 ${formatNumber(validConditionCount)}件`)}
+                </p>
               ) : null}
               {conditionEmpty ? (
                 <p className={styles.fieldHint}>条件が空のままだと、公開しても誰にも出ません。</p>
@@ -216,7 +222,7 @@ export function renderAudienceStep({ aggregateOnly, audience, canOperate, condit
         <Card variant="form" gap="normal">
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="出す順番" actions={editGroupId && canOperate ? <Button type="button" variant="text" size="inline" onClick={() => {
-              setPriorityInput(String(targetingPriority + 1)); setPriorityOpen(true)
+              setPriorityInput(validPriority === null ? '' : String(validPriority + 1)); setPriorityOpen(true)
             }}>順番を変更する</Button> : undefined} />
             <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます</p>
           </div>
