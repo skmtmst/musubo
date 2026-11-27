@@ -1,38 +1,9 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
-- [予約メニューの料金とルールの確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-19-1128.md)
-- [流入経路一覧の読み込み確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-20-1128.md)
-- [NEN自動配信の一覧確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-21-1128.md)
-- [サイト計測コードと計測先の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-22-1128.md)
-- [成果承認と停止確認の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-23-1128.md)
-- [運営画面とプール作成の再試行の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-24-1128.md)
-- [イベント予約の通知と集計の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-25-1128.md)
-- [LINE通知の説明とリンクの試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-26-1128.md)
-- [NEN配信の条件と日時の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-27-1128.md)
-- [リッチメニューの件数と並びの試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-28-1128.md)
-- [共通アクション一覧の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-29-1128.md)
-- [保存した検索の候補選択の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-30-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
-- [ダッシュボードと予約経路の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex104-1127.md)
 
 
 # 文書の入口
 
-- [来店スタンプのカード表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-36-1128.md)
-- [LIFFの店名表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-37-1128.md)
-- [フォーム選択肢の受付表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-38-1128.md)
-- [紹介リンクのコピー操作の修正履歴](release-log/unreleased/PR-kenta-later-cx5-39-1128.md)
-- [予約日時の変更エラーの修正履歴](release-log/unreleased/PR-kenta-later-cx5-40-1128.md)
-- [LINE画面の主色と読み込み表示の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-01-1128.md)
-- [LINE画面の各テーマの試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-02-1128.md)
-- [フォームと紹介画面の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-03-1128.md)
-- [LINE画面の色と予約履歴の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-04-1128.md)
-- [予約画面の写真の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-05-1128.md)
-- [イベント画面の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-06-1128.md)
-- [イベント画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-07-1128.md)
-- [リサーチ画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-08-1128.md)
-- [フォーム送信確認の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-09-1128.md)
-- [フォーム受付と画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-10-1128.md)
-- [業種ごとのイベント画面名の試験追加](release-log/unreleased/PR-kenta-src-assert-cx5-11-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
@@ -40,17 +11,6 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [スマートフォンの予約台帳入口の反映履歴](release-log/unreleased/PR-kenta-later-cx2-27-1128.md)（説明・2026-11-28確認）
-- [運用者通知の宛先の読み直しの反映履歴](release-log/unreleased/PR-kenta-later-cx2-28-1128.md)（説明・2026-11-28確認）
-- [一括配信のテンプレート選択の反映履歴](release-log/unreleased/PR-kenta-later-cx2-29-1128.md)（説明・2026-11-28確認）
-- [ひな形の版比較の反映履歴](release-log/unreleased/PR-kenta-later-cx2-30-1128.md)（説明・2026-11-28確認）
-- [ひな形の配布先の友だち数の反映履歴](release-log/unreleased/PR-kenta-later-cx2-31-1128.md)（説明・2026-11-28確認）
-- [受信箱の本文表示の反映履歴](release-log/unreleased/PR-kenta-later-cx2-32-1128.md)（説明・2026-11-28確認）
-- [受信箱の添付操作の反映履歴](release-log/unreleased/PR-kenta-later-cx2-33-1128.md)（説明・2026-11-28確認）
-- [ダッシュボードの読み直し確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-01-1128.md)（説明・2026-11-28確認）
-- [ダッシュボードの編集権限の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-02-1128.md)（説明・2026-11-28確認）
-- [操作を止める理由の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-03-1128.md)（説明・2026-11-28確認）
-- [スマホのメニュー操作の確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-04-1128.md)（説明・2026-11-28確認）
 - [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
@@ -1481,37 +1441,5 @@
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車11の画面と記録の修正](release-log/unreleased/270-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
+- [列車12の画面と試験の修正](release-log/unreleased/PR-kenta-train-d-1128.md) — 反映履歴、確認 2026-11-28。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
-- [テンプレート編集時の不正なフォルダ応答からの読み直しを修正](release-log/unreleased/PR-kenta-later-cx3-34-1128.md) — 反映履歴、確認 2026-11-28。
-- [テンプレート詳細と版の履歴の不正な応答を読み直せるよう修正](release-log/unreleased/PR-kenta-later-cx3-35-1128.md) — 反映履歴、確認 2026-11-28。
-- [対応マークの不正な一覧と二重操作を修正](release-log/unreleased/PR-kenta-later-cx3-36-1128.md) — 反映履歴、確認 2026-11-28。
-- [シナリオと来店スタンプの一覧の読み込みを修正](release-log/unreleased/PR-kenta-later-cx3-37-1128.md) — 反映履歴、確認 2026-11-28。
-- [お知らせの送信件数と送信枠の表示を修正](release-log/unreleased/PR-kenta-later-cx3-38-1128.md) — 反映履歴、確認 2026-11-28。
-- [予約媒体の店舗選択の確認を修正](release-log/unreleased/PR-kenta-later-cx3-39-1128.md) — 反映履歴、確認 2026-11-28。
-- [カルーセル画像の登録結果の確認を修正](release-log/unreleased/PR-kenta-later-cx3-40-1128.md) — 反映履歴、確認 2026-11-28。
-- [友だち情報欄の保存結果の確認を修正](release-log/unreleased/PR-kenta-later-cx3-41-1128.md) — 反映履歴、確認 2026-11-28。
-- [はじめの設定の状態と理由の表示を修正](release-log/unreleased/PR-kenta-later-cx3-42-1128.md) — 反映履歴、確認 2026-11-28。
-- [休業前の予約確認を修正](release-log/unreleased/PR-kenta-later-cx3-43-1128.md) — 反映履歴、確認 2026-11-28。
-- [ホームのアカウント読み込みと未選択表示を修正](release-log/unreleased/PR-kenta-later-cx3-44-1128.md) — 反映履歴、確認 2026-11-28。
-- [マニュアル対応表の検索と確認日時を修正](release-log/unreleased/PR-kenta-later-cx3-45-1128.md) — 反映履歴、確認 2026-11-28。
-- [スプレッドシート連携の二重操作を修正](release-log/unreleased/PR-kenta-later-cx3-46-1128.md) — 反映履歴、確認 2026-11-28。
-- [マニュアル対応表の不正な画面名と行き先を修正](release-log/unreleased/PR-kenta-later-cx3-47-1128.md) — 反映履歴、確認 2026-11-28。
-- [テンプレート編集の入口確認を修正](release-log/unreleased/PR-kenta-later-cx3-48-1128.md) — 反映履歴、確認 2026-11-28。
-- [機能設定の読み込み確認を修正](release-log/unreleased/PR-kenta-later-cx3-49-1128.md) — 反映履歴、確認 2026-11-28。
-- [運営ダッシュボード最初の10分の異常値防御と最初のリッチメニュー選択の保存切替防御](release-log/unreleased/PR-kenta-later-gemini119-1127.md) — 反映履歴、確認 2026-11-28。
-- [リッチメニュー公開確認ステップの未知サイズ・異常数防御と初期設定状態読み込みの不正形防御](release-log/unreleased/PR-kenta-later-gemini120-1127.md) — 反映履歴、確認 2026-11-28。
-- [デリバリー注文詳細の異常値・送信中防御とスタイル入口の未知値フェイルクローズ](release-log/unreleased/PR-kenta-later-gemini121-1127.md) — 反映履歴、確認 2026-11-28。
-- [デリバリー受付操作の未知状態防御とスタイル体験タブ選択の修正](release-log/unreleased/PR-kenta-later-gemini122-1127.md) — 反映履歴、確認 2026-11-28。
-- [運営の閲覧のみ判定フェイルクローズとリッチメニュー対象設定の防御](release-log/unreleased/PR-kenta-later-gemini123-1127.md) — 反映履歴、確認 2026-11-28。
-- [運営サポート件数カードの欠損防御とリッチメニュー再読み込み検証](release-log/unreleased/PR-kenta-later-gemini124-1127.md) — 反映履歴、確認 2026-11-28。
-- [Google投稿状態確認の再読込整合と通知ベル小窓の防御](release-log/unreleased/PR-kenta-later-gemini125-1127.md) — 反映履歴、確認 2026-11-28。
-- [リッチメニュー画像解放・フォロー下書き・卓定員判定の防御](release-log/unreleased/PR-kenta-later-gemini126-1127.md) — 反映履歴、確認 2026-11-28。
-- [友だち追加配信の確認説明とアカウント追加進捗の異常値防御](release-log/unreleased/PR-kenta-later-gemini127-1127.md) — 反映履歴、確認 2026-11-28。
-- [重複友だち候補の再検出防御とイベント変更確認の入力・人数防御](release-log/unreleased/PR-kenta-later-gemini128-1127.md) — 反映履歴、確認 2026-11-28。
-- [ブラウザ一時保存の破損防御とメディア名前変更キー操作の修正](release-log/unreleased/PR-kenta-later-gemini129-1127.md) — 反映履歴、確認 2026-11-28。
-- [自動応答の順番設定と重複候補の比較画面の入力・表示ガード（gemini130）](release-log/unreleased/PR-kenta-later-gemini130-1127.md) — 反映履歴、確認 2026-11-28。
-- [自動化作成モデルと回答フォーム編集モデルの異常値・差分判定ガード（gemini131）](release-log/unreleased/PR-kenta-later-gemini131-1127.md) — 反映履歴、確認 2026-11-28。
-- [共通情報の削除影響ガードとLINEアカウント登録ロジックの異常値防御（gemini132）](release-log/unreleased/PR-kenta-later-gemini132-1127.md) — 反映履歴、確認 2026-11-28。
-- [統合ユーザー詳細と共通情報編集欄の異常値・処理中ガード（gemini133）](release-log/unreleased/PR-kenta-later-gemini133-1127.md) — 反映履歴、確認 2026-11-28。
-- [自動応答プレビューと引き継ぎ再開画面の異常値・誤表示ガード（gemini134）](release-log/unreleased/PR-kenta-later-gemini134-1127.md) — 反映履歴、確認 2026-11-28。
-- [重複検出一覧と回答フォーム見た目タブの数値・状態ガード（gemini135）](release-log/unreleased/PR-kenta-later-gemini135-1127.md) — 反映履歴、確認 2026-11-28。
