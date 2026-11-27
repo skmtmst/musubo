@@ -1488,3 +1488,4 @@
 - [テンプレートの見本を取得できないときの再読み込みを修正](release-log/unreleased/PR-kenta-later-cx3-26-1128.md) — 反映履歴、確認 2026-11-28。
 - [外部連携の不正な出来事の表示を修正](release-log/unreleased/PR-kenta-later-cx3-27-1128.md) — 反映履歴、確認 2026-11-28。
 - [ウェビナー配信枠の不正な種類と曜日の表示を修正](release-log/unreleased/PR-kenta-later-cx3-28-1128.md) — 反映履歴、確認 2026-11-28。
+- [テンプレート種類別一覧の内容と公開状態の表示を修正](release-log/unreleased/PR-kenta-later-cx3-29-1128.md) — 反映履歴、確認 2026-11-28。
