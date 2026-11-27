@@ -58,6 +58,7 @@ export default function FieldNew() {
       const res = await api.folders.list('friend_field')
       if (generation !== context.current.generation || request !== folderRequest.current) return
       if (!res.success) throw new Error(res.error)
+      if (!Array.isArray(res.data)) throw new Error('フォルダの応答を確認できません')
       setFolders(res.data); setFoldersGeneration(generation); setFoldersState('ready')
     } catch (failure) {
       if (generation !== context.current.generation || request !== folderRequest.current) return
@@ -77,6 +78,7 @@ export default function FieldNew() {
       const res = await api.friendFields.list(account)
       if (generation !== context.current.generation || request !== existingRequest.current) return
       if (!res.success) throw new Error(res.error)
+      if (!Array.isArray(res.data)) throw new Error('既存項目の応答を確認できません')
       setExisting(res.data); setExistingGeneration(generation); setExistingState('ready')
     } catch (failure) {
       if (generation !== context.current.generation || request !== existingRequest.current) return

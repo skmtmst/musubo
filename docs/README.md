@@ -1490,3 +1490,4 @@
 - [ウェビナー配信枠の不正な種類と曜日の表示を修正](release-log/unreleased/PR-kenta-later-cx3-28-1128.md) — 反映履歴、確認 2026-11-28。
 - [テンプレート種類別一覧の内容と公開状態の表示を修正](release-log/unreleased/PR-kenta-later-cx3-29-1128.md) — 反映履歴、確認 2026-11-28。
 - [友だち情報欄とフォルダの不正な応答から再読み込みできるよう修正](release-log/unreleased/PR-kenta-later-cx3-30-1128.md) — 反映履歴、確認 2026-11-28。
+- [友だち情報欄の作成時に不正な一覧を読み直せるよう修正](release-log/unreleased/PR-kenta-later-cx3-31-1128.md) — 反映履歴、確認 2026-11-28。
