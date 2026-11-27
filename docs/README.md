@@ -1484,3 +1484,4 @@
 - [ブラウザ一時保存の破損防御とメディア名前変更キー操作の修正](release-log/unreleased/PR-kenta-later-gemini129-1127.md) — 反映履歴、確認 2026-11-28。
 - [自動応答の順番設定と重複候補の比較画面の入力・表示ガード（gemini130）](release-log/unreleased/PR-kenta-later-gemini130-1127.md) — 反映履歴、確認 2026-11-28。
 - [自動化作成モデルと回答フォーム編集モデルの異常値・差分判定ガード（gemini131）](release-log/unreleased/PR-kenta-later-gemini131-1127.md) — 反映履歴、確認 2026-11-28。
+- [共通情報の削除影響ガードとLINEアカウント登録ロジックの異常値防御（gemini132）](release-log/unreleased/PR-kenta-later-gemini132-1127.md) — 反映履歴、確認 2026-11-28。
