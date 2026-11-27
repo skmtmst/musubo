@@ -84,7 +84,8 @@ function toForm(a: OpsAnnouncement): Form {
   return { subject: a.subject, body: a.body, audienceKind: a.audienceKind, audiencePlans: a.audiencePlans, audienceTenantIds: a.audienceTenantIds, channels: a.channels, publishAt: toLocalInput(a.publishAt) }
 }
 
-function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementChannel[]): string {
+function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementChannel[], error: boolean): string {
+  if (error) return '宛先数を取得できませんでした'
   if (!p) return '宛先を数えています…'
   const words = [`${p.tenants} 件の契約先・${p.staff} 人の権限者`]
   if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked} 人へ届きます`)
@@ -92,17 +93,21 @@ function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementCha
   return words.join('。')
 }
 
-function confirmAudience(form: Form, preview: OpsAudiencePreview | null): string {
+function confirmAudience(form: Form, preview: OpsAudiencePreview | null, previewError: boolean): string {
   const base = form.audienceKind === 'all'
     ? 'すべての契約先'
     : form.audienceKind === 'plan'
-      ? `${form.audiencePlans.map((key) => PLANS.find((p) => p.key === key)?.label ?? key).join('・')}の契約先`
+      ? `${form.audiencePlans.map((key) => PLANS.find((p) => p.key === key)?.label ?? 'その他のプラン').join('・')}の契約先`
       : '選んだ契約先'
-  return preview ? `${base} ${preview.tenants} 社` : `${base}（数えています…）`
+  if (preview) return `${base} ${preview.tenants} 社`
+  return previewError ? `${base}（件数を取得できませんでした）` : `${base}（数えています…）`
 }
 
-function confirmChannels(form: Form, preview: OpsAudiencePreview | null): string {
-  if (!preview) return '数えています…'
+function confirmChannels(form: Form, preview: OpsAudiencePreview | null, previewError: boolean): string {
+  if (!preview) {
+    if (!previewError) return '数えています…'
+    return form.channels.map((key) => CHANNELS.find((c) => c.key === key)?.label ?? 'その他の方法').join('・')
+  }
   return form.channels.map((key) => {
     if (key === 'screen') return `画面 ${preview.tenants}`
     if (key === 'email') return `メール ${preview.withEmail}`
@@ -140,6 +145,8 @@ export default function OpsAnnouncementEditV8() {
   const [sourceMissing, setSourceMissing] = useState(false)
   const [lineConfigured, setLineConfigured] = useState(true)
   const [tenants, setTenants] = useState<OpsTenantRow[]>([])
+  const [tenantsState, setTenantsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const tenantsReq = useRef(0)
   const [form, setForm] = useState<Form>(EMPTY)
   const [editingId, setEditingId] = useState<string | null>(null)
   // 作る欄の再実行キー。二重押し・通信再送でも1件だけ作る。
@@ -147,6 +154,7 @@ export default function OpsAnnouncementEditV8() {
   // 直し始めたときの版。違う版からの保存は最新の内容つきで409になる。
   const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null)
   const [preview, setPreview] = useState<OpsAudiencePreview | null>(null)
+  const [previewError, setPreviewError] = useState(false)
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState('')
   const [notice, setNotice] = useState('')
@@ -211,16 +219,32 @@ export default function OpsAnnouncementEditV8() {
     void opsCall(api.ops.announcements.list()).then((res) => { if (res.success) setLineConfigured(res.noticeLineConfigured) })
   }, [editId, copyId])
 
+  const loadTenants = useCallback(async () => {
+    const seq = ++tenantsReq.current
+    setTenantsState('loading')
+    const res = await opsCall(api.ops.tenants())
+    if (tenantsReq.current !== seq) return
+    if (res.success) {
+      setTenants(res.data.filter((t) => t.status !== 'archived'))
+      setTenantsState('ready')
+    } else {
+      setTenantsState('error')
+    }
+  }, [])
+
   useEffect(() => {
-    if (form.audienceKind !== 'tenants' || tenants.length > 0) return
-    void opsCall(api.ops.tenants()).then((res) => { if (res.success) setTenants(res.data.filter((t) => t.status !== 'archived')) })
-  }, [form.audienceKind, tenants.length])
+    if (form.audienceKind !== 'tenants' || tenantsState !== 'idle') return
+    void loadTenants()
+  }, [form.audienceKind, tenantsState, loadTenants])
 
   useEffect(() => {
     let cancelled = false
     setPreview(null)
+    setPreviewError(false)
     void opsCall(api.ops.announcements.preview({ audienceKind: form.audienceKind, audiencePlans: form.audiencePlans, audienceTenantIds: form.audienceTenantIds })).then((res) => {
-      if (!cancelled && res.success) setPreview(res.data)
+      if (cancelled) return
+      if (res.success) setPreview(res.data)
+      else setPreviewError(true)
     })
     return () => { cancelled = true }
   }, [form.audienceKind, form.audiencePlans, form.audienceTenantIds])
@@ -404,7 +428,7 @@ export default function OpsAnnouncementEditV8() {
           <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
             <legend className={`${styles.smallLabel} ${styles.legend}`}>
               宛先
-              <HelpTip label="宛先の見込み">{previewLabel(preview, form.channels)}</HelpTip>
+              <HelpTip label="宛先の見込み">{previewLabel(preview, form.channels, previewError)}</HelpTip>
             </legend>
             <div className={styles.choices}>
               {AUDIENCES.map((a) => (
@@ -418,9 +442,13 @@ export default function OpsAnnouncementEditV8() {
             ) : null}
             {form.audienceKind === 'tenants' ? (
               <div className={`${styles.chips} ${styles.tenantChips}`}>
-                {tenants.length === 0
-                  ? <span className={parts.note}>契約先を読み込んでいます…</span>
-                  : tenants.map((t) => <FilterChip key={t.id} selected={form.audienceTenantIds.includes(t.id)} onChange={() => setForm((f) => ({ ...f, audienceTenantIds: toggle(f.audienceTenantIds, t.id) }))}>{t.name}</FilterChip>)}
+                {tenantsState === 'error'
+                  ? <Notice tone="danger">契約先を読み込めませんでした。<Button size="compact" onClick={() => void loadTenants()}>もう一度読み込む</Button></Notice>
+                  : tenantsState === 'ready' && tenants.length === 0
+                    ? <span className={parts.note}>選べる契約先がありません。</span>
+                    : tenantsState !== 'ready'
+                      ? <span className={parts.note}>契約先を読み込んでいます…</span>
+                      : tenants.map((t) => <FilterChip key={t.id} selected={form.audienceTenantIds.includes(t.id)} onChange={() => setForm((f) => ({ ...f, audienceTenantIds: toggle(f.audienceTenantIds, t.id) }))}>{t.name}</FilterChip>)}
               </div>
             ) : null}
             <FieldError id="ann-audience-error">{fields.error('audience')}</FieldError>
@@ -466,8 +494,8 @@ export default function OpsAnnouncementEditV8() {
         <div className={parts.dialogBody}>
           <OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: 'お知らせ 1件', name: form.subject.trim() || null }} />
           <dl className={styles.facts}>
-            <div className={styles.fact}><dt>宛先</dt><dd>{confirmAudience(form, preview)}</dd></div>
-            <div className={styles.fact}><dt>届く方法</dt><dd>{confirmChannels(form, preview)}</dd></div>
+            <div className={styles.fact}><dt>宛先</dt><dd>{confirmAudience(form, preview, previewError)}</dd></div>
+            <div className={styles.fact}><dt>届く方法</dt><dd>{confirmChannels(form, preview, previewError)}</dd></div>
             <div className={styles.fact}><dt>送る日時</dt><dd>{scheduled ? `${longPublishAt(form.publishAt)}（予約）` : '今すぐ'}</dd></div>
           </dl>
           <div className={styles.letter}>
