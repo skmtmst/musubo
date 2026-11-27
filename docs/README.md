@@ -3,6 +3,8 @@
 
 - [初期セットの配布確認の反映履歴](release-log/unreleased/PR-kenta-later-codex59.md)（説明・2026-11-27確認）
 
+- [初期セット配布中の操作の反映履歴](release-log/unreleased/PR-kenta-starter-distribute-state.md)（説明・2026-11-27確認）
+
 # 文書の入口
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
