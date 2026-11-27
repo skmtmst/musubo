@@ -15,6 +15,8 @@ import { formatNumber } from '@/lib/format'
 import styles from '../hq-broadcasts/create.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 
+const knownCount = (count: unknown): count is number => typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
+
 export default function HqAccountPicker({ title, help, allowed, selected, onChange, note, disabled, onFriendTotal }: {
   title: string
   /** 題の右の「？」の中身。 */
@@ -38,7 +40,7 @@ export default function HqAccountPicker({ title, help, allowed, selected, onChan
     setSnapshot(null)
     void Promise.resolve().then(() => api.lineAccounts.list()).then((list) => {
       if (!current) return
-      if (list?.success) setSnapshot({ scope, state: 'ready', friends: new Map(list.data.map((account) => [account.id, account.stats?.friendCount ?? null])) })
+      if (list?.success) setSnapshot({ scope, state: 'ready', friends: new Map(list.data.map((account) => [account.id, knownCount(account.stats?.friendCount) ? account.stats.friendCount : null])) })
       else setSnapshot({ scope, state: 'error', friends: new Map() })
     }).catch(() => { if (current) setSnapshot({ scope, state: 'error', friends: new Map() }) })
     return () => { current = false }
@@ -53,6 +55,7 @@ export default function HqAccountPicker({ title, help, allowed, selected, onChan
       const count = friends.get(id)
       if (count == null) return null
       sum += count
+      if (!Number.isSafeInteger(sum)) return null
     }
     return sum
   }, [friends, selected])
