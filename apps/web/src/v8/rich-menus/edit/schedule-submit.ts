@@ -1,7 +1,8 @@
 'use client'
 
-import { useRef } from 'react'
-import { api, type RichMenuScheduleInput } from '@/lib/api'
+import { useEffect, useRef } from 'react'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { ApiError, api, type RichMenuScheduleInput } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 
 export const SCHEDULE_SAVED_MESSAGE = '公開予約を保存しました。予約時点の内容で公開します。'
@@ -41,24 +42,54 @@ export function useScheduleSubmit(params: {
 }): (input: RichMenuScheduleInput) => Promise<void> {
   const keys = useRef<IdempotencyKeyStore | null>(null)
   if (!keys.current) keys.current = new IdempotencyKeyStore()
+  const mountedRef = useRef(true)
+  const submittingRef = useRef(false)
+  const scopeRef = useRef({ groupId: params.groupId, generation: 0 })
+  if (scopeRef.current.groupId !== params.groupId) {
+    scopeRef.current = { groupId: params.groupId, generation: scopeRef.current.generation + 1 }
+    submittingRef.current = false
+  }
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      scopeRef.current = { groupId: scopeRef.current.groupId, generation: scopeRef.current.generation + 1 }
+      submittingRef.current = false
+    }
+  }, [])
 
   return async (input: RichMenuScheduleInput) => {
+    if (submittingRef.current) return
+    const runScope = scopeRef.current
+    const groupId = params.groupId
+    const isCurrent = () => mountedRef.current && scopeRef.current === runScope
     const store = keys.current as IdempotencyKeyStore
-    const signature = scheduleSignature(params.groupId, input)
+    const signature = scheduleSignature(groupId, input)
     const idempotencyKey = store.get(signature)
+    submittingRef.current = true
     params.onSaving(true)
     try {
       await params.persistDraft()
-      const response = await api.richMenuGroups.schedule(params.groupId, input, idempotencyKey)
+      if (!isCurrent()) return
+      const response = await api.richMenuGroups.schedule(groupId, input, idempotencyKey)
       if (!response.success) throw new Error(response.error)
       // ここで初めて「この操作は終わった」と言える。次の予約は新しいキーになる。
       store.clear(signature)
+      if (!isCurrent()) return
       params.onSaved(SCHEDULE_SAVED_MESSAGE)
-    } catch {
+    } catch (caught) {
+      if (!isCurrent()) return
       // 応答が確定していないので、キーは捨てずに残す。
+      if (caught instanceof ApiError && (caught.status === 403 || caught.status === 429)) {
+        params.onFailed(describeApiFailure(caught, '公開予約の保存', { scope: 'store' }))
+        return
+      }
       params.onFailed(SCHEDULE_FAILED_MESSAGE)
     } finally {
-      params.onSaving(false)
+      if (isCurrent()) {
+        submittingRef.current = false
+        params.onSaving(false)
+      }
     }
   }
 }

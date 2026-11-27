@@ -1453,3 +1453,4 @@
 - [自動化の見込み人数と次の配信の表示を修正](release-log/unreleased/PR-kenta-later-codex54.md) — 反映履歴、確認 2026-11-27。
 - [はじめの質問と機能設定の保存まわりを修正](release-log/unreleased/PR-kenta-later-gemini43-1127.md) — 反映履歴、確認 2026-11-27。
 - [Googleビジネス営業時間とマニュアル対応表の保存まわりを修正](release-log/unreleased/PR-kenta-later-gemini44-1127.md) — 反映履歴、確認 2026-11-27。
+- [統合ユーザー一覧とリッチメニュー公開予約の通信まわりを修正](release-log/unreleased/PR-kenta-later-gemini45-1127.md) — 反映履歴、確認 2026-11-27。
