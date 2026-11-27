@@ -130,10 +130,11 @@ export default function SoldOutBoard({
   onPage,
   onPerPage,
 }: SoldOutBoardProps) {
-  const pageCount = Math.max(1, Math.ceil(items.length / perPage))
-  const currentPage = Math.min(page, pageCount)
-  const firstIndex = (currentPage - 1) * perPage
-  const visible = items.slice(firstIndex, firstIndex + perPage)
+  const safePerPage = Number.isFinite(perPage) && perPage > 0 ? Math.floor(perPage) : 20
+  const pageCount = Math.max(1, Math.ceil(items.length / safePerPage))
+  const currentPage = Number.isFinite(page) ? Math.min(pageCount, Math.max(1, Math.trunc(page))) : 1
+  const firstIndex = (currentPage - 1) * safePerPage
+  const visible = items.slice(firstIndex, firstIndex + safePerPage)
   const selectedSet = new Set(selected)
   const canSync = (item: DeliveryMenuItem) => !item.services.some(({ service }) => service === 'ubereats')
   const checkedCount = visible.filter((item) => canSync(item) && selectedSet.has(item.id)).length
@@ -180,7 +181,7 @@ export default function SoldOutBoard({
                     checked={allChecked}
                     indeterminate={someChecked}
                     disabled={selectableCount === 0 || busy}
-                    onCheckedChange={onToggleAll}
+                    onCheckedChange={(checked) => { if (!canManage || busy || selectableCount === 0) return; onToggleAll(checked) }}
                   />
                 </Th>
               ) : null}
@@ -209,7 +210,7 @@ export default function SoldOutBoard({
                         aria-label={`${item.name || '商品'}を選ぶ`}
                         checked={canSync(item) && selectedSet.has(item.id)}
                         disabled={!canSync(item) || busy}
-                        onCheckedChange={(checked) => onToggle(item.id, checked)}
+                        onCheckedChange={(checked) => { if (!canManage || !canSync(item) || busy) return; onToggle(item.id, checked) }}
                       />
                     </Td>
                   ) : null}
@@ -234,7 +235,7 @@ export default function SoldOutBoard({
                         label={`${item.name || '商品'}の販売`}
                         checked={!item.soldOut}
                         disabled={!canSync(item) || busy || busyItemId === item.id}
-                        onChange={(next) => onToggleOne(item.id, !next)}
+                        onChange={(next) => { if (!canManage || !canSync(item) || busy || busyItemId === item.id) return; onToggleOne(item.id, !next) }}
                       />
                     </Td>
                   ) : null}
@@ -244,11 +245,11 @@ export default function SoldOutBoard({
           </tbody></DataTable></Card>
 
           {canManage ? (
-            <BulkBar count={checkedCount} unit="品" onClear={() => onToggleAll(false)}>
-              <Button variant="danger-outline" disabled={!canSubmit} busy={busy} busyLabel="送信中…" onClick={() => onSubmit(true)}>
+            <BulkBar count={checkedCount} unit="品" onClear={() => { if (busy) return; onToggleAll(false) }}>
+              <Button variant="danger-outline" disabled={!canSubmit} busy={busy} busyLabel="送信中…" onClick={() => { if (!canSubmit) return; onSubmit(true) }}>
                 <Ban size={16} aria-hidden="true" />選んだ商品を品切れにする
               </Button>
-              <Button variant="secondary" disabled={!canSubmit} onClick={() => onSubmit(false)}>
+              <Button variant="secondary" disabled={!canSubmit} onClick={() => { if (!canSubmit) return; onSubmit(false) }}>
                 <RotateCcw size={16} aria-hidden="true" />販売を再開する
               </Button>
             </BulkBar>
@@ -339,17 +340,17 @@ export function IntakeStopDialog({
       footerGap={STOP_FOOT_GAP}
       actionsPlacement="footer"
       footerNote={selectionReason || error ? <DialogNote>{selectionReason ?? error}</DialogNote> : null}
-      onCancel={onClose}
+      onCancel={() => { if (!busy) onClose() }}
       actions={(
         <>
-          <Button onClick={onClose} disabled={busy}>閉じる</Button>
+          <Button onClick={() => { if (!busy) onClose() }} disabled={busy}>閉じる</Button>
           <Button
             variant="danger"
             busy={busy}
             busyLabel="停止中…"
             disabled={!canSubmit}
             aria-description={selectionReason ?? undefined}
-            onClick={onSubmit}
+            onClick={() => { if (!canSubmit) return; onSubmit() }}
           >
             <Pause size={16} aria-hidden="true" />止める
           </Button>
@@ -376,7 +377,7 @@ export function IntakeStopDialog({
                   size="row"
                   checked={picked}
                   disabled={Boolean(reason) || busy}
-                  onChange={(checked) => onToggleService(state.service, checked)}
+                  onChange={(checked) => { if (busy || reason) return; onToggleService(state.service, checked) }}
                   title={(
                     <>
                       <span className="sr-only">{`${label}の受付を止める`}</span>
@@ -392,6 +393,7 @@ export function IntakeStopDialog({
         </div>
         {!disabledReason && services.some(state => selectedSet.has(state.service) && intakeActionReason(state, 'stop')) ? (
           <Button variant="text" disabled={busy} onClick={() => {
+            if (busy) return
             for (const state of services) if (selectedSet.has(state.service) && intakeActionReason(state, 'stop')) onToggleService(state.service, false)
           }}>操作できないサービスの選択を外す</Button>
         ) : null}
@@ -411,7 +413,7 @@ export function IntakeStopDialog({
             label: option.label,
           }))}
           value={preset}
-          onChange={(value) => { if (value) onPresetChange(value) }}
+          onChange={(value) => { if (!busy && value) onPresetChange(value) }}
           disabled={busy}
         />
       </DialogField>
