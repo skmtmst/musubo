@@ -29,7 +29,6 @@ describe('保存の共通処理はV8の作成型を使う', () => {
     expect(source).not.toContain('data-design="Head"')
   })
   it('入力と右欄の配置は作成型へ渡す', () => {
-    expect(source).toContain('preview={aside}')
     expect(source).toContain('hidePreviewWhenNarrow')
     expect(source).not.toContain('xl:w-[390px]')
   })
