@@ -31,23 +31,28 @@ type HydrateMenuDraftContext = {
 }
 
 export function hydrateMenuDraft({ host, setActivePageId, setAudience, setBaselineSignature, setChatBarText, setDefaultOpen, setFolderId, setGroup, setName, setPages, setSelectedAreaId, setSize, setTabCount, setTargetingCondition, setTargetingPriority, setTemplateKey }: HydrateMenuDraftContext, g: Group) {
+    const safeSize: 'large' | 'compact' = g.size === 'compact' ? 'compact' : 'large'
+    const safePages = Array.isArray(g.pages)
+      ? g.pages.map((p) => ({ ...p, areas: Array.isArray(p.areas) ? p.areas : [] }))
+      : []
+    const firstAreas = safePages[0]?.areas ?? []
     setGroup(g)
-    setSize(g.size)
-    setTabCount(Math.max(0, g.pages.length - 1))
-    const matchedLayout = TEMPLATES.find((layout) => layout.size === g.size && layout.areas.length === g.pages[0]?.areas.length && layout.areas.every((bounds, i) => {
-      const area = g.pages[0].areas[i]
-      return area.boundsX === Math.round(bounds.x) && area.boundsY === Math.round(bounds.y) && area.boundsWidth === Math.round(bounds.w) && area.boundsHeight === Math.round(bounds.h)
+    setSize(safeSize)
+    setTabCount(Math.min(2, Math.max(0, safePages.length - 1)))
+    const matchedLayout = TEMPLATES.find((layout) => layout.size === safeSize && layout.areas.length === firstAreas.length && layout.areas.every((bounds, i) => {
+      const area = firstAreas[i]
+      return Boolean(area) && area.boundsX === Math.round(bounds.x) && area.boundsY === Math.round(bounds.y) && area.boundsWidth === Math.round(bounds.w) && area.boundsHeight === Math.round(bounds.h)
     }))
-    setTemplateKey(matchedLayout?.key ?? V8_LAYOUT_KEYS[g.size][0])
-    setPages(g.pages)
+    setTemplateKey(matchedLayout?.key ?? V8_LAYOUT_KEYS[safeSize][0])
+    setPages(safePages)
     // 保存→読み直しで、いま見ているページを飛ばさない。消えたページだけ既定へ戻す。
     setActivePageId((prev) =>
-      prev && g.pages.some((p) => p.id === prev)
+      prev && safePages.some((p) => p.id === prev)
         ? prev
-        : g.pages.find((p) => p.id === g.defaultPageId)?.id ?? g.pages[0]?.id ?? null,
+        : safePages.find((p) => p.id === g.defaultPageId)?.id ?? safePages[0]?.id ?? null,
     )
     setSelectedAreaId((prev) =>
-      prev && g.pages.some((p) => p.areas.some((a) => a.id === prev)) ? prev : (g.pages.find((p) => p.id === g.defaultPageId) ?? g.pages[0])?.areas[0]?.id ?? null,
+      prev && safePages.some((p) => p.areas.some((a) => a.id === prev)) ? prev : (safePages.find((p) => p.id === g.defaultPageId) ?? safePages[0])?.areas[0]?.id ?? null,
     )
     setName(g.name)
     setChatBarText(g.chatBarText)
@@ -76,7 +81,7 @@ export function hydrateMenuDraft({ host, setActivePageId, setAudience, setBaseli
         folderId: g.folderId,
         defaultOpen: g.defaultOpen,
         hqTag: hydratedAudience === 'tag' ? (host?.initial?.displayTagName ?? '').trim() : null,
-        pages: g.pages.map((p, i) => ({
+        pages: safePages.map((p, i) => ({
           id: p.id,
           name: p.name,
           orderIndex: i,
