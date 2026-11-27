@@ -127,6 +127,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    * 承認済みの札は4つのままなので、この続きがあることは画面の状態では持たず別に覚える。
    */
   const [uberPendingStore, setUberPendingStore] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadLoading, setLoadLoading] = useState(false)
+  const loadLoadingRef = useRef(false)
   const accountRef = useRef(selectedAccountId)
   const canManageRef = useRef(canManage)
   const initialServicesRef = useRef(initialServices)
@@ -183,6 +186,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     setPicking(null)
     setPickedStoreId('')
     setUberPendingStore(false)
+    setLoadFailed(false)
+    setLoadLoading(false)
+    loadLoadingRef.current = false
     return () => { disconnectWindow.current = {} }
   }, [selectedAccountId])
 
@@ -193,6 +199,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     loadRequestRef.current += 1
     operationRequestRef.current += 1
     operationLockRef.current = false
+    loadLoadingRef.current = false
+    setLoadFailed(false)
+    setLoadLoading(false)
     setBusy(null)
     setDisconnecting(null)
     setDisconnectError('')
@@ -210,22 +219,36 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     const accountId = selectedAccountId
     const request = ++loadRequestRef.current
     const stale = () => loadRequestRef.current !== request || accountRef.current !== accountId || !canManageRef.current
+    loadLoadingRef.current = true
+    setLoadLoading(true)
+    setLoadFailed(false)
     try {
       const data = await restaurantDeliveryApi.ubereatsConnection(accountId)
       if (stale()) return
+      loadLoadingRef.current = false
+      setLoadLoading(false)
+      setLoadFailed(false)
       setScopeStore(data.store?.id && data.store.name ? { accountId, id: data.store.id, name: data.store.name } : null)
       setUberPendingStore(data.connection.status === 'pending_store')
       patch('uber', uberPatch(data, uberReturn))
     } catch {
       if (stale()) return
+      loadLoadingRef.current = false
+      setLoadLoading(false)
+      setLoadFailed(true)
       setScopeStore(null)
       // 読めなかっただけなので、出ている状態はそのまま残し、つなぐ操作も止めない。
       patch('uber', {
-        stateNote: 'いまの接続の状態を読み取れませんでした。少し待ってから画面を開き直してください。',
-        stateNoteTone: 'warn',
+        stateNote: 'いまの接続の状態を読み取れませんでした。通信を確認して、もう一度読み込んでください。',
+        stateNoteTone: 'danger',
       })
     }
   }, [canManage, patch, selectedAccountId, uberReturn])
+
+  const retryLoad = useCallback(() => {
+    if (loadLoadingRef.current || operationLockRef.current) return
+    void load()
+  }, [load])
 
   useEffect(() => { void load() }, [load])
 
@@ -494,7 +517,15 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 {/* 帯を先に見るのは、ログイン済み・お店は未選択（`pending_store`）が
                     札の上では「未接続」のままで、続きを伝えるのがこの帯だけだから。 */}
                 {service.stateNote ? (
-                  <Notice tone={service.stateNoteTone ?? (service.status === 'error' ? 'danger' : 'warn')} appearance="soft">{service.stateNote}</Notice>
+                  <Notice
+                    tone={service.stateNoteTone ?? (service.status === 'error' ? 'danger' : 'warn')}
+                    appearance="soft"
+                    action={service.id === 'uber' && loadFailed ? (
+                      <Button onClick={retryLoad} disabled={loadLoading || busy !== null} busy={loadLoading}>もう一度読み込む</Button>
+                    ) : undefined}
+                  >
+                    {service.stateNote}
+                  </Notice>
                 ) : service.status === 'disconnected' ? (
                   <p className={styles.note}>{service.guide}</p>
                 ) : null}

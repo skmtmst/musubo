@@ -1429,3 +1429,4 @@
 - [統括の自動応答の設定表示の反映履歴](release-log/unreleased/PR-kenta-later-codex41.md)
 - [予約経路タブ・飲食店組織管理の読み込み失敗表示と再試行（gemini28）](release-log/unreleased/PR-kenta-later-gemini28-1127.md) — 反映履歴、確認 2026-11-27。
 - [お客さまの画面のデザインとコース写真選択の読み込み失敗・再読み込み修正](release-log/unreleased/PR-kenta-later-gemini30-1127.md) — 反映履歴、確認 2026-11-27。
+- [デリバリー連携の接続状態再読み込みとウェビナー編集の読み込み失敗表示修正](release-log/unreleased/PR-kenta-later-gemini31-1127.md) — 反映履歴、確認 2026-11-27。
