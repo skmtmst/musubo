@@ -1,5 +1,5 @@
 export function formatDelay(minutes: number): string {
-  if (!Number.isFinite(minutes) || minutes <= 0) return '即時'
+  if (!Number.isFinite(minutes) || minutes < 0) return '時間を確認できません'
   const safe = Math.floor(minutes)
   if (safe === 0) return '即時'
   if (safe < 60) return `${safe}分後`
