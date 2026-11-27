@@ -1435,3 +1435,4 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
+- [デリバリー注文詳細の異常値・送信中防御とスタイル入口の未知値フェイルクローズ](release-log/unreleased/PR-kenta-later-gemini121-1127.md) — 反映履歴、確認 2026-11-28。
