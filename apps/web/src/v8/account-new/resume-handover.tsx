@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import LineAccountEntryGate from '@/components/line-account-entry-gate'
@@ -10,6 +10,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { withRequestTimeout } from '@/lib/request-timeout'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
@@ -45,23 +46,28 @@ function FollowerHandover({ accountId }: { accountId: string }) {
   const [readError, setReadError] = useState(false)
   const [stepError, setStepError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const refreshSequence = useRef(0)
+  const refreshPending = useRef<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const [styleLabel, setStyleLabel] = useState('')
   const running = state?.phase === 'importing_ids' || state?.phase === 'hydrating_profiles'
   const complete = state?.phase === 'completed' || skipped
 
   const refresh = useCallback(async () => {
-    if (!accountId) return
+    if (!accountId || refreshPending.current !== null) return
+    const request = ++refreshSequence.current
+    refreshPending.current = request
     setRefreshing(true)
     try {
-      const response = await api.lineAccounts.followerImportState(accountId)
+      const response = await withRequestTimeout(api.lineAccounts.followerImportState(accountId))
+      if (request !== refreshSequence.current) return
       if (!response.success) throw new Error(response.error)
       setState((current) => latestFollowerImportState(current, response.data))
       setReadError(false)
     } catch {
-      setReadError(true)
+      if (request === refreshSequence.current) setReadError(true)
     } finally {
-      setRefreshing(false)
+      if (request === refreshSequence.current) { refreshPending.current = null; setRefreshing(false) }
     }
   }, [accountId])
 
@@ -71,7 +77,7 @@ function FollowerHandover({ accountId }: { accountId: string }) {
     setStepError(false)
     void refresh()
     const timer = setInterval(() => void refresh(), 5000)
-    return () => clearInterval(timer)
+    return () => { clearInterval(timer); refreshSequence.current += 1; refreshPending.current = null }
   }, [refresh])
 
   useEffect(() => {

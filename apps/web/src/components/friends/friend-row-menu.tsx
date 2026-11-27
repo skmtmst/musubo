@@ -32,8 +32,8 @@ export default function FriendRowMenu({ friendId, friendName, attention, canEdit
   const items: ActionMenuItem[] = [
     { id: 'talk', label: 'トークを開く', onSelect: () => router.push(`/chats?friend=${friendId}`) },
     { id: 'detail', label: '友だちの詳細を見る', onSelect: () => router.push(`/friends/detail?id=${friendId}`) },
-    edit('status', '対応状況を変える'),
-    edit('operator', '担当者を変える'),
+    edit('status', '対応状況を変更する'),
+    edit('operator', '担当者を変更する'),
     edit('tag', 'タグを付ける・外す'),
     { id: 'attention', label: attention ? '注目から外す' : '注目にする', disabled: !canEdit, disabledReason: '閲覧のみでは変更できません', onSelect: () => onToggleAttention?.() },
     edit('template', 'テンプレートを送る', true),

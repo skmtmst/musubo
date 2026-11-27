@@ -52,6 +52,9 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   usePageCrumbs([{label:'ホーム',href:'/'},{label:'テンプレート',href:'/templates'}], !host)
   const [draft,setDraft] = useState<RichVideoDraft>(() => visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
   const [folders,setFolders] = useState<Folder[]>([])
+  const [folderState,setFolderState] = useState<{account: string; status: 'loading' | 'ready' | 'error'} | null>(null)
+  const [folderRetry,setFolderRetry] = useState(0)
+  const foldersReady = Boolean(host) || (folderState?.account === scopeAccountId && folderState.status === 'ready')
   const [error,setError] = useState('')
   const [issue,setIssue] = useState<RichVideoIssue | null>(null)
   const [localBusy,setBusy] = useState(false)
@@ -86,9 +89,15 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
     setFolders([])
     if (host || !scopeAccountId) return
     let cancelled = false
-    void api.folders.list('template',scopeAccountId).then(res=>{if(!cancelled && res.success)setFolders(res.data)}).catch(()=>undefined)
+    setFolderState({account:scopeAccountId,status:'loading'})
+    void api.folders.list('template',scopeAccountId).then(res=>{
+      if(cancelled)return
+      if(!res.success)throw new Error('folders unavailable')
+      setFolders(res.data)
+      setFolderState({account:scopeAccountId,status:'ready'})
+    }).catch(()=>{if(!cancelled)setFolderState({account:scopeAccountId,status:'error'})})
     return ()=>{cancelled=true}
-  },[scopeAccountId,Boolean(host)])
+  },[scopeAccountId,Boolean(host),folderRetry])
   // アカウントを替えた後の動画・画像のアップロード結果を受け取らない。
   useEffect(()=>{generation.current++;if(!id){setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft);setSavedId(null);setFileName('');setNeedsImage(false);setBusy(false);setClean(snapshotOf(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft));setIssue(null);setError('')}},[scopeAccountId,id,visual])
   useEffect(()=> {
@@ -264,7 +273,7 @@ setError(describeApiFailure(cause, '保存')) }}
       {error?<Notice tone="danger" >{error}</Notice>:null}
       {mismatch?<Notice tone="info" role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</Notice>:null}
       {loading?<p role="status">読み込み中…</p>:null}
-      <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)"><h2 className={styles.cardTitle}>名前とフォルダ</h2><SettingsFormRow layout="name-folder"><div className={styles.field}><Field label="テンプレート名" htmlFor="rv-name" requirement={{ required: true }}><SaveErrorField names={["name","draft.name"]}><TextField id="rv-name" aria-required="true" invalid={issue?.field==='name'} aria-describedby={issue?.field==='name'?'rv-name-error':undefined} value={draft.name} onChange={e=>patch({name:e.target.value})} disabled={!canMutate||busy||loading||loadFailed}/></SaveErrorField>{fieldError('name')}</Field></div><div className={styles.field}><Field label="フォルダ" htmlFor="rv-folder">{canMutate?<SaveErrorField names={["folderId","draft.folderId","folder_id","draft.folder_id"]}><FolderSelect size="full" id="rv-folder" aria-label="フォルダ" value={hqHost?host!.folder:draft.folderId} onChange={hqHost?host!.onFolderChange:value=>patch({folderId:value})} folders={hqHost?host!.folders:folders.map(folderById)} onCreate={hqHost?hostFolderCreate(host!):undefined} disabled={busy||loading||loadFailed}/></SaveErrorField>:<span>{hqHost?host!.folders.find(f=>f.value===host!.folder)?.label??'未分類':folders.find(f=>f.id===draft.folderId)?.name??'未分類'}</span>}</Field></div></SettingsFormRow></Card>
+      <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)"><h2 className={styles.cardTitle}>名前とフォルダ</h2><SettingsFormRow layout="name-folder"><div className={styles.field}><Field label="テンプレート名" htmlFor="rv-name" requirement={{ required: true }}><SaveErrorField names={["name","draft.name"]}><TextField id="rv-name" aria-required="true" invalid={issue?.field==='name'} aria-describedby={issue?.field==='name'?'rv-name-error':undefined} value={draft.name} onChange={e=>patch({name:e.target.value})} disabled={!canMutate||busy||loading||loadFailed}/></SaveErrorField>{fieldError('name')}</Field></div><div className={styles.field}><Field label="フォルダ" htmlFor="rv-folder">{canMutate?<SaveErrorField names={["folderId","draft.folderId","folder_id","draft.folder_id"]}><FolderSelect size="full" id="rv-folder" aria-label="フォルダ" value={hqHost?host!.folder:draft.folderId} onChange={hqHost?host!.onFolderChange:value=>patch({folderId:value})} folders={hqHost?host!.folders:foldersReady?folders.map(folderById):[]} onCreate={hqHost?hostFolderCreate(host!):undefined} disabled={busy||loading||loadFailed||!foldersReady}/></SaveErrorField>:<span>{hqHost?host!.folders.find(f=>f.value===host!.folder)?.label??'未分類':foldersReady?(folders.find(f=>f.id===draft.folderId)?.name??'未分類'):'—'}</span>}{!host && folderState?.account === scopeAccountId && folderState.status === 'error' ? <Notice tone="danger">フォルダを読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setFolderRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}</Field></div></SettingsFormRow></Card>
       <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)"><div className={styles.cardHead}><h2 className={styles.cardTitle}>動画</h2><p className={styles.cardNote}>縦長・横長・正方形のどれでも。トーク画面では自動で流れます</p></div>
         <div id="rv-video" tabIndex={-1}>{canMutate && !loadFailed ? <SaveErrorField names={["originalContentUrl","draft.originalContentUrl","original_content_url","draft.original_content_url"]}><MediaSlot kind="video" title="動画を追加" value={draft.originalContentUrl||null} valueName={fileName||undefined} accept="video/mp4" maxBytes={200 * 1024 * 1024} limitText="1ファイル200メガバイト以内・MP4・縦長 / 横長 / 正方形" busy={busy} error={issue?.field==='video'?issue.message:undefined} disabled={loading||mismatch} onFile={file=>void upload(file)} onRemove={()=>{patch({originalContentUrl:'',previewImageUrl:''});setFileName('');setNeedsImage(false);media.current=[];baseUrl.current=''}}/></SaveErrorField>:null}</div>
         {fileName?<AttachmentRow name={fileName} meta={draft.previewImageUrl?'プレビュー画像も作りました':'プレビュー画像を追加してください'}/>:null}

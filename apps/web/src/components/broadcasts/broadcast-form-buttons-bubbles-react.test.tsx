@@ -261,7 +261,7 @@ it('WEB256: テンプレートを足しても3通目以降の入力を捨てな�
     const choice = container.querySelector<HTMLInputElement>('input[value="template"]')!
     await act(async () => choice.click()); await flush()
     await act(async () => (document.querySelector('[role="dialog"] input[type="radio"]') as HTMLInputElement).click()); await flush()
-    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '選ぶ')!.click()); await flush()
+    await act(async () => [...document.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === '選択する')!.click()); await flush()
     expect(textareas().map(t => t.value)).toEqual(['元の本文0', '元の本文1', '元の本文2', '元の本文3', '追加する本文'])
   } finally { unmount() }
 })
@@ -280,7 +280,7 @@ it('WEB257: 最近の配信は切替前の遅い応答で置き換わらない',
 })
 it('WEB259: テンプレートを開いただけでは確認したと表示しない',async()=>{
  await renderForm()
- const picker=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('テンプレートから選ぶ'))!
+ const picker=[...container.querySelectorAll('button')].find(button=>button.textContent?.includes('テンプレートから選択する'))!
  await act(async()=>picker.click());await flush()
  const template=document.querySelector<HTMLInputElement>('[role="dialog"] input[type="radio"][aria-label="お礼"]')!
  await act(async()=>template.click());await flush()

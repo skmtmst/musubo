@@ -85,7 +85,7 @@ describe('一覧の登録権限', () => {
   it('管理者から並び順と親子は取り上げない（account.metadata.edit）', async () => {
     fixture.role.value = 'admin'
     await open()
-    expect(screen.getByRole('button', { name: /並び順と親子を変える/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /並び順と親子を変更する/ })).toBeTruthy()
   })
 
   it.each(['staff', 'viewer'])('1件も無いときも %s には頼む先を出す', async (role) => {
@@ -108,7 +108,7 @@ it('本人未知は理由も帯も出さず普通にdisabled、判明したviewe
   const view = await open()
   expect(view.container.querySelector('[data-read-only-notice]')).toBeNull()
   expect(view.container.querySelector('[data-permission-locked]')).toBeNull()
-  for (const name of [/LINEアカウントを登録/, /並び順と親子を変える/]) {
+  for (const name of [/LINEアカウントを登録/, /並び順と親子を変更する/]) {
     for (const button of screen.getAllByRole('button', { name })) {
       expect((button as HTMLButtonElement).disabled).toBe(true)
       fireEvent.click(button)
@@ -137,11 +137,11 @@ it('ownerの閲覧代理への切替は書込入口を止め、書込代理で�
   expect(proxySlot?.parentElement?.getAttribute('data-template-region')).toBe('settings-flow')
   expect(proxySlot?.parentElement?.previousElementSibling?.getAttribute('data-template-region')).toBe('heading')
   expect(screen.queryByRole('link', { name: /LINEアカウントを登録/ })).toBeNull()
-  const order = screen.getByRole('button', { name: /並び順と親子を変える/ })
+  const order = screen.getByRole('button', { name: /並び順と親子を変更する/ })
   expect(order.getAttribute('aria-disabled')).toBe('true')
   fireEvent.click(order)
   expect(screen.queryByRole('dialog')).toBeNull()
-  const style = screen.getByRole('button', { name: 'スタイルを変える' })
+  const style = screen.getByRole('button', { name: 'スタイルを変更する' })
   expect(style.getAttribute('aria-disabled')).toBe('true')
   expect(style.getAttribute('href')).toBeNull()
   fireEvent.click(style)

@@ -182,6 +182,37 @@ describe('V8 健康日記（src/v8/nen-health）', () => {
     expect(String(listCalls().at(-1)?.[0])).not.toContain('q=%E3')
   })
 
+  it.each(['success', 'failure'])('切替前の遅い一覧%sが今の数を上書きしない', async (outcome) => {
+    let resolve!: (value: unknown) => void
+    const old = new Promise(done => { resolve = done })
+    fetchApi.mockImplementation((path: string) => {
+      if (path.includes('accountId=acc-1')) return old
+      if (path.startsWith('/api/nen/health?')) return Promise.resolve({ success: true, data: LIST })
+      return Promise.resolve({ success: true, data: {} })
+    })
+    await act(async () => { root.render(<HealthV8 accountId="acc-1" tab="logs" onChangeTab={() => {}} />) })
+    await act(async () => { root.render(<HealthV8 accountId="acc-2" tab="logs" onChangeTab={() => {}} />) })
+    await settle()
+    expect(host.textContent).toContain('記録のあるペット 6')
+    await act(async () => { resolve(outcome === 'success' ? { success: true, data: { ...LIST, kpis: { ...LIST.kpis, petsWithRecords: 99 } } } : { success: false, error: 'failed' }) })
+    expect(host.textContent).toContain('記録のあるペット 6')
+    expect(host.textContent).not.toContain('記録のあるペット 99')
+  })
+
+  it('記録の項目で数の取得に失敗したら読み直せる', async () => {
+    let calls = 0
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/nen/health?')) return ++calls === 1 ? { success: false, error: 'failed' } : { success: true, data: LIST }
+      return { success: true, data: {} }
+    })
+    await render('items')
+    expect(host.textContent).toContain('健康日記の数を読み込めませんでした')
+    expect(host.querySelector('[aria-label="健康日記の数の帯"]')?.querySelector('[aria-busy="true"]')).toBeNull()
+    await click(byText('もう一度読み込む'))
+    expect(host.textContent).not.toContain('健康日記の数を読み込めませんでした')
+    expect(host.textContent).toContain('記録のあるペット 6')
+  })
+
   it('記録の項目は、変えられない決まりの表を出す', async () => {
     await render('items')
     expect(host.textContent).toContain('「気になる変化」に出る条件')

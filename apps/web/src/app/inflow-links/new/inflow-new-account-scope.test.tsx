@@ -113,7 +113,7 @@ async function addAction(kind: string, name: string) {
   fireEvent.click(await screen.findByRole('menuitem', { name: kind }))
   const dialog = await screen.findByRole('dialog', { name: kind + '対象を選ぶ' })
   fireEvent.click(within(dialog).getByText(name))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する', exact: true }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 }
 beforeEach(() => {

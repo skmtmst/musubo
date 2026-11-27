@@ -153,3 +153,10 @@ it('移した権限の操作は焦点と説明を保ち、hrefと内部操作を
   fireEvent.click(item)
   expect(select).not.toHaveBeenCalled()
 })
+
+it('その他の操作は通常色で、危険な操作だけ危険色を使う', async () => {
+  render(<PageHeading title="一覧" actions={<><Button>読む</Button><Button variant="primary">作る</Button><Button textTone="accent">表示を変える</Button><Button variant="danger">削除する</Button></>} />)
+  fireEvent.click(screen.getByRole('button', { name: 'その他の操作' }))
+  expect((await screen.findByRole('menuitem', { name: '表示を変える' })).className).toContain('textInk')
+  expect(screen.getByRole('menuitem', { name: '削除する' }).className).toContain('textDanger')
+})

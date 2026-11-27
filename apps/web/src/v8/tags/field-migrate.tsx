@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import Card, { CardHeader } from '@/components/shared/card'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
@@ -500,7 +502,7 @@ function FieldMigrate() {
   const needsPollAction = executedRunId !== null && !executing && pollProblem !== ''
     && (!run || RUN_RUNNING.has(run.status))
   const pollAttention = pollProblem !== '' && (!run || RUN_RUNNING.has(run.status))
-  const status = pollAttention ? pollProblem : run ? RUN_STATUS_LABELS[run.status] : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0} 人` : undefined
+  const status = pollAttention ? pollProblem : run ? knownValue(RUN_STATUS_LABELS, run.status, '状態を確認できません') : executedRunId ? '実行を受け付けました。結果を確認しています' : confirmed ? `事前確認済み：${preview?.summary.total ?? 0} 人` : undefined
   const usage = typeof source.usageCount === 'number' ? `${formatNumber(source.usageCount)} 人に値が入っている` : '値が入っている人数は未集計'
   const back = <></>
   const rows = sample ? sampleRows(sample) : []
@@ -511,7 +513,7 @@ function FieldMigrate() {
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId="GobMd"
       title={`「${source.name}」の種類を変える`}
-      help={`今の種類：${FIELD_TYPE_WORDS[source.type]}・${usage}`}
+      help={`今の種類：${knownValue(FIELD_TYPE_WORDS, source.type, '種類を確認できません')}・${usage}`}
       identity={back}
       status={status}
       footerActions={<>
@@ -581,7 +583,7 @@ function FieldMigrate() {
         {target ? (
           <div ><Field label={<span>移行先の項目</span>}>
 
-            <p className={styles.cardNote}>{`${target.name}（{{field.${target.fieldKey}}}・${FIELD_TYPE_WORDS[target.type]}）`}</p>
+            <p className={styles.cardNote}>{`${target.name}（{{field.${target.fieldKey}}}・${knownValue(FIELD_TYPE_WORDS, target.type, '種類を確認できません')}）`}</p>
             <span>
               <Button type="button" variant="text" onClick={() => { setCreatedTarget(null); setExistingTargetId(''); resetConfirmation() }}>別の項目を選び直す</Button>
             </span>
@@ -610,7 +612,7 @@ function FieldMigrate() {
                     size="full"
                     options={[
                       { value: '', label: '項目を選ぶ' },
-                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: `${field.name}（${FIELD_TYPE_WORDS[field.type]}）` })),
+                      ...fields.filter((field) => field.id !== source.id).map((field) => ({ ...entityOptionMetadata(field), value: field.id, label: `${field.name}（${knownValue(FIELD_TYPE_WORDS, field.type, '種類を確認できません')}）` })),
                     ]}
                   /></SaveErrorField>
                 </span>
@@ -649,7 +651,7 @@ function FieldMigrate() {
       ) : null}
       {run ? (
         <Card variant="form" gap="normal" aria-live="polite">
-          <CreateSummaryCard title="移行の結果" description={RUN_STATUS_LABELS[run.status]} rows={[
+          <CreateSummaryCard title="移行の結果" description={knownValue(RUN_STATUS_LABELS, run.status, '状態を確認できません')} rows={[
             { label: '移行できた', value: `${formatNumber(run.summary.succeeded)} 人` },
             { label: '移行できなかった', value: `${formatNumber(run.summary.failed)} 人` },
             { label: '確認が必要なまま', value: `${run.summary.review + run.summary.invalid} 人` },

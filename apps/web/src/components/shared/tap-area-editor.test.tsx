@@ -46,20 +46,20 @@ describe('画像の上で面を選ぶ（共通部品 TapAreaEditor・採用案 W
 
   it('画像の上の面を押しても、一覧の行を押しても同じ面を選ぶ', () => {
     render(<Harness />)
-    fireEvent.click(screen.getByRole('button', { name: '面 B「お知らせ」を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '面 B「お知らせ」を選択する' }))
     expect(screen.getByText('選んだ面：b')).toBeTruthy()
     const rows = within(screen.getByRole('list', { name: '面の一覧' })).getAllByRole('button')
     expect(rows[1].getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByRole('button', { name: '面 B「お知らせ」を選ぶ' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '面 B「お知らせ」を選択する' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(rows[0])
     expect(screen.getByText('選んだ面：a')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '面 A「予約する」を選ぶ' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '面 A「予約する」を選択する' }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('canvas を渡すと部品の画像の代わりにそれを左に置く（面を足す・区切り直す画像）', () => {
     render(<Harness canvas={<div data-testid="canvas">編集できる画像</div>} />)
     expect(screen.getByTestId('canvas')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /を選ぶ$/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /を選択する$/ })).toBeNull()
   })
 
   it('面がなければ一覧の代わりに文を出す', () => {

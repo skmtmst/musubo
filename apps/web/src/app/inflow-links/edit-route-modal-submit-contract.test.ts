@@ -71,7 +71,7 @@ it.each([false, true])('編集=%sでタグを選択・解除すると実際の�
   const picker = screen.getByRole('dialog', { name: 'タグを選ぶ' })
   await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '次の自動タグ' })) })
   expect(net.create).not.toHaveBeenCalled(); expect(net.update).not.toHaveBeenCalled()
-  await act(async () => { within(picker).getByRole('button', { name: '選ぶ', exact: true }).click() })
+  await act(async () => { within(picker).getByRole('button', { name: '選択する', exact: true }).click() })
   expect(fieldContainer.textContent).toContain('次の自動タグ')
   const save = () => screen.getByRole('button', { name: editing ? '保存する' : '作る', exact: true }).click()
   await act(async () => { save() })

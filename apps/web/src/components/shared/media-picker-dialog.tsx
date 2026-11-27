@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -216,14 +218,14 @@ export default function MediaPickerDialog({
                       />
                     ) : (
                       <span className="border-hairline text-ink-faint flex h-10 w-10 shrink-0 items-center justify-center rounded-control border text-nano">
-                        {KIND_LABEL[item.kind]}
+                        {knownValue(KIND_LABEL, item.kind, '種類を確認できません')}
                       </span>
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="text-ink block truncate text-sm" title={item.filename}>
                         {item.filename}
                       </span>
-                      <span className="text-ink-faint block text-micro">{KIND_LABEL[item.kind]}</span>
+                      <span className="text-ink-faint block text-micro">{knownValue(KIND_LABEL, item.kind, '種類を確認できません')}</span>
                     </span>
                   </MediaOption>
                 </li>

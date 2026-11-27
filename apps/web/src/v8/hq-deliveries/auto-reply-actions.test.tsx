@@ -22,7 +22,7 @@ function mount(canEdit = true, initial: unknown[] = []) {
 async function open(label = 'タグを付ける') {
  fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })); fireEvent.click(screen.getByRole('menuitem', { name: label }))
 }
-async function choose() { fireEvent.click(await screen.findByRole('radio', { name: /会員/ })); fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true })) }
+async function choose() { fireEvent.click(await screen.findByRole('radio', { name: /会員/ })); fireEvent.click(screen.getByRole('button', { name: '選択する', exact: true })) }
 it('selects via HQ only, cancels without draft mutation and removes action/reference together', async () => {
  const changed = mount(); await open(); await screen.findByRole('radio', { name: /会員/ })
  expect(search).toHaveBeenCalledWith({ kind: 'tag', q: '', limit: 30, cursor: undefined })
@@ -39,7 +39,7 @@ it('failed/denied candidates cannot commit, retry and pagination preserve both a
  const changed = mount(); await open('タグを外す'); fireEvent.click(await screen.findByRole('button', { name: '再読込' }))
  expect(changed).not.toHaveBeenCalled(); fireEvent.click(await screen.findByRole('button', { name: 'さらに表示する' }))
  await waitFor(() => expect(screen.getAllByRole('radio')).toHaveLength(2))
- fireEvent.click(screen.getAllByRole('radio')[1]); fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true }))
+ fireEvent.click(screen.getAllByRole('radio')[1]); fireEvent.click(screen.getByRole('button', { name: '選択する', exact: true }))
  expect(changed.mock.calls.at(-1)?.[0]).toMatchObject({ settings: { actions: [{ actionType: 'tag', config: { op: 'remove', tagIds: ['tag-b'] } }] }, references: [{ sourceId: 'tag-b', accountId: 'tag-b' }] })
 })
 it('viewer preserves unknown saved actions without controls or requests', () => {

@@ -78,7 +78,7 @@ it.each([['send_template','テンプレート','案内'],['reminder','リマイ�
   render(<InlineActionList actions={[{key:'target',actionType,config:{templateId:'t',reminderId:'r',eventId:'e'},onFailure:'continue'}]} onChange={()=>{}} {...EMPTY_OPTIONS} templates={[{id:'t',name:'案内'}]} reminders={[{id:'r',name:'翌日'}]} events={[{id:'e',name:'相談会'}]} />)
   fireEvent.click(screen.getByRole('button', { name: new RegExp(selected) }))
   expect(screen.getByText(selected)).toBeTruthy()
-  expect(screen.getByRole('button',{name:label+'：変える'})).toBeTruthy()
+  expect(screen.getByRole('button',{name:label+'：変更する'})).toBeTruthy()
 })
 
 it('イベントの取り消しを選んでもイベントと指定回を保つ', async () => {

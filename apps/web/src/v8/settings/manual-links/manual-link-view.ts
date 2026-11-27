@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /* app/settings/manual-links/manual-link-view.ts から写した（src/v8 は @/app を読めない）。開けない数の言い方だけ ★V8  に合わせた。 */
 import { MANUAL_LINKS } from '@/lib/manual-links'
 import type { ManualLink } from '@/lib/api'
@@ -21,6 +22,10 @@ export const LINK_STATUS_LABEL: Record<LinkStatus, string> = {
   ok: '開けます',
   broken: '開けません',
   unset: 'まだ決めていません',
+}
+
+export function manualLinkStatusLabel(status: string): string {
+  return knownValue(LINK_STATUS_LABEL, status, '状態を確認できません')
 }
 
 export interface ManualLinkRow {

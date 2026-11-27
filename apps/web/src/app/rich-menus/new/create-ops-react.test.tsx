@@ -169,13 +169,13 @@ describe('登録メディア', () => {
   it('今のアカウントで選ぶ窓を開き、閉じても入力を残し、選んだ画像を作成の口へ渡す', async () => {
     await open('')
     await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '画像つき' } }) })
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' })) })
     expect(state.pickerAccount.at(-1)).toBe('acc-1')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '選ばずに閉じる' })) })
     expect(screen.queryByRole('dialog', { name: '登録メディア' })).toBeNull()
     expect((screen.getByLabelText('メニュー名（友だちには見えません）') as HTMLInputElement).value).toBe('画像つき')
 
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' })) })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '案内.png を選ぶ' })) })
     expect(screen.queryByRole('dialog', { name: '登録メディア' })).toBeNull()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' })) })
@@ -188,7 +188,7 @@ describe('登録メディア', () => {
 
   it('選んだ画像だけでも未保存の入力として、一覧へ離れる前に確かめる', async () => {
     await open('')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' })) })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '案内.png を選ぶ' })) })
     await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'キャンセル' })) })
     await settle()

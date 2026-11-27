@@ -66,7 +66,7 @@ describe('開催回の定員と申込状況', () => {
     api.save.mockRejectedValueOnce(new Error('offline'))
     const host = await render()
     await click(host, 'の開催回の操作')
-    await click(host, '定員を変える')
+    await click(host, '定員を変更する')
     await change(host, '60')
     expect(editing).toHaveBeenLastCalledWith(true)
     await click(host, '定員を保存')
@@ -82,7 +82,7 @@ describe('開催回の定員と申込状況', () => {
   it('小数を保存せず、空欄は無制限として保存する', async () => {
     const host = await render()
     await click(host, 'の開催回の操作')
-    await click(host, '定員を変える')
+    await click(host, '定員を変更する')
     await change(host, '3.5')
     await click(host, '定員を保存')
     expect(api.save).not.toHaveBeenCalled()

@@ -341,7 +341,7 @@ export function SummaryRow({
       <span className={styles.summaryKey}>{label}</span>
       <span className={styles.summaryVal} title={typeof children === 'string' ? children : undefined}>{children}</span>
       <Button type="button" variant="text" onClick={onEdit}>
-        変える
+        変更する
       </Button>
     </div>
   )

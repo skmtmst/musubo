@@ -212,6 +212,9 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   const [name, setName] = useState(hostInitial ? hostInitial.name : host?.composer ? 'リッチメッセージ' : visual ? '夏のキャンペーン告知' : '')
   const [folder, setFolder] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<{ account: string; status: 'loading' | 'ready' | 'error' } | null>(null)
+  const [folderRetry, setFolderRetry] = useState(0)
+  const foldersReady = Boolean(host) || (folderState?.account === selectedAccountId && folderState.status === 'ready')
   const [imageUrl, setImageUrl] = useState(hostInitial?.imageUrl ?? '')
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(hostInitial && 'pickedMedia' in hostInitial ? hostInitial.pickedMedia : null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -242,6 +245,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     if (host) return
     setPickedMedia(null)
     setImageUrl('')
+    setFolder('')
     // 統括では上のバーのアカウントに結びつかない。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
@@ -253,16 +257,20 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [richDraftSnapshot])
 
-  /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */
+  /* フォルダはアカウントの置き場一覧から選ぶ。保存値はフォルダ名。 */
   useEffect(() => {
     setFolders([])
     if (!selectedAccountId || host) return
     let cancelled = false
-    void api.folders.list('template', selectedAccountId)
-      .then((res) => { if (!cancelled && res.success) setFolders(res.data) })
-      .catch(() => undefined)
+    setFolderState({ account: selectedAccountId, status: 'loading' })
+    void api.folders.list('template', selectedAccountId).then(res => {
+      if (cancelled) return
+      if (!res.success) throw new Error('folders unavailable')
+      setFolders(res.data)
+      setFolderState({ account: selectedAccountId, status: 'ready' })
+    }).catch(() => { if (!cancelled) setFolderState({ account: selectedAccountId, status: 'error' }) })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, Boolean(host), folderRetry])
 
   const snapshot = useMemo(() => JSON.stringify({ name, folder, imageUrl, pickedMedia, shapeValue, areas }), [name, folder, imageUrl, pickedMedia, shapeValue, areas])
   const [clean, setClean] = useState(() => snapshot)
@@ -494,14 +502,15 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
                 aria-label="フォルダ"
                 value={host ? host.folder : folder}
                 onChange={host ? host.onFolderChange : setFolder}
-                folders={host ? host.folders : folders.map(folderByName)}
+                folders={host ? host.folders : foldersReady ? folders.map(folderByName) : []}
+                disabled={!foldersReady}
                 colors
                 onCreate={host
                   ? hostFolderCreate(host)
                   : canMutate && selectedAccountId
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                     : undefined}
-              /></SaveErrorField></Field></div>
+              /></SaveErrorField>{!host && folderState?.account === selectedAccountId && folderState.status === 'error' ? <Notice tone="danger">フォルダを読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setFolderRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}</Field></div>
           </SettingsFormRow>
         </Card>}
 
@@ -633,7 +642,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
         open={pendingShape !== null}
         title="面の分け方を変えますか？"
         description={`${droppingLabels.map((label) => `面 ${label}`).join('・')}の動きは消えます。`}
-        confirmLabel="変える"
+        confirmLabel="変更する"
         onConfirm={confirmShapeChange}
         onCancel={() => setPendingShape(null)}
       />

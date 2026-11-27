@@ -183,17 +183,22 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   /* ★V8 mAbif：配信の受け取り（段と右の引き出し）と、会員ランクの1行。 */
   const consents = useDeliveryConsents(friendId)
   const [consentOpen, setConsentOpen] = useState(false)
-  const [rankLine, setRankLine] = useState<string | null>(null)
+  const [rankRetry, setRankRetry] = useState(0)
+  const [rankState, setRankState] = useState<{ key: string; status: 'loading' | 'ready' | 'error'; name: string | null } | null>(null)
+  const rankKey = JSON.stringify([selectedAccountId, friendId])
+  const visibleRank = rankState?.key === rankKey ? rankState : null
   useEffect(() => {
     if (!selectedAccountId) return
     let alive = true
+    setRankState({ key: rankKey, status: 'loading', name: null })
     void memberRanksApi.friend(selectedAccountId, friendId).then((response) => {
-      if (!alive || !response.success) return
+      if (!alive) return
+      if (!response.success) throw new Error('rank unavailable')
       const current = (response.data as { current?: { name?: string } | null } | null)?.current
-      setRankLine(current?.name ? `会員ランク：${current.name}` : null)
-    }).catch(() => undefined)
+      setRankState({ key: rankKey, status: 'ready', name: current?.name ?? null })
+    }).catch(() => { if (alive) setRankState({ key: rankKey, status: 'error', name: null }) })
     return () => { alive = false }
-  }, [selectedAccountId, friendId])
+  }, [selectedAccountId, friendId, rankKey, rankRetry])
   return (
   <><CustomerInfoRail><aside className={styles.summary} data-design="Left" data-friend-profile-panel>
     <CustomerInfoPanel
@@ -230,9 +235,9 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
             マイル使える{mileage?.balanceSource === 'ec' ? '（ECと同期）' : mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
           </span>
         </div>
-      )}{mileageStatus === 'ready' && mileage?.balanceSource === 'ec' ? <p className={styles.memo}>会員ランク：{mileage.ecRank ?? '未設定'}（ECと同期）</p> : mileageStatus === 'ready' && mileage?.balanceSource !== 'ec' && rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
-        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
-        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変える</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変える</Button>, content: <>{richMenuStatus === 'error' ? (
+      )}{mileageStatus === 'ready' && mileage?.balanceSource === 'ec' ? <p className={styles.memo}>会員ランク：{mileage.ecRank ?? '未設定'}（ECと同期）</p> : mileageStatus === 'ready' && mileage?.balanceSource !== 'ec' && selectedAccountId ? visibleRank?.status === 'error' ? <p className={`${styles.memo} ${styles.faint}`}>会員ランクを読み込めませんでした <Button variant="text" size="inline" onClick={() => setRankRetry(value => value + 1)}>もう一度読み込む</Button></p> : visibleRank?.status === 'ready' && visibleRank.name ? <p className={styles.memo}>{`会員ランク：${visibleRank.name}`}</p> : null : null}</> },
+        { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)} disabled={consents.status !== 'ready'} disabledReason={consents.status === 'error' ? '読み直してから開いてください。' : '読み込み中です。'}>{perms.manage ? '変更する' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} onRetry={() => void consents.reload()} /> },
+        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変更する</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変更する</Button>, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
           <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>
@@ -278,7 +283,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </section>
       </div>}
     />
-  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} friendAccountId={friend.lineAccountId ?? null} selectedAccountId={selectedAccountId} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
+  </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} friendAccountId={friend.lineAccountId ?? null} selectedAccountId={selectedAccountId} rows={consents.rows} canEdit={perms.manage} status={consents.status} onRetry={() => void consents.reload()} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
     <SaveErrorScope errors={saveErrors}><Dialog open={tagDialogOpen && perms.editSupport} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
       <div className={styles.dialogBody} data-friend-tag-editor>
         {availableTags.map((tag) => <Checkbox key={tag.id} checked={selectedTagIds.includes(tag.id)} disabled={tagBusy} onCheckedChange={(checked) => setSelectedTagIds((current) => checked ? [...current, tag.id] : current.filter((id) => id !== tag.id))}>{tag.name}</Checkbox>)}

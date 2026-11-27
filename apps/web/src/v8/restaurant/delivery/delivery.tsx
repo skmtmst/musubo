@@ -46,7 +46,7 @@ import {
   type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
 import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a/public/frame/index'
-import OrdersBoard from './orders'
+import OrdersBoard, { DeliveryOverview, OrderStateTabs } from './orders'
 import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
 import HistoryBoard from './history'
 import SoldOutBoard, { IntakeStopDialog } from './bulk'
@@ -745,7 +745,7 @@ function DeliveryInner() {
         disabled: !item.line_account_id,
       }))}
     />
-  ) : null
+  ) : (<span className={styles.pendingStore} aria-hidden="true"><EntitySelect aria-label="店舗" noun="店舗" value="" onChange={() => {}} options={[]} disabled /></span>)
 
   const picker = view === 'sold-out' || view === 'history' ? undefined : (
     <div className={styles.headActions}>
@@ -767,7 +767,7 @@ function DeliveryInner() {
             品切れ一括設定
           </Button>
           <span className={styles.intakeAction}>
-            <Button variant="danger-outline" disabled={Boolean(bulkStopReason) || stopBusy || busyService !== null} disabledReason={bulkStopReason} onClick={() => openStop()}>
+            <Button variant="danger-outline" disabled={Boolean(bulkStopReason) || stopBusy || busyService !== null} disabledReason={loading && !data ? undefined : bulkStopReason} aria-description={loading && !data ? '読み込み中です' : undefined} title={loading && !data ? '読み込み中です' : undefined} onClick={() => openStop()}>
               <Pause size={16} aria-hidden="true" />
               受付をまとめて止める
             </Button>
@@ -789,17 +789,15 @@ function DeliveryInner() {
       )
     }
     if ((loading || accountLoading) && !data) {
-      return <ListState kind="loading" title="注文を読み込んでいます" />
+      return <><DeliveryOverview data={null} uberConnectionStatus={null} canManage={canManage} busyService={null} onStopService={() => {}} onResumeService={() => {}} /><OrderStateTabs tab={tab} onTab={next => go({ tab: next === 'new' ? undefined : next })} /><ListState kind="loading" title="注文を読み込んでいます" /></>
     }
     if (error && !data) {
-      return (
-        <ListState
+      return <><OrderStateTabs tab={tab} onTab={next => go({ tab: next === 'new' ? undefined : next })} /><ListState
           kind="error"
           title="注文を表示できませんでした"
           description={error}
           onRetry={() => { void loadOrders() }}
-        />
-      )
+        /></>
     }
     if (!data) return null
     return (

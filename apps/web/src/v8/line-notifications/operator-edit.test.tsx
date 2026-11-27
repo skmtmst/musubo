@@ -68,6 +68,7 @@ beforeEach(() => {
     if (url.includes('recipients-preview')) return json({ success: true, data: recipients })
     if (url.includes('/api/notifications/teams')) return json({ success: true, data: [] })
     if (url.includes('/operator-rules/rule-9')) return json({ success: true, data: rule })
+    if (url.includes('/operator-rules/rule-new')) return json({ success: true, data: { ...rule, id: 'rule-new', version: 2 } })
     if (url.includes('/operator-rules') && (init?.method ?? 'GET') === 'POST') return json({ success: true, data: { ...rule, id: 'rule-new', version: 1 } })
     if (url.endsWith('/api/staff')) return json({ success: true, data: [{ id: 'a', name: '見本 18', role: 'admin' }, { id: 'b', name: '見本 139', role: 'staff' }] })
     return json({ success: false, error: 'not mocked' })
@@ -147,6 +148,47 @@ describe('欄で知らせて移る', () => {
 })
 
 describe('公開前の確認の窓（sDXNy）', () => {
+  test('役割を読めなければ宛先を保ったまま窓内で読み直せる', async () => {
+    search.value = ''
+    const mock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const original = mock.getMockImplementation()!
+    let calls = 0
+    mock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/api/staff') && ++calls === 1) return Promise.reject(new Error('offline'))
+      return original(input, init)
+    })
+    await render()
+    const publish = [...host!.querySelectorAll('button')].find(b => b.textContent?.includes('運用者へのお知らせを公開'))!
+    await act(async () => { publish.click() })
+    const retry = await screen.findByRole('button', { name: '役割を読み直す' })
+    expect(document.body.textContent).toContain('受け取る人の役割を読み込めませんでした。')
+    expect(document.body.textContent).toContain('見本 18')
+    await act(async () => { retry.click() })
+    await screen.findByText('管理者')
+    expect(calls).toBe(2)
+    expect(screen.queryByRole('button', { name: '役割を読み直す' })).toBeNull()
+  })
+  test('閉じた確認窓の遅い失敗を次の確認窓に出さない', async () => {
+    search.value = ''
+    const mock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    const original = mock.getMockImplementation()!
+    let rejectOld!: (error: Error) => void
+    let calls = 0
+    mock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/api/staff') && ++calls === 1) return new Promise((_resolve, reject) => { rejectOld = reject })
+      return original(input, init)
+    })
+    await render()
+    const publish = [...host!.querySelectorAll('button')].find(b => b.textContent?.includes('運用者へのお知らせを公開'))!
+    await act(async () => { publish.click() })
+    await screen.findByRole('button', { name: '戻って直す' })
+    await act(async () => { screen.getByRole('button', { name: '戻って直す' }).click() })
+    const again = [...host!.querySelectorAll('button')].find(b => b.textContent?.includes('運用者へのお知らせを公開'))!
+    await act(async () => { again.click() })
+    await screen.findByText('管理者')
+    await act(async () => { rejectOld(new Error('old failure')) })
+    expect(screen.queryByRole('button', { name: '役割を読み直す' })).toBeNull()
+  })
   test('アカウントを切り替えたら古い公開確認は使えない', async () => {
     search.value = ''
     await render()

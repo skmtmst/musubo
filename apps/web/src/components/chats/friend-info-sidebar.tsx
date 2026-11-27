@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { asArray } from './friend-detail-shape'
 
 import { STATUS_WORD } from './friend-info-status'
@@ -463,7 +465,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                         {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
                           {/* 絵 eovoG：次回予約・次の自動配信も 状況・担当 と同じ行の形（見出し＋値）で続ける。 */}
                           <CustomerInfoRows
-                            rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]}
+                            rows={[{ label: '状況', value: effectiveStatus ? knownValue(STATUS_WORD, effectiveStatus, '状態を確認できません') : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]}
                           />
                           {(upcoming.kind === 'error' || (upcoming.kind === 'data' && (upcoming.data.nextBookingError || upcoming.data.nextAutoDeliveryError))) ? (
                             <Button variant="text" size="inline" onClick={() => setUpcomingRetry((key) => key + 1)}>再試行する</Button>

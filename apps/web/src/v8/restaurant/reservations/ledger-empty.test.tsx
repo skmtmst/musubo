@@ -8,7 +8,7 @@ import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import LedgerEmpty from './ledger-empty'
 
 const role = vi.hoisted(()=>({value:'owner' as string | null}))
-vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>role.value,canManageRole:(value:string|null)=>value==='owner'||value==='admin'}))
+vi.mock('@/lib/staff-role',()=>({useStaffIdentity:()=>({id:'staff-1'}),useStaffRole:()=>role.value,canManageRole:(value:string|null)=>value==='owner'||value==='admin'}))
 beforeEach(()=>{role.value=verifiedStaffRole('owner');forgetSessionSnapshot()})
 afterEach(()=>{cleanup();verifiedStaffRole(null);forgetSessionSnapshot()})
 

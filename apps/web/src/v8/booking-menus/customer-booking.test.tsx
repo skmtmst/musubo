@@ -270,7 +270,7 @@ describe('見せる相手の保存と読み直し', () => {
     render(<MenuFormV8 />)
     await settle()
     expect((screen.getByRole('radio', { name: mode === 'include_tags' ? 'タグが付いた人だけに見せる' : 'タグが付いた人には見せない' }) as HTMLInputElement).checked).toBe(true)
-    expect(screen.getByRole('button', { name: '見せる相手のタグ：変える' }).textContent).toContain('会員')
+    expect(screen.getByRole('button', { name: '見せる相手のタグ：変更する' }).textContent).toContain('会員')
   })
 
   it('編集で全員へ戻すと保存先へ空のタグを送り、読み直しても全員のまま', async () => {

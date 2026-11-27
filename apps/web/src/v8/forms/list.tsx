@@ -1095,11 +1095,7 @@ export default function FormsListV8() {
         title="まだ回答フォームがありません"
         description="アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。"
         canCreate={canEditForms}
-        action={
-          <Button type="button" variant="primary" onClick={createDraft}>
-            <Plus size={16} aria-hidden="true" />最初のフォームを作る
-          </Button>
-        }
+        create={{ label: '最初のフォームを作る', onClick: () => detailGuard.protect(createDraft) }}
         filtered={filterActive}
         onClearFilters={clearFilters}
         data-design-node="I3L41O-empty"

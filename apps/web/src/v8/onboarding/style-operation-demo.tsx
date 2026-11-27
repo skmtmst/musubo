@@ -1,5 +1,6 @@
 'use client'
 
+import { displayRange } from '@/lib/display-range'
 import Card from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './style-demo-pages.module.css'
@@ -12,14 +13,14 @@ const SALON_BOARD_SAMPLE: SalonColumn[] = [
   {
     staff: '見本 あおい', next: '次の空き 14:00',
     entries: [
-      { time: '10:00–11:00', name: '見本 ゆい', menu: 'カット', state: 'done', stateLabel: '来店済み' },
-      { time: '11:30–12:30', name: '見本 みお', menu: 'カット', state: 'booked', stateLabel: '予約' },
+      { time: displayRange('10:00', '11:00'), name: '見本 ゆい', menu: 'カット', state: 'done', stateLabel: '来店済み' },
+      { time: displayRange('11:30', '12:30'), name: '見本 みお', menu: 'カット', state: 'booked', stateLabel: '予約' },
     ],
   },
   {
     staff: '見本 れん', next: '次の空き 10:00',
     entries: [
-      { time: '12:00–13:00', name: '見本 そら', menu: 'トリートメント', state: 'booked', stateLabel: '予約' },
+      { time: displayRange('12:00', '13:00'), name: '見本 そら', menu: 'トリートメント', state: 'booked', stateLabel: '予約' },
     ],
   },
 ]
@@ -32,13 +33,13 @@ const CONSULT_BOARD_SAMPLE: ConsultColumn[] = [
   {
     staff: '見本 かい', next: '次の空き 11:00',
     entries: [
-      { time: '10:00–10:45', name: '見本 ひな', meet: 'オンライン', stateLabel: '予約' },
+      { time: displayRange('10:00', '10:45'), name: '見本 ひな', meet: 'オンライン', stateLabel: '予約' },
     ],
   },
   {
     staff: '見本 なな', next: '次の空き 10:00',
     entries: [
-      { time: '10:30–11:15', name: '見本 りく', meet: '対面', stateLabel: '予約' },
+      { time: displayRange('10:30', '11:15'), name: '見本 りく', meet: '対面', stateLabel: '予約' },
     ],
   },
 ]
@@ -74,9 +75,9 @@ type LessonEntry = { time: string; name: string; note: string; tone: 'success' |
  * 実データの読み書きはしない。
  */
 const LESSON_BOARD_SAMPLE: LessonEntry[] = [
-  { time: '9:00–10:00', name: '朝のヨガ', note: '12人', tone: 'success', stateLabel: '出席済み' },
-  { time: '10:00–11:00', name: 'はじめてのヨガ', note: '残り 3・出欠待ち 2人', tone: 'info', stateLabel: '出欠待ち' },
-  { time: '14:00–15:00', name: 'おひるのヨガ', note: '残り 8', tone: 'info', stateLabel: '受付中' },
+  { time: displayRange('9:00', '10:00'), name: '朝のヨガ', note: '12人', tone: 'success', stateLabel: '出席済み' },
+  { time: displayRange('10:00', '11:00'), name: 'はじめてのヨガ', note: '残り 3・出欠待ち 2人', tone: 'info', stateLabel: '出欠待ち' },
+  { time: displayRange('14:00', '15:00'), name: 'おひるのヨガ', note: '残り 8', tone: 'info', stateLabel: '受付中' },
 ]
 
 /** 面談・相談3ページ目「相談の予定を確認する」の静止見本。保存・送信はしない。 */
@@ -119,7 +120,7 @@ const EC_BOARD_SAMPLE: EcEntry[] = [
  * 保存しただけでは始まらない。実データの読み書き・送信はしない。
  */
 const RESTAURANT_AFTER_SAMPLE = {
-  visit: { time: '18:00–20:00', name: '見本 たろう', detail: '2名・テーブル席' },
+  visit: { time: displayRange('18:00', '20:00'), name: '見本 たろう', detail: '2名・テーブル席' },
   thanks: { when: '翌日 12:00', text: '昨日はありがとうございました。またのお越しをお待ちしています。' },
 }
 
@@ -153,7 +154,7 @@ export function RestaurantAfterDemo() {
  * 実データの読み書き・送信はしない。
  */
 const SALON_AFTER_SAMPLE = {
-  visit: { time: '11:30–12:30', name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
+  visit: { time: displayRange('11:30', '12:30'), name: '見本 みお', menu: 'カット', staff: '見本 あおい' },
   thanks: { when: '翌日 12:00', text: '昨日はご来店ありがとうございました。またのご利用をお待ちしています。' },
 }
 
@@ -186,7 +187,7 @@ export function SalonAfterDemo() {
  * 保存しただけでは始まらない。実データの読み書き・送信はしない。
  */
 const CONSULT_AFTER_SAMPLE = {
-  result: { time: '10:00–10:45', name: '見本 ひな', meet: 'オンライン', staff: '見本 かい' },
+  result: { time: displayRange('10:00', '10:45'), name: '見本 ひな', meet: 'オンライン', staff: '見本 かい' },
   thanks: { when: '翌日 12:00', text: '昨日はご相談ありがとうございました。次のご案内をお待ちください。' },
 }
 
@@ -219,7 +220,7 @@ export function ConsultAfterDemo() {
  * 保存しただけでは始まらない。実データの読み書き・送信はしない。
  */
 const LESSON_AFTER_SAMPLE = {
-  attendance: { time: '9:00–10:00', name: '朝のヨガ', note: '出席 12人' },
+  attendance: { time: displayRange('9:00', '10:00'), name: '朝のヨガ', note: '出席 12人' },
   thanks: { when: '翌日 12:00', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。' },
 }
 

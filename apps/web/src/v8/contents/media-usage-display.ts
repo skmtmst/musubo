@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /* ★V8 写し：src/app/contents/media-usage-display.ts から写した（src/v8 は src/app を import しない決まり）。中身は同じ。直すときは両方を直す。 */
 /**
  * 登録メディアの「使用箇所」の言葉づかい（設計 `voJtX` 15-1）。
@@ -45,7 +46,7 @@ export const UNKNOWN_USAGE_KIND = '種類を判別できない使用先'
 
 /** 使用箇所の種別を運用者の言葉にする。 */
 export function mediaUsageKindText(refKind: string): string {
-  return USAGE_KIND_LABELS[refKind] ?? UNKNOWN_USAGE_KIND
+  return knownValue(USAGE_KIND_LABELS, refKind, UNKNOWN_USAGE_KIND)
 }
 
 /**

@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useEffect, useState } from 'react'
 import { api, type OperationSendPath, type OperationSendPathsResponse } from '@/lib/api'
 import { formatOperationDate } from '@/lib/operation-status'
@@ -100,7 +102,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
     const paths = data.paths.filter((path) => path.capability === capability)
     if (paths.length === 0) continue
     groups.push({
-      title: CAPABILITY_LABEL[capability],
+      title: knownValue(CAPABILITY_LABEL, capability, '対象を確認できません'),
       stopped: paths.some((path) => path.state === 'stopped'),
       excluded: false,
       paths,
@@ -126,7 +128,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
               {path.state === 'stopped' ? '停止中' : path.state === 'running' ? '稼働中' : '対象外'}
             </span>
             <span className="min-w-0 font-bold text-ink">{operatorPathLabel(path.label)}</span>
-            <span className="text-ink-faint">{SEND_PATH_KIND_LABEL[path.kind]}</span>
+            <span className="text-ink-faint">{knownValue(SEND_PATH_KIND_LABEL, path.kind, '種類を確認できません')}</span>
             <span className="min-w-0 flex-1 text-ink-faint">{operatorPathNote(path.excludedReason ?? path.note)}</span>
           </li>)}
         </ul>

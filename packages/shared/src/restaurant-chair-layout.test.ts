@@ -26,3 +26,29 @@ describe('restaurantChairPositions', () => {
     expect(restaurantChairPositions({ capacity: 4, shape: 'circle' }).map((chair) => chair.side)).toEqual(['top', 'right', 'bottom', 'left']);
   });
 });
+
+describe('丸い卓の配置', () => {
+  it('全周は円の上で均等、古い方向なしの保存値も全周になる', () => {
+    const all = restaurantChairPositions({ capacity: 5, shape: 'circle', arrangement: 'all' })
+    expect(all.map(item => item.angle)).toEqual([-90, -18, 54, 126, 198])
+    expect(restaurantChairPositions({ capacity: 5, shape: 'circle', arrangement: 'both' })).toEqual(all)
+  })
+  it('片側と向かい合わせは選んだ方向の円周に置く', () => {
+    expect(restaurantChairPositions({ capacity: 3, shape: 'circle', arrangement: 'one', side: 'right' }).map(item => item.angle)).toEqual([-45, 0, 45])
+    expect(restaurantChairPositions({ capacity: 4, shape: 'circle', arrangement: 'both', side: 'top' }).map(item => item.angle)).toEqual([-135, -45, 45, 135])
+  })
+})
+
+it.each([['one', 6], ['both', 12], ['all', 100]] as const)('丸卓の%s・%i席は弧の間隔に合わせて椅子の幅を調整する', (arrangement, capacity) => {
+  const chairs = restaurantChairPositions({ capacity, shape: 'circle', arrangement, side: 'right' })
+  expect(chairs).toHaveLength(capacity)
+  const angles = chairs.map(chair => ((chair.angle! % 360) + 360) % 360).sort((a, b) => a - b)
+  const minGap = Math.min(...angles.map((angle, i) => (angles[(i + 1) % angles.length] - angle + 360) % 360))
+  const chord = 2 * 38 * Math.sin(minGap * Math.PI / 360)
+  expect(chord + 1e-8).toBeGreaterThanOrEqual(20 * chairs[0].scale!)
+})
+
+it.each([['one', 6], ['both', 12]] as const)('丸卓の%s %i席はほぼ通常の幅で置く', (arrangement, capacity) => {
+  const chairs = restaurantChairPositions({ capacity, shape: 'circle', arrangement, side: 'top' })
+  expect(chairs.every(chair => chair.scale! > 0.98)).toBe(true)
+})

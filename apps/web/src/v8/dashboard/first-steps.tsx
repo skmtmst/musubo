@@ -10,7 +10,7 @@ import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared
 import { lockUnless } from '@/components/shared/permission-lock'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { DisclosureToggle } from '@/components/shared/disclosure'
 import styles from './first-steps.module.css'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 
@@ -23,6 +23,7 @@ export {
   nextFirstStepKey,
   readFirstStepsFolded,
   shouldShowFirstSteps,
+  shouldKeepFirstStepsVisible,
   summarizeFirstSteps,
   useFirstMessageArrived,
   useFirstSteps,
@@ -70,10 +71,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
         <span className={styles.spacer} />
         {onRetry && summary?.steps.some(step => step.state === 'unknown') ? <Button size="compact" onClick={onRetry}>設定を読み直す</Button> : null}
         {onRecheck ? <Button size="compact" onClick={onRecheck} title="最初の1通の自動の確かめを止めました">もう一度確かめる</Button> : null}
-        {summary && !complete ? <button type="button" className={styles.fold} onClick={onToggle} aria-expanded={!folded} aria-controls="first-steps-list">
-          {folded ? '開く' : '畳む'}
-          {folded ? <ChevronDown className={styles.foldIcon} aria-hidden="true" /> : <ChevronUp className={styles.foldIcon} aria-hidden="true" />}
-        </button> : null}
+        {summary && !complete ? <DisclosureToggle open={!folded} controls="first-steps-list" onToggle={onToggle} subject="はじめにやること" /> : null}
       </div>
       {feedback}
       {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>

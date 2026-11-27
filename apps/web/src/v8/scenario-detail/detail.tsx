@@ -612,7 +612,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
                 className={styles.iconButton}
                 onClick={openRenameDialog}
                 title="名前・説明・置き場を変える"
-                aria-label="名前・説明・置き場を変える"
+                aria-label="名前・説明・置き場を変更する"
               >
                 <Pencil aria-hidden />
               </button>

@@ -166,15 +166,26 @@
 }
 
 .reviewer {
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-ink);
   font-weight: 600;
 }
 
 .comment {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+}
+
+.reviewDate {
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
 }
 
 .stars {

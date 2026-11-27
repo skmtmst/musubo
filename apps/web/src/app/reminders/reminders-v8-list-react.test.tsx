@@ -354,7 +354,7 @@ test('リマインダの全件選択はページ外の停止対象も確認す�
   await act(async () => root.render(<RemindersPage />))
   await eventually(() => expect(host.querySelector('tbody tr')).toBeTruthy())
   await act(async () => (host.querySelector('thead input[type="checkbox"]') as HTMLElement).click())
-  const all = [...host.querySelectorAll('button')].find(button => button.textContent === '条件に合う101件すべてを選ぶ') as HTMLElement
+  const all = [...host.querySelectorAll('button')].find(button => button.textContent === '条件に合う101件すべてを選択する') as HTMLElement
   expect(all).toBeTruthy()
   await act(async () => all.click())
   expect(host.textContent).toContain('101件を選択中')

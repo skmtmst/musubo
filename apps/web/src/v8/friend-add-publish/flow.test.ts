@@ -51,3 +51,8 @@ describe('友だち追加時の配信の確認（V8）の決まり', () => {
     expect(actionSummaryText(rule())).toBe('なし')
   })
 })
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('知らない初回案内の種類 %s は確認できないと表示する', messageType => {
+  expect(firstSendText(rule({ messageType: messageType as FriendAddRule['definition']['messageType'] }))).toBe('種類を確認できません・追加してすぐ')
+})

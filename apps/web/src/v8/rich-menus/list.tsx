@@ -804,7 +804,7 @@ export default function RichMenusListV8() {
     if (g.status === 'published') {
       items.push({
         id: 'apply',
-        label: '表示先を変える',
+        label: '表示先を変更する',
         onSelect: () => setApplyTo(g),
       })
     }

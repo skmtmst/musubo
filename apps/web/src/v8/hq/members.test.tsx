@@ -187,7 +187,7 @@ describe('V8 統括のメンバーの窓', () => {
 
     await act(async () => { buttonByText('変更を保存する')!.click() })
     await flush()
-    await act(async () => { buttonByText('変える')!.click() })
+    await act(async () => { buttonByText('変更する')!.click() })
     await flush()
     expect(update).toHaveBeenCalledTimes(1)
     const body = update.mock.calls[0][1] as Record<string, unknown>
@@ -217,7 +217,7 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     expect(dialogTitles()).toEqual(['本部 太郎 さんの権限を変えますか？'])
     // 管理者を止めるので本人確認つきの確定になる。
-    await act(async () => { buttonByText('確認コードを入れて変える')!.click() })
+    await act(async () => { buttonByText('確認コードを入れて変更する')!.click() })
     await flush()
     expect(update).toHaveBeenCalled()
     const body = update.mock.calls.at(-1)![1] as Record<string, unknown>

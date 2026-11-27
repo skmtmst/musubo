@@ -181,7 +181,7 @@ for (const width of [1152, 1440]) {
       const picker = page.getByRole('dialog').last()
       await expect(picker.getByText('未読 27件', { exact: true })).toBeVisible()
       await picker.getByRole('radio', { name: '未割り当て', exact: true }).check()
-      await picker.getByRole('button', { name: '選ぶ', exact: true }).click()
+      await picker.getByRole('button', { name: '選択する', exact: true }).click()
       await expect(page.locator('output')).toContainText('"assignee":"unassigned"')
       await panel.getByRole('button', { name: '対応ルール', exact: true }).click()
       const rules = page.getByRole('dialog', { name: '対応ルール', exact: true })

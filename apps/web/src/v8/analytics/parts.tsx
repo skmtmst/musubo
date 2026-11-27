@@ -108,14 +108,14 @@ export function shownValue(metric: AnalyticsMetric<number>): number | null {
   return metric.state === 'available' || metric.state === 'partial' ? metric.value : null
 }
 
-export const METRIC_STATE_TEXT: Record<AnalyticsMetricState, string> = {
+export const METRIC_STATE_TEXT: Record<AnalyticsMetricState, string> = Object.assign(Object.create(null), {
   available: '',
   partial: '一部だけ集計できています',
   pending: '集計を待っています',
   insufficient: '数が少なく出せません',
   unavailable: '未取得',
   failed: '集計を読めませんでした。もう一度お試しください',
-}
+})
 
 export type KpiCardState = { detail: string; description?: string; help?: string; onRetry?: () => void }
 

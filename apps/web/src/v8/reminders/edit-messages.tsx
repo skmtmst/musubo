@@ -11,6 +11,7 @@ import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import InsertTextField,{ type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import MessageInsertRow,{ MessageBody,MessageInsertButton } from '@/components/shared/message-insert-row'
 import NumberInput from '@/components/shared/number-field'
+import Notice from '@/components/shared/notice'
 import ReorderHandle,{ useReorder } from '@/components/shared/reorder-handle'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
@@ -68,6 +69,8 @@ export function MessagesStageV8({
   const { selectedAccount, selectedAccountId } = useAccount()
   const [selectedStepId, setSelectedStepId] = useState<string | null>(settings.steps[0]?.stableStepId ?? null)
   const [loadedFields, setLoadedFields] = useState<{ accountId: string; items: FriendField[] } | null>(null)
+  const [fieldsErrorAccount, setFieldsErrorAccount] = useState<string | null>(null)
+  const [fieldsAttempt, setFieldsAttempt] = useState(0)
   const fields = loadedFields?.accountId === selectedAccountId ? loadedFields.items : []
   const tokenNames = referenceTokenNames({ friendFields: fields, commonVars: [] })
   const [phoneOpen, setPhoneOpen] = useState(false)
@@ -78,11 +81,13 @@ export function MessagesStageV8({
     if (!selectedAccountId) return
     const accountId = selectedAccountId
     let active = true
+    setFieldsErrorAccount(null)
     void api.friendFields.list(accountId).then((res) => {
-      if (active && res.success) setLoadedFields({ accountId, items: res.data })
-    }).catch(() => undefined)
+      if (!res.success) throw new Error('friend_fields_unavailable')
+      if (active) setLoadedFields({ accountId, items: res.data })
+    }).catch(() => { if (active) { setLoadedFields(null); setFieldsErrorAccount(accountId) } })
     return () => { active = false }
-  }, [selectedAccountId])
+  }, [selectedAccountId, fieldsAttempt])
 
   const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
   const selectedStep = (selectedIndex >= 0 ? settings.steps[selectedIndex] : settings.steps[0]) ?? null
@@ -254,6 +259,7 @@ export function MessagesStageV8({
                       onChange={(patch) => updateStep(step.stableStepId, patch)}
                     />
                     <MessageBody>
+                      {fieldsErrorAccount === selectedAccountId && selectedAccountId ? <><Notice tone="warn">友だち情報の差し込み候補を読み込めませんでした。本文はそのまま編集できます。</Notice><Button type="button" variant="secondary" onClick={() => setFieldsAttempt(value => value + 1)}>差し込み候補を読み直す</Button></> : null}
                       <SaveErrorField names={[`shown.${index}.messageContent`,`shown.${index}.message_content`,"messageContent","step.messageContent","message_content","step.message_content"]}><InsertTextField tokenNames={tokenNames}
                         ref={bodyRef}
                         className={styles.bodyArea}

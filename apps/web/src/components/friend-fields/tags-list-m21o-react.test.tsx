@@ -181,7 +181,7 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
     fireEvent.click(within(await screen.findByRole('option', { name: 'フォルダを管理' })).getByRole('button'))
     const dialog = await screen.findByRole('dialog', { name: 'フォルダを管理' })
     fireEvent.click(within(dialog).getByRole('button', { name: `フォルダ「${LONG_FOLDER}」の操作` }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: '名前を変える' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '名前を変更する' }))
     const edit = await screen.findByRole('dialog', { name: 'フォルダを編集する' })
     expect(within(edit).getByText('色')).toBeTruthy()
     fireEvent.change(within(edit).getByLabelText('フォルダ名'), { target: { value: '変更したフォルダ' } })

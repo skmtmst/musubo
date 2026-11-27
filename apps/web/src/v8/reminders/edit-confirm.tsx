@@ -191,7 +191,7 @@ export function ConfirmStageV8({
               <span className={styles.confirmVal} title={row.key === '通知' && validation?.audience.matched != null
                 ? `${row.value}（対象者×通知数：${countLabel(validation.audience.matched * settings.steps.length, '通')}）`
                 : row.value}>{row.value}</span>
-              <Button variant="text" href={editHref(reminderId, row.stage)}>変える</Button>
+              <Button variant="text" href={editHref(reminderId, row.stage)}>変更する</Button>
             </div>
           ))}
         </div>

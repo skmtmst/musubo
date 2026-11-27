@@ -362,7 +362,7 @@ function FolderCreatePanel({
       <div className={styles.actions}>
         <button type="button" className={styles.cancel} disabled={busy} onClick={onBack}>やめる</button>
         <button type="button" className={styles.primary} disabled={busy || !trimmed} onClick={() => void submit()}>
-          {busy ? '作っています…' : error ? 'もう一度試す' : '作って選ぶ'}
+          {busy ? '作っています…' : error ? 'もう一度試す' : '作って選択する'}
         </button>
       </div>
     </div>

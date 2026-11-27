@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RichMenuCreateV8 from '@/v8/rich-menus/new/create'
 import RichMenuDetailV8 from './detail'
 
-const net = vi.hoisted(() => ({ role: 'owner', get: vi.fn(), update: vi.fn(), unpublish: vi.fn(), deleteImpact: vi.fn(), push: vi.fn(), reconcile: vi.fn(), runs: vi.fn(), retry: vi.fn() }))
+const net = vi.hoisted(() => ({ role: 'owner', get: vi.fn(), update: vi.fn(), unpublish: vi.fn(), deleteImpact: vi.fn(), push: vi.fn(), reconcile: vi.fn(), runs: vi.fn(), retry: vi.fn(), preview: vi.fn(), taps: vi.fn() }))
 const account = { id: 'account-1', name: '店A' }
 const group = {
   id: 'g1', accountId: 'account-1', name: 'メニュー', chatBarText: 'メニュー',
@@ -38,11 +38,11 @@ vi.mock('@/lib/api', async importOriginal => {
     richMenuGroups: { ...actual.api.richMenuGroups,
       get: net.get, update: net.update, unpublish: net.unpublish, deleteImpact: net.deleteImpact,
       list: async () => ({ success: true, data: [] }),
-      previewTargets: async () => ({ success: true, data: null }),
-      audienceSummary: async () => ({ success: true, data: null }),
+      previewTargets: net.preview,
+      audienceSummary: net.preview,
       publishProgress: async () => ({ success: true, data: { steps: [], run: null, message: null } }),
       publishRuns: net.runs, retryPublishRun: net.retry,
-      tapStats: async () => ({ success: true, data: { byGroup: [] } }),
+      tapStats: net.taps,
       reconcile: net.reconcile,
     },
   } }
@@ -52,6 +52,8 @@ let container: HTMLDivElement
 let root: Root
 beforeEach(() => {
   net.role = 'owner'; net.push.mockReset()
+  net.preview.mockReset().mockResolvedValue({ success: true, data: null })
+  net.taps.mockReset().mockResolvedValue({ success: true, data: { byGroup: [] } })
   net.get.mockReset().mockResolvedValue({ success: true, data: group })
   net.update.mockReset().mockImplementation(async (_id, input) => ({ success: true, data: { ...group, ...input } }))
   net.unpublish.mockReset().mockResolvedValue({ success: true, data: { warnings: [] } })
@@ -66,7 +68,7 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => { root.unmount() }); container.remove(); delete document.documentElement.dataset.theme })
 async function openPriority() {
   await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
-  fireEvent.click(await screen.findByRole('button', { name: '順番を変える' }))
+  fireEvent.click(await screen.findByRole('button', { name: '順番を変更する' }))
   return screen.getByRole('dialog', { name: '出す順番' })
 }
 async function openUnpublish() {
@@ -77,6 +79,60 @@ async function openUnpublish() {
   await waitFor(() => expect(net.deleteImpact).toHaveBeenCalled())
   return dialog
 }
+
+it('人数とタップ数の失敗を別々に読み直せる', async () => {
+  net.preview.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ success: true, data: { effective: { value: 12 } } })
+  net.taps.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: { byGroup: [{ groupId: 'g1', taps: 7 }] } })
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+  fireEvent.click(await screen.findByRole('button', { name: '人数を読み直す' }))
+  expect(await screen.findByText('12 人')).toBeTruthy()
+  expect(net.taps).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: '回数を読み直す' }))
+  expect(await screen.findByText('7 回')).toBeTruthy()
+  expect(net.preview).toHaveBeenCalledTimes(2)
+})
+
+it('別メニューへ切り替えた後は古い人数とタップ数の応答を捨てる', async () => {
+  let finishPreview!: (value: unknown) => void
+  let finishTaps!: (value: unknown) => void
+  net.preview.mockImplementationOnce(() => new Promise(resolve => { finishPreview = resolve })).mockResolvedValue({ success: true, data: { effective: { value: 21 } } })
+  net.taps.mockImplementationOnce(() => new Promise(resolve => { finishTaps = resolve })).mockResolvedValue({ success: true, data: { byGroup: [{ groupId: 'g2', taps: 6 }] } })
+  net.get.mockImplementation(async (id) => ({ success: true, data: { ...group, id, name: id === 'g1' ? '前のメニュー' : '今のメニュー' } }))
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+  await waitFor(() => expect(net.preview).toHaveBeenCalled())
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g2" />) })
+  expect(await screen.findByText('21 人')).toBeTruthy()
+  expect(await screen.findByText('6 回')).toBeTruthy()
+  await act(async () => { finishPreview({ success: true, data: { effective: { value: 999 } } }); finishTaps({ success: false }) })
+  expect(screen.queryByText('999 人')).toBeNull()
+  expect(screen.queryByRole('button', { name: '回数を読み直す' })).toBeNull()
+})
+
+it('新しいメニューの取得中は前のメニューの値や失敗を出さない', async () => {
+  net.preview.mockResolvedValue({ success: true, data: { effective: { value: 12 } } })
+  net.taps.mockRejectedValue(new Error('offline'))
+  net.get.mockImplementation((id) => id === 'g1' ? Promise.resolve({ success: true, data: group }) : new Promise(() => {}))
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+  expect(await screen.findByText('12 人')).toBeTruthy()
+  expect(await screen.findByRole('button', { name: '回数を読み直す' })).toBeTruthy()
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g2" />) })
+  expect(screen.queryByText('12 人')).toBeNull()
+  expect(screen.queryByRole('button', { name: '回数を読み直す' })).toBeNull()
+  expect(screen.queryByText('メニュー')).toBeNull()
+})
+
+it('新しいメニューの統計待ちでも前の人数や失敗を出さない', async () => {
+  net.preview.mockResolvedValueOnce({ success: true, data: { effective: { value: 12 } } }).mockImplementation(() => new Promise(() => {}))
+  net.taps.mockRejectedValueOnce(new Error('offline')).mockImplementation(() => new Promise(() => {}))
+  net.get.mockImplementation(async (id) => ({ success: true, data: { ...group, id, name: id === 'g1' ? '前のメニュー' : '今のメニュー' } }))
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g1" />) })
+  expect(await screen.findByText('12 人')).toBeTruthy()
+  expect(await screen.findByRole('button', { name: '回数を読み直す' })).toBeTruthy()
+  await act(async () => { root.render(<RichMenuDetailV8 groupId="g2" />) })
+  expect(await screen.findByText('今のメニュー')).toBeTruthy()
+  expect(screen.queryByText('12 人')).toBeNull()
+  expect(screen.queryByRole('button', { name: '回数を読み直す' })).toBeNull()
+})
 
 describe('現役V8へ残す旧編集の動き', () => {
   it('照合と読み直しの印を出し、読み直しでは確認だけを呼ぶ', async () => {
@@ -105,7 +161,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     const input = within(dialog).getByRole('textbox', { name: '出す順番' }) as HTMLInputElement
     expect(input.value).toBe('3')
     fireEvent.change(input, { target: { value: '1' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: '順番を変える' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '順番を変更する' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '出す順番' })).toBeNull())
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(net.update).toHaveBeenCalledWith('g1', expect.objectContaining({ targetingPriority: 0 })))
@@ -117,7 +173,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     const discard = await screen.findByRole('dialog', { name: '入力を破棄しますか？' })
     fireEvent.click(within(discard).getByRole('button', { name: '破棄する' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '出す順番' })).toBeNull())
-    fireEvent.click(screen.getByRole('button', { name: '順番を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '順番を変更する' }))
     expect((screen.getByRole('textbox', { name: '出す順番' }) as HTMLInputElement).value).toBe('3')
     expect(net.update).not.toHaveBeenCalled()
   })
@@ -125,7 +181,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     net.role = 'viewer'
     await act(async () => { root.render(<RichMenuCreateV8 editGroupId="g1" />) })
     await screen.findByRole('heading', { name: '出す順番' })
-    expect(screen.queryByRole('button', { name: '順番を変える' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '順番を変更する' })).toBeNull()
   })
   it.each([{ pages: [] }, { id: 'g1', name: 'メニュー', pages: undefined }])('形の違う取得結果（%j）で編集画面を落とさない', async data => {
     net.get.mockResolvedValue({ success: true, data })

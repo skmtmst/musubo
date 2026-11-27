@@ -35,7 +35,7 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import { useAccount } from '@/contexts/account-context'
 import { formatDate } from '@/lib/format'
 import { MCP_STEP_UP, mcpApi, type McpConnection, type McpIssued, type McpLevel } from './api'
-import { EXPIRY_OPTIONS, LEVEL_LABEL, LEVEL_NOTE, connectionState } from './words'
+import { EXPIRY_OPTIONS, LEVEL_LABEL, mcpLevelLabel, LEVEL_NOTE, connectionState } from './words'
 import { useMcpPermissions, currentMcpPermissions, captureMcpCreation } from './write-access'
 export { useMcpPermissions } from './write-access'
 import styles from './section.module.css'
@@ -151,7 +151,7 @@ export default function McpConnectionsSection() {
               return (
                 <Tr key={connection.id} data-row-id={connection.id}>
                   <Td grow title={connection.name}><TruncatedText value={connection.name} /></Td>
-                  <Td>{LEVEL_LABEL[connection.level]}</Td>
+                  <Td>{mcpLevelLabel(connection.level)}</Td>
                   <Td title={accountsText}><TruncatedText value={accountsText} /></Td>
                   <Td>{day(connection.expiresAt)}</Td>
                   <Td>{used(connection.lastUsedAt)}</Td>
@@ -322,7 +322,7 @@ export function McpIssuedDialog({ issued, onClose }: { issued: McpIssued | null;
       >
         {issued ? (
           <div className={styles.issued}>
-            <p className={styles.issuedMeta}>{`${issued.connection.name}・${LEVEL_LABEL[issued.connection.level]}・${issued.connection.accounts.map((account) => account.name).join('・')}・${day(issued.connection.expiresAt)} まで`}</p>
+            <p className={styles.issuedMeta}>{`${issued.connection.name}・${mcpLevelLabel(issued.connection.level)}・${issued.connection.accounts.map((account) => account.name).join('・')}・${day(issued.connection.expiresAt)} まで`}</p>
             <div className={styles.issuedRow}>
               <span className={styles.issuedLabel}>URL</span>
               <code className={styles.code}>{issued.url}</code>

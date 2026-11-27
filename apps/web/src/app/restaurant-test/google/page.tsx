@@ -1,8 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
 import GoogleV8, { type MediaUploadHelpers } from '@/v8/restaurant/google/google'
-import ListState from '@/components/shared/list-state'
 import { extractMediaMetadata, mediaAcceptForKind, putMediaFile, validateMediaFile } from '@/app/contents/media-direct-upload'
 
 /*
@@ -19,8 +17,6 @@ const MEDIA_UPLOAD: MediaUploadHelpers = {
 
 export default function Page() {
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
-      <GoogleV8 mediaUpload={MEDIA_UPLOAD} />
-    </Suspense>
+    <GoogleV8 mediaUpload={MEDIA_UPLOAD} />
   )
 }

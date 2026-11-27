@@ -116,7 +116,7 @@ export function MediaCardV8({
             onSelect: onDownload,
           },
           ...(canManageMedia && !item.archivedAt
-            ? [{ id: 'rename', label: '名前を変える', icon: <Pencil size={16} aria-hidden="true" />, onSelect: onRenameStart }]
+            ? [{ id: 'rename', label: '名前を変更する', icon: <Pencil size={16} aria-hidden="true" />, onSelect: onRenameStart }]
             : []),
           ...(canManageMedia && !item.archivedAt
             ? [{ id: 'move', label: 'フォルダへ移す', icon: <FolderInput size={16} aria-hidden="true" />, onSelect: onMoveStart }]

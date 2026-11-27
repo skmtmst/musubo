@@ -9,6 +9,8 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import { TextInput } from '@/components/shared/form-controls'
 import { EmailChipField } from '@/components/shared/email-chip-field'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
+import TruncatedText from '@/components/shared/truncated-text'
 
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
@@ -121,6 +123,15 @@ export default function NewStaffPage() {
 
     <FormSection step={role === 'staff' ? 4 : 3} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
       <Card frame="inset" className="divide-hairline overflow-hidden divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><NotificationSwitch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><NotificationSwitch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</Card>
+    </FormSection>
+    <FormSection step={role === 'staff' ? 5 : 4} label="送信前の確認" note="招待メールの宛先と担当範囲を確認してください。">
+      <DetailContent>
+        <DetailField label="名前"><TruncatedText value={name.trim() || '未入力'} /></DetailField>
+        <DetailField label="招待先メールアドレス"><TruncatedText value={email.trim() || '未入力'} /></DetailField>
+        <DetailField label="担当する店舗"><TruncatedText value={selectedAccount?.name || '店舗を選択してください'} /></DetailField>
+        <DetailField label="役割">{ROLES.find(item => item.value === role)?.label}</DetailField>
+        {role === 'staff' ? <DetailField label="操作できる機能"><TruncatedText value={PERMISSION_GROUPS.flatMap(group => group.items.filter(([key]) => permissionKeys.includes(key)).map(([, label]) => label)).join('・') || '未選択'} /></DetailField> : null}
+      </DetailContent>
     </FormSection>
   </CreatePage>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したユーザー" onConfirm={confirmLeave} onCancel={cancelLeave} />

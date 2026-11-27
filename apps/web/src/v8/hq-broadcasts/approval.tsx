@@ -27,6 +27,8 @@ import OperationTargetSummary from '@/components/shared/operation-target-summary
 export type HqApproval = {
   state: BroadcastApprovalState | null
   candidates: Array<{ id: string; name: string }>
+  candidatesState: 'loading' | 'ready' | 'error'
+  retryCandidates: () => void
   loading: boolean
   failed: boolean
   reload: () => void
@@ -36,6 +38,8 @@ export type HqApproval = {
 export function useHqApproval(run: Pick<HqBroadcastRun, 'id' | 'version' | 'status'> | null): HqApproval {
   const [state, setState] = useState<BroadcastApprovalState | null>(null)
   const [candidates, setCandidates] = useState<Array<{ id: string; name: string }>>([])
+  const [candidatesState, setCandidatesState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [candidatesAttempt, setCandidatesAttempt] = useState(0)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
   const [tick, setTick] = useState(0)
@@ -45,18 +49,29 @@ export function useHqApproval(run: Pick<HqBroadcastRun, 'id' | 'version' | 'stat
     if (!id) { setState(null); return }
     let current = true
     setLoading(true); setFailed(false)
-    void Promise.all([hqBroadcastsApi.approval(id), hqBroadcastsApi.approvalCandidates().catch(() => null)])
-      .then(([approval, people]) => {
+    void hqBroadcastsApi.approval(id)
+      .then((approval) => {
         if (!current) return
         setState(approval.data)
-        if (people) setCandidates(people.data.map((person) => ({ id: person.id, name: person.name })))
       })
       .catch(() => { if (current) { setState(null); setFailed(true) } })
       .finally(() => { if (current) setLoading(false) })
     return () => { current = false }
   }, [id, version, tick])
+  useEffect(() => {
+    setCandidates([])
+    setCandidatesState('loading')
+    if (!id) return
+    let current = true
+    void hqBroadcastsApi.approvalCandidates().then((result) => {
+      if (!Array.isArray(result.data)) throw new Error('approval_candidates_unavailable')
+      if (current) { setCandidates(result.data.map((person) => ({ id: person.id, name: person.name }))); setCandidatesState('ready') }
+    }).catch(() => { if (current) setCandidatesState('error') })
+    return () => { current = false }
+  }, [id, version, tick, candidatesAttempt])
   const reload = useCallback(() => setTick((value) => value + 1), [])
-  return { state, candidates, loading, failed, reload }
+  const retryCandidates = useCallback(() => setCandidatesAttempt((value) => value + 1), [])
+  return { state, candidates, candidatesState, retryCandidates, loading, failed, reload }
 }
 
 /** 送る口の関門。required かつ 2人以上の運用は承認済み（人数が同じ）でないと送れない。 */
@@ -174,18 +189,20 @@ export function HqApprovalBlock({
         busy={busy}
         error={message || undefined}
         onCancel={() => { if (!busy) { setMessage(''); onRequestClose() } }}
-        onConfirm={approverId ? () => run1(() => hqBroadcastsApi.requestApproval(run.id, run.version, approverId, note.trim() || undefined), '承認を依頼しました').then((ok) => { if (ok) onRequestClose() }) : undefined}
+        onConfirm={approval.candidatesState === 'ready' && approval.candidates.some((person) => person.id === approverId) ? () => run1(() => hqBroadcastsApi.requestApproval(run.id, run.version, approverId, note.trim() || undefined), '承認を依頼しました').then((ok) => { if (ok) onRequestClose() }) : undefined}
       >
         <ApprovalRequestFields
           recipientCount={state.gate.recipientCount}
           threshold={state.gate.threshold}
           candidates={approval.candidates.map((person) => ({ ...person, role: 'admin', canApprove: true })) as never}
-          candidatesState={approval.loading ? 'loading' : 'ready'}
+          candidatesState={approval.candidatesState}
+          candidatesErrorMessage="承認できる人を読み込めませんでした。"
           approverId={approverId}
           onApproverChange={setApproverId}
           note={note}
           onNoteChange={setNote}
         />
+        {approval.candidatesState === 'error' ? <Button type="button" variant="secondary" onClick={approval.retryCandidates}>承認できる人を読み直す</Button> : null}
       </ConfirmDialog>
       {stepUp ? (
         <StepUpPrompt

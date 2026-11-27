@@ -196,7 +196,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
           icon={<AccountIcon />}
           title="スタッフはまだいません"
           description="お客さまが予約するときに指名できる担当者を登録します。"
-          action={canEdit ? <Button variant="primary" onClick={() => setEditing(EMPTY_STAFF)}>スタッフを登録</Button> : undefined}
+          action={<PermissionGatedButton allowed={canEdit} variant="primary" onClick={() => setEditing(EMPTY_STAFF)}>スタッフを登録</PermissionGatedButton>}
         />
       ) : (
       <section className={styles.staffTable}>

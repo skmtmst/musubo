@@ -325,7 +325,7 @@ export default function EventsListV8() {
   const rowMenuItems = (e: EventListItem): ActionMenuItem[] => [
     { id: 'detail', label: "イベントの設定を見る", onSelect: () => detailGuard.protect(() => router.push(`/events/edit?id=${e.id}`)) },
     { id: 'applicants', label: '申込者を見る', onSelect: () => detailGuard.protect(() => router.push(`/events/bookings?id=${e.id}`)) },
-    { id: 'change', label: '日時・定員を変える', onSelect: () => detailGuard.protect(() => router.push(`/events/change-review?id=${e.id}`)) },
+    { id: 'change', label: '日時・定員を変更する', onSelect: () => detailGuard.protect(() => router.push(`/events/change-review?id=${e.id}`)) },
     { id: 'preview', label: 'プレビュー', onSelect: () => detailGuard.protect(() => router.push(`/events/preview?id=${e.id}`)) },
     ...(canEdit ? [{ id: 'duplicate', label: '複製する', disabled: duplicatingId !== null, onSelect: () => detailGuard.protect(() => { void duplicateEvent(e) }) }, { id: 'move', label: 'フォルダへ移す', onSelect: () => detailGuard.protect(() => folderMove.open(e)) }, { id: 'delete-event', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => detailGuard.protect(() => requestDelete(e)) }] : []),
   ]

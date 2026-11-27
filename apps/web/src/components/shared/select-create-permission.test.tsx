@@ -38,7 +38,7 @@ it('作成口未指定と明示undefinedはDOM/Tab/候補選択/作成を変え�
   expect(create().hasAttribute('data-permission-locked')).toBe(false)
   fireEvent.click(create())
   fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '追加' } })
-  fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '作って選択する' }))
   await act(async () => { await Promise.resolve() })
   expect(onCreate).toHaveBeenCalledTimes(1)
   expect(change).toHaveBeenCalledExactlyOnceWith('new')

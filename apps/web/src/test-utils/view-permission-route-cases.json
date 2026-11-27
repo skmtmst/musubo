@@ -109,6 +109,8 @@
   {"route":"/m/chats","boundary":"mobile-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/m","boundary":"mobile-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/m/todo","boundary":"mobile-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
+  {"route":"/m/today","boundary":"mobile-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
+  {"route":"/m/more","boundary":"mobile-shell","expected":{"staff-none":true,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/mileage/earning-rules/edit","boundary":null,"expected":{"staff-none":false,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},
   {"route":"/mileage/earning-rules/new","boundary":null,"expected":{"staff-none":false,"staff-view":false,"staff-edit":true,"viewer-staff":false,"viewer-owner":false,"owner":true,"admin":true}},
   {"route":"/mileage/friends/detail","boundary":null,"expected":{"staff-none":false,"staff-view":true,"staff-edit":true,"viewer-staff":true,"viewer-owner":true,"owner":true,"admin":true}},

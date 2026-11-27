@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { ImpactRows,readOnlyDate,ReadOnlyValue } from './edit-impact'
 import { loadCommonVar } from './edit-load'
 import { b244Requirements,formatHourMinute,historyStamp,jstNowLocalInput,utcToJstLocalInput } from './edit-model'
@@ -578,8 +580,8 @@ function EditCommonVarV8Inner() {
     : impactState === 'ready' && impact
       ? impact.total
       : null
-  const stateLabel = item ? (COMMON_VAR_STATE_LABELS[item.state ?? item.status ?? 'active'] ?? '使用中') : ''
-  const typeLabel = item ? (VAR_TYPE_LABELS[item.type] ?? item.type) : ''
+  const stateLabel = item ? (knownValue(COMMON_VAR_STATE_LABELS, item.state ?? item.status ?? 'active', '状態を確認できません')) : ''
+  const typeLabel = item ? (knownValue(VAR_TYPE_LABELS, item.type, item.type)) : ''
   const stopped = (item?.status ?? 'active') === 'stopped'
   const isDraft = (item?.status ?? 'active') === 'draft'
 

@@ -15,7 +15,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const fixture = vi.hoisted(() => ({ role: 'admin' as 'admin' | 'staff' }))
+const fixture = vi.hoisted(() => ({ role: 'admin' as 'admin' | 'staff' | 'viewer' }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
@@ -269,11 +269,11 @@ describe('数の帯と札', () => {
   it('管理者の「…」は全部の操作を出し、削除は危ない操作として区切りの下に置く', async () => {
     await render()
     await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    expect(menuItems()).toEqual(['プレビュー', 'ダウンロード', '名前を変える', 'フォルダへ移す', 'アーカイブ', '削除する'])
+    expect(menuItems()).toEqual(['プレビュー', 'ダウンロード', '名前を変更する', 'フォルダへ移す', 'アーカイブ', '削除する'])
     expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('変える・整理する')
     const deleteItem = [...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '削除する')
     expect(deleteItem?.closest('[data-menu-group]')?.getAttribute('data-menu-group')).toBe('destructive')
-    for (const [label, icon] of [['プレビュー', 'eye'], ['ダウンロード', 'download'], ['名前を変える', 'pencil'], ['フォルダへ移す', 'folder-input'], ['アーカイブ', 'archive'], ['削除する', 'trash-2']]) {
+    for (const [label, icon] of [['プレビュー', 'eye'], ['ダウンロード', 'download'], ['名前を変更する', 'pencil'], ['フォルダへ移す', 'folder-input'], ['アーカイブ', 'archive'], ['削除する', 'trash-2']]) {
       const row = [...document.querySelectorAll('[role="menuitem"]')].find((candidate) => candidate.textContent?.trim() === label)
       expect(row?.querySelector(`svg.lucide-${icon}`), `${label} の印`).not.toBeNull()
     }
@@ -282,7 +282,7 @@ describe('数の帯と札', () => {
   it('名前変更は一覧で読んだ版を送って保存し、新しい名前を表示する', async () => {
     await render()
     await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変える'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変更する'))
     const field = host.querySelector<HTMLInputElement>('input[aria-label="ファイル名"]')!
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '新しいガイド.mp4')
@@ -305,7 +305,7 @@ describe('数の帯と札', () => {
     conflictRename = true
     await render()
     await click(host.querySelector('button[aria-label="使い方ガイド.mp4のその他操作"]'))
-    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変える'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '名前を変更する'))
     await click(button('保存する', host))
     expect(host.textContent).toContain('ほかの人が先に名前を変更しました')
     expect((host.querySelector('input[aria-label="ファイル名"]') as HTMLInputElement).value).toBe('使い方ガイド.mp4')
@@ -402,7 +402,7 @@ describe('フォルダの列（R37）', () => {
     await render()
     const panel = host.querySelector('[data-template-region="folders"]')!
     await click(panel.querySelector('button[aria-label="フォルダ「01_商品写真」の操作"]'))
-    expect(menuItems()).toContain('名前を変える')
+    expect(menuItems()).toContain('名前を変更する')
     await click([...document.querySelectorAll('[role="menuitem"]')].find((row) => row.textContent?.trim() === '消す'))
     expect(document.body.textContent).toContain('中のメディア 1 件は消えずに「未分類」へ移ります')
     const listReads = calls.filter((call) => call.path === '/api/media').length
@@ -419,4 +419,15 @@ describe('フォルダの列（R37）', () => {
     await expectLockedFolderMenu(host.querySelector('button[aria-label="フォルダ「01_商品写真」の操作"]'))
     expect(host.textContent).toContain('01_商品写真')
   })
+  it('空の一覧では閲覧のみの人はメディアを登録できない', async () => {
+    fixture.role = 'viewer'
+    media = []
+    await render()
+    const create = button('最初のメディアを登録する')!
+    expect(create).toBeTruthy()
+    expect(create.disabled || create.getAttribute('aria-disabled') === 'true').toBe(true)
+    await click(create)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+  })
+
 })

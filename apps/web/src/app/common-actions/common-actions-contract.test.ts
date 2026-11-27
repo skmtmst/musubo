@@ -77,7 +77,8 @@ describe("管理画面共通アクションの画面契約", () => {
     expect(VERSIONS).toContain('runningCount')
     expect(VERSIONS).toContain('waitingCount')
     expect(VERSIONS).not.toContain('内容を取得できません')
-    expect(VERSIONS).not.toContain('確認できません')
+    // 差分の未知値の案内だけを除き、版画面の未実装表示を全体で防ぐ。
+    expect(VERSIONS.replaceAll('動作を確認できません', '')).not.toContain('確認できません')
   })
 
   it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {

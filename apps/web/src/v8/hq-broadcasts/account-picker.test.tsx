@@ -30,7 +30,7 @@ describe('送るアカウントの選択窓', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '梅田店' }))
     expect(screen.getByText('3 件')).toBeTruthy()
     expect(confirm).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ（3件）' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する（3件）' }))
     expect(confirm).toHaveBeenCalledWith(['a', 'b', 'c'])
   })
 

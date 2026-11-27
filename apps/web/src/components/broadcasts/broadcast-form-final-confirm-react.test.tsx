@@ -406,7 +406,7 @@ describe('条件が変わったら古い確認を使わない', () => {
   async function addExcludeTag() {
     await act(async () => { fireEvent.click(container.querySelector('button[aria-label="除くタグ"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('配信不要'))!) }); await flush()
-    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
+    await click('選択する', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
   }
 
   it('条件を変えた直後は、前の条件で数えた人数を出さない', async () => {

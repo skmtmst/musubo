@@ -20,10 +20,10 @@ const account = { id: 'a1', name: '銀座店', archivedAt: null, basicId: 'ginza
 test('渡すのに失敗したら、選んだアカウントを残す', async () => {
   const onDeliver = vi.fn(async () => false)
   render(<BannerImageDetailV8 image={image as never} presets={[]} accounts={[account] as never} canManage onClose={() => undefined} onToggleFavorite={() => undefined} onDeliver={onDeliver} onRemove={async () => false} />)
-  await act(async () => { screen.getByRole('button', { name: '配るアカウント：選ぶ' }).click() })
+  await act(async () => { screen.getByRole('button', { name: '配るアカウント：選択する' }).click() })
   const dialog = await screen.findByRole('dialog', { name: '配るアカウントを選ぶ' })
   await act(async () => { within(dialog).getByRole('checkbox', { name: '銀座店' }).click() })
-  await act(async () => { within(dialog).getByRole('button', { name: '選ぶ（1件）' }).click() })
+  await act(async () => { within(dialog).getByRole('button', { name: '選択する（1件）' }).click() })
   await act(async () => { screen.getByRole('button', { name: '1アカウントへ配る' }).click() })
   expect(onDeliver).toHaveBeenCalledWith(['a1'])
   expect(screen.getByRole('button', { name: '1アカウントへ配る' })).toBeTruthy()

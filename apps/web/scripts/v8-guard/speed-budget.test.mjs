@@ -122,19 +122,24 @@ test('CLIの測定不能は終了1・complete=false。報告は明示した警�
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
-test('速度だけ参考にし、必須レイアウトと生outcomeの警告を維持する', () => {
+test('速度と動作は必須の動作ジョブに残し、見た目の崩れは報告ジョブで止めずに測る', () => {
   const require = createRequire(new URL('../../../../apps/docs/package.json', import.meta.url))
   const { parse } = require('yaml')
   const workflow = parse(readFileSync(new URL('../../../../.github/workflows/required-pr-gate.yml', import.meta.url), 'utf8'))
-  const guard = workflow.jobs['v8-screen-guard']
+  const guard = workflow.jobs['v8-behavior-guard']
+  const screen = workflow.jobs['v8-screen-guard']
   assert.ok(!guard['continue-on-error'])
+  assert.ok(!screen['continue-on-error'])
   assert.equal(guard.env.V8_SPEED_ENFORCEMENT, '${{ vars.V8_SPEED_ENFORCEMENT }}')
-  assert.ok(workflow.jobs['required-pr-gate'].needs.includes('v8-screen-guard'))
-  for (const script of ['layout-overflow.mjs', 'layout-defects.mjs', 'friends-table.browser.mjs']) {
-    const step = guard.steps.find(s => s.run?.includes(script))
+  assert.ok(workflow.jobs['required-pr-gate'].needs.includes('v8-behavior-guard'))
+  for (const script of ['layout-overflow.mjs', 'layout-defects.mjs']) {
+    const step = screen.steps.find(s => s.run?.includes(script))
     assert.ok(step, script)
     assert.ok(!step['continue-on-error'], script)
   }
+  const table = guard.steps.find(s => s.run?.includes('friends-table.browser.mjs'))
+  assert.ok(table)
+  assert.ok(!table['continue-on-error'])
   for (const id of ['speed_budget', 'stress_speed']) {
     const step = guard.steps.find(s => s.id === id)
     assert.ok(!step['continue-on-error'])
@@ -143,7 +148,7 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
   assert.ok(!guard.steps.find(s => s.run?.includes('stgfix17-targets.mjs'))['continue-on-error'])
   assert.ok(!guard.steps.find(s => s.id === 'speed_budget').run.includes('ALLOW_JS_BASELINE_UPDATE'))
   const report = guard.steps.find(s => s.run?.includes('speed-report.mjs'))
-  assert.match(guard.steps.find(s => s.id === 'speed_budget').if, /!cancelled\(\)/, '画面の崩れで速度測定まで消さない')
+  assert.match(guard.steps.find(s => s.id === 'speed_budget').if, /!cancelled\(\)/, '動作の失敗で速度測定まで消さない')
   assert.match(guard.steps.find(s => s.run?.includes('speed-budget.test.mjs')).if, /!cancelled\(\)/)
   assert.match(report.if, /!cancelled\(\)/)
   assert.match(report.env.SPEED_BUDGET_OUTCOME, /speed_budget.outcome/)
@@ -152,9 +157,11 @@ test('速度だけ参考にし、必須レイアウトと生outcomeの警告を�
   assert.ok(!perf3['continue-on-error'])
   assert.match(perf3.run, /perf3-targets.mjs/)
   assert.match(report.env.PERF3_TARGETS_OUTCOME, /perf3_targets.outcome/)
-  const upload = guard.steps.find(s => s.name === 'Upload V8 screen guard results')
-  assert.match(upload.if, /always\(\)/)
-  assert.match(upload.with.path, /\/tmp\/v8-guard\//)
+  for (const [job, name] of [[guard, 'Upload V8 behavior guard results'], [screen, 'Upload V8 screen guard results']]) {
+    const upload = job.steps.find(s => s.name === name)
+    assert.match(upload.if, /always\(\)/)
+    assert.match(upload.with.path, /\/tmp\/v8-guard\//)
+  }
 })
 
 

@@ -63,7 +63,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useTenantWideAccess: () => ['owner', 'admin'].includes(roleBox.role), useStaffRole: () => roleBox.role }
+  return { ...actual, useTenantWideAccess: () => roleBox.role === 'owner' || roleBox.role === 'admin', useStaffRole: () => roleBox.role }
 })
 
 import HqBannerProjectV8 from './project'
@@ -393,7 +393,7 @@ it('生成条件と名前を同時に変更して移るときは確認を一つ�
     Object.getOwnPropertyDescriptor(Object.getPrototypeOf(line), 'value')!.set!.call(line, '春の企画')
     line.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  act(() => buttonNamed('名前と説明を変える')!.click()); await flush()
+  act(() => buttonNamed('名前と説明を変更する')!.click()); await flush()
   const field = document.querySelector('input[placeholder="例：春の感謝祭 2周年"]') as HTMLInputElement
   await act(async () => {
     Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value')!.set!.call(field, '別の名前')
@@ -445,7 +445,7 @@ it('複数店舗では選ぶまで機能設定へ移らず、選んだ店舗を�
   const choice = document.querySelector<HTMLInputElement>('[role=dialog] input[aria-label="大阪店"]')
   expect(choice).toBeTruthy()
   act(() => { choice!.click() }); await flush()
-  act(() => { buttonNamed('選ぶ')!.click() }); await flush()
+  act(() => { buttonNamed('選択する')!.click() }); await flush()
   act(() => { buttonNamed('機能設定を開く')!.click() }); await flush()
   expect(selectAccount).toHaveBeenCalledWith('a2')
   expect(push).toHaveBeenCalledWith('/settings#ai-features')

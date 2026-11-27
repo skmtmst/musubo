@@ -461,7 +461,7 @@ export default function MediaSlot({
     !readOnly && !busy && (onUrl || urlEntry || onMediaPick) ? (
       <span className={styles.links}>
         {onUrl || urlEntry ? (
-          <Button lockedReason={lockedReason} variant="text" size="inline" textTone="accent"
+          <Button lockedReason={lockedReason} variant="text" size={controlsBelow ? "compact" : "inline"} textTone="accent"
             type="button"
             disabled={disabled || permissionBlocked}
             aria-expanded={urlEntry ? urlOpen : undefined}
@@ -471,8 +471,8 @@ export default function MediaSlot({
           </Button>
         ) : null}
         {onMediaPick ? (
-          <Button lockedReason={lockedReason} variant="text" size="inline" textTone="accent" type="button" disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); if (canChange()) onMediaPick() }}>
-            <Images size={14} aria-hidden="true" />登録メディアから選ぶ
+          <Button lockedReason={lockedReason} variant="text" size={controlsBelow ? "compact" : "inline"} textTone="accent" type="button" disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); if (canChange()) onMediaPick() }}>
+            <Images size={14} aria-hidden="true" />登録メディアから選択する
           </Button>
         ) : null}
       </span>

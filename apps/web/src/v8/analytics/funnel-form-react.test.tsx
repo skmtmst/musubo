@@ -136,7 +136,7 @@ it('ファネルの段の種類はサーバーの全種類を利用者が選べ�
   fireEvent.click(screen.getByRole('button', { name: '2段目で何をしたら進むか' }))
   const choice = await screen.findByRole('radio', { name: 'ほかの条件' })
   fireEvent.click(choice)
-  fireEvent.click(within(choice.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選ぶ' }))
+  fireEvent.click(within(choice.closest('[role="dialog"]') as HTMLElement).getByRole('button', { name: '選択する' }))
   fireEvent.click(screen.getByRole('button', { name: '2段目の種類' }))
   const list = await screen.findByRole('listbox')
   expect(within(list).getAllByRole('option').map(option => option.textContent?.trim())).toEqual(FUNNEL_STEP_KINDS.map(option => option.label))

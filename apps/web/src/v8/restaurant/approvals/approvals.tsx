@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useState } from 'react'
@@ -38,6 +39,9 @@ const kindLabel: Record<RestaurantApproval['kind'], string> = {
   line_message: 'LINE配信',
   menu_change: 'メニュー改定',
 }
+
+export const approvalKindWord = (kind: string) => knownValue(kindLabel, kind, '種類を確認できません')
+
 
 function approvalPayload(item: RestaurantApproval): Record<string, unknown> {
   try {
@@ -115,7 +119,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
   return (
     <Card variant="form">
       <div className={styles.cardHead}>
-        <StatusBadge dot={false} tone="success">{kindLabel[item.kind]}</StatusBadge>
+        <StatusBadge dot={false} tone={Object.prototype.hasOwnProperty.call(kindLabel, item.kind) ? 'success' : 'neutral'}>{approvalKindWord(item.kind)}</StatusBadge>
         <Status value={item.status} />
         <span className={styles.store}>{store?.name || '全店舗'}</span>
         <span className={styles.spacer} aria-hidden="true" />
@@ -168,7 +172,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
         <div className={styles.dialogBody}>
           <div className={styles.dialogSummary}>
             <p className={styles.dialogSummaryMeta}>
-              {`${kindLabel[item.kind]}・${store?.name || '全店舗'}・申請 ${item.requested_by || emptyValue('unknown')}（${formatStamp(item.created_at)}）`}
+              {`${approvalKindWord(item.kind)}・${store?.name || '全店舗'}・申請 ${item.requested_by || emptyValue('unknown')}（${formatStamp(item.created_at)}）`}
             </p>
             <p className={styles.dialogSummaryMain}>{approvalSummary(item)}</p>
           </div>

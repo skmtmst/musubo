@@ -13,6 +13,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowNameButton, DataTable, TableHeadRow, Tr, Th, Td } from '@/components/shared/table'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import EmptyList from '@/components/shared/empty-list'
 import { EmptyCell } from '@/components/shared/empty-value'
 import { notifyToast } from '@/components/shared/toast'
@@ -254,12 +255,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
           />
         </div>
         <span className={styles.toolbarSpacer} />
-        {canEdit ? (
-          <Button variant="primary" href="/booking/menus/new">{<><Plus size={16} aria-hidden="true" />予約メニューを作る</>}</Button>
-        ) : (
-          /* 閲覧のみ：作るボタンは置かず、場所だけ空ける（下の段の位置を変えない）。 */
-          <span className={styles.createSlot} aria-hidden="true" />
-        )}
+        <PermissionGatedButton allowed={canEdit} variant="primary" href="/booking/menus/new"><Plus size={16} aria-hidden="true" />予約メニューを作る</PermissionGatedButton>
       </div>
 
       {reorderError ? <Notice tone="danger" className="mt-2" >{reorderError}</Notice> : null}

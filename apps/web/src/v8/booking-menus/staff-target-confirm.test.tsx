@@ -45,3 +45,21 @@ it.each(['止める', '削除する'])('%sは確認後に対象のアカウン�
  if(action==='止める') await waitFor(()=>expect(net.update).toHaveBeenCalledWith('a','s1',{is_active:0}))
  else await waitFor(()=>expect(net.remove).toHaveBeenCalledWith('a','s1'))
 })
+
+it('スタッフが空のときも閲覧のみには登録入口と理由を示し、窓を開かない', async () => {
+  const { verifiedStaffRole } = await import('@/test-utils/verified-staff-role')
+  verifiedStaffRole('viewer')
+  try {
+    render(<StaffTabV8 accountId="a" staff={[]} status="ready" error={null} matrices={{}} extras={{}} members={[]} canEdit={false} onReload={vi.fn()} />)
+    const actions = screen.getAllByRole('button', { name: 'スタッフを登録' })
+    expect(actions).toHaveLength(2)
+    for (const button of actions) {
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(button)
+    }
+    expect(document.body.textContent).toContain('閲覧のみのため変更できません。オーナーか管理者に頼んでください。')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  } finally {
+    verifiedStaffRole(null)
+  }
+})

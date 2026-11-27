@@ -61,6 +61,13 @@ beforeEach(() => {
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
 describe('V8の5手順で送信を確定する', () => {
+  it('配信画面に5段の進みと現在の段を表示する', async () => {
+    await render('audience')
+    const nav = container.querySelector('[aria-label="配信作成の進み"]') as HTMLElement
+    expect(nav).toBeTruthy()
+    expect(nav.querySelectorAll('li')).toHaveLength(5)
+    expect(nav.querySelector('[aria-current="step"]')?.textContent).toContain('配信対象')
+  })
   it('最終確認へ直接来ても未選択のままなら理由1行で止まり保存・送信しない', async () => {
     await render('confirm', false, false)
     expect(button('送信設定を確認する', container).disabled).toBe(true)
@@ -113,7 +120,7 @@ describe('V8の5手順で送信を確定する', () => {
     await render(); const dialog = await confirm()
     await act(async () => { fireEvent.click(dialog.querySelector('button[aria-label="承認をお願いする人"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('確認担当'))!) }); await flush()
-    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
+    await click('選択する', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
     await acknowledge(dialog)
     await click('承認を依頼する', dialog)
     expect(mocks.request).toHaveBeenCalledWith('draft', { approverStaffId: 'reviewer', note: undefined })
@@ -143,7 +150,7 @@ describe('V8の5手順で送信を確定する', () => {
     await render('audience')
     await act(async () => { fireEvent.click(container.querySelector('button[aria-label="除くタグ"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('配信不要'))!) }); await flush()
-    await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
+    await click('選択する', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
     await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
     const counted = mocks.preflight.mock.calls.at(-1)![0].segmentConditions
     expect(counted).toMatchObject({ operator: 'AND', rules: [{ type: 'tag_not_exists', value: 'exclude' }], groups: [{ operator: 'AND', rules: [{ type: 'is_following', value: true }], groups: [{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }, { type: 'tag_exists', value: 'member' }] }] }] })

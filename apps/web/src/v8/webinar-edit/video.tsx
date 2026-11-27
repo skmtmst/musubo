@@ -303,13 +303,13 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
     >
       <Card variant="form" gap="normal" aria-labelledby="webinar-video-title" data-wc-pane="video">
         <div className={form.cardHead}><h2 id="webinar-video-title" className={form.cardTitle}>動画</h2></div>
-        <div className={styles.videoRow}>
+        <VideoMetadata webinar={webinar}>{metadata => <div className={styles.videoRow}>
           <span className={styles.thumb} aria-hidden="true"><Play size={20} /></span>
-          <span className={styles.videoText}>
-            <VideoMetadata webinar={webinar} />
-          </span>
-          {<PermissionGatedButton allowed={!readOnly} onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選ぶ'}</PermissionGatedButton>}
-        </div>
+          <div className={styles.videoText}>
+            {metadata}
+          </div>
+          {<PermissionGatedButton allowed={!readOnly} onClick={() => setReplaceOpen(true)}><Upload size={16} aria-hidden="true" />{hasVideo ? '差し替える' : '動画を選択する'}</PermissionGatedButton>}
+        </div>}</VideoMetadata>
         {showStages && asset ? <>
           <ol className={styles.stages} aria-label="動画の準備の段">
             {STAGES.map((stage, index) => {
@@ -361,7 +361,7 @@ export default function VideoPane({ ctx, chrome, onDirtyChange, registerSave }: 
               readOnly={readOnly}
               editing={capacityEdit === index}
               onEdit={(on) => setCapacityEdit(on ? index : null)}
-              menu={(openEdit) => ruleMenu(index, `${shortJst(rule.at as string)}の開催回`, [{ id: 'capacity', label: '定員を変える', onSelect: () => { setMenuOpen(null); openEdit() } }])}
+              menu={(openEdit) => ruleMenu(index, `${shortJst(rule.at as string)}の開催回`, [{ id: 'capacity', label: '定員を変更する', onSelect: () => { setMenuOpen(null); openEdit() } }])}
             />
           ))}
           {sessions.length === 0 ? <p className={form.cardNote}>まだ開催回がありません。</p> : null}

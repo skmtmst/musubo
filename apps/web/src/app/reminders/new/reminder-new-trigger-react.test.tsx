@@ -223,7 +223,7 @@ describe('起点の実在候補選択', () => {
     fireEvent.click(screen.getByRole('radio', { name: /イベントの予約日時/ }))
 
     await waitFor(() => expect(fixture.listEvents).toHaveBeenCalled())
-    await waitFor(() => expect((screen.getByRole('button', { name: '基準日にするイベント：選ぶ' }) as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect((screen.getByRole('button', { name: '基準日にするイベント：選択する' }) as HTMLButtonElement).disabled).toBe(false))
     await pickEntity('基準日にするイベント', '10月の体験会')
 
     goNext()
@@ -238,7 +238,7 @@ describe('起点の実在候補選択', () => {
     render(<NewReminderPage />)
     fillName()
     fireEvent.click(screen.getByRole('radio', { name: /イベントの予約日時/ }))
-    await waitFor(() => expect((screen.getByRole('button', { name: '基準日にするイベント：選ぶ' }) as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect((screen.getByRole('button', { name: '基準日にするイベント：選択する' }) as HTMLButtonElement).disabled).toBe(false))
     await waitNextEnabled()
 
     goNext()

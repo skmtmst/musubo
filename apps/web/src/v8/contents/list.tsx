@@ -1399,6 +1399,7 @@ export default function MediaLibraryListV8() {
                 title="まだメディアがありません"
                 description="配信で使う画像・動画・音声・ファイルを置いておきます。"
                 create={{ label: '最初のメディアを登録する', onClick: () => setUploadOpen(true) }}
+                canCreate={canRegisterMedia}
                 filtered={hasFilter}
                 onClearFilters={clearFilters}
                 filteredDescription="種類、フォルダ、検索を外すと、すべて出ます"

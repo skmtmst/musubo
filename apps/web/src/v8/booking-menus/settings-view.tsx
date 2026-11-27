@@ -7,6 +7,7 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { V8TabEditContext, AccountIcon, StateCard } from './tabs/shared'
@@ -61,7 +62,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             />}
 
 
-        actions={tab === 'passes' && canEditSettings ? <Button variant="primary" href="/booking/passes/new">回数券・月謝を作る</Button> : undefined}
+        actions={tab === 'passes' ? <PermissionGatedButton allowed={canEditSettings} variant="primary" href="/booking/passes/new">回数券・月謝を作る</PermissionGatedButton> : undefined}
         preview={tab === 'payments' && accountId && !paymentsWide ? <PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /> : withoutPreview ? undefined : previewContent}
         previewToggle={tab === 'payments' && accountId && !paymentsWide ? (
           /* 狭い幅（1152）：右の欄を畳み、「メニューごとの支払い方法」を窓で開く。 */

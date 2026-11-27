@@ -2,7 +2,7 @@
 import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 /*
  * フォルダの列の「…」（V8.pen 共通部品4 の H・）の動き。
- * V8 の言葉（名前を変える・色を変える・並べ替える・消す）、消す前の確認の窓、
+ * V8 の言葉（名前を変更する・色を変更する・並べ替える・消す）、消す前の確認の窓、
  * 消すと共通のフォルダの口へ DELETE を送って読み直す。閲覧のみでも「…」を開け、変更項目は理由付きで拒否する。
  */
 import { renderHook, within } from '@testing-library/react'
@@ -148,14 +148,14 @@ describe('フォルダの「…」（共通）', () => {
     try {
       await act(async () => { root.render(<Screen enabled onChanged={() => {}} onDeleted={() => {}} />) })
       await click(menuButton('キャンペーン'))
-      await click([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '名前を変える'))
+      await click([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '名前を変更する'))
       expect(document.querySelector('[role="dialog"]')).toBeNull()
     } finally { window.removeEventListener('musubo:request-unsaved-action', stop) }
   })
   it('V8 の言葉で出す。端の行には押せない並べ替えを置かない', async () => {
     await act(async () => { root.render(<Screen enabled onChanged={() => {}} onDeleted={() => {}} />) })
     await click(menuButton('キャンペーン'))
-    expect(menuItems()).toEqual(['名前を変える', '色を変える', '並べ替える（下へ）', '消す'])
+    expect(menuItems()).toEqual(['名前を変更する', '色を変更する', '並べ替える（下へ）', '消す'])
   })
 
   it('所有先と環境を表示し、選択中アカウントで穴埋めしない', async () => {
@@ -237,7 +237,7 @@ describe('フォルダの「…」（共通）', () => {
     await act(async () => { root.render(<Screen enabled accountId="acc-1" onChanged={() => {}} onDeleted={() => {}} />) })
     await act(async () => { root.render(<Screen enabled accountId="acc-2" onChanged={() => {}} onDeleted={() => {}} />) })
     await click(menuButton('キャンペーン'))
-    await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '名前を変える'))
+    await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.trim() === '名前を変更する'))
     expect(document.querySelector('[role="dialog"]')).toBeTruthy()
   })
 
@@ -296,7 +296,7 @@ describe('フォルダの「…」（共通）', () => {
     expect(remove).not.toHaveBeenCalled()
     expect(swap).not.toHaveBeenCalled()
     expect(document.body.textContent).not.toContain('フォルダを追加する')
-    expect(document.body.textContent).not.toContain('色を変える')
+    expect(document.body.textContent).not.toContain('色を変更する')
   })
 })
 
@@ -305,7 +305,7 @@ it('色の変更に失敗しても窓と入力を残し、再試行で名前・�
   const onChanged = vi.fn()
   await act(async () => root.render(<Screen enabled onChanged={onChanged} onDeleted={() => {}} />))
   await click(menuButton('キャンペーン'))
-  await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変える'))
+  await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変更する'))
   const dialog = within(document.querySelector('[role="dialog"]') as HTMLElement)
   await click(dialog.getByRole('button', { name: /フォルダの色/ }))
   await click([...document.querySelectorAll('[role="radio"]')].find((el) => el.getAttribute('aria-label') === 'ピンク'))

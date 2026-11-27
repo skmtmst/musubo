@@ -170,7 +170,7 @@ export default function UploadTargetDialog({
                 <p className="text-label text-ink-secondary">ここへドラッグ、または</p>
                 <Button onClick={(event) => { event.stopPropagation(); fileRef.current?.click() }}>
                   <Upload aria-hidden="true" className="h-4 w-4" />
-                  ファイルを選ぶ
+                  ファイルを選択する
                 </Button>
               </>
             )}

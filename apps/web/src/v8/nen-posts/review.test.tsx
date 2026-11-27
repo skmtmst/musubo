@@ -142,8 +142,8 @@ describe('V8 投稿（審査）', () => {
     await render()
     const checkbox = host.querySelector('input[type="checkbox"]')!
     await click(checkbox)
-    expect(buttons('条件に合う201枚すべてを選ぶ')).toHaveLength(1)
-    await click(buttons('条件に合う201枚すべてを選ぶ')[0])
+    expect(buttons('条件に合う201枚すべてを選択する')).toHaveLength(1)
+    await click(buttons('条件に合う201枚すべてを選択する')[0])
     expect(host.textContent).toContain('201枚を選択中')
     expect(offsets).toContain('200')
     await click(buttons('まとめて採用')[0])
@@ -307,7 +307,7 @@ it('掲載順の端の操作は理由を示し、並びを変えても取消で�
   })
   await render()
   await click(buttons('公式サイト掲載')[0])
-  await click(buttons('並び順を変える')[0])
+  await click(buttons('並び順を変更する')[0])
   const dialog = document.querySelector('[role="dialog"]')!
   const orderButtons = () => [...dialog.querySelectorAll<HTMLButtonElement>('button')]
   const up = orderButtons().find(button => button.getAttribute('aria-label') === 'こむぎを上へ')!

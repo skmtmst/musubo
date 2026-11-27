@@ -60,35 +60,51 @@ export default function ColumnNew() {
   const [failure, setFailure] = useState<Failure | null>(null)
   const [touched, setTouched] = useState(false)
   const [tags, setTags] = useState<Tag[]>([])
-  const [audienceCount, setAudienceCount] = useState<number | null>(null)
+  const [tagState, setTagState] = useState<{ account: string; status: 'loading' | 'ready' | 'error' } | null>(null)
+  const [tagRetry, setTagRetry] = useState(0)
+  const tagsReady = tagState?.account === selectedAccountId && tagState.status === 'ready'
+  const [audience, setAudience] = useState<{ key: string; status: 'loading' | 'ready' | 'error'; count: number | null } | null>(null)
+  const [audienceRetry, setAudienceRetry] = useState(0)
+  const audienceKey = JSON.stringify([selectedAccountId, draft.targetMode, draft.targetTagId])
+  const audienceCount = tagsReady && audience?.key === audienceKey ? audience.count : null
   const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const dirty = JSON.stringify(draft) !== JSON.stringify(EMPTY_DRAFT)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
   useEffect(() => {
-    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
-      .then((response) => response.success && setTags(response.data)).catch(() => undefined)
-  }, [selectedAccountId])
-  // アカウントを替えて、選んでいたタグが今のアカウントに無くなったら外して知らせる。
+    if (!selectedAccountId) return
+    let active = true
+    setTags([])
+    setTagState({ account: selectedAccountId, status: 'loading' })
+    void api.tags.list({ accountId: selectedAccountId }).then(response => {
+      if (!active) return
+      if (!response.success) throw new Error('tags unavailable')
+      setTags(response.data)
+      setTagState({ account: selectedAccountId, status: 'ready' })
+    }).catch(() => { if (active) setTagState({ account: selectedAccountId, status: 'error' }) })
+    return () => { active = false }
+  }, [selectedAccountId, tagRetry])
+  // 候補が取得できた時だけ、現在のアカウントにない選択を外す。
   useEffect(() => {
-    if (draft.targetMode !== 'tag' || !draft.targetTagId) return
-    if (!tags.some((tag) => tag.id === draft.targetTagId)) {
-      setDraft((current) => ({ ...current, targetTagId: '' }))
+    if (!tagsReady || draft.targetMode !== 'tag' || !draft.targetTagId) return
+    if (!visibleAccountTags(tags, selectedAccountId).some(tag => tag.id === draft.targetTagId)) {
+      setDraft(current => ({ ...current, targetTagId: '' }))
       setTagPruneNotice('選んでいたタグは、今のアカウントにないため外しました。選び直してください。')
     }
+    // 候補の取得やアカウント変更時だけ、既存の選択を見直す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tags])
+  }, [tags, tagsReady, selectedAccountId])
   useEffect(() => {
-    if (!selectedAccountId || (draft.targetMode === 'tag' && !draft.targetTagId)) {
-      setAudienceCount(null)
-      return
-    }
+    let active = true
+    setAudience(null)
+    if (!selectedAccountId || !tagsReady || (draft.targetMode === 'tag' && !draft.targetTagId)) return () => { active = false }
+    setAudience({ key: audienceKey, status: 'loading', count: null })
     void api.nenCampaigns.columnAudience(selectedAccountId, draft.targetMode, draft.targetTagId || null)
-      .then((response) => setAudienceCount(response.success ? response.data.count : null))
-      .catch(() => setAudienceCount(null))
-  }, [draft.targetMode, draft.targetTagId, selectedAccountId])
-
+      .then(response => { if (!active) return; if (!response.success) throw new Error('audience unavailable'); setAudience({ key: audienceKey, status: 'ready', count: response.data.count }) })
+      .catch(() => { if (active) setAudience({ key: audienceKey, status: 'error', count: null }) })
+    return () => { active = false }
+  }, [draft.targetMode, draft.targetTagId, selectedAccountId, tagsReady, audienceKey, audienceRetry])
   if (!selectedAccountId) {
     return (
       <SaveErrorScope errors={saveErrors}><ListState
@@ -115,7 +131,8 @@ export default function ColumnNew() {
 
   const errors = validateDraft(draft)
   const errorFor = (field: keyof ColumnDraft) => (touched ? errors.find((e) => e.field === field)?.message : undefined)
-  const accountTags = visibleAccountTags(tags, selectedAccountId)
+  const accountTags = tagsReady ? visibleAccountTags(tags, selectedAccountId) : []
+  const targetReady = tagsReady && (draft.targetMode !== 'tag' || !draft.targetTagId || accountTags.some(tag => tag.id === draft.targetTagId))
   const set = (patch: Partial<ColumnDraft>) => setDraft((current) => ({ ...current, ...patch }))
   const hasImage = draft.imageUrl.trim() !== ''
   const longTitle = draft.title.trim().length > TITLE_NOTICE_LENGTH ? titleNotice(draft.title) : null
@@ -128,7 +145,7 @@ export default function ColumnNew() {
       focusFormField(`nen-col-${errors[0].field}`)
       return
     }
-    if (!canSubmit({ draft, busy })) return
+    if (!targetReady || !canSubmit({ draft, busy })) return
     setBusy(true)
     setFailure(null)
     try {
@@ -185,13 +202,14 @@ export default function ColumnNew() {
       footerActions={(
         <>
           <Button href="/nen-campaigns?tab=columns">キャンセル</Button>
-          <Button type="button" variant="primary" disabled={busy} busy={busy} busyLabel="保存しています…" onClick={() => void save()}>
+          <Button type="button" variant="primary" disabled={busy || !targetReady} disabledReason={!targetReady ? '配信対象のタグを確認してください。' : undefined} busy={busy} busyLabel="保存しています…" onClick={() => void save()}>
             <Save size={16} aria-hidden="true" />下書きを保存
           </Button>
         </>
       )} dirty={false}
     >
       {failure ? <Notice tone="danger" message={failure.message} data-failure-kind={failure.kind} /> : null}
+      {tagState?.account === selectedAccountId && tagState.status === 'error' ? <Notice tone="danger">配信対象のタグを読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setTagRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}
       {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} /> : null}
 
       <Card variant="form" gap="normal" aria-labelledby="nen-col-title-heading" data-nen-part="title">
@@ -263,6 +281,7 @@ export default function ColumnNew() {
               id="nen-col-targetTagId"
               describedBy={errorFor('targetTagId') ? 'nen-col-targetTagId-error' : undefined}
               kind="tag"
+              disabled={!tagsReady}
               label="配信対象"
               value={draft.targetMode === 'tag' ? draft.targetTagId : ''}
               clearable
@@ -273,6 +292,7 @@ export default function ColumnNew() {
               onChange={(value) => set(value ? { targetMode: 'tag', targetTagId: value } : { targetMode: 'all', targetTagId: '' })}
             /></SaveErrorField>
             <FieldError id="nen-col-targetTagId-error">{errorFor('targetTagId')}</FieldError>
+            {tagsReady && audience?.key === audienceKey && audience.status === 'error' ? <Notice tone="danger">届く人数を読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setAudienceRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}
           </div>
         </SettingsFormRow>
         {publishOpen ? (

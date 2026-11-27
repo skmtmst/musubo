@@ -186,7 +186,7 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
                   <Td>{tierLabel(tiers, index)}</Td>
                   <Td>{tier.percent === 0 ? '無料' : `料金の ${tier.percent}%`}</Td>
                   <Td>{canEdit ? <RowMenu appearance="box" size="row" label={`${tierLabel(tiers, index)}の操作`} items={[
-                    { id: 'edit', label: '変える', onSelect: () => setEditing(index) },
+                    { id: 'edit', label: '変更する', onSelect: () => setEditing(index) },
                     ...(tiers.length > 1 ? [{ id: 'remove', label: '消す', tone: 'danger' as const, onSelect: () => setTiers(tiers.filter((_, i) => i !== index)) }] : []),
                   ]} /> : null}</Td>
                 </Tr>
@@ -194,7 +194,7 @@ export function CancellationSection({ state, connected, testMode, canEdit }: { s
               <Tr>
                 <Td>連絡なしで来なかった</Td>
                 <Td>{`料金の ${draft.noShowPercent}%`}</Td>
-                <Td>{canEdit ? <RowMenu appearance="box" size="row" label="無断の操作" items={[{ id: 'edit', label: '変える', onSelect: () => setEditing('noshow') }]} /> : null}</Td>
+                <Td>{canEdit ? <RowMenu appearance="box" size="row" label="無断の操作" items={[{ id: 'edit', label: '変更する', onSelect: () => setEditing('noshow') }]} /> : null}</Td>
               </Tr>
             </tbody></DataTable>
             <p className={styles.minor}>物差しは「予約の開始の何時間前か」1 つだけです。段の間に空き・重なりがあると保存できません。100% を超える値は入れられません。</p>

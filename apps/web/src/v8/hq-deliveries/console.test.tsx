@@ -181,7 +181,7 @@ it('HQ action selection saves canonical actions and references with the original
  fireEvent.click(await screen.findByRole('button', { name: '追加のお礼', exact: true }))
  fireEvent.click(await screen.findByRole('button', { name: '何を返すかに進む' }))
  fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })); fireEvent.click(screen.getByRole('menuitem', { name: 'タグを付ける' }))
- fireEvent.click(await screen.findByRole('radio', { name: /会員/ })); fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true }))
+ fireEvent.click(await screen.findByRole('radio', { name: /会員/ })); fireEvent.click(screen.getByRole('button', { name: '選択する', exact: true }))
  fireEvent.click(getPageAction({ name: '下書きとして保存' }))
  await waitFor(() => expect(calls.update).toHaveBeenCalled())
  expect(calls.update.mock.calls[0][1]).toMatchObject({ expectedRevision: 2, definition: { schemaVersion: 1, settings: { priority: 42, responseContent: '返答', actions: [preserved, { actionType: 'tag', config: { op: 'add', tagIds: ['tag-a'] }, onFailure: 'stop' }] }, references: [{ sourceId: 'notice', kind: 'notification_rule', name: '担当者' }, { sourceId: 'tag-a', kind: 'tag', name: '会員', accountId: 'account-1' }] } })

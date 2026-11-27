@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 /**
  * 写真審査3画面で使う小さな表示補助。`components/shared` ではなく
  * この機能の中だけで共有する（#500 軽: `text` の3ファイル分散の解消）。
@@ -56,5 +58,5 @@ const REVIEW_REASON_TEXT: Record<string, string> = {
   other: '自分で書く',
 }
 export function photoReviewReasonLabel(code: unknown) {
-  return REVIEW_REASON_TEXT[text(code)] ?? '理由未記録'
+  return knownValue(REVIEW_REASON_TEXT, text(code), '理由未記録')
 }

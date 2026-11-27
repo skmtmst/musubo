@@ -344,7 +344,7 @@ describe('統括のテンプレートを作る（リッチメッセージ g8d6ai
     expect(await screen.findByRole('heading', { name: 'リッチメッセージを作る' })).toBeTruthy()
     /* 普通のメッセージの作る画面には入らない。 */
     expect(screen.queryByLabelText('本文')).toBeNull()
-    expect(screen.queryByRole('button', { name: '登録メディアから選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '登録メディアから選択する' })).toBeNull()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '夏のキャンペーン告知' } })
     const file = new File(['png'], 'summer.png', { type: 'image/png' })
     fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [file] } })

@@ -14,7 +14,7 @@ import ScoreTab from './score'
 const version = { id: 'draft-1', versionNumber: 1, status: 'draft', createdAt: '2026-01-01', publishedAt: null, bands: { min: 0, max: 100, normalMin: 10, highMin: 30 }, rules: [{ id: 'rule-1', name: '来店', eventType: 'booking_created', source: 'booking', operation: 'delta', value: 1, frequency: { kind: 'per_day', limit: 1 }, enabled: true }] }
 const configuration = { configured: true, status: 'published', currentDraftVersionId: 'draft-1', currentPublishedVersionId: 'published-1', editableVersion: version, publishedVersion: version }
 beforeEach(() => { state.account = 'account-a'; state.rules.mockResolvedValue({ success: true, data: configuration }); state.friends.mockResolvedValue({ success: true, data: { items: [], total: 0, summary: {} } }) })
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.resetAllMocks() })
 async function open(kind: 'publish' | 'stop' | 'remove') {
   if (kind === 'publish') fireEvent.click(await screen.findByRole('button', { name: 'スコアのルールを公開' }))
   else {
@@ -41,4 +41,18 @@ it.each(['publish', 'stop', 'remove'] as const)('%s は切り替えた古い確�
  state.account = 'account-a'; view.rerender(<ScoreTab />)
  await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button }) })
  expect(state.publish).not.toHaveBeenCalled(); expect(state.stop).not.toHaveBeenCalled(); expect(state.save).not.toHaveBeenCalled()
+})
+
+
+it('知らない行動スコアの帯もCSVに確認できないと出す', async () => {
+  state.friends.mockResolvedValue({ success: true, data: { items: [{ friendId: 'f1', displayName: '確認用', currentScore: 12, band: '__proto__', change30d: 0, lastReason: null, lastChangedAt: null }], total: 1, pagination: { total: 1, limit: 20, offset: 0 }, summary: {} } })
+  const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:score')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  render(<ScoreTab />)
+  expect(await screen.findByText('状態を確認できません')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: /この頁の行動スコアをCSVで書き出す/ }))
+  const csv = await (createUrl.mock.calls[0][0] as Blob).text()
+  expect(csv).toContain('状態を確認できません')
+  expect(csv).not.toContain('[object Object]')
 })

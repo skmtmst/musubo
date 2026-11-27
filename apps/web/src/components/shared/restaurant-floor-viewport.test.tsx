@@ -60,3 +60,10 @@ it('広いフロアの縮小表示ではマークと椅子を隠し、卓の操�
  view.rerender(<RestaurantFloorMap floor={wide} labels={props.resources} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
  expect(screen.getByRole('button',{name:'T1'}).querySelector('.lucide-cigarette-off')).toBeTruthy()
 })
+it('丸卓の座席図も椅子を円周に沿って配置する',()=>{
+ const round={...floor,tables:[{...floor.tables[0],shape:'circle' as const,width:80,height:80,maxCapacity:4,chairArrangement:'all' as const}]}
+ render(<RestaurantFloorMap floor={round} labels={props.resources} onSelect={props.onSelect} viewport="0 0 500 500" penTableStyle/>)
+ const chairs=screen.getByRole('button',{name:'T1'}).querySelectorAll('rect[class*="chair"]')
+ expect(chairs).toHaveLength(4)
+ expect([...chairs].map(chair=>chair.getAttribute('transform'))).toEqual(expect.arrayContaining([expect.stringContaining('rotate(0 '),expect.stringContaining('rotate(90 '),expect.stringContaining('rotate(180 '),expect.stringContaining('rotate(270 ')]))
+})

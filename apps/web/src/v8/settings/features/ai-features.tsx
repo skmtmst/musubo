@@ -19,6 +19,7 @@ import IconButton from '@/components/shared/icon-button'
 import styles from './screen.module.css'
 
 const IMPERSONATION_REASON = '代理ログイン中は変更できません。代理ログインを終了してから操作してください。'
+const CONSENT_UPDATED = '同意文が更新されました。内容を確認してもう一度同意してください。'
 const FEATURES: Array<{ id: AccountAiFeature; label: string; note: string }> = [
   { id: 'banner', label: 'バナー生成', note: '統括のバナー生成でこの店の AI を使います' },
   { id: 'google_review', label: 'Google口コミの返信案', note: '口コミへの返信の下書きを AI が作ります' },
@@ -80,7 +81,7 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
           setSettings(refreshed.data); setAgreed(false)
           if (cause.code === 'ai_consent_required') {
             setPending(refreshed.data.items.find(row => row.feature === item.feature) ?? null)
-            setError('同意文が更新されました。内容を確認してもう一度同意してください。')
+            setError(CONSENT_UPDATED)
           } else {
             setPending(null)
             setInfo('ほかの人が先に変更しました。最新の状態を表示しています。')
@@ -94,11 +95,12 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
   }
   const enabledCount = settings?.items.filter(item => FEATURES.some(feature => feature.id === item.feature) && item.enabled).length
   const Chevron = open ? ChevronDown : ChevronRight
+  const cancelConsent = () => { if (!saving) { setPending(null); setAgreed(false); setError(current => current === CONSENT_UPDATED ? '' : current) } }
   return <SaveErrorScope errors={saveErrors}><Card as="section" id="ai-features" overflow="hidden" aria-label="AI の機能">
     <div className={styles.groupHead}>
       <IconButton variant="plain" size="small" aria-expanded={open} aria-label={`AI の機能を${open ? '畳む' : '開く'}`} onClick={() => setOpen(!open)}><Chevron className={styles.chevron} aria-hidden="true" /></IconButton>
       <h2 className={styles.groupTitle}>AI の機能</h2><span className={styles.spacer} />
-      <span className={styles.groupMeta}>{enabledCount === undefined ? '状態を確認できません' : `${FEATURES.length}件中${enabledCount}件オン`}</span>
+      {canManage ? <span className={styles.groupMeta}>{enabledCount === undefined ? '状態を確認できません' : `${FEATURES.length} 件中 ${enabledCount} 件オン`}</span> : null}
     </div>
     {open ? <>
       <div className={styles.row}><p className={styles.rowNote}>切り替えるとすぐ保存されます。オンには同意と本人確認が必要です。</p></div>
@@ -114,8 +116,8 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
         </li>
       })}</ul>
     </> : null}
-    {pending && settings && !stepUp ? <Dialog open title={`${FEATURES.find(row => row.id === pending.feature)?.label}をオンにする`} onCancel={() => { if (!saving) { setPending(null); setAgreed(false) } }} footer={<DialogActions><Button onClick={() => { setPending(null); setAgreed(false) }} disabled={saving}>キャンセル</Button><Button variant="primary" disabled={!agreed || saving} onClick={() => void save(pending, true)}>同意してオンにする</Button></DialogActions>}>
-      {error ? <Notice tone="danger" action={<Button size="compact" onClick={() => void load()} disabled={saving}>読み直す</Button>}>{error}</Notice> : null}
+    {pending && settings && !stepUp ? <Dialog open title={`${FEATURES.find(row => row.id === pending.feature)?.label}をオンにする`} onCancel={cancelConsent} footer={<DialogActions><Button onClick={cancelConsent} disabled={saving}>キャンセル</Button><Button variant="primary" disabled={!agreed || saving} onClick={() => void save(pending, true)}>同意してオンにする</Button></DialogActions>}>
+      {error ? <Notice tone="danger" action={error !== CONSENT_UPDATED ? <Button size="compact" onClick={() => void load()} disabled={saving}>読み直す</Button> : undefined}>{error}</Notice> : null}
       <p>{settings.disclosure}</p><SaveErrorField names={["consent", "disclosureVersion"]}><Checkbox checked={agreed} onCheckedChange={setAgreed}>内容に同意します</Checkbox></SaveErrorField>
     </Dialog> : null}
     {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}

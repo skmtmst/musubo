@@ -16,3 +16,11 @@ it('招待の予約と見送りの両方を残し、通常のお礼には足さ�
 it('送信上限を超える時は本文を落とさず保存を断る',()=>{
  expect(()=>protectRestaurantFollowupMessageParts('reservation_24h',Array.from({length:5},(_,index)=>({...parts[0],id:String(index)})))).toThrow('吹き出しを減らして');
 });
+it('来店確認の追加 JSON は送信先とボタン順を変えない',()=>{
+ const saved=protectRestaurantFollowupMessageParts('reservation_24h',parts);
+ expect(saved[1].messageContent).toBe('{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"text","text":"ご予約について","wrap":true}]},"footer":{"type":"box","layout":"vertical","contents":[{"type":"button","action":{"type":"postback","label":"行きます","data":"{{var.restaurant_going}}"}},{"type":"button","action":{"type":"postback","label":"変更したい","data":"{{var.restaurant_change}}"}},{"type":"button","action":{"type":"postback","label":"取り消す","data":"{{var.restaurant_cancel}}"}}]}}');
+});
+it('招待に自動追加する本文を送信時と同じに保つ',()=>{
+ const saved=protectRestaurantFollowupMessageParts('waitlist_invited',parts);
+ expect(saved[1]).toEqual({id:'invitation',messageType:'text',messageContent:'この時間で予約する：{{var.waitlist_book_url}}\n今回は見送る：{{var.waitlist_decline_url}}'});
+});
