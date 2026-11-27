@@ -1487,3 +1487,4 @@
 - [シナリオステップ編集の順序入力・保存中キャンセル制御と自動配席設定の応答検証・競合防止](release-log/unreleased/PR-kenta-later-gemini57-1127.md) — 反映履歴、確認 2026-11-27。
 - [予約メール取り込みアドレス欄の競合・再読み込み修正とLINEフォローのテンプレート選択のアカウント切替修正](release-log/unreleased/PR-kenta-later-gemini58-1127.md) — 反映履歴、確認 2026-11-27。
 - [タグフォルダ作成の連打・未選択制御とウェビナー基本設定の保存・テスト送信制御の修正](release-log/unreleased/PR-kenta-later-gemini59-1127.md) — 反映履歴、確認 2026-11-27。
+- [業種ダッシュボード一覧の空き表示・行き先ボタンと LINE来店フォロー編集の修正](release-log/unreleased/PR-kenta-later-gemini69-1127.md) — 反映履歴、確認 2026-11-27。
