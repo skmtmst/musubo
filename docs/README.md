@@ -4,6 +4,7 @@
 - [フォームの見本の反映履歴](release-log/unreleased/PR-kenta-later-codex62.md)（説明・2026-11-27確認）
 - [素材のプレビューと一括削除の反映履歴](release-log/unreleased/PR-kenta-later-codex63.md)（説明・2026-11-27確認）
 - [シナリオ下書きの読み込みの反映履歴](release-log/unreleased/PR-kenta-scenario-draft-load.md)（説明・2026-11-27確認）
+- [素材の削除時の再確認の反映履歴](release-log/unreleased/PR-kenta-media-delete-reread.md)（説明・2026-11-27確認）
 - [素材の一覧と削除確認の反映履歴](release-log/unreleased/PR-kenta-later-codex64.md)（説明・2026-11-27確認）
 - [素材の削除確認と会話内検索の反映履歴](release-log/unreleased/PR-kenta-later-codex65.md)（説明・2026-11-27確認）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）

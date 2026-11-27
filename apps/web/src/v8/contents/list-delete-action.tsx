@@ -68,7 +68,10 @@ export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, 
             && impactRequestRef.current.accountId === at.accountId
             && impactRequestRef.current.mediaId === at.mediaId
             && impactRequestRef.current.generation === at.generation
-          if (same && again.success) {
+          if (same && again.success && again.data && Array.isArray(again.data.references)
+            && again.data.references.every(ref => ref !== null && typeof ref === 'object')
+            && Number.isInteger(again.data.usageCount) && again.data.usageCount >= 0
+            && typeof again.data.canDelete === 'boolean') {
             setImpact(again.data)
             if (!fieldFailure) setDeleteError('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
           }

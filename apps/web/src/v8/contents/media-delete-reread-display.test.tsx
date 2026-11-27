@@ -59,7 +59,7 @@ type Call = { method: string; path: string; params: URLSearchParams }
 let calls: Call[] = []
 let media: Media[] = []
 /** メディアごとの影響の返事。関数なら呼ぶたびに決める（読み直しで変わる場合）。 */
-let impacts = new Map<string, Impact | (() => Impact | Promise<Impact>) | 'fail'>()
+let impacts = new Map<string, Impact | (() => Impact | Promise<Impact>) | 'fail' | 'invalid'>()
 /** メディアごとの削除の返事（HTTP の状態）。無ければ 200。 */
 let deleteStatus = new Map<string, number | (() => Promise<number>)>()
 let root: Root
@@ -93,6 +93,7 @@ beforeEach(() => {
     const impactMatch = url.pathname.match(/^\/api\/media\/([^/]+)\/delete-impact$/)
     if (impactMatch) {
       const answer = impacts.get(impactMatch[1])
+      if (answer === 'invalid') return json({ success: true, data: { usageCount: 0, canDelete: true, verified: true, references: null } })
       if (answer === 'fail' || answer === undefined) return json({ success: false, error: 'scan failed' })
       const impact = typeof answer === 'function' ? await answer() : answer
       return json({ success: true, data: impactOf(impactMatch[1], impact) })
@@ -158,6 +159,17 @@ it('削除の競合後に使用先を読み直せなければ、削除を止め�
   await click(buttonIn(dialog(), '削除する'))
   expect(dialog()?.textContent).toContain('使われている場所を確認できませんでした')
   expect(dialog()?.textContent).not.toContain('使用先を確認しています')
+  expect(buttonIn(dialog(), '削除する')).toBeUndefined()
+  expect(buttonIn(dialog(), 'もう一度読み込む')).toBeTruthy()
+})
+
+it('競合後に不正な使用先が届いたら、削除を止めて読み直しを案内する', async () => {
+  impacts.set('m-1', { usageCount: 0, canDelete: true })
+  deleteStatus.set('m-1', 409)
+  await render(); await openDeleteFor('秋の新商品.png')
+  impacts.set('m-1', 'invalid')
+  await click(buttonIn(dialog(), '削除する'))
+  expect(dialog()?.textContent).toContain('使われている場所を確認できませんでした')
   expect(buttonIn(dialog(), '削除する')).toBeUndefined()
   expect(buttonIn(dialog(), 'もう一度読み込む')).toBeTruthy()
 })
