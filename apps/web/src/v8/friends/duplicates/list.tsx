@@ -36,16 +36,24 @@ import Card from '@/components/shared/card'
  * 探す・状態の札・見直した時刻・もう一度見直す → 重複の候補（比べて決める）→ アカウントごとの重なり。
  */
 
+function validNonNegInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 export default function DuplicatesListV8() {
   usePageTitle('友だち')
   const d = useDuplicatesData()
   /* 1152 の板は探す欄が狭いので、案内の文を短くする（メールでも探せるのは同じ）。 */
   const narrow = useNarrowViewport()
 
-  const pageCount = Math.max(1, Math.ceil(d.candidateTotal / CANDIDATE_PAGE_SIZE))
+  const pageCount = validNonNegInt(d.candidateTotal) && d.candidateTotal > 0
+    ? Math.max(1, Math.ceil(d.candidateTotal / CANDIDATE_PAGE_SIZE))
+    : 1
   const filtering = !d.unfilteredCandidates
   const counts = d.statusCounts
-  const deliveryCount = !isForbidden(d.statsFailure) && typeof d.data?.overlappingDeliveryCount === 'number' ? d.data.overlappingDeliveryCount : null
+  const deliveryCount = !isForbidden(d.statsFailure) && validNonNegInt(d.data?.overlappingDeliveryCount)
+    ? d.data.overlappingDeliveryCount
+    : null
 
   const exportVisible = () => {
     const header = ['候補A', '候補B', '確からしさ', '一致した根拠', 'アカウント', '状態', '最終更新']
@@ -272,13 +280,14 @@ export default function DuplicatesListV8() {
                 </thead>
                 <tbody>
                   {d.data.perAccount.map((row) => {
-                    const rate = Math.round(row.dupRate * 100)
+                    const validRate = typeof row.dupRate === 'number' && Number.isFinite(row.dupRate) && row.dupRate >= 0
+                    const rate = validRate ? Math.round(row.dupRate * 100) : null
                     return (
                       <Tr key={row.accountId} className={styles.rowCompact}>
                         <Td><span className={styles.cellText} title={row.accountName}>{row.accountName}</span></Td>
-                        <Td>{formatNumber(row.friends)}</Td>
-                        <Td>{formatNumber(row.dups)}</Td>
-                        <Td><span className={rate >= 10 ? styles.rateHigh : undefined}>{`${rate}%`}</span></Td>
+                        <Td>{validNonNegInt(row.friends) ? formatNumber(row.friends) : emptyValue('unknown')}</Td>
+                        <Td>{validNonNegInt(row.dups) ? formatNumber(row.dups) : emptyValue('unknown')}</Td>
+                        <Td><span className={rate !== null && rate >= 10 ? styles.rateHigh : undefined}>{rate !== null ? `${rate}%` : emptyValue('unknown')}</span></Td>
                       </Tr>
                     )
                   })}
@@ -308,7 +317,7 @@ export default function DuplicatesListV8() {
                     {d.data!.perAccount.map((col) => {
                       if (row.accountId === col.accountId) return <Td key={col.accountId}><EmptyCell /></Td>
                       const pair = d.data!.pairwiseOverlap!.find((p) => p.fromAccountId === row.accountId && p.toAccountId === col.accountId)
-                      return <Td key={col.accountId}>{formatNumber(pair?.overlap ?? 0)}</Td>
+                      return <Td key={col.accountId}>{pair && validNonNegInt(pair.overlap) ? formatNumber(pair.overlap) : emptyValue('unknown')}</Td>
                     })}
                   </Tr>
                 ))}
