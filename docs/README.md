@@ -1491,3 +1491,4 @@
 - [タグフォルダ作成の連打・未選択制御とウェビナー基本設定の保存・テスト送信制御の修正](release-log/unreleased/PR-kenta-later-gemini59-1127.md) — 反映履歴、確認 2026-11-27。
 - [業種ダッシュボード一覧の空き表示・行き先ボタンと LINE来店フォロー編集の修正](release-log/unreleased/PR-kenta-later-gemini69-1127.md) — 反映履歴、確認 2026-11-27。
 - [LINE来店フォローの単位切り替え時の小数表示を修正](release-log/unreleased/PR-kenta-timing-fields-unit-1127.md) — 反映履歴、確認 2026-11-27。
+- [サービス別営業時間確認の欠損表示とリッチメニューのタブ数制御の修正](release-log/unreleased/PR-kenta-later-gemini70-1127.md) — 反映履歴、確認 2026-11-27。
