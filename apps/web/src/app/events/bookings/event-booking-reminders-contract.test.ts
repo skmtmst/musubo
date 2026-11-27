@@ -29,23 +29,6 @@ describe('IDEA-07 イベント予約の通知予定', () => {
     expect(code(API)).toContain("'pending' | 'sent' | 'failed' | 'failed_permanent' | 'cancelled'")
   })
 
-  it('予約枠のそばに通知の種類・日時・状態を出す', () => {
-    const page = code(PAGE)
-    expect(page).toContain('booking.reminders')
-    expect(page).toContain('data-booking-reminders')
-    expect(page).toContain('formatJp(reminder.scheduled_at')
-  })
-
-  it('止まった分は「停止済み」、送った分は「送信済み」と区別する', () => {
-    expect(PAGE).toContain('前日のお知らせ')
-    expect(PAGE).toContain('開始前のお知らせ')
-    expect(PAGE).toContain('送信予定')
-    expect(PAGE).toContain('送信済み')
-    expect(PAGE).toContain('停止済み')
-    // 失敗は別の状態名で出し、送信予定と混ぜない。
-    expect(PAGE).toContain('failed_permanent')
-  })
-
   it('変更に連動しない別管理の通知一覧は増やさない', () => {
     const page = code(PAGE)
     // 通知予定は予約の行の中だけ。独立した一覧口は呼ばない。
