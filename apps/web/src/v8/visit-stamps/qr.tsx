@@ -30,35 +30,59 @@ function useQrImage(url:string|undefined,width:number) {
 }
 
 export function StorefrontQr({card,accountId,shop,canManage}: {card:VisitStampCard;accountId:string;shop:string;canManage:boolean}) {
-  const [qr,setQr]=useState<VisitStampQr|null>(null),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false)
+  const [qr,setQr]=useState<VisitStampQr|null>(null),[loaded,setLoaded]=useState(false),[loadError,setLoadError]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false)
   const [confirm,setConfirm]=useState(false),[print,setPrint]=useState(false)
   const scope=JSON.stringify([card.id,card.version,accountId,qr?.id??null,canManage])
   const currentScope=useRef(scope),confirmTicket=useRef<object|null>(null)
   if(currentScope.current!==scope){currentScope.current=scope;confirmTicket.current=null}
   const renderedTicket=confirmTicket.current
   const [confirmScope,setConfirmScope]=useState('')
-  const pending=useRef<VisitStampQrInput|null>(null),live=useRef(true)
-  useEffect(()=>{let cancelled=false;live.current=true;setQr(null);setLoaded(false);setError('');pending.current=null;void visitStampsApi.storefrontQr(card.id,accountId).then(r=>{if(!cancelled){setQr(r.data);setLoaded(true)}}).catch(e=>{if(!cancelled){setError(reason(e));setLoaded(true)}});return()=>{cancelled=true;live.current=false}},[card.id,card.version,accountId])
+  const pending=useRef<VisitStampQrInput|null>(null),live=useRef(true),loadSeq=useRef(0),loadingRef=useRef(false),issuingRef=useRef(false)
+  const loadQr=useCallback(async(force=false)=>{
+    if(!force&&loadingRef.current)return
+    const seq=++loadSeq.current;loadingRef.current=true;setLoaded(false);setLoadError('');setError('')
+    try {
+      const r=await visitStampsApi.storefrontQr(card.id,accountId)
+      if((r as {success?:boolean}|null)?.success===false)throw (r as {error?:unknown}).error??new Error('店頭のQRを読み込めませんでした')
+      if(live.current&&loadSeq.current===seq){setQr(r.data);setLoaded(true)}
+    } catch(e) {
+      if(live.current&&loadSeq.current===seq){setLoadError(reason(e));setLoaded(true)}
+    } finally {
+      if(loadSeq.current===seq)loadingRef.current=false
+    }
+  },[card.id,accountId])
+  useEffect(()=>{live.current=true;setQr(null);setBusy(false);pending.current=null;issuingRef.current=false;void loadQr(true);return()=>{live.current=false;loadSeq.current+=1;loadingRef.current=false;issuingRef.current=false}},[card.version,loadQr])
   const image=useQrImage(qr?.status==='active'?qr.url:undefined,1024)
   const issue=async()=>{
-    if(busy)return;setBusy(true);setError('')
+    if(issuingRef.current||busy||loadError)return
+    const seq=loadSeq.current;issuingRef.current=true;setBusy(true);setError('')
     pending.current??={requestId:requestId(),expectedQrId:qr?.id??null}
-    try {const r=await visitStampsApi.issueStorefrontQr(card.id,accountId,pending.current);if(live.current){setQr(r.data);setConfirm(false);pending.current=null}}
-    catch(e){if(live.current){setError(reason(e));if((e as {status?:number}).status===409){pending.current=null;const latest=await visitStampsApi.storefrontQr(card.id,accountId).catch(()=>null);if(latest)setQr(latest.data)}}}
-    finally{if(live.current)setBusy(false)}
+    try {
+      const r=await visitStampsApi.issueStorefrontQr(card.id,accountId,pending.current)
+      if((r as {success?:boolean}|null)?.success===false)throw (r as {error?:unknown}).error??new Error('店頭のQRを発行できませんでした')
+      if(live.current&&loadSeq.current===seq){setQr(r.data);setConfirm(false);pending.current=null}
+    } catch(e){
+      if(live.current&&loadSeq.current===seq){
+        setError(reason(e))
+        if((e as {status?:number}).status===409){pending.current=null;const latest=await visitStampsApi.storefrontQr(card.id,accountId).catch(()=>null);if(latest&&(latest as {success?:boolean}|null)?.success!==false&&live.current&&loadSeq.current===seq)setQr(latest.data)}
+      }
+    } finally {
+      if(loadSeq.current===seq)issuingRef.current=false
+      if(live.current&&loadSeq.current===seq)setBusy(false)
+    }
   }
   const note=card.settings.stampInterval?.mode==='hours'?`1日1回まで・前の押印から${card.settings.stampInterval.hours}時間`:'1日1回まで'
   return <section className={styles.storefront} aria-label="店頭の QR（印刷用）">
     <div className={styles.titleLine}><h3>店頭の QR（印刷用）</h3><HelpTip label="店頭のQRの説明">店頭に貼るQRです。読んだ人に押します。同じ日は1回までです。作り直すと古いQRは使えません。</HelpTip></div>
     <div className={styles.storeRow}>{image.src?<img width={96} height={96} className={styles.thumb} src={image.src} alt="店頭のQR" />:null}
       <div className={styles.storeDetails}><div className={styles.storeInfo}><span className={styles.sub}>{`${card.name}・この店で1つ`}</span>
-        {qr?.status!=='active'?(loaded?canManage?<Button variant="secondary" busy={busy} busyLabel="発行しています…" onClick={()=>issue()}>{qr?'店頭のQRを作り直す':'店頭のQRを作る'}</Button>:<span className={styles.sub}>店頭のQRは管理者が発行します。</span>:<span className={styles.sub}>QRを読み込んでいます…</span>):null}</div>
+        {qr?.status!=='active'?(loaded?(loadError?null:canManage?<Button variant="secondary" busy={busy} busyLabel="発行しています…" onClick={()=>void issue()}>{qr?'店頭のQRを作り直す':'店頭のQRを作る'}</Button>:<span className={styles.sub}>店頭のQRは管理者が発行します。</span>):<span className={styles.sub}>QRを読み込んでいます…</span>):null}</div>
         {qr?.status==='active'?<><div className={styles.actions}><Button variant="secondary" disabled={!image.src} onClick={()=>setPrint(true)}><QrCode size={16} aria-hidden="true" />保存・印刷</Button></div>
           <div className={styles.actions}>{canManage?<Button variant="text" onClick={()=>{pending.current=null;confirmTicket.current={};setConfirmScope(scope);setConfirm(true)}}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>:null}<span className={styles.sub}>{`最後に作り直した日 ${new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'}).format(new Date(qr.issuedAt))}`}</span></div></>
           :null}
       </div>
     </div>
-    {error||image.error?<Notice tone="danger" message={error||image.error}/>:null}
+    {loadError?<Notice tone="danger" message={loadError} action={<Button variant="secondary" size="compact" onClick={()=>void loadQr()}>もう一度読み込む</Button>}/>:error||image.error?<Notice tone="danger" message={error||image.error}/>:null}
     <Dialog open={confirm && confirmScope===scope && renderedTicket!==null} designNode="PYDUP" designWidth={560} tone="destructive" confirmation confirmIcon={<RefreshCw size={16} aria-hidden="true"/>} title="店頭の QR を作り直しますか？" confirmLabel="作り直す" busy={busy} error={error||undefined} onCancel={()=>{confirmTicket.current=null;setConfirm(false)}} onConfirm={()=>{if(renderedTicket && renderedTicket===confirmTicket.current && confirmScope===currentScope.current && canManage)return issue()}}>
       <OperationTargetSummary accounts={[{id:accountId}]} externalTarget={{label:'カード',name:card.name}} />
       <div className={styles.dialogBody}><p>今の店頭の QR は使えなくなります。印刷した紙を貼り替えてください。</p><p className={styles.sub}>新しい QR は、作り直したあとに［保存・印刷］から出せます。</p></div>
@@ -72,7 +96,7 @@ export function StaffQr({card,accountId,shop,onClose}: {card:VisitStampCard;acco
   const [count,setCount]=useState(1),[amount,setAmount]=useState(''),[view,setView]=useState<'input'|'qr'|'result'>('input')
   const [state,setState]=useState<{qr:VisitStampQr;receivedAt:number}|null>(null),[result,setResult]=useState<VisitStampQrStatus['result']>(null)
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[fieldError,setFieldError]=useState(''),[seconds,setSeconds]=useState(30)
-  const session=useRef(requestId()),latest=useRef<VisitStampQr|null>(null),live=useRef(true),pending=useRef<VisitStampQrInput|null>(null),input=useRef<HTMLInputElement>(null)
+  const session=useRef(requestId()),latest=useRef<VisitStampQr|null>(null),live=useRef(true),pending=useRef<VisitStampQrInput|null>(null),input=useRef<HTMLInputElement>(null),issuingRef=useRef(false)
   const amountNumber=Number(amount.replace(/[,，]/g,'')),preview=Number.isSafeInteger(amountNumber)&&amountNumber>=0?Math.min(card.settings.maxPerVisit,Math.floor(amountNumber/card.settings.amountUnit)):0
   const revoke=useCallback((qr:VisitStampQr|null)=>{if(qr)void visitStampsApi.revokeStaffQr(qr.id,accountId).catch(()=>{})},[accountId])
   useEffect(()=>{live.current=true;return()=>{live.current=false;revoke(latest.current)}},[revoke])
@@ -85,12 +109,14 @@ export function StaffQr({card,accountId,shop,onClose}: {card:VisitStampCard;acco
   const issue=useCallback(async(continueAfterUse=false)=>{
     if(!pending.current)pending.current={requestId:requestId(),sessionId:session.current,previousQrId:latest.current?.id??null,...(mode==='amount'?{amount:amountNumber}:{count}),continueAfterUse}
     const response=await visitStampsApi.issueStaffQr(card.id,accountId,pending.current)
+    if((response as {success?:boolean}|null)?.success===false)throw (response as {error?:unknown}).error??new Error('QRを発行できませんでした')
     pending.current=null;await accept(response.data)
   },[card.id,accountId,mode,amountNumber,count,accept])
   const open=async()=>{
+    if(issuingRef.current||busy)return
     if(mode==='amount'&&(!amount.trim()||!Number.isSafeInteger(amountNumber)||amountNumber<0||amountNumber>100000000||preview<1)) {setFieldError('1個以上たまる会計金額を入れてください。');input.current?.focus();input.current?.scrollIntoView?.({block:'center'});return}
-    setBusy(true);setError('');setFieldError('')
-    try{await issue()}catch(e){setError(reason(e))}finally{if(live.current)setBusy(false)}
+    issuingRef.current=true;setBusy(true);setError('');setFieldError('')
+    try{await issue()}catch(e){if(live.current)setError(reason(e))}finally{issuingRef.current=false;if(live.current)setBusy(false)}
   }
   // 1つずつ状態確認→必要なら交換。処理が遅い場合も並行発行しない。閉じた後の発行結果は失効させる。
   useEffect(()=>{
@@ -116,7 +142,7 @@ export function StaffQr({card,accountId,shop,onClose}: {card:VisitStampCard;acco
   useEffect(()=>{if(!state?.qr.expiresAt)return;const tick=()=>setSeconds(Math.max(0,Math.ceil((Date.parse(state.qr.expiresAt!)-Date.parse(state.qr.serverTime)-(Date.now()-state.receivedAt))/1000)));tick();const id=setInterval(tick,250);return()=>clearInterval(id)},[state])
   const qr=state?.qr,image=useQrImage(view==='qr'&&qr?.status==='active'&&seconds>0?qr.url:undefined,680)
   const close=()=>{live.current=false;revoke(latest.current);onClose()}
-  const more=async()=>{if(busy)return;setBusy(true);setError('');try{await issue(true);setResult(null)}catch(e){setError(reason(e))}finally{if(live.current)setBusy(false)}}
+  const more=async()=>{if(issuingRef.current||busy)return;issuingRef.current=true;setBusy(true);setError('');try{await issue(true);if(live.current)setResult(null)}catch(e){if(live.current)setError(reason(e))}finally{issuingRef.current=false;if(live.current)setBusy(false)}}
   if(view==='input')return <Dialog open designNode={mode==='amount'?'pYdrv':'l3wpv'} designWidth={560} title="QR を出す" description="友だちは選びません。QR を読んだ人に押します" confirmLabel="QR を出す" confirmIcon={<QrCode size={16} aria-hidden="true"/>} busy={busy} error={error||undefined} onCancel={close} onConfirm={()=>open()}>
     <div className={styles.dialogBody}><div className={styles.field}><span>押し方</span><div><SegmentedControl aria-label="押し方" value={mode} onChange={v=>{setMode(v);pending.current=null;setFieldError('')}} disabled={busy} options={[{value:'count',label:'個数で'},{value:'amount',label:'会計の金額で'}]}/></div></div>
       {mode==='count'?<div className={styles.field}><span>押す個数</span><div className={styles.actions}><IconButton aria-label="1個へらす" disabled={count<=1} onClick={()=>{setCount(n=>n-1);pending.current=null}}><Minus size={16}/></IconButton><strong className={styles.count}>{`${formatNumber(count)} 個`}</strong><IconButton aria-label="1個ふやす" disabled={count>=card.settings.maxPerVisit} onClick={()=>{setCount(n=>n+1);pending.current=null}}><Plus size={16}/></IconButton><span className={styles.sub}>{`1 から ${card.settings.maxPerVisit} 個まで`}</span></div></div>
