@@ -4,13 +4,23 @@ import { tables } from '../booking-kit/test-data'
 import { freeTables, openTimes, slotLabel, tableNote } from './slots'
 
 describe('restaurant/front-desk/slots の不正営業時間・不正数値ガード', () => {
-  it('openTimes は壊れた営業時刻を 00:00 に丸めて予約枠を作らない', () => {
+  it('openTimes は壊れた営業時刻を 00:00 に丸めず、24:00・26:00 などの深夜閉店では通常どおり枠を出す', () => {
     const day = '2026-10-11'
     const now = new Date('2026-10-10T12:00:00+09:00')
     const malformed = [
-      { weekday: 0, periods: [{ opensAt: '', closesAt: '22:00' }, { opensAt: 'bad', closesAt: '22:00' }, { opensAt: '25:00', closesAt: '26:00' }] },
+      { weekday: 0, periods: [{ opensAt: '', closesAt: '22:00' }, { opensAt: 'bad', closesAt: '22:00' }, { opensAt: '18:60', closesAt: '22:00' }, { opensAt: '48:00', closesAt: '50:00' }] },
     ]
     expect(openTimes(day, malformed, now)).toEqual([])
+
+    const midnightClose = [
+      { weekday: 0, periods: [{ opensAt: '21:00', closesAt: '24:00' }] },
+    ]
+    expect(openTimes(day, midnightClose, now)).toEqual(['21:00', '21:30', '22:00'])
+
+    const lateNightClose = [
+      { weekday: 0, periods: [{ opensAt: '22:00', closesAt: '26:00' }] },
+    ]
+    expect(openTimes(day, lateNightClose, now)).toEqual(['22:00', '22:30', '23:00', '23:30'])
 
     const mixed = [
       { weekday: 0, periods: [{ opensAt: '', closesAt: '22:00' }, { opensAt: '18:00', closesAt: '21:00' }] },
