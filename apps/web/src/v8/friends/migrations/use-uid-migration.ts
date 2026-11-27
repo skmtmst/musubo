@@ -236,7 +236,15 @@ export function useUidMigration(initialRunId: string | null = null) {
     setMappingsFile(null)
     setFile(selected)
     if (!selected) { setMappings([]); return }
-    const text = await selected.text()
+    let text: string
+    try {
+      text = await selected.text()
+    } catch {
+      if (mounted.current && seq === fileSeq.current && permissionEpoch === accessEpoch.current && canWriteMigrationNow()) {
+        setMessage('CSVを読み込めませんでした。ファイルを確認して、もう一度選んでください。')
+      }
+      return
+    }
     if (!mounted.current) return
     if (seq !== fileSeq.current) return
     if (permissionEpoch !== accessEpoch.current || !canWriteMigrationNow()) {
