@@ -350,13 +350,13 @@ export function GuideOverlay({
             : anchorName === 'hours.confirm' && applyingHours ? '変更内容を確かめて、「Googleに反映する」または「設定を保存する」を押します。'
             : receptionCopy ? receptionCopy.body
             : viewport.width <= NARROW_GUIDE_WIDTH ? procedure.mobileBody ?? procedure.body : procedure.body}</p>
-          <div className={styles.balloonFooter}>
+          <div className={styles.balloonFooter} data-followup-reason={!inputReady && anchorName === 'followup.body' || undefined}>
             <Button presentation="quiet-text" onClick={() => {
               if (courseEditorStep || (stepKey === 'followup' && safeIndex !== 2)) onAdvanceProcedure(true)
               else onAdvanceProcedure()
             }}>この手順をスキップ</Button>
             {compactTableGuide ? <Button presentation="quiet-text" onClick={onPause}>一時停止</Button> : null}
-            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} onClick={() => onAdvanceProcedure()}>次へ</Button> : null}
+            {procedure.trigger === 'confirm-input' ? <Button variant="primary" size="compact" disabled={!inputReady} disabledReason={!inputReady && anchorName === 'followup.body' ? '送る時期と本文を入力してください。' : undefined} onClick={() => onAdvanceProcedure()}>次へ</Button> : null}
           </div>
         </div> : null}
         {tablesComplete ? (
