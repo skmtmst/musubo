@@ -1,8 +1,6 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
-- [二段階認証と前月比の画面改善](release-log/unreleased/PR-kenta-later-codex4.md)（説明・2026-11-27確認）
-- [運営画面と広告設定の表示改善](release-log/unreleased/PR-kenta-later-codex5.md)（説明・2026-11-27確認）
 
 # 文書の入口
 
@@ -20,9 +18,7 @@
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
 - [画面の読み込みと案内の修正の反映履歴](release-log/unreleased/266-kenta-train-night3-1127.md)（説明・2026-11-27確認）
-- [契約先の操作履歴の表示の反映履歴](release-log/unreleased/PR-kenta-tenant-audit-unknown.md)（説明・2026-11-27確認）
-- [アカウントのアーカイブ理由の反映履歴](release-log/unreleased/PR-kenta-archive-blocker-unknown.md)（説明・2026-11-27確認）
-- [ファネルの未対応条件の反映履歴](release-log/unreleased/PR-kenta-funnel-unknown-kind.md)（説明・2026-11-27確認）
+- [夜の列車3〜8の画面の修正の反映履歴](release-log/unreleased/270-kenta-train-a-1127.md)（説明・2026-11-27確認）
 - [EC連携の未対応の出来事の反映履歴](release-log/unreleased/259-kenta-ec-unknown-event.md)（説明・2026-11-27確認）
 - [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
@@ -1427,8 +1423,6 @@
 
 - [画面の読み直しと表示の列車5](release-log/unreleased/243-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
 - [画面の読み直しと操作の列車6](release-log/unreleased/243-kenta-train6-1126.md) — 読み直しと画面操作の改善履歴。確認 2026-11-26。
-- [カルーセル編集と質問テンプレート編集の読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini6-1127.md) — 反映履歴、確認 2026-11-27。
-- [リッチビデオ編集と運用状態の更新履歴の読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini7-1127.md) — 反映履歴、確認 2026-11-27。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。
@@ -1444,9 +1438,3 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
-- [夜の画面修正をまとめて取り込み](release-log/unreleased/PR-kenta-train-night5-1127.md) — 反映履歴、確認 2026-11-27。
-- [夜の画面の直し（列車6）](release-log/unreleased/PR-kenta-train-night6-1127.md) — 反映履歴、確認 2026-11-27。
-- [夜の画面の直し（列車7）](release-log/unreleased/PR-kenta-train-night7-1127.md) — 反映履歴、確認 2026-11-27。
-- [夜の画面の直し（列車8）](release-log/unreleased/PR-kenta-train-night8-1127.md) — 反映履歴、確認 2026-11-27。
-- [フォーム回答CSVの反映履歴](release-log/unreleased/PR-kenta-form-csv-period.md)（説明・2026-11-27確認）
-- [スマホの対応画面の反映履歴](release-log/unreleased/PR-kenta-mobile-todo-order.md)（説明・2026-11-27確認）
