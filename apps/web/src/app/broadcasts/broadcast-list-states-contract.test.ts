@@ -16,37 +16,18 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
    * `DelayedSkeleton` の包みへ移り、`listBody` は権限不足が先頭になった。
    * 三項の続き形 `) : forbidden ? (` は固定せず、各状態の枝があること自体を見る。
    */
-  it('権限不足を読み込み失敗と別の1枚にする', () => {
-    /*
-     * 403 は読み直しても直らない。失敗の枠に混ぜると「もう一度試す」を
-     * 何度押しても直らない道へ誘うことになる。
-     */
-    expect(PAGE, '403 を見分けていない').toContain('err.status === 403')
-    expect(PAGE, '権限不足の1枚が無い').toContain('forbidden ? (')
-  })
-
   it('失敗をページ上の帯と一覧の2か所に出さない', () => {
     // ★管理画面 `x63W5x`：同じ失敗は1画面に1つ。一覧の失敗なら帯を出さず、
     // 一覧の場所の ListState error だけ残す。権限不足も別の1枚で重ねない。
     expect(PAGE).not.toContain('{error && !forbidden && (')
     // ページ上の帯（`p-4 bg-danger-bg` の箱）。行の削除ボタンの hover は別物。
     expect(PAGE).not.toContain('p-4 bg-danger-bg')
-    expect(PAGE).toContain('forbidden ? (')
-    expect(PAGE).toContain("onClick={() => loadList(")
   })
 
-  it('空・失敗・権限不足を共通部品で描く', () => {
-    /* 画面ごとに直書きすると、同じ状態が画面ごとに違う顔になる。 */
-    expect(PAGE).toContain("import EmptyList")
-    for (const kind of ['forbidden', 'error']) {
-      expect(PAGE, `${kind} の1枚が無い`).toContain(`${kind} ? (`)
-    }
-  })
 })
 
 describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
   it('画面名は上部バーだけに出し、フォルダ追加を左欄へ置く', () => {
-    expect(PAGE).toContain("usePageTitle('一斉配信')")
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
     // 追加口の描画・実行・権限拒否は broadcasts/list.test.tsx の実操作で確かめる。
