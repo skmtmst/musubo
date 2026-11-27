@@ -4,7 +4,7 @@ import { parseJsonArray } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
-import { getBroadcastById, countBroadcastLedger, deriveBroadcastDisplayStatus, BROADCAST_DISPLAY_STATUS_LABELS } from '@line-crm/db';
+import { getBroadcastById, countBroadcastLedger, countRetryableRecipients, deriveBroadcastDisplayStatus, BROADCAST_DISPLAY_STATUS_LABELS } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, parseBroadcastMessageParts, renderMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
 import type { SegmentCondition } from '@line-crm/shared';
@@ -468,9 +468,10 @@ export const get__api_broadcasts_id_progress_4 = async (c: Context<Env, "/api/br
    * `successCount` だけだと「残りは失敗」と読めてしまい、送達不明の相手を
    * 再送してよいものと誤解させる。
    */
-  const [ledger, breakdown] = await Promise.all([
+  const [ledger, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(c.env.DB, id),
     failedBreakdown(c.env.DB, id),
+    countRetryableRecipients(c.env.DB, id),
   ]);
   const ledgerRows = ledger.sent + ledger.failed + ledger.unknown + ledger.claimed;
   const displayStatus = deriveBroadcastDisplayStatus({
@@ -501,8 +502,8 @@ export const get__api_broadcasts_id_progress_4 = async (c: Context<Env, "/api/br
         failedTemporary: breakdown.temporary,
         failedPermanent: breakdown.permanent,
         unknown: ledger.unknown,
-        inFlight: ledger.claimed,
-        retryableCount: breakdown.temporary,
+        inFlight: Math.max(0, ledger.claimed - Math.max(0, retryableCount - breakdown.temporary)),
+        retryableCount,
       },
       perAccountStats,
     },

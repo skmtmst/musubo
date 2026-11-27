@@ -50,6 +50,16 @@ export async function getBlockedRecipientIds(
   return new Set((rows.results ?? []).map((row) => row.friend_id));
 }
 
+/** 宛先台帳の alias c に対する、完了・停止中で再送できる未送信行の条件。 */
+export const RETRYABLE_UNSENT_CLAIM_SQL = `(c.state='claimed' AND c.dispatched_at IS NULL
+  AND COALESCE(c.error_code,'') NOT LIKE 'simulation_%'
+  AND NOT EXISTS (SELECT 1 FROM messages_log m WHERE m.broadcast_id=c.broadcast_id AND m.friend_id=c.friend_id
+    AND m.direction='outgoing' AND COALESCE(m.delivery_type,'') != 'test')
+  AND EXISTS (SELECT 1 FROM broadcasts b WHERE b.id=c.broadcast_id AND
+    (b.status='sent' OR (b.status='sending' AND b.stopped_at IS NOT NULL))))`;
+const RETRYABLE_CLAIM = `((c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch'))
+  OR ${RETRYABLE_UNSENT_CLAIM_SQL})`;
+
 /**
  * 再送の対象（一時的な失敗だけ）。
  *
@@ -63,14 +73,32 @@ export async function getRetryableRecipientIds(
 ): Promise<string[]> {
   const rows = await db
     .prepare(
-      `SELECT friend_id FROM broadcast_send_claims
-        WHERE broadcast_id = ? AND state = 'failed'
-          AND error_code IN ('line_http_429', 'stopped_before_dispatch')
-        ORDER BY friend_id`,
+      `SELECT c.friend_id FROM broadcast_send_claims c JOIN broadcasts b ON b.id=c.broadcast_id
+        WHERE c.broadcast_id = ? AND ${RETRYABLE_CLAIM}
+        ORDER BY c.friend_id`,
     )
     .bind(broadcastId)
     .all<{ friend_id: string }>();
   return (rows.results ?? []).map((row) => row.friend_id);
+}
+
+/** 完了・停止中に残った未送信の押さえも再送対象として数える。 */
+export async function countRetryableRecipients(db: D1Database, broadcastId: string): Promise<number> {
+  const row = await db.prepare(`SELECT COUNT(*) AS n FROM broadcast_send_claims c JOIN broadcasts b ON b.id=c.broadcast_id
+    WHERE c.broadcast_id=? AND ${RETRYABLE_CLAIM}`)
+    .bind(broadcastId).first<{n:number}>();
+  return Number(row?.n ?? 0);
+}
+
+/** 世代を更新した後、前の世代で外へ出していない押さえだけを引き継ぐ。 */
+export async function reopenUnsentClaims(db: D1Database, broadcastId: string, attemptNo: number, at?: string): Promise<number> {
+  const result = await db.prepare(`UPDATE broadcast_send_claims SET attempt_no=?,updated_at=?
+    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NULL AND attempt_no<?
+      AND NOT EXISTS (SELECT 1 FROM messages_log m WHERE m.broadcast_id=broadcast_send_claims.broadcast_id
+        AND m.friend_id=broadcast_send_claims.friend_id AND m.direction='outgoing' AND COALESCE(m.delivery_type,'') != 'test')
+      AND EXISTS (SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND send_attempt_no=?)`)
+    .bind(attemptNo,at ?? jstNow(),broadcastId,attemptNo,broadcastId,attemptNo).run();
+  return result.meta.changes ?? 0;
 }
 
 export async function countBroadcastLedger(
@@ -101,6 +129,8 @@ export interface MarkDispatchedInput {
   /** 重複除外配信では世代を送信直前に照合する。 */
   guardAttempt?: boolean;
   guardLockVersion?: number;
+  /** その場送信にはキューロックが無いが、版の照合は必要。 */
+  requireBatchLock?: boolean;
   expectedRecipients?: Array<{ id: string; lineUserId: string }>;
   at?: string;
 }
@@ -125,15 +155,16 @@ export async function markBroadcastRecipientsDispatched(
   if (input.friendIds.length === 0) return [];
   const now = input.at ?? jstNow();
   if (input.expectedLockVersion !== undefined) {
+    const lockClause = input.requireBatchLock === false ? '' : ' AND batch_offset=-1';
     const statements=input.friendIds.map(friendId=>db.prepare(`UPDATE broadcast_send_claims
       SET state='claimed',attempt_no=?,dispatched_at=?,settled_at=NULL,error_code=NULL,updated_at=?
       WHERE broadcast_id=? AND friend_id=? AND ((state='claimed' AND dispatched_at IS NULL)
         OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
-      AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND batch_offset=-1 AND lock_version=?)`)
+      AND EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL${lockClause} AND lock_version=?)`)
       .bind(input.attemptNo,now,now,input.broadcastId,friendId,input.attemptNo,input.broadcastId,input.expectedLockVersion));
     if (input.expectedRecipients) {
       if (input.expectedRecipients.length !== input.friendIds.length || input.expectedRecipients.some((item,index) => item.id !== input.friendIds[index])) return [];
-      const guard=db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL AND batch_offset=-1 AND lock_version=?)
+      const guard=db.prepare(`SELECT CASE WHEN EXISTS(SELECT 1 FROM broadcasts WHERE id=? AND status='sending' AND stopped_at IS NULL${lockClause} AND lock_version=?)
         AND NOT EXISTS(SELECT 1 FROM json_each(?) e WHERE NOT EXISTS(
           SELECT 1 FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id AND c.broadcast_id=?
           WHERE f.id=json_extract(e.value,'$.id') AND f.line_platform_user_id=json_extract(e.value,'$.lineUserId')

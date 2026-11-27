@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import type { Context } from 'hono';
-import { countBroadcastLedger, isTemporaryLedgerErrorCode, deriveBroadcastDisplayStatus, recordBroadcastLifecycleEvent, BROADCAST_DISPLAY_STATUS_LABELS, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
+import { RETRYABLE_UNSENT_CLAIM_SQL, countBroadcastLedger, countRetryableRecipients, isTemporaryLedgerErrorCode, deriveBroadcastDisplayStatus, recordBroadcastLifecycleEvent, BROADCAST_DISPLAY_STATUS_LABELS, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
 import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -384,9 +384,10 @@ export async function broadcastStatusView(
   row: Record<string, unknown>,
 ): Promise<BroadcastStatusView> {
   const id = String(row.id);
-  const [counts, breakdown] = await Promise.all([
+  const [counts, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(db, id),
     failedBreakdown(db, id),
+    countRetryableRecipients(db, id),
   ]);
   const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
   const displayStatus = deriveBroadcastDisplayStatus({
@@ -408,8 +409,8 @@ export async function broadcastStatusView(
       failedTemporary: breakdown.temporary,
       failedPermanent: breakdown.permanent,
       unknown: counts.unknown,
-      inFlight: counts.claimed,
-      retryableCount: breakdown.temporary,
+      inFlight: Math.max(0, counts.claimed - Math.max(0, retryableCount - breakdown.temporary)),
+      retryableCount,
     },
   };
 }
@@ -495,13 +496,13 @@ export function recipientResultFilter(result: string): string {
     case 'delivered':
       return ` AND c.state = 'sent'`;
     case 'temporary':
-      return ` AND c.state = 'failed' AND c.error_code IN ${RECIPIENT_TEMPORARY_CODES}`;
+      return ` AND ((c.state = 'failed' AND c.error_code IN ${RECIPIENT_TEMPORARY_CODES}) OR ${RETRYABLE_UNSENT_CLAIM_SQL})`;
     case 'permanent':
       return ` AND c.state = 'failed' AND (c.error_code NOT IN ${RECIPIENT_TEMPORARY_CODES} OR c.error_code IS NULL)`;
     case 'unknown':
       return ` AND c.state = 'unknown'`;
     case 'inflight':
-      return ` AND c.state = 'claimed'`;
+      return ` AND c.state = 'claimed' AND NOT ${RETRYABLE_UNSENT_CLAIM_SQL}`;
     default:
       return '';
   }
@@ -599,9 +600,10 @@ async function recordBroadcastControlAudit(
 
 export /** 台帳の数え上げと再送対象数。画面と応答で同じ数を使う。 */
 async function broadcastLedgerSummary(db: D1Database, id: string) {
-  const [counts, breakdown] = await Promise.all([
+  const [counts, breakdown, retryableCount] = await Promise.all([
     countBroadcastLedger(db, id),
     failedBreakdown(db, id),
+    countRetryableRecipients(db, id),
   ]);
   return {
     sent: counts.sent,
@@ -609,9 +611,9 @@ async function broadcastLedgerSummary(db: D1Database, id: string) {
     failedTemporary: breakdown.temporary,
     failedPermanent: breakdown.permanent,
     unknown: counts.unknown,
-    inFlight: counts.claimed,
-    // 再送できるのは一時的な失敗だけ。
-    retryableCount: breakdown.temporary,
+    inFlight: Math.max(0, counts.claimed - Math.max(0, retryableCount - breakdown.temporary)),
+    // 再送できる未送信の宛先も含む。
+    retryableCount,
   };
 }
 

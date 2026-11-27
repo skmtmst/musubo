@@ -111,6 +111,13 @@ describe('宛先のタブ', () => {
     expect(screen.getByRole('button', { name: /1件を再送/ })).toBeTruthy()
   })
 
+  it('再送できる未送信の宛先を共通の状態の札で表示する', async () => {
+    fixture.recipients.mockResolvedValue({success:true,data:{rows:[row('山田花子','failed_temporary','未送信（再送できます）')],summary:SUMMARY,aggregateOnly:false,aggregateReason:null,legacySuccessCount:null}})
+    render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
+    await waitFor(() => expect(screen.getByText('未送信（再送できます）')).toBeTruthy())
+    expect(screen.getByText('未送信（再送できます）').closest('[data-design-node="xRvDB"]')?.getAttribute('data-tone')).toBe('warning')
+  })
+
   it('宛先の結果は共通の状態の札で色を分け、時刻は time で桁をそろえる', async () => {
     fixture.recipients.mockResolvedValue({
       success: true,

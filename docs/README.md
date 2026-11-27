@@ -558,6 +558,7 @@
 
 - [開店準備の接続・コース入力・再開](release-log/unreleased/148-masato-first-guide-recheck.md) — 反映履歴、確認 2026-11-21。
 - [LINE接続の自動更新](release-log/unreleased/152-masato-line-token-auto-renew.md) — 反映履歴、確認 2026-11-22。
+- [送信前に残った相手の再送を修正](release-log/unreleased/147-kenta-resend-claimed.md) — 反映履歴、確認 2026-11-21。
 
 - [開店準備の確認と保存の手順](release-log/unreleased/143-masato-first-steps-recovery.md)
 

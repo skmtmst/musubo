@@ -224,7 +224,7 @@ export default function BroadcastRecipients({
         <StatusBadge tone="danger">{`失敗 ${formatNumber(summary.failedTemporary + summary.failedPermanent)}`}</StatusBadge>
         <StatusBadge tone="neutral">{`送る前 ${formatNumber(pending ?? 0)}`}</StatusBadge>
         <HelpTip label="宛先の数の説明">
-          LINEが受け付けた数・失敗・送る前は宛先の台帳の数です。お客さまに届いたかは確認できません。送る前はまだ送っていない人数で、名前の一覧はありません。
+          LINEが受け付けた数・失敗・送る前は宛先の台帳の数です。お客さまに届いたかは確認できません。送る前には、まだ記録がない相手と、再送できる未送信の相手が含まれます。
         </HelpTip>
       </div>
 
@@ -247,7 +247,7 @@ export default function BroadcastRecipients({
             </label>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={handleRetry} disabled={retryBusy || summary.retryableCount === 0}>
-                一時的な失敗 {formatNumber(summary.retryableCount)}件を再送
+                再送できる {formatNumber(summary.retryableCount)}件を再送
               </Button>
               <Button variant="secondary" onClick={handleCsv} disabled={csvBusy}>
                 CSVに書き出す
@@ -285,7 +285,7 @@ export default function BroadcastRecipients({
           ) : null}
           <p className="text-ink-faint text-xs">
             {total > 0 ? `対象 ${formatNumber(total)}人` : null}
-            {pending != null && pending > 0 ? `・送る前 ${formatNumber(pending)}人は名前の一覧がありません` : null}
+            {pending != null && pending > 0 ? `・送る前 ${formatNumber(pending)}人` : null}
           </p>
         </>
       )}

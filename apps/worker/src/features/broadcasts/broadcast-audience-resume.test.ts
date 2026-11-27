@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, insertFriend } from '../../test-utils/d1-sqlite.js';
 import { processQueuedBroadcasts, processBroadcastSend } from './broadcast.js';
-import { reopenFailedClaims, updateBroadcastStatus, beginBroadcastRetryAttempt, requestBroadcastStop, resumeBroadcastSending } from '@line-crm/db';
+import { reopenFailedClaims, reopenUnsentClaims, updateBroadcastStatus, beginBroadcastRetryAttempt, requestBroadcastStop, resumeBroadcastSending } from '@line-crm/db';
 import { prepareHqBroadcast, dispatchHqBroadcast } from '../../services/hq-broadcasts.js';
 
 const sends = vi.hoisted(() => [] as string[]);
@@ -149,6 +149,41 @@ it.each([false,true])('重複除外の旧進捗に宛先snapshotが無い場合�
   const result=await processMultiAccountDedupBroadcast(f.db,{id:'b',account_ids:'["a"]',dedup_priority:'["a"]',target_tag_id:'t',message_type:'text',message_content:'案内',dedup_progress:progress},()=>({async multicast(ids:string[]){sends.push(...ids);return {requestId:'fake'};}} as never));
   expect(sends).toHaveLength(0);expect(result.complete).toBe(false);expect(result.stopped).toBe(true);
   expect(f.raw.prepare("SELECT reason FROM broadcast_lifecycle_events WHERE broadcast_id='b'").get()).toMatchObject({reason:expect.stringContaining('要確認')});
+});
+
+
+it('古い未送信の押さえを再送し、送信済みと送達不明は重ねて送らない', async () => {
+  const f=fixture();
+  await processQueuedBroadcasts(f.db,client);
+  expect(sends).toHaveLength(150);
+  sends.length=0;
+  f.raw.exec("UPDATE broadcasts SET status='sent' WHERE id='b'; UPDATE broadcast_send_claims SET state='unknown',dispatched_at='2026-11-21' WHERE broadcast_id='b' AND friend_id='f156'; UPDATE broadcast_send_claims SET state='failed',error_code='line_http_403' WHERE broadcast_id='b' AND friend_id>='f150' AND friend_id<>'f155' AND friend_id<>'f156'");
+  const {lock_version}=f.raw.prepare("SELECT lock_version FROM broadcasts WHERE id='b'").get() as {lock_version:number};
+  const attempt=await beginBroadcastRetryAttempt(f.db,{id:'b',expectedVersion:lock_version});
+  expect(attempt).toEqual({changes:1,attemptNo:2});
+  expect(await reopenUnsentClaims(f.db,'b',2)).toBe(1);
+  await processQueuedBroadcasts(f.db,client);
+  expect(sends).toEqual(['Uf155']);
+  expect(f.raw.prepare("SELECT state FROM broadcast_send_claims WHERE broadcast_id='b' AND friend_id='f156'").get()).toEqual({state:'unknown'});
+});
+
+it('旧処理と進捗更新が重なっても、送達済みの人数を二重に数えない', async () => {
+  const f=fixture();
+  f.raw.exec("UPDATE broadcasts SET message_content='案内' WHERE id='b'");
+  let injected=false;
+  const racingDb={...f.db,async batch(stmts:D1PreparedStatement[]) {
+    const result=await f.db.batch(stmts);
+    if (!injected && stmts.some(stmt=>((stmt as unknown as {sql?:string}).sql??'').includes('INSERT INTO messages_log'))) {
+      injected=true;
+      f.raw.exec("UPDATE broadcasts SET success_count=(SELECT COUNT(*) FROM broadcast_send_claims WHERE broadcast_id='b' AND state='sent') WHERE id='b'");
+    }
+    return result;
+  }} as D1Database;
+  const multicast={async multicast(ids:string[]){sends.push(...ids); return {requestId:'fake'};}} as never;
+  await processQueuedBroadcasts(racingDb,multicast);
+  expect(injected).toBe(true);
+  expect(sends).toHaveLength(160);
+  expect(f.raw.prepare("SELECT success_count FROM broadcasts WHERE id='b'").get()).toEqual({success_count:160});
 });
 
 it.each([[false, false],[true, false],[false, true],[true, true]])('並走：複数アカウントで旧処理と再送・再開が重なっても二重送信しない（個別=%s、再開=%s）', async (personalized, resume) => {

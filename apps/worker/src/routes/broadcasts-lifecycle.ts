@@ -7,7 +7,7 @@ import { validateAfterActionVersion } from './broadcast-after-action-validation.
 import { parseJsonArray, sameJsonMeaning } from './broadcast-json.js';
 import { inputError, validatedInputBody, readBoundedBytes } from '../lib/input-errors.js';
 import { fail } from '../lib/fail.js';
-import { getBroadcastById, updateBroadcast, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, closeClaimsForStop, reopenFailedClaims, getRetryableRecipientIds } from '@line-crm/db';
+import { getBroadcastById, updateBroadcast, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, closeClaimsForStop, reopenFailedClaims, reopenUnsentClaims, getRetryableRecipientIds } from '@line-crm/db';
 import type { BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
 import type { SegmentCondition } from '@line-crm/shared';
@@ -679,7 +679,8 @@ export const post__api_broadcasts_id_retry_failed_5 = async (c: Context<Env, "/a
 
     // 失敗した相手だけを新しい試行番号で開け直す。送達済み・送達不明の行は
     // 触らない（`state = 'failed'` で絞る）。
-    const reopened = await reopenFailedClaims(c.env.DB, id, attempt.attemptNo);
+    const reopenedFailed = await reopenFailedClaims(c.env.DB, id, attempt.attemptNo);
+    const reopened = reopenedFailed + await reopenUnsentClaims(c.env.DB, id, attempt.attemptNo);
     const updated = await getBroadcastById(c.env.DB, id);
     const ledger = await broadcastLedgerSummary(c.env.DB, id);
     await recordBroadcastControlAudit(c, 'broadcast.retry_failed', existing, {
