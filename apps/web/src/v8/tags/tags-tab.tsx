@@ -282,8 +282,15 @@ export default function TagsTab({
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
+      if (!Array.isArray(tags.data)) throw new Error('タグの応答を確認できません')
       setItems(tags.data)
-      if (folders.success) setGroups(folders.data)
+      if (folders.success && Array.isArray(folders.data)) {
+        setGroups(folders.data)
+        setFolderError('')
+      } else {
+        setGroups([])
+        setFolderError('フォルダを読み込めませんでした。')
+      }
       setStatus('ready')
     } catch (reason) {
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
