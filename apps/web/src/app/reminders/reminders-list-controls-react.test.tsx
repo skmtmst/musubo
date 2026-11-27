@@ -199,3 +199,30 @@ describe('一覧もフォルダも失敗したら読み直しは1枚だけ', () 
     expect(fullRetries).toHaveLength(1)
   })
 })
+
+it('一覧を読み込めないとき空と誤認させず、もう一度試すと復帰する', async () => {
+  let fail = true
+  fetchApi.mockImplementation(async (url: string) => {
+    calls.push(url)
+    if (url.startsWith('/api/folders')) return { success: true, data: [], unfiledCount: 0 }
+    if (url.startsWith('/api/reminders?') && fail) return { success: false, error: '失敗' }
+    return { success: true, data: { items: [reminder('r-1', '予約前のお知らせ')], total: 1, limit: 20, sort: [] } }
+  })
+  await act(async () => { root.render(<RemindersPage />) })
+  for (let i = 0; i < 30 && !host.textContent?.includes('リマインダを読み込めませんでした'); i++) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  }
+  expect(host.textContent).toContain('リマインダを読み込めませんでした')
+  expect(host.textContent).not.toContain('まだリマインダがありません')
+  const retry = [...host.querySelectorAll('button')].find(b => b.textContent?.trim() === 'もう一度試す')!
+  expect(retry).toBeTruthy()
+  const before = listCalls().length
+  fail = false
+  await act(async () => { retry.click() })
+  for (let i = 0; i < 30 && !host.textContent?.includes('予約前のお知らせ'); i++) {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)) })
+  }
+  expect(listCalls().length).toBeGreaterThan(before)
+  expect(host.textContent).toContain('予約前のお知らせ')
+  expect(host.textContent).not.toContain('リマインダを読み込めませんでした')
+})
