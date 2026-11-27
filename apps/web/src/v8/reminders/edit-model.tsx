@@ -29,10 +29,14 @@ export const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
  */
 export type V8Stage = 'basics' | 'target' | 'messages' | 'schedule' | 'confirm' | 'done'
 
+function safeNonNegativeCount(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null
+}
+
 /** 保存済みの対象人数。未取得を0にしない。現役の対象の段が使う。 */
 export function reminderAudienceCounts(validation: ReminderValidationResult | null) {
-  const matched = validation?.audience.matched ?? null
-  const excluded = validation?.audience.excluded ?? null
+  const matched = safeNonNegativeCount(validation?.audience?.matched)
+  const excluded = safeNonNegativeCount(validation?.audience?.excluded)
   return {
     matched,
     excluded,
@@ -61,7 +65,8 @@ export function stageFor(raw: string | null): V8Stage {
 }
 
 export function countLabel(value: number | null, unit: string): string {
-  return value == null ? `—${unit}` : `${formatNumber(value)} ${unit}`
+  const safe = safeNonNegativeCount(value)
+  return safe == null ? `—${unit}` : `${formatNumber(safe)} ${unit}`
 }
 
 export const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
@@ -96,12 +101,13 @@ export function exampleSendAt(step: ReminderDraftStep, mode: ReminderDraftSettin
 
 /** ステップの短い呼び名。「1日前 18:00」「1時間前」。 */
 export function stepShortTiming(step: ReminderDraftStep, mode: ReminderDraftSettings['deliveryMode']): string {
-  if (mode === 'time' && step.offsetDays != null && step.sendAtTime) {
-    const days = step.offsetDays
-    const dayLabel = days === 0 ? '当日' : days < 0 ? `${-days}日前` : `${days}日後`
-    return `${dayLabel} ${step.sendAtTime}`
+  const sendAtTime = step.sendAtTime?.trim() || null
+  const offsetDays = typeof step.offsetDays === 'number' && Number.isFinite(step.offsetDays) ? Math.trunc(step.offsetDays) : null
+  if (mode === 'time' && offsetDays !== null && sendAtTime) {
+    const dayLabel = offsetDays === 0 ? '当日' : offsetDays < 0 ? `${-offsetDays}日前` : `${offsetDays}日後`
+    return `${dayLabel} ${sendAtTime}`
   }
-  return describeReminderTiming(step, mode)
+  return describeReminderTiming({ ...step, offsetDays, sendAtTime }, mode)
 }
 
 /** 板が 1100px を切ったら（画面幅で約 1352px 未満）、通知の中身は 1152 の板  の形。 */
