@@ -6,7 +6,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { accountStyleUpdated } from '@/hooks/use-account-style'
 import { styleApi } from '@/lib/api/helpers/styles'
 import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
-import { useEffect,useMemo,useState } from 'react'
+import { useEffect,useMemo,useRef,useState } from 'react'
 import { LOOK_CHOICES, SETTINGS_KEYS, answerOf, answersForApi, changedAnswers, isBookingConfirmSample, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, settingsChanges, stepNames } from './model'
 import { type Question } from './question-types'
 import type { Props, SummaryData, WizardStep } from './wizard-types'
@@ -20,6 +20,12 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
   const [step, setStep] = useState<WizardStep>(initialStep)
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
   const [error, setError] = useState('')
   const router = useRouter()
   const [summary, setSummary] = useState<SummaryData | null>(null)
@@ -142,11 +148,10 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
       if (choice === 'existing') {
         if (!resource) { setError('使うリッチメニューを選んでください。'); return null }
         /* 今あるリッチメニューをそのまま使う：初期セットのリッチメニューの代わりにする（choices）。 */
-        try {
-          const set = await styleApi.starterSet(accountId, style)
-          const menuKey = set.success ? set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key : undefined
-          return { key: 'image', value: { mode: 'configured', value: 'existing',resourceId:resource }, nextChoices: menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: resource } } : choices }
-        } catch (caught) { setError(describeApiFailure(caught, '読み込み')); return null }
+        const set = await styleApi.starterSet(accountId, style)
+        if (!set.success) throw new Error('メニューを確認できませんでした')
+        const menuKey = set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key
+        return { key: 'image', value: { mode: 'configured', value: 'existing',resourceId:resource }, nextChoices: menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: resource } } : choices }
       }
       return { key: 'image', value: { mode: 'configured', value: choice }, nextChoices: choices }
     }
@@ -154,12 +159,14 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
   }
 
   const onNext = async () => {
+    if (busy || busyRef.current) return
     if (step === 0) {
       /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
       if (choice === 'later' || choice === 'manual') { await saveStyleMode(choice); return }
       if (!choice) return
       if (styleOnly) {
         if (choice === state.style) { onClose(false); return }
+        busyRef.current = true
         setBusy(true)
         setError('')
         try {
@@ -167,8 +174,8 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
           if (!res.success) throw new Error('使い方を保存できませんでした')
           accountStyleUpdated(accountId)
           onClose(true)
-        } catch (caught) { setError(describeApiFailure(caught, '保存')) }
-        finally { setBusy(false) }
+        } catch (caught) { if (mountedRef.current) setError(describeApiFailure(caught, '保存')) }
+        finally { busyRef.current = false; if (mountedRef.current) setBusy(false) }
         return
       }
       setStyleChosen(true)
@@ -177,7 +184,25 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
       void go(1)
       return
     }
-    const selected = await selectedAnswer()
+    const needsFetch = step === 1 && (choice === 'simple' || (choice === 'existing' && Boolean(resource)))
+    if (needsFetch) {
+      busyRef.current = true
+      setBusy(true)
+      setError('')
+    }
+    let selected: Awaited<ReturnType<typeof selectedAnswer>>
+    try {
+      selected = await selectedAnswer()
+    } catch (caught) {
+      if (mountedRef.current) setError(describeApiFailure(caught, '読み込み'))
+      return
+    } finally {
+      if (needsFetch) {
+        busyRef.current = false
+        if (mountedRef.current) setBusy(false)
+      }
+    }
+    if (!mountedRef.current) return
     if (selected) {if(step===1)setMenuConfirmed(selected.value.value==='simple');commitAndNext(selected.key, selected.value, selected.nextChoices)}
   }
 
@@ -193,7 +218,8 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
   }
 
   const saveAndClose = async () => {
-    if (busy) return
+    if (busy || busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -205,14 +231,17 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
       }
       onClose(true)
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存'))
+      if (mountedRef.current) setError(describeApiFailure(caught, '保存'))
     } finally {
-      setBusy(false)
+      busyRef.current = false
+      if (mountedRef.current) setBusy(false)
     }
   }
 
   /* スタイルを「あとで」（はじめにやることに残る）・「手動」（スタイルを使わず設定の画面で決める）。 */
   const saveStyleMode = async (mode: 'later' | 'manual') => {
+    if (busy || busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -221,14 +250,17 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
       onClose(true)
       if (mode === 'manual') router.push('/settings')
     } catch (caught) {
-      setError(describeApiFailure(caught, '保存'))
+      if (mountedRef.current) setError(describeApiFailure(caught, '保存'))
     } finally {
-      setBusy(false)
+      busyRef.current = false
+      if (mountedRef.current) setBusy(false)
     }
   }
 
   const activate = async () => {
+    if (busy || busyRef.current) return
     const targets = (summary?.activation ?? []).filter((pair) => enabled[pair.state.target_id])
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -252,9 +284,10 @@ export function useWizard({ accountId, state, initialStep = 0, styleOnly = false
       notifySaved(`${formatNumber(items.length)}件を動かしました`)
       onClose(true)
     } catch (caught) {
-      setError(describeApiFailure(caught, '動かす操作'))
+      if (mountedRef.current) setError(describeApiFailure(caught, '動かす操作'))
     } finally {
-      setBusy(false)
+      busyRef.current = false
+      if (mountedRef.current) setBusy(false)
     }
   }
 
