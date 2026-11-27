@@ -10,6 +10,7 @@
 - [フォーム選択肢の受付表示の修正履歴](release-log/unreleased/PR-kenta-later-cx5-38-1128.md)
 - [紹介リンクのコピー操作の修正履歴](release-log/unreleased/PR-kenta-later-cx5-39-1128.md)
 - [予約日時の変更エラーの修正履歴](release-log/unreleased/PR-kenta-later-cx5-40-1128.md)
+- [LINE画面の主色と読み込み表示の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-01-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
