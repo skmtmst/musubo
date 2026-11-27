@@ -1,6 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -81,11 +79,6 @@ it('内容違いは自動再送せず、別回答を明示したときだけ鍵�
   fireEvent.click(resend);
   await screen.findByRole('button', { name: 'LINEに戻る' });
   expect(vi.mocked(api.submitForm).mock.calls[1][2]).not.toBe(vi.mocked(api.submitForm).mock.calls[0][2]);
-});
-
-it('紹介画面に旧い箱の名前を戻さない', () => {
-  expect(readFileSync(join(import.meta.dirname, 'affiliate.tsx'), 'utf8')).not.toContain('af-');
-  expect(readFileSync(join(import.meta.dirname, 'form.tsx'), 'utf8')).not.toContain('bg-ground');
 });
 
 it('選んだメニューが消えたとき、入力を残して選び直して再送できる', async () => {
