@@ -14,6 +14,11 @@ import styles from './visit-stamp-qr.module.css';
 
 /** 来店スタンプのQRを読んだ後の画面。QRの個数・友だちIDは渡さず、サーバの押印結果だけを表示。 */
 export default function VisitStampQr() {
+ const [params]=useSearchParams();
+ return <VisitStampQrResult key={JSON.stringify([params.get('accountId'),params.get('token')])}/>;
+}
+
+function VisitStampQrResult() {
  const [params]=useSearchParams(),navigate=useNavigate();
  const token=params.get('token')??'',account=params.get('accountId')??'';
  const [result,setResult]=useState<VisitStampQrResult|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[shop,setShop]=useState<{accountId:string;accountName:string;botBasicId:string}|null>(null),[adding,setAdding]=useState(false);
@@ -27,6 +32,7 @@ export default function VisitStampQr() {
      setShop(config.data);
      if(config.data.accountId!==account||!token) {setResult({status:'invalid',reason:'invalid'});return;}
      const response=await visitStampsApi.redeemQr(account,token,request.current.id,visitId);
+     if(!response?.data || !['success','limited','visit_required','invalid','friend_required'].includes(response.data.status))throw new Error('Invalid stamp result');
      if(current===sequence.current)setResult(response.data);
    }catch(e){if(current===sequence.current){setError(liffErrorMessage((e as {body?:unknown})?.body,'押印を確認できませんでした。読み直してください。'));}}
    finally{if(current===sequence.current)setBusy(false);}
