@@ -1458,3 +1458,4 @@
 - [統合ユーザー一覧とリッチメニュー公開予約の通信まわりを修正](release-log/unreleased/PR-kenta-later-gemini45-1127.md) — 反映履歴、確認 2026-11-27。
 - [開店準備ガイドと統括リッチメニュー下書きの切替まわりを修正](release-log/unreleased/PR-kenta-later-gemini46-1127.md) — 反映履歴、確認 2026-11-27。
 - [既存リッチメニュー選択と投稿画像の切り取り確認窓を修正](release-log/unreleased/PR-kenta-later-gemini47-1127.md) — 反映履歴、確認 2026-11-27。
+- [飲食メニューの再開ガードとリッチメニュー公開時のエラー案内を修正](release-log/unreleased/PR-kenta-later-gemini48-1127.md) — 反映履歴、確認 2026-11-27。
