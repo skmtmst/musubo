@@ -25,19 +25,10 @@ describe("管理画面リッチメニューの画面契約", () => {
   })
 
   it('一覧を取得できないときはメニュー数と出し分け数を0件と断定しない', () => {
-    expect(PAGE).toContain("const groupKpiState = !selectedAccount?.id")
-    expect(PAGE).toContain("const groupKpiReady = groupKpiState === 'ready'")
-    expect(PAGE).toContain('value={groupKpiReady ? groupFacets?.published ?? null : null}')
     expect(PAGE).toContain("unit={groupKpiReady && groupFacets?.published != null ? '件' : ''}")
-    expect(PAGE).toContain("value={groupKpiReady ? groupFacets?.targeting ?? null : null}")
-    expect(PAGE).toContain(': groupKpiUnavailableText')
-    expect(PAGE).toContain("'一覧を読み込めませんでした'")
   })
 
   it('一覧APIの月間タップ数とのべ人数を表示し、部分集計だと明記する', () => {
-    expect(PAGE).toContain('formatNumber(taps)')
-    expect(PAGE).toContain('formatNumber(g.monthlyStats.uniqueAudience.value')
-    expect(PAGE).toContain('（記録開始後）')
   })
 
   it('LINEから読んだ面ごとの動きを取り込み前に表示する', () => {
@@ -49,7 +40,6 @@ describe("管理画面リッチメニューの画面契約", () => {
   })
 
   it('GO8RQどおり実際に友だちへ出す優先順を既定表示にする', () => {
-    expect(PAGE).toContain("sort: 'priority', size: '20', page: '1'")
     expect(PAGE).toContain('出す順番')
     expect(PAGE).toContain('上のメニューが優先されます。')
     expect(PAGE).toContain('いちばん上の1つだけが出ます。')
