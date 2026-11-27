@@ -38,6 +38,7 @@
 - [台帳の盤の操作メニューとスタイル体験自動再生の修正履歴](release-log/unreleased/PR-kenta-later-gemini65-1127.md)（説明・2026-11-27確認）
 - [カルーセル保存とウェビナー基本設定フォームの修正履歴](release-log/unreleased/PR-kenta-later-gemini66-1127.md)（説明・2026-11-27確認）
 - [シナリオ移動ダイアログとテンプレート保存処理の修正履歴](release-log/unreleased/PR-kenta-later-gemini67-1127.md)（説明・2026-11-27確認）
+- [営業時間確認画面とリッチメニュー画像枠の修正履歴](release-log/unreleased/PR-kenta-later-gemini68-1127.md)（説明・2026-11-27確認）
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
