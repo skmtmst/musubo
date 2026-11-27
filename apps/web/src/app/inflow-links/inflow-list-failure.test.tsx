@@ -31,6 +31,7 @@ let root: Root
 let entryRoutesStatus: number
 let entryRoutesHeaders: Record<string, string>
 let entryRoutesSuccessData: Array<Record<string, unknown>> | null
+let pendingRoutes: Promise<Response> | null = null
 
 function stubFetch() {
   vi.stubGlobal('fetch', vi.fn(async (input: unknown) => {
@@ -44,6 +45,7 @@ function stubFetch() {
       )
     }
     if (path.startsWith('/api/entry-routes')) {
+      if (pendingRoutes) return pendingRoutes
       if (entryRoutesSuccessData !== null) {
         return new Response(
           JSON.stringify({ success: true, data: entryRoutesSuccessData }),
@@ -86,6 +88,7 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     entryRoutesStatus = 500
     entryRoutesHeaders = {}
     entryRoutesSuccessData = null
+    pendingRoutes = null
     stubFetch()
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -98,6 +101,30 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     })
     host.remove()
     vi.unstubAllGlobals()
+  })
+
+  it('取得中は読み込みを表示し、成功した0件と区別する', async () => {
+    let resolve!: (response: Response) => void
+    pendingRoutes = new Promise(done => { resolve = done })
+    await act(async () => { root.render(<InflowLinksPage />) })
+    expect(host.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('流入経路を読み込んでいます')
+    expect(host.textContent).not.toContain('まだ流入リンクがありません')
+    await act(async () => { resolve(new Response(JSON.stringify({ success: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) })
+    await settle()
+    expect(host.textContent).toContain('まだ流入リンクがありません')
+    expect(errorCard()).toBeNull()
+  })
+
+  it('取得失敗のあと読み直し、成功した0件に戻る', async () => {
+    await act(async () => { root.render(<InflowLinksPage />) })
+    await settle()
+    expect(errorCard()?.textContent).toContain('流入リンクを読み込めませんでした')
+    expect(host.textContent).not.toContain('まだ流入リンクがありません')
+    entryRoutesSuccessData = []
+    await act(async () => { errorCard()!.querySelector('button')!.click() })
+    await settle()
+    expect(errorCard()).toBeNull()
+    expect(host.textContent).toContain('まだ流入リンクがありません')
   })
 
   it('403は権限の案内にし、再読み込みの口を出す', async () => {
@@ -113,6 +140,7 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     // 権限が追加された後も同じ画面で読み直せる。
     expect(card!.querySelector('button')).toBeTruthy()
     expect(card!.textContent).not.toContain('流入経路を読み込めませんでした')
+    expect(card!.textContent).not.toContain('流入経路を再読み込み')
   })
 
   it('429は待ち秒数を添え、再試行の口を残す', async () => {
@@ -140,6 +168,7 @@ describe('M029 流入経路一覧の取得失敗は原因どおりに言い分�
     const card = errorCard()
     expect(card).not.toBeNull()
     expect(card!.textContent).toContain('流入リンクを読み込めませんでした')
+    expect(card!.textContent).not.toContain('リファラルリンクの取得に失敗しました')
     expect(card!.querySelector('button')).not.toBeNull()
     const routeCard = [...host.querySelectorAll('[data-design-version]')].find(element => element.querySelector('[data-kpi-label]')?.textContent?.trim() === '経路')
     expect(routeCard).toBeTruthy()

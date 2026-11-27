@@ -23,32 +23,9 @@ describe("管理画面 流入経路一覧の契約", () => {
     expect(PAGE).not.toMatch(/<Button[^>]*>フォルダを追加<\/Button>/)
   })
 
-  it('空・読込・取得失敗の3状態を共通ListStateで言い分ける', () => {
-    expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
-    expect(PAGE).toContain('<ListState kind="loading"')
-    expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('<EmptyList')
-    // M029: 原因をそのまま渡す。403は権限の案内・再試行なし、
-    // 429は待ち案内つきで再試行あり（m23mの共通文）。
-    expect(PAGE).toContain("loadFailureCopy")
-    expect(PAGE).toContain("loadFailureCopy(loadError, '流入経路')")
+  it('再読込の可否と失敗の詳細を共通表示へ渡す', () => {
     expect(PAGE).toContain('error={loadError ?? undefined}')
     expect(PAGE).toContain('onRetry={loadFailure === null || loadFailure.retryable ? () => void load() : undefined}')
-    // 通らない再試行を促す一律の文・ボタンは残さない。
-    expect(PAGE).not.toContain('流入経路を読み込めませんでした')
-    expect(PAGE).not.toContain('流入経路を再読み込み')
-  })
-
-  it('一覧を引けなかったことを、空と別に覚える', () => {
-    expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
-    // 例外で抜けても「読み込み中」のまま固まらない。
-    expect(PAGE).toContain('} catch (e) {')
-    expect(PAGE).toContain('setLoadFailed(true)')
-    // M029: 原因も残し、403・429を言い分ける。
-    expect(PAGE).toContain('const [loadError, setLoadError] = useState<unknown>(null)')
-    expect(PAGE).toContain('setLoadError(e)')
-    // 失敗を赤帯だけで流していた古い出し方は残さない。
-    expect(PAGE).not.toContain("setError('リファラルリンクの取得に失敗しました')")
   })
 
   it('アカウント切替後の古い返事を捨て、集計未取得を0にしない', () => {
