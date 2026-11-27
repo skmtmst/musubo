@@ -80,10 +80,14 @@ export function timelineStatusLabel(type: string, status: string | null) {
   return knownValue(labels, status, status)
 }
 
-function safeExternalHttpUrl(raw: unknown): string | null {
+function safeSourceUrl(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const trimmed = raw.trim()
   if (!trimmed) return null
+  // 「/」1つで始まる相対パスは許可する（プロトコル相対「//」やバックスラッシュは拒否）。
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !/^\/\\/.test(trimmed)) {
+    return trimmed
+  }
   try {
     const parsed = new URL(trimmed)
     return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? trimmed : null
@@ -100,7 +104,7 @@ export function timelineSourceHref(item: FriendTimelineItem, friendId: string): 
   const source = item?.source
   if (!source || typeof source !== 'object') return null
   if (typeof source.url === 'string' && source.url.trim() !== '') {
-    const safeUrl = safeExternalHttpUrl(source.url)
+    const safeUrl = safeSourceUrl(source.url)
     return safeUrl ? { href: safeUrl, external: true, label: item.type === 'ec_order' ? '注文' : '元の記録' } : null
   }
   switch (source.kind) {

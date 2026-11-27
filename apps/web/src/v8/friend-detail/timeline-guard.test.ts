@@ -19,9 +19,16 @@ function makeItem(url: string | null): FriendTimelineItem {
 }
 
 describe('friend-detail/timeline ガード', () => {
-  it('javascript: や data: など危険な外部 URL スキームを拒否し、安全な https/http URL のみリンク化する', () => {
+  it('javascript:・data:・// 等の危険な URL を拒否し、安全な http/https URL と「/」始まりの相対パスをリンク化する', () => {
     expect(timelineSourceHref(makeItem('javascript:alert(1)'), 'f-1')).toBeNull()
     expect(timelineSourceHref(makeItem('data:text/html,<h1>x</h1>'), 'f-1')).toBeNull()
+    expect(timelineSourceHref(makeItem('//evil.example/orders/1'), 'f-1')).toBeNull()
+    expect(timelineSourceHref(makeItem('/\\evil.example/orders/1'), 'f-1')).toBeNull()
+    expect(timelineSourceHref(makeItem('/orders/1'), 'f-1')).toEqual({
+      href: '/orders/1',
+      external: true,
+      label: '注文',
+    })
     expect(timelineSourceHref(makeItem('https://example.com/orders/1'), 'f-1')).toEqual({
       href: 'https://example.com/orders/1',
       external: true,
