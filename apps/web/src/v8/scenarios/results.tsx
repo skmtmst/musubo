@@ -127,15 +127,20 @@ export default function ScenarioResultsV8() {
 
   /* 画面（id）やアカウントを切り替えたあとに返ってきた古い応答を捨てる世代番号（SCENARIO-11）。 */
   const loadSeqRef = useRef(0)
+  const mainInFlightRef = useRef(false)
+  const runsInFlightRef = useRef(false)
 
   /** シナリオ本体と集計。ここだけ先に読めれば本文は見せられる。 */
-  const loadMain = useCallback(async (seq: number) => {
+  const loadMain = useCallback(async (seq: number, options?: { force?: boolean }) => {
     if (!id) {
+      mainInFlightRef.current = false
       setLoading(false)
       setError('')
       setResultsMissing(false)
       return
     }
+    if (!options?.force && mainInFlightRef.current) return
+    mainInFlightRef.current = true
     setLoading(true)
     setError('')
     setResultsMissing(false)
@@ -156,7 +161,10 @@ export default function ScenarioResultsV8() {
         setError('配信結果を読み込めませんでした。時間を置いてもう一度お試しください。')
       }
     } finally {
-      if (seq === loadSeqRef.current) setLoading(false)
+      if (seq === loadSeqRef.current) {
+        mainInFlightRef.current = false
+        setLoading(false)
+      }
     }
   }, [id])
 
@@ -164,21 +172,24 @@ export default function ScenarioResultsV8() {
    * 購読一覧は50件ずつカーソルで辿る（SCENARIO-12）。続きのページは購読の行だけを
    * 後ろへ足し、集計・通別結果は新しい応答のものへ置き換える。
    */
-  const loadRuns = useCallback(async (seq: number, cursor?: string) => {
+  const loadRuns = useCallback(async (seq: number, cursor?: string, options?: { force?: boolean }) => {
     if (!id) return
     const requestScope = accountScope.current
     if (!selectedAccountId) {
       // アカウントが選ばれていないと購読は読めない。「0件」ではなく未取得。
       if (seq === loadSeqRef.current) {
+        runsInFlightRef.current = false
         setRuns(null)
         setRunsState('idle')
       }
       return
     }
+    if (!cursor && !options?.force && runsInFlightRef.current) return
     if (cursor) {
       setRunsLoadingMore(true)
       setRunsMoreError('')
     } else {
+      runsInFlightRef.current = true
       runsScope.current = null
       setRuns(null)
       setRunsState('loading')
@@ -213,7 +224,10 @@ export default function ScenarioResultsV8() {
         setRunsState('error')
       }
     } finally {
-      if (seq === loadSeqRef.current) setRunsLoadingMore(false)
+      if (seq === loadSeqRef.current) {
+        if (!cursor) runsInFlightRef.current = false
+        setRunsLoadingMore(false)
+      }
     }
   }, [id, selectedAccountId, subscriptionStatus])
 
@@ -230,6 +244,8 @@ export default function ScenarioResultsV8() {
   useEffect(() => {
     if (accountLoading) return
     const seq = ++loadSeqRef.current
+    mainInFlightRef.current = false
+    runsInFlightRef.current = false
     setScenario(null)
     setStats(null)
     setRuns(null)
@@ -239,14 +255,19 @@ export default function ScenarioResultsV8() {
     moveTicket.current = null
     setMoveOptions(null)
     setMoveOptionsError(false)
-    void loadMain(seq)
-    void loadRuns(seq)
+    void loadMain(seq, { force: true })
+    void loadRuns(seq, undefined, { force: true })
+    return () => {
+      loadSeqRef.current += 1
+      mainInFlightRef.current = false
+      runsInFlightRef.current = false
+    }
   }, [accountLoading, loadMain, loadRuns])
 
   /** 購読一覧だけを読み直す。再試行と操作後の更新はこの領域に限る（SCENARIO-13）。 */
   const reloadRuns = useCallback(() => {
     const seq = loadSeqRef.current
-    void loadRuns(seq)
+    void loadRuns(seq, undefined, { force: true })
     void refreshStats(seq)
   }, [loadRuns, refreshStats])
 
@@ -438,7 +459,7 @@ export default function ScenarioResultsV8() {
 
       {!loading && scenario && stats ? (
         <>
-          <ScenarioResultSummary stats={stats} summary={runs?.summary} />
+          <ScenarioResultSummary stats={stats} summary={runs?.summary} runsState={runsState} />
           <section className={styles.section} aria-labelledby="scenario-results-steps">
             <div className={styles.sectionHead}>
               <h2 id="scenario-results-steps" className={styles.sectionTitle}>通ごとの反応</h2>

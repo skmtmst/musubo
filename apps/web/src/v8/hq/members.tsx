@@ -3,7 +3,7 @@
 import { loadStaffIdentity, useTenantAdministratorAccess } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
 import { UserPlus } from 'lucide-react'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
@@ -70,6 +70,9 @@ function MembersInner() {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [me, setMe] = useState<StaffMember | null>(null)
   const [lastLogins, setLastLogins] = useState<Record<string, string>>({})
+  const [lastLoginsError, setLastLoginsError] = useState(false)
+  const [accountsError, setAccountsError] = useState(false)
+  const [reloading, setReloading] = useState(false)
   const [dialog, setDialog] = useState<{ open: boolean; member: StaffMember | null }>({ open: false, member: null })
   const [dialogSession, setDialogSession] = useState(0)
   const [dialogBusy, setDialogBusy] = useState(false)
@@ -81,39 +84,70 @@ function MembersInner() {
   const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
   /* 板 「権限を変える確認」。変える前に変更前→変更後を見せる。 */
   const [confirmChange, setConfirmChange] = useState<{ member: StaffMember; value: MemberDialogValue } | null>(null)
+  const loadSeqRef = useRef(0)
+  const loadInFlightRef = useRef(false)
 
-  const load = useCallback(async () => {
-    setStatus('loading')
+  const load = useCallback(async (options?: { force?: boolean; keepVisible?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current) return
+    const seq = ++loadSeqRef.current
+    loadInFlightRef.current = true
+    if (!options?.keepVisible) setStatus('loading')
+    setReloading(true)
     setActionError('')
     try {
       // M025: 範囲限定の担当者に一覧は出さない（口も403で断る）。
       // 先に自分を読んで理由の分かる面を出し、通らない一覧は呼ばない。
       const meRes = await loadStaffIdentity()
+      if (seq !== loadSeqRef.current) return
       if (!meRes.success) throw new Error(meRes.error)
       setMe(meRes.data)
       if (meRes.data.accountScope === 'accounts') {
+        setLastLoginsError(false)
+        setAccountsError(false)
         setStatus('ready')
         return
       }
-      const [staffRes, accountRes, loginRes] = await Promise.all([
+      const [staffRes, accountRes, loginRes] = await Promise.allSettled([
         api.staff.list(),
         api.lineAccounts.list(),
-        api.staff.lastLogins().catch(() => null),
+        api.staff.lastLogins(),
       ])
-      if (!staffRes.success) throw new Error(staffRes.error)
-      setMembers(staffRes.data)
-      if (accountRes.success) setAccounts(accountRes.data)
-      if (loginRes?.success) setLastLogins(loginRes.data)
+      if (seq !== loadSeqRef.current) return
+      if (staffRes.status !== 'fulfilled') throw staffRes.reason
+      if (!staffRes.value.success) throw new Error(staffRes.value.error)
+      setMembers(staffRes.value.data)
+      if (accountRes.status === 'fulfilled' && accountRes.value.success) {
+        setAccounts(accountRes.value.data)
+        setAccountsError(false)
+      } else {
+        setAccountsError(true)
+      }
+      if (loginRes.status === 'fulfilled' && loginRes.value.success) {
+        setLastLogins(loginRes.value.data)
+        setLastLoginsError(false)
+      } else {
+        setLastLoginsError(true)
+      }
       setStatus('ready')
     } catch (caught) {
+      if (seq !== loadSeqRef.current) return
       saveErrors.capture(caught);
 
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
+    } finally {
+      if (seq === loadSeqRef.current) {
+        loadInFlightRef.current = false
+        setReloading(false)
+      }
     }
   }, [saveErrors])
 
   useEffect(() => {
-    void load()
+    void load({ force: true })
+    return () => {
+      loadSeqRef.current += 1
+      loadInFlightRef.current = false
+    }
   }, [load]);
 
 
@@ -169,7 +203,7 @@ function MembersInner() {
         setNotice(`${value.email} へ招待メールを送りました。`)
       }
       setDialog({ open: false, member: null })
-      await load()
+      await load({ force: true })
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
 
@@ -236,6 +270,15 @@ function MembersInner() {
               <Button variant="primary" disabled={!canManage} onClick={openInvite}><UserPlus aria-hidden="true" className={styles.buttonIcon} />招待する</Button>
             </ListToolbarRow></ListToolbarFrame>
             {missingMfa > 0 ? <Notice tone="warn" message={`二段階認証が未設定の人が ${missingMfa}人 います。高い権限の人から設定してください。`} /> : null}
+            {lastLoginsError || accountsError ? (
+              <Notice tone="info" action={<Button onClick={() => void load({ keepVisible: true })} disabled={reloading} busy={reloading} busyLabel="読み込み中…">もう一度読み込む</Button>}>
+                {lastLoginsError && accountsError
+                  ? '最終ログインと担当アカウント一覧を読み込めませんでした。もう一度読み込むと最新の状態を確認できます。'
+                  : lastLoginsError
+                    ? '最終ログインを読み込めませんでした。もう一度読み込むと最新の状態を確認できます。'
+                    : '担当アカウント一覧を読み込めませんでした。もう一度読み込むと最新の状態を確認できます。'}
+              </Notice>
+            ) : null}
             <section className={styles.listCard}>
               <h2 className={styles.listTitle}>メンバー</h2><p className={styles.listCount}>{members.length}人</p>
             <GridTable label="権限者の一覧" columnSizing="content" framed={false} design={{ columns: 'minmax(0, 1fr) var(--tpl-hq-col-role) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
@@ -251,7 +294,7 @@ function MembersInner() {
                   <GridRow key={member.id}>
                     <GridNameCell folder={false} name={<span className={styles.identity}><span className={styles.identityLine}><strong><TruncatedText value={`${member.name}${isSelf ? '（あなた）' : ''}`} /></strong></span><small><TruncatedText value={member.email ?? emptyValue('unknown')} /></small></span>} />
                     <GridCell stack><StatusBadge tone={member.role === 'viewer' ? 'neutral' : member.role === 'staff' ? 'info' : 'success'}>{ROLE_WORDS[member.role] ?? member.role}</StatusBadge>{memberStatus(member) === 'active' && member.twoFactorEnabled === false ? <StatusBadge tone="warning" size="compact" dot={false}>二段階認証なし</StatusBadge> : null}</GridCell>
-                    <GridCell><span className={styles.shortText}>{lastLoginShort(lastLogins[member.id])}</span></GridCell>
+                    <GridCell><span className={styles.shortText}>{lastLoginsError && !lastLogins[member.id] ? '取得失敗' : lastLoginShort(lastLogins[member.id])}</span></GridCell>
                     <GridCell align="right">
                       {canManage ? <RowActions subjectName={member.name} edit={{ label: '権限を変更する', onClick: () => openChange(member) }} menuItems={canResendInvite(member) ? [{ id: 'resend', label: '招待を再送する', disabled: resendingId === member.id, disabledReason: resendingId === member.id ? '招待を送信しています' : undefined, onSelect: () => { void resend(member) } }] : []} /> : null}
                     </GridCell>
