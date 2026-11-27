@@ -78,8 +78,12 @@ export async function webinarListCsv(args: {
  * 状態の札。公開期間が終わったものは「非公開」（一覧の絵の の
  * 旧機能説明会の行。公開ページはもう開けない）。公開の予定は「公開予定」。
  */
+const knownPublicationStates: readonly string[] = ['period', 'always', 'scheduled', 'ended', 'unset']
+
 export function statusLabel(webinar: WebinarListItem): string {
   if (webinar.status === 'archived') return 'アーカイブ'
+  if (webinar.status !== 'active' && webinar.status !== 'draft') return '状態を確認できません'
+  if (webinar.status === 'active' && webinar.publicationState != null && !knownPublicationStates.includes(webinar.publicationState)) return '状態を確認できません'
   if (webinar.publicationState === 'scheduled') return '公開予定'
   if (webinar.publicationState === 'ended') return '非公開'
   if (webinar.status === 'draft') return '下書き'
@@ -90,6 +94,8 @@ export type StatusTone = 'active' | 'scheduled' | 'neutral'
 
 export function statusTone(webinar: WebinarListItem): StatusTone {
   if (webinar.status === 'archived') return 'neutral'
+  if (webinar.status !== 'active' && webinar.status !== 'draft') return 'neutral'
+  if (webinar.status === 'active' && webinar.publicationState != null && !knownPublicationStates.includes(webinar.publicationState)) return 'neutral'
   if (webinar.publicationState === 'scheduled') return 'scheduled'
   if (webinar.status === 'active' && webinar.publicationState !== 'ended') return 'active'
   return 'neutral'
@@ -102,7 +108,7 @@ export function statusTone(webinar: WebinarListItem): StatusTone {
 export function showsCounts(webinar: WebinarListItem): boolean {
   if (webinar.status === 'archived') return true
   if (webinar.status !== 'active') return false
-  return webinar.publicationState !== 'ended' && webinar.publicationState !== 'unset' && Boolean(webinar.publicationState)
+  return webinar.publicationState === 'period' || webinar.publicationState === 'always' || webinar.publicationState === 'scheduled'
 }
 
 /** 公開の予定で、まだ始まっていない（視聴の列は「開始前」）。 */
