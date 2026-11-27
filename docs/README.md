@@ -1446,3 +1446,4 @@
 - [予約フォーム復旧案内の権限・代理ログイン表示とリマインダ作成フッターの処理中ガード](release-log/unreleased/PR-kenta-later-gemini78-1127.md) — 反映履歴、確認 2026-11-27。
 - [業種別ホームの空表示権限ガードとGoogle営業時間の入力ガード](release-log/unreleased/PR-kenta-later-gemini79-1127.md) — 反映履歴、確認 2026-11-27。
 - [対応マーク基本設定とスタイル選択ボタンの無効ガード修正](release-log/unreleased/PR-kenta-later-gemini80-1127.md) — 反映履歴、確認 2026-11-27。
+- [リッチメニュー見本プレビュー寸法整合とGoogle営業予定カレンダーの無効ガード](release-log/unreleased/PR-kenta-later-gemini82-1127.md) — 反映履歴、確認 2026-11-27。
