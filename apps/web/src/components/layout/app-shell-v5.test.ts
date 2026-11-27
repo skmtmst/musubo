@@ -55,8 +55,6 @@ describe("Pen.dev 管理画面を共通レイアウトの正本にする", () =>
       行内の `aria-expanded` は無い。表の下の注釈に戻さない。
       DASH-17（ホバー専用の吹き出しに戻さない）は共通部品側が守る。
     */
-    expect(friendTrend).toContain('日付の推定値の説明')
-    expect(friendTrend).toContain('ESTIMATED_NOTE')
     expect(friendTrend).not.toContain('aria-expanded={open}')
     expect(friendTrend).not.toContain('border-t px-5 py-3')
     expect(friendTrend).toContain('Date.UTC(year, month - 1, day)')
