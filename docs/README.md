@@ -10,6 +10,7 @@
 - [NEN配信の条件と日時の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-27-1128.md)
 - [リッチメニューの件数と並びの試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-28-1128.md)
 - [共通アクション一覧の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-29-1128.md)
+- [保存した検索の候補選択の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-30-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 - [ダッシュボードと予約経路の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex104-1127.md)
 
