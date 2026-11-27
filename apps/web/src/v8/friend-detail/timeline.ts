@@ -92,10 +92,12 @@ function hasControlChar(value: string): boolean {
 
 function safeSourceUrl(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
+  if (hasControlChar(raw)) return null
   const trimmed = raw.trim()
-  if (!trimmed || hasControlChar(trimmed)) return null
-  // 相対パスは固定基準 URL で解決し、オリジンが変わらない場合のみ許可する。
+  if (!trimmed) return null
+  // 相対パスは //・/\ を明示拒否したうえで固定基準 URL で解決し、オリジンが変わらない場合のみ許可する。
   if (trimmed.startsWith('/')) {
+    if (trimmed[1] === '/' || trimmed[1] === '\\') return null
     try {
       const resolved = new URL(trimmed, SAME_ORIGIN_BASE)
       return resolved.origin === SAME_ORIGIN_BASE ? trimmed : null

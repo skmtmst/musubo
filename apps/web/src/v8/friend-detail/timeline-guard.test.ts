@@ -24,6 +24,8 @@ describe('friend-detail/timeline ガード', () => {
     expect(timelineSourceHref(makeItem('data:text/html,<h1>x</h1>'), 'f-1')).toBeNull()
     expect(timelineSourceHref(makeItem('//evil.example/orders/1'), 'f-1')).toBeNull()
     expect(timelineSourceHref(makeItem('/\\evil.example/orders/1'), 'f-1')).toBeNull()
+    expect(timelineSourceHref(makeItem('//same.invalid/path'), 'f-1')).toBeNull()
+    expect(timelineSourceHref(makeItem('/\\same.invalid/path'), 'f-1')).toBeNull()
     expect(timelineSourceHref(makeItem('/\t/evil.example/x'), 'f-1')).toBeNull()
     expect(timelineSourceHref(makeItem('/\r\\evil.example/x'), 'f-1')).toBeNull()
     expect(timelineSourceHref(makeItem('/orders/1'), 'f-1')).toEqual({
