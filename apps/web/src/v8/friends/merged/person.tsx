@@ -44,6 +44,29 @@ function shortDate(iso: string): string {
 
 const FIELD_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
 
+function isValidMergedPerson(person: NonNullable<ReturnType<typeof useMergedPerson>['person']>): boolean {
+  return Array.isArray(person.linkedFriends)
+    && Array.isArray(person.deliveryPriorities)
+    && Array.isArray(person.profileValues)
+    && Array.isArray(person.profileCandidates)
+    && Array.isArray(person.history)
+}
+
+function findEarliestLinkedAt(friends: ReadonlyArray<{ linkedAt: string }>): string | null {
+  let bestIso: string | null = null
+  let bestMs = Number.POSITIVE_INFINITY
+  for (const friend of friends) {
+    if (typeof friend.linkedAt !== 'string' || !friend.linkedAt.trim()) continue
+    const ms = Date.parse(friend.linkedAt)
+    if (!Number.isFinite(ms)) continue
+    if (ms < bestMs) {
+      bestMs = ms
+      bestIso = friend.linkedAt
+    }
+  }
+  return bestIso
+}
+
 export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { personId: string; onClose: () => void; onDirtyChange?: (dirty: boolean) => void }) {
   usePageTitle('統合ユーザーの詳細')
   const staffRole = useStaffRole()
@@ -58,7 +81,8 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
         help={<>{description}</>} />
   )
 
-  if (m.phase !== 'ready' || !m.person) {
+  if (m.phase !== 'ready' || !m.person || !isValidMergedPerson(m.person)) {
+    const corrupt = m.phase === 'ready' && m.person !== null && !isValidMergedPerson(m.person)
     return (
       <PageFrame kind="detail" boardId="Hn9eE">
         {head('統合ユーザー', '結び付けて、同じ人として扱っている人です')}
@@ -66,7 +90,12 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
           {m.phase === 'loading' ? <ListState kind="loading" /> : m.phase === 'forbidden' ? (
             <ListState kind="forbidden" title={m.failure?.title} description={m.failure?.description} action={<Button type="button" onClick={onClose}>一覧へ戻る</Button>} />
           ) : (
-            <ListState kind="error" title={m.failure?.title} description={m.failure?.description} onRetry={m.reload} />
+            <ListState
+              kind="error"
+              title={corrupt ? '統合ユーザーの情報を読み込めませんでした' : m.failure?.title}
+              description={corrupt ? '表示に必要なデータが正しく読み込めませんでした。再読み込みしてお試しください。' : m.failure?.description}
+              onRetry={m.reload}
+            />
           )}
         </div>
       </PageFrame>
@@ -74,11 +103,12 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
   }
 
   const person = m.person
+  const busyAny = m.saving || m.unlinking || m.profileSaving
   const deliveryRows = person.linkedFriends.map((friend) => {
     const rows = person.deliveryPriorities.filter((p) => p.friendId === friend.friendId)
     return { friend, active: rows.length > 0 && rows.every((row) => row.isActive) }
   })
-  const earliestLink = person.linkedFriends.reduce<string | null>((min, f) => (min === null || f.linkedAt < min ? f.linkedAt : min), null)
+  const earliestLink = findEarliestLinkedAt(person.linkedFriends)
 
   return (
     <PageFrame kind="detail" boardId="Hn9eE">
@@ -87,7 +117,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
       {!canManage ? <ReadOnlyNotice need="manager" /> : null}
       <PageContent><DetailColumns asideLabel="使っている値" expanded={valuesExpanded} onExpandedChange={setValuesExpanded} aside={
         <div className={styles.rail}>
-          <Button type="button" variant="secondary" className={styles.railButton} disabled={!canManage} lockedReason={manageLockedReason} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile"><Pencil aria-hidden="true" />使う値を編集する</Button>
+          <Button type="button" variant="secondary" className={styles.railButton} disabled={!canManage || busyAny} lockedReason={manageLockedReason} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile"><Pencil aria-hidden="true" />使う値を編集する</Button>
           <section className={styles.valuesCard} aria-labelledby="mp-values">
             <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>
             <ul className={styles.values}>
@@ -115,7 +145,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
             <div className={styles.cardHead}>
               <div className={styles.cardTitleRow}>
                 <h3 id="mp-delivery" className={styles.cardTitle}>同じ人に重なって届かないようにする</h3>
-                <Button type="button" variant="text" size="inline" disabled={!canManage} lockedReason={manageLockedReason} onClick={() => { if (!canManage) return; m.setSaveError(''); m.setEditing(true) }}>目的ごとの順位を編集 →</Button>
+                <Button type="button" variant="text" size="inline" disabled={!canManage || busyAny} lockedReason={manageLockedReason} onClick={() => { if (!canManage || busyAny) return; m.setSaveError(''); m.setEditing(true) }}>目的ごとの順位を編集 →</Button>
               </div>
               <p className={styles.cardSub} title={deliveryPriorityDetails(person.deliveryPriorities)}>どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります</p>
             </div>
@@ -135,7 +165,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
                     <Td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
                     <Td><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
                     <Td>
-                      <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} disabled={!canManage || m.saving} lockedReason={manageLockedReason} label={`${friend.lineAccountName} の配信に使う`} onChange={!canManage || m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
+                      <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} disabled={!canManage || busyAny} lockedReason={manageLockedReason} label={`${friend.lineAccountName} の配信に使う`} onChange={!canManage || busyAny ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
                     </Td>
                   </Tr>
                 ))}
@@ -165,7 +195,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
                     <Td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
                     <Td title={linkedFriendDetails(friend)}>{shortDate(friend.linkedAt)}</Td>
                     <Td>
-                      <Button type="button" variant="text" size="inline" disabled={!canManage || m.saving} lockedReason={manageLockedReason} onClick={() => { if (canManage) m.setUnlinkTarget(friend) }}>
+                      <Button type="button" variant="text" size="inline" disabled={!canManage || busyAny} lockedReason={manageLockedReason} onClick={() => { if (canManage && !busyAny) m.setUnlinkTarget(friend) }}>
                         <Unlink size={16} aria-hidden="true" />解除する
                       </Button>
                     </Td>
@@ -233,7 +263,7 @@ export default function MergedPersonV8({ personId, onClose, onDirtyChange }: { p
       >
         <OperationTargetSummary accounts={[{ id: m.unlinkTarget?.lineAccountId ?? '', name: m.unlinkTarget?.lineAccountId ? m.unlinkTarget.lineAccountName : '不明' }]} externalTarget={{ label: '友だち', name: m.unlinkTarget?.displayName }} />
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
-        <Field label="解除する理由" required><SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></SaveErrorField></Field>
+        <Field label="解除する理由" required><SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><TextArea value={m.unlinkReason} disabled={m.unlinking} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></SaveErrorField></Field>
       </Dialog>
     </PageFrame>
   )
