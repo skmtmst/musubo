@@ -1467,3 +1467,4 @@
 - [LINE来店フォローの時期数値・単位追従と運営招待の重複応答・二重送信ガード](release-log/unreleased/PR-kenta-later-gemini50-1127.md) — 反映履歴、確認 2026-11-27。
 - [見本リッチメニューの未選択時読み込み停止と運営ログインの二重送信ガード](release-log/unreleased/PR-kenta-later-gemini51-1127.md) — 反映履歴、確認 2026-11-27。
 - [飲食の座席表読み込みの店舗切替分離とコース写真調整のガード](release-log/unreleased/PR-kenta-later-gemini52-1127.md) — 反映履歴、確認 2026-11-27。
+- [ウェビナーテスト受信者の応答検証と飲食の店の組一覧の切替分離](release-log/unreleased/PR-kenta-later-gemini53-1127.md) — 反映履歴、確認 2026-11-27。
