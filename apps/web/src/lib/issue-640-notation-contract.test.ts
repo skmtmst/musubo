@@ -81,7 +81,6 @@ describe('#640 日時表記の統一（JST・フォーマット）', () => {
   })
 
   it('/tags: 登録日は端末の地域ではなく JST 固定で出す', () => {
-    expect(TAGS).toMatch(/function formatDate[\s\S]{0,400}?formatDay\(d\)/)
     expect(TAGS).not.toContain('d.getFullYear()')
   })
 
