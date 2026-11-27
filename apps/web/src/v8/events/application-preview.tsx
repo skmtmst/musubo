@@ -5,7 +5,7 @@
  * 口は既存の applicationPreview。APIが見本として返した情報を表示する。
  * 見本を作るだけで、申し込みや公開はしない。
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { EventApplicationPreview } from '@line-crm/shared'
 import { eventsApi, type EventDetail } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -32,9 +32,21 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
   const [data, setData] = useState<EventApplicationPreview | null>(null)
   const [error, setError] = useState('')
   const generation = useRef(0)
+  const scope = JSON.stringify([accountId, draft, date, startTime, endTime, capacity])
+  const currentScope = useRef(scope)
+  currentScope.current = scope
+  const [openedScope, setOpenedScope] = useState(scope)
+
+  useEffect(() => {
+    setOpen(false)
+    return () => { generation.current += 1 }
+  }, [scope])
 
   async function load() {
     const seq = ++generation.current
+    const requestScope = scope
+    const current = () => seq === generation.current && requestScope === currentScope.current
+    setOpenedScope(requestScope)
     setOpen(true)
     setBusy(true)
     setError('')
@@ -48,14 +60,14 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
         || typeof result.capacity !== 'number' || !Number.isFinite(result.capacity) || typeof result.requiresApproval !== 'boolean'
         || !Array.isArray(result.questions) || result.questions.some((q) => !q || typeof q.id !== 'string' || typeof q.label !== 'string' || typeof q.required !== 'boolean')
         || [result.venueName, result.venueUrl, result.venueAddress, result.description].some((value) => value != null && typeof value !== 'string')) {
-        if (seq === generation.current) setError('見本の内容を確認できませんでした。もう一度お試しください。')
+        if (current()) setError('見本の内容を確認できませんでした。もう一度お試しください。')
         return
       }
-      if (seq === generation.current) setData(result)
+      if (current()) setData(result)
     } catch {
-      if (seq === generation.current) setError('見本を開けませんでした。入力を確かめて、もう一度お試しください。')
+      if (current()) setError('見本を開けませんでした。入力を確かめて、もう一度お試しください。')
     } finally {
-      if (seq === generation.current) setBusy(false)
+      if (current()) setBusy(false)
     }
   }
   const close = () => {
@@ -66,7 +78,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
   return (
     <div className={styles.linkRow}>
       <Button variant="text" onClick={() => void load()}>プレビューを開く →</Button>
-      <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} >
+      <Dialog open={open && openedScope === scope} title="お客さまの申込ページの見本" onCancel={close} >
         {busy ? <ListState kind="loading" /> : error ? (
           <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : data ? (
