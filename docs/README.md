@@ -32,6 +32,7 @@
 - [開店準備完了ダイアログと予約回答フォーム編集の修正履歴](release-log/unreleased/PR-kenta-later-gemini61-1127.md)（説明・2026-11-27確認）
 - [リッチメニュー画像保存と閲覧用資産一覧の修正履歴](release-log/unreleased/PR-kenta-later-gemini62-1127.md)（説明・2026-11-27確認）
 - [操作見本のスタイル切替と監査ログ件数取得の修正履歴](release-log/unreleased/PR-kenta-later-gemini63-1127.md)（説明・2026-11-27確認）
+- [吹き出し編集枠とリマインダ基本設定の修正履歴](release-log/unreleased/PR-kenta-later-gemini64-1127.md)（説明・2026-11-27確認）
 - [面談・飲食店の予約一覧の修正履歴](release-log/unreleased/86-kenta-1360.md)
 - [開発用の説明の古い参照を修正](release-log/unreleased/151-kenta-q04-refs.md)
 
