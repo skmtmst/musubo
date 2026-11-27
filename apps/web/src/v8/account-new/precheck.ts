@@ -56,12 +56,14 @@ const PRECHECK_SUMMARY_VALUES: Record<PrecheckKey, Record<string, string>> = {
 
 /** ①の札。「質問 1」〜「質問 4」と「チェック完了」。②③の `stepLabel` は①では空を返す。 */
 export function precheckStateLabel(at: PrecheckAt): string {
-  return at === 'done' ? 'チェック完了' : `質問 ${PRECHECK_ORDER.indexOf(at) + 1}`
+  if (at === 'done') return 'チェック完了'
+  const index = PRECHECK_ORDER.indexOf(at)
+  return index >= 0 ? `質問 ${index + 1}` : ''
 }
 
 /** 最後のツールの使い方は、ほかのツールを使う場合だけ尋ねる。 */
 export function precheckAsked(key: PrecheckKey, answers: PrecheckAnswers): boolean {
-  if (key === 'q5') return answers.q4 === 'yes'
+  if (key === 'q5') return answers?.q4 === 'yes'
   return true
 }
 
@@ -70,10 +72,12 @@ export function precheckAsked(key: PrecheckKey, answers: PrecheckAnswers): boole
  * null のあいだは「次へ」を押せない＝②へ進めない。
  */
 export function precheckNext(at: PrecheckAt, answers: PrecheckAnswers): PrecheckAt | null {
-  if (at === 'done') return null
+  if (at === 'done' || !answers || typeof answers !== 'object') return null
+  const index = PRECHECK_ORDER.indexOf(at)
+  if (index < 0) return null
   if (answers[at] === undefined) return null
   if (at === 'q1' && answers.q1 === 'no') return null
-  const rest = PRECHECK_ORDER.slice(PRECHECK_ORDER.indexOf(at) + 1).filter((key) => precheckAsked(key, answers))
+  const rest = PRECHECK_ORDER.slice(index + 1).filter((key) => precheckAsked(key, answers))
   return rest[0] ?? 'done'
 }
 
@@ -91,13 +95,17 @@ export function precheckBack(at: PrecheckAt, answers: PrecheckAnswers): Precheck
  */
 export interface PrecheckSummaryRow { key: PrecheckKey; label: string; value: string }
 export function precheckSummary(at: PrecheckAt, answers: PrecheckAnswers): PrecheckSummaryRow[] {
-  const stopAt = at === 'done' ? PRECHECK_ORDER.length : PRECHECK_ORDER.indexOf(at) + 1
+  if (!answers || typeof answers !== 'object') return []
+  const index = at === 'done' ? PRECHECK_ORDER.length : PRECHECK_ORDER.indexOf(at)
+  const stopAt = at === 'done' ? PRECHECK_ORDER.length : index >= 0 ? index + 1 : 0
   const rows: PrecheckSummaryRow[] = []
   for (let i = 0; i < stopAt; i += 1) {
     const key = PRECHECK_ORDER[i]
     const answer = answers[key]
-    if (!answer || !precheckAsked(key, answers)) continue
-    rows.push({ key, label: PRECHECK_SUMMARY_LABELS[key], value: PRECHECK_SUMMARY_VALUES[key][answer] ?? '' })
+    if (typeof answer !== 'string' || !precheckAsked(key, answers)) continue
+    const valueMap = PRECHECK_SUMMARY_VALUES[key]
+    if (!Object.prototype.hasOwnProperty.call(valueMap, answer)) continue
+    rows.push({ key, label: PRECHECK_SUMMARY_LABELS[key], value: valueMap[answer] })
   }
   return rows
 }
@@ -168,12 +176,12 @@ export function precheckBlocked(at: PrecheckAt, answers: PrecheckAnswers, acks: 
   if (at === 'done') return false
   if (precheckNext(at, answers) === null) return true
   const note = precheckNote(at, answers)
-  return note?.ack ? !acks[note.ack.key] : false
+  return note?.ack ? !acks?.[note.ack.key] : false
 }
 
 /** 下書きから戻した①の答え。知らない値は捨てる。 */
 export function readPrecheckAnswers(value: unknown): PrecheckAnswers {
-  if (!value || typeof value !== 'object') return {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const raw = value as Record<string, unknown>
   const yesNo = (key: PrecheckKey): PrecheckYesNo | undefined =>
     raw[key] === 'yes' || raw[key] === 'no' ? raw[key] as PrecheckYesNo : undefined
