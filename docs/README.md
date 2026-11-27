@@ -1442,3 +1442,4 @@
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [予約フォーム復旧案内の権限・代理ログイン表示とリマインダ作成フッターの処理中ガード](release-log/unreleased/PR-kenta-later-gemini78-1127.md) — 反映履歴、確認 2026-11-27。
+- [業種別ホームの空表示権限ガードとGoogle営業時間の入力ガード](release-log/unreleased/PR-kenta-later-gemini79-1127.md) — 反映履歴、確認 2026-11-27。
