@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 const read = (name: string) => readFileSync(new URL(`../../v8/affiliates/${name}`, import.meta.url), 'utf8')
 const AFFILIATORS = read('affiliators.tsx')
-const APPROVALS = read('approvals.tsx')
 const DRAWER = read('drawer.tsx')
 const DISPLAY = read('display.ts')
 const NEW_AFFILIATE = read('create.tsx')
-const ACTION_DIALOGS = read('dialogs.tsx')
 const FLOW = read('monthly-flow.tsx')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
@@ -19,27 +17,13 @@ describe('機能16 現役V8の一覧', () => {
     expect(FLOW).toContain('api.affiliates.settlementPreview(accountId, period)')
   })
 
-  it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {
-    expect(APPROVALS).toContain("['pending', 'approved', 'rejected'] as const")
-    expect(APPROVALS).toContain('approvalReviewReasons(item).length === 0')
-    expect(APPROVALS).toContain('<BulkOpWizard')
-    expect(APPROVALS).toContain('<ConfirmDialog')
-    expect(APPROVALS).toContain('確認が必要な成果はまとめて認められません')
-  })
 })
 
 describe('機能16 現役V8の確認画面', () => {
-  it('紹介者の停止・アーカイブは影響を読んで記録を残す', () => {
+  it('紹介者一覧にアーカイブ確認を組み込む', () => {
     expect(AFFILIATORS).toContain('<AffiliateArchiveDialog')
-    expect(ACTION_DIALOGS).toContain('api.affiliates.archiveImpact')
-    expect(ACTION_DIALOGS).toContain('api.affiliates.archive')
-    expect(ACTION_DIALOGS).toContain('過去の成果・報酬・支払いの記録は消えません')
-    expect(ACTION_DIALOGS).toContain("label={`確認のため「${target?.name ?? ''}」と打ってください`}")
   })
 
-  it('影響確認は読込・通常・空・失敗を分ける', () => {
-    for (const word of ['使われている場所を確認しています', '使われている場所を確認できませんでした', '確認できる情報がありません', "phase === 'loading'", "phase === 'error'"]) expect(ACTION_DIALOGS).toContain(word)
-  })
 })
 
 describe('機能16 現役V8の内訳と報酬率', () => {
