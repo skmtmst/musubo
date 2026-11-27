@@ -2,7 +2,7 @@
 import { knownValue } from '@/lib/known-value'
 
 import { Pencil, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsAnnouncement } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -42,6 +42,15 @@ function shortDateTime(value: string | null): string {
   return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
+function isValidCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function ratioText(numerator: unknown, denominator: unknown): string {
+  if (!isValidCount(numerator) || !isValidCount(denominator)) return emptyValue('unknown')
+  return `${formatNumber(numerator)}/${formatNumber(denominator)}`
+}
+
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined
   if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
@@ -72,28 +81,33 @@ export default function OpsAnnouncementsV8() {
   const [loadError, setLoadError] = useState<unknown>(null)
   const [actionError, setActionError] = useState('')
   const [deleting, setDeleting] = useState<OpsAnnouncement | null>(null)
+  const loadGenRef = useRef(0)
+  const busyRef = useRef(false)
   const access = useOpsReadOnlyState()
   const [urlState, setUrlState] = useListUrlState({ highlight: '' })
   // 作る画面は `?highlight=<作った行のID>` で戻ってくる。表の共通部品と同じく1回だけ使って消す。
   const [highlightId, setHighlightId] = useState('')
 
   const load = useCallback(async () => {
+    const gen = ++loadGenRef.current
     setLoadError(null)
     try {
       const res = await api.ops.announcements.list()
-      if (!res.success) { setLoadError(new Error(res.error || '読み込めませんでした')); return }
+      if (gen !== loadGenRef.current) return
+      if (!res.success || !Array.isArray(res.data)) { setLoadError(new Error((!res.success && res.error) || '読み込めませんでした')); return }
       setRows(res.data)
       setLinked(res.linked)
     } catch (caught) {
+      if (gen !== loadGenRef.current) return
       const fieldFailure = saveErrors.capture(caught)
       { if (!fieldFailure)
       setLoadError(caught) }
     } finally {
-      setLoaded(true)
+      if (gen === loadGenRef.current) setLoaded(true)
     }
   }, [saveErrors])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); return () => { loadGenRef.current += 1 } }, [load])
 
   // 対象の行が描かれてから印を消費する。読み込み中には消さない（表の共通部品と同じ）。
   useEffect(() => {
@@ -106,14 +120,19 @@ export default function OpsAnnouncementsV8() {
   }, [rows, setUrlState, urlState.highlight])
 
   const remove = async () => {
-    if (access !== 'writer' || !deleting || !rows.some(row => row.id === deleting.id && row.updatedAt === deleting.updatedAt)) return
+    if (busyRef.current || access !== 'writer' || !deleting || !rows.some(row => row.id === deleting.id && row.updatedAt === deleting.updatedAt)) return
+    busyRef.current = true
     setBusy(true)
-    const res = await opsCall(api.ops.announcements.remove(deleting.id))
-    setBusy(false)
-    if (!res.success) { setActionError(res.error || '消せませんでした'); return }
-    setDeleting(null)
-    setActionError('')
-    await load()
+    try {
+      const res = await opsCall(api.ops.announcements.remove(deleting.id))
+      if (!res.success) { setActionError(res.error || '消せませんでした'); return }
+      setDeleting(null)
+      setActionError('')
+      await load()
+    } finally {
+      busyRef.current = false
+      setBusy(false)
+    }
   }
 
   return (
@@ -135,7 +154,7 @@ export default function OpsAnnouncementsV8() {
         <section aria-label="配信済みの表" className={styles.list}>
           <div className={styles.listHead}>
             <h2 className={parts.panelTitle}>配信済み・予約・下書き</h2>
-            <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked} 人 / ${formatNumber(linked.total)} 人` : '登録状況を読み込んでいます'}</HelpTip>
+            <HelpTip label="契約者専用LINEの登録状況">{linked ? (isValidCount(linked.linked) && isValidCount(linked.total) ? `契約者専用LINEの登録 ${formatNumber(linked.linked)} 人 / ${formatNumber(linked.total)} 人` : '契約者専用LINEの登録状況を確認できません') : '登録状況を読み込んでいます'}</HelpTip>
           </div>
           {actionError && !deleting ? <Notice tone="danger" className={parts.alertNoticePlacement}>{actionError}</Notice> : null}
           {!loaded ? (
@@ -168,14 +187,14 @@ export default function OpsAnnouncementsV8() {
                   </span>
                   <span className={`${parts.fixed} ${styles.colTo}`} role="cell" title={a.audienceLabel}>{a.audienceKind === 'all' ? 'すべて' : a.audienceLabel}</span>
                   <span className={`${parts.fixed} ${styles.colState}`} role="cell"><StatusBadge tone={announcementTone(a.status)}>{a.statusLabel}</StatusBadge></span>
-                  <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : emptyValue('unknown')}</span>
-                  <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : emptyValue('unknown')}</span>
+                  <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? ratioText(a.screenRead, a.screenTotal) : emptyValue('unknown')}</span>
+                  <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? ratioText(a.lineSent, a.recipientsTotal) : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">
                     {/* 行の右端は「…」1つ（B-253）。閲覧のみにも押せない形＋理由で出す（2026-10-26 オーナー決定）。送信中は中身の無い「…」（使える操作はありません）。 */}
                     <RowMenu
                       label={`「${a.subject}」の操作`}
                       size="row"
-                      items={rowItems(a, access, busy, () => setDeleting(a))}
+                      items={rowItems(a, access, busy, () => { setActionError(''); setDeleting(a) })}
                     />
                   </span>
                 </div>
@@ -195,7 +214,7 @@ export default function OpsAnnouncementsV8() {
         busy={busy}
         error={actionError}
         onConfirm={() => remove()}
-        onCancel={() => { if (!busy) setDeleting(null) }}
+        onCancel={() => { if (!busy) { setActionError(''); setDeleting(null) } }}
       ><OperationTargetSummary accounts={[{ id: '', name: '不明' }]} externalTarget={{ label: 'お知らせ 1件', name: deleting?.subject }} /></ConfirmDialog>
     </div></SaveErrorScope>
   )
