@@ -30,16 +30,18 @@ class GuardShardsTest(unittest.TestCase):
             expected = dict(original)
             self.assertEqual(restored, expected.pop('if'), original['name'])
             self.assertEqual(actual, expected, original['name'])
-        speed = [next(s for s in steps if s.get('name') == original['name']) for original in self.original if '!cancelled()' in original.get('if', '')]
-        self.assertTrue(speed)
-        for step in speed:
-            self.assertIn("matrix.shard == 'general'", step['if'])
+        expected_names = {s['name'] for s in self.original}
+        assigned = [s for s in steps if 'matrix.shard ==' in s.get('if', '')]
+        self.assertEqual({s['name'] for s in assigned}, expected_names)
+        self.assertEqual(len(assigned), len(expected_names))
+        self.assertIn('v8-behavior-guard', self.workflow['jobs']['required-pr-gate']['needs'])
+        self.assertNotIn('strategy', self.workflow['jobs']['v8-behavior-guard'])
 
     def test_gate_can_observe_matrix_result_when_restored(self):
         gate = self.workflow['jobs']['required-pr-gate']
         self.assertNotIn('v8-screen-guard', gate['needs'])
         self.assertEqual(gate['steps'][0]['env']['V8_GUARD_REPORT_ONLY'], 'true')
-        self.assertEqual(gate['steps'][0]['env']['V8_SCREEN_GUARD_RESULT'], '${{ needs.v8-screen-guard.result }}')
+        self.assertEqual(gate['steps'][0]['env']['V8_SCREEN_GUARD_RESULT'], "${{ fromJSON(toJSON(needs))['v8-screen-guard'].result }}")
         self.assertIn('"$V8_SCREEN_GUARD_RESULT"', gate['steps'][0]['run'])
 
 
