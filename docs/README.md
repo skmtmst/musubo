@@ -1433,3 +1433,4 @@
 - [休業日の既存予約確認とシナリオ設定のフォルダ一覧の再読み込み](release-log/unreleased/261-kenta-later-gemini5-1127.md) — 反映履歴、確認 2026-11-27。
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
+- [コラム作成の読了後タグ保護とGoogle変更履歴のアカウント切替時クリア](release-log/unreleased/PR-kenta-after243-column-history.md) — 反映履歴、確認 2026-11-27。
