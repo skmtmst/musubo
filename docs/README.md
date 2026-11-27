@@ -1496,3 +1496,4 @@
 - [営業時間変更案の重複日付制御と見本リッチメニューの画像・座標ガード](release-log/unreleased/PR-kenta-later-gemini71-1127.md) — 反映履歴、確認 2026-11-27。
 - [リッチメニューボタン設定の面番号・ID制御とシナリオ削除確認のガード](release-log/unreleased/PR-kenta-later-gemini72-1127.md) — 反映履歴、確認 2026-11-27。
 - [テンプレート削除ダイアログの確定・キャンセルガード](release-log/unreleased/PR-kenta-later-gemini73-1127.md) — 反映履歴、確認 2026-11-27。
+- [在庫自動停止履歴の表示補正とリッチメニュー形設定のガード追加](release-log/unreleased/PR-kenta-later-gemini74-1127.md) — 反映履歴、確認 2026-11-27。
