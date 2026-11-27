@@ -105,6 +105,26 @@ export default function ListView({ accountStyle = 'standard', view, rows, total,
   const moveMonth = (offset: number) => onDay(new Date(Date.UTC(year, month - 1 + offset, 1, 3)))
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const tableById = new Map(tables.map((table) => [table.id, table]))
+  const handleImport = () => {
+    if (!canImport || busy) return
+    return onImport()
+  }
+  const handleCreate = () => {
+    if (!canWrite || busy) return
+    return onCreate()
+  }
+  const handleEdit = (id: string) => {
+    if (!canWrite || busy) return
+    return onEdit(id)
+  }
+  const handleCancel = (id: string) => {
+    if (!canWrite || busy) return
+    return onCancel(id)
+  }
+  const handleRestore = (id: string) => {
+    if (!canWrite || busy) return
+    return onRestore(id)
+  }
 
   return (
     <>
@@ -116,7 +136,7 @@ export default function ListView({ accountStyle = 'standard', view, rows, total,
       </StatRow>
       {/* R11: 5つ目は帯の下の短い1行に残す。配席は今日の盤で付ける。 */}
       <p className={styles.fifthLine}>未配席 {formatNumber(unseated)} 件 <Button variant="text" size="inline" onClick={() => onView('today')}>今日の配席へ →</Button></p>
-      <ReservationBoard formatListDateTime={mdhm} notice={floorError ? <ListState kind="error" title="座席表を読み込めませんでした" error={floorError} onRetry={reloadFloor}/> : undefined} selectedId={selectedId} printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='upcoming'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns monthNamePresentation="readable" entries={rows.map(r=>{const entry=seatBoardEntry(r as unknown as Record<string,unknown>);return r.line_uid?{...entry,contactLabel:LINE_CONTACT_LABEL}:entry})} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} edit={{label:'変更',disabled:busy,onClick:()=>onEdit(e.id)}} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',onSelect:()=>onRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,onSelect:()=>onCancel(e.id)}])]} />} canWrite={canWrite} busy={busy}
+      <ReservationBoard formatListDateTime={mdhm} notice={floorError ? <ListState kind="error" title="座席表を読み込めませんでした" error={floorError} onRetry={reloadFloor}/> : undefined} selectedId={selectedId} printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='upcoming'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns monthNamePresentation="readable" entries={rows.map(r=>{const entry=seatBoardEntry(r as unknown as Record<string,unknown>);return r.line_uid?{...entry,contactLabel:LINE_CONTACT_LABEL}:entry})} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} edit={canWrite?{label:'変更',disabled:busy,onClick:()=>handleEdit(e.id)}:undefined} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(canWrite?(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',disabled:busy,onSelect:()=>handleRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,disabled:busy,onSelect:()=>handleCancel(e.id)}]):[])]} />} canWrite={canWrite} busy={busy}
         toolbar={      <>
         {view === 'month' ? <><Button presentation="restaurant" onClick={() => moveMonth(-1)} aria-label="前の月">前の月</Button><strong>{year}年{month}月</strong><Button presentation="restaurant" onClick={() => moveMonth(1)} aria-label="次の月">次の月</Button></> : null}
         {view === 'list' ? (
@@ -139,10 +159,10 @@ export default function ListView({ accountStyle = 'standard', view, rows, total,
         ) : null}
 </>} trailingToolbar={<>        <span className={styles.dateSpacer} />
         {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
-        {<PermissionGatedButton allowed={canImport} presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</PermissionGatedButton>}
-        {<PermissionGatedButton allowed={canWrite} presentation="restaurant" aria-label="手動で予約を作る" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動予約</PermissionGatedButton>}
+        {<PermissionGatedButton allowed={canImport} presentation="restaurant" disabled={busy} onClick={handleImport}><Inbox size={16} aria-hidden="true" />受信データを試す</PermissionGatedButton>}
+        {<PermissionGatedButton allowed={canWrite} presentation="restaurant" aria-label="手動で予約を作る" disabled={busy} onClick={handleCreate}><Plus size={16} aria-hidden="true" />手動予約</PermissionGatedButton>}
       </>} renderBody={body=><DetailColumns asideLayout="detail" variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
-        {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
+        {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={handleCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={handleCreate}/> : null}
         {(rows.length===0 && axis!=='month') || axis==='floor' && floorError ? null : body}
         {view === 'list' && pageCount > 1 ? (
           <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * pageSize + 1}〜${Math.min((page - 1) * pageSize + rows.length, total)} 件`} />
