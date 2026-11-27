@@ -31,7 +31,7 @@ export function useFriendDetailPermissions(): FriendDetailPermissions {
     manage,
     editSupport,
     saveFields,
-    canEditField: (field) => manage || (field.isPersonal && saveFields),
+    canEditField: (field) => manage || Boolean(field && typeof field === 'object' && field.isPersonal === true && saveFields),
     viewOnly: !manage && !editSupport && !saveFields,
   }
 }
