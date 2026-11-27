@@ -4,11 +4,13 @@ import type { AccountStyle } from '@line-crm/shared'
 import { Check } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import { DialogActions } from '@/components/shared/dialog'
 import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import StyleDemoPages from './style-demo-pages'
 import StyleChooseAction from './style-choose-action'
+import StyleChoiceVideo from './style-choice-video'
 import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
 import styles from './style-choice-step.module.css'
 
@@ -39,6 +41,7 @@ export type StyleChoiceStepProps = {
   switcher?: 'inline' | 'external'
   detail?: boolean
   onDetailChange?: (detail: boolean) => void
+  videoPreview?: boolean
   demoPage?: number
   onDemoPage?: (page: number) => void
 }
@@ -70,7 +73,7 @@ export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false,
   </div>
 }
 
-export default function StyleChoiceStep({ accountName, viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline', detail: controlledDetail, onDetailChange, demoPage, onDemoPage }: StyleChoiceStepProps) {
+export default function StyleChoiceStep({ accountName, viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline', detail: controlledDetail, onDetailChange, demoPage, onDemoPage, videoPreview = false }: StyleChoiceStepProps) {
   const script = STYLE_EXPERIENCE_SCRIPT
   const viewed = script.styles[viewing]
   const [localDetail, setLocalDetail] = useState(false)
@@ -106,20 +109,20 @@ export default function StyleChoiceStep({ accountName, viewing, onView, chosen, 
         </ul>
       </section>
       <Card surface="muted" layout="block" contentPadding="var(--polish-space-card)" className={styles.frame} aria-label="見本">
-        <StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={script} style={viewing} switcher="external" variant={variant} data="sample" />
+        {videoPreview ? <StyleChoiceVideo key={viewing} style={viewing} accountName={accountName} fallback={<StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={script} style={viewing} switcher="external" variant={variant} data="sample" />} /> : <StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={script} style={viewing} switcher="external" variant={variant} data="sample" />}
       </Card>
-      <div className={styles.choose}><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} /></div>
-      <div className={styles.choose}><Button ref={openRef} onClick={() => { setPage(0); setDetail(true) }} disabled={disabled}>詳しく見る</Button></div>
+      <DialogActions align="center" layout="inline" padding="none"><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} />
+      <Button ref={openRef} onClick={() => { setPage(0); setDetail(true) }} disabled={disabled}>詳しく見る</Button></DialogActions>
       </>}
     </div>
   )
 }
 
 /** 下の帯の 1 行。見ているスタイルではなく、選んでいるスタイルを言う。 */
-export function StyleChoiceStatus({ chosen }: { chosen: AccountStyle | null }) {
+export function StyleChoiceStatus({ chosen, emptyText = 'まだ選んでいません' }: { chosen: AccountStyle | null; emptyText?: string }) {
   return (
     <span className={styles.status} role="status">
-      {chosen ? `選んでいるスタイル：${STYLE_EXPERIENCE_SCRIPT.styles[chosen].label}` : 'まだ選んでいません'}
+      {chosen ? `選んでいるスタイル：${STYLE_EXPERIENCE_SCRIPT.styles[chosen].label}` : emptyText}
     </span>
   )
 }

@@ -33,7 +33,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
 import TestModeNote from '@/components/shared/test-mode-note'
 import { notifyToast } from '@/components/shared/toast'
-import { DashboardPage } from '@/components/templates/dashboard-page'
+import { DashboardPage, DashboardTop, DashboardSubtitle } from '@/components/templates/dashboard-page'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate, formatNumber } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
@@ -250,22 +250,24 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   return (
     <KpiValueMotionProvider scope={accountId ? JSON.stringify([accountId, style, date, range, days, staff, compare, tab, subTab, view]) : null}>
-    <DashboardPage boardId={`style-${style}`} initialContent={{ scope: JSON.stringify([accountId, style]), pending: start.status === 'loading' || setup.status === 'loading' || (!today && !failed) }} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
-      <div className={styles.head}>{filters}</div>
+    <DashboardPage boardId={`style-${style}`} initialContent={{ scope: JSON.stringify([accountId, style]), pending: start.status === 'loading' || setup.status === 'loading' || (!today && !failed) }} title={cfg.title} help={cfg.help} actions={headActions}>
       <div className={styles.inset}>
+        <DashboardTop intro={<>
         {absence.notice}
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {/* 未設定のボタンの警告の帯は出さない（承認済み Pen「はじめにやること08d_v04」でこの帯を削除）。 */}
         <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
-        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide} firstMessageInline={style === 'restaurant'}
+        {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} keepVisible={start.status !== 'ready' || setup.status === 'loading' || Boolean(start.error || setup.error)} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'} guide={start.guide} firstMessageInline={style === 'restaurant'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           feedback={<>{start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
             {setup.error && canManageRole(role) ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}</>} /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
+        </>} controls={<div className={styles.head}>{subtitle ? <DashboardSubtitle>{subtitle}</DashboardSubtitle> : null}{filters}</div>}>
         {today && today.kpis.length === 0 ? null : <KpiBand layout="link-row" maxColumns={5} data-style-dashboard={style}>
           {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
         </KpiBand>}
+        </DashboardTop>
         {alert ? (
           <Notice tone="warn" role="status" heading={alert.title} className={styles.alert}
             action={alert.actions.some((a) => canWrite || a.icon === 'external') ? <div className={styles.alertActions}>{alert.actions.filter((a) => canWrite || a.icon === 'external').map((a) => (

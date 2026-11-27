@@ -100,19 +100,34 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
   const errors = useSaveFormErrors()
   const [events, setEvents] = useState<FriendDeliveryConsentEvent[] | null>(null)
   const [historyFailed, setHistoryFailed] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [reviewRequired, setReviewRequired] = useState(false)
   const commitLock = useRef(false)
+  const historyRequest = useRef(0)
   const loadHistory = useCallback(async () => {
+    const seq = ++historyRequest.current
+    setHistoryLoading(true)
+    setHistoryFailed(false)
     try {
       const response = await friendDeliveryConsentHistoryApi.list(friendId, { limit: 20 })
+      if (historyRequest.current !== seq) return
       if (!response.success) throw new Error('history_failed')
       setEvents(Array.isArray(response.data?.items) ? response.data.items : [])
-      setHistoryFailed(false)
     } catch {
-      setHistoryFailed(true)
+      if (historyRequest.current === seq) setHistoryFailed(true)
+    } finally {
+      if (historyRequest.current === seq) setHistoryLoading(false)
     }
   }, [friendId])
-  useEffect(() => { if (open) void loadHistory() }, [open, loadHistory])
+  useEffect(() => {
+    setEvents(null)
+    setHistoryFailed(false)
+  }, [friendId])
+  useEffect(() => {
+    if (!open) return
+    void loadHistory()
+    return () => { historyRequest.current += 1 }
+  }, [open, loadHistory])
 
   const rowOf = (key: string) => rows.find((row) => row.purpose === key)
   const begin = (key: string) => {
@@ -212,7 +227,25 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, frie
         ) : null}
         <section aria-label="履歴">
           <h3 className={styles.sectionTitle}>履歴</h3>
-          {historyFailed ? <p className={styles.faint}>履歴を読み込めませんでした。</p> : events === null ? <p className={styles.faint}>読み込んでいます</p> : events.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
+          {historyFailed ? (
+            <Notice
+              tone="danger"
+              action={
+                <Button
+                  variant="text"
+                  size="inline"
+                  data-notice-inline-action
+                  type="button"
+                  disabled={historyLoading}
+                  onClick={() => void loadHistory()}
+                >
+                  もう一度読み込む
+                </Button>
+              }
+            >
+              履歴を読み込めませんでした。
+            </Notice>
+          ) : events === null ? <p className={styles.faint}>読み込んでいます</p> : events.length === 0 ? <p className={styles.faint}>まだ記録はありません。</p> : (
             <DataTable>
               <thead><TableHeadRow><Th>いつ</Th><Th>目的</Th><Th>前 → 後</Th><Th>だれ</Th></TableHeadRow></thead>
               <tbody>

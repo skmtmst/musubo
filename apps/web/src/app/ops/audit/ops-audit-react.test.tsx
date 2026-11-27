@@ -64,6 +64,20 @@ async function flush() {
   for (let i = 0; i < 6; i += 1) await act(async () => { await Promise.resolve() })
 }
 
+describe('未知の操作名', () => {
+  it('継承名でも一覧と記録の詳細に操作名を出す', async () => {
+    auditAction = 'constructor'
+    totalRows = 1
+    await act(async () => { root.render(<OpsAuditPage />) })
+    await flush()
+    const button = host.querySelector<HTMLButtonElement>('[data-part="row-name"]')!
+    expect(button.textContent).toBe('constructor')
+    expect(button.title).toBe('constructor')
+    await act(async () => { button.click() })
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('constructor')
+  })
+})
+
 describe('日付範囲の折返し（R158）', () => {
   it('省略される長い操作名も、タイトルで全文を確認できる', async () => {
     auditAction = 'impersonation.write'

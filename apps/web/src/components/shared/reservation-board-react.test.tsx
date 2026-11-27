@@ -7,6 +7,17 @@ const entry:ReservationBoardEntry={id:'r',kind:'seats',version:4,scopeId:'s',sta
 const resources=[{id:'t1',label:'T1',capacity:2,active:true},{id:'t2',label:'T2',capacity:2,active:true}]
 afterEach(()=>{cleanup();vi.restoreAllMocks()})
 describe('共通盤の操作',()=>{
+ it('表示軸を切り替えても詳細欄の入力を保つ',()=>{
+  const renderBody=(body:React.ReactNode)=><section>{body}<input aria-label="詳細メモ" /></section>
+  const props={entries:[entry],resources,onOpen:()=>{},onAxis:()=>{},renderBody,dates:['2027-02-01']}
+  const view=render(<ReservationBoard {...props} axis="list" />)
+  const input=screen.getByLabelText('詳細メモ') as HTMLInputElement
+  fireEvent.change(input,{target:{value:'編集中'}})
+  view.rerender(<ReservationBoard {...props} axis="resource" />)
+  view.rerender(<ReservationBoard {...props} axis="list" />)
+  expect(screen.getByLabelText('詳細メモ')).toBe(input)
+  expect(input.value).toBe('編集中')
+ })
  it('一覧に指定した日時形式を使い、年の異なる予約を区別する',()=>{
   const older={...entry,id:'older',startsAt:'2026-02-01T09:00:00Z'}
   render(<ReservationBoard axis="list" columns="dining" entries={[older,entry]} resources={resources} onOpen={()=>{}} formatListDateTime={value=>value.slice(0,10).replaceAll('-','/')}/>)

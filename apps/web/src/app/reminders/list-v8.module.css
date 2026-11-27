@@ -493,3 +493,6 @@
 .folderNote, .folderNoteNoticePlacement { margin: 0; }
 
 .errorBandNoticePlacement { margin: 0; }
+
+/* 狭い画面では送信予定の補助列を畳み、名前と状態を残す。 */
+@media (max-width: 600px) { .mobileOptional { display: none; } }

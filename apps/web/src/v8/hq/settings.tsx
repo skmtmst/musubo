@@ -1,7 +1,7 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import { useEffect, useId, useState, useRef, useImperativeHandle, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useState, useRef, useImperativeHandle, type FormEvent } from 'react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -86,22 +86,30 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
   const [ready, setReady] = useState(false)
   const [nameFocusRequest, setNameFocusRequest] = useState(0)
   const handledNameFocusRequest = useRef(0)
+  const loadSequence = useRef(0)
+
+  const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    setLoading(true)
+    setError('')
+    try {
+      const response = await api.tenants.me()
+      if (sequence !== loadSequence.current) return
+      if (!response.success) throw new Error(response.error)
+      setName(response.data.name ?? '')
+      setBaseline(response.data.name ?? '')
+      setReady(true)
+    } catch {
+      if (sequence === loadSequence.current) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    void api.tenants.me()
-      .then((response) => {
-        if (!response.success) throw new Error(response.error)
-        if (!cancelled) { setName(response.data.name ?? ''); setBaseline(response.data.name ?? ''); setReady(true) }
-      })
-      .catch(() => {
-        if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [])
+    void load()
+    return () => { loadSequence.current += 1 }
+  }, [load])
 
   const save = async (event?: FormEvent) => {
     event?.preventDefault()
@@ -158,6 +166,10 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
   useImperativeHandle(draftRef, () => ({ dirty, save, reset }))
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
+  const reloadAction = !ready && !loading
+    ? <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void load()}>もう一度読み込む</Button>
+    : undefined
+
   if (!canEdit) {
     return (
       <SaveErrorScope errors={saveErrors}><Card variant="form" gap="normal" aria-label="統括名">
@@ -165,7 +177,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
           <dt className={styles.label}>統括名</dt>
           <dd className={styles.value}>{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || emptyValue('unknown')}</dd>
         </dl>
-        {error ? <Notice tone="danger" >{error}</Notice> : null}
+        {error ? <Notice tone="danger" action={reloadAction}>{error}</Notice> : null}
         <p className={styles.hint}>統括名の変更は管理者だけができます。</p>
       </Card></SaveErrorScope>
     )
@@ -184,7 +196,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
           className={styles.full}
         /></SaveErrorField>
 {nameError ? <p id={`${uid}-name-error`} className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
-      {error ? <Notice tone="danger" >{error}</Notice> : null}
+      {error ? <Notice tone="danger" action={reloadAction}>{error}</Notice> : null}
       {null}
 
     </Card></form></SaveErrorScope>
