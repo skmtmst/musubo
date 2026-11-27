@@ -8,7 +8,7 @@
  * 配った先ごとの版（版3（いまの版）／新しい版を未配布）・版の履歴（比べる・この版に戻す）・今月送った数は API-18。
  * 読み書き（読み込み・複製・配る・版を比べる・戻す）は呼ぶ側（console.tsx）。ここは見せ方と押した知らせだけ。
  */
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeft, ChevronDown, CircleAlert, Copy, GitCompare, LogIn, Pencil, RotateCcw, Send, Upload } from 'lucide-react'
 import type { HqTemplateReceivedVersion, HqTemplateVersionComparison, HqTemplateVersionDisplay, MessageTemplateDefinition } from '@line-crm/shared'
 import { templateKind } from '@line-crm/shared'
@@ -106,6 +106,7 @@ export default function HqTemplateDetail({
   onRemove?: () => void
 }) {
   const [compare, setCompare] = useState<{ from: number; to: number; result: HqTemplateVersionComparison | null; error: string } | null>(null)
+  const compareRequest = useRef(0)
   const [restoreTarget, setRestoreTarget] = useState<number | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [restoreError, setRestoreError] = useState('')
@@ -131,12 +132,16 @@ export default function HqTemplateDetail({
   const receivedRows = (received ?? []).filter((item) => item.targetVersion.status !== 'undistributed')
 
   const openCompare = (from: number, to: number) => {
+    const request = ++compareRequest.current
     if (compare && compare.from === from && compare.to === to) { setCompare(null); return }
     setCompare({ from, to, result: null, error: '' })
-    void onCompare(from, to).then(
-      (result) => setCompare((now) => (now && now.from === from && now.to === to ? { ...now, result } : now)),
-      (caught) => setCompare((now) => (now && now.from === from && now.to === to ? { ...now, error: japaneseDetailOf(caught) || '版を比べられませんでした。もう一度お試しください。' } : now)),
-    )
+    void onCompare(from, to).then((result) => {
+      if (request !== compareRequest.current) return
+      if (typeof definitionText(result.from.definition) !== 'string' || typeof definitionText(result.to.definition) !== 'string') throw new Error('invalid comparison')
+      setCompare((now) => now ? { ...now, result } : now)
+    }).catch((caught) => {
+      if (request === compareRequest.current) setCompare((now) => now ? { ...now, error: japaneseDetailOf(caught) || '版を比べられませんでした。もう一度お試しください。' } : now)
+    })
   }
   const compareBox = compare ? (
     compare.error ? <Notice tone="danger" >{compare.error}</Notice>
