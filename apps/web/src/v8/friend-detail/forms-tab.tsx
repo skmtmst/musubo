@@ -39,7 +39,7 @@ export default function FormsTab({ data }: { data: FriendDetailState }) {
       {submissions.map((s) => {
         const named = (s.fields ?? []).filter((f) => f && typeof f.name === 'string' && typeof f.label === 'string')
         const labelByName = new Map(named.map((f) => [f.name, f.label]))
-        const keys = named.map((f) => f.name).filter((name) => name in (s.data ?? {}))
+        const keys = named.map((f) => f.name).filter((name) => Object.prototype.hasOwnProperty.call(s.data ?? {}, name))
         const orphans = Object.keys(s.data ?? {}).filter((k) => !labelByName.has(k))
         return (
           <article key={s.id} className={styles.card}>
