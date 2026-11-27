@@ -176,6 +176,7 @@ export function useInboxDraft({ selectedAccountId, selectedChatId }: Options) {
   const clearPendingImage = () => {
     const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
     imageJobGenRef.current.set(ownerKey, (imageJobGenRef.current.get(ownerKey) ?? 0) + 1)
+    setImageBusyKeys((prev) => { const next = new Set(prev); next.delete(ownerKey); return next })
     imageDraftsRef.current.delete(ownerKey)
     imageMetaDraftsRef.current.delete(ownerKey)
     imageErrorDraftsRef.current.delete(ownerKey)

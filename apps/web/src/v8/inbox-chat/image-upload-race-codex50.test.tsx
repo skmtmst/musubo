@@ -34,3 +34,16 @@ it('古い画像の完了後も新しい画像の読み込み中は送れない'
   expect(screen.getByText('new.png')).toBeTruthy()
   expect(screen.getByRole('button', { name: '送る' })).toHaveProperty('disabled', false)
 })
+
+it('読み込み中の画像を外すと送れるようになり、古い完了でも復活しない', async () => {
+  const latest = pending()
+  upload.mockResolvedValueOnce(result('old')).mockReturnValueOnce(latest.promise)
+  render(<Demo />)
+  await act(async () => pick('old.png'))
+  expect(screen.getByText('old.png')).toBeTruthy()
+  pick('new.png')
+  fireEvent.click(screen.getByRole('button', { name: '画像を外す' }))
+  expect(screen.getByRole('button', { name: '送る' })).toHaveProperty('disabled', false)
+  await act(async () => latest.resolve(result('new')))
+  expect(screen.queryByText('new.png')).toBeNull()
+})
