@@ -78,7 +78,8 @@ export default function RestaurantFloorEditor({accountId,storeId,resources,canEd
  },[accountId,storeId])
  useEffect(()=>{observed.current=resourceKey;setFloors([]);setDraft(null);setSelected('');setZoom(100);setViewport(null);void load();return()=>{latest.current++}},[accountId,storeId]) // eslint-disable-line react-hooks/exhaustive-deps
  const dirty=!!draft&&JSON.stringify(draft)!==JSON.stringify(floors.find(f=>f.id===draft.id))
- const guard=useUnsavedGuard({dirty,busy:busy||loading})
+ // 読み直しで待たせるのは、残す配置の変更があるときだけ。変更が無い読み込み中は左メニュー・戻る・再読込を止めない。
+ const guard=useUnsavedGuard({dirty,busy:busy||(loading&&dirty)})
  useEffect(()=>{if(observed.current!==resourceKey){observed.current=resourceKey;setRefreshPending(true)}},[resourceKey])
  useEffect(()=>{if(refreshPending&&!busy&&!loading){setRefreshPending(false);void load(true)}},[refreshPending,busy,loading,load])
  const save=async()=>{if(!draft||!canEdit||busy)return;setBusy(true);setError('');try{await reservationBoardApi.saveFloor(accountId,{...draft,expectedVersion:draft.version});const next={...draft,version:draft.version+1};setDraft(next);setFloors(fs=>fs.map(f=>f.id===next.id?next:f))}catch(cause){saveErrors.capture(cause);setError('保存できませんでした。版が変わった場合は、入力を控えて最新の座席図を読み込んでください。')}finally{setBusy(false)}}
