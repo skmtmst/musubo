@@ -62,7 +62,9 @@ const EMPTY: Record<NotificationTab, string> = {
  * 中身（取得・既読）は呼ぶ側が持つ。
  */
 export default function BellPanel({ items, tab, onTabChange, ...rest }: BellPanelProps) {
-  const rows: BellItem[] = items.map(({ kind, ...item }) => ({ ...item, category: kind === 'system' ? 'error' : 'update' }))
+  const safeItems = Array.isArray(items) ? items : []
+  const rows: BellItem[] = safeItems.map(({ kind, ...item }) => ({ ...item, category: kind === 'system' ? 'error' : 'update' }))
+  const emptyMessage = Object.prototype.hasOwnProperty.call(EMPTY, tab) ? EMPTY[tab] : EMPTY.all
   return (
     <BellPopover<NotificationTab>
       {...rest}
@@ -71,7 +73,7 @@ export default function BellPanel({ items, tab, onTabChange, ...rest }: BellPane
       filters={NOTIFICATION_TABS}
       filter={tab}
       onFilterChange={onTabChange}
-      emptyText={rest.partialNotice ? '読み込めた店舗に該当する通知はありません。' : EMPTY[tab]}
+      emptyText={rest.partialNotice ? '読み込めた店舗に該当する通知はありません。' : emptyMessage}
     />
   )
 }
