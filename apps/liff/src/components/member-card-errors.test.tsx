@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { useState } from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import MemberCard, { MemberCardView, type MemberCardData } from './member-card.js';
 
@@ -8,6 +8,18 @@ vi.mock('@line/liff', () => ({ default: { getIDToken: () => 'token', id: 'accoun
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const card: MemberCardData = { name: 'シルバー', since: '2026-09-01', downgradeDueAt: null, next: { name: 'ゴールド', remaining: 2, metric: 'visits', progress: 0.6 } };
 
+it('会員証がない場合は再試行の案内を出さない', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 404, ok: false }));
+  const view = render(<MemberCard />);
+  await act(async () => {});
+  expect(view.container.textContent).toBe('');
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+it.each([401, 503])('取得が %i のときは再確認を案内する', async (status) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status, ok: false }));
+  render(<MemberCard />);
+  expect(await screen.findByText('会員証を読み込めませんでした。')).toBeTruthy();
+});
 it('取得に失敗したら再読み込みでき、成功したら会員証を表示する', async () => {
   const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ success: false }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: card }) });
   vi.stubGlobal('fetch', fetchMock);

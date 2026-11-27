@@ -30,6 +30,7 @@ export async function fetchMemberCard(): Promise<MemberCardData | null> {
   const url = new URL(`${BASE}/api/liff/member-card`, window.location.origin);
   url.searchParams.set('liffId', liff.id ?? '');
   const response = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` }, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error('member-card');
   const body = (await response.json()) as { success: boolean; data: MemberCardData | null };
   if (!body || body.success !== true || body.data === undefined) throw new Error('member-card');
