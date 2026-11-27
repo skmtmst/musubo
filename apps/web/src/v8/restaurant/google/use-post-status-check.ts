@@ -20,7 +20,7 @@ export function usePostStatusCheck(accountId: string, reload: () => Promise<void
   }, [accountId, canSync])
 
   const sync = async () => {
-    if (!canSync || pending.current?.accountId === accountId) return
+    if (!canSync || !accountId.trim() || pending.current?.accountId === accountId) return
     const request = { accountId }
     pending.current = request
     const current = () => pending.current === request
@@ -29,8 +29,9 @@ export function usePostStatusCheck(accountId: string, reload: () => Promise<void
       const result = await restaurantGoogleApi.syncPosts(accountId)
       if (!current()) return
       if (!result?.success) throw new Error('Googleの状態を確認できませんでした。もう一度お試しください。')
-      setState({ accountId, at: new Date().toISOString(), busy: true, error: '' })
       await reloadRef.current()
+      if (!current()) return
+      setState({ accountId, at: new Date().toISOString(), busy: true, error: '' })
     } catch (error) {
       if (current()) setState(previous => ({ ...previous, error: errorMessage(error, 'Googleから投稿の状態を確認できませんでした。') }))
     } finally {
