@@ -2,7 +2,7 @@
 
 import { twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { ArrowRight } from 'lucide-react'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import PasswordField from '@/components/auth/password-field'
 import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
@@ -47,18 +47,25 @@ export default function OpsInviteV8() {
   const [checkFailed, setCheckFailed] = useState<unknown>(null)
   /* 使えない招待（未使用でない・期限切れ・見つからない）では「もう一度読み込む」を出さない。通信・混雑・サーバーの失敗だけ再試行する。 */
   const [checkRetryable, setCheckRetryable] = useState(false)
+  const mountedRef = useRef(true)
+  const checkSeqRef = useRef(0)
+  const submittingRef = useRef(false)
 
   const checkInvite = useCallback(async () => {
+    const seq = ++checkSeqRef.current
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const value = hash.get('invite') ?? ''
     setToken(value)
     setState('loading')
     setMessage('')
+    setError('')
+    setAcceptCode(null)
     setCheckFailed(null)
     setCheckRetryable(false)
     setInviteCode(null)
     if (!value) { setState('invalid'); setMessage('この招待は見つかりません。招待した運営メンバーに確認してください'); return }
     const res = await authRequest<Check>(`/api/auth/ops-invite/check?token=${encodeURIComponent(value)}`)
+    if (!mountedRef.current || seq !== checkSeqRef.current) return
     if (!res.ok || !res.data) {
       setCheckFailed(new ApiError(res.status, res.error))
       setCheckRetryable(res.status === 0 || res.status === 429 || res.status >= 500)
@@ -70,11 +77,18 @@ export default function OpsInviteV8() {
     setState('ready')
   }, [])
 
-  useEffect(() => { void checkInvite() }, [checkInvite])
+  useEffect(() => {
+    mountedRef.current = true
+    void checkInvite()
+    return () => {
+      mountedRef.current = false
+      checkSeqRef.current += 1
+    }
+  }, [checkInvite])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!check) return
+    if (!check || submittingRef.current) return
     if (check.needsPassword) {
       const nameProblem = name.trim() ? null : 'お名前を入力してください'
       const passwordProblem = passwordError(password)
@@ -84,6 +98,7 @@ export default function OpsInviteV8() {
       setConfirmMessage(confirmProblem)
       if (nameProblem || passwordProblem || confirmProblem) return
     }
+    submittingRef.current = true
     setBusy(true)
     setError('')
     setAcceptCode(null)
@@ -91,9 +106,14 @@ export default function OpsInviteV8() {
       token,
       ...(check.needsPassword ? { name: name.trim(), password } : {}),
     })
+    if (!mountedRef.current) {
+      submittingRef.current = false
+      return
+    }
     if (!res.ok || !res.data) {
       setError(res.error || '登録を進められませんでした')
       setAcceptCode(res.code ?? null)
+      submittingRef.current = false
       setBusy(false)
       return
     }

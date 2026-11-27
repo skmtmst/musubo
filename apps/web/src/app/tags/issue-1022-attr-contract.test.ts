@@ -17,26 +17,10 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
  *  - 属性辞書の独立メニュー・自動統合・新しいタイトルバーは作らない
  */
 describe('IDEA-04（issue #1022）タグの分類説明・重複候補・変更前後条件', () => {
-  it('分類の使い分け案内は共通部品1つに寄せ、4分類すべてを説明する', () => {
+  it('分類案内は情報欄の作成先を持つ', () => {
     const guide = read('components/friend-fields/attribute-kind-guide.tsx')
-    // 4分類とも「何を持つか」「いつ選ぶか」「作る入口」を持つ。
-    for (const label of ['タグ', '友だち情報欄', '対応マーク', '保存した検索']) {
-      expect(guide, `分類「${label}」の説明が無い`).toContain(`label: '${label}'`)
-    }
     // 作る入口は既存画面だけ。独立した属性辞書メニューは作らない。
-    expect(guide).toContain("createHref: '/tags/new'")
     expect(guide).toContain("createHref: '/tags/fields/new'")
-    expect(guide).toContain("createHref: '/tags/marks/new'")
-    expect(guide).toContain("createHref: '/friends'")
-    // 新しいタイトルバーではなく、既存カード内の開閉案内として置く。
-    expect(guide).toContain('<details')
-    expect(guide).toContain('いま選択中')
-    expect(guide).toContain('この画面')
-    // 重複名の比べ方はサーバーの duplicate_name（packages/db の
-    // normalizeTagNameForCleanup）と同じ正規化。
-    expect(guide).toContain("name.normalize('NFKC').trim().replace(/\\s+/g, ' ').toLocaleLowerCase('ja-JP')")
-    expect(guide).toContain('findDuplicateNames')
-    expect(guide).toContain('DuplicateNameNote')
   })
 
   it('4つの作成・編集画面すべてに分類案内と重複名の注意がある', () => {

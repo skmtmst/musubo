@@ -32,19 +32,26 @@ export default function StaffList({
   /** 読み込み中・失敗・選ぶものが無い間は、下の帯を出さないための合図。 */
   onLoadState?: (ready: boolean) => void;
 }) {
-  const [list, setList] = useState<StaffItem[] | null>(null);
+  const [loaded, setLoaded] = useState<{ menuId: string; list: StaffItem[] } | null>(null);
+  const list = loaded?.menuId === menu.id ? loaded.list : null;
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let alive = true;
+    setLoaded(null);
     setFailed(false);
     api
       .staffOf(menu.id)
-      .then((r) => setList(r.staff))
+      .then((r) => {
+        if (!r || !Array.isArray(r.staff)) throw new Error('Invalid staff response');
+        if (alive) setLoaded({ menuId: menu.id, list: r.staff });
+      })
       .catch((e) => {
         logFailure('staff', e);
-        setFailed(true);
+        if (alive) setFailed(true);
       });
+    return () => { alive = false; };
   }, [menu.id, reloadKey]);
 
   useEffect(() => {

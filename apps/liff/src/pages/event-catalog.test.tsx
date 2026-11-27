@@ -79,3 +79,24 @@ it('日時を選ぶと既存のクエリとクラスIDを引き継ぐ', async ()
   open();fireEvent.click(await screen.findByRole('button', { name: '日時を選ぶ' }));
   expect(await screen.findByText('/events/entry?liffId=qa&source=catalog')).toBeTruthy();
 });
+
+it('初回の不正な応答は空一覧にせず、読み直しで回復する', async () => {
+  list.mockResolvedValueOnce({ items: null, nextCursor: null } as unknown as Awaited<ReturnType<typeof api.listEvents>>)
+    .mockResolvedValueOnce({ items: [event('1')], nextCursor: null });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }));
+  expect(await screen.findByRole('heading', { name: 'クラス1' })).toBeTruthy();
+});
+
+it('続きの不正な日時は表示済みの一覧を保ち、同じ続きを読み直せる', async () => {
+  list.mockResolvedValueOnce({ items: [event('1')], nextCursor: 'cursor-2' })
+    .mockResolvedValueOnce({ items: [{ ...event('2'), nextStartsAt: 'invalid' }], nextCursor: null })
+    .mockResolvedValueOnce({ items: [event('2')], nextCursor: null });
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: '続きを見る' }));
+  const retry = await screen.findByRole('button', { name: 'もう一度読み込む' });
+  expect(screen.getByRole('heading', { name: 'クラス1' })).toBeTruthy();
+  fireEvent.click(retry);
+  expect(await screen.findByRole('heading', { name: 'クラス2' })).toBeTruthy();
+  expect(list.mock.calls).toEqual([[], ['cursor-2'], ['cursor-2']]);
+});

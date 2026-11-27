@@ -20,7 +20,8 @@ import styles from '@/components/shared/restaurant-table-board.module.css'
 export default function TableAutoAssignmentDialog({ accountId, storeId, canEdit, onClose }: {
   accountId: string; storeId: string; canEdit: boolean; onClose: () => void
 }) {
-  const [saved, setSaved] = useState<RestaurantTableAssignmentSettings | null>(null)
+  const scope = `${accountId}:${storeId}`
+  const [savedState, setSavedState] = useState<{ scope: string; data: RestaurantTableAssignmentSettings } | null>(null)
   const [enabled, setEnabled] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -28,32 +29,56 @@ export default function TableAutoAssignmentDialog({ accountId, storeId, canEdit,
   const [conflict, setConflict] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
   const saveErrors = useSaveFormErrors()
-  const alive = useRef(false), writing = useRef(false), editable = useRef(canEdit)
+  const alive = useRef(false), writing = useRef(false), editable = useRef(canEdit), loadSeq = useRef(0), scopeRef = useRef(scope)
   editable.current = canEdit
+  scopeRef.current = scope
+  const saved = savedState?.scope === scope ? savedState.data : null
   const load = useCallback(async (keepInput = false) => {
+    const seq = ++loadSeq.current
+    const requestScope = `${accountId}:${storeId}`
     setLoading(true); setError('')
     try {
       const result = await bookingAssignmentApi.getTableAutomation(accountId, storeId)
-      if (!alive.current) return
-      setSaved(result.data)
+      if (!alive.current || loadSeq.current !== seq || scopeRef.current !== requestScope) return
+      if ((result as { success?: boolean } | null)?.success === false || !result?.data || typeof result.data.enabled !== 'boolean' || typeof result.data.version !== 'number') {
+        setError('設定を読み込めませんでした。もう一度お試しください。')
+        return
+      }
+      setSavedState({ scope: requestScope, data: result.data })
       if (!keepInput) setEnabled(result.data.enabled)
       setConflict(false)
-    } catch { if (alive.current) setError('設定を読み込めませんでした。もう一度お試しください。') }
-    finally { if (alive.current) setLoading(false) }
+    } catch {
+      if (alive.current && loadSeq.current === seq && scopeRef.current === requestScope) {
+        setError('設定を読み込めませんでした。もう一度お試しください。')
+      }
+    } finally {
+      if (alive.current && loadSeq.current === seq && scopeRef.current === requestScope) setLoading(false)
+    }
   }, [accountId, storeId])
-  useEffect(() => { alive.current = true; void load(); return () => { alive.current = false } }, [load])
+  useEffect(() => {
+    alive.current = true
+    setConflict(false)
+    setConfirmClose(false)
+    void load()
+    return () => { alive.current = false; loadSeq.current += 1 }
+  }, [load])
   const dirty = saved !== null && enabled !== saved.enabled
   const guard = useUnsavedGuard({ dirty, busy: saving })
   const close = () => { if (!writing.current) { if (dirty) setConfirmClose(true); else onClose() } }
   const save = async () => {
     if (!alive.current || !editable.current || !saved || loading || !dirty || writing.current || conflict) return
+    const requestScope = scope
     writing.current = true; setSaving(true); setError(''); saveErrors.reset()
     try {
-      await bookingAssignmentApi.saveTableAutomation(accountId, storeId, { enabled, expectedVersion: saved.version })
-      if (!alive.current) return
+      const result = await bookingAssignmentApi.saveTableAutomation(accountId, storeId, { enabled, expectedVersion: saved.version })
+      if (!alive.current || scopeRef.current !== requestScope) return
+      if ((result as { success?: boolean } | null)?.success === false) {
+        setError('保存できませんでした。もう一度お試しください。')
+        return
+      }
       guard.disarm(); notifySaved('自動配席の設定を保存しました'); onClose()
     } catch (cause) {
-      if (!alive.current) return
+      if (!alive.current || scopeRef.current !== requestScope) return
       if (isSaveConflict(cause)) setConflict(true)
       else if (!saveErrors.capture(cause)) setError(cause instanceof ApiError && cause.status === 403 ? '設定を変更する権限がありません。' : '保存できませんでした。もう一度お試しください。')
     } finally { writing.current = false; if (alive.current) setSaving(false) }

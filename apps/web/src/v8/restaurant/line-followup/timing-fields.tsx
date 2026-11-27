@@ -11,11 +11,72 @@ import { exactTiming,UNIT_MINUTES,type OffsetUnit } from './config'
 import { followupTimingError } from './board-model'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import styles from './board.module.css'
-function CountdownField({value,before,onChange}:{value:number;before:boolean;onChange:(value:number)=>void}){
- const initial=exactTiming(Math.abs(value),['minutes','hours','days'])
- const [unit,setUnit]=useState<OffsetUnit>(initial.unit)
- return <SettingsFormRow layout="columns"><SaveErrorField names={["timing","timing.offsetMinutes"]}><NumberField aria-label={before?'予約までの時間':'きっかけから待つ時間'} min={before?1:0} value={Number.isFinite(value)?(before?-value:value)/UNIT_MINUTES[unit]:''} onChange={e=>onChange((before?-1:1)*e.target.valueAsNumber*UNIT_MINUTES[unit])}/></SaveErrorField><Select aria-label="時間の単位" value={unit} onChange={next=>setUnit(next as OffsetUnit)} options={[{value:'minutes',label:'分'},{value:'hours',label:'時間'},{value:'days',label:'日'}]}/></SettingsFormRow>
+function defaultUnitFor(value: number): OffsetUnit {
+ return Number.isFinite(value) ? exactTiming(Math.abs(value), ['minutes', 'hours', 'days']).unit : 'minutes'
 }
+
+function parseFiniteNumber(raw: string, valueAsNumber: number): number | null {
+ if (raw.trim() === '') return null
+ if (Number.isFinite(valueAsNumber)) return valueAsNumber
+ const parsed = Number(raw)
+ return Number.isFinite(parsed) ? parsed : null
+}
+
+function CountdownField({value,before,onChange}:{value:number;before:boolean;onChange:(value:number)=>void}){
+ const [state,setState]=useState<{syncedValue:number;emittedValue:number|null;unit:OffsetUnit;draft:string|null}>(()=>({
+  syncedValue:value,
+  emittedValue:null,
+  unit:defaultUnitFor(value),
+  draft:null,
+ }))
+ let unit=state.unit
+ let draft=state.draft
+ if(!Object.is(state.syncedValue,value)){
+  const fromSelf=state.emittedValue!==null&&Object.is(state.emittedValue,value)
+  const nextUnit=fromSelf?state.unit:defaultUnitFor(value)
+  const nextDraft=fromSelf?state.draft:null
+  setState({syncedValue:value,emittedValue:null,unit:nextUnit,draft:nextDraft})
+  unit=nextUnit
+  draft=nextDraft
+ }
+ const displayed=draft!==null?draft:Number.isFinite(value)?(before?-value:value)/UNIT_MINUTES[unit]:''
+ return <SettingsFormRow layout="columns"><SaveErrorField names={["timing","timing.offsetMinutes"]}><NumberField aria-label={before?'予約までの時間':'きっかけから待つ時間'} min={before?1:0} value={displayed} onChange={e=>{
+  const parsed=parseFiniteNumber(e.target.value,e.target.valueAsNumber)
+  if(parsed===null){setState(prev=>({...prev,draft:''}));return}
+  const next=parsed===0?0:(before?-1:1)*parsed*UNIT_MINUTES[unit]
+  setState(prev=>({...prev,emittedValue:next,draft:null}))
+  onChange(next)
+ }} onBlur={()=>{if(draft!==null)setState(prev=>({...prev,draft:null}))}}/></SaveErrorField><Select aria-label="時間の単位" value={unit} onChange={next=>{
+  const nextUnit=next as OffsetUnit
+  const unitMinutes=UNIT_MINUTES[nextUnit]
+  if(!Number.isFinite(value)||value===0){setState(prev=>({...prev,unit:nextUnit,draft:null}));return}
+  const rawAmount=(before?-value:value)/unitMinutes
+  if(Number.isInteger(rawAmount)){setState(prev=>({...prev,unit:nextUnit,draft:null}));return}
+  const maxAmount=Math.floor(525600/unitMinutes)
+  const snapped=Math.min(maxAmount,Math.max(1,Math.round(rawAmount)))
+  const nextMinutes=(before?-1:1)*snapped*unitMinutes
+  setState(prev=>({...prev,unit:nextUnit,emittedValue:nextMinutes,draft:null}))
+  onChange(nextMinutes)
+ }} options={[{value:'minutes',label:'分'},{value:'hours',label:'時間'},{value:'days',label:'日'}]}/></SettingsFormRow>
+}
+
+function DaysField({offsetDays,anniversary,onChange}:{offsetDays:number;anniversary:boolean;onChange:(offsetDays:number)=>void}){
+ const [state,setState]=useState<{syncedDays:number;draft:string|null}>(()=>({syncedDays:offsetDays,draft:null}))
+ let draft=state.draft
+ if(!Object.is(state.syncedDays,offsetDays)){
+  setState({syncedDays:offsetDays,draft:null})
+  draft=null
+ }
+ const displayed=draft!==null?draft:Number.isFinite(offsetDays)?(offsetDays===0?0:-offsetDays):''
+ return <NumberField aria-label={anniversary?'記念日の何日前':'予約の何日前'} unit="日前" min={anniversary?1:0} max={365} value={displayed} onChange={e=>{
+  const parsed=parseFiniteNumber(e.target.value,e.target.valueAsNumber)
+  if(parsed===null){setState(prev=>({...prev,draft:''}));return}
+  const next=parsed===0?0:-parsed
+  setState(prev=>({...prev,draft:null}))
+  onChange(next)
+ }} onBlur={()=>{if(draft!==null)setState(prev=>({...prev,draft:null}))}}/>
+}
+
 export function FollowupTimingFields({trigger,value,onChange}:{trigger:RestaurantFollowupTrigger;value:RestaurantFollowupTiming;onChange:(next:RestaurantFollowupTiming)=>void}){
  const before=['reservation_24h','reservation_2h','anniversary_before'].includes(trigger),anniversary=trigger==='anniversary_before'
  const nextDay=['post_visit','review_request'].includes(trigger)
@@ -30,7 +91,7 @@ export function FollowupTimingFields({trigger,value,onChange}:{trigger:Restauran
     {nextDay&&<Radio name="followup-timing" checked={value.mode==='next_day'} onChange={()=>onChange({mode:'next_day',sendAtTime:'10:00'})}>退店の翌日の時刻に送る</Radio>}
    </>}
   </RadioGroup>
-  {value.mode==='time'?<SettingsFormRow layout="columns"><SaveErrorField names={["timing","timing.offsetDays"]}><NumberField aria-label={anniversary?'記念日の何日前':'予約の何日前'} unit="日前" min={anniversary?1:0} max={365} value={-value.offsetDays} onChange={e=>onChange({...value,offsetDays:-e.target.valueAsNumber})}/></SaveErrorField><SaveErrorField names={["timing.sendAtTime"]}><TimeField aria-label="送る時刻" value={value.sendAtTime} onChange={sendAtTime=>onChange({...value,sendAtTime})}/></SaveErrorField></SettingsFormRow>:
+  {value.mode==='time'?<SettingsFormRow layout="columns"><SaveErrorField names={["timing","timing.offsetDays"]}><DaysField offsetDays={value.offsetDays} anniversary={anniversary} onChange={offsetDays=>onChange({...value,offsetDays})}/></SaveErrorField><SaveErrorField names={["timing.sendAtTime"]}><TimeField aria-label="送る時刻" value={value.sendAtTime} onChange={sendAtTime=>onChange({...value,sendAtTime})}/></SaveErrorField></SettingsFormRow>:
    value.mode==='next_day'?<SaveErrorField names={["timing","timing.sendAtTime"]}><TimeField aria-label="翌日の時刻" value={value.sendAtTime} onChange={sendAtTime=>onChange({...value,sendAtTime})}/></SaveErrorField>:
    value.offsetMinutes!==0?<CountdownField before={before} value={value.offsetMinutes} onChange={offsetMinutes=>onChange({mode:'countdown',offsetMinutes})}/>:null}
  </Field>

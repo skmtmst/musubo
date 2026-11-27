@@ -8,6 +8,7 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { PageExplanationProvider } from '@/components/shared/page-explanation'
 
 const calls = vi.hoisted(() => ({
@@ -53,7 +54,7 @@ import SearchesTab from './searches-tab'
 import FieldsTab from './fields-tab'
 
 beforeEach(() => { window.history.replaceState(null, '', '/tags'); flushListUrlState(); document.documentElement.dataset.theme = 'v8' })
-afterEach(() => { cleanup(); vi.clearAllMocks(); delete document.documentElement.dataset.theme })
+afterEach(() => { cleanup(); clearToastsForTest(); vi.clearAllMocks(); delete document.documentElement.dataset.theme })
 
 const [tagA, tagB] = FRIEND_ATTRIBUTES_QA_TAGS
 const cases = [
@@ -168,4 +169,31 @@ describe.each(cases)('$title の一覧', (testCase) => {
       expect(calls.tagUpdate).not.toHaveBeenCalled()
     })
   }
+})
+
+
+it('友だち情報欄の名前を保存すると完了を知らせる', async () => {
+  const { container } = render(<><PageExplanationProvider pageKey="tags:fields"><FieldsTab accountId="acc-1" canEdit /></PageExplanationProvider><ToastHost /></>)
+  await screen.findAllByText('好きな色')
+  openRow(container, '来店日')
+  const panel = await screen.findByRole('dialog', { name: '来店日' })
+  fireEvent.click(panel.querySelector('button[aria-label="項目名を変更する"]')!)
+  const input = screen.getByRole('textbox', { name: '項目名' })
+  fireEvent.change(input, { target: { value: '来店日（済）' } })
+  await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }) })
+  expect(await screen.findByText('友だち情報欄の名前を保存しました。')).toBeTruthy()
+})
+
+it('友だち情報欄の名前の保存に失敗したら通知せず入力を残す', async () => {
+  calls.fieldUpdate.mockResolvedValueOnce({ success: false, error: '保存できませんでした' } as never)
+  const { container } = render(<><PageExplanationProvider pageKey="tags:fields"><FieldsTab accountId="acc-1" canEdit /></PageExplanationProvider><ToastHost /></>)
+  await screen.findAllByText('好きな色')
+  openRow(container, '来店日')
+  const panel = await screen.findByRole('dialog', { name: '来店日' })
+  fireEvent.click(panel.querySelector('button[aria-label="項目名を変更する"]')!)
+  const input = screen.getByRole('textbox', { name: '項目名' })
+  fireEvent.change(input, { target: { value: '新しい名前' } })
+  await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }) })
+  expect(screen.queryByText('友だち情報欄の名前を保存しました。')).toBeNull()
+  expect(screen.getByDisplayValue('新しい名前')).toBeTruthy()
 })

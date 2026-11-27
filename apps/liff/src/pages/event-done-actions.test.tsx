@@ -31,3 +31,10 @@ test('自分の待ちがある場合だけ取り消しを出し、確認して�
   fireEvent.click(screen.getByRole('button',{name:'取り消す'}));
   await screen.findByText('履歴へ移動');expect(calls.cancel).toHaveBeenCalledExactlyOnceWith('wait');
 });
+test.each(['', 'unexpected'])('不明な申し込み状態 %s を確定と表示しない', async status => {
+  show(status);
+  expect(screen.getByText('申し込みの状態を確認してください')).toBeTruthy();
+  expect(screen.queryByText('申し込みが確定しました')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '自分のクラスを見る' }));
+  expect(await screen.findByText('履歴へ移動')).toBeTruthy();
+});

@@ -21,15 +21,19 @@ export default function NotFoundV8() {
   const pathname = usePathname()
   const missingPath = missingPathLabel(pathname)
   const hq = pathname === '/hq' || Boolean(pathname?.startsWith('/hq/'))
+  const ops = pathname === '/ops' || Boolean(pathname?.startsWith('/ops/'))
+  const home = ops ? '/ops/dashboard' : hq ? '/hq' : '/'
   // 役割と権限は本人の API（/api/staff/me）から。手元の保存値は書き換えられるので使わない。
   const staff = useStaffIdentity()
-  const destinations = hq
+  const destinations = ops
+    ? [{ href: '/ops/tenants', label: '契約先アカウント' }, { href: '/ops/support', label: 'お問い合わせ' }]
+    : hq
     ? [{ href: '/hq/attention', label: '対応が要るもの' }, { href: '/hq/templates', label: 'テンプレート' }]
     : frequentDestinations(staff?.role ?? null, staff?.permissionKeys ?? [], staff?.permissionViewKeys ?? [])
   const goBack = () => {
     // 直接開いた（戻る先が無い）ときは、ダッシュボードへ。
     if (typeof window !== 'undefined' && window.history.length > 1) router.back()
-    else router.push(hq ? '/hq' : '/')
+    else router.push(home)
   }
   return (
     <div className={styles.board} data-design-node="Nx5dz">
@@ -40,7 +44,7 @@ export default function NotFoundV8() {
         {missingPath ? <p className={styles.path} title={missingPath}>開こうとしたページ：{missingPath}</p> : null}
         <div className={styles.actions}>
           <Button type="button" variant="secondary" onClick={goBack}>前のページへ戻る</Button>
-          <Button href={hq ? '/hq' : '/'} variant="primary">{hq ? '統括へ' : 'ダッシュボードへ'}</Button>
+          <Button href={home} variant="primary">{ops ? '運営ダッシュボードへ' : hq ? '統括へ' : 'ダッシュボードへ'}</Button>
         </div>
         <nav className={styles.destinations} aria-label="よく使うページ">
           <span className={styles.destinationsLabel}>よく使うページ</span>

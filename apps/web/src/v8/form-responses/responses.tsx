@@ -81,12 +81,15 @@ function normalizedSubmission(item: Submission): Submission {
     return { ...item, data: {} }
   }
 }
+function answerOf(data: Record<string, unknown>, key: string): unknown {
+  return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : undefined
+}
 function saveCsv(filename: string, rows: Submission[], fieldKeys: string[], labels: Record<string, string>, blocks: InputBlock[]) {
   const header = ['回答ID', '答えた人', '答えた日時', ...fieldKeys.map((key) => labels[key] ?? key)]
   const lines = [header.map(csvCell).join(',')]
   for (const row of rows) {
     const data = row.data as Record<string, unknown>
-    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => valueText(data[key], blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
+    lines.push([row.id, row.friendName ?? '不明', formatDateTime(row.createdAt), ...fieldKeys.map((key) => valueText(answerOf(data, key), blocks.find(block => block.name === key || block.id === key)))].map(csvCell).join(','))
   }
   const url = URL.createObjectURL(new Blob([`﻿${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
@@ -158,6 +161,7 @@ function Responses() {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportProgress, setExportProgress] = useState('')
+  const exportController = useRef<AbortController | null>(null)
   const scopeKey = `${selectedAccountId ?? ''}:${formId}`
   const scope = useRef({ key: scopeKey, generation: 0 })
   if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
@@ -172,6 +176,16 @@ function Responses() {
   const [period, setPeriod] = useState<'this_month' | 'last_month' | 'all'>('this_month')
   const periodRef = useRef(period)
   periodRef.current = period
+
+  useEffect(() => {
+    setExporting(false)
+    setExportError('')
+    setExportProgress('')
+    return () => {
+      exportController.current?.abort()
+      exportController.current = null
+    }
+  }, [scopeKey])
 
   const load = useCallback(async (nextPage = 1, nextLimit = 20, searchText?: string) => {
     if (!selectedAccountId || !formId) {
@@ -265,7 +279,7 @@ function Responses() {
       return []
     }
   }, [form])
-  const labels = useMemo(() => Object.fromEntries(fields.map((field) => [field.name, field.label])), [fields])
+  const labels = useMemo<Record<string, string>>(() => Object.assign(Object.create(null), Object.fromEntries(fields.map((field) => [field.name, field.label]))), [fields])
   const fieldKeys = useMemo(() => {
     const fromDefinition = fields.map((field) => field.name)
     const fromRows = items.flatMap((item) => Object.keys(item.data as Record<string, unknown>))
@@ -278,7 +292,7 @@ function Responses() {
   const summaries = useMemo(() => fieldKeys.map((key) => {
     const counts = new Map<string, number>()
     for (const item of items) {
-      const value = valueText((item.data as Record<string, unknown>)[key], blockByKey(key))
+      const value = valueText(answerOf(item.data as Record<string, unknown>, key), blockByKey(key))
       if (value === '—') continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
@@ -292,11 +306,15 @@ function Responses() {
   const failedSteps = [...new Set(incompleteItems.flatMap((item) => item.postActions?.pending ?? []).map(postActionStepLabel))]
 
   const exportAll = async () => {
-    if (!selectedAccountId || !form || exporting) return
+    if (!selectedAccountId || !form || exportController.current) return
     if (total !== null && total > MAX_EXPORT_ROWS) {
       setExportError(`回答が${formatNumber(total)} 件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`)
       return
     }
+    const controller = new AbortController()
+    exportController.current = controller
+    const generation = scope.current.generation
+    const stopped = () => controller.signal.aborted || generation !== scope.current.generation
     setExporting(true)
     setExportError('')
     setExportProgress('')
@@ -308,8 +326,10 @@ function Responses() {
       const exportSearch = exportNeedle ? `&q=${encodeURIComponent(exportNeedle)}` : ''
       do {
         const result = await fetchApi<{ success: boolean; data: SubmissionPage }>(
-          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}${exportSearch}`,
+          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}${exportSearch}&period=${period}`,
+          { signal: controller.signal },
         )
+        if (stopped()) return
         if (!result.success) throw new Error('export_failed')
         expected = result.data.total
         if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
@@ -317,16 +337,22 @@ function Responses() {
         setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)} 件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
+      if (stopped()) return
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
-      saveCsv(csvFileName("フォーム回答"), all, keys, labels, inputBlocks)
+      const periodLabel = { this_month: '今月', last_month: '先月', all: 'すべて' }[period]
+      saveCsv(csvFileName(`フォーム回答_${periodLabel}`), all, keys, labels, inputBlocks)
     } catch (caught) {
+      if (stopped()) return
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
         ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`
         : 'CSVを書き出せませんでした。もう一度お試しください。')
     } finally {
-      setExporting(false)
-      setExportProgress('')
+      if (exportController.current === controller) {
+        exportController.current = null
+        setExporting(false)
+        setExportProgress('')
+      }
     }
   }
 
@@ -405,7 +431,7 @@ function Responses() {
     rate != null ? `全回答の答え終えた割合 ${formatNumber(rate)}%` : null,
   ].filter(Boolean).join('・')
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
-    && items.some((item) => String((item.data as Record<string, unknown>)[key] ?? '').trim() !== ''))
+    && items.some((item) => String(answerOf(item.data as Record<string, unknown>, key) ?? '').trim() !== ''))
 
   const responseSelection = view === 'rows' ? selected : null
   const rail = (
@@ -430,11 +456,11 @@ function Responses() {
               <dd>{shortWhen(selected.createdAt)}</dd>
             </div>
             {fieldKeys.map((key) => {
-              const value = valueText((selected.data as Record<string, unknown>)[key], blockByKey(key))
+              const value = valueText(answerOf(selected.data as Record<string, unknown>, key), blockByKey(key))
               return (
                 <div key={key}>
                   <dt title={labels[key] ?? key}>{labels[key] ?? key}</dt>
-                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={(selected.data as Record<string, unknown>)[key]} block={blockByKey(key)} />}</dd>
+                  <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={answerOf(selected.data as Record<string, unknown>, key)} block={blockByKey(key)} />}</dd>
                 </div>
               )
             })}
@@ -532,13 +558,13 @@ function Responses() {
                 )
               })}
               {longKey ? (() => {
-                const recents = items.filter((item) => String((item.data as Record<string, unknown>)[longKey] ?? '').trim() !== '')
+                const recents = items.filter((item) => String(answerOf(item.data as Record<string, unknown>, longKey) ?? '').trim() !== '')
                 return (
                   <Card variant="form" padding="roomy" aria-label={labels[longKey] ?? longKey}>
                     <CardHeader size="stacked" title={labels[longKey] ?? longKey} meta={`表示中の複数行回答・${formatNumber(recents.length)} 件`} />
                     <DataTable label={`${labels[longKey] ?? longKey}の新しい回答`} presentation="columns" columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'auto', gap: 'var(--polish-space-card)', padding: 'var(--polish-space-row) 0' }}><tbody>
                       {recents.slice(0, 2).map((item) => {
-                        const text = String((item.data as Record<string, unknown>)[longKey])
+                        const text = String(answerOf(item.data as Record<string, unknown>, longKey))
                         return (
                           <Tr key={item.id} interactive={false} data-table-layout="columns">
                             <Td grow><TruncatedText value={`「${text}」`} /></Td>
@@ -575,7 +601,7 @@ function Responses() {
                 <tbody>
                   {items.map((item) => {
                     const incomplete = incompleteOf(item)
-                    const first = firstKey ? valueText((item.data as Record<string, unknown>)[firstKey], blockByKey(firstKey)) : emptyValue('unknown')
+                    const first = firstKey ? valueText(answerOf(item.data as Record<string, unknown>, firstKey), blockByKey(firstKey)) : emptyValue('unknown')
                     const isSelected = selected?.id === item.id
                     return (
                       <Tr

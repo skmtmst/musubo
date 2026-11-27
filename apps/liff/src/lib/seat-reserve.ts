@@ -121,7 +121,7 @@ export function closedNote(dates: string[], reasons: Record<string, RestaurantUn
   const groups: Array<{ label: string; dates: string[] }> = [];
   for (const d of dates) {
     const r = reasons[d];
-    const label = r ? UNAVAILABLE_LABEL[r] : '空きなし';
+    const label = r ? Object.hasOwn(UNAVAILABLE_LABEL, r) ? UNAVAILABLE_LABEL[r] : '理由不明' : '空きなし';
     const g = groups.find((x) => x.label === label);
     if (g) g.dates.push(d);
     else groups.push({ label, dates: [d] });
@@ -139,7 +139,7 @@ export function dayReason(
   return list.length === 1 ? list[0] : undefined;
 }
 
-/** 席の種類の言葉 (卓の設定の seat_type)。知らない種類はそのまま。 */
+/** 席の種類の言葉 (卓の設定の seat_type)。知らない種類は確認不能と伝える。 */
 export const SEAT_TYPE_LABEL: Record<string, string> = {
   table: 'テーブル席',
   counter: 'カウンター席',
@@ -149,7 +149,7 @@ export const SEAT_TYPE_LABEL: Record<string, string> = {
 
 export function seatTypeLabel(type: string | null | undefined): string | null {
   if (!type) return null;
-  return SEAT_TYPE_LABEL[type] ?? type;
+  return Object.hasOwn(SEAT_TYPE_LABEL, type) ? SEAT_TYPE_LABEL[type]! : '席の種類を確認できません';
 }
 
 /** ② の「お席」。割り当てた卓の種類か、空いている候補の種類 (1つならそれ、いくつもなら「・」でつなぐ)。 */

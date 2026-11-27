@@ -1,5 +1,7 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
+
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { createPageReturnHref } from '@/components/shared/create-page';
@@ -365,6 +367,7 @@ export default function NewCommonVarV8() {
         }
         return
       }
+      notifySaved(asDraft ? '共通情報の下書きを保存しました。' : '共通情報を作成しました。')
       router.push(createPageReturnHref('/contents/vars', res.data.id))
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);

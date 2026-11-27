@@ -66,6 +66,7 @@ export default function FieldEdit() {
       const res = await api.folders.list('friend_field')
       if (generation !== context.current.generation || request !== folderRequest.current) return
       if (!res.success) throw new Error(res.error)
+      if (!Array.isArray(res.data)) throw new Error('フォルダの応答を確認できません')
       setFolders(res.data)
       setFoldersState('ready')
     } catch (saveFailure) {
@@ -95,7 +96,7 @@ export default function FieldEdit() {
       api.folders.list('friend_field').catch(() => null),
     ]).then(([list, folderResult]) => {
       if (cancelled) return
-      if (folderResult?.success) {
+      if (folderResult?.success && Array.isArray(folderResult.data)) {
         setFolders(folderResult.data)
         setFoldersState('ready')
       } else {

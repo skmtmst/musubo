@@ -100,7 +100,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
     try {
       const list = await api.friendFields.list(account, { withUsage: true })
       if (stale()) return
-      if (!list.success) throw new Error('load failed')
+      if (!list.success || !Array.isArray(list.data)) throw new Error('load failed')
       setItems(list.data); setStatus('ready')
     } catch (reason) {
       if (stale()) return
@@ -120,7 +120,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
     setFolderError('')
     try {
       const res = await api.folders.list('friend_field', accountId)
-      if (res.success) setFolders(res.data)
+      if (res.success && Array.isArray(res.data)) setFolders(res.data)
       else setFolderError('フォルダを読み込めませんでした。')
     } catch {
       setFolderError('フォルダを読み込めませんでした。')

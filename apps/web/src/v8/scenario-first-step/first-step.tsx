@@ -49,6 +49,7 @@ import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
 import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
 import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { ScenarioDraftLoadNotice } from '@/v8/autosave/public/scenario-draft-load-notice/index'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 
@@ -647,6 +648,7 @@ export default function ScenarioFirstStepV8() {
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {savedWhileBlocked ? <Notice tone="info">1通目は保存されています。確認状態が変わったため、続く操作を中止しました。<Link href={`/scenarios/detail?id=${encodeURIComponent(id)}`}>保存したシナリオを見る</Link></Notice> : null}
+      <ScenarioDraftLoadNotice failed={browserDraft.loadFailed} onRetry={browserDraft.retryLoad} />
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
       <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
 

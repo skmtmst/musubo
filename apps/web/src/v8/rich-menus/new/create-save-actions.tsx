@@ -91,27 +91,42 @@ export async function createMenuDraft({ accountId, audience, chatBarText, defaul
       })),
     })
     if (!res.success) throw new Error(res.error ?? '作成失敗')
+    if (!res.data?.id || !Array.isArray(res.data.pages)) throw new Error('作成失敗')
     const createdId = res.data.id
     // ①で選んだタブごとの画像をそのページへ上げる（最初のページの登録メディアは作るときに渡した）。
+    let imageUploadFailed = false
     for (let index = 0; index <= tabCount; index += 1) {
       const image = pendingImages[index]
       const pageId = res.data.pages[index]?.id
       if (!image || !pageId || (index === 0 && image.media && !image.file)) continue
+      const fromMedia = !image.file && Boolean(image.media)
       try {
         const file = image.file ?? (image.media && accountId ? await mediaToFile(image.media, accountId) : null)
-        if (file) await api.richMenuGroups.uploadImage(createdId, pageId, file)
+        if (file) {
+          const uploaded = await api.richMenuGroups.uploadImage(createdId, pageId, file)
+          if (uploaded && (uploaded as { success?: boolean }).success === false) {
+            throw new Error((uploaded as { error?: string }).error || '画像をアップロードできませんでした。')
+          }
+        }
       } catch (e) {
+        imageUploadFailed = true
         const fieldFailure = saveErrors.capture(e)
         // 下書き自体はできている。画像だけ失敗として知らせる。
-        { if (!fieldFailure)
-
-        setError(e instanceof ApiError ? imageUploadErrorText(e) : '登録メディアの画像を読み込めませんでした。もう一度お試しください。') }
+        if (!fieldFailure) {
+          setError(
+            e instanceof ApiError
+              ? imageUploadErrorText(e)
+              : fromMedia
+                ? '登録メディアの画像を読み込めませんでした。もう一度お試しください。'
+                : describeApiFailure(e, '画像のアップロード', { scope: 'store' }),
+          )
+        }
       }
     }
     await reloadGroup(createdId)
     pendingImages.forEach((image) => { if (image?.url) URL.revokeObjectURL(image.url) })
     setPendingImages([])
-    return true
+    return !imageUploadFailed
   }
 
 type PersistMenuDraftContext = {

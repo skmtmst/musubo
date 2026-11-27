@@ -96,7 +96,7 @@ export default function CatalogStarterSets() {
       {!loaded ? error ? null : <ListState kind="loading" /> : <>
         <div className={styles.head}><h2 className={styles.title}>{styleLabel(active)}の初期セット</h2>
           <StatusBadge tone="neutral">{catalogMode ? 'カタログから選択' : '従来の初期セット'}</StatusBadge>
-          <Button lockedReason={lock} disabled={busy || dirty || !current || role===null} onClick={()=>share.setDraft({target:'style',accounts:[],editedAction:'notify'})}>使っているアカウントへ配る</Button>
+          <Button lockedReason={lock} disabled={busy || dirty || !current || role===null} disabledReason={canEdit && dirty ? '変更を保存してから配ってください。' : undefined} onClick={()=>share.setDraft({target:'style',accounts:[],editedAction:'notify'})}>使っているアカウントへ配る</Button>
           {!catalogMode ? <Button onClick={()=>void viewCurrent()}>現在の中身を見る</Button> : null}</div>
         <SaveErrorField names={['autoInsert']}><ToggleField checked={auto} disabled={busy || role===null} lockedReason={lock} onChange={value=>{setAuto(value);setDirty(true)}}
           description="新しいアカウントでこのスタイルを選んだときに入ります。">新しいアカウントへ自動で入れる</ToggleField></SaveErrorField>

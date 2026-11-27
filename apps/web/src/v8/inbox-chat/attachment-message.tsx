@@ -7,6 +7,9 @@
  * 読めない形のときは今までどおり文字で出す（親が null を見て決める）。
  */
 import { Download, FileText } from 'lucide-react'
+import { useState } from 'react'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { formatExpiry, formatSize, parseSentAttachment } from './attachments'
 import styles from './inbox-chat.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -15,18 +18,7 @@ import TextLink from '@/components/shared/text-link'
 export default function AttachmentMessage({ messageType, content }: { messageType: string; content: string }) {
   const view = parseSentAttachment(messageType, content)
   if (!view) return <span>{messageType === 'video' ? '[動画]' : '[ファイル]'}</span>
-  if (view.kind === 'video') {
-    return (
-      <video
-        className={styles.sentVideo}
-        src={view.url}
-        poster={view.previewUrl ?? undefined}
-        controls
-        preload="metadata"
-        aria-label="送った動画"
-      />
-    )
-  }
+  if (view.kind === 'video') return <VideoAttachment key={view.url} url={view.url} previewUrl={view.previewUrl} />
   const expiry = formatExpiry(view.expiresAt)
   const sub = [view.size !== null ? formatSize(view.size) : null, expiry ? `ダウンロード ${expiry}` : null].filter(Boolean).join('・')
   const body = (
@@ -44,4 +36,11 @@ export default function AttachmentMessage({ messageType, content }: { messageTyp
   ) : (
     <span className={styles.sentFile}>{body}</span>
   )
+}
+
+
+function VideoAttachment({ url, previewUrl }: { url: string; previewUrl: string | null }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <div className={styles.sentVideo}><Notice tone="warn" action={<Button variant="text" onClick={() => setFailed(false)}>動画を読み込み直す</Button>}><TruncatedText value="動画を読み込めませんでした" /></Notice></div>
+  return <video className={styles.sentVideo} src={url} poster={previewUrl ?? undefined} controls preload="metadata" aria-label="送った動画" onError={() => setFailed(true)} />
 }

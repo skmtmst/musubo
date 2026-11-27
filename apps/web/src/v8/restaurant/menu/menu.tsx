@@ -92,33 +92,57 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const openNew = () => router.push(`/restaurant-test/menu/edit${store ? `?store=${encodeURIComponent(store.id)}` : ''}`)
   const openEdit = (item: RestaurantMenuItem) => router.push(`/restaurant-test/menu/edit?id=${encodeURIComponent(item.id)}`)
 
+  const isSameScope = (capturedScope: string) => JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation]) === capturedScope
+
   const stop = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId || !dataIsCurrent || !confirmedRevision || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
+    if (busy || !selectedAccountId || !dataIsCurrent || !confirmedRevision || !isSameScope(confirmationScope)) return
+    const capturedScope = currentScope
     void mutate(
       async () => {
         try { await restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'archived', expectedVersion: confirmedRevision }) }
-        catch (error) { if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') { setStopId(''); setConfirmedRevision(null); setRefreshConfirmation({kind:'stop',id:item.id,scope:currentScope,previous:data}); await reload(); throw new QuietError() }; throw error }
+        catch (error) {
+          if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') {
+            if (isSameScope(capturedScope)) { setStopId(''); setConfirmedRevision(null); setRefreshConfirmation({kind:'stop',id:item.id,scope:capturedScope,previous:data}); await reload() }
+            throw new QuietError()
+          }
+          throw error
+        }
       },
       'メニューを保管しました。予約履歴の参照は残ります。',
-    ).then((ok) => { if (ok) setStopId('') })
+    ).then((ok) => { if (ok && isSameScope(capturedScope)) setStopId('') })
   }
 
   /* 参照の有無は削除時にサーバで判定する。 */
   const remove = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId || !dataIsCurrent || !confirmedRevision || confirmationScope !== JSON.stringify([scopeVersion.current.key, scopeVersion.current.generation])) return
+    if (busy || !selectedAccountId || !dataIsCurrent || !confirmedRevision || !isSameScope(confirmationScope)) return
+    const capturedScope = currentScope
     void mutate(
       async () => {
         try { await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(item.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE', body: JSON.stringify({ expectedVersion: confirmedRevision }) }) }
-        catch (error) { if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') { setDeleteId(''); setConfirmedRevision(null); setRefreshConfirmation({kind:'delete',id:item.id,scope:currentScope,previous:data}); await reload(); throw new QuietError() }; setDeleteError(japaneseDetailOf(error) || '削除できませんでした。'); throw new QuietError() }
+        catch (error) {
+          if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') {
+            if (isSameScope(capturedScope)) { setDeleteId(''); setConfirmedRevision(null); setRefreshConfirmation({kind:'delete',id:item.id,scope:capturedScope,previous:data}); await reload() }
+            throw new QuietError()
+          }
+          if (isSameScope(capturedScope)) setDeleteError(japaneseDetailOf(error) || '削除できませんでした。')
+          throw new QuietError()
+        }
       },
       'メニューを削除しました。',
-    ).then((ok) => { if (ok) setDeleteId('') })
+    ).then((ok) => { if (ok && isSameScope(capturedScope)) setDeleteId('') })
   }
 
   const resume = (item: RestaurantMenuItem) => {
-    if (!selectedAccountId || !Number.isSafeInteger(item.confirmation_revision) || item.confirmation_revision < 1) return
+    if (busy || !selectedAccountId || !dataIsCurrent || !Number.isSafeInteger(item.confirmation_revision) || item.confirmation_revision < 1) return
+    const capturedScope = currentScope
     void mutate(
-      async () => { try { await restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'active', expectedVersion: item.confirmation_revision }) } catch (error) { if (error instanceof ApiError && error.code === 'menu_confirmation_conflict') await reload(); throw error } },
+      async () => {
+        try { await restaurantTestApi.updateMenu(selectedAccountId, item.id, { status: 'active', expectedVersion: item.confirmation_revision }) }
+        catch (error) {
+          if (error instanceof ApiError && error.code === 'menu_confirmation_conflict' && isSameScope(capturedScope)) await reload()
+          throw error
+        }
+      },
       'メニューを再開しました。',
     )
   }
@@ -180,7 +204,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <ActionCell className={styles.colOps}>
                     {canEdit || lockReason ? (
                       <span className={styles.rowActions}>
-                        {archived ? <PermissionGatedButton allowed={canEdit} disabled={busy} onClick={() => resume(item)}>再開</PermissionGatedButton> : null}
+                        {archived ? <PermissionGatedButton allowed={canEdit} disabled={busy || !dataIsCurrent} onClick={() => resume(item)}>再開</PermissionGatedButton> : null}
                         <RowMore
                           subject={`メニュー「${item.name}」`}
                           lockedReason={canEdit ? undefined : lockReason}

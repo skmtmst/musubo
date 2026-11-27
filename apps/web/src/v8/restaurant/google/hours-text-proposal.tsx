@@ -8,14 +8,22 @@ import type { GoogleChange, GoogleProfileData } from '@/lib/restaurant-google-ap
 import { hoursText, workspaceDay } from './hours-model'
 import styles from './hours.module.css'
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
 const longDate = (date: string) => {
+ if (!ISO_DATE.test(date)) return date
  const [year, month, day] = date.split('-').map(Number)
  return `${year}年${month}月${day}日`
 }
 
 /** 読み取った実際の日付と営業状態を、確認しやすい変更案にまとめる。 */
 export function HoursTextProposal({ change, data, workspace, holidays, onEditDates }: { change: GoogleChange; data:GoogleProfileData; workspace:HoursWorkspace; holidays:Array<{date:string}>; onEditDates: (dates: string[]) => void }) {
- const days = change.kind === 'special_hours' ? [...change.after as OpeningDate[]].sort((a,b)=>a.date.localeCompare(b.date)) : []
+ const rawDays = change.kind === 'special_hours' && Array.isArray(change.after) ? change.after as OpeningDate[] : []
+ const byDate = new Map<string, OpeningDate>()
+ for (const entry of rawDays) {
+  if (entry && typeof entry.date === 'string' && ISO_DATE.test(entry.date)) byDate.set(entry.date, entry)
+ }
+ const days = [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date))
  const dates = days.map(d=>d.date)
  const contiguous = dates.length > 0 && hoursDateRange(dates[0],dates[dates.length-1]).length === dates.length
  const sameHours = days.length > 0 && days.every(d=>d.closed===days[0].closed && JSON.stringify(d.periods)===JSON.stringify(days[0].periods) && d.remove===days[0].remove)

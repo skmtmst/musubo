@@ -16,10 +16,16 @@ export function stateOf(row: HqTemplate): { label: string; tone: 'live' | 'chang
 }
 
 
-/** 合計（API-18）。1つでも数えていない行があれば null（「—」）。 */
+/** 件数は0以上の整数だけが確定値。 */
+export function isKnownCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+}
+
+/** 合計（API-18）。1つでも不明・不正な行があれば null（「—」）。 */
 export function sumOrNull(values: Array<number | null | undefined>): number | null {
-  if (values.some((value) => value == null)) return null
-  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+  if (!values.every(isKnownCount)) return null
+  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+  return Number.isSafeInteger(total) ? total : null
 }
 
 

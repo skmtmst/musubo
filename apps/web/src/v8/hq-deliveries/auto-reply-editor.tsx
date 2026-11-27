@@ -76,6 +76,9 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
   const req = (label: string, required: boolean) => ({ label, requirement: canEdit ? { required } : undefined, optional: canEdit && !required })
   const inserts = [...new Set((text.match(/\{\{[^}]+\}\}/g) ?? []).map((token) => token === '{{name}}' ? '名前（無いときは「お客さま」）' : token === '{{account.name}}' ? '店名' : token === '{{var.store_phone}}' ? '店の電話番号' : token === '{{var.reservation_url}}' ? '予約ページ' : '友だち情報'))]
   const next = NEXT[step]
+  const nextReason = step === 'basic' ? '統括での名前と店に届く名前を入力してください。'
+    : step === 'trigger' ? 'キーワードを入力してください。'
+      : '返信する内容を入力してください。'
 
   const preview = <>
     <CreateSummaryCard title="送るものの確認" rows={[
@@ -102,8 +105,8 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
     footerActions={<>
       {/* ページ内に戻るは置かない（決まり）。前の段へは上の手順の段から戻る。 */}
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
-      {<PermissionGatedButton allowed={canEdit} disabled={busy || !name.trim()} title={!name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</PermissionGatedButton>}
-      {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}>{`次へ：${STEP_LABELS[next]}`}<ArrowRight size={16} aria-hidden="true" /></Button> : null}
+      {<PermissionGatedButton allowed={canEdit} disabled={busy || !name.trim()} disabledReason={!busy && canEdit && !name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</PermissionGatedButton>}
+      {next ? <Button variant="primary" disabled={busy || !done(step)} disabledReason={!busy && !done(step) ? nextReason : undefined} onClick={() => setStep(next)}>{`次へ：${STEP_LABELS[next]}`}<ArrowRight size={16} aria-hidden="true" /></Button> : null}
     </>}>
     {step === 'basic' ? <Card variant="form" gap="normal">
       <CardHeader size="stacked" title="基本設定" />

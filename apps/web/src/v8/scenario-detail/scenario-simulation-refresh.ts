@@ -24,13 +24,15 @@ export interface ScenarioSimulationResult {
 export function scenarioSimulationKey(
   scenario: Pick<
     ScenarioWithSteps,
-    'lineAccountId' | 'audienceCondition' | 'allowConcurrent' | 'triggerType' | 'steps'
+    'id' | 'deliveryMode' | 'lineAccountId' | 'audienceCondition' | 'allowConcurrent' | 'triggerType' | 'steps'
   > | null,
   /** 開始のきっかけの数。WEB229：同じ数のまま中身を変えたときも鍵が変わるよう、版つきの文字も受ける。 */
   triggerCount: number | string | null,
 ): string {
   if (!scenario) return ''
   return JSON.stringify({
+    scenarioId: scenario.id,
+    deliveryMode: scenario.deliveryMode ?? 'relative',
     account: scenario.lineAccountId,
     audience: scenario.audienceCondition ?? null,
     allowConcurrent: scenario.allowConcurrent ?? null,

@@ -91,7 +91,7 @@ describe('プールからアカウントを外す確認', () => {
     )
     expect(body, '生のAPIエラーをそのまま出している').not.toMatch(/setRemoveError\(\s*(res\.error|String\(|e\b)/)
     expect(body, '成功していないのに一覧を作り直している').toMatch(
-      /throw new Error\(res\.error\)[\s\S]*await reload\(\)/,
+      /throw new Error\(res\.error\)[\s\S]*await reload\(\{ force: true \}\)/,
     )
   })
 

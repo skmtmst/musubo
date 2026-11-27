@@ -556,7 +556,8 @@ export function ScenarioDetailDialogs({
           value={(scenario.audienceCondition as SegmentCondition | null) ?? null}
           onSave={async (next) => {
             const res = await api.scenarios.update(id, { audienceCondition: next } as never)
-            if (res.success) await loadScenario(true)
+            if (!res.success) throw new Error(res.error || '条件を保存できませんでした。')
+            await loadScenario(true)
           }}
           onClose={() => setAudienceOpen(false)}
         />
@@ -573,7 +574,7 @@ export function ScenarioDetailDialogs({
               onCompleteMode: mode,
               onCompleteScenarioId: target,
             } as never)
-            if (!res.success) return res.error
+            if (!res.success) return res.error || '設定を保存できませんでした。'
             await loadScenario(true)
             return null
           }}

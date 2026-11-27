@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, type RefObject } from 'react'
 import { listRowContentLines } from './list-row-density.mjs'
+import { scheduleTableMeasure } from './table-measure-batch'
 
 /** : the table owns density, including wrapping, loading and filtering. */
 export function useListRowDensity(ref: RefObject<HTMLElement | null>) {
@@ -9,12 +10,14 @@ export function useListRowDensity(ref: RefObject<HTMLElement | null>) {
     const table = ref.current
     const view = table?.ownerDocument.defaultView
     if (!table || !view?.requestAnimationFrame) return
-    let frame = 0
+    let cancel: (() => void) | null = null
     let disposed = false
+    const taskKey = {}
     const measure = () => {
-      if (disposed || frame) return
-      frame = view.requestAnimationFrame(() => {
-        frame = 0
+      if (disposed || cancel) return
+      cancel = scheduleTableMeasure(view, taskKey, () => {
+        cancel = null
+        if (disposed) return
         const list = table.closest('[data-list-skeleton], [data-page-template="list"]')
           || table.dataset.tablePresentation === 'template-list'
         const dedicated = table.dataset.tablePresentation && !['template-list', 'event-list'].includes(table.dataset.tablePresentation)
@@ -27,14 +30,16 @@ export function useListRowDensity(ref: RefObject<HTMLElement | null>) {
           const lines = !list || dedicated || generalCard ? undefined : String(listRowContentLines(row))
           if (row.dataset.listContentLines !== lines) changes.push([row, lines])
         }
-        // Changing a native row's height before reading the next row forces
-        // layout for the entire table. Read every row, then commit together.
-        if (generalCard) {
-          if (table.dataset.listDensityScope !== 'general') table.dataset.listDensityScope = 'general'
-        } else if (table.dataset.listDensityScope) delete table.dataset.listDensityScope
-        for (const [row, lines] of changes) {
-          if (lines === undefined) delete row.dataset.listContentLines
-          else row.dataset.listContentLines = lines
+        return () => {
+          // Changing a native row's height before reading the next row forces
+          // layout for the entire table. Read every row, then commit together.
+          if (generalCard) {
+            if (table.dataset.listDensityScope !== 'general') table.dataset.listDensityScope = 'general'
+          } else if (table.dataset.listDensityScope) delete table.dataset.listDensityScope
+          for (const [row, lines] of changes) {
+            if (lines === undefined) delete row.dataset.listContentLines
+            else row.dataset.listContentLines = lines
+          }
         }
       })
     }
@@ -44,9 +49,10 @@ export function useListRowDensity(ref: RefObject<HTMLElement | null>) {
     sizes?.observe(table)
     view.addEventListener('resize', measure)
     table.addEventListener('load', measure, true)
-    table.ownerDocument.fonts?.addEventListener('loadingdone', measure)
-    void table.ownerDocument.fonts?.ready.then(() => { if (!disposed) measure() })
+    const fonts = table.ownerDocument.fonts
+    fonts?.addEventListener('loadingdone', measure)
+    if (fonts && fonts.status !== 'loaded') void fonts.ready.then(() => { if (!disposed) measure() })
     measure()
-    return () => { disposed = true; view.cancelAnimationFrame(frame); mutations.disconnect(); sizes?.disconnect(); view.removeEventListener('resize', measure); table.removeEventListener('load', measure, true); table.ownerDocument.fonts?.removeEventListener('loadingdone', measure) }
+    return () => { disposed = true; cancel?.(); cancel = null; mutations.disconnect(); sizes?.disconnect(); view.removeEventListener('resize', measure); table.removeEventListener('load', measure, true); fonts?.removeEventListener('loadingdone', measure) }
   }, [ref])
 }

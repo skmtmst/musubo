@@ -235,7 +235,7 @@ export default function StoreNewV8() {
       </>
     }
     if (step === STEP.BASICS) return <><Button href="/hq">キャンセル</Button><Button variant="primary" onClick={nextFromBasics}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
-    if (step === STEP.OFFICIAL_ACCOUNT) return <><Button onClick={() => setStep(STEP.BASICS)}>戻る</Button><Button variant="primary" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
+    if (step === STEP.OFFICIAL_ACCOUNT) return <><Button onClick={() => setStep(STEP.BASICS)}>戻る</Button><Button variant="primary" disabled={!officialAccountReady} disabledReason={!officialAccountReady ? 'LINE公式アカウントの作成を確認してください。' : undefined} onClick={() => setStep(STEP.CREDENTIALS)}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
     if (step === STEP.CREDENTIALS) return <><Button onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)}>戻る</Button><Button variant="primary" onClick={nextFromCredentials}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
     if (created) {
       return selectedAccountId

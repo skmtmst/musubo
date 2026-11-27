@@ -102,8 +102,14 @@ export default function BalancesTab() {
   const [allMembers, setAllMembers] = useState<MileageFriendV6[] | null>(null)
   const [grantedMiles, setGrantedMiles] = useState<number | null>(null)
   const [decreasedMiles, setDecreasedMiles] = useState<number | null>(null)
+  const [historyFailed, setHistoryFailed] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const reloadSeqRef = useRef(0)
+  const historySeqRef = useRef(0)
+  const historyLoadingRef = useRef(false)
+  const approvalLoadingRef = useRef(false)
   const [searchInput, setSearchInput] = useListUrlValue('q', '')
   const [search, setSearch] = useListUrlValue('q', '')
   const [offset, setOffset] = useListUrlValue('offset', 0)
@@ -112,6 +118,7 @@ export default function BalancesTab() {
   const [pendingOnly, setPendingOnly] = useListUrlValue('pendingOnly', false)
   const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)
   const [approvalFailed, setApprovalFailed] = useState(false)
+  const [approvalLoading, setApprovalLoading] = useState(false)
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
   const [approvalError, setApprovalError] = useState('')
   const [rejectTarget, setRejectTarget] = useState<MileageAdjustmentApprovalRequest | null>(null)
@@ -161,34 +168,72 @@ export default function BalancesTab() {
     return res.data.balanceSource
   }, [chipActive, offset, pageSize, search, selectedAccountId])
 
-  const reloadAll = useCallback(async () => {
-    setLoading(true)
-    setLoadError(false)
+  const loadHistorySummary = useCallback(async (accountId: string, expectedSeq?: number) => {
+    const seq = expectedSeq ?? ++historySeqRef.current
+    historyLoadingRef.current = true
+    setHistoryLoading(true)
+    setHistoryFailed(false)
     try {
-      const source = await loadOverview()
-      if (source === 'musubo' && selectedAccountId && latestAccountRef.current === selectedAccountId) {
-        const historyRes = await api.mileage.history({
-          accountId: selectedAccountId,
-          from: dateOnlyDaysAgo(29),
-          to: dateOnlyDaysAgo(0),
-          limit: 1,
-          offset: 0,
-        })
-        if (latestAccountRef.current !== selectedAccountId) return
-        if (historyRes.success) {
-          const byType = (historyRes.data as MileageAdminHistory).summary.byType
-          setGrantedMiles(byType.find((item) => item.entryType === 'grant')?.amount ?? 0)
-          setDecreasedMiles(byType
-            .filter((item) => item.entryType !== 'grant')
-            .reduce((sum, item) => sum + Math.abs(item.amount ?? 0), 0))
-        }
+      const historyRes = await api.mileage.history({
+        accountId,
+        from: dateOnlyDaysAgo(29),
+        to: dateOnlyDaysAgo(0),
+        limit: 1,
+        offset: 0,
+      })
+      if (historySeqRef.current !== seq || latestAccountRef.current !== accountId || !alive.current) return
+      if (historyRes.success && Array.isArray((historyRes.data as MileageAdminHistory)?.summary?.byType)) {
+        const byType = (historyRes.data as MileageAdminHistory).summary.byType
+        setGrantedMiles(byType.find((item) => item.entryType === 'grant')?.amount ?? 0)
+        setDecreasedMiles(byType
+          .filter((item) => item.entryType !== 'grant')
+          .reduce((sum, item) => sum + Math.abs(item.amount ?? 0), 0))
+        setHistoryFailed(false)
+      } else {
+        setGrantedMiles(null)
+        setDecreasedMiles(null)
+        setHistoryFailed(true)
       }
     } catch {
-      setLoadError(true)
+      if (historySeqRef.current !== seq || latestAccountRef.current !== accountId || !alive.current) return
+      setGrantedMiles(null)
+      setDecreasedMiles(null)
+      setHistoryFailed(true)
     } finally {
-      setLoading(false)
+      if (historySeqRef.current === seq) {
+        historyLoadingRef.current = false
+        setHistoryLoading(false)
+      }
     }
-  }, [loadOverview, selectedAccountId])
+  }, [])
+
+  const retryHistory = useCallback(() => {
+    if (!selectedAccountId || historyLoadingRef.current) return
+    void loadHistorySummary(selectedAccountId)
+  }, [loadHistorySummary, selectedAccountId])
+
+  const reloadAll = useCallback(async () => {
+    const seq = ++reloadSeqRef.current
+    const historySeq = ++historySeqRef.current
+    historyLoadingRef.current = false
+    setLoading(true)
+    setLoadError(false)
+    setGrantedMiles(null)
+    setDecreasedMiles(null)
+    setHistoryFailed(false)
+    setHistoryLoading(false)
+    try {
+      const source = await loadOverview()
+      if (reloadSeqRef.current !== seq) return
+      if (source === 'musubo' && selectedAccountId && latestAccountRef.current === selectedAccountId) {
+        await loadHistorySummary(selectedAccountId, historySeq)
+      }
+    } catch {
+      if (reloadSeqRef.current === seq) setLoadError(true)
+    } finally {
+      if (reloadSeqRef.current === seq) setLoading(false)
+    }
+  }, [loadHistorySummary, loadOverview, selectedAccountId])
 
   useEffect(() => {
     if (accountLoading) return
@@ -210,10 +255,15 @@ export default function BalancesTab() {
   const loadApprovals = useCallback(async () => {
     const requestScope = scope.current.generation
     if (!selectedAccountId) {
+      approvalLoadingRef.current = false
+      setApprovalLoading(false)
       setApprovalRequests(null)
       setApprovalFailed(false)
       return
     }
+    if (approvalLoadingRef.current) return
+    approvalLoadingRef.current = true
+    setApprovalLoading(true)
     try {
       const response = await api.mileage.adjustmentApprovals(selectedAccountId, 'pending')
       if (!alive.current || requestScope !== scope.current.generation) return
@@ -224,6 +274,9 @@ export default function BalancesTab() {
       if (!alive.current || requestScope !== scope.current.generation) return
       setApprovalRequests(null)
       setApprovalFailed(true)
+    } finally {
+      approvalLoadingRef.current = false
+      if (alive.current && requestScope === scope.current.generation) setApprovalLoading(false)
     }
   }, [selectedAccountId])
 
@@ -322,6 +375,7 @@ export default function BalancesTab() {
         icon={<Users size={16} aria-hidden="true" />}
         value={ready ? summary.totalMembers : null}
         unit="人"
+        loading={loading}
         detail={ready ? `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人` : emptyValue('unknown')}
       />
       <KpiCard
@@ -330,6 +384,7 @@ export default function BalancesTab() {
         icon={<Wallet size={16} aria-hidden="true" />}
         value={ready && (!ecSource || (overview?.ecKnownCount ?? 0) > 0) ? summary.available : null}
         unit=""
+        loading={loading}
         detail={ready
           ? ecSource ? `ECと同期・取得済み ${formatMileageNumber(overview?.ecKnownCount ?? 0)} 人` : `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round((summary.available ?? 0) / summary.totalMembers) : 0)} マイル`
           : emptyValue('unknown')}
@@ -338,17 +393,21 @@ export default function BalancesTab() {
         presentation="band"
         title="直近30日 増えた"
         icon={<TrendingUp size={16} aria-hidden="true" />}
-        value={!loading && !loadError ? grantedMiles ?? 0 : null}
+        value={ready && !historyFailed ? grantedMiles : null}
         unit=""
-        detail="この30日に付いた分"
+        loading={loading || historyLoading}
+        detail={ready && historyFailed ? '集計を読み込めませんでした' : 'この30日に付いた分'}
+        onRetry={ready && historyFailed && !historyLoading ? retryHistory : undefined}
       />
       <KpiCard
         presentation="band"
         title="直近30日 減った"
         icon={<TrendingDown size={16} aria-hidden="true" />}
-        value={!loading && !loadError ? decreasedMiles ?? 0 : null}
+        value={ready && !historyFailed ? decreasedMiles : null}
         unit=""
-        detail="交換・取り消し"
+        loading={loading || historyLoading}
+        detail={ready && historyFailed ? '集計を読み込めませんでした' : '交換・取り消し'}
+        onRetry={ready && historyFailed && !historyLoading ? retryHistory : undefined}
       /></> : null}
     </KpiBand>
   )
@@ -397,7 +456,7 @@ export default function BalancesTab() {
       <p className={styles.approvalTitle}>承認待ちのマイル変更</p>
       <p className={styles.approvalNote}>承認待ちを読み込めませんでした。依頼があるか分からない状態です。</p>
       <div>
-        <Button onClick={() => loadApprovals()} busyLabel="処理中…">もう一度読み込む</Button>
+        <Button onClick={() => void loadApprovals()} disabled={approvalLoading} busy={approvalLoading} busyLabel="読み込み中…">もう一度読み込む</Button>
       </div>
     </section>
   ) : null

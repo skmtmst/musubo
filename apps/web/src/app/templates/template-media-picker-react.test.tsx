@@ -132,7 +132,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-describe('テンプレート作成の「登録メディアから選択する」（N-193）', () => {
+describe('テンプレート作成で登録メディアから選択する', () => {
   it('リッチメッセージ: 押すと選択窓が開き、選んだID・種別・URLが保存値へ載る', async () => {
     await renderEditor('rich_message')
     expect(fixture.listCalls).toEqual([])

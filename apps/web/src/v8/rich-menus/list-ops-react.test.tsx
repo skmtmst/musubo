@@ -60,7 +60,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         duplicate: (...args: unknown[]) => mocks.duplicate(...args),
         external: () => Promise.resolve({
           success: true,
-          data: { currentDefault: null, lineMenus: [{ richMenuId: 'line-only', name: '外部メニュー', areasCount: 1, size: { width: 2500, height: 843 }, adminManaged: false }] },
+          data: { currentDefault: null, lineMenus: [{ richMenuId: 'line-only', name: '外部メニュー', areasCount: 1, areas: [{ bounds: { x: 0, y: 0, width: 2500, height: 843 }, action: { type: 'uri', label: null, url: 'https://example.com', text: null, displayText: null, richMenuAliasId: null, supported: true, unsupportedReason: null } }], size: { width: 2500, height: 843 }, adminManaged: false }] },
         }),
         tapStats: () => Promise.resolve({ success: true, data: { from: '2026-10-01', to: '2026-11-01', total: 0, byGroup: [], byArea: [] } }),
         deleteImpact: (...args: unknown[]) => mocks.deleteImpact(...args),

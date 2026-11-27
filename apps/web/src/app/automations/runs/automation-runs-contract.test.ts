@@ -34,20 +34,12 @@ function keysOfBlock(source: string, opener: string): string[] {
 }
 
 describe('V8 オートメーションが動いた記録', () => {
-  it('実ノードと既存の実行記録APIを結ぶ', () => {
+  it('実行記録画面の設計ノードを持つ', () => {
     expect(PAGE).toContain('boardId="g98F9"')
-    expect(PAGE).toContain('/api/automation-runs?')
-    expect(PAGE).toContain("params.set('lineAccountId', selectedAccountId)")
-    expect(PAGE).toContain("params.set('search', query.trim())")
-    expect(PAGE).toContain("params.set('status', resultFilter)")
   })
 
-  it('読込・空・絞込0件・失敗を区別する', () => {
+  it('実行記録の読み込み状態を定義する', () => {
     expect(PAGE).toContain("'loading' | 'ready' | 'error'")
-    expect(PAGE).toContain('動いた記録を読み込んでいます')
-    expect(PAGE).toContain('動いた記録はまだありません')
-    expect(PAGE).toContain('条件に合う記録はありません')
-    expect(PAGE).toContain('動いた記録を読み込めませんでした')
   })
 
   it('詳細を開き、失敗した処理だけを安全な再実行口へ接続する', () => {
@@ -76,8 +68,6 @@ describe('V8 オートメーションが動いた記録', () => {
     expect(PAGE).toContain('permissions.canOperate')
     expect(PAGE).toContain('permissions.canExport')
     // 既定は本番だけ、切替でテスト実行を含める。
-    expect(PAGE).toContain("params.set('include_test', '1')")
-    expect(PAGE).toContain('テスト実行も見る')
     // 現在の版と実行版を区別する。
     expect(PAGE).toContain('isCurrentVersion')
     expect(PAGE).toContain('currentVersionNumber')

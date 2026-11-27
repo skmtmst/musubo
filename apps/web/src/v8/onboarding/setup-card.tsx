@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import { CircleCheck, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { RowStatusActions } from '@/components/shared/row-actions'
@@ -11,7 +11,8 @@ import { ProgressBar, StepMark } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import { SetupStepList, SetupStepRow, SetupStepLabel } from '@/components/shared/setup-step-row'
-import { permissionLockReason } from '@/components/shared/permission-lock'
+import { PERMISSION_LOCK_REASON, permissionLockReason } from '@/components/shared/permission-lock'
+import { readPermissionSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
 import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, setupWarningsForStyle, type SetupSummary, type TodoRow } from './model'
@@ -32,10 +33,22 @@ export function setupSummary(data: StyleSetupData | null, includeComplete = fals
   return summary.rows.length > 0 || includeComplete ? summary : null
 }
 
+const subscribeSession = (listener: () => void) => {
+  window.addEventListener(SESSION_SNAPSHOT_CHANGED, listener)
+  return () => window.removeEventListener(SESSION_SNAPSHOT_CHANGED, listener)
+}
+
 /** 標準と業種のホームで、同じ復旧理由と権限に応じた入口を出す。 */
 export function ReservationFormRepairNotices({notices,role}:{notices?:readonly {message:string;href:string}[];role:string|null}){
-  const canRepair=role==='owner'||role==='admin'
-  return <>{notices?.map(item=><Notice key={item.href} tone="warn" action={<Button {...(canRepair?{href:item.href}:{disabled:true})} lockedReason={permissionLockReason(role,canRepair,'manager')}>予約フォームを直す →</Button>}>{item.message}</Notice>)}</>
+  const session = useSyncExternalStore(subscribeSession, readPermissionSessionSnapshot, () => null)
+  const readOnlyImpersonation = session?.impersonation?.mode === 'read'
+  const canRepair = !readOnlyImpersonation && (role === 'owner' || role === 'admin')
+  const lockReason = role === null
+    ? undefined
+    : readOnlyImpersonation
+      ? PERMISSION_LOCK_REASON.impersonation
+      : permissionLockReason(role, canRepair, 'manager')
+  return <>{notices?.map(item=><Notice key={item.href} tone="warn" action={<Button {...(canRepair?{href:item.href}:role===null?{disabled:true}:{})} lockedReason={lockReason}>予約フォームを直す →</Button>}>{item.message}</Notice>)}</>
 }
 
 /** 警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。ホーム（dashboard・style-dashboard）では呼ばない。 */

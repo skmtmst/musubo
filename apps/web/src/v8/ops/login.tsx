@@ -41,6 +41,7 @@ export default function OpsLoginV8() {
   const [password, setPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
+  const busyRef = useRef<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const turnstileRef = useRef<TurnstileHandle | null>(null)
@@ -51,6 +52,7 @@ export default function OpsLoginV8() {
   useEffect(() => {
     const restore = (event: PageTransitionEvent) => {
       if (!event.persisted) return
+      busyRef.current = null
       setBusy(null)
       turnstileRef.current?.reset()
     }
@@ -70,6 +72,7 @@ export default function OpsLoginV8() {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (busyRef.current !== null) return
     const emailProblem = emailError(email)
     setEmailMessage(emailProblem)
     if (emailProblem) return
@@ -81,6 +84,7 @@ export default function OpsLoginV8() {
       setError('「私はロボットではありません」の確認を済ませてください')
       return
     }
+    busyRef.current = 'password'
     setBusy('password')
     setError('')
     const res = await authRequest<{ twoFactor: boolean; twoFactorSetup?: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
@@ -92,6 +96,7 @@ export default function OpsLoginV8() {
     turnstileRef.current?.reset()
     if (!res.ok || !res.data) {
       setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? 'ログインできませんでした。時間をおいて、もう一度お試しください。')
+      busyRef.current = null
       setBusy(null)
       return
     }
@@ -120,6 +125,7 @@ export default function OpsLoginV8() {
           return
         }
         setError('ログインはできましたが、運営メンバーではありません。')
+        busyRef.current = null
         setBusy(null)
         return
       }
@@ -129,6 +135,7 @@ export default function OpsLoginV8() {
       { if (!fieldFailure)
 
       setError('ログイン状態を確認できませんでした。もう一度お試しください。') }
+      busyRef.current = null
       setBusy(null);
 
       return
@@ -137,10 +144,15 @@ export default function OpsLoginV8() {
   }
 
   const lineLogin = () => {
+    if (busyRef.current !== null) return
+    busyRef.current = 'line'
     setBusy('line')
     resetAuthSelectionCleared(localStorage, sessionStorage)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    if (!apiUrl) return setBusy(null)
+    if (!apiUrl) {
+      busyRef.current = null
+      return setBusy(null)
+    }
     window.location.assign(`${apiUrl}/api/auth/line?${new URLSearchParams({ next: 'ops', handoff: beginAdminLoginHandoff() })}`)
   }
 

@@ -16,6 +16,7 @@ export function formatPreviousDate(startsAt: string): string {
 }
 
 type Ready = {
+  source: MenuItem[] | null | undefined;
   menu: MenuItem;
   staff: StaffItem;
   startsAt: string;
@@ -26,8 +27,7 @@ type Ready = {
  * 1-0 前回と同じで予約 (booking-plus 1)。
  * 予約の最初に、前回の予約（メニュー・担当・前回の日）を札で出す。
  * 押すとメニューと担当が入ったまま日時へ直接進む。
- * 対象外（履歴なし・担当が辞めた・メニューが止まっている）・読み込み失敗は
- * 黙って出さない（今までどおりの最初になる）。
+ * 対象外（履歴なし・担当が辞めた・メニューが止まっている）は表示しない。
  */
 export default function RepeatCard({
   menus: menusProp,
@@ -39,9 +39,12 @@ export default function RepeatCard({
   onRepeat: (menu: MenuItem, staff: StaffItem) => void;
 }) {
   const [ready, setReady] = useState<Ready | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let alive = true;
+    setReady(null); setFailed(false);
     (async () => {
       try {
         const menus = menusProp ?? (await api.menus()).menus;
@@ -56,6 +59,7 @@ export default function RepeatCard({
         const staff = staffRes.staff.find((s) => s.id === res.booking!.staff.id);
         if (!staff) return;
         setReady({
+          source: menusProp,
           menu,
           staff,
           startsAt: res.booking.starts_at,
@@ -63,14 +67,16 @@ export default function RepeatCard({
         });
       } catch (e) {
         logFailure('last-booking', e);
+        if (alive) setFailed(true);
       }
     })();
     return () => {
       alive = false;
     };
-  }, [menusProp]);
+  }, [menusProp, retry]);
 
-  if (!ready) return null;
+  if (failed) return <Button variant="secondary" onClick={() => setRetry(n => n + 1)}>前回の予約を読み直す</Button>;
+  if (!ready || ready.source !== menusProp) return null;
 
   return (
     <Button variant="option"

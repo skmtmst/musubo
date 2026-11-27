@@ -39,10 +39,16 @@ export interface RefSummaryData {
 export function isRefSummaryData(value: unknown): value is RefSummaryData {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RefSummaryData>
+  const isCount = (count: unknown): count is number => typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
   return Array.isArray(candidate.routes)
-    && Number.isFinite(candidate.totalFriends)
-    && Number.isFinite(candidate.friendsWithRef)
-    && Number.isFinite(candidate.friendsWithoutRef)
+    && candidate.routes.every((row) => row != null && typeof row === 'object'
+      && typeof row.refCode === 'string'
+      && (row.name == null || typeof row.name === 'string')
+      && isCount(row.friendCount) && isCount(row.clickCount)
+      && (row.latestAt == null || typeof row.latestAt === 'string'))
+    && isCount(candidate.totalFriends)
+    && isCount(candidate.friendsWithRef)
+    && isCount(candidate.friendsWithoutRef)
 }
 
 export interface TrackedLinkRow {

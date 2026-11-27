@@ -97,7 +97,18 @@ export function selectedValue(answer: SetupAnswer | undefined, question?: Questi
 /** 予約設定に書く答え（口は approval を予約設定の承認の仕方へ書く）。 */
 export const SETTINGS_KEYS = ['approval']
 
-const same = (a: SetupAnswer | undefined, b: SetupAnswer | undefined) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b))
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+const same = (a: SetupAnswer | undefined, b: SetupAnswer | undefined) => canonicalJson(a ?? null) === canonicalJson(b ?? null)
 
 /** 前に保存した答えから変わった物だけ。 */
 export function changedAnswers(saved: Record<string, SetupAnswer>, next: Record<string, SetupAnswer>): Record<string, SetupAnswer> {
@@ -105,6 +116,10 @@ export function changedAnswers(saved: Record<string, SetupAnswer>, next: Record<
 }
 
 const APPROVAL_WORD: Record<string, string> = { automatic: 'その場で確定する', manual: 'お店が承認してから確定する' }
+const approvalLabel = (value: unknown) => {
+  const key = String(value)
+  return Object.hasOwn(APPROVAL_WORD, key) ? APPROVAL_WORD[key] : key
+}
 
 /** 予約設定のどこがどう変わるか（確かめの窓の文）。変わらなければ空。 */
 export function settingsChanges(saved: Record<string, SetupAnswer>, next: Record<string, SetupAnswer>): string[] {
@@ -112,8 +127,10 @@ export function settingsChanges(saved: Record<string, SetupAnswer>, next: Record
   const lines: string[] = []
   const approval = changed.approval
   if (approval?.mode === 'configured') {
-    const before = saved.approval?.mode === 'configured' ? APPROVAL_WORD[String(saved.approval.value)] : null
-    lines.push(`予約の確定の仕方：${before ? `${before} → ` : ''}${APPROVAL_WORD[String(approval.value)] ?? String(approval.value)}`)
+    const before = saved.approval?.mode === 'configured' && Object.hasOwn(APPROVAL_WORD, String(saved.approval.value))
+      ? APPROVAL_WORD[String(saved.approval.value)]
+      : null
+    lines.push(`予約の確定の仕方：${before ? `${before} → ` : ''}${approvalLabel(approval.value)}`)
   }
   return lines
 }
@@ -147,7 +164,7 @@ export const FEATURES: Record<string, { name: string; opens: string; settingHref
 }
 
 export function featureName(feature: string): string {
-  return FEATURES[feature]?.name ?? feature
+  return Object.hasOwn(FEATURES, feature) ? FEATURES[feature].name : feature
 }
 
 /** 機能の設定の画面。口の href は今の画面に無い道（/booking/settings 等）があるので、画面の表を先に使う。 */
@@ -155,7 +172,7 @@ export function featureHref(feature: string, fallback?: string, style?: AccountS
   if (style === 'lesson' && (feature === 'booking' || feature === 'history')) return '/events'
   if (feature === 'meeting') return '/booking/menus?tab=staff'
   if (feature === 'auto_line') return '/ec-commerce?tab=auto-line'
-  return FEATURES[feature]?.settingHref ?? fallback ?? '/'
+  return (Object.hasOwn(FEATURES, feature) ? FEATURES[feature].settingHref : undefined) ?? fallback ?? '/'
 }
 
 /* ── 見本のリッチメニュー（wI4ZX）。色は見本の画像の色（globals.css の --sample-*） ───────────── */

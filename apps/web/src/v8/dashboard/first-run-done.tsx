@@ -30,7 +30,7 @@ const KIND_ROWS: ReadonlyArray<{ kind: Exclude<StarterSetItem['kind'], 'dashboar
 const RUNNING = new Set(['active', 'published'])
 
 type ItemState = { kind: string; status: string | null }
-export type DoneRow = { kind: string; label: string; badge: { tone: StatusBadgeTone; text: string } }
+export type DoneRow = { kind: string; label: string; badge: { tone: StatusBadgeTone; text: string }; hasStopped?: boolean }
 
 /** 入った物を種類ごとに 1 行。送る物は動いているか止めているか、入らなかった種類は「入れなかった（あとで）」。 */
 export function doneRows(definition: ReadonlyArray<Pick<StarterSetItem, 'kind'>>, items: ReadonlyArray<ItemState>): DoneRow[] {
@@ -41,7 +41,15 @@ export function doneRows(definition: ReadonlyArray<Pick<StarterSetItem, 'kind'>>
     if (inserted.length === 0) return [{ kind, label, badge: { tone: 'neutral', text: '入れなかった（あとで）' } }]
     if (kind === 'template') return [{ kind, label, badge: { tone: 'neutral', text: '入っています' } }]
     const running = inserted.some((item) => item.status !== null && RUNNING.has(item.status))
-    return [{ kind, label, badge: running ? { tone: 'success', text: '動いています' } : { tone: 'warning', text: '止めています' } }]
+    const hasStopped = inserted.some((item) => item.status !== null && item.status !== 'missing' && !RUNNING.has(item.status))
+    const missingCount = inserted.filter((item) => item.status === 'missing').length
+    if (missingCount > 0) {
+      return [{ kind, label, badge: { tone: 'warning', text: missingCount === inserted.length ? '見つかりません' : '一部見つかりません' }, hasStopped }]
+    }
+    if (!running && inserted.some((item) => item.status === null)) {
+      return [{ kind, label, badge: { tone: 'warning', text: '状態を確認できません' } }]
+    }
+    return [{ kind, label, badge: running ? { tone: 'success', text: '動いています' } : { tone: 'warning', text: '止めています' }, hasStopped }]
   })
 }
 
@@ -100,7 +108,7 @@ export function FirstRunDoneDialog({ accountId, style, minutes, steps, progress,
                   ))}
                 </ul>
               )}
-          {rows?.some((row) => row.badge.text === '止めています') ? <p className={styles.note}>止めている物は、はじめの質問の最後の一覧の［まとめて動かす］から動かせます。</p> : null}
+          {rows?.some((row) => row.hasStopped) ? <p className={styles.note}>止めている物は、はじめの質問の最後の一覧の［まとめて動かす］から動かせます。</p> : null}
         </section>
         {next.length > 0 ? (
           <section className={styles.section} aria-labelledby="first-run-done-next">

@@ -62,10 +62,11 @@ function shortJst(iso: string): string {
 function ruleView(rule: WebinarScheduleRule): { kind: string; tone: 'success' | 'neutral' | 'warn'; detail: string } {
   if (rule.type === 'daily') return { kind: '毎日', tone: 'success', detail: rule.time ? `${rule.time}〜` : '時刻未定' }
   if (rule.type === 'weekly') {
-    const days = (rule.days ?? []).map((day) => WEEKDAY[day] ?? '').join('・')
+    const days = rule.days == null ? '' : Array.isArray(rule.days) && rule.days.every((day) => Number.isInteger(day) && day >= 0 && day < WEEKDAY.length) ? rule.days.map((day) => WEEKDAY[day]).join('・') : '曜日を確認できません'
     return { kind: '毎週', tone: 'neutral', detail: `${days}${days ? ' ' : ''}${rule.time ?? ''}`.trim() || '曜日未定' }
   }
-  return { kind: '単発', tone: 'warn', detail: rule.at ? shortJst(rule.at) : '日時未定' }
+  if (rule.type === 'once') return { kind: '単発', tone: 'warn', detail: rule.at ? shortJst(rule.at) : '日時未定' }
+  return { kind: '種類不明', tone: 'warn', detail: '配信枠の種類を確認できません' }
 }
 
 function sessionText(session: WebinarSessionCapacity | null | undefined, failed: boolean): string {

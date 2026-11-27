@@ -175,6 +175,8 @@ export default function AutomationListV8() {
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [summary, setSummary] = useState<{ executionCount30d: number; failureCount30d: number } | null>(null)
   const [skipped, setSkipped] = useState<number | null>(null)
+  const [skippedFailed, setSkippedFailed] = useState(false)
+  const [skippedLoading, setSkippedLoading] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
   const [foldersError,setFoldersError]=useState(false)
   const [folderFilter, setFolderFilter] = useListUrlValue('folderFilter', '')
@@ -200,6 +202,8 @@ export default function AutomationListV8() {
   const [testError, setTestError] = useState('')
   const [testDone, setTestDone] = useState(false)
   const requestRef = useRef(0)
+  const skippedRequestRef = useRef(0)
+  const folderRequestRef = useRef(0)
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const rowActionLockRef = useRef<object | null>(null)
@@ -207,21 +211,36 @@ export default function AutomationListV8() {
 
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
+    skippedRequestRef.current += 1
     setLoadStatus('loading')
+    setSkippedFailed(false)
+    setSkippedLoading(Boolean(selectedAccountId))
     try {
-      const [listRes, runsRes] = await Promise.all([
+      const [listRes, runsResult] = await Promise.all([
         api.automations.list({ accountId: selectedAccountId || undefined, includeArchived: true }),
         selectedAccountId
           ? fetchApi<ApiResponse<{ summary: RunsSummary }>>(
             `/api/automation-runs?lineAccountId=${encodeURIComponent(selectedAccountId)}&limit=1`,
-          ).catch(() => null)
+          ).then(
+            (value) => ({ ok: true as const, value }),
+            () => ({ ok: false as const, value: null }),
+          )
           : Promise.resolve(null),
       ])
       if (requestId !== requestRef.current) return
       if (!listRes.success) throw new Error(listRes.error)
       setItems(listRes.data)
       setSummary(listRes.summary ?? null)
-      setSkipped(runsRes && runsRes.success ? runsRes.data.summary.skipped : null)
+      if (!selectedAccountId) {
+        setSkipped(null)
+        setSkippedFailed(false)
+      } else if (runsResult && runsResult.ok && runsResult.value.success) {
+        setSkipped(runsResult.value.data.summary.skipped)
+        setSkippedFailed(false)
+      } else {
+        setSkipped(null)
+        setSkippedFailed(true)
+      }
       setLoadStatus('ready')
     } catch {
       if (requestId !== requestRef.current) return
@@ -229,18 +248,53 @@ export default function AutomationListV8() {
       setSummary(null)
       setSkipped(null)
       setLoadStatus('error')
+    } finally {
+      if (requestId === requestRef.current) setSkippedLoading(false)
+    }
+  }, [selectedAccountId])
+
+  const reloadSkipped = useCallback(async () => {
+    if (!selectedAccountId) return
+    const accountAtStart = selectedAccountId
+    const skippedReqId = ++skippedRequestRef.current
+    setSkippedLoading(true)
+    setSkippedFailed(false)
+    try {
+      const runsRes = await fetchApi<ApiResponse<{ summary: RunsSummary }>>(
+        `/api/automation-runs?lineAccountId=${encodeURIComponent(accountAtStart)}&limit=1`,
+      )
+      if (skippedRequestRef.current !== skippedReqId || selectedAccountIdRef.current !== accountAtStart) return
+      if (runsRes.success) {
+        setSkipped(runsRes.data.summary.skipped)
+        setSkippedFailed(false)
+      } else {
+        setSkipped(null)
+        setSkippedFailed(true)
+      }
+    } catch {
+      if (skippedRequestRef.current !== skippedReqId || selectedAccountIdRef.current !== accountAtStart) return
+      setSkipped(null)
+      setSkippedFailed(true)
+    } finally {
+      if (skippedRequestRef.current === skippedReqId && selectedAccountIdRef.current === accountAtStart) {
+        setSkippedLoading(false)
+      }
     }
   }, [selectedAccountId])
 
   /* フォルダの箱（kind=automation）。ルールをフォルダへ入れる口がまだ無いので、件数は出さない。 */
   const loadFolders = useCallback(async () => {
-    if (!selectedAccountId) { setFolders([]); return }
+    const reqId = ++folderRequestRef.current
+    setFolders([])
     setFoldersError(false)
+    if (!selectedAccountId) return
     try {
       const res = await api.folders.list('automation', selectedAccountId)
-      if(!res.success)throw new Error(res.error)
+      if (folderRequestRef.current !== reqId) return
+      if (!res.success) throw new Error(res.error)
       setFolders(res.data)
     } catch {
+      if (folderRequestRef.current !== reqId) return
       setFoldersError(true)
     }
   }, [selectedAccountId])
@@ -248,9 +302,12 @@ export default function AutomationListV8() {
   useEffect(() => {
     if (accountLoading) return
     void load()
-    return () => { requestRef.current += 1 }
+    return () => { requestRef.current += 1; skippedRequestRef.current += 1 }
   }, [accountLoading, load])
-  useEffect(() => { void loadFolders() }, [loadFolders])
+  useEffect(() => {
+    void loadFolders()
+    return () => { folderRequestRef.current += 1 }
+  }, [loadFolders])
   useEffect(() => {
     setFolderFilter(''); setPending(null); setRowBusyId(null); setWorking(false)
     rowActionLockRef.current = null; pendingLockRef.current = null
@@ -417,12 +474,26 @@ export default function AutomationListV8() {
 
   /* ===== 数の帯（4つ） ===== */
   const ready = loadStatus === 'ready'
+  const kpiLoading = accountLoading || loadStatus === 'loading'
   const estimatedHoursSaved = summary ? Math.round(summary.executionCount30d / 120) : null
   const cells: BandCell[] = [
-    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: ready ? currentRules.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown') },
-    { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数' },
-    { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます' },
-    { key: 'skipped', title: '条件に外れた', icon: <Filter size={16} aria-hidden="true" />, value: skipped, unit: '回', detail: ready ? `稼働中で直近30日動いていないルール ${neverRunCount}` : emptyValue('unknown') },
+    { key: 'rules', title: 'ルール', icon: <ListChecks size={16} aria-hidden="true" />, value: ready ? currentRules.length : null, unit: '件', detail: ready ? `動いている ${activeCount}・止めている ${stoppedCount}` : emptyValue('unknown'), loading: kpiLoading },
+    { key: 'runs', title: '今月動いた', icon: <Activity size={16} aria-hidden="true" />, value: summary?.executionCount30d ?? null, unit: '回', detail: 'この30日に動いた回数', loading: kpiLoading },
+    { key: 'failed', title: '失敗', icon: <FileWarning size={16} aria-hidden="true" />, value: summary?.failureCount30d ?? null, unit: '件', detail: '「動いた記録」からやり直せます', loading: kpiLoading },
+    {
+      key: 'skipped',
+      title: '条件に外れた',
+      icon: <Filter size={16} aria-hidden="true" />,
+      value: skipped,
+      unit: '回',
+      detail: !ready
+        ? emptyValue('unknown')
+        : skippedFailed
+          ? '条件に外れた回数を読み込めませんでした'
+          : `稼働中で直近30日動いていないルール ${neverRunCount}`,
+      loading: kpiLoading || skippedLoading,
+      onRetry: ready && skippedFailed && !skippedLoading ? () => void reloadSkipped() : undefined,
+    },
   ]
 
   /* ===== フォルダ ===== */

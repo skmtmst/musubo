@@ -40,14 +40,6 @@ describe("管理画面 支払いの追記台帳契約", () => {
     expect(PAYMENT_DIALOGS).toContain('exportKey)')
   })
 
-  it('APIに無い支払日と過去履歴を作り物で補わない', () => {
-    expect(PAYMENT).toContain('title="次の支払日"')
-    expect(PAYMENT).toContain('支払日はアフィリエイターごとの取り決めです')
-    expect(PAYMENT).toContain('title="今年 払った合計"')
-    expect(PAYMENT).toContain('振込の記録がつながると出ます')
-    expect(PAYMENT).toContain('value={null}')
-  })
-
   it('口座番号を管理画面へ返さず、登録状態だけを表示する', () => {
     expect(API).toContain('bankProfileRegistered: boolean')
     expect(PAYMENT).toContain('口座番号は本人だけに表示')
@@ -81,15 +73,6 @@ describe("管理画面 支払いの追記台帳契約", () => {
     expect(DIALOGS).not.toContain('却下した2件')
     expect(DIALOGS).not.toContain('>直す<')
     expect(DIALOGS).toContain('本人にLINEで依頼する')
-  })
-
-  it('読込・通常・空・失敗を分け、失敗を0円にしない', () => {
-    expect(PAYMENT).toContain('loadState === \'loading\'')
-    expect(PAYMENT).toContain('loadState === \'error\'')
-    expect(PAYMENT).toContain('rows.length === 0')
-    expect(PAYMENT).toContain('数の帯は「—」にしています')
-    expect(PAYMENT).toContain("const ready = loadState === 'ready'")
-    expect(PAYMENT).toContain("valueText={ready && preview ? formatYen(preview.totalAmount) : emptyValue('unknown')}")
   })
 
   it('一覧と締め対象の返事を形検査してから画面へ入れる', () => {

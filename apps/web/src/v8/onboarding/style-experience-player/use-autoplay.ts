@@ -69,7 +69,12 @@ export function useStyleExperienceAutoplay({ script, style, onStyleChange, rotat
   const reduced = useReducedMotion()
   const inView = useInView(rootRef)
   const tabVisible = useTabVisible()
-  const lastIndex = (name: AccountStyle) => script.styles[name].scenes.length - 1
+  const lastIndex = (name: AccountStyle) => Math.max(0, script.styles[name].scenes.length - 1)
+  const clampIndex = useCallback((name: AccountStyle, index: number) => {
+    const last = Math.max(0, script.styles[name].scenes.length - 1)
+    if (!Number.isFinite(index)) return 0
+    return Math.max(0, Math.min(Math.trunc(index), last))
+  }, [script])
   const startIndex = (name: AccountStyle) => (reduced ? lastIndex(name) : 0)
   const [position, setPosition] = useState<AutoplayPosition>(() => {
     const first = style ?? rotation[0] ?? script.order[0]
@@ -90,42 +95,44 @@ export function useStyleExperienceAutoplay({ script, style, onStyleChange, rotat
   }
 
   const running = !userPaused && inView && tabVisible && !reduced
-  const scene = script.styles[position.style].scenes[position.index]
+  const safeIndex = clampIndex(position.style, position.index)
+  const safePosition: AutoplayPosition = safeIndex === position.index ? position : { style: position.style, index: safeIndex }
+  const scene = script.styles[safePosition.style].scenes[safePosition.index]
 
   useEffect(() => {
     if (!running || !scene) return
     const timer = window.setTimeout(() => {
       setManual(false)
-      if (position.index < lastIndex(position.style)) {
-        setPosition({ style: position.style, index: position.index + 1 })
+      if (safePosition.index < lastIndex(safePosition.style)) {
+        setPosition({ style: safePosition.style, index: safePosition.index + 1 })
         return
       }
-      if (repeatStyle) {
-        setPosition({ style: position.style, index: 0 })
+      if (repeatStyle || rotation.length === 0) {
+        setPosition({ style: safePosition.style, index: 0 })
         return
       }
-      const at = rotation.indexOf(position.style)
-      const next = rotation[(at + 1) % rotation.length] ?? position.style
+      const at = rotation.indexOf(safePosition.style)
+      const next = rotation[(at + 1) % rotation.length] ?? safePosition.style
       setPosition({ style: next, index: 0 })
-      if (next !== position.style) onStyleChange?.(next)
+      if (next !== safePosition.style) onStyleChange?.(next)
     }, scene.ms)
     return () => window.clearTimeout(timer)
     // 段・スタイル・止める条件・押した印が変わった時だけ数え直す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, position.style, position.index, restart, repeatStyle])
+  }, [running, safePosition.style, safePosition.index, restart, repeatStyle])
 
   // 押せる段は今の段と違うので、段が変わったことでタイマーが数え直す。
   const goToStep = useCallback((index: number) => {
     setManual(true)
-    setPosition((current) => ({ style: current.style, index }))
-  }, [])
+    setPosition((current) => ({ style: current.style, index: clampIndex(current.style, index) }))
+  }, [clampIndex])
 
   const selectStyle = useCallback((next: AccountStyle) => {
     setManual(true)
-    setPosition({ style: next, index: prefersReducedMotion() ? script.styles[next].scenes.length - 1 : 0 })
+    setPosition({ style: next, index: prefersReducedMotion() ? Math.max(0, script.styles[next].scenes.length - 1) : 0 })
     setRestart((value) => value + 1)
     onStyleChange?.(next)
   }, [onStyleChange, script])
 
-  return { position, scene, running, reduced, manual, userPaused, togglePause: () => setUserPaused((value) => !value), goToStep, selectStyle }
+  return { position: safePosition, scene, running, reduced, manual, userPaused, togglePause: () => setUserPaused((value) => !value), goToStep, selectStyle }
 }

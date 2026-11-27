@@ -7,13 +7,14 @@ const FIELD_REQUIREMENTS = {
 }
 
 
+import { notifySaved } from '@/components/shared/toast'
 import Toggle, { ToggleField } from '@/components/shared/toggle'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand, SaveConflictCompareTable } from '@/components/shared/save-conflict'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, Link2, RefreshCw, TriangleAlert } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { ApiError, api, type BroadcastMessageAsset } from '@/lib/api'
@@ -93,6 +94,13 @@ function InflowCreate() {
   const initialName = params.get('name') ?? ''
   const initialRef = params.get('ref') ?? ''
   const { selectedAccountId, selectedAccount } = useAccount()
+  const saveScope = useRef({ accountId: selectedAccountId, active: true })
+  if (saveScope.current.accountId !== selectedAccountId) saveScope.current = { accountId: selectedAccountId, active: true }
+  useEffect(() => {
+    const scope = saveScope.current
+    scope.active = true
+    return () => { scope.active = false }
+  }, [selectedAccountId])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [name, setName] = useState(initialName)
@@ -123,6 +131,7 @@ function InflowCreate() {
   const [showCompare, setShowCompare] = useState(false)
 
   useEffect(() => {
+    setSaving(false)
     clearConflict()
     setCoupon({ couponEnabled: false, couponAssetId: null, couponAudience: 'new_friends' })
     setCouponOptions([])
@@ -211,6 +220,8 @@ function InflowCreate() {
       setSaveError('LINEアカウントを選んでください（画面上部で選べます）')
       return
     }
+    const scope = saveScope.current
+    const current = () => scope.active && saveScope.current === scope
     setSaving(true)
     setSaveError(null)
     try {
@@ -228,14 +239,18 @@ function InflowCreate() {
         lineAccountId: selectedAccountId,
         ...coupon,
       })
+      if (!current()) return
       if (!res.success) throw new Error(res.error)
+      notifySaved('流入リンクを発行しました。')
       router.push(createPageReturnHref('/inflow-links', res.data.id))
     } catch (error) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(error);
 
       if (error instanceof ApiError && error.status === 409) {
         /* 見分けるための文字が使用中。同じ文字の発行済みリンクを探して比べられるようにする。 */
         const existing = await findRouteByRef(refCode.trim(), selectedAccountId)
+        if (!current()) return
         if (existing) {
           setConflict(existing)
           setShowCompare(false)
@@ -249,7 +264,7 @@ function InflowCreate() {
         scope: 'store',
       })) }
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 

@@ -41,7 +41,12 @@ export default function SheetDialog({
   onClose: () => void
   children?: ReactNode
 }) {
-  return <Dialog open={open} title={title} description={description} onCancel={onClose} busy={busy} error={error} designNode={designNode}
+  const handleClose = () => {
+    if (busy) return
+    return onClose()
+  }
+
+  return <Dialog open={open} title={title} description={description} onCancel={handleClose} busy={busy} error={error} designNode={designNode}
     role={destructive ? 'alertdialog' : undefined} confirmation designLayout="stacked" designWidth={designWidth} designTop={designTop}
     footer={<DialogActions>{destructive}{actions}</DialogActions>} footerAlign={destructive ? 'start' : 'center'}>
     {children}

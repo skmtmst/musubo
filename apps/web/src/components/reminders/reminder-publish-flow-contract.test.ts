@@ -30,7 +30,7 @@ describe('リマインダの公開フロー', () => {
     expect(FLOW).toContain('api.reminders.previewDraft(reminderId)')
     expect(FLOW).toContain('preview?.items')
     expect(FLOW).toContain('preview.summary.audience')
-    expect(FLOW).toContain('onRetry={onRetryPreview}')
+    // 読み直し操作と処理中の制御は edit-schedule-guard.test.tsx で確認する。
   })
 
   it('押しても動かないボタンは描かない（出す＝使える）', () => {

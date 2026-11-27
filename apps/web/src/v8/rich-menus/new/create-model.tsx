@@ -13,7 +13,7 @@ import { isAreaActionConfigured } from '@/components/rich-menus/action-drafts'
 export const MAX_TAB_PAGES = Math.min(RICH_MENU_MAX_PAGES, TAB_COUNT_OPTIONS.length)
 
 /** 配る前の確認の参照の種類の呼び名（口は kind を英字で返す）。 */
-export const HQ_REFERENCE_LABEL: Record<string, string> = { booking: '予約ページ', form: '回答フォーム', template: 'テンプレート', tag: 'タグ', scenario: 'シナリオ', stamp_card: 'スタンプカード', liff: 'LIFF' }
+export const HQ_REFERENCE_LABEL: Record<string, string> = Object.assign(Object.create(null), { booking: '予約ページ', form: '回答フォーム', template: 'テンプレート', tag: 'タグ', scenario: 'シナリオ', stamp_card: 'スタンプカード', liff: 'LIFF' })
 
 /* ---------- 統括のひな形（host）の画面の中の下書き ---------- */
 

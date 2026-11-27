@@ -59,7 +59,7 @@ export function restaurantToday(d: StoreToday, tables: RestaurantTable[], now: n
   const waiting = d.today.filter((r) => r.status === 'pending').length
   const breakdown = [['LINE', summary.line], ['電話', summary.phone], ['他', summary.walkIn + summary.media]] as const
   const kpis: StyleKpi[] = [
-    { id: 'today', title: '今日の予約', value: summary.groups, unit: `組・${summary.guests}人`, detail: breakdown.filter(([, n]) => n > 0).map(([l, n]) => `${l} ${n}`).join('・') || 'まだ予約はありません', link: { label: '一覧', href: '/restaurant-test/reservations' }, help: '取消・無断・押さえを除く今日の予約です。来店日で数えます。' },
+    { id: 'today', title: '今日の予約', value: summary.groups, unit: summary.guests === null ? '組・人数を確認できません' : `組・${summary.guests}人`, detail: breakdown.filter(([, n]) => n > 0).map(([l, n]) => `${l} ${n}`).join('・') || 'まだ予約はありません', link: { label: '一覧', href: '/restaurant-test/reservations' }, help: '取消・無断・押さえを除く今日の予約です。来店日で数えます。' },
     { id: 'waiting', title: '対応待ち', value: waiting, unit: '件', detail: `承認 ${waiting}`, link: { label: '内訳', href: '/restaurant-test/reservations' }, help: '承認待ちなど、お店が何かする必要がある予約の数です。' },
     { id: 'free', title: '空席（いま）', value: summary.freeTables, unit: '卓', detail: `全 ${summary.totalTables} 卓`, link: { label: '座席表', href: '/restaurant-test/tables' }, help: '動いている卓のうち、いま予約が重なっていない卓の数です。' },
     { id: 'noshow', title: '無断キャンセル率', value: null, unit: '%', detail: '過去30日', link: null, help: '無断キャンセル ÷（予約 − 取消 − 押さえ）。過去30日に始まった予約で数えます。' },

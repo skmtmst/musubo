@@ -6,6 +6,10 @@ import { InboxMedia } from '@/components/shared/inbox-content';
 
 
 function StickerMessageImage({ content }: { content: string }) {
+  return <StickerImage key={content} content={content} />
+}
+
+function StickerImage({ content }: { content: string }) {
   const [failed, setFailed] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   const sticker = parseStickerMessageContent(content)
@@ -52,6 +56,10 @@ function StickerMessageImage({ content }: { content: string }) {
  * 再読み込みに倒す。画像の内容は推測して書かない。
  */
 function ChatImageMessage({ content }: { content: string }) {
+  return <ChatImage key={content} content={content} />
+}
+
+function ChatImage({ content }: { content: string }) {
   const [failed, setFailed] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
   let url: string | null = null

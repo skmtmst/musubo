@@ -37,19 +37,21 @@ function soleTagId(condition: SegmentCondition): string | null {
  *
  * `targetCondition` は `unknown` で来る（DBのJSON列そのまま）。形が違う古い
  * 行を素通しすると `rules.filter is not a function` で**画面ごと落ちる**。
- * 読めない値は「絞り込みなし」として扱い、落とさない。
+ * 読めない値は、絞り込みなしと区別して表示する。
  */
 function asCondition(raw: unknown): SegmentCondition | null {
   if (!raw || typeof raw !== 'object') return null
   const value = raw as Partial<SegmentCondition>
   if (!Array.isArray(value.rules)) return null
   if (value.groups !== undefined && !Array.isArray(value.groups)) return null
+  if (value.operator !== undefined && value.operator !== 'AND' && value.operator !== 'OR') return null
+  if (value.rules.some((rule) => !rule || typeof rule !== 'object' || typeof rule.type !== 'string')) return null
+  const groups = (value.groups ?? []).map((g) => asCondition(g))
+  if (groups.some((g) => g === null)) return null
   return {
-    operator: value.operator === 'OR' ? 'OR' : 'AND',
+    operator: value.operator ?? 'AND',
     rules: value.rules,
-    groups: (value.groups ?? [])
-      .map((g) => asCondition(g))
-      .filter((g): g is SegmentCondition => g !== null),
+    groups: groups.filter((g): g is SegmentCondition => g !== null),
   }
 }
 
@@ -63,7 +65,9 @@ export function describeStepAudience(
   raw: unknown,
   tags: readonly AudienceTagName[],
 ): string {
-  const condition = pruneCondition(asCondition(raw))
+  const parsed = asCondition(raw)
+  if (raw != null && parsed === null) return '配信対象を確認できません'
+  const condition = pruneCondition(parsed)
   if (condition === null || isEmptyCondition(condition)) return '購読中の全員'
 
   const tagId = soleTagId(condition)
@@ -83,13 +87,13 @@ export function describeStepAudience(
  * 既定の `continue` は**決まっている値**なので `—` にしない。`—` は
  * 「取れていない」の印で、そこに既定値を混ぜると読み手が区別できなくなる。
  */
-export function describeAfterSend(afterSend: 'continue' | 'pause' | undefined): {
+export function describeAfterSend(afterSend: unknown): {
   label: string
   paused: boolean
 } {
-  return afterSend === 'pause'
-    ? { label: '配信後に止める', paused: true }
-    : { label: '配信後：続ける', paused: false }
+  if (afterSend === 'pause') return { label: '配信後に止める', paused: true }
+  if (afterSend === 'continue' || afterSend == null) return { label: '配信後：続ける', paused: false }
+  return { label: '配信後の処理を確認できません', paused: false }
 }
 
 /*

@@ -97,7 +97,7 @@ describe('記録の JSON を開いて写す', () => {
     act(() => root.render(<LogRecordJson value={big} canCopy />))
     act(() => button('記録の JSON を開く').click())
     expect(host.querySelector('pre')!.textContent!.length).toBe(LOG_RECORD_SHOWN_CHARS)
-    expect(host.textContent).toContain('先頭の 100,000 文字だけ')
+    expect(host.textContent).toContain('先頭の 1,000 文字だけ')
     await act(async () => { button('JSON をコピー').click() })
     expect(writeText.mock.calls[0]![0].length).toBeGreaterThan(LOG_RECORD_SHOWN_CHARS)
   })

@@ -53,6 +53,7 @@ const PAYLOAD_WORD: Record<string, string> = {
 }
 
 export function eventWord(type: string): string {
+  if (typeof type !== 'string') return '出来事を確認できません'
   const known = knownValue(EVENT_WORD, type, '')
   if (known) return known
   if (type.startsWith('ec.')) return ecEventLabel(type)
@@ -70,6 +71,7 @@ export function eventLabel(types: readonly string[]): string {
 
 export function payloadLabel(types: readonly string[]): string {
   const first = types[0]
+  if (types.length > 0 && typeof first !== 'string') return '送る内容を確認できません'
   if (!first) return 'まだ決めていません'
   const known = knownValue(PAYLOAD_WORD, first, '')
   if (known) return known

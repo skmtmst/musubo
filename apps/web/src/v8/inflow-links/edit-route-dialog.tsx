@@ -92,24 +92,30 @@ export default function EditRouteModal({
   // Per-pool member account names, loaded lazily so the dropdown can show
   // "Pool 名 — アカA, アカB" instead of just the pool name.
   const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>(poolMemberNames ?? {})
+  const [poolStatus, setPoolStatus] = useState<'loading' | 'ready' | 'error'>(poolMemberNames || pools.length === 0 ? 'ready' : 'loading')
   useEffect(() => {
     if (poolMemberNames) {
       setPoolMembers(poolMemberNames)
+      setPoolStatus('ready')
       return
     }
     let cancelled = false
+    setPoolStatus(pools.length ? 'loading' : 'ready')
     ;(async () => {
       const result = pools.length > 0
         ? await api.pools.listAccounts(
             pools.map((pool) => pool.id),
             { suppressFeatureDisabledEvent: true },
-          ).catch(() => ({ success: false as const, data: [] }))
+          ).catch(() => ({ success: false as const }))
         : { success: true as const, data: [] }
       if (!cancelled && result.success) {
         setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
           poolId,
           accounts.filter((account) => account.isActive).map((account) => account.accountName ?? emptyValue('unknown')),
         ])))
+        setPoolStatus('ready')
+      } else if (!cancelled) {
+        setPoolStatus('error')
       }
     })()
     return () => {
@@ -342,7 +348,7 @@ export default function EditRouteModal({
             size="full"
             options={pools.map((p) => {
               const members = poolMembers[p.id] ?? []
-              const memberText =
+              const memberText = poolStatus === 'loading' ? '（所属を確認中）' : poolStatus === 'error' ? '（所属を確認できませんでした）' :
                 members.length === 0
                   ? '（アカウント未所属）'
                   : `— ${members.join(', ')}`

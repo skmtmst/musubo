@@ -29,7 +29,12 @@ async function agree() {
   fireEvent.click(screen.getByRole('button', { name: '同意して次へ進む' }))
 }
 
+// happy-dom は高さを測らない（0）。未計測では利用規約を読んだ扱いにしないので、読み切れる高さを与える。
+const measured = ['clientHeight', 'scrollHeight'] as const
+const original = Object.fromEntries(measured.map((key) => [key, Object.getOwnPropertyDescriptor(HTMLElement.prototype, key)]))
+
 beforeEach(() => {
+  for (const key of measured) Object.defineProperty(HTMLElement.prototype, key, { configurable: true, get: () => 300 })
   fixture.termsAgreement.mockResolvedValue({ data: { agreedVersion: null, agreedAt: null } })
   fixture.agreeToTerms.mockResolvedValue({ data: { agreedAt: '2026-09-27 10:00:00' } })
 })
@@ -37,6 +42,11 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  for (const key of measured) {
+    const descriptor = original[key]
+    if (descriptor) Object.defineProperty(HTMLElement.prototype, key, descriptor)
+    else delete (HTMLElement.prototype as unknown as Record<string, unknown>)[key]
+  }
 })
 
 describe('R161: 店舗追加の書きかけがある間の離脱確認', () => {

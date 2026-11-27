@@ -45,7 +45,16 @@ function MobileTodoBody() {
   const canSeeTalk = shell.canView('/chats')
   const [talks, setTalks] = useState<Loaded<ChatListItem> | null>(null)
   const [notices, setNotices] = useState<Loaded<NotificationCenterItem> | null>(null)
+  const [, setClockTick] = useState(0)
+  const now = Date.now()
   const generation = useRef(0)
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') setClockTick((value) => value + 1) }
+    const interval = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange', refresh) }
+  }, [])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -59,26 +68,25 @@ function MobileTodoBody() {
     const noticeRequest = api.notifications.center.list(accountId, { category: 'error', limit: NOTICE_LIMIT })
       .then((res): Loaded<NotificationCenterItem> => (res.success ? { accountId, rows: res.data.items.filter((item) => !item.isRead) } : { accountId, failed: true }))
       .catch((): Loaded<NotificationCenterItem> => ({ accountId, failed: true }))
-    const [talkResult, noticeResult] = await Promise.all([talkRequest, noticeRequest])
-    // 待つ間にアカウントを切り替えたら、前の店の答えは捨てる。
-    if (mine !== generation.current) return
-    setTalks(talkResult)
-    setNotices(noticeResult)
+    // 片方の通信が遅くても、届いた結果から表示する。
+    await Promise.all([
+      talkRequest.then((result) => { if (mine === generation.current) setTalks(result) }),
+      noticeRequest.then((result) => { if (mine === generation.current) setNotices(result) }),
+    ])
   }, [selectedAccountId, canSeeTalk])
 
   useEffect(() => {
     setTalks(null)
     setNotices(null)
     void load()
+    return () => { generation.current += 1 }
   }, [load])
 
   const current = <T,>(value: Loaded<T> | null) => (value && value.accountId === selectedAccountId ? value : null)
   const talkState = current(talks)
   const noticeState = current(notices)
-  if (!talkState || !noticeState) return <ListState kind="loading" title="対応が要るものを読み込んでいます" />
-
-  const talkRows = 'rows' in talkState ? talkState.rows : null
-  const noticeRows = 'rows' in noticeState ? noticeState.rows : null
+  const talkRows = talkState && 'rows' in talkState ? talkState.rows : null
+  const noticeRows = noticeState && 'rows' in noticeState ? noticeState.rows : null
   if (talkRows?.length === 0 && noticeRows?.length === 0) {
     return <ListState kind="empty" emptyPreset="readonly" title="今、対応が要るものはありません" description="新しい問い合わせやエラーが届くと、ここに出ます。" />
   }
@@ -101,7 +109,9 @@ function MobileTodoBody() {
     <div className={styles.stack}>
       {canSeeTalk ? (
         <MobileSection title="返事を待っているトーク" count={talkRows ? talkRows.length : null} action={talkRows && talkRows.length >= TALK_LIMIT ? <Button href="/m/chats" variant="text" size="compact">すべて見る</Button> : null}>
-          {talkRows === null ? (
+          {!talkState ? (
+            <ListState kind="loading" title="トークを読み込んでいます" />
+          ) : talkRows === null ? (
             <ListState kind="error" title="トークを読み込めませんでした" onRetry={() => { void load() }} />
           ) : talkRows.length === 0 ? (
             <ListState kind="empty" emptyPreset="readonly" title="返事を待っているトークはありません" />
@@ -111,7 +121,9 @@ function MobileTodoBody() {
         </MobileSection>
       ) : null}
       <MobileSection title="確かめるお知らせ" count={noticeRows ? noticeRows.length : null}>
-        {noticeRows === null ? (
+        {!noticeState ? (
+          <ListState kind="loading" title="お知らせを読み込んでいます" />
+        ) : noticeRows === null ? (
           <ListState kind="error" title="お知らせを読み込めませんでした" onRetry={() => { void load() }} />
         ) : noticeRows.length === 0 ? (
           <ListState kind="empty" emptyPreset="readonly" title="確かめるお知らせはありません" />
@@ -125,7 +137,7 @@ function MobileTodoBody() {
                   <span className={styles.notice}>
                     <span className={styles.noticeHead}>
                       <StatusBadge tone="danger" size="compact">エラー</StatusBadge>
-                      <time className={styles.time} title={formatListRecentTitle(item.createdAt) || undefined}>{formatListRecent(item.createdAt)}</time>
+                      <time className={styles.time} title={formatListRecentTitle(item.createdAt, { now }) || undefined}>{formatListRecent(item.createdAt, { now })}</time>
                     </span>
                     <span className={styles.noticeTitle} title={item.title}>{item.title}</span>
                     {item.body ? <span className={styles.noticeBody}>{item.body}</span> : null}

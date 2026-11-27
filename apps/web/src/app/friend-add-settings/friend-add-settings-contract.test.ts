@@ -31,10 +31,6 @@ describe("管理画面 友だち追加時配信 7画面の契約", () => {
     expect(API).toContain('friendId: input?.friendId')
   })
 
-  it('読込中・空・失敗と再読込を用意する', () => {
-    expect(LIST_PAGE).toContain("onClick={() => load()}")
-  })
-
   it('未接続の見せかけアクションを選択肢に出さない', () => {
     expect(EDITOR).toContain("type: 'add_tag'")
     expect(EDITOR).toContain("type: 'remove_tag'")

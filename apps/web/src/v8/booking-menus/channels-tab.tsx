@@ -232,12 +232,16 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
   const loadedAccountId = useRef('')
   const [calendars, setCalendars] = useState<Record<string, string>>({})
   const [conflicts, setConflicts] = useState<BookingConflict[]>([])
+  const [conflictsError, setConflictsError] = useState(false)
+  const [calendarDetailsError, setCalendarDetailsError] = useState(false)
+  const [reloading, setReloading] = useState(false)
   const [connectTarget, setConnectTarget] = useState<BookingChannelStaff | null>(null)
   const [detailTarget, setDetailTarget] = useState<BookingChannelStaff | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
   const [savingAssign, setSavingAssign] = useState(false)
   const [assignError, setAssignError] = useState('')
   const assignBusy = useRef(false)
+  const loadInFlightRef = useRef(false)
   const latestAccountId = useRef(accountId)
   latestAccountId.current = accountId
   /* 名前の下の1行（役割）。予約設定の担当スタッフと同じ人だけ出す。 */
@@ -274,61 +278,85 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
     setData(null)
     setCalendars({})
     setConflicts([])
+    setConflictsError(false)
+    setCalendarDetailsError(false)
     setConflictOpen(false)
-    return () => { loadGeneration.current += 1 }
+    loadInFlightRef.current = false
+    return () => {
+      loadGeneration.current += 1
+      loadInFlightRef.current = false
+    }
   }, [accountId])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { force?: boolean; keepVisible?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current) return
     const generation = ++loadGeneration.current
     const alive = () => generation === loadGeneration.current
-    setStatus('loading')
+    loadInFlightRef.current = true
+    setReloading(true)
+    if (!options?.keepVisible) setStatus('loading')
     setError('')
     try {
-      const [channelsRes, conflictsRes] = await Promise.all([
+      const [channelsResult, conflictsResult] = await Promise.allSettled([
         bookingChannelsApi.channels(accountId),
         bookingChannelsApi.conflicts(accountId),
       ])
       if (!alive()) return
-      if (!channelsRes.success) throw new Error(channelsRes.error)
-      if (!conflictsRes.success) throw new Error(conflictsRes.error)
+      if (channelsResult.status !== 'fulfilled') throw channelsResult.reason
+      if (!channelsResult.value.success) throw new Error(channelsResult.value.error)
       loadedAccountId.current = accountId
-      setData(channelsRes.data)
-      setConflicts(conflictsRes.data.conflicts)
+      setData(channelsResult.value.data)
+      if (conflictsResult.status === 'fulfilled' && conflictsResult.value.success) {
+        setConflicts(conflictsResult.value.data.conflicts)
+        setConflictsError(false)
+      } else {
+        setConflicts([])
+        setConflictsError(true)
+      }
       setStatus('ready')
-      // つながっている分だけカレンダーの ID を読む（失敗しても表は出す）。
-      const linked = channelsRes.data.staff.filter((s) => s.status !== 'not_connected')
+      // つながっている分だけカレンダーの ID を読む（失敗しても表は出し、案内で知らせる）。
+      const linked = channelsResult.value.data.staff.filter((s) => s.status !== 'not_connected')
+      let anyDetailFailed = false
       const details = await Promise.all(linked.map(async (s) => {
         try {
           const d = await bookingChannelsApi.calendarDetail(accountId, s.staffId)
-          return [s.staffId, d.connection?.calendar_id ?? ''] as const
-        } catch (saveFailure) {
-          saveErrors.capture(saveFailure);
-
+          return [s.staffId, d?.connection?.calendar_id ?? ''] as const
+        } catch {
+          anyDetailFailed = true
           return [s.staffId, ''] as const
         }
-      }));
+      }))
 
-      if (!alive())
-
- return
+      if (!alive()) return
       setCalendars(Object.fromEntries(details.filter(([, id]) => id)))
+      setCalendarDetailsError(anyDetailFailed)
     } catch (e) {
       if (!alive()) return
       const fieldFailure = saveErrors.capture(e)
       { if (!fieldFailure)
 
-      setError(describeApiFailure(e, '予約経路を読み込めませんでした。')) }
+      setError(describeApiFailure(e, '予約経路の読み込み')) }
       setStatus('error')
+    } finally {
+      if (alive()) {
+        loadInFlightRef.current = false
+        setReloading(false)
+      }
     }
   }, [accountId, saveErrors])
 
   useEffect(() => {
-    void load()
+    void load({ force: true })
   }, [load])
 
   useEffect(() => {
-    onSummaryChange?.({ accountId: data ? loadedAccountId.current : accountId, status, data, conflicts: conflicts.length })
-  }, [accountId, status, data, conflicts.length, onSummaryChange])
+    onSummaryChange?.({
+      accountId: data ? loadedAccountId.current : accountId,
+      status,
+      data,
+      conflicts: conflictsError ? null : conflicts.length,
+    })
+  }, [accountId, status, data, conflicts.length, conflictsError, onSummaryChange])
 
   const firstConflict = conflicts[0] ?? null
 
@@ -345,6 +373,16 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
           {/* WEB059：閲覧のみには、付け替え（書き込み）へ進む口を置かない。重なりの知らせは出す。 */}
           <Button size="compact" onClick={() => setConflictOpen(true)}>{canEdit ? '重なりを解消する' : '重なりを見る'}</Button>
         </NoteBar>
+      ) : null}
+      {conflictsError ? (
+        <Notice tone="info" action={<Button onClick={() => void load({ keepVisible: true })} disabled={reloading} busy={reloading} busyLabel="読み込み中…">もう一度読み込む</Button>}>
+          予約の重なりを確認できませんでした。もう一度読み込むと最新の状態を確認できます。
+        </Notice>
+      ) : null}
+      {calendarDetailsError ? (
+        <Notice tone="info" action={<Button onClick={() => void load({ keepVisible: true })} disabled={reloading} busy={reloading} busyLabel="読み込み中…">もう一度読み込む</Button>}>
+          一部のカレンダー詳細を読み込めませんでした。もう一度読み込むと最新の状態を確認できます。
+        </Notice>
       ) : null}
 
       <ChannelsTables data={data} canEdit={canEdit} roles={roles} calendars={calendars} onDetail={setDetailTarget} onConnect={setConnectTarget} />
@@ -380,10 +418,10 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
         />
       ) : null}
       {connectTarget ? (
-        <ConnectDialog accountId={accountId} staff={connectTarget} onClose={() => setConnectTarget(null)} onDone={() => { setConnectTarget(null); void load() }} />
+        <ConnectDialog accountId={accountId} staff={connectTarget} onClose={() => setConnectTarget(null)} onDone={() => { setConnectTarget(null); void load({ force: true }) }} />
       ) : null}
       {conflictOpen && firstConflict ? (
-        <ConflictDialog canEdit={canEdit} accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load() }} />
+        <ConflictDialog canEdit={canEdit} accountId={accountId} conflict={firstConflict} staff={data.staff} onClose={() => setConflictOpen(false)} onDone={() => { setConflictOpen(false); void load({ force: true }) }} />
       ) : null}
     </div></SaveErrorScope>
   )

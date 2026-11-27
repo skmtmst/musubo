@@ -41,6 +41,10 @@ import { countLabel,formatMd } from './edit-model'
 import styles from './edit.module.css'
 import { PhoneV8,SummaryCardV8,WizardFooterV8 } from './ui'
 
+function validCount(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : null
+}
+
 /* ---------------- 手順5：確認＝ 設定の確認・テスト送信・有効にする前の確認 ---------------- */
 export function editHref(reminderId: string, stage: 'basics' | 'target' | 'preview' | null): string {
   return `/reminders/edit?id=${encodeURIComponent(reminderId)}${stage ? `&stage=${stage}` : ''}`
@@ -96,15 +100,15 @@ export function ConfirmStageV8({
 
   // フォルダ名の解決だけ。一覧は確認の段でしか要らない。
   useEffect(() => {
-    if (!settings.folderId) {
-      setFolderName('')
-      return
-    }
+    setFolderName('')
+    if (!settings.folderId) return
     let active = true
     void api.folders.list('reminder').then((res) => {
       if (!active) return
-      if (res.success) setFolderName(res.data.find((folder) => folder.id === settings.folderId)?.name ?? '')
-    }).catch(() => undefined)
+      setFolderName(res.success ? (res.data.find((folder) => folder.id === settings.folderId)?.name ?? '') : '')
+    }).catch(() => {
+      if (active) setFolderName('')
+    })
     return () => { active = false }
   }, [settings.folderId])
 
@@ -123,12 +127,16 @@ export function ConfirmStageV8({
     return 'basics'
   }
 
+  const matchedCount = validCount(validation?.audience.matched)
+  const next7DaysCount = validCount(preview?.summary.next7Days)
+  const duplicateCount = validCount(preview?.summary.duplicateCount)
+
   const confirmRows: Array<{ key: string; value: string; stage: 'basics' | 'target' | 'preview' | null }> = [
     { key: '名前・フォルダ', value: `${settings.name}${folderName ? `・${folderName}` : ''}`, stage: 'basics' },
     { key: '基準日', value: reminderTriggerLabel(settings.triggerType), stage: 'basics' },
     {
       key: '対象者',
-      value: `${pruneCondition(settings.targetCondition as SegmentCondition | null) ? '条件に合う人だけ' : '基準日がある人すべて'}${validation?.audience.matched != null ? `（${formatNumber(validation.audience.matched)} 人に送る予定）` : ''}`,
+      value: `${pruneCondition(settings.targetCondition as SegmentCondition | null) ? '条件に合う人だけ' : '基準日がある人すべて'}${matchedCount !== null ? `（${formatNumber(matchedCount)} 人に送る予定）` : ''}`,
       stage: 'target',
     },
     { key: '止める条件', value: reminderStopSummary(settings.stopConditions), stage: 'target' },
@@ -136,7 +144,7 @@ export function ConfirmStageV8({
     {
       key: '配信予定',
       value: preview
-        ? `今後7日 ${countLabel(preview.summary.next7Days, '通')}${preview.summary.duplicateCount > 0 ? `（重なり ${formatNumber(preview.summary.duplicateCount)} 件はまとめる）` : ''}`
+        ? `今後7日 ${countLabel(next7DaysCount, '通')}${duplicateCount !== null && duplicateCount > 0 ? `（重なり ${formatNumber(duplicateCount)} 件はまとめる）` : ''}`
         : previewFailed ? '読み込めませんでした' : '確認中',
       stage: 'preview',
     },
@@ -150,7 +158,7 @@ export function ConfirmStageV8({
           <SummaryCardV8
             rows={[
               { key: '基準日', value: reminderTriggerLabel(settings.triggerType) },
-              { key: '対象者', value: validation?.audience.matched != null ? `${formatNumber(validation.audience.matched)}人` : emptyValue('unknown') },
+              { key: '対象者', value: matchedCount !== null ? `${formatNumber(matchedCount)}人` : emptyValue('unknown') },
               { key: '通知', value: `${settings.steps.length}通` },
               { key: '状態', value: '下書き → 有効にする' },
             ]}
@@ -188,8 +196,8 @@ export function ConfirmStageV8({
           {confirmRows.map((row) => (
             <div key={row.key} className={styles.confirmRow}>
               <span className={styles.confirmKey}>{row.key}</span>
-              <span className={styles.confirmVal} title={row.key === '通知' && validation?.audience.matched != null
-                ? `${row.value}（対象者×通知数：${countLabel(validation.audience.matched * settings.steps.length, '通')}）`
+              <span className={styles.confirmVal} title={row.key === '通知' && matchedCount !== null
+                ? `${row.value}（対象者×通知数：${countLabel(matchedCount * settings.steps.length, '通')}）`
                 : row.value}>{row.value}</span>
               <Button variant="text" href={editHref(reminderId, row.stage)}>変更する</Button>
             </div>
@@ -232,9 +240,9 @@ export function ConfirmStageV8({
                 : 'まだ送れていません。上の「テストを送る」から送ってください'}
             />
             <CheckRow
-              ok={validation.audience.matched != null}
+              ok={matchedCount !== null}
               title="対象者を数えた"
-              note={validation.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人に送る予定` : '対象者を数えられませんでした'}
+              note={matchedCount !== null ? `${formatNumber(matchedCount)} 人に送る予定` : '対象者を数えられませんでした'}
               action={<Button variant="text" href={editHref(reminderId, 'target')}>見直す</Button>}
             />
             {validation.checks.filter((check) => check.key !== 'test_send').map((check) => (
@@ -285,7 +293,7 @@ export function DoneStageV8({
   const nextScheduledAt = published?.nextScheduledAt
     ?? preview?.items.find((item) => item.state === 'scheduled')?.scheduledAt
     ?? null
-  const next7 = preview?.summary.next7Days ?? published?.plannedDeliveries ?? null
+  const next7 = validCount(preview?.summary.next7Days) ?? validCount(published?.plannedDeliveries)
   const { boardId, ...heading } = frame
 
   // 完了には下の帯が無い。型の枠と頭はそのまま使い、本文だけ真ん中のカードにする。

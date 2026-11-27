@@ -19,6 +19,7 @@ type RequestMenuTabCountContext = {
 }
 
 export function requestMenuTabCount({ applyTabCount, group, pageHasSettings, pages, pendingImages, removePageBlockers, setPendingTabCount, tabCount }: RequestMenuTabCountContext, next: number) {
+    if (!Number.isInteger(next) || next < 0) return
     if (!group) {
       if (next === tabCount) return
       if (pendingImages.slice(next + 1).some(Boolean)) {
@@ -54,9 +55,10 @@ type ApplyMenuTabCountContext = {
 }
 
 export function applyMenuTabCount({ activePageId, group, host, pages, removePageBlockers, setActivePageId, setPages, setPendingImages, setPendingTabCount, setSelectedAreaId, setTabCount, setTabNames, templateKey }: ApplyMenuTabCountContext, next: number) {
+    if (!Number.isInteger(next) || next < 0) return
     setPendingTabCount(null)
-    setTabCount(next)
     if (!group) {
+      setTabCount(next)
       setPendingImages((prev) => {
         prev.slice(next + 1).forEach((image) => { if (image?.url) URL.revokeObjectURL(image.url) })
         return prev.slice(0, next + 1)
@@ -68,6 +70,7 @@ export function applyMenuTabCount({ activePageId, group, host, pages, removePage
     if (pages.length > count) {
       const remaining = pages.slice(0, count)
       if (removePageBlockers(pages.slice(count), remaining).length > 0) return
+      setTabCount(next)
       setPages(remaining)
       if (!remaining.some((p) => p.id === activePageId)) {
         setActivePageId(remaining[0]?.id ?? null)
@@ -75,6 +78,7 @@ export function applyMenuTabCount({ activePageId, group, host, pages, removePage
       }
       return
     }
+    setTabCount(next)
     // 足すタブは①の面の分け方で始める（面と動きはタブごとに持つ）。保存すると作られる。
     const layout = TEMPLATES.find((t) => t.key === templateKey) ?? TEMPLATES[0]
     const added: Page[] = Array.from({ length: count - pages.length }, (_, offset) => {

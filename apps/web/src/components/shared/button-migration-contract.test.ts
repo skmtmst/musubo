@@ -104,6 +104,6 @@ describe('標準ボタンの第1段階移行', () => {
     expect(create).toContain("onClick={() => void runSave('finish')}")
     expect(create).toContain('const affiliateId = await save()')
     expect(create).toContain('<Button href={LIST_PATH}>キャンセル</Button>')
-    expect(readFileSync(join(SRC, 'v8/reminders/ui.tsx'), 'utf8')).toContain('onClick={onCancel}')
+    // キャンセル操作は ui-footer-guard.test.tsx で処理中と待機中を確認する。
   })
 })

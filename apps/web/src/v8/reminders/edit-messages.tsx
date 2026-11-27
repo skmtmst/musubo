@@ -78,12 +78,16 @@ export function MessagesStageV8({
   const sampleBase = useRef<Date>(sampleBaseDate())
 
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setLoadedFields(null)
+      setFieldsErrorAccount(null)
+      return
+    }
     const accountId = selectedAccountId
     let active = true
     setFieldsErrorAccount(null)
     void api.friendFields.list(accountId).then((res) => {
-      if (!res.success) throw new Error('friend_fields_unavailable')
+      if (!res.success || !Array.isArray(res.data)) throw new Error('friend_fields_unavailable')
       if (active) setLoadedFields({ accountId, items: res.data })
     }).catch(() => { if (active) { setLoadedFields(null); setFieldsErrorAccount(accountId) } })
     return () => { active = false }
@@ -102,6 +106,7 @@ export function MessagesStageV8({
   }
 
   const addStep = () => {
+    if (settings.steps.length >= MAX_STEPS) return
     const step: ReminderDraftStep = {
       stableStepId: crypto.randomUUID(),
       offsetMinutes: 0,
@@ -332,18 +337,21 @@ export function TimingEditor({
   base: Date
   onChange: (patch: Partial<ReminderDraftStep>) => void
 }) {
-  const dayWritten = mode === 'time' && step.offsetDays != null && step.sendAtTime != null
-  const minutes = step.offsetMinutes ?? 0
+  const dayWritten = mode === 'time' && step.offsetDays != null
+  const rawMinutes = step.offsetMinutes ?? 0
+  const minutes = Number.isFinite(rawMinutes) ? rawMinutes : 0
+  const rawDays = step.offsetDays ?? 0
+  const safeDays = Number.isFinite(rawDays) ? rawDays : 0
   const abs = Math.abs(minutes)
   const unit: TimingUnit = dayWritten ? 'day' : abs % 1440 === 0 && abs > 0 ? 'day' : abs % 60 === 0 ? 'hour' : 'min'
-  const amount = dayWritten ? Math.abs(step.offsetDays ?? 0) : unit === 'day' ? abs / 1440 : unit === 'hour' ? abs / 60 : abs
-  const after = dayWritten ? (step.offsetDays ?? 0) > 0 : minutes > 0
+  const amount = dayWritten ? Math.abs(safeDays) : unit === 'day' ? abs / 1440 : unit === 'hour' ? abs / 60 : abs
+  const after = dayWritten ? safeDays > 0 : minutes > 0
   const sign = (value: number, isAfter: boolean) => (isAfter ? value : -value)
 
   /** 数・単位・前後から、保存する形（日で書く／分で書く）を作る。 */
   const build = (n: number, u: TimingUnit, isAfter: boolean): Partial<ReminderDraftStep> => {
     if (mode === 'time' && u === 'day') {
-      return { offsetDays: sign(n, isAfter), sendAtTime: step.sendAtTime ?? '09:00', offsetMinutes: 0 }
+      return { offsetDays: sign(n, isAfter), sendAtTime: step.sendAtTime ?? (dayWritten ? null : '09:00'), offsetMinutes: 0 }
     }
     const per = u === 'day' ? 1440 : u === 'hour' ? 60 : 1
     return { offsetDays: null, sendAtTime: null, offsetMinutes: sign(n * per, isAfter) }
@@ -362,8 +370,10 @@ export function TimingEditor({
         className={styles.timingDays}
         value={String(amount)}
         onChange={(event) => {
-          const next = Number(event.target.value)
-          if (Number.isInteger(next) && next >= 0) onChange(build(next, unit, after))
+          const raw = event.target.value.trim()
+          if (raw === '') return
+          const next = Number(raw)
+          if (Number.isSafeInteger(next) && next >= 0 && (unit !== 'day' || next <= 365)) onChange(build(next, unit, after))
         }}
       /></SaveErrorField>
       <SaveErrorField names={["unit"]}><Select
@@ -392,7 +402,11 @@ export function TimingEditor({
         </>
       ) : null}
       <span className={styles.spacer} aria-hidden="true" />
-      <span className={styles.timingExample}>{`例：${formatShort(base)} の予約 → ${formatShort(example)} に届く`}</span>
+      <span className={styles.timingExample}>
+        {dayWritten && !step.sendAtTime
+          ? '例：送る時刻を入力すると届く日時が出ます'
+          : `例：${formatShort(base)} の予約 → ${formatShort(example)} に届く`}
+      </span>
     </div>
   )
 }

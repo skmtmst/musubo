@@ -109,6 +109,9 @@
   gap: var(--space-8);
 }
 
+.balloonFooter[data-followup-reason] { flex-wrap: wrap; }
+.balloonFooter[data-followup-reason] > [role="status"] { flex-basis: 100%; }
+
 /*
   「この手順をスキップ」。寸法だけ画面が持つ。高さは中身で決まる値なので
   共通ボタンの40を外して auto に戻す（最小の高さ32は素のボタンと同じ、

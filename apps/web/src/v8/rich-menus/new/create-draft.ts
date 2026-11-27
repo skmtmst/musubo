@@ -45,8 +45,8 @@ export function describeMenuSummary(input: {
 }): string {
   const areaCount = input.pages.reduce((total, page) => total + page.areas.length, 0)
   return [
-    `名前：${input.name || emptyValue('unconfigured')}`,
-    `言葉：${input.chatBarText || emptyValue('unconfigured')}`,
+    `名前：${input.name.trim() || emptyValue('unconfigured')}`,
+    `言葉：${input.chatBarText.trim() || emptyValue('unconfigured')}`,
     `出す相手：${describeMenuAudience(input.audience, input.forHq)}`,
     `面の数：${input.pages.length}`,
     `ボタンの数：${areaCount}`,
@@ -58,7 +58,9 @@ export function describeMenuSummary(input: {
 export function parseStoredCondition(raw: string | null): SegmentCondition | null {
   if (!raw) return null
   try {
-    return JSON.parse(raw) as SegmentCondition
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return parsed as SegmentCondition
   } catch {
     return null
   }
@@ -101,12 +103,12 @@ export async function mediaToFile(item: MediaItem, accountId: string): Promise<F
 export function areaDraftsWithSwitchTargets(areas: Area[]) {
   return areas.map((area) => {
     if (area.actionType !== 'richmenuswitch') return projectAreaForDraft(area)
-    const raw = area.actionData?.targetPageId
-    const index = typeof raw === 'string' ? Number(raw) : NaN
+    const raw = typeof area.actionData?.targetPageId === 'string' ? area.actionData.targetPageId.trim() : ''
+    const index = /^\d+$/.test(raw) ? Number(raw) : NaN
     const { targetPageId: _dropped, ...rest } = (area.actionData ?? {}) as Record<string, unknown>
     return {
       ...projectAreaForDraft(area),
-      actionData: Number.isInteger(index) ? { ...rest, targetPageIndex: index } : rest,
+      actionData: Number.isSafeInteger(index) ? { ...rest, targetPageIndex: index } : rest,
     }
   })
 }

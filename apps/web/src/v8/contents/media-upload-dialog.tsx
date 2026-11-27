@@ -258,7 +258,7 @@ export default function MediaUploadDialog({
           </p>}>
 
           <>
-            {allDone && !busy ? <Button type="button" variant="primary" onClick={onClose}>完了</Button> : <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
+            {allDone && !busy ? <Button type="button" variant="primary" onClick={onClose}>完了</Button> : <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} disabledReason={!accountId ? '上のバーでLINE公式アカウントを選んでください。' : readyCount === 0 ? '登録できるファイルを選んでください。' : undefined} busy={busy} busyLabel="登録しています…">
               {`${formatNumber(readyCount)}件を登録する`}
             </Button>}
           </>

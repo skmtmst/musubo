@@ -10,7 +10,26 @@ import styles from './catalog-editor.module.css'
 
 export function CatalogDetails({selection,onClose}:{selection:StarterCatalogSelection;onClose:()=>void}) {
   const [details,setDetails]=useState<StarterCatalogDetails|null>(null),[error,setError]=useState(''),[tick,setTick]=useState(0)
-  useEffect(()=>{let valid=true;setDetails(null);setError('');void hqStyleApi.catalogDetails(selection).then(res=>{if(valid)setDetails(res.data)}).catch(err=>{if(valid)setError(describeApiFailure(err,'読み込み',{scope:'hq'}))});return()=>{valid=false}},[selection,tick])
+  useEffect(() => {
+    let valid = true
+    setDetails(null); setError('')
+    void hqStyleApi.catalogDetails(selection).then((res) => {
+      const reply = res as unknown as { success?: unknown; data?: unknown } | null
+      const raw = reply?.data
+      const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+      const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
+      const lines = object(raw) && Array.isArray(raw.lines) && raw.lines.every((line: unknown) => object(line) && typeof line.label === 'string' && typeof line.value === 'string')
+      const pages = object(raw) && (raw.pages === undefined || (Array.isArray(raw.pages) && raw.pages.every((page: unknown) =>
+        object(page) && typeof page.name === 'string' && finite(page.width) && page.width > 0 && finite(page.height) && page.height > 0 &&
+        Array.isArray(page.areas) && page.areas.every((area: unknown) => object(area) && typeof area.label === 'string' && typeof area.destination === 'string' &&
+          finite(area.x) && finite(area.y) && finite(area.width) && finite(area.height)))))
+      if (!reply || (reply.success !== undefined && reply.success !== true) || !object(raw) || typeof raw.name !== 'string' || !finite(raw.version) || !lines || !pages) {
+        throw new Error('選んだ版の内容を確認できません。もう一度読み込んでください。')
+      }
+      if (valid) setDetails(raw as unknown as StarterCatalogDetails)
+    }).catch((err) => { if (valid) setError(describeApiFailure(err, '読み込み', { scope: 'hq' })) })
+    return () => { valid = false }
+  }, [selection, tick])
   return <Dialog open title={details?`${details.name}（版${details.version}）`:'選んだ版の中身'} size="large" contentLayout="form" onCancel={onClose}
     description={details?.pages?'行き先を変えるときは、カタログで新しい版を作って選び直してください。':undefined}
     footer={details?.pages?<DialogActions><Button href={`/hq/rich-menus?mode=edit&item=${encodeURIComponent(selection.templateId)}`}>カタログを編集する</Button></DialogActions>:undefined}>

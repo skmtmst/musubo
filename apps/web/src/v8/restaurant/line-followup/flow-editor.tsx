@@ -38,16 +38,22 @@ export function StepEditor({ name, bubbles, readOnly, busy, onChange }: {
   const noop = () => {}
   const current = bubbles.length ? bubbles : [{ id: 'draft', type: 'text', content: { text: '' } } as BroadcastBubble]
   const move = (index: number, direction: -1 | 1) => {
+    if (readOnly || busy) return
     const next = [...current]
     const at = index + direction
-    if (at < 0 || at >= next.length) return
+    if (index < 0 || index >= next.length || at < 0 || at >= next.length) return
     const moved = next.splice(index, 1)[0]!
     next.splice(at, 0, moved)
     onChange(next)
   }
   const remove = (index: number) => {
-    if (current.length <= 1) return
+    if (readOnly || busy || current.length <= 1) return
+    if (index < 0 || index >= current.length) return
     onChange(current.filter((_item, at) => at !== index))
+  }
+  const update = (index: number, next: BroadcastBubble) => {
+    if (readOnly || busy) return
+    onChange(current.map((item, at) => at === index ? { ...next, id: item.id } : item))
   }
   return <Card variant="form" padding="default" gap="normal" aria-label={`${name} の中身`}>
     <div className={styles.contentHead}>
@@ -58,7 +64,7 @@ export function StepEditor({ name, bubbles, readOnly, busy, onChange }: {
       {readOnly
         ? <Field label="本文" fill><TextArea value={allBubbleText(bubbles)} readOnly /></Field>
         : <MessageComposer bubblesOnly bubbles={current} accountId={null} busy={busy} unavailable={UNAVAILABLE}
-            onChange={(index, next) => onChange(current.map((item, at) => at === index ? { ...next, id: item.id } : item))}
+            onChange={update}
             onMove={move} onDelete={remove} onAdd={noop} onPickTemplate={noop} onSaveTemplate={noop} onCompose={noop} />}
     </SaveErrorField>
   </Card>
@@ -73,7 +79,9 @@ export function previewBubbleText(bubble: BroadcastBubble): string {
 /* 送る中身そのままの見え方。送らない画像やボタンは付けない。吹き出しは共通の部品。 */
 export function StepPreview({ bubbles, accountName }: { bubbles: BroadcastBubble[]; accountName: string }) {
   const shown = bubbles.length ? bubbles.map(previewBubbleText) : ['本文']
-  return <LinePreview title={null} accountName={accountName} fit>
-    {shown.map((text, index) => <LinePreviewMessage key={index} accountName={accountName} avatar={accountName.slice(0, 1)} time="今">{text}</LinePreviewMessage>)}
+  const senderName = accountName.trim() || '公式アカウント'
+  const avatar = Array.from(senderName)[0] ?? '公'
+  return <LinePreview title={null} accountName={senderName} fit>
+    {shown.map((text, index) => <LinePreviewMessage key={index} accountName={senderName} avatar={avatar} time="今">{text}</LinePreviewMessage>)}
   </LinePreview>
 }

@@ -29,7 +29,7 @@ export function groupRuns(runs: GoogleSheetsSyncRun[]): RunGroup[] {
       continue
     }
     if (content) existing.parts.push(content)
-    if (run.status === 'error' || (run.status === 'partial' && existing.status === 'ok') || (run.status === 'running' && existing.status !== 'error')) {
+    if (run.status === 'error' || (run.status === 'partial' && existing.status === 'ok') || (run.status === 'running' && existing.status !== 'error') || (!Object.hasOwn(RUN_STATUS_LABEL, run.status) && existing.status === 'ok')) {
       existing.status = run.status
     }
   }
@@ -38,10 +38,10 @@ export function groupRuns(runs: GoogleSheetsSyncRun[]): RunGroup[] {
 
 /** WEB233：同期の結果（HTTP 200）から、運用者へ出す失敗の理由。問題が無ければ null。 */
 export function syncResultProblem(data: { status: string; results?: Array<{ status: string; error?: string | null }> } | null | undefined): string | null {
-  if (!data) return null
-  const reason = data.results?.find((result) => result.error)?.error ?? null
+  if (!data) return '同期の結果を確認できません。記録を確かめてください。'
+  const reason = Array.isArray(data.results) ? data.results.find((result) => result?.error)?.error ?? null : null
   if (data.status === 'error') return reason ? `同期できませんでした（${reason}）` : '同期できませんでした。時間をおいて、もう一度お試しください。'
   if (data.status === 'partial') return reason ? `一部だけ書き出しました（${reason}）` : '一部だけ書き出しました。記録で失敗した内容を確かめてください。'
   if (data.status === 'already_running') return 'いま同期しています。終わってから、もう一度お試しください。'
-  return null
+  return data.status === 'ok' ? null : '同期の結果を確認できません。記録を確かめてください。'
 }

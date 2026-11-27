@@ -8,7 +8,21 @@ export function useDialogScrollHint() {
   useEffect(() => {
     const viewport = content?.closest<HTMLElement>('[data-window-body]')
     if (!content || !viewport) { setHasMore(false); return }
-    const update = () => setHasMore(viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight > 2)
+    const update = () => {
+      const { scrollHeight, scrollTop, clientHeight } = viewport
+      if (
+        !Number.isFinite(scrollHeight) ||
+        !Number.isFinite(scrollTop) ||
+        !Number.isFinite(clientHeight) ||
+        clientHeight <= 0 ||
+        scrollHeight <= clientHeight + 2
+      ) {
+        setHasMore(false)
+        return
+      }
+      const safeTop = Math.max(0, scrollTop)
+      setHasMore(scrollHeight - safeTop - clientHeight > 2)
+    }
     update()
     viewport.addEventListener('scroll', update, { passive: true })
     window.addEventListener('resize', update)

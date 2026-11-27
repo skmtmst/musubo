@@ -1,8 +1,11 @@
-import { initialFormKey, initialMenuFormTargets } from '@line-crm/shared'
+import { INITIAL_MENUS, initialFormKey, initialMenuFormTargets } from '@line-crm/shared'
 import type { StarterSetItem } from '@/lib/api/helpers/styles'
 
 export function legacyRemovalKeys(items: StarterSetItem[], key: string): Set<string> {
  const selected = items.find(item => item.key === key)
+ if (!selected) return new Set<string>()
+ const invalidMenu = (item: StarterSetItem) => item.kind === 'rich_menu' && item.initialMenu != null && !Object.prototype.hasOwnProperty.call(INITIAL_MENUS, item.initialMenu)
+ if ((selected.kind === 'form' && items.some(invalidMenu)) || invalidMenu(selected)) return new Set<string>()
  const menu = items.find(item => item.kind === 'rich_menu' && item.initialMenu && (
   item.key === key || (selected?.kind === 'form' && initialMenuFormTargets(item.initialMenu).some(target => initialFormKey(item.initialMenu!, target) === key))
  ))
@@ -13,5 +16,6 @@ export function legacyRemovalKeys(items: StarterSetItem[], key: string): Set<str
 
 export function removeLegacyItem(items: StarterSetItem[], key: string): StarterSetItem[] {
  const keys = legacyRemovalKeys(items, key)
+ if (!keys.size) throw new Error('初期セットの内容を確認できません。一覧を再読み込みしてください。')
  return items.filter(item => !keys.has(item.key))
 }

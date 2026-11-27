@@ -2,7 +2,9 @@
 
 
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import TextLink from '@/components/shared/text-link'
+import { useState } from 'react'
 
 /*
  * メディアのプレビュー。全面の暗い幕の上に中身だけを出す。
@@ -24,13 +26,21 @@ export default function MediaPreviewOverlay({
   onClose: () => void
 }) {
   return <Dialog open title={`${filename}のプレビュー`} onCancel={onClose} size="wide">
+    <MediaContent key={`${kind}:${src}`} filename={filename} kind={kind} src={src} />
+  </Dialog>
+}
+
+function MediaContent({ filename, kind, src }: { filename: string; kind: 'image' | 'video' | 'audio' | 'file'; src: string }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <Notice tone="danger">{kind === 'image' ? '画像を表示できませんでした。' : 'メディアを再生できませんでした。'}</Notice>
+  return <>
       {kind === 'image' ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={filename} className="max-h-full max-w-full object-contain" />
+        <img src={src} alt={filename} onError={() => setFailed(true)} className="max-h-full max-w-full object-contain" />
       ) : kind === 'video' ? (
-        <video src={src} controls className="max-h-full max-w-full" />
+        <video src={src} controls onError={() => setFailed(true)} className="max-h-full max-w-full" />
       ) : kind === 'audio' ? (
-        <audio src={src} controls />
+        <audio src={src} controls onError={() => setFailed(true)} />
       ) : (
         <div className="rounded-card bg-canvas p-6 text-center text-sm">
           <p className="text-ink font-medium">{filename}</p>
@@ -39,5 +49,5 @@ export default function MediaPreviewOverlay({
           </TextLink>
         </div>
       )}
-  </Dialog>
+  </>
 }
