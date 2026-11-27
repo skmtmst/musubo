@@ -53,6 +53,7 @@ function TodayBody() {
       if (styleKind === 'restaurant') {
         const storesResponse = await restaurantTestApi.listStores(id)
         if (!storesResponse.success || !Array.isArray(storesResponse.data?.stores)) throw new Error('stores unavailable')
+        if (storesResponse.data.stores.some(store => !store || (store.line_account_id !== null && typeof store.line_account_id !== 'string'))) throw new Error('store account unavailable')
         const stores = storesResponse.data.stores.filter(store => store.line_account_id === id && store.status !== 'archived')
         if (!stores.length) { if (sequence.current === request) setResult({ accountId: id, noStore: true }); return }
         const days = await Promise.all(stores.map(store => restaurantTestApi.reservationsDay(id, store.id, date)))
@@ -65,6 +66,7 @@ function TodayBody() {
       } else {
         const data = await bookingApi.getToday(id, { date, mode: 'staff' })
         if (!Array.isArray(data.timeline)) throw new Error('timeline unavailable')
+        if (data.timeline.some(row => !row || (row.kind !== 'seat' && row.kind !== 'staff'))) throw new Error('booking kind unavailable')
         limited = data.timeline.length >= 200
         rows = data.timeline.map(row => ({
           id: `${row.kind}-${row.id}`, startsAt: row.starts_at, name: row.customer_name || '名前未登録',
