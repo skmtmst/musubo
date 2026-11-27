@@ -1461,3 +1461,4 @@
 - [長い記録の表示を直した反映履歴](release-log/unreleased/PR-kenta-log-record-long.md) — 反映履歴、確認 2026-11-27。
 - [一覧の列幅を整える処理の高速化](release-log/unreleased/PR-kenta-list-column-sizing-speed.md) — 反映履歴、確認 2026-11-27。
 - [リマインダ基準オフセットとサポート先月比較表記の安全化](release-log/unreleased/PR-kenta-later-gemini91-1127.md) — 反映履歴、確認 2026-11-28。
+- [テンプレートの質問・カルーセルの表示修正](release-log/unreleased/PR-kenta-later-cx3-01-1128.md) — 反映履歴、確認 2026-11-28。
