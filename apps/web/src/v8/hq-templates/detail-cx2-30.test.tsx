@@ -13,7 +13,7 @@ function props(overrides: Record<string, unknown> = {}) {
 }
 afterEach(cleanup)
 
-it('同じ版の比較を開き直した後は古い結果を使わない', async () => {
+it('同じ版の比較をもう一度開いた後は古い結果を使わない', async () => {
   let oldFinish!: (value: ReturnType<typeof comparison>) => void
   let newFinish!: (value: ReturnType<typeof comparison>) => void
   const compare = vi.fn().mockImplementationOnce(() => new Promise(resolve => { oldFinish = resolve })).mockImplementationOnce(() => new Promise(resolve => { newFinish = resolve }))

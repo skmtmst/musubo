@@ -6,6 +6,7 @@ import { useHqRichMenuDraft } from './use-hq-rich-menu-draft'
 import { hqSeedFailureMessage, makeHqMenuSeed, MISSING_DEFAULT_PAGE_ERROR, resolveHqDefaultPageId } from './hq-menu-seed'
 
 import { RichMenuCreateNotices } from './create-notices'
+import { HqRichMenuFooterActions } from './create-host-footer'
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
 import { seedMenuShape } from './create-seed-shape'
@@ -72,7 +73,6 @@ type RichMenuScheduleInput,
 type RichMenuTargetPreview,
 } from '@/lib/api'
 import { previewHqRichMenu,type HqRichMenuDraft,type HqRichMenuPreview } from '@/lib/api/helpers/hq-authoring'
-import { formatNumber } from '@/lib/format'
 import { hqRichMenuDefinitionFromSeed,type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
@@ -97,8 +97,7 @@ type MediaItem
 import {
 ArrowRight,
 CalendarClock,
-Send,
-Upload
+Send
 } from 'lucide-react'
 import { useCallback,useEffect,useRef,useState } from 'react'
 import { describeMenuAudience,describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
@@ -1268,52 +1267,8 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
           </div>
         ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: describeMenuAudience(audience, Boolean(host)) }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
           !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
-            <>
-              <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
-              {step === 'publish' ? (
-                <>
-                  <Button
-                    type="button"
-                    disabled={busy || !host.canOperate || !publishSizeKnown}
-                    title={!publishSizeKnown ? 'メニューのサイズを確認できないため保存できません。画面を読み直すか新しく作り直してください' : undefined}
-                    busy={saving || host.busy}
-                    busyLabel="保存中…"
-                    onClick={() => void hostSave(false)}
-                  >
-                    下書きを保存
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    disabled={busy || !host.canOperate || !publishSizeKnown}
-                    title={!publishSizeKnown ? 'メニューのサイズを確認できないため配布できません。画面を読み直すか新しく作り直してください' : '保存したあとに、配る前の確認へ進みます'}
-                    busy={saving || host.busy}
-                    busyLabel="保存しています…"
-                    onClick={() => void hostSave(true)}
-                  >
-                    <Upload size={16} aria-hidden="true" />
-                    {host.selectedCount > 0 ? `${formatNumber(host.selectedCount)} アカウントへ配る` : 'アカウントへ配る'}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    type="button"
-                    disabled={busy || !host.canOperate || !publishSizeKnown}
-                    title={!publishSizeKnown ? 'メニューのサイズを確認できないため保存できません。画面を読み直すか新しく作り直してください' : undefined}
-                    busy={saving}
-                    busyLabel="保存中…"
-                    onClick={() => void hostSave(false)}
-                  >
-                    下書きを保存
-                  </Button>
-                  <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
-                    {nextLabel(step as Exclude<StepKey, 'publish'>)}
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </Button>
-                </>
-              )}
-            </>
+            <HqRichMenuFooterActions host={host} publishStep={step === 'publish'} busy={busy} saving={saving} sizeKnown={publishSizeKnown}
+              nextText={step === 'publish' ? '' : nextLabel(step)} onSave={(distribute) => void hostSave(distribute)} onNext={() => void goNext()} />
           ) : <>
             <Button href="/rich-menus">キャンセル</Button>
             {step === 'publish' ? (
