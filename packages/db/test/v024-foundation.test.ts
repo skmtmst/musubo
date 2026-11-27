@@ -397,7 +397,9 @@ describe('対応マーク', () => {
     // 新規インストールに届かない。ヘルパ側で補っている。
     expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks`).get()).toEqual({ c: 0 });
     const marks = await getSupportMarks(db, SCOPE);
-    expect(marks.map((m) => m.name)).toEqual(['未対応', '対応中', '解決済']);
+    expect(marks.map((m) => [m.name, m.color])).toEqual([['未対応','#ef4444'], ['対応中','#f97316'], ['対応済み','#16a34a']]);
+    sqlite.prepare('UPDATE support_marks SET name=?, color=? WHERE id=?').run('店独自の確認', '#123456', marks[0]!.id);
+    expect((await getSupportMarks(db,SCOPE))[0]).toMatchObject({name:'店独自の確認',color:'#123456'});
   });
 
   test('既定は1つだけ', async () => {

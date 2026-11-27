@@ -16,6 +16,9 @@ const fixture = vi.hoisted(() => ({
   readCalls: [] as string[],
   readStatus: 200,
   listCalls: 0,
+  savedRead: false,
+  delayRead: false,
+  finishRead: null as null | (() => void),
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
@@ -39,10 +42,10 @@ const chatRow = {
   lastMessageContent: '届きましたか', lastMessageType: 'text', lastMessageDirection: 'incoming',
 }
 
-function responseFor(url: URL, init?: RequestInit): Response {
+function responseFor(url: URL, init?: RequestInit): Response | Promise<Response> {
   if (url.pathname === '/api/chats') {
     fixture.listCalls += 1
-    return json({ success: true, data: [chatRow] })
+    return json({ success: true, data: [{...chatRow, isUnread: !fixture.savedRead, unreadCount: fixture.savedRead ? 0 : 3}] })
   }
   if (url.pathname === '/api/chats/stats') {
     return json({ success: true, data: { total: 1, unread: 1, inProgress: 0, onHold: 0, resolved: 0, oldestUnansweredMinutes: null, assigneeUnread: [] } })
@@ -52,9 +55,9 @@ function responseFor(url: URL, init?: RequestInit): Response {
   if (url.pathname === '/api/inbox/saved-views') return json({ success: true, data: [] })
   if (url.pathname === '/api/chats/friend-a/read' && init?.method === 'POST') {
     fixture.readCalls.push(url.pathname)
-    return fixture.readStatus === 200
-      ? json({ success: true, data: { isUnread: false } })
-      : json({ success: false, error: 'boom' }, fixture.readStatus)
+    if (fixture.readStatus !== 200) return json({ success: false, error: 'boom' }, fixture.readStatus)
+    const save = () => { fixture.savedRead = true; return json({ success: true, data: { isUnread: false } }) }
+    return fixture.delayRead ? new Promise(resolve => { fixture.finishRead = () => resolve(save()) }) : save()
   }
   if (url.pathname === '/api/chats/friend-a') {
     return json({ success: true, data: {
@@ -99,6 +102,9 @@ describe('受信箱：開いたら既読', () => {
     fixture.readCalls = []
     fixture.readStatus = 200
     fixture.listCalls = 0
+    fixture.savedRead = false
+    fixture.delayRead = false
+    fixture.finishRead = null
     document.documentElement.dataset.theme = 'v8'
     vi.stubGlobal('localStorage', { getItem: () => null, setItem() {}, removeItem() {} })
     vi.stubGlobal('fetch', (input: string | URL, init?: RequestInit) => responseFor(new URL(String(input), 'http://localhost'), init))
@@ -125,6 +131,7 @@ describe('受信箱：開いたら既読', () => {
     await act(async () => root.render(<ChatsPage />))
     await eventually(() => expect(row()).toBeTruthy())
     expect(unreadDot()).toBeTruthy()
+    expect(unreadDot()?.textContent).toBe('3')
     expect(name().className).toContain('font-semibold')
   }
 
@@ -135,6 +142,23 @@ describe('受信箱：開いたら既読', () => {
     expect(unreadDot()).toBeNull()
     expect(name().className).not.toContain('font-semibold')
     await eventually(() => expect(fixture.readCalls).toEqual(['/api/chats/friend-a/read']))
+    await act(async () => { window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)) })
+    await eventually(() => expect(fixture.listCalls).toBeGreaterThan(1))
+    expect(unreadDot()).toBeNull()
+  })
+
+  it('既読の保存中に古い一覧が届いても未読へ戻らず、保存後も既読を保つ', async () => {
+    fixture.delayRead = true
+    await renderUnread()
+    await act(async () => { row().click() })
+    await eventually(() => expect(fixture.finishRead).toBeTruthy())
+    const before = fixture.listCalls
+    await act(async () => { window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)) })
+    await eventually(() => expect(fixture.listCalls).toBeGreaterThan(before))
+    expect(unreadDot()).toBeNull()
+    await act(async () => { fixture.finishRead!() })
+    await eventually(() => expect(fixture.savedRead).toBe(true))
+    await eventually(() => expect(unreadDot()).toBeNull())
   })
 
   it('既読の口が失敗しても会話は開く。読み直しで口の未読へ戻る', async () => {

@@ -1,4 +1,5 @@
 'use client'
+import { withRequestTimeout } from '@/lib/request-timeout'
 import { useInboxPreview } from './use-reservation-warning'
 import { InboxResolvedText, InboxUnresolvedNotice } from './send-preview'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
@@ -77,7 +78,7 @@ function MobileTalkInbox() {
   const [nameQuery, setNameQuery] = useState('')
   const [, setError] = useState('')
   const {
-    chats, setChats, debouncedNameQuery, loading, chatListFailed, loadingMore, hasMoreChats,
+    chats, beginChatRead, debouncedNameQuery, loading, chatListFailed, loadingMore, hasMoreChats,
     listFilterKey, chatListCompletedKey, loadChats, loadMoreChats, loadChatsQuietly,
   } = useInboxLists({
     CHAT_PAGE_SIZE: LIST_BATCH,
@@ -97,11 +98,8 @@ function MobileTalkInbox() {
   const pending = nameQuery.trim() !== debouncedNameQuery || chatListCompletedKey !== listFilterKey
   const items = chats.map(talkItem)
   const open = (item: MobileTalkItem) => {
-    // 既読はログイン中の担当者だけに付く。対応の状態は変えない（PC で会話を開いた時と同じ）。
-    setChats((prev) => prev.map((chat) => (chat.id === item.id ? { ...chat, isUnread: false } : chat)))
-    void api.chats.markRead(item.id).catch(() => {
-      // 会話を開く操作は止めない。次の読み直しで正しい未読に戻る。
-    })
+    const finishRead = beginChatRead(item.id)
+    void withRequestTimeout(api.chats.markRead(item.id)).then(() => finishRead(true), () => finishRead(false))
   }
   return (
     <MobileScreen title="トーク" permission={TALK_PERMISSION}>

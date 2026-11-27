@@ -6,9 +6,11 @@ import { isImeComposing } from './ime'
 export const OverlayDepthContext = createContext(0)
 const activeOverlays = new Map<object, { depth: number; order: number }>()
 let overlayOrder = 0
-const openLayers = new Set<object>()
+const openLayers = new Map<object, number>()
 /** 窓・引き出しの重なりの基準。後から開いたものほど上（+1 ずつ）。メニューなど上に出す物は 100 以上。 */
 export const OVERLAY_LAYER_BASE = 90
+export const OVERLAY_DEPTH_STEP = 32
+export const OVERLAY_MENU_BASE = 120
 /** A newly opened modal closes existing non-modal portal panels such as the notification popover. */
 export const OVERLAY_MODAL_OPEN_EVENT = 'overlay:modal-open'
 /**
@@ -17,14 +19,17 @@ export const OVERLAY_MODAL_OPEN_EVENT = 'overlay:modal-open'
  */
 export function useOverlayLayer(open: boolean): number {
   const key = useRef<object>({})
-  const [layer, setLayer] = useState(OVERLAY_LAYER_BASE)
+  const depth = useContext(OverlayDepthContext)
+  const [layer, setLayer] = useState(OVERLAY_LAYER_BASE + depth * OVERLAY_DEPTH_STEP)
   useEffect(() => {
     if (!open) return
     const self = key.current
-    setLayer(OVERLAY_LAYER_BASE + openLayers.size)
-    openLayers.add(self)
+    const minimum = OVERLAY_LAYER_BASE + depth * OVERLAY_DEPTH_STEP
+    const next = Math.max(minimum, ...[...openLayers.values()].map(value => value + 1))
+    setLayer(next)
+    openLayers.set(self, next)
     return () => { openLayers.delete(self) }
-  }, [open])
+  }, [open, depth])
   return layer
 }
 let originalOverflow = ''

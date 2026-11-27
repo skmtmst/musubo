@@ -1,6 +1,6 @@
 'use client'
 
-import { StatusDot, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
+import { StatusDot, SUPPORT_STATUS_TONES, SUPPORT_STATUS_LABELS, SUPPORT_STATUS_ORDER } from '@/components/shared/status-pill'
 import Select from '@/components/shared/select'
 import { buildOperatorRows, type OperatorOption } from '@/components/chats/inbox-dropdown'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -17,13 +17,8 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 
 export type HeadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
-export const HEAD_STATUS_LABEL: Record<HeadStatus, string> = {
-  unread: '未対応',
-  in_progress: '対応中',
-  on_hold: '保留',
-  resolved: '対応済み',
-}
-const STATUS_ORDER: HeadStatus[] = ['unread', 'in_progress', 'on_hold', 'resolved']
+export const HEAD_STATUS_LABEL = SUPPORT_STATUS_LABELS
+const STATUS_ORDER = SUPPORT_STATUS_ORDER
 
 /** 絵の担当の箱の幅（担当：Kenta）。名前が長いときは省略し、全文は title で読める。 */
 const OPERATOR_WIDTH = 116
@@ -50,7 +45,7 @@ export function HeadOperatorMenu({
 }) {
   const rows = buildOperatorRows(operators, false, value)
   return (
-    <span data-compact-operator={compact || undefined} title={`担当：${rows.find(row => row.id === value)?.name ?? '未割り当て'}`} data-initial={(rows.find(row => row.id === value)?.name ?? '未').charAt(0)}><SaveErrorField names={["value", "operatorId", "operator_id"]}><EntitySelect
+    <span data-head-operator="" data-compact-operator={compact || undefined} title={`担当：${rows.find(row => row.id === value)?.name ?? '未割り当て'}`} data-initial={(rows.find(row => row.id === value)?.name ?? '未').charAt(0)}><SaveErrorField names={["value", "operatorId", "operator_id"]}><EntitySelect confirmLabel="選択する"
       aria-label={ariaLabel}
       label="担当"
       width={compact ? 36 : OPERATOR_WIDTH}

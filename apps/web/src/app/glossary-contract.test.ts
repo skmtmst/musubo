@@ -164,13 +164,6 @@ describe("用語表（管理画面 §7 48番の表記ゆれ潰し）", () => {
     expect(hits, '「対応状況」に寄せる').toEqual([])
   })
 
-  it('対応状況の4つは、要件書と同じ順に並べる', () => {
-    const inbox = FILES.find((f) => f.p === 'components/chats/inbox-filter-panel.tsx')
-    expect(inbox).toBeDefined()
-    const order = [...inbox!.s.matchAll(/label: '(未対応|対応中|保留|対応済み)'/g)].map((m) => m[1])
-    expect(order, 'v6-02-inbox-requirements-draft.md:188 の順').toEqual(['未対応', '対応中', '保留', '対応済み'])
-  })
-
   /**
    * **言葉の表（docs/v8-requirements/terms.md）の「使わない」を画面に出さない。**
    *

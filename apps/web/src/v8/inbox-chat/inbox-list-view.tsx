@@ -12,6 +12,7 @@ import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadl
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
+import UnreadCountBadge from '@/components/shared/unread-count-badge';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
 import StatusBadge from '@/components/shared/status-badge';
 import { STATUS_WORD } from '@/components/chats/friend-info-status';
@@ -527,7 +528,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
                           <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={34} />
                           {chat.isUnread && (
-                            <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
+                            <UnreadCountBadge id={`chat-row-unread-${chat.id}`} count={chat.unreadCount} className={styles.unreadCount} />
                           )}
                         </div>
                         <div className={styles.rowColumns}>

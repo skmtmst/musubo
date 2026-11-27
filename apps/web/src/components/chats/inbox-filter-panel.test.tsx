@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import InboxFilterPanel, { type InboxFilterValue } from './inbox-filter-panel'
@@ -44,6 +44,12 @@ function chooseDeadline(label: string) {
 }
 
 describe('受信箱の期限と補助操作', () => {
+  it('対応状況は正本の4状態を順に表示する', () => {
+    render(<Panel />)
+    fireEvent.click(screen.getByRole('button', { name: '対応状況で絞り込む' }))
+    expect(screen.getAllByRole('option').map(option => option.textContent?.trim())).toEqual(['すべて', '未対応', '対応中', '保留', '対応済み'])
+  })
+
   it.each([false, true])('期限を変えてもほかの条件を保持し、リセットは期限も解除する（期限あり=%s）', (slaEnabled) => {
     render(<Panel slaEnabled={slaEnabled} />)
     chooseDeadline('要返信')
@@ -74,7 +80,7 @@ describe('受信箱の期限と補助操作', () => {
     const picker = screen.getAllByRole('dialog').at(-1)!
     expect(within(picker).getByText(count === null ? '未読 —' : `未読 ${count}件`)).toBeTruthy()
     fireEvent.click(within(picker).getByRole('radio', { name: '未割り当て' }))
-    fireEvent.click(within(picker).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(picker).getByRole('button', { name: '選択する' }))
     expect(JSON.parse(screen.getByLabelText('現在の条件').textContent!)).toEqual({ ...initial, assignee: 'unassigned' })
   })
 
@@ -105,4 +111,22 @@ describe('受信箱の期限と補助操作', () => {
       expect(document.activeElement).toBe(link)
     }
   })
+})
+
+it('絞り込みの中から担当を選ぶ窓は手前に出て、選択を反映する', async () => {
+  function Anchored() {
+    const anchor=useRef<HTMLButtonElement>(null)
+    const [value,setValue]=useState(initial)
+    return <><button ref={anchor}>絞り込みを開く</button><output aria-label="現在の条件">{JSON.stringify(value)}</output><InboxFilterPanel open anchorRef={anchor} value={value} operators={[{id:'operator-a',name:'担当者A'}]} onChange={setValue} onReset={()=>{}} onClose={()=>{}} /></>
+  }
+  render(<Anchored />)
+  const filter=await screen.findByRole('dialog',{name:'絞り込み'})
+  fireEvent.click(within(filter).getByRole('button',{name:'担当者で絞り込む'}))
+  const picker=await screen.findByRole('dialog',{name:/担当者/})
+  const menu=filter.closest('[data-menu-portal]') as HTMLElement
+  const overlay=picker.closest('[role="presentation"]') as HTMLElement
+  await waitFor(()=>expect(Number(overlay.style.zIndex)).toBeGreaterThan(Number(menu.style.zIndex)))
+  fireEvent.click(within(picker).getByRole('radio',{name:'未割り当て'}))
+  fireEvent.click(within(picker).getByRole('button',{name:'選択する'}))
+  expect(JSON.parse(screen.getByLabelText('現在の条件').textContent!).assignee).toBe('unassigned')
 })

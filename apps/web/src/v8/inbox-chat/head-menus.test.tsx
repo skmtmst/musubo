@@ -68,7 +68,7 @@ describe('会話の頭のメニュー', () => {
     expect(options.map((o) => o.getAttribute('aria-label'))).toEqual(['Kenta', 'Masato', '未割り当て'])
     expect((options[0] as HTMLInputElement).checked).toBe(true)
     fireEvent.click(options[1])
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する' }))
     expect(onOperator).toHaveBeenCalledWith('op-m')
   })
 
@@ -112,7 +112,7 @@ test('長い名前と担当は省略しても全文を確認できる', () => {
   expect(screen.getAllByTitle('担当：Kenta').find(el => el.hasAttribute('data-compact-operator'))?.getAttribute('data-initial')).toBe('K')
   fireEvent.click(screen.getByRole('button', {name:'担当者を変える'}))
   fireEvent.click(screen.getByRole('radio', {name:'Masato'}))
-  fireEvent.click(screen.getByRole('button', {name:'選ぶ'}))
+  fireEvent.click(screen.getByRole('button', {name:'選択する'}))
   expect(onChange).toHaveBeenCalledWith('op-m')
 })
 

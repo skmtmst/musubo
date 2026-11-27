@@ -68,8 +68,8 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
       <MenuPortal open={open} align="end" getAnchor={() => wrapRef.current} onClose={() => setOpen(false)}>
         <section role="dialog" aria-label="対応ルール" className={styles.pop}>
           <div>
-            <p className={styles.popTitle}>対応ルール</p>
-            <p className={styles.popNote}>対応マークと、自動で付くときの決まりです。</p>
+            <p className={styles.popTitle}>対応マークのルール</p>
+            <p className={styles.popNote}>友だちの対応マークが自動で付くときの決まりです。会話の対応状況とは別です。</p>
           </div>
           {!accountId ? (
             <p className={styles.popNote}>LINEアカウントを選ぶと表示されます。</p>

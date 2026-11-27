@@ -1,4 +1,5 @@
 'use client'
+import { withRequestTimeout } from '@/lib/request-timeout'
 import { notifySaved } from '@/components/shared/toast'
 
 import { japaneseDetailOf } from '@/components/shared/api-error-message';
@@ -229,6 +230,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
   const {
     chats,
     setChats,
+    beginChatRead,
     emailItems,
     setEmailItems,
     emailError,
@@ -523,13 +525,9 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     setSelectedChatId(chatId)
     // friend は外すが、一覧条件の savedView は残す(N-021)。
     clearConversationParams()
-    // 既読はログイン中の担当者だけに反映する。対応状況は変えない。
-    setChats((prev) => prev.map((chat) => (
-      chat.id === chatId ? { ...chat, isUnread: false } : chat
-    )))
-    void api.chats.markRead(chatId).catch(() => {
-      // 会話を開く処理は止めない。次の一覧取得で正しい未読へ戻る。
-    })
+    // 取得途中の古い一覧は破棄し、保存後は新着を含む正しい一覧を読む。
+    const finishRead = beginChatRead(chatId)
+    void withRequestTimeout(api.chats.markRead(chatId)).then(() => finishRead(true), () => finishRead(false))
     /*
      * 開いていたメールを外す。
      *

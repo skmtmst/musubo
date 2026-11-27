@@ -5,6 +5,7 @@ import { lineAccountConnectionState } from '@/lib/line-account-state'
 import Card from '@/components/shared/card'
 import { ProgressBar } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
+import { SUPPORT_STATUS_LABELS, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Bell, Send, TriangleAlert, UserPlus } from 'lucide-react'
@@ -189,10 +190,10 @@ export function OperationalAlerts({ risk, healthIssues, oldestWaitMinutes, twoFa
 /* ── 右の列：現在の対応状況 ───────────────────────── */
 export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOverview['inbox'] | null; autoOnInbound: boolean | null }) {
   const rows = [
-    { label: '未対応', value: inbox?.unanswered ?? null, href: '/chats?status=unread', dot: 'danger' },
-    { label: '対応中', value: inbox?.inProgress ?? null, href: '/chats?status=in_progress', dot: 'warning' },
-    { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold', dot: 'faint' },
-    { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved', dot: 'success' },
+    { label: SUPPORT_STATUS_LABELS.unread, value: inbox?.unanswered ?? null, href: '/chats?status=unread', dot: SUPPORT_STATUS_TONES.unread },
+    { label: SUPPORT_STATUS_LABELS.in_progress, value: inbox?.inProgress ?? null, href: '/chats?status=in_progress', dot: SUPPORT_STATUS_TONES.in_progress },
+    { label: SUPPORT_STATUS_LABELS.on_hold, value: inbox?.onHold ?? null, href: '/chats?status=on_hold', dot: SUPPORT_STATUS_TONES.on_hold },
+    { label: SUPPORT_STATUS_LABELS.resolved, value: inbox?.resolved ?? null, href: '/chats?status=resolved', dot: SUPPORT_STATUS_TONES.resolved },
   ] as const
   const autoText = `メッセージ受信時の自動変更：${autoOnInbound === null ? emptyValue('unknown') : autoOnInbound ? '有効' : '無効'}`
   return (
@@ -207,7 +208,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
       {rows.map((row) => (
         <KeyValue
           key={row.label}
-          label={<StatusBadge tone={row.dot === 'faint' ? 'neutral' : row.dot}>{row.label}</StatusBadge>}
+          label={<StatusBadge tone={row.dot}>{row.label}</StatusBadge>}
           value={row.value === null ? emptyValue('unknown') : `${formatNumber(row.value)} 件`}
           tone={row.label === '未対応' && (row.value ?? 0) > 0 ? 'danger' : 'default'}
           href={row.href}

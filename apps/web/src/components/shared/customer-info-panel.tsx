@@ -147,10 +147,7 @@ export default function CustomerInfoPanel({
     <Button onClick={() => setExpanded(current => !current)} aria-expanded={expanded}>
       {expanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
     </Button>
-    {expanded ? <div className={styles.more}>
-      <TextLink inline href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>情報欄をすべて見る</TextLink>
-      {more}
-    </div> : null}
+    {expanded && more ? <div className={styles.more}>{more}</div> : null}
     <PermissionGatedButton allowed={canEdit} variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</PermissionGatedButton>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="基本情報の変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {settings && canEdit ? <DisplayItemsDialog title="表示項目" hierarchy items={[

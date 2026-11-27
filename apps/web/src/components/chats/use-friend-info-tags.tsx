@@ -124,8 +124,9 @@ export function useFriendInfoTags({ setMemoSaving, targetKey, friendId, accountI
     for (const id of added) {
       const target = known.find((tag) => tag.id === id)
       if (target) addTagById(id, { name: target.name, color: target.color })
+      else notifyToast('タグを保存できませんでした。候補を読み直してお試しください。', { tone: 'error' })
     }
-    for (const id of removed) removeTagById(id)
+    for (const id of removed) void removeTagById(id)?.catch(() => undefined)
   }
 
   // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。

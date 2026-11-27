@@ -171,3 +171,5 @@
 
 /* hold：右の友だち情報は320。狭い板では今までどおり重ねて開く。 */
 :global(:root) .infoPanel { width: var(--tpl-inbox-summary-width); }
+
+.unreadCount { position: absolute; top: -2px; right: -6px; }

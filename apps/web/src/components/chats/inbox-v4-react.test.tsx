@@ -173,7 +173,7 @@ describe('受信箱V4で既存機能を失わない', () => {
     const names = within(dialog).getAllByRole('radio').map((radio) => radio.getAttribute('aria-label'))
     expect(names).not.toContain('すべて')
     fireEvent.click(within(dialog).getByRole('radio', { name: '未割り当て' }))
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
     await eventually(() => {
       const put = calls.find((call) => call.method === 'PUT' && call.path === '/api/chats/chat-1')
       expect(put?.body).toMatchObject({ operatorId: null, revision: 4 })
@@ -210,7 +210,7 @@ describe('受信箱V4で既存機能を失わない', () => {
     const dialog = screen.getAllByRole('dialog').at(-1)!
     await eventually(() => expect(within(dialog).getByRole('radio', { name: '佐々木' })).toBeTruthy())
     fireEvent.click(within(dialog).getByRole('radio', { name: '佐々木' }))
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
     await eventually(() => {
       const patch = calls.find((call) => call.method === 'PATCH' && call.path === '/api/support/email/threads/thread-1/assignee')
       expect(patch?.body).toMatchObject({ staffId: 'op-m', revision: 1 })
@@ -276,7 +276,7 @@ describe('受信箱V4で既存機能を失わない', () => {
     fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
     const dialog = screen.getAllByRole('dialog').at(-1)!
     fireEvent.click(within(dialog).getByRole('radio', { name: '佐々木' }))
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
     await eventually(() => expect(detailReads).toBe(2))
     fireEvent.click(screen.getByRole('button', { name: '対応状況を変える' }))
     await act(async () => { fireEvent.click(screen.getByRole('option', { name: '対応中' }).querySelector('button')!) })

@@ -120,3 +120,15 @@ it('手作りのモーダル内では選択欄・日付欄を開け、外の通�
   expect(screen.getByRole('dialog', { name: '日付を選ぶ' })).toBeTruthy()
   expect(screen.getAllByRole('gridcell')).toHaveLength(42)
 })
+
+it('引き出し内の窓の後に開く全画面の窓も一番前に出る', async () => {
+ function Both() {
+  const [nested,setNested]=useState(false),[global,setGlobal]=useState(false)
+  return <><Drawer open title="引き出し" onClose={()=>{}}><Dialog open={nested} title="引き出し内の窓" onCancel={()=>setNested(false)} /><button onClick={()=>setNested(true)}>子を開く</button></Drawer>
+    <button onClick={()=>setGlobal(true)}>全画面の窓を開く</button><Dialog open={global} title="全画面の窓" onCancel={()=>setGlobal(false)} /></>
+ }
+ render(<Both />)
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'子を開く'})))
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'全画面の窓を開く'})))
+ expect(layerOf('全画面の窓')).toBeGreaterThan(layerOf('引き出し内の窓'))
+})

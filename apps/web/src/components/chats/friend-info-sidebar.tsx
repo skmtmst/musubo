@@ -2,6 +2,8 @@
 import { asArray } from './friend-detail-shape'
 
 import { STATUS_WORD } from './friend-info-status'
+import StatusBadge from '@/components/shared/status-badge'
+import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 
 import { type ChatStatusInfo,type Props } from './friend-info-types'
 
@@ -463,7 +465,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                         {editingSupport ? sectionBody(renderSupport(friend)).filter(child => !(isValidElement<{ 'data-customer-memo'?: boolean }>(child) && child.props['data-customer-memo'])) : <>
                           {/* 絵 eovoG：次回予約・次の自動配信も 状況・担当 と同じ行の形（見出し＋値）で続ける。 */}
                           <CustomerInfoRows
-                            rows={[{ label: '状況', value: effectiveStatus ? STATUS_WORD[effectiveStatus] : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]}
+                            rows={[{ label: '状況', value: effectiveStatus ? <StatusBadge tone={SUPPORT_STATUS_TONES[effectiveStatus]}>{STATUS_WORD[effectiveStatus]}</StatusBadge> : '未設定' }, { label: '担当', value: operators?.find(item => item.id === effectiveOperatorId)?.name ?? operatorName ?? '未割り当て' }, { label: '最後の連絡', value: lastContactAt ? formatDateTime(lastContactAt) : '—' }, { label: '次回予約', value: upcomingRowValue('booking') }, { label: '次の自動配信', value: upcomingRowValue('delivery') }]}
                           />
                           {(upcoming.kind === 'error' || (upcoming.kind === 'data' && (upcoming.data.nextBookingError || upcoming.data.nextAutoDeliveryError))) ? (
                             <Button variant="text" size="inline" onClick={() => setUpcomingRetry((key) => key + 1)}>再試行する</Button>

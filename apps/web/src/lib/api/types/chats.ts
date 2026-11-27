@@ -54,6 +54,8 @@ export type ChatListItem = Chat & {
   lastMessageType: string | null
   /** ログイン中の担当者だけの未読。対応状況とは別。 */
   isUnread: boolean
+  /** 担当者ごとの未読受信数。旧バージョンの口では省略。 */
+  unreadCount?: number
   /** 友だち一覧と共通の注目印。旧応答では未指定。 */
   isAttention?: boolean
 }

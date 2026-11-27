@@ -9,6 +9,9 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
+- [受信箱の操作と表示の修正](release-log/unreleased/241-kenta-inbox-head.md)
+- [受信箱の表示と操作](../apps/web/src/v8/inbox-chat/BEHAVIOR.md)
+- [対応マークの動き](../apps/web/src/components/friend-fields/BEHAVIOR.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
 - [動作確認の名前を整理（3回目）](release-log/unreleased/160-kenta-q04-test-titles3.md)

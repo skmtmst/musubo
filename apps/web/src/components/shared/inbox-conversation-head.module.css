@@ -12,9 +12,9 @@
   background: var(--color-canvas);
   position: relative;
 }
-.cheadWho { display: flex; min-width: 120px; flex: 1 1 120px; align-items: center; gap: var(--tpl-inbox-chead-gap); }
+.cheadWho { display: flex; min-width: 0; flex: 1 1 120px; align-items: center; gap: var(--tpl-inbox-chead-gap); }
 .cheadBack { flex: none; border: 0; background: none; color: var(--color-ink-faint); cursor: pointer; }
-.cheadText { display: flex; min-width: 0; flex-direction: column; }
+.cheadText { display: flex; flex: 1 1 auto; min-width: 0; flex-direction: column; }
 .cheadName {
   display: block;
   min-width: 0;
@@ -35,7 +35,8 @@
 }
 .cheadSub { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-inbox-chead-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
 .cheadTools { display: flex; flex: none; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--tpl-inbox-chead-gap); margin-left: auto; }
-.cheadTools { min-width: 0; }
+.cheadTools > * { flex-shrink: 0; }
+.cheadTools :global([data-head-operator]) { flex: none; }
 .cheadSquare {
   display: inline-flex;
   flex: none;
@@ -64,4 +65,4 @@
 .cheadTools :global([data-compact-operator])::after { content: attr(data-initial); position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-size: var(--text-caption); font-weight: 600; }
 .cheadTools :global([data-compact-operator] [data-choice-value]), .cheadTools :global([data-compact-operator] [data-choice-chevron]) { visibility: hidden; }
 .cheadTools :global([data-compact-operator]) { width: 36px; }
-.cheadTools :global([data-compact-operator] [data-choice-field]) { box-sizing: border-box; width: 36px; min-width: 0; padding: 0; }
+html:root .cheadTools :global([data-compact-operator] [data-choice-field]) { box-sizing: border-box; width: 36px; min-width: 0; padding: 0; }

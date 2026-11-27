@@ -67,9 +67,9 @@ test('文字操作は本文と違う緑、明示色・選択・灰色と理由�
         assert.equal(await page.locator(selector).evaluate(el => getComputedStyle(el).color), tokens.link, '文字リンクも共通の緑で操作を区別する')
       }
       await page.getByRole('button', { name: '顧客情報をすべて表示', exact: true }).click()
-      const actualLink = page.getByRole('link', { name: '情報欄をすべて見る', exact: true })
-      assert.equal(await actualLink.getAttribute('href'), '/friends/detail?id=friend-link&tab=info')
-      assert.equal(await actualLink.evaluate(el => getComputedStyle(el).color), tokens.link, '実際の顧客欄の操作も本文の色に戻さない')
+      const actualLink = page.getByRole('link', { name: '友だちの詳細を開く：山田', exact: true })
+      assert.equal(await actualLink.getAttribute('href'), '/friends/detail?id=friend-link')
+      assert.equal(await actualLink.evaluate(el => getComputedStyle(el).color), tokens.link, '顧客詳細へのリンクは共通の色で操作を示す')
       await actualLink.hover()
       assert.equal(await actualLink.evaluate(el => getComputedStyle(el).textDecorationLine), 'underline')
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)

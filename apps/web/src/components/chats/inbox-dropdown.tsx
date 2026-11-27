@@ -1,5 +1,7 @@
 'use client'
 
+import StatusBadge from '@/components/shared/status-badge'
+import { StatusDot, SUPPORT_STATUS_LABELS, SUPPORT_STATUS_ORDER, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 import { useRef, useState } from 'react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
@@ -280,14 +282,7 @@ export type ChatStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
  * 状態ごとの色。**一覧の札と同じ色を使う。**
  * ここだけ別の色にすると、開いて選んだものと一覧に出るものが結びつかない。
  */
-const STATUS_STYLE: Record<ChatStatus, { label: string; dot: string; pill: string }> = {
-  unread: { label: '未対応', dot: 'bg-danger', pill: 'bg-danger-bg text-danger' },
-  in_progress: { label: '対応中', dot: 'bg-warning', pill: 'bg-warning-bg text-warning' },
-  on_hold: { label: '保留', dot: 'bg-info', pill: 'bg-info-bg text-info' },
-  resolved: { label: '対応済み', dot: 'bg-accent', pill: 'bg-accent-soft text-accent-deep' },
-}
-
-const STATUS_ORDER: ChatStatus[] = ['unread', 'in_progress', 'on_hold', 'resolved']
+const STATUS_ORDER = SUPPORT_STATUS_ORDER
 
 export function StatusDropdown({
   value,
@@ -300,7 +295,7 @@ export function StatusDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const current = STATUS_STYLE[value]
+  const current = SUPPORT_STATUS_LABELS[value]
 
   return (
     <div className="relative" ref={wrapRef}>
@@ -311,8 +306,8 @@ export function StatusDropdown({
         onClick={() => setOpen((now) => !now)}
         className={`border-hairline rounded-control bg-canvas flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border px-2.5 text-xs ${open ? 'border-accent' : ''}`}
       >
-        <span className={`h-2 w-2 rounded-pill ${current.dot}`} aria-hidden="true" />
-        <span className="font-semibold">{current.label}</span>
+        <StatusDot tone={SUPPORT_STATUS_TONES[value]} />
+        <span className="font-semibold">{current}</span>
         <span className="text-ink-faint"><Chevron open={open} /></span>
       </button>
       {open ? (
@@ -326,7 +321,6 @@ export function StatusDropdown({
           panelClassName={`${panelClass} right-0`}
         >
           {STATUS_ORDER.map((status) => {
-            const style = STATUS_STYLE[status]
             const selected = status === value
             return (
               <button
@@ -337,8 +331,7 @@ export function StatusDropdown({
                 onClick={() => { onChange(status); setOpen(false) }}
                 className={`${rowClass} whitespace-nowrap ${selected ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
               >
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-pill ${style.dot}`} aria-hidden="true" />
-                <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${style.pill}`}>{style.label}</span>
+                <StatusBadge tone={SUPPORT_STATUS_TONES[status]}>{SUPPORT_STATUS_LABELS[status]}</StatusBadge>
                 <span className={`text-accent-deep ml-auto ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>
             )

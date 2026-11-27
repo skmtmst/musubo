@@ -6,6 +6,7 @@ import type { ChatStatus } from './inbox-dropdown'
 import type { InboxStats } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Checkbox from '@/components/shared/checkbox'
+import { StatusDot, SUPPORT_STATUS_ORDER, SUPPORT_STATUS_LABELS, SUPPORT_STATUS_TONES } from '@/components/shared/status-pill'
 
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
@@ -33,12 +34,8 @@ export type InboxFilterValue = {
   quickFilter?: 'all' | 'reply' | 'overdue'
 }
 
-const STATUS_OPTIONS: { value: InboxFilterValue['status']; label: string }[] = [
-  { value: 'all', label: 'すべて' },
-  { value: 'unread', label: '未対応' },
-  { value: 'in_progress', label: '対応中' },
-  { value: 'on_hold', label: '保留' },
-  { value: 'resolved', label: '対応済み' },
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'すべて' }, ...SUPPORT_STATUS_ORDER.map(value => ({ value, label: SUPPORT_STATUS_LABELS[value], leading: <StatusDot tone={SUPPORT_STATUS_TONES[value]} /> })),
 ]
 
 const CHANNEL_OPTIONS: { value: InboxFilterValue['channel']; label: string }[] = [
@@ -146,7 +143,7 @@ export default function InboxFilterPanel({
           <div>
             <span className={labelClass}>担当</span>
             <div className="mt-1.5">
-              <EntitySelect clearable size="full"
+              <EntitySelect clearable size="full" confirmLabel="選択する"
                 aria-label="担当者で絞り込む"
                 placeholder="すべて"
                 value={value.assignee === 'all' ? '' : value.assignee}
