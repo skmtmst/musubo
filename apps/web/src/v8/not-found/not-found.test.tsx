@@ -115,3 +115,23 @@ it('統括の未知のページでは統括内へ戻れる', () => {
     expect(links).not.toContain('/friends')
   } finally { close() }
 })
+
+
+it('運営の存在しないページでは運営のダッシュボードへ戻れる', () => {
+  nav.pathname = '/ops/missing-example'
+  const { host, close } = render()
+  try {
+    const links = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href'))
+    expect(links).toContain('/ops/dashboard')
+    expect(links).toContain('/ops/tenants')
+    expect(links).toContain('/ops/support')
+    expect(links).not.toContain('/')
+    expect(links).not.toContain('/chats')
+    expect(host.textContent).toContain('運営ダッシュボードへ')
+    const historyLength = vi.spyOn(window.history, 'length', 'get').mockReturnValue(1)
+    try {
+      act(() => [...host.querySelectorAll('button')].find((button) => button.textContent === '前のページへ戻る')!.click())
+      expect(router.push).toHaveBeenCalledWith('/ops/dashboard')
+    } finally { historyLength.mockRestore() }
+  } finally { close() }
+})

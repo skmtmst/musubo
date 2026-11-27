@@ -1,6 +1,9 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
+- [二段階認証と前月比の画面改善](release-log/unreleased/PR-kenta-later-codex4.md)（説明・2026-11-27確認）
+- [運営画面と広告設定の表示改善](release-log/unreleased/PR-kenta-later-codex5.md)（説明・2026-11-27確認）
+
 # 文書の入口
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
@@ -16,6 +19,10 @@
 - [動作確認の名前を整理（4回目）](release-log/unreleased/163-kenta-q04-test-titles4.md)
 - [開発用の説明を整理](release-log/unreleased/165-kenta-q04-comments-pkg.md)
 - [動作確認の名前とコメントの整理をまとめて取り込み](release-log/unreleased/172-kenta-train-q04.md)
+- [画面の読み込みと案内の修正の反映履歴](release-log/unreleased/266-kenta-train-night3-1127.md)（説明・2026-11-27確認）
+- [契約先の操作履歴の表示の反映履歴](release-log/unreleased/PR-kenta-tenant-audit-unknown.md)（説明・2026-11-27確認）
+- [アカウントのアーカイブ理由の反映履歴](release-log/unreleased/PR-kenta-archive-blocker-unknown.md)（説明・2026-11-27確認）
+- [ファネルの未対応条件の反映履歴](release-log/unreleased/PR-kenta-funnel-unknown-kind.md)（説明・2026-11-27確認）
 - [EC連携の未対応の出来事の反映履歴](release-log/unreleased/259-kenta-ec-unknown-event.md)（説明・2026-11-27確認）
 - [流入経路の注文状態の反映履歴](release-log/unreleased/260-kenta-inflow-order-status.md)（説明・2026-11-27確認）
 - [運営の操作履歴の表示の反映履歴](release-log/unreleased/263-kenta-ops-audit-unknown.md)（説明・2026-11-27確認）
@@ -1420,6 +1427,8 @@
 
 - [画面の読み直しと表示の列車5](release-log/unreleased/243-kenta-train5-1126.md) — 取得失敗時の読み直しと表示の修正履歴。確認 2026-11-26。
 - [画面の読み直しと操作の列車6](release-log/unreleased/243-kenta-train6-1126.md) — 読み直しと画面操作の改善履歴。確認 2026-11-26。
+- [カルーセル編集と質問テンプレート編集の読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini6-1127.md) — 反映履歴、確認 2026-11-27。
+- [リッチビデオ編集と運用状態の更新履歴の読み込み失敗時再読み込み](release-log/unreleased/PR-kenta-later-gemini7-1127.md) — 反映履歴、確認 2026-11-27。
 - [Search Console のグラフ右端の日付ラベルのはみ出しを直した反映履歴](release-log/unreleased/248-kenta-search-console-label.md) — 反映履歴、確認 2026-11-27。
 - [はじめの設定の権限表示と閲覧のみ案内文の修正](release-log/unreleased/249-kenta-later-gemini-1127.md) — 反映履歴、確認 2026-11-27。
 - [振替の再読み込み時の古い応答上書き防止](release-log/unreleased/250-kenta-makeup-reload.md) — 反映履歴、確認 2026-11-27。

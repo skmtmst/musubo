@@ -3,7 +3,7 @@
 import { ValueBarChart } from '@/components/shared/charts'
 
 import Link from '@/components/shared/list-navigation'
-import { Banknote, Hourglass, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Banknote, Hourglass, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -16,6 +16,7 @@ import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import { KpiDelta } from '@/v8/dashboard'
 import ListState from '@/components/shared/list-state'
 import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
@@ -30,6 +31,7 @@ import parts from './parts.module.css'
 import styles from './dashboard.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
+import { ActivityTime } from '@/components/shared/activity-item'
 
 /**
  * 運営ダッシュボード V8。
@@ -123,9 +125,10 @@ export default function OpsDashboardV8() {
       ) : (
         <div className={parts.stack}>
           {error ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
+          {data?.generatedAt ? <ActivityTime>{formatDateTime(data.generatedAt)}時点</ActivityTime> : null}
           <KpiBand>
             <KpiCard presentation="cell" icon={<Wallet size={16} aria-hidden="true" />} title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? <span title={contractDetail(k.active, k.byPlan, k.filledByListPriceCount)}>{`契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）`}</span> : emptyValue('unknown')} loading={loading} />
-            <KpiCard presentation="cell" icon={<Banknote size={16} aria-hidden="true" />} title="今月の売上" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={data && k ? <span title={revenueDetail(k.revenueDelta, k.refundsThisMonth)}>{`決済失敗 ${data.alerts.pastDue} 社`}</span> : emptyValue('unknown')} description={k ? `今月の売上（入金済み）・${revenueDetail(k.revenueDelta, k.refundsThisMonth)}` : '今月に入金済みの売上です。'} loading={loading} />
+            <KpiCard presentation="cell" icon={<Banknote size={16} aria-hidden="true" />} title="今月の売上" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} delta={k && Number.isFinite(k.revenueDelta) ? <>{k.revenueDelta > 0 ? <ArrowUp size={16} aria-hidden="true" /> : k.revenueDelta < 0 ? <ArrowDown size={16} aria-hidden="true" /> : null}<KpiDelta current={k.revenueDelta} previous={0} better="high" unit="円" basis={{ short: '前月比', reading: '前月' }} /></> : undefined} detail={data && k ? <span title={revenueDetail(k.revenueDelta, k.refundsThisMonth)}>{`決済失敗 ${data.alerts.pastDue} 社`}</span> : emptyValue('unknown')} description={k ? `今月の売上（入金済み）・${revenueDetail(k.revenueDelta, k.refundsThisMonth)}` : '今月に入金済みの売上です。'} loading={loading} />
             <KpiCard presentation="cell" icon={<Hourglass size={16} aria-hidden="true" />} title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data && k ? <span title={`新規 ${k.newInPeriod}件・新規トライアル ${k.newTrialsInPeriod}件・解約 ${k.churnInPeriod}件・解約率 ${k.churnRate.toFixed(1)}%`}>{`期限 3日以内 ${data.alerts.trialEndingSoon}`}</span> : emptyValue('unknown')} loading={loading} />
           </KpiBand>
 

@@ -63,6 +63,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const baseUrl = useRef('')
   const [loading,setLoading] = useState(Boolean(id))
   const [loadFailed,setLoadFailed] = useState(false)
+  const [loadRetry,setLoadRetry] = useState(0)
   const [needsImage,setNeedsImage] = useState(false)
   const [fileName,setFileName] = useState('')
   const [binding,setBinding] = useState<string | null>(null)
@@ -115,7 +116,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
       media.current = []; baseUrl.current = ''; setBinding(null); setSavedId(null); setLoading(false)
       return ()=>{generation.current++}
     }
-    setLoading(true); setLoadFailed(false)
+    setLoading(true); setLoadFailed(false); setError('')
     void api.templates.get(id).then(res=> {
       if(current !== generation.current)return
       if(!res.success)throw new Error('読み込めませんでした')
@@ -126,7 +127,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
       setDraft(next);setClean(snapshotOf(next));setBinding(res.data.accountId??null);setSavedId(id)
     }).catch(()=>{if(current===generation.current){setLoadFailed(true);setError('読み込めませんでした。一覧から開き直してください。')}}).finally(()=>{if(current===generation.current)setLoading(false)})
     return ()=>{generation.current++}
-  },[id,visual,scopeAccountId])
+  },[id,visual,scopeAccountId,loadRetry])
 
   const upload = async (file: File, image = false) => {
     if(!canMutate || (!hqHost && !selectedAccountId) || busy)return
@@ -185,7 +186,7 @@ setError(describeApiFailure(cause, '画像の登録')) }}
     { label: 'リンク先URL', value: !draft.buttonEnabled || draft.actionUrl },
     { label: '通知に出る文', value: draft.altText },
   ])
-  const mismatch = Boolean(id && binding !== selectedAccountId)
+  const mismatch = Boolean(id && !loading && !loadFailed && binding !== selectedAccountId)
   const save = async (alsoSave = false, distribute = true) => {
     if(saveLock.current || !canMutate || busy || loading || loadFailed || mismatch || (!hqHost && !selectedAccountId))return
     const validation = richVideoDraftIssue(draft)
@@ -270,7 +271,7 @@ setError(describeApiFailure(cause, '保存')) }}
       band={!canMutate && role ? <ReadOnlyNotice />:undefined}
       footerActions={canMutate?<>{hqHost && host ? <Button disabled={busy} onClick={()=>guarded(host.onCancel)}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}{hqHost?<Button onClick={()=>void save(false,false)} disabled={busy||loading||loadFailed}>下書きを保存</Button>:null}<Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||(!hqHost&&!selectedAccountId)||Boolean(inputReason)} disabledReason={inputReason} busy={busy} busyLabel="保存中…">{hqHost?host?.primaryLabel??'保存して配る':'保存する'}</Button></>:undefined}>
       {host?.notice}
-      {error?<Notice tone="danger" >{error}</Notice>:null}
+      {error?<Notice tone="danger" action={loadFailed && id ? <Button size="compact" onClick={()=>setLoadRetry(count=>count+1)}>もう一度読み込む</Button> : undefined}>{error}</Notice>:null}
       {mismatch?<Notice tone="info" role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</Notice>:null}
       {loading?<p role="status">読み込み中…</p>:null}
       <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)"><h2 className={styles.cardTitle}>名前とフォルダ</h2><SettingsFormRow layout="name-folder"><div className={styles.field}><Field label="テンプレート名" htmlFor="rv-name" requirement={{ required: true }}><SaveErrorField names={["name","draft.name"]}><TextField id="rv-name" aria-required="true" invalid={issue?.field==='name'} aria-describedby={issue?.field==='name'?'rv-name-error':undefined} value={draft.name} onChange={e=>patch({name:e.target.value})} disabled={!canMutate||busy||loading||loadFailed}/></SaveErrorField>{fieldError('name')}</Field></div><div className={styles.field}><Field label="フォルダ" htmlFor="rv-folder">{canMutate?<SaveErrorField names={["folderId","draft.folderId","folder_id","draft.folder_id"]}><FolderSelect size="full" id="rv-folder" aria-label="フォルダ" value={hqHost?host!.folder:draft.folderId} onChange={hqHost?host!.onFolderChange:value=>patch({folderId:value})} folders={hqHost?host!.folders:foldersReady?folders.map(folderById):[]} onCreate={hqHost?hostFolderCreate(host!):undefined} disabled={busy||loading||loadFailed||!foldersReady}/></SaveErrorField>:<span>{hqHost?host!.folders.find(f=>f.value===host!.folder)?.label??'未分類':foldersReady?(folders.find(f=>f.id===draft.folderId)?.name??'未分類'):'—'}</span>}{!host && folderState?.account === scopeAccountId && folderState.status === 'error' ? <Notice tone="danger">フォルダを読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setFolderRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}</Field></div></SettingsFormRow></Card>

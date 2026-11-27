@@ -10,6 +10,7 @@ import Dialog from '@/components/shared/dialog'
 import Toggle from '@/components/shared/toggle'
 import FormSection from '@/components/shared/form-section'
 import Notice from '@/components/shared/notice'
+import { notifySaved } from '@/components/shared/toast'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -60,6 +61,7 @@ export default function MfaPolicy({ loginPath = '/login', accountMembers, compac
       setPolicy(current => current ? { ...current, required: data.required } : null)
       setTurnOn(false)
       if (data.relogin) window.location.assign(loginPath)
+      else notifySaved(data.required ? '二段階認証を必須にしました。' : '二段階認証の必須を解除しました。')
     } catch (caught) { if (!saveErrors.capture(caught)) setError(describeSaveFailure(caught)) }
     finally { setBusy(false) }
   }
