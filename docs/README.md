@@ -1544,3 +1544,4 @@
 - [通知一覧の分類既読・重複表示防御とリマインダ確認画面のフォルダ・件数防御](release-log/unreleased/PR-kenta-later-gemini116-1127.md) — 反映履歴、確認 2026-11-28。
 - [リッチメニュー一覧の競合・異常表示防御とUber Eats接続状態の未知・再選択修正](release-log/unreleased/PR-kenta-later-gemini117-1127.md) — 反映履歴、確認 2026-11-28。
 - [飲食店本日データの切替リセット・媒体応答検証とリマインダ通知編集の時刻クリア・上限防御](release-log/unreleased/PR-kenta-later-gemini118-1127.md) — 反映履歴、確認 2026-11-28。
+- [NEN配信のきっかけ表示と今日のお店の集計・日時表示の修正](release-log/unreleased/PR-kenta-later-gemini93-1127.md) — 反映履歴、確認 2026-11-28。
