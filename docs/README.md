@@ -1439,6 +1439,7 @@
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [統括名の読み込みと保存結果を確かめる修正の反映履歴](release-log/unreleased/PR-kenta-later-cx2-05-1128.md) — 反映履歴、確認 2026-11-28。
 - [統括の配布状況を正しく確認する修正の反映履歴](release-log/unreleased/PR-kenta-later-cx2-06-1128.md) — 反映履歴、確認 2026-11-28。
+- [受信箱の切り替え後の自動更新を直した反映履歴](release-log/unreleased/PR-kenta-later-cx2-07-1128.md) — 反映履歴、確認 2026-11-28。
 - [画面の検査結果と必須の動作確認の反映履歴](release-log/unreleased/244-kenta-v8-guard-report.md)
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
