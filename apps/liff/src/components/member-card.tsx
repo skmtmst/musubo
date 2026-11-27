@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import Card from './ui/card.js';
 import ProgressBar from './ui/progress-bar.js';
+import Button from './ui/button/index.js';
 
 /*
  * 会員証の段（G5-3 板 I2pkdP）。マイル・紹介の画面の上に、今のランク・次の段まで・下がる予定を出す。
@@ -31,11 +32,13 @@ export async function fetchMemberCard(): Promise<MemberCardData | null> {
   const response = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` }, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   if (!response.ok) throw new Error('member-card');
   const body = (await response.json()) as { success: boolean; data: MemberCardData | null };
-  return body.success ? body.data : null;
+  if (!body || body.success !== true || body.data === undefined) throw new Error('member-card');
+  return body.data;
 }
 
 export function MemberCardView({ card }: { card: MemberCardData }) {
-  const goal = card.next && card.next.remaining > 0 ? `${card.next.name}まで あと ${card.next.remaining.toLocaleString()} ${UNIT[card.next.metric]}` : card.next ? `${card.next.name}の条件を満たしています` : '最上位のランクです';
+  const unit = card.next && Object.hasOwn(UNIT, card.next.metric) ? UNIT[card.next.metric] : null;
+  const goal = card.next && !unit ? '次のランクの条件を確認できません' : card.next && card.next.remaining > 0 ? `${card.next.name}まで あと ${card.next.remaining.toLocaleString()} ${unit}` : card.next ? `${card.next.name}の条件を満たしています` : '最上位のランクです';
   return <section aria-label="会員証" className="space-y-3">
     <div data-liff-card className="flex flex-col gap-2.5 rounded-(--liff-radius-lg) bg-liff-member-card p-4 text-white">
       <div className="flex items-center justify-between text-xs text-liff-deep-sub"><span>会員証</span>{card.memberNumber ? <span>{`No. ${card.memberNumber}`}</span> : null}</div>
@@ -53,10 +56,14 @@ export function MemberCardView({ card }: { card: MemberCardData }) {
 
 export default function MemberCard() {
   const [card, setCard] = useState<MemberCardData | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let alive = true;
-    fetchMemberCard().then((data) => { if (alive) setCard(data); }).catch(() => undefined);
+    setFailed(false);
+    fetchMemberCard().then((data) => { if (alive) setCard(data); }).catch(() => { if (alive) setFailed(true); });
     return () => { alive = false; };
-  }, []);
+  }, [attempt]);
+  if (failed) return <div role="alert" className="space-y-2 text-sm text-liff-sub"><p>会員証を読み込めませんでした。</p><Button variant="secondary" onClick={() => setAttempt(n => n + 1)}>会員証をもう一度確認</Button></div>;
   return card ? <MemberCardView card={card} /> : null;
 }
