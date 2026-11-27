@@ -54,32 +54,41 @@ export function useInboxAi(chatIdIn: string | null, accountIdIn: string | null, 
   const [summaryOpen, setSummaryOpen] = useState(true)
   /** ［使わない］を押した会話と、その時の最後の受信。新しい受信が来るまで出さない（AI-05）。 */
   const [dismissed, setDismissed] = useState<Record<string, string | null>>({})
-  const chatRef = useRef(chatId)
-  chatRef.current = chatId
+  const scope = useRef({ chatId, accountId })
+  if (scope.current.chatId !== chatId || scope.current.accountId !== accountId) scope.current = { chatId, accountId }
+  const summarySeq = useRef(0)
+  const draftSeq = useRef(0)
+  useEffect(() => () => { summarySeq.current += 1; draftSeq.current += 1 }, [])
 
   const loadSummary = useCallback(async (refresh: boolean) => {
     if (!chatId) return
     const mine = chatId
+    const requestScope = scope.current
+    const seq = ++summarySeq.current
+    const current = () => scope.current === requestScope && summarySeq.current === seq
     setSummary((current) => ({ kind: 'loading', prev: current.kind === 'ready' ? current.data : current.kind === 'loading' ? current.prev : null }))
     try {
       const res = await aiReplyApi.summary(mine, refresh)
-      if (chatRef.current === mine) setSummary({ kind: 'ready', data: res.data })
+      if (current()) setSummary({ kind: 'ready', data: res.data })
     } catch (error) {
-      if (chatRef.current === mine) setSummary({ kind: 'error', ...failureText(error, '要約') })
+      if (current()) setSummary({ kind: 'error', ...failureText(error, '要約') })
     }
-  }, [chatId])
+  }, [chatId, accountId])
 
   const loadDraft = useCallback(async () => {
     if (!chatId) return
     const mine = chatId
+    const requestScope = scope.current
+    const seq = ++draftSeq.current
+    const current = () => scope.current === requestScope && draftSeq.current === seq
     setDraft((current) => ({ kind: 'loading', prev: current.kind === 'ready' ? current.data : current.kind === 'loading' ? current.prev : null }))
     try {
       const res = await aiReplyApi.draft(mine)
-      if (chatRef.current === mine) setDraft({ kind: 'ready', data: res.data })
+      if (current()) setDraft({ kind: 'ready', data: res.data })
     } catch (error) {
-      if (chatRef.current === mine) setDraft({ kind: 'error', ...failureText(error, '返信案') })
+      if (current()) setDraft({ kind: 'error', ...failureText(error, '返信案') })
     }
-  }, [chatId])
+  }, [chatId, accountId])
 
   const isDismissed = Boolean(chatId && chatId in dismissed && dismissed[chatId] === lastIncomingId)
 
@@ -87,7 +96,7 @@ export function useInboxAi(chatIdIn: string | null, accountIdIn: string | null, 
     setSummary({ kind: 'idle' })
     setDraft({ kind: 'idle' })
     setSummaryOpen(true)
-  }, [chatId])
+  }, [chatId, accountId])
 
   useEffect(() => {
     if (!chatId || !active || !ai.permissions.seeSummary) return
