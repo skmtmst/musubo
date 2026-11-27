@@ -44,14 +44,25 @@ export const newOperationKey = (): string =>
  *
  * 鍵の並び順を固定するので、**同じ中身なら必ず同じ文字列**になる。
  */
-export const canonicalJson = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+export const canonicalJson = (value: unknown, seen = new WeakSet<object>()): string => {
+  if (typeof value === 'bigint') return JSON.stringify(value.toString())
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return '"[Circular]"'
+    seen.add(value)
+    const out = `[${value.map((item) => canonicalJson(item, seen)).join(',')}]`
+    seen.delete(value)
+    return out
+  }
   if (value && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
+    if (seen.has(value)) return '"[Circular]"'
+    seen.add(value)
+    const out = `{${Object.entries(value as Record<string, unknown>)
       .filter(([, item]) => item !== undefined)
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`)
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item, seen)}`)
       .join(',')}}`
+    seen.delete(value)
+    return out
   }
   return JSON.stringify(value === undefined ? null : value)
 }
@@ -138,20 +149,25 @@ export const blankFormSnapshot = (): FormSnapshot => ({
 })
 
 /** 何か入力されているか。空のまま切り替えただけなら控えを残さない。 */
-export const formSnapshotHasContent = (snapshot: FormSnapshot): boolean =>
-  Boolean(
-    snapshot.name.trim()
-      || snapshot.keyword.trim()
+export const formSnapshotHasContent = (snapshot: FormSnapshot): boolean => {
+  const triggerConfig = snapshot.triggerConfig && typeof snapshot.triggerConfig === 'object' && !Array.isArray(snapshot.triggerConfig)
+    ? snapshot.triggerConfig
+    : {}
+  const actions = Array.isArray(snapshot.actions) ? snapshot.actions : []
+  return Boolean(
+    (snapshot.name ?? '').trim()
+      || (snapshot.keyword ?? '').trim()
       || !isEmptyCondition(snapshot.condition)
       || snapshot.conditionUnreadable
-      || snapshot.testFriendId.trim()
+      || (snapshot.testFriendId ?? '').trim()
       || snapshot.eventType !== EVENTS[0].value
-      || Object.keys(snapshot.triggerConfig).length > 0
-      || snapshot.actions.length > 1
-      || snapshot.actions.some(
-        (row) => row.type !== 'add_tag' || row.tagId || row.message.trim() || row.scenarioId || row.commonActionId,
+      || Object.keys(triggerConfig).length > 0
+      || actions.length > 1
+      || actions.some(
+        (row) => row.type !== 'add_tag' || row.tagId || (row.message ?? '').trim() || row.scenarioId || row.commonActionId,
       ),
   )
+}
 
 /** 「すること」1行を、保存で送る形へ直す。指紋とも同じ形を使う。 */
 export const actionDraftToPayload = (row: ActionDraft, index: number, rows?: ActionDraft[]): AutomationDraftAction => {
@@ -204,8 +220,10 @@ export const normalizeTriggerConfigFor = (
     action: triggerConfig.action === 'remove' ? 'remove' : 'add',
   }
   if (eventType === 'datetime') {
-    const local = String(triggerConfig.at ?? '')
-    return { ...kept, at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: normalizeFriendIds(triggerConfig.friendIds) }
+    const local = String(triggerConfig.at ?? '').trim()
+    const parsedMs = local ? Date.parse(`${local}:00+09:00`) : Number.NaN
+    const at = !local ? '' : Number.isFinite(parsedMs) ? new Date(parsedMs).toISOString() : local
+    return { ...kept, at, friendIds: normalizeFriendIds(triggerConfig.friendIds) }
   }
   if (eventType === 'daily' || eventType === 'weekly') return {
     ...kept,
@@ -273,6 +291,15 @@ export const draftDetailToForm = (detail: AutomationDraftDetail): {
   triggerConfig: Record<string, unknown>
   actions: ActionDraft[]
 } => {
+  if (detail.triggerConfig !== null && detail.triggerConfig !== undefined && (typeof detail.triggerConfig !== 'object' || Array.isArray(detail.triggerConfig))) {
+    throw new Error('保存された下書きのきっかけ設定を読み込めませんでした。')
+  }
+  if (!Array.isArray(detail.actions)) {
+    throw new Error('保存された下書きの「すること」を読み込めませんでした。')
+  }
+  if (detail.actions.some((step) => !step || typeof step !== 'object' || !step.params || typeof step.params !== 'object' || Array.isArray(step.params))) {
+    throw new Error('保存された下書きの「すること」の内容を読み込めませんでした。')
+  }
   const storedCondition = storedConditionToForm(detail.conditions)
   const config = detail.triggerConfig ?? {}
   /* R21・R22: 曜日と対象の友だちは配列で持つ。古い文字列の控えも正規化する。 */
@@ -325,7 +352,7 @@ export const draftDetailToForm = (detail: AutomationDraftDetail): {
         kept: step.type === 'notify_staff' || step.type === 'wait' ? { ...step.params } : undefined,
       }))
   return {
-    name: detail.name,
+    name: typeof detail.name === 'string' ? detail.name : '',
     eventType: detail.eventType,
     keyword: detail.eventType === 'message_received' ? String(config.keyword ?? '') : '',
     condition: storedCondition.condition,
@@ -337,7 +364,7 @@ export const draftDetailToForm = (detail: AutomationDraftDetail): {
 
 /** 保存した時刻の表示（DETAIL-15）。分まであれば「いつ保存したか」は読める。 */
 export const formatClock = (time: number): string =>
-  formatTime(time)
+  Number.isFinite(time) ? formatTime(time) : '—'
 
 /**
  * 「この内容で送る」と押したときに送る中身を、押す前に固めた控え（N-358）。
