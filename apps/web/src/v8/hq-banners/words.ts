@@ -30,19 +30,21 @@ export function monthDayTime(iso: string): string {
  */
 export function shortPresetLabel(preset: BannerPreset | null | undefined, image?: Pick<BannerImage, 'generation'>): string {
   const ratio = image?.generation?.aspectRatio ?? preset?.aspectRatio ?? ''
+  if (typeof ratio !== 'string' || (preset && typeof preset.key !== 'string')) return '用途を確認できません'
   if (!preset) return ratio || '—'
   if (preset.key.startsWith('line_rich_menu')) return 'リッチメニュー'
   if (preset.key === 'line_rich_message') return 'リッチメッセージ'
   if (preset.key === 'line_card') return `カード ${ratio}`
   if (preset.key.startsWith('sns_instagram')) return `Instagram ${ratio}`
   if (preset.key === 'sns_story') return `ストーリー ${ratio}`
-  return preset.label
+  return typeof preset.label === 'string' ? preset.label : '用途を確認できません'
 }
 
 /** プロジェクトの中の画像の札（「リッチメッセージ・1:1」「カード・3:2」）。 */
 export function tileLabel(preset: BannerPreset | null | undefined, image: Pick<BannerImage, 'generation' | 'source'>): string {
   if (image.source === 'upload') return '取り込み'
   const ratio = image.generation?.aspectRatio ?? preset?.aspectRatio ?? ''
-  const name = !preset ? '' : preset.key === 'line_card' ? 'カード' : preset.key.startsWith('line_rich_menu') ? 'リッチメニュー' : preset.key === 'line_rich_message' ? 'リッチメッセージ' : preset.label
+  if (typeof ratio !== 'string' || (preset && typeof preset.key !== 'string')) return '用途を確認できません'
+  const name = !preset ? '' : preset.key === 'line_card' ? 'カード' : preset.key.startsWith('line_rich_menu') ? 'リッチメニュー' : preset.key === 'line_rich_message' ? 'リッチメッセージ' : typeof preset.label === 'string' ? preset.label : '用途を確認できません'
   return [name, ratio].filter(Boolean).join('・') || '—'
 }

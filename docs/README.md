@@ -1454,3 +1454,4 @@
 - [統括のひな形一覧で不正な内容と配布先の表示を修正](release-log/unreleased/PR-kenta-later-cx2-15-1128.md) — 反映履歴、確認 2026-11-28。
 - [フォルダ配布の確認できない結果を再確認できるよう修正](release-log/unreleased/PR-kenta-later-cx2-16-1128.md) — 反映履歴、確認 2026-11-28。
 - [受信箱の会話一覧で確認できないメッセージを表示](release-log/unreleased/PR-kenta-later-cx2-17-1128.md) — 反映履歴、確認 2026-11-28。
+- [統括バナーで確認できない用途と比率の表示を修正](release-log/unreleased/PR-kenta-later-cx2-18-1128.md) — 反映履歴、確認 2026-11-28。
