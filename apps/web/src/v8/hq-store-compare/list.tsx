@@ -332,7 +332,7 @@ function DiffCountLine({ row, average }: { row: StoreComparisonRow; average: Sto
 }
 
 function MetricCell({ def, metric, compare, computed, coverage }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean; coverage: string | null }) {
-  if (!metric || !metric.available || metric.value === null) {
+  if (!metric || !metric.available || typeof metric.value !== 'number' || !Number.isFinite(metric.value)) {
     return <span className={styles.cellEmpty} title={computed ? 'この数はまだ取れていません' : NOT_COMPUTED}>—</span>
   }
   const diff = formatDiff(def.key, metric.diff)
