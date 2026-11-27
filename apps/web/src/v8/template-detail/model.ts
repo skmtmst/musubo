@@ -81,13 +81,15 @@ export function broadcastStatusText(status: string): string {
   if (status === 'scheduled') return '予約中'
   if (status === 'sending') return '送信中'
   if (status === 'sent') return '送信済み'
-  return '下書き'
+  if (status === 'draft') return '下書き'
+  return '状態を確認できません'
 }
 
 function enrollmentStatusText(status: string): string {
   if (status === 'active') return '送信待ち'
   if (status === 'cancelled') return '取消ずみ'
-  return status
+  if (status === 'completed') return '完了'
+  return '状態を確認できません'
 }
 
 /**
