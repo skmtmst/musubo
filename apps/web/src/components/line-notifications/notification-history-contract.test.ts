@@ -40,7 +40,6 @@ describe("管理画面 LINE notification history contract", () => {
     // 受け付けた行の言い方は v8/settings/line-notifications/runs-tab-accepted.test.tsx が描いて読む。
     expect(LIST).not.toContain('届きました')
     expect(LIST).not.toContain('開きました')
-    expect(LIST).toContain('個人の既読は見られません')
   })
 
   it('shows retry only when the ledger marks the row retryable and sends its record version', () => {
