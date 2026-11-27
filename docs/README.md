@@ -13,6 +13,7 @@
 - [LINE画面の主色と読み込み表示の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-01-1128.md)
 - [LINE画面の各テーマの試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-02-1128.md)
 - [フォームと紹介画面の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-03-1128.md)
+- [LINE画面の色と予約履歴の試験整理](release-log/unreleased/PR-kenta-src-assert-cx5-04-1128.md)
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
 
