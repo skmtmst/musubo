@@ -52,9 +52,9 @@ export default function FieldsTable({ canEdit, host, items, loaded, status, erro
                 interactive
                 key={field.id}
                 data-reorder-id={field.id}
-                onDragEnter={() => { if (!field.isInherited) liveOrder.enter(field.id) }}
-                onDragOver={dragId ? (event) => event.preventDefault() : undefined}
-                onDrop={dragId ? () => void move(liveOrder.dropTarget(field.id)) : undefined}
+                onDragEnter={canEdit && dragId && !field.isInherited ? () => liveOrder.enter(field.id) : undefined}
+                onDragOver={canEdit && dragId && !field.isInherited ? (event) => event.preventDefault() : undefined}
+                onDrop={canEdit && dragId && !field.isInherited ? () => void move(liveOrder.dropTarget(field.id)) : undefined}
                 className={`${styles.row} ${styles.fieldRow}`}
                 leaving={leavingId === field.id}
                 tabIndex={0}
@@ -67,13 +67,13 @@ export default function FieldsTable({ canEdit, host, items, loaded, status, erro
                       className={styles.gripBox}
                       draggable={!field.isInherited}
                       title={field.isInherited ? '共通項目は移行後に並び替えできます' : undefined}
-                      onDragStart={() => setDragId(field.id)}
+                      onDragStart={() => { if (!canEdit || field.isInherited) return; setDragId(field.id) }}
                       onDragEnd={() => setDragId(null)}
                     >
                       <ReorderHandle
                         label={field.name}
                         disabledReason={field.isInherited === true ? '共通項目は移行後に並び替えできます' : null}
-                        onMove={(direction) => void keyboardMove(field.id, direction)}
+                        onMove={(direction) => { if (!canEdit || field.isInherited) return; void keyboardMove(field.id, direction) }}
                       >
                         <GripVertical className={styles.gripIcon} aria-hidden="true" />
                       </ReorderHandle>
