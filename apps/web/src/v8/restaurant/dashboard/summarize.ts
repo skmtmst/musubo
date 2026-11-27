@@ -40,6 +40,10 @@ export function liveReservations(rows: RestaurantReservation[]): RestaurantReser
   return rows.filter((r) => !INACTIVE.includes(r.status) && !isHold(r))
 }
 
+function safeCount(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0
+}
+
 export function summarizeToday(rows: RestaurantReservation[], tables: RestaurantTable[], now: number): TodaySummary {
   const live = liveReservations(rows)
   const walkIn = live.filter(isWalkIn).length
@@ -48,9 +52,12 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
   const byHour = new Map<number, number>()
   for (const r of live) {
     // 表の時刻（lib/format）と同じく、時差の無い文字は UTC として読む。ブラウザの時計で読むと日本では 9 時間ずれる。
+    if (typeof r.starts_at !== 'string' || !r.starts_at.trim()) continue
     const iso = /Z$|[+-]\d{2}:?\d{2}$/i.test(r.starts_at) ? r.starts_at : `${r.starts_at.replace(' ', 'T')}Z`
-    const hour = japanCalendar(new Date(Date.parse(iso))).getUTCHours()
-    byHour.set(hour, (byHour.get(hour) ?? 0) + r.guest_count)
+    const parsed = Date.parse(iso)
+    if (!Number.isFinite(parsed)) continue
+    const hour = japanCalendar(new Date(parsed)).getUTCHours()
+    byHour.set(hour, (byHour.get(hour) ?? 0) + safeCount(r.guest_count))
   }
   let peak: TodaySummary['peak'] = null
   for (const [hour, guests] of [...byHour.entries()].sort((a, b) => a[0] - b[0])) {
@@ -59,7 +66,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
   const active = tables.filter((t) => t.is_active)
   return {
     groups: live.length,
-    guests: live.reduce((sum, r) => sum + r.guest_count, 0),
+    guests: live.reduce((sum, r) => sum + safeCount(r.guest_count), 0),
     line,
     phone,
     walkIn,
@@ -67,7 +74,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
     peak,
     freeTables: active.filter((t) => !tableBusy(t.id, now, now + 1, rows, now)).length,
     totalTables: active.length,
-    counterSeats: active.filter((t) => t.seat_type === 'counter').reduce((sum, t) => sum + t.max_capacity, 0),
+    counterSeats: active.filter((t) => t.seat_type === 'counter').reduce((sum, t) => sum + safeCount(t.max_capacity), 0),
   }
 }
 
@@ -140,9 +147,11 @@ export function openItems(group: CloseGroup): CloseGroup['items'] {
   return group.items.filter((item) => item.status === 'close')
 }
 
-/** 枠の日時「1/13（火）19:00」。 */
+/** 枠の日時「1/13（火）19:00」。読めない日時は未確定として出す。 */
 export function slotTitle(iso: string): string {
-  const day = japanCalendar(new Date(Date.parse(iso)))
+  const parsed = Date.parse(iso)
+  if (!Number.isFinite(parsed)) return '日時を確認できません'
+  const day = japanCalendar(new Date(parsed))
   const week = '日月火水木金土'[day.getUTCDay()]
   return `${day.getUTCMonth() + 1}/${day.getUTCDate()}（${week}）${pad2(day.getUTCHours())}:${pad2(day.getUTCMinutes())}`
 }
@@ -151,6 +160,6 @@ export function reasonText(group: Pick<CloseGroup, 'reason' | 'remainingSeats'>)
   if (group.reason === 'full') return '満席になりました'
   if (group.reason === 'table_conflict') return '卓が重なる予約が届きました'
   if (group.reason === 'closure') return '臨時休業・貸切で閉じました'
-  if (group.remainingSeats === null) return 'LINE・電話で予約が入りました'
-  return `残り ${Math.max(0, group.remainingSeats)}席になりました`
+  if (group.remainingSeats === null || !Number.isFinite(group.remainingSeats)) return 'LINE・電話で予約が入りました'
+  return `残り ${Math.max(0, Math.trunc(group.remainingSeats))}席になりました`
 }
