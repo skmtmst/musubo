@@ -31,6 +31,7 @@ const fixture = vi.hoisted(() => ({
   tagsList: null as null | (() => Promise<unknown>),
   createMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
   mileageRules: null as null | (() => Promise<unknown>),
+  getSettings: vi.fn(),
 }))
 
 /**
@@ -123,7 +124,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       listStaffMenusBulk: async () => ({ staff: [] }),
 
       createMenu: (...args: unknown[]) => fixture.createMenu!(...args),
-      getSettings: async () => ({ success: true, data: { menuCount: 1 } }),
+      getSettings: (...args: unknown[]) => fixture.getSettings(...args),
       listStaff: async () => ({ staff: [{ id: 'staff-a', display_name: '担当A', is_active: 1 }] }),
       getStaffMenus: async () => ({ matrix: [] }),
       putStaffMenus: async () => ({ ok: true }),
@@ -166,6 +167,7 @@ beforeEach(() => {
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.createMenu = vi.fn(async () => ({ id: 'menu-new', version: 1 }))
   fixture.mileageRules = async () => ({ success: true, data: [] })
+  fixture.getSettings.mockReset().mockResolvedValue({ success: true, data: { menuCount: 1, bookingWindowDays: 30 } })
 })
 
 afterEach(() => {
@@ -319,4 +321,40 @@ test.each([['', 'inquiry', 0], ['0', 'free', 0], ['8400', 'fixed', 8400]])('金�
     price_mode: mode, base_price: price,
     booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null,
   }), expect.any(String))
+})
+
+
+test('店舗のきまりを読み、固有の期限を設定して送れる', async () => {
+  render(<NewBookingMenuPage />)
+  await waitFor(() => expect(fixture.getSettings).toHaveBeenCalledWith('account-a'))
+  expect(screen.getByText('空ならお店全体のきまり（予約のルール）を使います')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'このメニューだけ変更する' }))
+  fireEvent.change(screen.getByLabelText('先の予約が取れる範囲（日）'), { target: { value: '45' } })
+  fireEvent.change(screen.getByLabelText('受付の締め切り（時間前）'), { target: { value: '5' } })
+  fireEvent.change(screen.getByLabelText('キャンセルの期限（時間前）'), { target: { value: '12' } })
+  await publish()
+  await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-a', expect.objectContaining({ booking_window_days: 45, cutoff_hours_before: 5, cancel_deadline_hours_before: 12 }), expect.any(String)))
+})
+
+test('お店のきまりに戻すと固有の期限は送らない', async () => {
+  render(<NewBookingMenuPage />)
+  fireEvent.click(screen.getByRole('button', { name: 'このメニューだけ変更する' }))
+  fireEvent.change(screen.getByLabelText('先の予約が取れる範囲（日）'), { target: { value: '45' } })
+  fireEvent.click(screen.getByRole('button', { name: 'お店のきまりに戻す' }))
+  expect(screen.queryByLabelText('先の予約が取れる範囲（日）')).toBeNull()
+  await publish()
+  await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-a', expect.objectContaining({ booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null }), expect.any(String)))
+})
+
+test('予約後の通知とリマインダの説明を開け、予約用の有効なマイルだけを示す', async () => {
+  fixture.mileageRules = async () => ({ success: true, data: [
+    { eventType: 'message_received', isActive: true, amount: 999 },
+    { eventType: 'booking_created', isActive: false, amount: 888 },
+    { eventType: 'booking_created', isActive: true, amount: 12345 },
+  ] })
+  render(<NewBookingMenuPage />)
+  expect(screen.getByText('予約を受けたときにすること')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '予約を受けたときにすることの説明' }))
+  expect(screen.getByText(/予約を受け付けたことを知らせる/).textContent).toContain('前日・開始前に思い出してもらう')
+  await waitFor(() => expect((screen.getByLabelText('予約したときのマイル（お店全体の設定）') as HTMLInputElement).value).toBe('12,345'))
 })
