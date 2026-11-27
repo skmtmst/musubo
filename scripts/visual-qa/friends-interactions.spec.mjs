@@ -64,3 +64,27 @@ test('表示項目は確定前に変わらず、保存と再読み込みで維�
   await page.getByRole('dialog', { name: '表示項目を編集', exact: true }).getByRole('button', { name: '保存する', exact: true }).click()
   await expect(column).toBeVisible()
 })
+
+for (const width of [1024, 1152, 1440]) {
+  test(`友だち追加の条件欄が横にはみ出さない ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1080 })
+    await page.addInitScript(() => {
+      sessionStorage.setItem('lh_auth_selection_cleared', '1')
+      localStorage.setItem('lh_selected_account', 'visual-qa-account')
+    })
+    await page.goto(`${BASE}/friend-add-settings?view=new&step=routes`)
+    if (width <= 1280) {
+      await page.getByRole('button', { name: /対象をしぼる/ }).click()
+      const dialog = page.getByRole('dialog', { name: '対象をしぼる' })
+      await expect(dialog.getByRole('button', { name: '友だち条件：選ぶ' })).toBeVisible()
+      const size = await dialog.evaluate((element) => {
+        const content = element.querySelector('[class*="dialog_content"]')
+        return { scroll: content.scrollWidth, client: content.clientWidth }
+      })
+      expect(size.scroll).toBeLessThanOrEqual(size.client)
+    } else {
+      await expect(page.getByRole('button', { name: '友だち条件：選ぶ' })).toBeVisible()
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0)
+  })
+}
