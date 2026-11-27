@@ -82,7 +82,7 @@ test('送信中の連打は1回だけ、失敗は印を変えず再試行でき�
   await act(async () => reject(new Error('failed')))
   expect(fixture.mark).toBeNull()
   expect(fixture.changed).not.toHaveBeenCalled()
-  expect(fixture.toast).toHaveBeenCalledWith(expect.stringContaining('変更できません'), expect.objectContaining({ tone: 'error' }))
+  expect(fixture.toast).toHaveBeenCalledWith(expect.stringContaining('確認できません'), expect.objectContaining({ tone: 'error' }))
   expect((screen.getByRole('button', { name: '来店した' }) as HTMLButtonElement).disabled).toBe(false)
 })
 

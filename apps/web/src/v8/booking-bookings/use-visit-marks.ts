@@ -44,7 +44,7 @@ export function usePeopleVisitMarks(accountId: string | null, date: string, enab
       setSeq(value => value + 1)
       notifyToast(kind === 'visited' ? '来店しました' : kind === 'late' ? `${lateMinutes}分遅れにしました` : kind === 'no_show' ? '来なかったにしました' : '印を取り消しました')
     } catch {
-      if (mounted.current && current.current === key) notifyToast('印を変更できませんでした。予約は変更前のままです。もう一度試してください。', { tone: 'error', actionLabel: '読み直す', onAction: () => { if (mounted.current && current.current === key) { setSeq(value => value + 1); onChanged() } } })
+      if (mounted.current && current.current === key) notifyToast('印の変更を確認できません。', { tone: 'error', actionLabel: '読み直す', onAction: () => { if (mounted.current && current.current === key) { setSeq(value => value + 1); onChanged() } } })
     } finally {
       running.current.delete(operation)
       if (mounted.current) setBusyIds(new Set(running.current))
