@@ -107,7 +107,7 @@ describe('FollowupTemplatePicker のアカウント切替・選択競合の防�
 
     const optionA = await screen.findByRole('radio', { name: templateA.name })
     fireEvent.click(optionA)
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する' }))
     await waitFor(() => expect(calls.get).toHaveBeenCalledWith(templateA.id))
 
     view.rerender(

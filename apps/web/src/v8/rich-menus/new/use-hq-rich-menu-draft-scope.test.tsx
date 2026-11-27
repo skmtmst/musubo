@@ -98,7 +98,7 @@ describe('useHqRichMenuDraft のスコープ切替と失敗の隔離', () => {
     view.rerender(<Harness scope={undefined} initialName="" />)
     view.rerender(<Harness scope="scope-a" initialName="" />)
 
-    // 2回目の読み込みが完了する前は ready=false で、空の下書きを書き込まない
+    // 読み込み中は ready=false で、空の下書きを書き込まない
     expect(screen.getByTestId('ready').textContent).toBe('false')
     expect(storeMocks.write).not.toHaveBeenCalled()
 

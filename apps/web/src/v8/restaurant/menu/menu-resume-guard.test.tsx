@@ -54,7 +54,7 @@ afterEach(() => {
 })
 
 describe('MenuPage のアカウント切替直後の再開ガード', () => {
-  it('別アカウントへ切り替えて読み込みが完了する前は、前のアカウントのメニューを再開できない', async () => {
+  it('別アカウントへの切替後、読み込み中は元のアカウントのメニューを再開できない', async () => {
     let finishSecond!: (value: unknown) => void
     fixture.snapshot
       .mockResolvedValueOnce({ data: snapshotOf() })

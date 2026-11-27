@@ -44,7 +44,7 @@ describe('HoursServiceConfirm の欠損データと空曜日の守り', () => {
     expect(screen.getByText('ランチの営業時間')).toBeTruthy()
     expect(screen.getByText('提供する曜日：月曜日')).toBeTruthy()
     expect(screen.getByText('未設定')).toBeTruthy()
-    expect(screen.getByText('11:30–14:00')).toBeTruthy()
+    expect(screen.getByText('11:30 – 14:00')).toBeTruthy()
   })
 
   it('変更後の全曜日が空・一部曜日が欠けていても落ちず「未設定」と表示する', () => {
@@ -61,7 +61,7 @@ describe('HoursServiceConfirm の欠損データと空曜日の守り', () => {
     render(<HoursServiceConfirm changes={[change]} workspace={baseWorkspace} data={baseData} />)
 
     expect(screen.getByText('提供する曜日：未設定')).toBeTruthy()
-    expect(screen.getByText('11:30–14:00')).toBeTruthy()
+    expect(screen.getByText('11:30 – 14:00')).toBeTruthy()
     expect(screen.getByText('未設定')).toBeTruthy()
   })
 })

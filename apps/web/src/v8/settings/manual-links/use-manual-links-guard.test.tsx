@@ -98,7 +98,7 @@ afterEach(() => {
 })
 
 describe('useManualLinks の競合再取得失敗・権限/混雑表示・二重実行防止', () => {
-  it('409 競合のあとに一覧の読み直しが失敗したとき「読み直した」と偽らない', async () => {
+  it('409 競合後の一覧の読み込み失敗時に成功を表示しない', async () => {
     mocks.update.mockRejectedValueOnce(new ApiError(409, 'conflict'))
     render(<Harness />)
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'))

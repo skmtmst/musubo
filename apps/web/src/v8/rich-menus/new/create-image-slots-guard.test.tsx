@@ -57,7 +57,7 @@ describe('リッチメニュー画像スロットのURL付与と未保存タブ�
     )
 
     expect(screen.getByText('下書きを保存すると、このタブの画像を入れられます。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '登録メディアから選ぶ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '登録メディアから選択する' })).toBeNull()
 
     // 保存済みタブ（busy=false）なら登録メディア選択が出る
     view.rerender(
@@ -81,6 +81,6 @@ describe('リッチメニュー画像スロットのURL付与と未保存タブ�
         )}
       </div>,
     )
-    expect(screen.getByRole('button', { name: '登録メディアから選ぶ' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '登録メディアから選択する' })).toBeTruthy()
   })
 })

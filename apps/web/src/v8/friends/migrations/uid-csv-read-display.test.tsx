@@ -39,7 +39,7 @@ it('CSVを読めなければ画面に理由を出し、処理を進めない', a
   expect(await screen.findByText('CSVを読み込めませんでした。ファイルを確認して、もう一度選んでください。')).toBeTruthy()
 })
 
-it('選び直した後に古いCSVの読み込みが失敗しても、今のファイルに失敗を出さない', async () => {
+it('ファイル再選択後に古いCSVの読み込みが失敗しても、今のファイルに失敗を出さない', async () => {
   let rejectOld!: (error: Error) => void
   const view = render(<UidMigrationV8 initialRunId={null} />)
   await screen.findByText('まだ移行していません')

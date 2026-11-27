@@ -25,7 +25,7 @@ const draft = (text: string) => ({ data: { text, sources: [], generatedAt: '2026
 beforeEach(() => { vi.clearAllMocks(); calls.summary.mockReturnValue(new Promise(() => {})); calls.draft.mockReturnValue(new Promise(() => {})) })
 afterEach(() => cleanup())
 
-it('作り直した要約のあとに古い結果が届いても、新しい要約を保つ', async () => {
+it('要約の再生成後に古い結果が届いても、新しい要約を保つ', async () => {
   const old = pending(), latest = pending()
   calls.summary.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise)
   render(<Demo />)
@@ -38,7 +38,7 @@ it('作り直した要約のあとに古い結果が届いても、新しい要�
   expect(screen.queryByText('古い要約')).toBeNull()
 })
 
-it('新しい受信で作り直した返信案のあとに古い結果が届いても、新しい案を保つ', async () => {
+it('新しい受信で返信案を再生成後に古い結果が届いても、新しい案を保つ', async () => {
   const old = pending(), latest = pending()
   calls.draft.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise)
   const view = render(<Demo message="first" />)
