@@ -1480,3 +1480,4 @@
 - [Google投稿状態確認の再読込整合と通知ベル小窓の防御](release-log/unreleased/PR-kenta-later-gemini125-1127.md) — 反映履歴、確認 2026-11-28。
 - [リッチメニュー画像解放・フォロー下書き・卓定員判定の防御](release-log/unreleased/PR-kenta-later-gemini126-1127.md) — 反映履歴、確認 2026-11-28。
 - [友だち追加配信の確認説明とアカウント追加進捗の異常値防御](release-log/unreleased/PR-kenta-later-gemini127-1127.md) — 反映履歴、確認 2026-11-28。
+- [重複友だち候補の再検出防御とイベント変更確認の入力・人数防御](release-log/unreleased/PR-kenta-later-gemini128-1127.md) — 反映履歴、確認 2026-11-28。
