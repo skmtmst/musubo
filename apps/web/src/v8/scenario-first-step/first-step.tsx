@@ -2,7 +2,7 @@
 
 import { firstQuestionChoiceLabelProblem } from '@/components/scenarios/question-choice-label-validation'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
 import { formatNumber } from '@/lib/format';
 import { notifySaved } from '@/components/shared/toast';
@@ -108,6 +108,7 @@ export default function ScenarioFirstStepV8() {
   const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)
   const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? selectedAccountId)
   const [loadState, setLoadState] = useState<LoadState>('idle')
+  const [loadError, setLoadError] = useState<unknown>(null)
   /** 失敗したあとの「再読み込み」で effect を回し直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
@@ -199,6 +200,7 @@ export default function ScenarioFirstStepV8() {
     const seq = ++loadSeq.current
     setScenario(null)
     setLoadState('loading')
+    setLoadError(null)
     setError('')
     setLoadMissing(false)
     resetForm()
@@ -209,7 +211,9 @@ export default function ScenarioFirstStepV8() {
         if (!res.success) {
           // 失敗の応答がキャッシュに残ると、再読み込みでも同じ失敗が返る。
           scenarioReferenceData.invalidateScenario(id)
-          setError(firstStepFailureMessage(new Error(res.error), 'load'))
+          const loadFailure = new Error(res.error)
+          setLoadError(loadFailure)
+          setError(firstStepFailureMessage(loadFailure, 'load'))
           setLoadState('error')
           return
         }
@@ -257,11 +261,13 @@ export default function ScenarioFirstStepV8() {
           { if (!fieldFailure)
 
           setError('') }
+          setLoadError(null)
           setLoadMissing(true)
         } else {
-          { if (!fieldFailure)
-          setError('シナリオを読み込めませんでした。通信状態を確認して、もう一度お試しください。')
-        }
+          { if (!fieldFailure) {
+          setLoadError(caught)
+          setError(firstStepFailureMessage(caught, 'load'))
+        } }
         }
         { if (!fieldFailure)
         setLoadState('error') }
@@ -506,21 +512,22 @@ export default function ScenarioFirstStepV8() {
     )
   }
   if (loadState === 'error') {
-    return loadMissing || !error ? (
-      <TargetMissing
+    return loadMissing || (!error && loadError == null) ? (
+      <SaveErrorScope errors={saveErrors}><TargetMissing
         kind="not-found"
         title="このシナリオは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
         backHref="/scenarios"
         backLabel="シナリオ一覧へ戻る"
-      />
+      /></SaveErrorScope>
     ) : (
-      <TargetMissing
+      <SaveErrorScope errors={saveErrors}><ListState
         kind="error"
-        title="シナリオを読み込めませんでした"
-        description="1通目の作成・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        title={isForbiddenOrRateLimited(loadError) ? undefined : 'シナリオを読み込めませんでした'}
+        description={isForbiddenOrRateLimited(loadError) ? undefined : '1通目の作成・保存はできません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+        error={loadError ?? undefined}
         onRetry={() => setReloadKey((k) => k + 1)}
-      />
+      /></SaveErrorScope>
     )
   }
   /* シナリオが確定するまでフォームは出さない（SCENARIO-04）。 */
