@@ -1460,3 +1460,4 @@
 - [受信箱で確認できない添付の準備を止める修正](release-log/unreleased/PR-kenta-later-cx2-19-1128.md) — 反映履歴、確認 2026-11-28。
 - [電話の会話一覧で確認できない名前と未読状態を表示](release-log/unreleased/PR-kenta-later-cx2-20-1128.md) — 反映履歴、確認 2026-11-28。
 - [統括の配信先と情報欄の確認できない人数の表示を修正](release-log/unreleased/PR-kenta-later-cx2-21-1128.md) — 反映履歴、確認 2026-11-28。
+- [流入経路の状態が不明なときの QR 表示を修正](release-log/unreleased/PR-kenta-later-cx2-22-1128.md) — 反映履歴、確認 2026-11-28。
