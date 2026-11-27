@@ -161,6 +161,7 @@ function Responses() {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportProgress, setExportProgress] = useState('')
+  const exportController = useRef<AbortController | null>(null)
   const scopeKey = `${selectedAccountId ?? ''}:${formId}`
   const scope = useRef({ key: scopeKey, generation: 0 })
   if (scope.current.key !== scopeKey) scope.current = { key: scopeKey, generation: scope.current.generation + 1 }
@@ -175,6 +176,16 @@ function Responses() {
   const [period, setPeriod] = useState<'this_month' | 'last_month' | 'all'>('this_month')
   const periodRef = useRef(period)
   periodRef.current = period
+
+  useEffect(() => {
+    setExporting(false)
+    setExportError('')
+    setExportProgress('')
+    return () => {
+      exportController.current?.abort()
+      exportController.current = null
+    }
+  }, [scopeKey])
 
   const load = useCallback(async (nextPage = 1, nextLimit = 20, searchText?: string) => {
     if (!selectedAccountId || !formId) {
@@ -295,11 +306,15 @@ function Responses() {
   const failedSteps = [...new Set(incompleteItems.flatMap((item) => item.postActions?.pending ?? []).map(postActionStepLabel))]
 
   const exportAll = async () => {
-    if (!selectedAccountId || !form || exporting) return
+    if (!selectedAccountId || !form || exportController.current) return
     if (total !== null && total > MAX_EXPORT_ROWS) {
       setExportError(`回答が${formatNumber(total)} 件あり、一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`)
       return
     }
+    const controller = new AbortController()
+    exportController.current = controller
+    const generation = scope.current.generation
+    const stopped = () => controller.signal.aborted || generation !== scope.current.generation
     setExporting(true)
     setExportError('')
     setExportProgress('')
@@ -311,8 +326,10 @@ function Responses() {
       const exportSearch = exportNeedle ? `&q=${encodeURIComponent(exportNeedle)}` : ''
       do {
         const result = await fetchApi<{ success: boolean; data: SubmissionPage }>(
-          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}${exportSearch}`,
+          `/api/forms/${formId}/submissions?page=${currentPage}&limit=${EXPORT_PAGE_LIMIT}&account_id=${encodeURIComponent(selectedAccountId)}${exportSearch}&period=${period}`,
+          { signal: controller.signal },
         )
+        if (stopped()) return
         if (!result.success) throw new Error('export_failed')
         expected = result.data.total
         if (expected > MAX_EXPORT_ROWS) throw new Error('export_too_many')
@@ -320,16 +337,22 @@ function Responses() {
         setExportProgress(`${formatNumber(Math.min(all.length, expected))} / ${formatNumber(expected)} 件を取得中`)
         currentPage += 1
       } while (all.length < expected && currentPage <= 1001)
+      if (stopped()) return
       if (all.length < expected) throw new Error('export_incomplete')
       const keys = [...new Set([...fieldKeys, ...all.flatMap((item) => Object.keys(item.data as Record<string, unknown>))])]
-      saveCsv(csvFileName("フォーム回答"), all, keys, labels, inputBlocks)
+      const periodLabel = { this_month: '今月', last_month: '先月', all: 'すべて' }[period]
+      saveCsv(csvFileName(`フォーム回答_${periodLabel}`), all, keys, labels, inputBlocks)
     } catch (caught) {
+      if (stopped()) return
       setExportError(caught instanceof Error && caught.message === 'export_too_many'
         ? `回答が一度に書き出せる上限（${formatNumber(MAX_EXPORT_ROWS)} 件）を超えています。`
         : 'CSVを書き出せませんでした。もう一度お試しください。')
     } finally {
-      setExporting(false)
-      setExportProgress('')
+      if (exportController.current === controller) {
+        exportController.current = null
+        setExporting(false)
+        setExportProgress('')
+      }
     }
   }
 
