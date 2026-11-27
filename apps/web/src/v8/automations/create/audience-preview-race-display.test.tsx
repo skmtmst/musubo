@@ -15,7 +15,7 @@ function Subject() {
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(false)
   const { refreshAudiencePreview } = useAutomationAudience({ formStashRef: stash as never, selectedAccountRef: selected, setPreviewRefreshing: setLoading, setPreviewFailed: setFailed, setPreviewCount: setCount, setPreviewTotal: setTotal, saveErrors: { capture: () => false } as never })
-  return <><button onClick={() => void refreshAudiencePreview(account, { id: 'draft', draftVersionId: 'old' })}>前の条件で数える</button><button onClick={() => void refreshAudiencePreview(account, { id: 'draft', draftVersionId: 'new' })}>新しい条件で数える</button><button onClick={() => setAccount('b')}>店を切り替える</button><p>対象 {count ?? '不明'} 人</p><p>全体 {total?.accountId === account ? total.total : '不明'} 人</p>{loading && <p>数えています</p>}{failed && <p>数えられませんでした</p>}</>
+  return <><button onClick={() => void refreshAudiencePreview(account, { id: 'draft', draftVersionId: 'old' })}>前の条件で数える</button><button onClick={() => void refreshAudiencePreview(account, { id: 'draft', draftVersionId: 'new' })}>新しい条件で数える</button><button onClick={() => setAccount('b')}>店を切り替える</button><button onClick={() => setAccount('a')}>元の店に戻る</button><p>対象 {count ?? '不明'} 人</p><p>全体 {total?.accountId === account ? total.total : '不明'} 人</p>{loading && <p>数えています</p>}{failed && <p>数えられませんでした</p>}</>
 }
 function deferred() { let resolve!: (value: unknown) => void; let reject!: (reason: unknown) => void; const promise = new Promise((r, j) => { resolve = r; reject = j }); return { promise, resolve, reject } }
 it('新しい条件の人数を出したあと、古い結果で上書きしない', async () => {
@@ -45,5 +45,33 @@ it('古い読み込みが終わっても新しい読み込み中の表示を消�
  await act(async () => old.resolve({ success: true, data: { matched: 3, total: 30 } }))
  expect(screen.getByText('数えています')).toBeTruthy()
  await act(async () => current.resolve({ success: true, data: { matched: 20, total: 200 } }))
+ expect(screen.queryByText('数えています')).toBeNull()
+})
+it('店を切り替えると前の店の処理中表示を消し、戻れば進行中の状態を表示する', async () => {
+ const old = deferred(); net.preview.mockReturnValueOnce(old.promise)
+ render(<Subject />); fireEvent.click(screen.getByRole('button', { name: '前の条件で数える' }))
+ expect(screen.getByText('数えています')).toBeTruthy()
+ fireEvent.click(screen.getByRole('button', { name: '店を切り替える' }))
+ expect(screen.queryByText('数えています')).toBeNull()
+ fireEvent.click(screen.getByRole('button', { name: '元の店に戻る' }))
+ expect(screen.getByText('数えています')).toBeTruthy()
+ await act(async () => old.resolve({ success: true, data: { matched: 3, total: 30 } }))
+ expect(screen.queryByText('数えています')).toBeNull()
+})
+it('切り替え後に数え直している間は前の店の完了で処理中表示を消さない', async () => {
+ const old = deferred(), current = deferred(); net.preview.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise)
+ render(<Subject />); fireEvent.click(screen.getByRole('button', { name: '前の条件で数える' }))
+ fireEvent.click(screen.getByRole('button', { name: '店を切り替える' })); fireEvent.click(screen.getByRole('button', { name: '新しい条件で数える' }))
+ await act(async () => old.resolve({ success: true, data: { matched: 3, total: 30 } }))
+ expect(screen.getByText('数えています')).toBeTruthy()
+ await act(async () => current.resolve({ success: true, data: { matched: 20, total: 200 } }))
+ expect(screen.queryByText('数えています')).toBeNull()
+})
+it('別の店にいる間に元の店の処理が終われば、戻っても処理中にならない', async () => {
+ const old = deferred(); net.preview.mockReturnValueOnce(old.promise)
+ render(<Subject />); fireEvent.click(screen.getByRole('button', { name: '前の条件で数える' }))
+ fireEvent.click(screen.getByRole('button', { name: '店を切り替える' }))
+ await act(async () => old.resolve({ success: true, data: { matched: 3, total: 30 } }))
+ fireEvent.click(screen.getByRole('button', { name: '元の店に戻る' }))
  expect(screen.queryByText('数えています')).toBeNull()
 })

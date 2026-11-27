@@ -2,7 +2,7 @@
 
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api } from '@/lib/api'
-import { useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { FormSnapshot } from './draft-model'
 import { StoredDraft } from './draft-storage'
 
@@ -16,9 +16,15 @@ export function useAutomationAudience({ formStashRef, selectedAccountRef, setPre
   saveErrors: ReturnType<typeof useSaveFormErrors>
 }) {
   const requests = useRef<Record<string, number>>({})
+  const pending = useRef<Record<string, number>>({})
+  const selectedAccount = selectedAccountRef.current
+  useEffect(() => {
+    setPreviewRefreshing(selectedAccount !== null && pending.current[selectedAccount] !== undefined)
+  }, [selectedAccount, setPreviewRefreshing])
   const refreshAudiencePreview = async (accountId: string, draft: StoredDraft) => {
     const request = (requests.current[accountId] ?? 0) + 1
     requests.current[accountId] = request
+    pending.current[accountId] = request
     const latest = () => requests.current[accountId] === request
     const stashedNow = formStashRef.current[accountId]
     if (stashedNow) stashedNow.previewFailed = false
@@ -49,7 +55,10 @@ export function useAutomationAudience({ formStashRef, selectedAccountRef, setPre
       if (stashed) stashed.previewFailed = true
       if (selectedAccountRef.current === accountId) setPreviewFailed(true)
     } finally {
-      if (latest() && selectedAccountRef.current === accountId) setPreviewRefreshing(false)
+      if (latest()) {
+        delete pending.current[accountId]
+        if (selectedAccountRef.current === accountId) setPreviewRefreshing(false)
+      }
     }
   }
 
