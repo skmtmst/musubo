@@ -44,6 +44,13 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
         ...draft,
         slot: { starts_at: jstToUtcIso(date, startTime), ends_at: jstToUtcIso(date, endTime), capacity: Number(capacity) || 1 },
       })
+      if (!result || typeof result.name !== 'string' || typeof result.startsAt !== 'string' || typeof result.endsAt !== 'string'
+        || typeof result.capacity !== 'number' || !Number.isFinite(result.capacity) || typeof result.requiresApproval !== 'boolean'
+        || !Array.isArray(result.questions) || result.questions.some((q) => !q || typeof q.id !== 'string' || typeof q.label !== 'string' || typeof q.required !== 'boolean')
+        || [result.venueName, result.venueUrl, result.venueAddress, result.description].some((value) => value != null && typeof value !== 'string')) {
+        if (seq === generation.current) setError('見本の内容を確認できませんでした。もう一度お試しください。')
+        return
+      }
       if (seq === generation.current) setData(result)
     } catch {
       if (seq === generation.current) setError('見本を開けませんでした。入力を確かめて、もう一度お試しください。')
