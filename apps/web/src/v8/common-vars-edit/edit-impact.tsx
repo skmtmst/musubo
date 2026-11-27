@@ -12,6 +12,7 @@ import type { CommonVarChangeImpact,CommonVarDeleteImpact } from '@line-crm/shar
 import { ChevronDown,ChevronUp,CircleCheck,Download } from 'lucide-react'
 import { useState } from 'react'
 import styles from './edit.module.css'
+import impactLayout from './impact-csv-layout.module.css'
 import { blockingErrors,characterCountText,checkedAtText,hiddenText,historicalText,immediateItems,isChangeItem,reflectionScopeText,reflectionTimingText,reviewWarnings } from './impact'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
 
@@ -73,10 +74,10 @@ export function ImpactRows({
         ) : null}
         <span className={styles.impactSpacer} aria-hidden="true" />
         {changeable ? (
-          <Button variant="text" type="button" onClick={onExportCsv} disabled={csvRows.length === 0}>
+          <div className={impactLayout.csvAction}><Button variant="text" type="button" onClick={onExportCsv} disabled={csvRows.length === 0} disabledReason={csvRows.length === 0 ? '書き出す使用先がありません。' : undefined}>
             <Download size={16} aria-hidden="true" />
             この一覧をCSVで
-          </Button>
+          </Button></div>
         ) : null}
       </div>
       {changeable ? (
