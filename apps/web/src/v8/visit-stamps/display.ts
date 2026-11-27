@@ -141,15 +141,15 @@ export function historyRows(entries: VisitStampEntry[], name: (id: string) => st
       const sign = e.delta >= 0 ? '+' : '−'
       const amount = `${sign}${Math.abs(e.delta)} 個`
       const count = reverse ? `${amount} → 取り消し` : e.kind === 'redeem' ? `${amount}（特典）` : amount
-      let why = e.reason || KIND_LABEL[e.kind] || e.kind
-      if (e.kind === 'redeem') why = `${e.reason}を使った`
+      let why = e.reason?.trim() || KIND_LABEL[e.kind] || e.kind
+      if (e.kind === 'redeem') why = e.reason?.trim() ? `${e.reason.trim()}を使った` : '特典を使った'
       if (e.kind === 'paper') why = '紙のカードから移行'
-      if (e.kind === 'visit' && !e.reason) why = '来店'
+      if (e.kind === 'visit' && !e.reason?.trim()) why = '来店'
       let actor = who(e.actorId)
       if (e.kind === 'redeem' && e.actorId) actor = `店員：${actor}（暗証番号）`
       else if (e.kind === 'visit' && e.actorId) actor = `店員：${actor}`
       else if (e.kind === 'paper' && e.actorId) actor = `${actor}（承認）`
-      if (reverse) { why = reverse.reason; actor = who(reverse.actorId) }
+      if (reverse) { why = reverse.reason?.trim() || '取り消し'; actor = who(reverse.actorId) }
       return {
         id: e.id, friendId: e.friendId, at: e.createdAt, count, why, actor,
         reversed: !!reverse,
