@@ -25,22 +25,63 @@ vi.mock('next/navigation', () => ({
 import RichMenuCreateV8 from './create'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import type { HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { getPageAction } from '@/test-utils/page-action'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let hostEl: HTMLDivElement
 let root: Root
+let staffRole: 'owner' | 'viewer' = 'owner'
 
 async function settle() {
   for (let i = 0; i < 10; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 }
 
+function buildHost(overrides: Partial<RichMenuCreateHost> = {}): RichMenuCreateHost {
+  const initial: HqRichMenuSeed = {
+    id: 'hq-tpl-1',
+    name: '本部メニュー',
+    chatBarText: 'メニュー',
+    folderId: '   ',
+    size: 'large',
+    displayAudience: 'all',
+    displayTagName: '',
+    defaultOpen: true,
+    displayOrder: 1,
+    defaultPageId: 'deleted-page',
+    pages: [
+      { id: 'page-a', name: 'トップ', imageR2Key: 'img-a', areas: [] },
+      { id: 'page-b', name: '会員メニュー', imageR2Key: 'img-b', areas: [] },
+    ],
+  }
+  return {
+    backHref: '/hq/templates',
+    onCancel: vi.fn(),
+    canOperate: true,
+    folders: [],
+    references: { tags: [], templates: [], forms: [] },
+    initial,
+    uploadImage: vi.fn(async () => ({ r2Key: 'img-up' })),
+    imageUrl: (key) => `https://cdn.example/${key}`,
+    distribute: null,
+    selectedCount: 1,
+    selectedIds: ['acc-1'],
+    friendTotal: 10,
+    busy: false,
+    onSave: vi.fn(),
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
+  staffRole = 'owner'
+  forgetStaffIdentity()
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
     const parsed = new URL(String(url), 'http://localhost')
     if (parsed.pathname === '/api/staff/me') {
-      return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) }
+      return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'staff-1', role: staffRole } }) }
     }
     return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
   }))
@@ -52,6 +93,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   hostEl.remove()
+  forgetStaffIdentity()
   vi.unstubAllGlobals()
   window.history.replaceState(null, '', '/')
 })
@@ -59,38 +101,7 @@ afterEach(() => {
 describe('統括リッチメニュー作成画面の既定ページ未存在ガード', () => {
   it('既定の面が pages に無いと保存されず案内が出続け、選び直すと選んだ面で保存できる', async () => {
     const onSave = vi.fn()
-    const initial: HqRichMenuSeed = {
-      id: 'hq-tpl-1',
-      name: '本部メニュー',
-      chatBarText: 'メニュー',
-      folderId: '   ',
-      size: 'large',
-      displayAudience: 'all',
-      displayTagName: '',
-      defaultOpen: true,
-      displayOrder: 1,
-      defaultPageId: 'deleted-page',
-      pages: [
-        { id: 'page-a', name: 'トップ', imageR2Key: 'img-a', areas: [] },
-        { id: 'page-b', name: '会員メニュー', imageR2Key: 'img-b', areas: [] },
-      ],
-    }
-    const hqHost: RichMenuCreateHost = {
-      backHref: '/hq/templates',
-      onCancel: vi.fn(),
-      canOperate: true,
-      folders: [],
-      references: { tags: [], templates: [], forms: [] },
-      initial,
-      uploadImage: vi.fn(async () => ({ r2Key: 'img-up' })),
-      imageUrl: (key) => `https://cdn.example/${key}`,
-      distribute: null,
-      selectedCount: 1,
-      selectedIds: ['acc-1'],
-      friendTotal: 10,
-      busy: false,
-      onSave,
-    }
+    const hqHost = buildHost({ onSave })
 
     await act(async () => {
       root.render(<RichMenuCreateV8 host={hqHost} initialStep="publish" />)
@@ -123,5 +134,43 @@ describe('統括リッチメニュー作成画面の既定ページ未存在ガ�
       folderId: null,
       size: 'large',
     })
+  })
+
+  it('閲覧のみでは最初に出す面にするボタンが押せず理由が出て、押しても切り替わらない', async () => {
+    staffRole = 'viewer'
+    const hqHost = buildHost({ canOperate: false })
+
+    await act(async () => {
+      root.render(<RichMenuCreateV8 host={hqHost} initialStep="publish" />)
+    })
+    await settle()
+
+    const pickButton = screen.getByRole('button', { name: '会員メニューを最初に出す面にする' })
+    expect(pickButton.getAttribute('aria-disabled')).toBe('true')
+    expect(hostEl.textContent).toContain(PERMISSION_LOCK_REASON.viewer)
+
+    await act(async () => {
+      fireEvent.click(pickButton)
+    })
+    await settle()
+    expect(screen.getByText('最初に出す面を選び直してください')).toBeTruthy()
+  })
+
+  it('保存中（busy）は最初に出す面にするボタンが押せず、押しても切り替わらない', async () => {
+    const hqHost = buildHost({ busy: true })
+
+    await act(async () => {
+      root.render(<RichMenuCreateV8 host={hqHost} initialStep="publish" />)
+    })
+    await settle()
+
+    const pickButton = screen.getByRole('button', { name: '会員メニューを最初に出す面にする' }) as HTMLButtonElement
+    expect(pickButton.disabled).toBe(true)
+
+    await act(async () => {
+      fireEvent.click(pickButton)
+    })
+    await settle()
+    expect(screen.getByText('最初に出す面を選び直してください')).toBeTruthy()
   })
 })
