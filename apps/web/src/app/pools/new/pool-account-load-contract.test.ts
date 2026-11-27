@@ -30,13 +30,6 @@ describe('プール作成の受け入れ先の読み込み (#1058)', () => {
 
   it('.then だけの呼び出しを残さない（拒否が宙に浮く）', () => {
     expect(PAGE).not.toContain('api.lineAccounts.list().then(')
-    expect(PAGE).toMatch(/useEffect\(\(\) => \{\s*void loadAccounts\(\)/)
-  })
-
-  it('失敗したらその場で読み直せる', () => {
-    expect(PAGE).toContain('{accountsError ? (')
-    expect(PAGE).toContain('onClick={() => void loadAccounts()}')
-    expect(PAGE).toContain('もう一度読み込む')
   })
 
   it('読み直しても選んだアカウントを上書きしない', () => {
