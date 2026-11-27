@@ -461,7 +461,7 @@ function PoolMembers({ poolId, poolName, accounts, canManage, onChange }: {
             </Card></li>
           )
         })}
-        {membersLoading && members.length === 0 ? <li className={styles.empty} role="status">所属アカウントを読み込んでいます…</li> : members.length === 0 && !listError ? <li className={styles.empty}>所属アカウントなし</li> : null}
+        {membersLoading && members.length === 0 ? <li><ListState kind="loading" title="所属アカウントを読み込んでいます…" /></li> : members.length === 0 && !listError ? <li><ListState kind="empty" title="所属アカウントなし" description="" /></li> : null}
       </ul>
       {listError ? (
         <Notice tone="danger" >{listError}{' '}<Button type="button" variant="text" disabled={membersLoading} busy={membersLoading} busyLabel="読み込み中…" onClick={() => void reload()}>もう一度読み込む</Button></Notice>

@@ -103,7 +103,7 @@ describe('プール管理の読み込み失敗表示と再試行', () => {
     render(<PoolsV8 />)
 
     await screen.findByText('メインの入り口')
-    await screen.findByText('所属アカウントを読み込んでいます…')
+    expect((await screen.findByLabelText('所属アカウントを読み込んでいます…')).getAttribute('aria-busy')).toBe('true')
     expect(screen.queryByText('所属アカウントなし')).toBeNull()
 
     resolveFirst({ success: false, error: 'temporary' })
