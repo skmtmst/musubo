@@ -201,6 +201,9 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
   const [mode, setMode] = useState<'cards' | 'preview'>('cards')
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [reloading, setReloading] = useState(false)
+  const reloadingRef = useRef(false)
+  const openSessionRef = useRef(0)
+  const busyAll = saving || reloading
   /* 最後に押した保存の種類（失敗の帯の「もう一度」で同じ操作をやり直す）。 */
   const [lastAction, setLastAction] = useState<'apply' | 'reset'>('apply')
   /* 5つ目を ON にした瞬間だけ出す注意。OFF にしたカードの名前を持つ。開き直すと消える。 */
@@ -226,6 +229,9 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
   const preferencesRef = useRef(preferences)
   preferencesRef.current = preferences
   useEffect(() => {
+    openSessionRef.current += 1
+    reloadingRef.current = false
+    setReloading(false)
     if (open) {
       setDraft(preferencesRef.current)
       setMode('cards')
@@ -236,7 +242,7 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
   }, [open])
 
   const toggle = (group: DashboardGroup, id: DashboardCardId) => {
-    if (saving) return
+    if (busyAll) return
     const before = draft[group]
     const next = toggleDashboardItem(before, id, group === 'today' ? TODAY_TASK_LIMIT : undefined)
     setDraft({ ...draft, [group]: next })
@@ -259,9 +265,9 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
 
   const handleDragEnd = (group: DashboardGroup, event: DragEndEvent) => {
     setKeyboardDrag(false)
-    if (saving) return
+    if (busyAll) return
     const { active, over } = event
-    if (saving || !over || active.id === over.id) return
+    if (busyAll || !over || active.id === over.id) return
     setDraft((current) => ({
       ...current,
       [group]: reorderDashboardItems(current[group], active.id as DashboardCardId, over.id as DashboardCardId),
@@ -270,7 +276,7 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
 
   /* 上下ボタンの移動。端では何もしない。結果は日本語で読み上げる。 */
   const handleMove = (group: DashboardGroup, id: DashboardCardId, direction: 'up' | 'down') => {
-    if (saving) return
+    if (busyAll) return
     const next = moveDashboardItem(draft[group], id, direction)
     if (next === draft[group]) return
     setDraft({ ...draft, [group]: next })
@@ -291,10 +297,12 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
   }
 
   const apply = () => {
+    if (busyAll) return
     setLastAction('apply')
     onApply(draft)
   }
   const reset = () => {
+    if (busyAll) return
     setConfirmingReset(false)
     if (!onReset) {
       setDraft(defaultDashboardPreferences(V8_DASHBOARD_DEFAULT_VISIBILITY))
@@ -304,13 +312,18 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
     onReset()
   }
   const reloadLatest = async () => {
-    if (!onReloadPreferences) return
+    if (!onReloadPreferences || reloadingRef.current) return
+    const session = openSessionRef.current
+    reloadingRef.current = true
     setReloading(true)
     try {
       const latest = await onReloadPreferences()
-      if (latest) setDraft(latest)
+      if (latest && session === openSessionRef.current) setDraft(latest)
     } finally {
-      setReloading(false)
+      if (session === openSessionRef.current) {
+        reloadingRef.current = false
+        setReloading(false)
+      }
     }
   }
 
@@ -323,7 +336,7 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
           tone="danger"
           message={saveError}
           action={(
-            <Button size="compact" onClick={() => (lastAction === 'reset' ? onReset?.() : apply())} disabled={saving}>
+            <Button size="compact" onClick={() => (lastAction === 'reset' ? reset() : apply())} disabled={busyAll}>
               {lastAction === 'reset' ? 'もう一度試す' : 'もう一度保存する'}
             </Button>
           )}
@@ -345,7 +358,7 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
         title="ダッシュボード編集"
         description="表示するカードと位置を変更します"
         dirty={JSON.stringify(draft) !== JSON.stringify(preferences)}
-        busy={saving}
+        busy={busyAll}
         onClose={close}
         toolbar={(
           <div className={styles.toolbar}>
@@ -363,12 +376,12 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
         band={band}
         footer={(
           <div className={styles.footer} data-design-node="mcOqK">
-            <button type="button" className={styles.resetLink} disabled={saving} onClick={() => (onReset ? setConfirmingReset(true) : reset())}>
+            <button type="button" className={styles.resetLink} disabled={busyAll} onClick={() => (onReset ? setConfirmingReset(true) : reset())}>
               初期状態に戻す
             </button>
             <span className={styles.spacer} />
-            <Button onClick={close} disabled={saving}>閉じる</Button>
-            <Button variant="primary" onClick={apply} busy={saving}>ダッシュボードに反映</Button>
+            <Button onClick={close} disabled={busyAll}>閉じる</Button>
+            <Button variant="primary" onClick={apply} disabled={busyAll} busy={saving}>ダッシュボードに反映</Button>
           </div>
         )}
       >
@@ -407,7 +420,7 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
                             key={item.id}
                             item={item}
                             definition={definition}
-                            disabled={saving}
+                            disabled={busyAll}
                             canMoveUp={index > 0}
                             canMoveDown={index < draft[group].length - 1}
                             onMove={(direction) => handleMove(group, item.id, direction)}
@@ -432,7 +445,7 @@ export default function DashboardEditorV8({ open, preferences, usageStyle, savin
         titleIcon={false}
         confirmIcon={false}
         designWidth={400}
-        busy={saving}
+        busy={busyAll}
         onConfirm={reset}
         onCancel={() => setConfirmingReset(false)}
       />
