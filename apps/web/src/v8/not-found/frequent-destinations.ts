@@ -25,14 +25,20 @@ export function frequentDestinations(
   return canSeeBroadcasts ? [...ALWAYS, BROADCASTS] : ALWAYS
 }
 
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g
+
 /** 開けなかった URL の道（パス）だけ。クエリと # は秘密値が乗ることがあるので出さない。 */
 export function missingPathLabel(pathname: string | null | undefined): string | null {
   if (!pathname) return null
-  const path = pathname.split(/[?#]/)[0]
-  if (!path || path === '/') return null
+  const raw = pathname.split(/[?#]/)[0]?.trim() ?? ''
+  if (!raw || raw === '/') return null
+  let decoded = raw
   try {
-    return decodeURI(path)
+    decoded = decodeURI(raw)
   } catch {
-    return path
+    decoded = raw
   }
+  const sanitized = decoded.replace(CONTROL_CHARS, '').trim()
+  if (!sanitized || sanitized === '/') return null
+  return sanitized
 }
