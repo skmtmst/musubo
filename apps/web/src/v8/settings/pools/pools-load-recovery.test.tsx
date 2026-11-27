@@ -69,6 +69,14 @@ afterEach(() => {
 })
 
 describe('プール管理の読み込み失敗表示と再試行', () => {
+  it('useEffect はPromiseを返さない（Reactのcleanup契約）', async () => {
+    mocks.poolAccountsList.mockRejectedValue(new Error('offline'))
+    const view = render(<React.StrictMode><PoolsV8 /></React.StrictMode>)
+    await screen.findByText(/所属アカウントを読み込めませんでした/)
+    expect(screen.queryByText('所属アカウントなし')).toBeNull()
+    expect(() => view.unmount()).not.toThrow()
+  })
+
   it('LINEアカウント一覧だけが失敗してもプール一覧を残し、案内から再読み込みして復旧できる', async () => {
     let resolveAccountsRetry!: (value: unknown) => void
     mocks.lineAccountsList
