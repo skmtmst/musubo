@@ -72,21 +72,28 @@ export default function InsertRow({
   const visibility = useFeatureVisibility(accountId)
   const fieldsEnabled = visibility.enabled('friend_fields')
   const varsEnabled = visibility.enabled('common_vars')
-  const [menu, setMenu] = useState<MenuKey | null>(null)
-  const [targetOpen, setTargetOpen] = useState(false)
+  const [menuState, setMenuState] = useState<{ accountId: string | null; key: MenuKey } | null>(null)
+  const [targetOpenAccount, setTargetOpenAccount] = useState<{ accountId: string | null; open: boolean } | null>(null)
   const [targetDate, setTargetDate] = useState('')
   const fieldRef = useRef<HTMLButtonElement>(null)
   const varRef = useRef<HTMLButtonElement>(null)
   const dateRef = useRef<HTMLButtonElement>(null)
   const otherRef = useRef<HTMLButtonElement>(null)
   const loadingWord = state === 'loading' ? '読み込み中です' : undefined
-  const pick = (token: string) => {
-    setMenu(null)
-    onInsert(token)
-  }
-  const toggle = (key: MenuKey) => setMenu((current) => (current === key ? null : key))
   const fieldsReady = Boolean(accountId) && state === 'ready' && references.friendFields.length > 0
   const varsReady = Boolean(accountId) && state === 'ready' && references.commonVars.length > 0
+  const rawMenu = !disabled && menuState?.accountId === accountId ? menuState.key : null
+  const menu = (rawMenu === 'field' && !fieldsReady) || (rawMenu === 'var' && !varsReady) ? null : rawMenu
+  const targetOpen = !disabled && targetOpenAccount?.open === true && targetOpenAccount.accountId === accountId
+  const pick = (token: string) => {
+    if (disabled) return
+    setMenuState(null)
+    onInsert(token)
+  }
+  const toggle = (key: MenuKey) => {
+    if (disabled) return
+    setMenuState((current) => (current?.accountId === accountId && current.key === key ? null : { accountId, key }))
+  }
 
   const nameChip = <Chip label="名前" disabled={disabled} onClick={() => onInsert('{{name}}')} />
   const fieldChip = fieldsEnabled ? (
@@ -120,31 +127,31 @@ export default function InsertRow({
         open={menu === 'field'}
         anchorRef={fieldRef}
         ariaLabel="差し込む友だち情報"
-        onClose={() => setMenu(null)}
+        onClose={() => setMenuState(null)}
         items={references.friendFields.map((field) => ({ id: field.fieldKey, label: field.name, onSelect: () => pick(`{{field.${field.fieldKey}}}`) }))}
       />
       <ActionMenu
         open={menu === 'var'}
         anchorRef={varRef}
         ariaLabel="差し込む共通情報"
-        onClose={() => setMenu(null)}
+        onClose={() => setMenuState(null)}
         items={references.commonVars.map((item) => ({ id: item.varKey, label: item.name, onSelect: () => pick(`{{var.${item.varKey}}}`) }))}
       />
       <ActionMenu
         open={menu === 'date'}
         anchorRef={dateRef}
         ariaLabel="差し込む配信日の書き方"
-        onClose={() => setMenu(null)}
+        onClose={() => setMenuState(null)}
         items={DATE_OPTIONS.map((option) => ({ id: option.value, label: option.label, onSelect: () => pick(option.value) }))}
       />
       <ActionMenu
         open={menu === 'other'}
         anchorRef={otherRef}
         ariaLabel="その他の差し込み"
-        onClose={() => setMenu(null)}
+        onClose={() => setMenuState(null)}
         items={[
           ...OTHER_OPTIONS.map((option) => ({ id: option.value, label: option.label, onSelect: () => pick(option.value) })),
-          { id: 'days-until', label: '目標日までの日数…', dividerBefore: true, onSelect: () => { setMenu(null); setTargetOpen(true) } },
+          { id: 'days-until', label: '目標日までの日数…', dividerBefore: true, onSelect: () => { setMenuState(null); setTargetOpenAccount({ accountId, open: true }) } },
         ]}
       />
       <Dialog
@@ -152,13 +159,15 @@ export default function InsertRow({
         title="目標日までの日数を差し込む"
         description="送る日から目標日までの日数に置き換わります（過ぎた日は0）。"
         confirmLabel="差し込む"
+        confirmDisabled={disabled || !targetDate}
+        confirmDisabledReason={!targetDate ? '目標日を選んでから差し込んでください。' : undefined}
         busy={false}
         onConfirm={() => {
-          if (!targetDate) return
+          if (disabled || !targetDate) return
           onInsert(`{{days_until:${targetDate}}}`)
-          setTargetOpen(false)
+          setTargetOpenAccount(null)
         }}
-        onCancel={() => setTargetOpen(false)}
+        onCancel={() => setTargetOpenAccount(null)}
       >
         <div className={styles.dateRow}>
           <SaveErrorField names={["targetDate","target_date"]}><DateField aria-label="日数を数える目標日" value={targetDate} onChange={setTargetDate} /></SaveErrorField>
