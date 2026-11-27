@@ -1421,3 +1421,4 @@
 
 - [ファイル登録とごはんの目安の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex34.md)
 - [メディアと友だち情報の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex35.md)
+- [安全確認と自動応答の操作案内の反映履歴](release-log/unreleased/PR-kenta-later-codex36.md)

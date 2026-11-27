@@ -13,7 +13,7 @@ import { api } from '@/lib/api'
  * この帯が出ている間は他の帯と並べない（呼び出し側で1本に寄せる）。
  */
 export default function FileScanStoppedBanner({ accountId }: { accountId: string | null }) {
-  const [stopped, setStopped] = useState(false)
+  const [health, setHealth] = useState<{ accountId: string; stopped: boolean } | null>(null)
 
   useEffect(() => {
     // 帯が画面を壊さない。検査の口が無い古い応答でも黙って出さない。
@@ -21,12 +21,12 @@ export default function FileScanStoppedBanner({ accountId }: { accountId: string
     if (!accountId || !readHealth) return
     let alive = true
     readHealth(accountId).then((res) => {
-      if (alive && res.success) setStopped(res.data.stopped)
+      if (alive && res.success) setHealth({ accountId, stopped: res.data.stopped })
     }).catch(() => {})
     return () => { alive = false }
   }, [accountId])
 
-  if (!stopped) return null
+  if (!accountId || health?.accountId !== accountId || !health.stopped) return null
   return (
     <NoteBar tone="warn">
       ファイルの安全確認が止まっています。上げたファイルは持ちのまま、確かめ終わるまで使えません。しばらくしてから自動で続きます。
