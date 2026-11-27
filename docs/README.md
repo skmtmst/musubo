@@ -6,6 +6,7 @@
 - [成果承認と停止確認の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-23-1128.md)
 - [運営画面とプール作成の再試行の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-24-1128.md)
 - [イベント予約の通知と集計の試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-25-1128.md)
+- [LINE通知の説明とリンクの試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-26-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 - [ダッシュボードと予約経路の確認の反映履歴](release-log/unreleased/PR-kenta-later-codex104-1127.md)
 
