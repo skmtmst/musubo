@@ -1533,3 +1533,4 @@
 - [予約台帳の時刻・コース表示とリッチメニュー削除影響確認の異常値対策の反映履歴](release-log/unreleased/PR-kenta-later-gemini105-1127.md) — 反映履歴、確認 2026-11-28。
 - [マイペット誕生日・CSV・給餌目安とリッチメニュープレビュー異常表示の修正履歴](release-log/unreleased/PR-kenta-later-gemini106-1127.md) — 反映履歴、確認 2026-11-28。
 - [リッチメニュー画像エラー案内と切替つながり統計・権限表示の修正履歴](release-log/unreleased/PR-kenta-later-gemini107-1127.md) — 反映履歴、確認 2026-11-28。
+- [はじめの質問差分比較と統括リッチメニューひな形作成の異常値修正履歴](release-log/unreleased/PR-kenta-later-gemini108-1127.md) — 反映履歴、確認 2026-11-28。

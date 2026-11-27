@@ -3,7 +3,7 @@ import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
 import { useMenuShapeDraft } from './use-menu-shape-draft'
 import { useHqRichMenuDraft } from './use-hq-rich-menu-draft'
-import { makeHqMenuSeed } from './hq-menu-seed'
+import { makeHqMenuSeed, MISSING_DEFAULT_PAGE_ERROR, resolveHqDefaultPageId } from './hq-menu-seed'
 
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
@@ -54,6 +54,7 @@ import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import NumberInput from '@/components/shared/number-field'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -1188,6 +1189,14 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
   /* ---------- 描画 ---------- */
 
   const busy = saving || publishing || Boolean(host?.busy)
+  const hqOperateAllowed = Boolean(host?.canOperate)
+  const hqOperateLockReason = usePermissionLockReason(hqOperateAllowed, 'manager')
+  const hqDefaultPageMissing = Boolean(host && group && !resolveHqDefaultPageId(group, pages))
+  const selectHqDefaultPage = (pageId: string) => {
+    if (!hqOperateAllowed || busy) return
+    setGroup((current) => current ? { ...current, defaultPageId: pageId } : current)
+    setError((current) => current === MISSING_DEFAULT_PAGE_ERROR ? null : current)
+  }
 
   /** 統括：画面の中の下書きを一度に保存する（手順の途中でも同じ）。 */
   async function hostSave(distribute: boolean) {
@@ -1206,7 +1215,14 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
       return
     }
     if (!validateBasics()) return
-    host.onSave(seedNow(), distribute, hqDuplicateMode)
+    let seed: HqRichMenuSeed
+    try {
+      seed = seedNow()
+    } catch (caught) {
+      setError(caught instanceof Error && caught.message ? caught.message : MISSING_DEFAULT_PAGE_ERROR)
+      return
+    }
+    host.onSave(seed, distribute, hqDuplicateMode)
   }
   function seedNow(): HqRichMenuSeed { return makeHqMenuSeed({ host, name, chatBarText, folderId, size, group, audience, hqTagName, defaultOpen, targetingPriority, pages }) }
 
@@ -1324,7 +1340,33 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
       {host?.notice}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
-      {error ? (
+      {hqDefaultPageMissing ? (
+        <Notice
+          tone="danger"
+          message={MISSING_DEFAULT_PAGE_ERROR}
+          className="mb-1"
+          action={
+            pages.length > 0 ? (
+              <span className={styles.pageTools}>
+                {pages.map((page) => (
+                  <Button
+                    key={page.id}
+                    type="button"
+                    variant="secondary"
+                    size="compact"
+                    disabled={busy || (!hqOperateAllowed && !hqOperateLockReason)}
+                    lockedReason={!hqOperateAllowed ? hqOperateLockReason : undefined}
+                    onClick={() => selectHqDefaultPage(page.id)}
+                  >
+                    {`${page.name}を最初に出す面にする`}
+                  </Button>
+                ))}
+              </span>
+            ) : undefined
+          }
+        />
+      ) : null}
+      {error && !(hqDefaultPageMissing && error === MISSING_DEFAULT_PAGE_ERROR) ? (
         <Notice
           tone="danger"
           message={error}
