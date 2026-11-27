@@ -3,12 +3,13 @@
  * R539: 予約スタッフ一覧の429は、待ち案内と一緒に画面内の再読込で
  * 取り直せる。403だけが権限案内のみで再試行の口を出さない。
  */
-import React from 'react'
+import React, { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   listStaff: vi.fn() as unknown as (...args: unknown[]) => Promise<unknown>,
+  account: 'account-a',
 }))
 
 // 画面は localStorage の権限表を読む。happy-dom では未定義なので
@@ -28,7 +29,7 @@ vi.stubGlobal('localStorage', memStorage)
 memStorage.setItem('lh_staff_role', 'owner')
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a' }),
+  useAccount: () => ({ selectedAccountId: fixture.account }),
 }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: vi.fn() }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -63,6 +64,7 @@ const ROW = {
 }
 
 beforeEach(() => {
+  fixture.account = 'account-a'
   fixture.listStaff = vi.fn(async () => ({ staff: [ROW] })) as unknown as typeof fixture.listStaff
 })
 
@@ -82,6 +84,32 @@ describe('R539 429は画面内の再読込で取り直せる', () => {
     fixture.listStaff = vi.fn(async () => ({ staff: [ROW] })) as unknown as typeof fixture.listStaff
     fireEvent.click(retry)
     await screen.findByText('稼働さん')
+  })
+
+  test('通信断は空一覧ではなく理由を表示し、作成を押せなくする', async () => {
+    fixture.listStaff = vi.fn(async () => { throw new Error('private network failure') }) as unknown as typeof fixture.listStaff
+    render(<BookingStaffPage />)
+    await screen.findByText('予約スタッフを読み込めませんでした')
+    expect(screen.getByText(/登録したスタッフは消えていません/)).toBeTruthy()
+    expect(screen.queryByText(/private network failure/)).toBeNull()
+    expect(screen.queryByText('予約スタッフはまだいません')).toBeNull()
+    expect((screen.getByRole('button', { name: /スタッフを作る/ }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  test.each(['success', 'failure'])('店を切り替えた後の古い%s応答を表示しない', async (result) => {
+    let resolveOld!: (value: unknown) => void
+    let rejectOld!: (reason: unknown) => void
+    fixture.listStaff = vi.fn((account: unknown) => account === 'account-a'
+      ? new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject })
+      : Promise.resolve({ staff: [{ ...ROW, id: 'new', display_name: '新しい店舗の担当' }] })) as unknown as typeof fixture.listStaff
+    const view = render(<BookingStaffPage />)
+    fixture.account = 'account-b'
+    view.rerender(<BookingStaffPage />)
+    await screen.findByText('新しい店舗の担当')
+    await act(async () => { if (result === 'success') resolveOld({ staff: [ROW] }); else rejectOld(new Error('old failure')) })
+    expect(screen.queryByText('稼働さん')).toBeNull()
+    expect(screen.queryByText('予約スタッフを読み込めませんでした')).toBeNull()
+    expect(screen.getByText('新しい店舗の担当')).toBeTruthy()
   })
 
   test('403は権限案内のみで、再試行の口は出さない', async () => {
