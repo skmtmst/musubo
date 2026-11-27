@@ -104,7 +104,7 @@ function isFriendCondition(value: unknown): value is SegmentCondition {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const condition = value as Record<string, unknown>
   if (condition.operator !== 'AND' && condition.operator !== 'OR') return false
-  if (!Array.isArray(condition.rules) || !condition.rules.every(rule => rule && typeof rule === 'object' && !Array.isArray(rule) && typeof rule.type === 'string' && 'value' in rule)) return false
+  if (!Array.isArray(condition.rules) || !condition.rules.every(rule => rule && typeof rule === 'object' && !Array.isArray(rule) && typeof rule.type === 'string')) return false
   return condition.groups === undefined || (Array.isArray(condition.groups) && condition.groups.every(isFriendCondition))
 }
 export function parseFriendConditionJson(value: string): SegmentCondition | null {

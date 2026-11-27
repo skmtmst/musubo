@@ -179,7 +179,7 @@ export function RoutesStep({ rule, definition, setDefinition, options, routeUses
           /></SaveErrorField></Field></div>
       </div>
       {legacy ? (
-        <Notice tone="warn" role="alert">保存された条件を表示できません。下の条件を作り直してください。</Notice>
+        <Notice tone="warn" role="alert">保存された条件を表示できないため、今は配信を止めています。下の条件を作り直してください。</Notice>
       ) : null}
       <div className={styles.conditionRow}>
         {<PermissionGatedButton allowed={canEdit} type="button" onClick={() => setConditionOpen(true)}>条件を足す</PermissionGatedButton>}
