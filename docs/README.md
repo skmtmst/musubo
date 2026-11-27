@@ -1419,3 +1419,4 @@
 - [コースの公開後の状態・友だち追加の実行結果の表示を直す（LATER）](release-log/unreleased/262-kenta-later-codex3.md) — 反映履歴、確認 2026-11-27。
 - [列車：夜の画面の直し15本をまとめて（#248〜#263）](release-log/unreleased/264-kenta-train-night2-1127.md) — 反映履歴、確認 2026-11-27。
 - [イベントの申込ページの見本の表示を修正](release-log/unreleased/PR-kenta-later-codex53.md) — 反映履歴、確認 2026-11-27。
+- [イベントの申込ページの見本の定員表示を修正](release-log/unreleased/PR-kenta-event-preview-capacity.md) — 反映履歴、確認 2026-11-27。
