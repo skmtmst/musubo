@@ -206,4 +206,77 @@ describe('AssignMatrixV8 ガード', () => {
     fireEvent.click(saveBtn)
     expect(fx.putStaffMenusBulk).not.toHaveBeenCalled()
   })
+
+  it('matrix 配列内に null 等の不正要素がある場合は黙って空割当にせず、個別取得でも不正なら保存を止める', async () => {
+    fx.listMenus.mockResolvedValue({
+      menus: [{ id: 'm-1', name: 'カット', sort_order: 1, duration_minutes: 60, base_price: 5000, price_mode: 'fixed' }],
+    })
+    fx.listStaff.mockResolvedValue({
+      staff: [
+        { id: 's-1', name: '田中', display_name: '田中', is_active: true, is_designation_optional: 0 },
+        { id: 's-2', name: '佐藤', display_name: '佐藤', is_active: true, is_designation_optional: 0 },
+      ],
+    })
+    // s-1 の matrix に null 要素が混入している
+    fx.listStaffMenusBulk.mockResolvedValue({
+      staff: [
+        { staff_id: 's-1', matrix: [null] },
+        { staff_id: 's-2', matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 0, override_duration_minutes: null, override_price: null }] },
+      ],
+    })
+    // 個別取得でも不正要素が返る
+    fx.getStaffMenus.mockImplementation(async (_acc: string, staffId: string) => {
+      if (staffId === 's-1') return { matrix: [null] }
+      return { matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 0, override_duration_minutes: null, override_price: null }] }
+    })
+
+    render(<AssignMatrixV8 />)
+
+    await waitFor(() => {
+      expect(screen.getByText('表示できませんでした')).toBeTruthy()
+    })
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    const saveBtn = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+    expect(saveBtn.disabled).toBe(true)
+    fireEvent.click(saveBtn)
+    expect(fx.putStaffMenusBulk).not.toHaveBeenCalled()
+  })
+
+  it('matrix が空配列 [] の担当者がいても正常な値として読み込み・保存できる', async () => {
+    fx.listMenus.mockResolvedValue({
+      menus: [{ id: 'm-1', name: 'カット', sort_order: 1, duration_minutes: 60, base_price: 5000, price_mode: 'fixed' }],
+    })
+    fx.listStaff.mockResolvedValue({
+      staff: [
+        { id: 's-1', name: '田中', display_name: '田中', is_active: true, is_designation_optional: 0 },
+        { id: 's-2', name: '佐藤', display_name: '佐藤', is_active: true, is_designation_optional: 0 },
+      ],
+    })
+    fx.listStaffMenusBulk.mockResolvedValue({
+      staff: [
+        { staff_id: 's-1', matrix: [] },
+        { staff_id: 's-2', matrix: [{ menu_id: 'm-1', name: 'カット', is_offered: 1, override_duration_minutes: null, override_price: null }] },
+      ],
+    })
+    fx.putStaffMenusBulk.mockResolvedValue({ ok: true })
+
+    render(<AssignMatrixV8 />)
+
+    const tanakaBox = (await screen.findByRole('checkbox', { name: 'カット を 田中 が受ける' })) as HTMLInputElement
+    const satoBox = screen.getByRole('checkbox', { name: 'カット を 佐藤 が受ける' }) as HTMLInputElement
+    expect(tanakaBox.checked).toBe(false)
+    expect(satoBox.checked).toBe(true)
+
+    fireEvent.click(tanakaBox)
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+
+    await waitFor(() => {
+      expect(fx.putStaffMenusBulk).toHaveBeenCalledTimes(1)
+    })
+    expect(fx.getStaffMenus).not.toHaveBeenCalled()
+    expect(fx.putStaffMenusBulk).toHaveBeenCalledWith('acc-a', [
+      { staff_id: 's-1', menus: [{ menu_id: 'm-1', is_offered: true, override_duration_minutes: null, override_price: null }] },
+      { staff_id: 's-2', menus: [{ menu_id: 'm-1', is_offered: true, override_duration_minutes: null, override_price: null }] },
+    ])
+  })
 })

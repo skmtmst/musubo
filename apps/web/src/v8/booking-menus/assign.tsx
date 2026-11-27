@@ -51,6 +51,27 @@ function staffLabel(person: BookingStaff): string {
   return person.display_name || person.name
 }
 
+function isValidOptionalNumber(value: unknown): boolean {
+  return value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value))
+}
+
+function isValidMatrixEntry(entry: unknown): entry is StaffMenuMatrix {
+  if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return false
+  const row = entry as Record<string, unknown>
+  const offeredOk = typeof row.is_offered === 'boolean' || row.is_offered === 0 || row.is_offered === 1
+  return (
+    typeof row.menu_id === 'string'
+    && row.menu_id.length > 0
+    && offeredOk
+    && isValidOptionalNumber(row.override_duration_minutes)
+    && isValidOptionalNumber(row.override_price)
+  )
+}
+
+function isValidMatrixArray(matrix: unknown): matrix is StaffMenuMatrix[] {
+  return Array.isArray(matrix) && matrix.every(isValidMatrixEntry)
+}
+
 /** 升目表の読み込み待ちの骨組み（見出し行＋5行・メニュー列＋担当3列の形）。 */
 function MatrixSkeleton() {
   return (
@@ -170,7 +191,7 @@ export default function AssignMatrixV8() {
         if (!mountedRef.current || seq !== loadSeqRef.current) return
         if (!Array.isArray(bulk?.staff)) throw new Error('一括割り当ての形式が正しくありません')
         for (const entry of bulk.staff) {
-          if (!entry || typeof entry.staff_id !== 'string' || !Array.isArray(entry.matrix)) {
+          if (!entry || typeof entry.staff_id !== 'string' || !isValidMatrixArray(entry.matrix)) {
             throw new Error('一括割り当ての形式が正しくありません')
           }
           matrices.set(entry.staff_id, entry.matrix)
@@ -186,7 +207,7 @@ export default function AssignMatrixV8() {
           staffRes.staff.map(async (s) => {
             const r = await bookingApi.getStaffMenus(accountId, s.id)
             if (!mountedRef.current || seq !== loadSeqRef.current) return
-            if (!Array.isArray(r?.matrix)) throw new Error('担当メニューの形式が正しくありません')
+            if (!isValidMatrixArray(r?.matrix)) throw new Error('担当メニューの形式が正しくありません')
             matrices.set(s.id, r.matrix)
           }),
         )
@@ -198,7 +219,7 @@ export default function AssignMatrixV8() {
         if (!matrix) throw new Error('担当メニューの割り当てが不足しています')
         const byMenu: Record<string, StaffMenuMatrix> = {}
         for (const m of menusRes.menus) {
-          byMenu[m.id] = matrix.find((x) => x && x.menu_id === m.id) ?? {
+          byMenu[m.id] = matrix.find((x) => x.menu_id === m.id) ?? {
             menu_id: m.id,
             name: m.name,
             is_offered: 0,
