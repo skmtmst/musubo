@@ -2,6 +2,7 @@
  * ★V8 友だち一覧の言葉と日付の書き方。
  * 状態の名前は受信箱・詳細と同じ（管理画面 の friend-list-row と同じ4つ）。
  */
+import { knownValue } from '@/lib/known-value'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { FriendListItem } from '@/lib/api'
 
@@ -34,7 +35,7 @@ const TYPE_WORDS: Record<string, string> = {
 }
 
 export function messageWord(message: { content: string; messageType: string }): string {
-  return message.messageType === 'text' ? message.content : TYPE_WORDS[message.messageType] ?? 'メッセージ'
+  return message.messageType === 'text' ? message.content : knownValue(TYPE_WORDS, message.messageType, 'メッセージ')
 }
 
 

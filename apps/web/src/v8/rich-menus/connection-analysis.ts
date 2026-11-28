@@ -31,8 +31,16 @@ export type ConnectionAnalysis = {
 }
 
 function targetPageId(area: ConnectionArea): string | null {
-  const value = area.actionData.targetPageId
-  return typeof value === 'string' && value.length > 0 ? value : null
+  const data = area.actionData
+  if (!data || typeof data !== 'object') return null
+  const value = data.targetPageId
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function normalizedOrderIndex(value: number): number {
+  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY
 }
 
 function visit(start: string, adjacency: Map<string, string[]>): Set<string> {
@@ -57,7 +65,7 @@ export function analyzeConnections(
   pages: ConnectionPage[],
   defaultPageId: string | null,
 ): ConnectionAnalysis {
-  const sorted = [...pages].sort((a, b) => a.orderIndex - b.orderIndex)
+  const sorted = [...pages].sort((a, b) => normalizedOrderIndex(a.orderIndex) - normalizedOrderIndex(b.orderIndex))
   const pageIds = new Set(sorted.map((page) => page.id))
   const entryPageId = defaultPageId && pageIds.has(defaultPageId)
     ? defaultPageId

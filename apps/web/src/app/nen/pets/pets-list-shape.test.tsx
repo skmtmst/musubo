@@ -59,7 +59,7 @@ describe('nen/pets の一覧', () => {
   it('本物の器で行が出て件数も出る', async () => {
     api.pets.mockResolvedValue({ success: true, data: petList })
     const onTotal = vi.fn()
-    render(<PetsTab canEdit accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={onTotal} />)
+    render(<PetsTab canEdit accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={onTotal} onKpisFailed={() => undefined} />)
     await flush()
     expect((await screen.findAllByText('もも')).length).toBeGreaterThan(0)
     expect(onTotal).toHaveBeenCalledWith(expect.objectContaining({total:1}))
@@ -68,7 +68,7 @@ describe('nen/pets の一覧', () => {
 
   it('旧偽APIの器では読み込み失敗になる', async () => {
     api.pets.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
-    render(<PetsTab canEdit accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={() => undefined} />)
+    render(<PetsTab canEdit accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={() => undefined} onKpisFailed={() => undefined} />)
     await flush()
     expect(await screen.findByText('ペットを読み込めませんでした')).toBeTruthy()
   })
@@ -77,7 +77,7 @@ describe('nen/pets の一覧', () => {
 describe('ペットの行から使う操作', () => {
   async function openActions(canEdit: boolean) {
     api.pets.mockResolvedValue({ success: true, data: petList })
-    render(<PetsTab canEdit={canEdit} accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={() => undefined} />)
+    render(<PetsTab canEdit={canEdit} accountId="account-a" query={query} onQueryChange={() => undefined} onKpis={() => undefined} onKpisFailed={() => undefined} />)
     await screen.findByText('もも', { exact: true })
     fireEvent.click(screen.getByRole('button', { name: /もも.*の操作/ }))
     return within(screen.getByRole('menu'))

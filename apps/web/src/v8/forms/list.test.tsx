@@ -511,4 +511,14 @@ describe('フォームを片付ける時の案内', () => {
     expect(dialog.getByText(/影響を確認できませんでした/)).toBeTruthy()
     for (const name of ['削除する', 'アーカイブする']) expect((dialog.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
   })
+  it('空一覧では権限の無い人のフォーム作成を止める', async () => {
+    role.value = verifiedStaffRole('staff')
+    fetchApi.mockImplementation(async (path: string) => path.startsWith('/api/forms?') ? { success: true, data: { items: [], total: 0, all_total: 0, page: 1, limit: 20 } } : { success: true, data: {} })
+    await mount()
+    const b = screen.getByRole('button', { name: /最初のフォームを作る/ }) as HTMLButtonElement
+    expect(b.disabled || b.getAttribute('aria-disabled') === 'true').toBe(true)
+    fireEvent.click(b)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
 })

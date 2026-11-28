@@ -8,7 +8,7 @@ import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api, ApiError, type ScenarioRuns, type ScenarioTriggerItem } from '@/lib/api'
 import type { ScenarioTriggerType } from '@line-crm/shared'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useLayoutEffect } from 'react'
 import { ScenarioStats, ScenarioWithSteps, TagOpt, TemplateOpt } from './detail-model'
 import { scenarioSimulationKey, simulationForKey, type ScenarioSimulationResult } from './scenario-simulation-refresh'
 
@@ -164,7 +164,7 @@ export function useScenarioReads({
       .list(id)
       .then((res) => {
         if (!res.success) return
-        const counts: Record<string, number> = {}
+        const counts: Record<string, number> = Object.create(null)
         for (const action of res.data) {
           const key = action.hook === 'scenario_completed' ? '__complete__' : (action.stepId ?? '')
           if (!key) continue
@@ -175,6 +175,8 @@ export function useScenarioReads({
       .catch(() => {})
   }, [id, setActionCounts])
 
+  // 初回表示とシナリオ切替時にも、未取得の識別子を数として扱わない。
+  useLayoutEffect(() => { setActionCounts(Object.create(null)) }, [id, setActionCounts])
   useEffect(() => {
     if (id) reloadActionCounts()
   }, [id, reloadActionCounts])

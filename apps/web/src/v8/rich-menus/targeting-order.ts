@@ -4,11 +4,13 @@ export type TargetingOrderItem = {
   createdAt: string
 }
 
+const priorityOf = (value: number) => (Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER)
+
 export function compareTargetingGroups(
   a: TargetingOrderItem,
   b: TargetingOrderItem,
 ): number {
-  return a.targetingPriority - b.targetingPriority || a.createdAt.localeCompare(b.createdAt)
+  return priorityOf(a.targetingPriority) - priorityOf(b.targetingPriority) || a.createdAt.localeCompare(b.createdAt)
 }
 
 /** Workerが友だちへ出すメニューを選ぶ順番と同じ並び。 */
@@ -43,10 +45,14 @@ export function withNormalizedPriority<T extends TargetingOrderItem>(
   orderedIds: string[],
 ): T[] {
   const byId = new Map(groups.map((group) => [group.id, group]))
+  const seen = new Set<string>()
   const next: T[] = []
-  for (const [priority, id] of orderedIds.entries()) {
+  for (const id of orderedIds) {
+    if (seen.has(id)) continue
     const group = byId.get(id)
-    if (group) next.push({ ...group, targetingPriority: priority })
+    if (!group) continue
+    seen.add(id)
+    next.push({ ...group, targetingPriority: next.length })
   }
   return next
 }

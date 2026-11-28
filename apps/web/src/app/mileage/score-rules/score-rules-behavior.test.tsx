@@ -123,3 +123,32 @@ it('試算の通信失敗は窓を開いたまま理由を出す', async () => {
   expect(await within(dialog).findByText('通信に失敗しました。接続を確認してもう一度お試しください。')).toBeTruthy()
   expect(screen.getByRole('dialog', { name: '1人でスコアのルールを試す' })).toBeTruthy()
 })
+
+async function openRuleDelete() {
+  const trigger = await screen.findByRole('button', { name: /来店.*操作/ })
+  expect(trigger.closest('[data-row-actions]')).not.toBeNull()
+  fireEvent.click(trigger)
+  fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+  return screen.findByRole('alertdialog', { name: '「来店」を削除しますか？' })
+}
+
+it('削除を選ぶだけでは消えず、取り消すとルールが残る', async () => {
+  render(<ActionScoreRulesPage />)
+  expect(await screen.findByRole('button', { name: '来店を編集' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '来店を削除' })).toBeNull()
+  const dialog = await openRuleDelete()
+  expect(within(dialog).getByText(/公開中の版と友だちの点数は変わりません/)).toBeTruthy()
+  expect(within(dialog).getByRole('button', { name: '削除する' }).getAttribute('data-dialog-action')).toBe('danger')
+  expect(screen.getByRole('button', { name: '来店を編集' })).toBeTruthy()
+  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(screen.getByRole('button', { name: '来店を編集' })).toBeTruthy()
+})
+
+it('確認してから削除すると該当ルールが一覧から消える', async () => {
+  render(<ActionScoreRulesPage />)
+  const dialog = await openRuleDelete()
+  fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+  expect(screen.queryByRole('button', { name: '来店を編集' })).toBeNull()
+})

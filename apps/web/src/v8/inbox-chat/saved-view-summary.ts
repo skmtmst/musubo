@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import type { InboxSavedViewConditions } from './saved-view-types'
 import { formatNumber } from '@/lib/format'
 
@@ -41,7 +42,7 @@ export function savedViewSummary(
   if (conditions.query.trim()) parts.push(`語：${conditions.query.trim()}`)
 
   if (conditions.channels.length > 0 && conditions.channels.length < 2) {
-    parts.push(`受信経路：${conditions.channels.map((c) => CHANNEL_LABELS[c] ?? c).join('・')}`)
+    parts.push(`受信経路：${conditions.channels.map((c) => knownValue(CHANNEL_LABELS, c, c)).join('・')}`)
   }
 
   /*
@@ -62,7 +63,7 @@ export function savedViewSummary(
   }
 
   if (conditions.statuses.length > 0 && conditions.statuses.length < 4) {
-    parts.push(`対応状況：${conditions.statuses.map((s) => STATUS_LABELS[s] ?? s).join('・')}`)
+    parts.push(`対応状況：${conditions.statuses.map((s) => knownValue(STATUS_LABELS, s, s)).join('・')}`)
   }
 
   // 「要返信」は N-020 で保存対象になった軸。「1時間以上待ち」は
@@ -81,7 +82,7 @@ export function savedViewSummary(
     parts.push(`受信日：${conditions.receivedFrom ?? ''}〜${conditions.receivedTo ?? ''}`)
   }
 
-  if (conditions.sort !== 'newest') parts.push(SORT_LABELS[conditions.sort] ?? conditions.sort)
+  if (conditions.sort !== 'newest') parts.push(knownValue(SORT_LABELS, conditions.sort, conditions.sort))
 
   /*
     **絞っていないことを黙らない。** 空文字を返すと、名前の下が

@@ -18,6 +18,8 @@ export type BellItem = {
   unread: boolean
   /** 「5分前」「昨日 18:20」など。 */
   time: string
+  /** 元の日時（相対表示に指を乗せて確認する）。 */
+  timeTitle?: string
   /** 作成日時を日本時間で分けた日付の組。日時が不正なら不明として残す。 */
   period: 'today' | 'earlier' | 'unknown'
   /** 行き先の言葉（「配信を開く」など。→ は部品が付ける）。 */
@@ -196,7 +198,7 @@ export default function BellPopover<F extends string = BellFilter>({
                             {item.unread ? <span className="sr-only">（未読）</span> : null}
                           </span>
                           <span className={styles.meta}>
-                            <span className={styles.time}>{item.time}</span>
+                            <span className={styles.time} title={item.timeTitle}>{item.time}</span>
                             <span className={styles.go}>{`${item.linkLabel} →`}</span>
                           </span>
                         </span>

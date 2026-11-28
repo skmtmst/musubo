@@ -114,7 +114,7 @@ test('REM3-06 new staff can choose registered media and save its public URL',asy
  await screen.findByRole('button',{name:'予約を受けられるメニュー'})
  fireEvent.change(screen.getByLabelText('スタッフ名（管理画面での呼び名）'),{target:{value:'人工スタッフ'}})
  await pickEntities('予約を受けられるメニュー',['カット'])
- fireEvent.click(screen.getByRole('button',{name:'登録メディアから選ぶ'}))
+ fireEvent.click(screen.getByRole('button',{name:'登録メディアから選択する'}))
  fireEvent.click(await screen.findByRole('option',{name:/人工画像/}))
  fireEvent.click(screen.getByRole('button',{name:'スタッフを登録する'}))
  await waitFor(()=>expect(fixture.create).toHaveBeenCalled())

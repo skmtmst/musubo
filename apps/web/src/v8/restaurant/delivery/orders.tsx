@@ -125,6 +125,11 @@ const TAB_LABELS: Record<DeliveryOrderTab, string> = {
 
 const TAB_ORDER: DeliveryOrderTab[] = ['new', 'cooking', 'handed_over', 'all']
 
+export function OrderStateTabs({ tab, onTab }: { tab: DeliveryOrderTab; onTab: (tab: DeliveryOrderTab) => void }) {
+  return <Tabs label="注文の状態" items={TAB_ORDER.map(value => ({ label: TAB_LABELS[value], current: tab === value, onClick: () => onTab(value) }))} />
+}
+
+
 /** 表の列数（選ぶ・注文番号・サービス・注文内容・金額・経過・急ぎ度・状態・操作）。 */
 const COLUMN_COUNT = 9
 /** 閲覧のみの人には「選ぶ」の列を出さないので1つ少ない（★V8 2026-10-06）。 */
@@ -169,7 +174,9 @@ function ServiceCard({
   onResume,
   uberConnectionStatus,
   intakeDisabledReason,
+  unavailable = false,
 }: {
+  unavailable?: boolean
   state: DeliveryServiceState
   uberConnectionStatus: DeliveryConnectionStatus | null
   intakeDisabledReason?: string
@@ -180,15 +187,16 @@ function ServiceCard({
 }) {
   const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
   const preparing = state.service === 'ubereats'
-  const connectionStatus = preparing ? uberConnectionStatus : state.connectionStatus
+  const connectionStatus = unavailable ? null : preparing ? uberConnectionStatus : state.connectionStatus
   const stopped = state.intakeStatus === 'stopped'
-  const actionReason = intakeDisabledReason ?? intakeActionReason(state, stopped ? 'resume' : 'stop')
+  const actionReason = unavailable ? '読み込み中です' : intakeDisabledReason ?? intakeActionReason(state, stopped ? 'resume' : 'stop')
   /* 絵（kDQHr）の札は1行。いつまで止めているかは札の説明に入れ、行を増やさない。 */
-  const stopNote = stopped && state.stopUntil ? `${formatClock(state.stopUntil)} まで停止` : undefined
+  const stopClock = stopped && state.stopUntil ? formatClock(state.stopUntil) : DASH
+  const stopNote = stopClock !== DASH ? `${stopClock} まで停止` : undefined
   /* 数は推測しない。取れないときは「—」で、単位も出さない（D021/D024）。 */
-  const hasCount = typeof state.todayCount === 'number' && Number.isFinite(state.todayCount)
+  const hasCount = typeof state.todayCount === 'number' && Number.isFinite(state.todayCount) && state.todayCount >= 0
   return (
-    <Card appearance="outlined" layout="vertical" gap="tight" className={styles.serviceCard} aria-label={label}>
+    <Card appearance="outlined" layout="vertical" gap="tight" className={styles.serviceCard} aria-label={unavailable ? undefined : label}>
       {/* 1段目：印・名前・操作。2段目：札・数。狭い幅でも札と数が重ならないよう、2段に分ける。 */}
       <div className={styles.serviceTop}>
         <span className={styles.serviceMark} aria-hidden="true">
@@ -230,7 +238,7 @@ function ServiceCard({
           <StatusBadge tone={connectionStatus ? CONNECTION_TONES[connectionStatus] : 'neutral'} size="delivery">
             {connectionStatus ? CONNECTION_LABELS[connectionStatus] : '接続未確認'}
           </StatusBadge>
-          {preparing || connectionStatus === 'connected' ? <span title={preparing ? undefined : stopNote}>
+          {!unavailable && (preparing || connectionStatus === 'connected') ? <span title={preparing ? undefined : stopNote}>
             <StatusBadge tone={preparing ? 'neutral' : INTAKE_TONES[state.intakeStatus]} size="delivery">
               {preparing ? PREPARING_WORD : INTAKE_LABELS[state.intakeStatus]}
             </StatusBadge>
@@ -436,6 +444,69 @@ export interface OrdersBoardProps {
   onPerPage: (perPage: number) => void
 }
 
+export function DeliveryOverview({ data, uberConnectionStatus, intakeDisabledReason, canManage, busyService, onStopService, onResumeService }: Pick<OrdersBoardProps, 'uberConnectionStatus' | 'intakeDisabledReason' | 'canManage' | 'busyService' | 'onStopService' | 'onResumeService'> & { data: DeliveryOrdersData | null }) {
+  const kpis = data?.kpis
+  const services = data?.services ?? (['ubereats', 'demaecan', 'rocketnow'] as DeliveryService[]).map(service => ({ service, label: DELIVERY_SERVICE_LABELS[service], connectionStatus: 'disconnected' as const, intakeStatus: 'open' as const, stopUntil: null, todayCount: Number.NaN, todayAmount: Number.NaN }))
+  return <>
+      <div className={styles.serviceRow}>
+        {services.map((state) => (
+          <ServiceCard
+            unavailable={!data}
+            key={state.service}
+            intakeDisabledReason={intakeDisabledReason}
+            state={state}
+            uberConnectionStatus={uberConnectionStatus}
+            canManage={canManage}
+            busy={busyService === state.service}
+            onStop={onStopService}
+            onResume={onResumeService}
+          />
+        ))}
+      </div>
+
+      <KpiBand>
+        <KpiCard
+          presentation="cell"
+          title="本日の注文"
+          icon={<ShoppingBag size={16} />}
+          value={kpis?.todayCount ?? null}
+          unit="件"
+          delta={deltaMark(signedCount(kpis?.todayCountDelta, '件'), 'success')}
+          detail={`受け渡し済み ${countText(kpis?.handedOverCount)}`}
+        />
+        <KpiCard
+          presentation="cell"
+          title="本日の売上"
+          icon={<Banknote size={16} />}
+          value={kpis?.todaySales ?? null}
+          unit=""
+          valueText={formatYen(kpis?.todaySales)}
+          delta={deltaMark(signedPercent(kpis?.todaySalesDeltaPercent), 'success')}
+          detail={`平均単価 ${formatYen(kpis?.averageAmount)}`}
+        />
+        <KpiCard
+          presentation="cell"
+          title="急ぎ対応"
+          icon={<Zap size={16} />}
+          value={kpis?.urgentCount ?? null}
+          unit="件"
+          delta={deltaMark((kpis?.urgentCount ?? 0) > 0 ? '要対応' : undefined, 'danger')}
+          detail="待ち時間と注文内容から自動判定"
+        />
+        <KpiCard
+          presentation="cell"
+          title="平均準備時間"
+          icon={<Timer size={16} />}
+          value={kpis?.averagePrepMinutes ?? null}
+          unit="分"
+          delta={deltaMark(signedCount(kpis?.averagePrepMinutesDelta, '分'), 'success')}
+          detail="目標 15分以内"
+        />
+      </KpiBand>
+
+  </>
+}
+
 export default function OrdersBoard({
   data,
   uberConnectionStatus,
@@ -464,12 +535,13 @@ export default function OrdersBoard({
   onPage,
   onPerPage,
 }: OrdersBoardProps) {
-  const kpis = data.kpis
   const total = data.tabCounts[data.tab]
-  const pageCount = Math.max(1, Math.ceil(data.orders.length / perPage))
-  const currentPage = Math.min(page, pageCount)
-  const firstIndex = (currentPage - 1) * perPage
-  const visible = data.orders.slice(firstIndex, firstIndex + perPage)
+  const safePerPage = Number.isFinite(perPage) && perPage >= 1 ? Math.trunc(perPage) : 20
+  const pageCount = Math.max(1, Math.ceil(data.orders.length / safePerPage))
+  const safePage = Number.isFinite(page) ? Math.trunc(page) : 1
+  const currentPage = Math.max(1, Math.min(safePage, pageCount))
+  const firstIndex = (currentPage - 1) * safePerPage
+  const visible = data.orders.slice(firstIndex, firstIndex + safePerPage)
   /*
    * 「まとめて受け付ける」は新着だけを相手にする。
    * まとめ送りの口はWorkerに無いので、親が1件ずつ順に送る（絵の操作は変えない）。
@@ -490,60 +562,7 @@ export default function OrdersBoard({
 
   return (
     <>
-      <div className={styles.serviceRow}>
-        {data.services.map((state) => (
-          <ServiceCard
-            key={state.service}
-            intakeDisabledReason={intakeDisabledReason}
-            state={state}
-            uberConnectionStatus={uberConnectionStatus}
-            canManage={canManage}
-            busy={busyService === state.service}
-            onStop={onStopService}
-            onResume={onResumeService}
-          />
-        ))}
-      </div>
-
-      <KpiBand>
-        <KpiCard
-          presentation="cell"
-          title="本日の注文"
-          icon={<ShoppingBag size={16} />}
-          value={kpis.todayCount}
-          unit="件"
-          delta={deltaMark(signedCount(kpis.todayCountDelta, '件'), 'success')}
-          detail={`受け渡し済み ${countText(kpis.handedOverCount)}`}
-        />
-        <KpiCard
-          presentation="cell"
-          title="本日の売上"
-          icon={<Banknote size={16} />}
-          value={kpis.todaySales}
-          unit=""
-          valueText={formatYen(kpis.todaySales)}
-          delta={deltaMark(signedPercent(kpis.todaySalesDeltaPercent), 'success')}
-          detail={`平均単価 ${formatYen(kpis.averageAmount)}`}
-        />
-        <KpiCard
-          presentation="cell"
-          title="急ぎ対応"
-          icon={<Zap size={16} />}
-          value={kpis.urgentCount}
-          unit="件"
-          delta={deltaMark(kpis.urgentCount > 0 ? '要対応' : undefined, 'danger')}
-          detail="待ち時間と注文内容から自動判定"
-        />
-        <KpiCard
-          presentation="cell"
-          title="平均準備時間"
-          icon={<Timer size={16} />}
-          value={kpis.averagePrepMinutes}
-          unit="分"
-          delta={deltaMark(signedCount(kpis.averagePrepMinutesDelta, '分'), 'success')}
-          detail="目標 15分以内"
-        />
-      </KpiBand>
+      <DeliveryOverview data={data} uberConnectionStatus={uberConnectionStatus} intakeDisabledReason={intakeDisabledReason} canManage={canManage} busyService={busyService} onStopService={onStopService} onResumeService={onResumeService} />
 
       <Tabs items={tabs} label="注文の状態" />
 

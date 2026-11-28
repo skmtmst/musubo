@@ -1,5 +1,7 @@
 'use client'
 
+import { notifySaved } from '@/components/shared/toast'
+
 import { useState } from 'react'
 import type { AdEventMapping } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
@@ -32,7 +34,10 @@ export default function AdMappingDialog({ item, onClose, onSave }: {
     setBusy(true)
     setError('')
     try {
-      if (await onSave({ mode, eventName: mode === 'manual' ? name : null, googleActionId: actionId || null })) disarm()
+      if (await onSave({ mode, eventName: mode === 'manual' ? name : null, googleActionId: actionId || null })) {
+        disarm()
+        notifySaved('広告への対応を保存しました。')
+      }
     } catch (failure) {
       if (!errors.capture(failure)) setError(describeSaveFailure(failure))
     } finally {

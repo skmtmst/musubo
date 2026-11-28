@@ -93,12 +93,18 @@
 [data-placement='timeline'] .cardMeta [data-booking-count] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-placement='timeline'] .cardMeta > [data-booking-guests] { order: -2; }
 [data-placement='timeline'] .cardMeta > [data-booking-warning] { order: -1; }
+/* 幅が限られる予約では補助情報を先に畳み、コース名と人数を読めるようにする。 */
+@container booking-card (max-width: 14rem) {
+  .cardMeta:has([data-booking-guests]) > [data-booking-source], .cardMeta [data-booking-warning-text] { display: none; }
+  :root [data-placement='timeline'] .cardMeta svg[data-booking-warning-mark] { display: block; width: var(--space-16); height: var(--space-16); flex: none; }
+}
 @container booking-card (max-width: 8rem) {
   .cardHeading > .time { flex: 0 1 auto; min-width: 0; }
   .cardMeta:has([data-booking-guests]) > [data-booking-source] { display: none; }
 }
 @container booking-card (max-width: 6rem) {
   .cardMeta:has([data-booking-guests]) > .label { display: none; }
+  .cardDetails:has([data-booking-guests]) > .detail { display: none; }
 }
 @container booking-card (max-width: 4rem) {
   .cardHeading:has(+ .cardDetails [data-booking-guests]) { display: none; }
@@ -110,7 +116,7 @@
   .cardMeta [data-booking-count] { display: block; }
   .cardMeta [data-booking-count][data-many], .cardMeta [data-booking-warning-text] { display: none; }
   .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { display: flex; align-items: center; justify-content: center; min-height: var(--tpl-rs-lh-11); }
-  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: var(--space-8); height: var(--space-8); flex: none; }
+  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: min(var(--space-8), 100%); height: auto; aspect-ratio: 1; flex: none; }
   .cardMeta [data-booking-count-unit] { display: none; }
 }
 

@@ -19,6 +19,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowRight } from 'lucide-react'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Dialog from '@/components/shared/dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
@@ -109,17 +110,25 @@ function EditInner() {
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState('')
   const loadRequestId = useRef(0)
+  const loadLoadingRef = useRef(false)
+  const [retryingLoad, setRetryingLoad] = useState(false)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const analyticsRequest = useRef<string | null>(null)
   const analyticsGeneration = useRef(0)
-  const retryAnalytics = useCallback(() => {
+  const analyticsLoadingRef = useRef(false)
+  const resetAnalytics = useCallback(() => {
     analyticsGeneration.current += 1
     analyticsRequest.current = null
+    analyticsLoadingRef.current = false
     setAnalytics(null)
     setAnalyticsState('idle')
   }, [])
-  useEffect(() => () => { analyticsGeneration.current += 1; analyticsRequest.current = null }, [])
+  const retryAnalytics = useCallback(() => {
+    if (analyticsLoadingRef.current) return
+    resetAnalytics()
+  }, [resetAnalytics])
+  useEffect(() => () => { analyticsGeneration.current += 1; analyticsRequest.current = null; analyticsLoadingRef.current = false }, [])
 
   const webinar = loaded && loaded.id === id ? loaded.webinar : null
   const editor = loaded && loaded.id === id ? loaded.editor : null
@@ -218,16 +227,22 @@ function EditInner() {
   useEffect(() => {
     if (!id) return
     const requestId = ++loadRequestId.current
-    retryAnalytics()
+    loadLoadingRef.current = true
+    if (reloadKey > 0) setRetryingLoad(true)
+    resetAnalytics()
     Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       .then(([webinarResponse, editorResponse]) => {
         if (requestId !== loadRequestId.current) return
+        loadLoadingRef.current = false
+        setRetryingLoad(false)
         setLoadFailure(null)
         setLoadMissing(null)
         setLoaded({ id, webinar: webinarResponse.data, editor: editorResponse.data })
       })
       .catch((err) => {
         if (requestId !== loadRequestId.current) return
+        loadLoadingRef.current = false
+        setRetryingLoad(false)
         if (err instanceof ApiError && err.status === 404) {
           setLoadFailure(null)
           setLoadMissing({ id })
@@ -236,8 +251,8 @@ function EditInner() {
           setLoadFailure({ id, failure: webinarLoadFailure(err) })
         }
       })
-    return () => { loadRequestId.current += 1 }
-  }, [id, reloadKey, retryAnalytics])
+    return () => { loadRequestId.current += 1; loadLoadingRef.current = false }
+  }, [id, reloadKey, resetAnalytics])
 
   /*
     集計は重い口。公開後に見る3つ（参加者・分析・コメント演出：タブの「参加者 124」）を開いたときだけ取り、
@@ -248,26 +263,34 @@ function EditInner() {
     if (!id) return
     if (!isDetailPane) {
       if (analyticsState === 'error') {
-        retryAnalytics()
+        resetAnalytics()
       }
       return
     }
     if (analyticsRequest.current === id) return
     const generation = analyticsGeneration.current
     analyticsRequest.current = id
+    analyticsLoadingRef.current = true
     setAnalyticsState('loading')
     webinarApi.analytics(id)
       .then((response) => {
         if (generation !== analyticsGeneration.current) return
+        analyticsLoadingRef.current = false
         setAnalytics(response.data)
         setAnalyticsState('ready')
       })
       .catch(() => {
         if (generation !== analyticsGeneration.current) return
+        analyticsLoadingRef.current = false
         setAnalytics(null)
         setAnalyticsState('error')
       })
-  }, [id, isDetailPane, analyticsState, reloadKey, retryAnalytics])
+  }, [id, isDetailPane, analyticsState, reloadKey, resetAnalytics])
+
+  const retryLoad = () => {
+    if (loadLoadingRef.current) return
+    setReloadKey((key) => key + 1)
+  }
 
   if (!id) {
     return <>
@@ -276,7 +299,7 @@ function EditInner() {
     </>
   }
   if (loading) {
-    return <><p className="text-ink-faint p-6 text-sm" role="status">読み込み中…</p>{leaveDialog}</>
+    return <><ListState kind="loading" title="ウェビナーを読み込んでいます" />{leaveDialog}</>
   }
   if (missingNow || (!loadError && (!webinar || !editor))) {
     return <>
@@ -290,7 +313,7 @@ function EditInner() {
         kind="error"
         title={loadError?.title ?? 'ウェビナーを読み込めませんでした'}
         description={loadError?.description ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
-        {...(loadError === null || loadError.retryable ? { onRetry: () => setReloadKey((key) => key + 1) } : {})}
+        {...(loadError === null || loadError.retryable ? { onRetry: retryLoad, retrying: retryingLoad } : {})}
       />
       {leaveDialog}
     </>
@@ -451,7 +474,7 @@ function EditInner() {
 
 export default function WebinarEditV8() {
   return (
-    <Suspense fallback={<p className="text-ink-faint p-6 text-sm" role="status">読み込み中…</p>}>
+    <Suspense fallback={<ListState kind="loading" title="ウェビナーを読み込んでいます" />}>
       <EditInner />
     </Suspense>
   )

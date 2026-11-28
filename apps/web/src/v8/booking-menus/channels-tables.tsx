@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -84,7 +86,7 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
       <DataTable aria-label="予約経路" columnSizing="content" columnLayout={TABLE_LAYOUT}>
         <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日の予約</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
         <tbody>{data.channels.filter(channel => channel.key !== 'google_reserve').map(channel => {
-          const label = CHANNEL_LABEL[channel.key] ?? { name: channel.key, sub: '', how: '' }
+          const label = knownValue(CHANNEL_LABEL, channel.key, { name: channel.key, sub: '', how: '' })
           return <Tr key={channel.key} data-table-layout="columns">
             <Td grow title={`受け取り方：${label.how || emptyValue('unknown')}`}><span className={ch.nameCell}><OneLine text={label.name} tone="name" />{label.sub ? <OneLine text={label.sub} tone="sub" /> : null}</span></Td>
             <Td collapseAt="narrow"><TruncatedText value={label.how || emptyValue('unknown')} /></Td>

@@ -20,14 +20,16 @@ type LoadWizardDraftContext = {
   setMatchedAccountId: Dispatch<SetStateAction<string | null>>
   setMatchedLast28Days: Dispatch<SetStateAction<number | null>>
   setTemplates: Dispatch<SetStateAction<{ id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string; }[]>>
+  setTemplateState?: Dispatch<SetStateAction<'loading' | 'ready' | 'error' | 'retrying'>>
   setVersionNumber: Dispatch<SetStateAction<number | null>>
   setWasPublished: Dispatch<SetStateAction<boolean>>
 }
 
-export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }: LoadWizardDraftContext) {
+export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setTemplateState, setVersionNumber, setWasPublished }: LoadWizardDraftContext) {
     setLoadState('loading')
     setLoadError(null)
     setInputIssue(null)
+    setTemplateState?.('loading')
     try {
       const [draftRes, liveRes] = await Promise.all([
         autoReplyId ? api.autoReplies.getDraft(autoReplyId) : Promise.resolve(null),
@@ -61,7 +63,7 @@ export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSna
       setMatchedAccountId(accountId)
       // 返す文の候補は、この応答のアカウントだけ。
       const tplRes = await api.templates.list(undefined, accountId ?? undefined).catch(() => null)
-      if (tplRes?.success) {
+      if (tplRes?.success && Array.isArray(tplRes.data)) {
         setTemplates(
           tplRes.data.map((t) => ({
             id: t.id,
@@ -72,6 +74,9 @@ export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSna
             updatedAt: t.updatedAt,
           })),
         )
+        setTemplateState?.('ready')
+      } else {
+        setTemplateState?.('error')
       }
       setLoadState('ready')
     } catch (caught) {

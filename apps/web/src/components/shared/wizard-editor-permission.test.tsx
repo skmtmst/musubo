@@ -90,7 +90,7 @@ it('条件の入力/変更は止めても、候補GETの再読込と人数の読
  await act(async()=>{});expect(screen.getByRole('button',{name:'読み直す'})).toBeTruthy()
  const input=screen.getByRole('textbox',{name:'名前に含む文字'}) as HTMLInputElement
  expect(input.value).toBe('確認');expect(input.closest('fieldset')?.disabled).toBe(true)
- fireEvent.change(input,{target:{value:'別の値'}});fireEvent.click(screen.getByRole('button',{name:'この条件を外す'}));fireEvent.click(screen.getByRole('button',{name:'追加する条件を選ぶ'}))
+ fireEvent.change(input,{target:{value:'別の値'}});fireEvent.click(screen.getByRole('button',{name:'この条件を外す'}));fireEvent.click(screen.getByRole('button',{name:'追加する条件を選択する'}))
  expect(change).not.toHaveBeenCalled();expect(screen.queryByRole('dialog')).toBeNull()
  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'読み直す'}))})
  expect(network.tags).toHaveBeenCalledTimes(2)

@@ -144,3 +144,6 @@ html:root .toggle.on[data-size='restaurant']::after { transform:translateX(20px)
 .field[data-size='restaurant'] .fieldBody { gap:var(--space-8); }
 .field[data-size='restaurant'] label { font-weight:700; }
 .field[data-size='restaurant'] .description { font-size:12px; font-weight:400; }
+
+/* 道具の段では軌道を保ち、押せる高さをほかの操作にそろえる。 */
+html:root .toggle[data-size='toolbar'] { height: var(--control-h); border-block: calc((var(--control-h) - var(--toggle-height)) / 2) solid transparent; background-clip: padding-box; box-shadow: none; }

@@ -1,8 +1,11 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useEffect, useState } from 'react'
 import { api, type OperationSendPath, type OperationSendPathsResponse } from '@/lib/api'
 import { formatOperationDate } from '@/lib/operation-status'
+import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { CAPABILITY_LABEL } from '@/lib/operation-restore'
 
@@ -44,6 +47,7 @@ export function operatorPathNote(text: string | null | undefined): string | null
 export function SendPathCoveragePanel({ accountId, revision }: { accountId: string | null; revision: number }) {
   const [data, setData] = useState<OperationSendPathsResponse | null>(null)
   const [failed, setFailed] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -69,10 +73,23 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
-  }, [accountId, revision])
+  }, [accountId, revision, retryCount])
 
   if (failed) {
-    return <Notice tone="warn">
+    return <Notice
+      tone="warn"
+      action={
+        <Button
+          variant="text"
+          size="inline"
+          data-notice-inline-action
+          type="button"
+          onClick={() => setRetryCount((value) => value + 1)}
+        >
+          もう一度読み込む
+        </Button>
+      }
+    >
       送信経路の台帳を読み込めませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
     </Notice>
   }
@@ -85,7 +102,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
     const paths = data.paths.filter((path) => path.capability === capability)
     if (paths.length === 0) continue
     groups.push({
-      title: CAPABILITY_LABEL[capability],
+      title: knownValue(CAPABILITY_LABEL, capability, '対象を確認できません'),
       stopped: paths.some((path) => path.state === 'stopped'),
       excluded: false,
       paths,
@@ -111,7 +128,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
               {path.state === 'stopped' ? '停止中' : path.state === 'running' ? '稼働中' : '対象外'}
             </span>
             <span className="min-w-0 font-bold text-ink">{operatorPathLabel(path.label)}</span>
-            <span className="text-ink-faint">{SEND_PATH_KIND_LABEL[path.kind]}</span>
+            <span className="text-ink-faint">{knownValue(SEND_PATH_KIND_LABEL, path.kind, '種類を確認できません')}</span>
             <span className="min-w-0 flex-1 text-ink-faint">{operatorPathNote(path.excludedReason ?? path.note)}</span>
           </li>)}
         </ul>

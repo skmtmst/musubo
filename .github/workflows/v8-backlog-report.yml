@@ -1,0 +1,41 @@
+name: V8 guard backlog
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [codex/development]
+  workflow_run:
+    workflows: [Required PR gate, V8 nightly guard]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: '完了済みの Required PR gate または V8 nightly guard の run ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: v8-backlog-report
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  record:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Record failed V8 guard steps
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python3 .github/scripts/v8-backlog-report.py

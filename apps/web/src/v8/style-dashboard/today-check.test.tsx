@@ -54,7 +54,7 @@ function Check({ cards, accountId = 'account-1', style = 'restaurant', canWrite 
 const NEW = '新着予約（今日入った）'
 const item = (title: string) => screen.getByRole('button', { name: title })
 const expanded = (title: string) => item(title).getAttribute('aria-expanded') === 'true'
-const openTitles = () => screen.getAllByRole('button').filter((button) => button.getAttribute('aria-expanded') === 'true').map((button) => button.textContent)
+const openTitles = () => screen.getAllByRole('button').filter((button) => button.getAttribute('aria-expanded') === 'true' && button.hasAttribute('data-disclosure-toggle')).map((button) => button.textContent)
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -226,4 +226,57 @@ describe('今日の確認：予約元の札', () => {
     expect(document.querySelectorAll('[data-source]')).toHaveLength(0)
     expect(screen.queryByText('経路不明')).toBeNull()
   })
+})
+
+
+describe('今日の確認のカード全体の開閉', () => {
+  it('畳むと確かな正の件数だけを札にし、開くと内容に戻る', () => {
+    const cards: StyleSideCard[] = [
+      { id: 'new', title: '新着予約', rows: [], count: 3, summary: { text: '3件' } },
+      { id: 'pay', title: 'お支払い', rows: [], summary: { text: '未払い 2件' } },
+      { id: 'care', title: '今日気をつけること', rows: [], summary: { text: '1件' } },
+      { id: 'waitlist', title: '席のキャンセル待ち', rows: [], summary: { text: '2人' } },
+    ]
+    render(<Check cards={cards} />)
+    const panel = screen.getByRole('region', { name: '今日の確認' })
+    fireEvent.click(within(panel).getByRole('button', { name: '今日の確認を畳む' }))
+    expect(within(panel).queryByRole('button', { name: '新着予約' })).toBeNull()
+    expect(within(panel).getByText('新着 3').closest('[data-tone]')?.getAttribute('data-tone')).toBe('danger')
+    expect(within(panel).getByText('お支払い 2')).toBeTruthy()
+    expect(within(panel).getByText('注意 1')).toBeTruthy()
+    expect(within(panel).getByText('キャンセル待ち 2')).toBeTruthy()
+    fireEvent.click(within(panel).getByRole('button', { name: '今日の確認を開く' }))
+    expect(within(panel).getByRole('button', { name: '新着予約' })).toBeTruthy()
+    expect(within(panel).queryByText('新着 3')).toBeNull()
+  })
+
+  it('畳んだ状態を本人・アカウント・スタイルごとに覚える', () => {
+    const cards = sideOf('restaurant', WITH_NEW)
+    const view = render(<Check cards={cards} />)
+    fireEvent.click(within(screen.getByRole('region', { name: '今日の確認' })).getByRole('button', { name: '今日の確認を畳む' }))
+    view.unmount()
+    const next = render(<Check cards={cards} />)
+    expect(within(screen.getByRole('region', { name: '今日の確認' })).getByRole('button', { name: '今日の確認を開く' })).toBeTruthy()
+    next.rerender(<Check cards={cards} accountId="account-2" />)
+    expect(within(screen.getByRole('region', { name: '今日の確認' })).getByRole('button', { name: '今日の確認を畳む' })).toBeTruthy()
+    next.rerender(<Check cards={cards} accountId="account-1" style="salon" />)
+    expect(within(screen.getByRole('region', { name: '今日の確認' })).getByRole('button', { name: '今日の確認を畳む' })).toBeTruthy()
+    identity.current = { id: 'staff-b' }
+    next.rerender(<Check cards={cards} accountId="account-1" style="restaurant" />)
+    expect(within(screen.getByRole('region', { name: '今日の確認' })).getByRole('button', { name: '今日の確認を畳む' })).toBeTruthy()
+  })
+})
+
+
+it('0件・欠測・数え方を特定できない要約には札を出さない', () => {
+  const cards: StyleSideCard[] = [
+    { id: 'new', title: '新着予約', rows: [], count: 0, summary: { text: 'なし', empty: true } },
+    { id: 'pay', title: 'お支払い', rows: [], summary: { text: '—', empty: true } },
+    { id: 'care', title: '今日気をつけること', rows: [], summary: { text: '0件' } },
+    { id: 'waitlist', title: '席のキャンセル待ち', rows: [], summary: { text: '2件・未確認 —' } },
+  ]
+  render(<Check cards={cards} />)
+  const panel = screen.getByRole('region', { name: '今日の確認' })
+  fireEvent.click(within(panel).getByRole('button', { name: '今日の確認を畳む' }))
+  expect(panel.querySelectorAll('[data-tone="danger"]')).toHaveLength(0)
 })

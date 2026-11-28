@@ -3,8 +3,9 @@ import { useListNavigationRouter } from '@/components/shared/list-navigation'
 import { useMenuMediaScope } from './use-menu-media-scope'
 import { useMenuShapeDraft } from './use-menu-shape-draft'
 import { useHqRichMenuDraft } from './use-hq-rich-menu-draft'
-import { makeHqMenuSeed } from './hq-menu-seed'
+import { hqSeedFailureMessage, makeHqMenuSeed, MISSING_DEFAULT_PAGE_ERROR, resolveHqDefaultPageId } from './hq-menu-seed'
 
+import { RichMenuCreateNotices } from './create-notices'
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
 import { seedMenuShape } from './create-seed-shape'
@@ -1188,6 +1189,13 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
   /* ---------- 描画 ---------- */
 
   const busy = saving || publishing || Boolean(host?.busy)
+  const hqOperateAllowed = Boolean(host?.canOperate)
+  const hqDefaultPageMissing = Boolean(host && group && !resolveHqDefaultPageId(group, pages))
+  const selectHqDefaultPage = (pageId: string) => {
+    if (!hqOperateAllowed || busy) return
+    setGroup((current) => current ? { ...current, defaultPageId: pageId } : current)
+    setError((current) => current === MISSING_DEFAULT_PAGE_ERROR ? null : current)
+  }
 
   /** 統括：画面の中の下書きを一度に保存する（手順の途中でも同じ）。 */
   async function hostSave(distribute: boolean) {
@@ -1206,7 +1214,9 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
       return
     }
     if (!validateBasics()) return
-    host.onSave(seedNow(), distribute, hqDuplicateMode)
+    let seed: HqRichMenuSeed
+    try { seed = seedNow() } catch (caught) { setError(hqSeedFailureMessage(caught)); return }
+    host.onSave(seed, distribute, hqDuplicateMode)
   }
   function seedNow(): HqRichMenuSeed { return makeHqMenuSeed({ host, name, chatBarText, folderId, size, group, audience, hqTagName, defaultOpen, targetingPriority, pages }) }
 
@@ -1324,22 +1334,11 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
       {host?.notice}
       <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
-      {error ? (
-        <Notice
-          tone="danger"
-          message={error}
-          className="mb-1"
-          action={
-            loadFailedKinds.length > 0 && !isForbidden(loadError) ? (
-              <Button type="button" onClick={() => { setError(null); return load() }} busyLabel="処理中…">
-                もう一度読み込む
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : null}
-      {notice ? <Notice tone="success" message={notice} className="mb-1" onClose={() => setNotice('')} /> : null}
-      {candidatePruneNotice ? <Notice tone="warn" message={candidatePruneNotice} onClose={() => setCandidatePruneNotice('')} /> : null}
+      <RichMenuCreateNotices
+        missingDefaultPage={hqDefaultPageMissing} pages={pages} busy={busy} canOperate={hqOperateAllowed} onSelectDefaultPage={selectHqDefaultPage}
+        error={error} onRetry={loadFailedKinds.length > 0 && !isForbidden(loadError) ? () => { setError(null); return load() } : undefined}
+        notice={notice} onCloseNotice={() => setNotice('')} pruneNotice={candidatePruneNotice} onClosePruneNotice={() => setCandidatePruneNotice('')}
+      />
 
           {step === 'shape' ? renderShape() : null}
           {step === 'buttons' ? renderButtons() : null}
@@ -1416,7 +1415,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
         onSavedLeave={discardUnknown ? () => { disarm(); router.push('/rich-menus') } : confirmLeave} onConfirm={createdDraft ? () => void discardCreatedDraft() : confirmLeaveAndDiscard}
         onCancel={() => { setDiscardDraftError(''); setDiscardUnknown(false); cancelLeave() }} />
       <Dialog open={priorityOpen} title="出す順番" description="一覧で上にあるメニューが優先されます。1がいちばん先です。"
-        confirmLabel="順番を変える" onConfirm={() => {
+        confirmLabel="順番を変更する" onConfirm={() => {
           setTargetingPriority(Math.max(0, (parseInt(priorityInput, 10) || 1) - 1))
           setPriorityOpen(false)
         }} onCancel={() => setPriorityOpen(false)}>

@@ -200,7 +200,7 @@ export default function TapActionField({
           label={`${name}の${target.noun}`} noun={target.noun} icon={Icon}
           name={value.refId ? picked?.name ?? `保存してある${target.noun}` : undefined}
           meta={picked?.note} placeholder={emptyText}
-          id={id} invalid={invalid} describedBy={saveDescription} ariaLabel={`${name}の${target.noun}を${value.refId ? '変える' : '選ぶ'}`} onOpen={() => setPicking(true)} />}
+          id={id} invalid={invalid} describedBy={saveDescription} ariaLabel={`${name}の${target.noun}を${value.refId ? '変更する' : '選択する'}`} onOpen={() => setPicking(true)} />}
         {picking ? (
           <TapTargetPicker
             tapKind={def.kind}

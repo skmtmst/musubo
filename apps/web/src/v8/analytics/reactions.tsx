@@ -25,6 +25,12 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 
 /** 表の数。集計待ち・取得できない数は 0 にせず「—」と理由（title）。 */
+function metricStateLabel(state: string): string {
+  return Object.prototype.hasOwnProperty.call(METRIC_STATE_TEXT, state)
+    ? METRIC_STATE_TEXT[state as keyof typeof METRIC_STATE_TEXT]
+    : '未取得'
+}
+
 export function MetricText({ metric, percent, currency }: { metric: AnalyticsMetric<number | string>; percent?: boolean; currency?: boolean }) {
   const shown = metric.state === 'available' || metric.state === 'partial'
   return <span className={shown && metric.value !== null ? undefined : styles.faint} title={metric.reason ?? undefined}>{shown ? metricText(metric, { percent, currency }) : emptyValue('unknown')}</span>
@@ -78,9 +84,9 @@ export default function ReactionsV8({ accountId }: { accountId: string }) {
   return <>
     <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="配信" icon={<Send size={16} aria-hidden="true" />} value={overview.campaigns.length} unit="件" detail={`一斉配信 ${broadcastShown}・シナリオ ${scenarioShown}`} />
-      <KpiCard presentation="band" title="届いた人" icon={<Users size={16} aria-hidden="true" />} value={delivered} unit="人" detail={delivered === null ? (METRIC_STATE_TEXT[overview.metrics.delivered.state] || '未取得') : `対象 ${formatNumber(targets)} 人のうち`} />
+      <KpiCard presentation="band" title="届いた人" icon={<Users size={16} aria-hidden="true" />} value={delivered} unit="人" detail={delivered === null ? (metricStateLabel(overview.metrics.delivered.state)) : `対象 ${formatNumber(targets)} 人のうち`} />
       <KpiCard presentation="band" title="押された割合" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" />
-      <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={16} aria-hidden="true" />} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (METRIC_STATE_TEXT[unavailable.state] || '未取得') : '20人未満で数が出ない'} />
+      <KpiCard presentation="band" title="取得できない配信" icon={<CircleHelp size={16} aria-hidden="true" />} value={shownValue(unavailable)} unit="件" detail={shownValue(unavailable) === null ? (metricStateLabel(unavailable.state)) : '20人未満で数が出ない'} />
     </KpiBand></ListPageStats>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>

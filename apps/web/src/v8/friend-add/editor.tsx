@@ -530,7 +530,9 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         : `テキスト ${definition.messageText.length}字`
       : step === 'basic' || step === 'routes'
         ? '手順3で作る'
-        : MESSAGE_TYPE_LABEL[definition.messageType] ?? emptyValue('unconfigured')
+        : Object.prototype.hasOwnProperty.call(MESSAGE_TYPE_LABEL, definition.messageType)
+          ? MESSAGE_TYPE_LABEL[definition.messageType]
+          : emptyValue('unconfigured')
   const statusLabel = rule.status === 'published' ? '有効' : rule.status === 'stopped' ? '停止中' : '下書き'
   const routeSummary = step === 'basic'
     ? '手順2で選ぶ'

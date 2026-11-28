@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 import { CardHeader } from '@/components/shared/card'
 import TruncatedText from '@/components/shared/truncated-text'
 import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
@@ -60,6 +61,8 @@ const STAGE_CHIPS: Array<{ key: OpsSupportStage | 'all'; label: string }> = [
 const STAGE_TONE: Record<OpsSupportStage, StatusBadgeTone> = {
   new: 'danger', in_progress: 'info', waiting: 'warning', resolved: 'success', closed: 'neutral',
 }
+
+export const supportStageTone = (stage: string) => knownValue(STAGE_TONE, stage, 'neutral')
 
 function stageLabel(stage: OpsSupportStage, fallback: string): string {
   if (stage === 'waiting') return '確認待ち'
@@ -363,7 +366,7 @@ export default function OpsSupportV8() {
                   <button type="button" aria-current={t.id === selectedId ? 'true' : undefined} onClick={() => pick(t.id)} className={`${styles.ticket} ${t.id === selectedId ? styles.ticketSelected : ''}`}>
                     <span className={styles.ticketTop}>
                       <span className={styles.ticketNo}>{t.ticketLabel}</span>
-                      <span className={styles.badges}><StatusBadge tone={STAGE_TONE[t.stage]}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge><span className={styles[`priority${t.priority}`]}>{t.priorityLabel}</span></span>
+                      <span className={styles.badges}><StatusBadge tone={supportStageTone(t.stage)}>{stageLabel(t.stage, t.stageLabel)}</StatusBadge><span className={styles[`priority${t.priority}`]}>{t.priorityLabel}</span></span>
                     </span>
                     <span className={styles.ticketSubject}>{t.subject}</span>
                     <span className={styles.ticketMeta} title={`${t.staffName || emptyValue('unknown')}・${t.channelLabel}・最終のやり取り ${formatDateTime(t.lastMessageAt)}（${elapsedLabel(t.lastMessageAt)}）`}>{t.tenantName}</span>
@@ -387,7 +390,7 @@ export default function OpsSupportV8() {
               <div className={styles.mobileTop}><Button variant="text" textTone="ink" className={styles.mobileBack} onClick={() => setSelectedId(null)}><ChevronLeft aria-hidden="true" />お問い合わせ</Button><RowMenu label="その他の操作" appearance="outlined" className={styles.outlinedMore} items={proxyMenuItems} /></div>
               <div className={styles.detailTitleRow}><CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} /></div>
               <div className={styles.detailControls}>
-                <div className={styles.statusWrap}><Button variant="text" data-stage={ticket.stage} className={styles.statusButton} aria-label="状態を変更" aria-expanded={stageOpen} disabled={busy || unknown || access !== 'writer'} title={lock} onClick={() => setStageOpen((value) => !value)}><StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge><span aria-hidden="true">⌄</span></Button>
+                <div className={styles.statusWrap}><Button variant="text" data-stage={ticket.stage} className={styles.statusButton} aria-label="状態を変更" aria-expanded={stageOpen} disabled={busy || unknown || access !== 'writer'} title={lock} onClick={() => setStageOpen((value) => !value)}><StatusBadge tone={supportStageTone(ticket.stage)}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge><span aria-hidden="true">⌄</span></Button>
                   {stageOpen ? <div className={styles.actionMenu}>{(ticket.stage === 'resolved' || ticket.stage === 'closed' ? [{ value: 'in_progress' as const, label: '対応中に戻す' }] : [{ value: 'resolved' as const, label: '解決する' }, { value: 'closed' as const, label: 'クローズする' }]).map((item) => <Button variant="text" textTone="ink" key={item.value} onClick={() => { setStageOpen(false); void changeStage(item.value) }}>{item.label}</Button>)}</div> : null}
                 </div>
                 <span className={styles.prioritySelect}>

@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import type { RichMenuDeleteImpact } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 
@@ -37,6 +38,11 @@ export function impactMatchesRequest(
   return impact.group.accountId === request.accountId && impact.group.id === request.groupId
 }
 
+function validAudienceCount(audience: RichMenuDeleteImpact['currentAudience'] | null | undefined): number | null {
+  const value = audience?.value
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
+}
+
 /**
  * いま表示している人数。
  *
@@ -44,15 +50,17 @@ export function impactMatchesRequest(
  * 割り当て台帳の記録開始前を含まないことを理由として添える。
  */
 export function audienceText(audience: RichMenuDeleteImpact['currentAudience']): string {
-  if (audience.value === null) return NOT_AVAILABLE
-  return `${formatNumber(audience.value)} 人`
+  const count = validAudienceCount(audience)
+  if (count === null) return NOT_AVAILABLE
+  return `${formatNumber(count)} 人`
 }
 
 export function audienceReason(audience: RichMenuDeleteImpact['currentAudience']): string | null {
-  if (audience.value !== null && audience.state === 'partial') {
+  const count = validAudienceCount(audience)
+  if (count !== null && audience.state === 'partial') {
     return '記録開始後に確認できた人数です。開始前の割り当ては含みません。'
   }
-  if (audience.value !== null) return null
+  if (count !== null) return null
   return '誰に出ているかの記録がまだ無いため、人数は数えられません。'
 }
 
@@ -79,7 +87,7 @@ const REFERENCE_KIND = {
 } as const
 
 export function referenceKindText(kind: RichMenuDeleteImpact['operationalReferences'][number]['kind']): string {
-  return REFERENCE_KIND[kind]
+  return knownValue<string>(REFERENCE_KIND, kind, '使われている場所')
 }
 
 const BLOCKER_TEXT = {
@@ -102,7 +110,7 @@ export const UNKNOWN_BLOCKER_TEXT = '確認が必要な項目があります。�
  * 知らない種が来たら予備の文言にする (#502中)。
  */
 export function blockerTexts(blockers: RichMenuDeleteImpact['blockers']): string[] {
-  return blockers.map((key) => BLOCKER_TEXT[key as keyof typeof BLOCKER_TEXT] ?? UNKNOWN_BLOCKER_TEXT)
+  return blockers.map((key) => knownValue<string>(BLOCKER_TEXT, key, UNKNOWN_BLOCKER_TEXT))
 }
 
 const ACTION_TEXT = {
@@ -112,7 +120,7 @@ const ACTION_TEXT = {
 } as const
 
 export function recommendedActionText(action: RichMenuDeleteImpact['recommendedAction']): string {
-  return ACTION_TEXT[action]
+  return knownValue<string>(ACTION_TEXT, action, '操作を確認できません。')
 }
 
 /**
@@ -145,7 +153,12 @@ export function impactFromError(data: unknown): RichMenuDeleteImpact | null {
   if (typeof body.canDelete !== 'boolean') return null
   if (!Array.isArray(body.blockers)) return null
   if (typeof body.group !== 'object' || body.group === null) return null
+  const group = body.group as Record<string, unknown>
+  if (typeof group.id !== 'string' || typeof group.accountId !== 'string') return null
+  if (typeof body.currentAudience !== 'object' || body.currentAudience === null) return null
   if (typeof body.nextDisplay !== 'object' || body.nextDisplay === null) return null
+  const nextDisplay = body.nextDisplay as Record<string, unknown>
+  if (!Array.isArray(nextDisplay.candidates)) return null
   if (!Array.isArray(body.incomingSwitches) || !Array.isArray(body.operationalReferences)) return null
   return body as unknown as RichMenuDeleteImpact
 }

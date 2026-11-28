@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import type { AccountWithStats } from '@/contexts/account-context'
 
 
@@ -122,7 +124,7 @@ export function renderPreviewRail({ activePage, audience, conditionEmpty, condit
               ? [{ key: 'accounts', label: '配るアカウント', value: 'まだ選んでいません' }]
               : (hqPreview && hqPreview.references.length === 0 ? [{ key: 'none', label: '配った先で探すもの', value: emptyValue('none') }] : hqPreview?.references ?? []).map((ref) => 'sourceId' in ref ? ({
                 key: `${ref.kind}:${ref.sourceId}`,
-                label: `${HQ_REFERENCE_LABEL[ref.kind] ?? '参照'}「${ref.name ?? '名前なし'}」`,
+                label: `${knownValue(HQ_REFERENCE_LABEL, ref.kind, '参照')}「${ref.name ?? '名前なし'}」`,
                 value: <span className={ref.availableAccountCount < ref.totalAccountCount ? styles.summaryValueWarn : undefined}>{`${ref.availableAccountCount} / ${ref.totalAccountCount}`}</span>,
               }) : ref)}
           >
@@ -134,27 +136,33 @@ export function renderPreviewRail({ activePage, audience, conditionEmpty, condit
           </CreateSummaryCard>
         ) : null}
 
-        {step === 'buttons' && !host ? (
+        {step === 'buttons' && !host ? (() => {
+          const selectedAreaIndex = selectedArea && activePage
+            ? activePage.areas.findIndex((a) => a.id === selectedArea.id)
+            : -1
+          const hasSelectedArea = Boolean(selectedArea && activePage && selectedAreaIndex >= 0)
+          return (
           <CreateSummaryCard
             title="押された回数（今月）"
             rows={
-              selectedArea && activePage
+              hasSelectedArea && selectedArea
                 ? [
                     {
                       key: selectedArea.id,
-                      label: `${String.fromCharCode(65 + activePage.areas.findIndex((a) => a.id === selectedArea.id))} ${areaDisplayName(selectedArea, activePage.areas.findIndex((a) => a.id === selectedArea.id))}`,
+                      label: `${String.fromCharCode(65 + selectedAreaIndex)} ${areaDisplayName(selectedArea, selectedAreaIndex)}`,
                       value: '—（公開前）',
                     },
                   ]
                 : []
             }
           >
-            {selectedArea && activePage ? null : <p className={styles.cardNote}>面を選ぶと、ここに数が出ます。</p>}
+            {hasSelectedArea ? null : <p className={styles.cardNote}>面を選ぶと、ここに数が出ます。</p>}
             <p className={styles.tapNote}>
               「リッチメニューを切り替える」「日時を選ぶ」などLINEの中で終わる動きは、押されたことがこちらに届きません。
             </p>
           </CreateSummaryCard>
-        ) : null}
+          )
+        })() : null}
 
         {(step === 'audience' || step === 'publish') && host ? (
           <CreateSummaryCard
@@ -168,7 +176,7 @@ export function renderPreviewRail({ activePage, audience, conditionEmpty, condit
                   ? '各アカウントで決める'
                   : host.selectedCount === 0
                     ? emptyValue('none')
-                    : host.friendTotal == null ? emptyValue('unknown') : `${formatNumber(host.friendTotal)} 人`,
+                    : host.friendTotal == null || !Number.isFinite(host.friendTotal) ? emptyValue('unknown') : `${formatNumber(host.friendTotal)} 人`,
               },
               ...(step === 'audience' && host.selectedCount > 0 && hqPreview ? [{
                 key: 'same-name',

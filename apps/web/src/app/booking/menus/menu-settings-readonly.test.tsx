@@ -30,7 +30,9 @@ it('閲覧では案内と理由付きの作成操作を出し、作成を拒否�
   expect(container.querySelector('[data-design-node="C9fv7A"] [data-read-only-notice]')).toBeTruthy()
   await screen.findByText('まだ予約メニューがありません')
   expect(screen.queryByRole('link', { name: /予約メニューを作る/ })).toBeNull()
-  await expectPermissionLocked(screen.getByRole('button', { name: /予約メニューを作る/ }))
+  const controls = screen.getAllByRole('button', { name: /予約メニューを作る/ })
+  expect(controls).toHaveLength(2)
+  for (const control of controls) await expectPermissionLocked(control)
 })
 
 afterEach(() => { verifiedStaffRole(null) })

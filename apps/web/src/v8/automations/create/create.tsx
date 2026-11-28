@@ -23,7 +23,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ActionDraft } from './action-draft'
 import styles from './create.module.css'
-import { collectConditionRules, describeConditionRule } from './draft-conditions'
+import { collectConditionRules, describeConditionRule, hasUnknownCondition } from './draft-conditions'
 import { actionDraftToPayload, draftPayloadFingerprint, formatClock, FormSnapshot, newActionDraft, normalizeTriggerConfigFor, TestConfirmation, TestRunRecord } from './draft-model'
 import { EVENTS, KEYWORD_EVENTS, REPRESENTATIVE_TRIGGER_EVENTS, TRIGGER_EVENT_GROUPS } from './draft-options'
 import { StoredDraft } from './draft-storage'
@@ -457,7 +457,7 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
   const validate = (forPublish = true): string | null => {
     setError('')
     setInputError(null)
-    const problem = validateAutomationInput({ name, eventType, triggerConfig, conditionUnreadable, actions, forPublish })
+    const problem = validateAutomationInput({ name, eventType, triggerConfig, conditionUnreadable, condition, actions, forPublish })
     if (!problem) return null
     if (problem.actionKey !== undefined) setEditingActionKey(problem.actionKey)
     setInputError({ target: problem.target, message: problem.message })
@@ -530,9 +530,10 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
     busy: leaveBusy,
   })
   const dirtySinceSave = savedFingerprint !== null && savedFingerprint !== currentFingerprint
+  const unknownCondition = hasUnknownCondition(condition)
   const saveStatusText = saving
     ? '保存しています'
-    : blockedReason ?? (
+    : blockedReason ?? (unknownCondition ? '条件を選び直してください' : null) ?? (
         saveOutcome === 'failed'
           ? '保存できませんでした。入力した内容は残っています'
           : saveOutcome === 'published'
@@ -794,7 +795,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
               ) : (
                 <Button
                   variant="primary"
-                  disabled={saving || Boolean(blockedReason)}
+                  disabled={saving || Boolean(blockedReason) || unknownCondition}
                   busy={saving}
                   busyLabel="作成中…"
                   onClick={() => {
@@ -854,7 +855,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
         setTriggerConfig={setTriggerConfig}
         tags={tags}
         selectedAccountId={selectedAccountId}
-        triggerConfigSummary={triggerConfigSummary}
+        triggerConfigSummary={triggerConfigSummary} unknownCondition={unknownCondition}
         conditionUnreadable={conditionUnreadable}
         setConditionUnreadable={setConditionUnreadable}
         conditionSummaries={conditionSummaries}

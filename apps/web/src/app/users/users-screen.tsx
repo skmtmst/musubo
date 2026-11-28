@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 import { useCallback, useState } from 'react'
@@ -260,7 +262,7 @@ export default function UsersV8() {
                         tone={row.identityKeyKind === 'url_token' ? 'warning' : row.identityKeyKind === 'uid' ? 'success' : 'neutral'}
                         size="compact"
                       >
-                        {UID_STATUS[row.identityKeyKind]}
+                        {knownValue<string>(UID_STATUS, row.identityKeyKind, '状態を確認できません')}
                       </StatusBadge>
                       {row.isDuplicate ? (
                         <StatusBadge tone="warning" size="compact">要確認</StatusBadge>

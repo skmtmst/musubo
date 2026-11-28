@@ -389,14 +389,14 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
 
     // 欄の［選ぶ］で選ぶ窓を開き、候補を選んで確定する。
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('button[aria-label="登録するシナリオ：選ぶ"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="登録するシナリオ：選択する"]')!.click()
     })
     const pickerDialog = [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!
     await act(async () => {
       pickerDialog.querySelector<HTMLInputElement>(`input[type="radio"][aria-label="お迎えシナリオ"]`)!.click()
     })
     await act(async () => {
-      [...pickerDialog.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選ぶ')!.click()
+      [...pickerDialog.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '選択する')!.click()
     })
     // 選択→確認→実行
     await eventually(() => expect(document.body.textContent).toContain('を登録します'))

@@ -873,10 +873,10 @@ export default function RemindersListV8() {
   const tableHeadCells = (
     <>
       <Th aria-label="並び替え" />
-      <Th>リマインダ（基準日・いつ送るか）</Th>
+      <Th truncate>リマインダ（基準日・いつ送るか）</Th>
       <Th>状態</Th>
-      <Th>これから送る</Th>
-      <Th>次に送る</Th>
+      <Th className={styles.mobileOptional}>これから送る</Th>
+      <Th className={styles.mobileOptional}>次に送る</Th>
       <Th aria-label="操作" />
     </>
   )
@@ -937,7 +937,7 @@ export default function RemindersListV8() {
         </span>
         {reorderDisabledReason ? <span className="sr-only" data-reorder-reason>{reorderDisabledReason}</span> : null}
         <div className={styles.tableWrap}>
-          <DataTable>
+          <DataTable mobileMinWidth="40rem">
             <colgroup>
               {/* ★V8 列の幅＝絵の中身の幅＋欄の間16（左右8ずつ）。端の列は端の24も足す（apLqS：選ぶ16・並べ替え14・状態80・予定90・次120・操作28） */}
               {/* 閲覧のみでも選ぶ列の幅は残す（箱は出さない）。名前の位置を絵どおりに保つ。 */}
@@ -945,8 +945,8 @@ export default function RemindersListV8() {
               <col style={{ width: 14 + 16 }} />
               <col />
               <col style={{ width: 80 + 16 }} />
-              <col style={{ width: 90 + 16 }} />
-              <col style={{ width: 120 + 16 }} />
+              <col className={styles.mobileOptional} style={{ width: 90 + 16 }} />
+              <col className={styles.mobileOptional} style={{ width: 120 + 16 }} />
               <col style={{ width: 28 + 8 + 24 }} />
             </colgroup>
             <thead>
@@ -1047,10 +1047,10 @@ export default function RemindersListV8() {
                           </button>
                         ) : null}
                     </Td>
-                    <Td className={styles.countCell}>
+                    <Td className={`${styles.countCell} ${styles.mobileOptional}`}>
                       <div className={styles.countMain}>{planned}</div>
                     </Td>
-                    <Td className={styles.countCell}>
+                    <Td className={`${styles.countCell} ${styles.mobileOptional}`}>
                       <div className={styles.countMain}>{nextSend}</div>
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === row.id ? 'SkY9V' : undefined}>
@@ -1354,11 +1354,9 @@ export default function RemindersListV8() {
           </ManagedFolderPanel>
         </>}
         collapsedFolders={<>
-          {canEdit ? (
-            <Button href="/reminders/new" variant="primary">
-              ＋ リマインダを作る
-            </Button>
-          ) : null}
+          <PermissionGatedButton allowed={canEdit} href="/reminders/new" variant="primary">
+            ＋ リマインダを作る
+          </PermissionGatedButton>
           {folderSelect}
         </>}
         toolbar={<>

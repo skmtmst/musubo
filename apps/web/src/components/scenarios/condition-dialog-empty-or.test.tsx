@@ -64,7 +64,7 @@ function groupRemovers() {
 }
 
 function kindPickers() {
-  return screen.getAllByRole('button', { name: '追加する条件を選ぶ', hidden: true })
+  return screen.getAllByRole('button', { name: '追加する条件を選択する', hidden: true })
 }
 
 function pickKind(field: HTMLElement, query: string) {

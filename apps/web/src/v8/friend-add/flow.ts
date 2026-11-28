@@ -10,6 +10,7 @@ import type {
   FriendAddRuleKind,
   FriendAddRuleStatus,
 } from '@/lib/api'
+import { knownValue } from '@/lib/known-value'
 import { resendSuppressionText } from './text'
 import { formatNumber } from '@/lib/format'
 
@@ -19,12 +20,12 @@ export type FriendAddFlowStep = {
   detail: string
 }
 
-export const MESSAGE_TYPE_LABEL: Record<FriendAddRuleDefinition['messageType'], string> = {
+export const MESSAGE_TYPE_LABEL: Record<FriendAddRuleDefinition['messageType'], string> = Object.assign(Object.create(null) as Record<FriendAddRuleDefinition['messageType'], string>, {
   text: 'テキスト',
   template: 'テンプレート',
   form: '回答フォーム',
   scenario: 'シナリオ',
-}
+})
 
 /**
  * 「この経路から来た人に起きること」を、経路・初回案内・付く属性・次の配信の
@@ -69,7 +70,7 @@ export function friendAddFlowSteps(input: {
     && definition.deliveryChoices?.sendWelcomeMessage !== false
     && definition.messageType !== 'scenario'
   const firstTitle = sendsWelcome
-    ? `初回案内（${MESSAGE_TYPE_LABEL[definition.messageType]}）`
+    ? `初回案内（${knownValue(MESSAGE_TYPE_LABEL, definition.messageType, '種類を確認できません')}）`
     : '初回案内'
   const firstDetail = deliversNothing
     ? '「何も配信しない」の設定のため届きません。'

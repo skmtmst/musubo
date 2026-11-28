@@ -11,7 +11,7 @@ it('開いた選ぶ窓は理由が付いても残り、読取とプレビュー�
   const dialog = screen.getByRole('dialog')
   rerender(draw('この操作はオーナーか管理者だけができます。'))
   expect(screen.getByRole('dialog')).toBe(dialog)
-  const confirm = screen.getByRole('button', { name: '選ぶ' }) as HTMLButtonElement
+  const confirm = screen.getByRole('button', { name: '選択する' }) as HTMLButtonElement
   expect(confirm.disabled).toBe(false); expect(confirm.getAttribute('aria-disabled')).toBe('true')
   fireEvent.focus(confirm)
   expect(screen.getByRole('tooltip').textContent).toContain('オーナーか管理者')
@@ -41,7 +41,7 @@ it('理由付きの窓では作成ボタンと作成先リンクも残して止�
     fireEvent.click(button); fireEvent.keyDown(button, { key: 'Enter' }); fireEvent.keyDown(button, { key: ' ' })
   }
   expect(create).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled()
-  expect(screen.getByRole('button', { name: '選ぶ' }).hasAttribute('title')).toBe(false)
+  expect(screen.getByRole('button', { name: '選択する' }).hasAttribute('title')).toBe(false)
   rerender(draw())
   expect(screen.getByRole('link', { name: '作る画面へ：タグを作る' }).getAttribute('href')).toBe('/tags/new')
   fireEvent.click(screen.getByRole('button', { name: '新しい候補を作る' }))

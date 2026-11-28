@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { DashboardComparison, DashboardComparisonKey, DashboardComparisons } from '@line-crm/shared'
 import { api, type DashboardOverview } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
@@ -11,19 +11,22 @@ import { formatDateTime } from '@/lib/format'
  * 返らない時は null のままにし、画面は差の札を出さない（0 として比べない）。
  */
 export function useDashboardComparisons(accountId: string | null, start: boolean): DashboardComparisons | null {
-  const [loaded, setLoaded] = useState<{ accountId: string; value: DashboardComparisons } | null>(null)
+  const scope = useRef({ accountId, start })
+  if (scope.current.accountId !== accountId || scope.current.start !== start) scope.current = { accountId, start }
+  const [loaded, setLoaded] = useState<{ scope: object; value: DashboardComparisons } | null>(null)
   useEffect(() => {
     if (!start || !accountId) return
+    const requestScope = scope.current
     let cancelled = false
     void api.dashboard.comparisons(accountId)
       .then((response) => {
         if (cancelled) return
-        setLoaded(response.success && isComparisons(response.data) ? { accountId, value: response.data } : null)
+        setLoaded(response.success && isComparisons(response.data) ? { scope: requestScope, value: response.data } : null)
       })
       .catch(() => { if (!cancelled) setLoaded(null) })
     return () => { cancelled = true }
   }, [accountId, start])
-  return loaded && loaded.accountId === accountId ? loaded.value : null
+  return loaded && loaded.scope === scope.current && start ? loaded.value : null
 }
 
 function isComparisons(value: unknown): value is DashboardComparisons {

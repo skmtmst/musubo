@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { fireEvent, screen, within } from '@testing-library/react'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -259,4 +260,36 @@ test('v8 の読み込み中は受け取り口の形の骨組みが出て「読�
   } finally {
     vi.useRealTimers()
   }
+})
+
+
+test('受け取り口は見本を選べ、その他は自由入力した値で作れる', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  let submitted: Record<string, unknown> | null = null
+  const previousFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('/api/webhooks/incoming') && init?.method === 'POST') {
+      submitted = JSON.parse(String(init.body))
+      return json({ success: true, data: { ...inlet, name: '新しい受け取り口', secret: 'a'.repeat(32) } })
+    }
+    return previousFetch(input, init)
+  })
+  await renderPage()
+  const create = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('受け取り口を作る'))!
+  await act(async () => { create.click() })
+  const dialog = screen.getByRole('dialog', { name: '受け取る設定を追加' })
+  const picker = within(dialog).getByLabelText('どこから来るか')
+  await act(async () => { fireEvent.click(picker) })
+  for (const label of ['LINE公式アカウント', '予約サービス', 'アンケートツール', 'ECサイト', '決済サービス', 'その他（自分で書く）']) {
+    expect(screen.getByRole('option', { name: label })).toBeTruthy()
+  }
+  await act(async () => { fireEvent.click(within(screen.getByRole('option', { name: 'その他（自分で書く）' })).getByRole('button')) })
+  const free = within(dialog).getByLabelText('どこから来るか（自由入力）')
+  await act(async () => {
+    fireEvent.change(free, { target: { value: '  custom-source  ' } })
+    fireEvent.change(within(dialog).getByPlaceholderText('体験申込フォーム（自社サイト）'), { target: { value: '新しい受け取り口' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '作る' }))
+  })
+  expect(submitted).toMatchObject({ sourceType: 'custom-source', name: '新しい受け取り口' })
+  expect(screen.queryByRole('dialog', { name: '受け取る設定を追加' })).toBeNull()
 })

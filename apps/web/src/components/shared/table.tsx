@@ -110,11 +110,14 @@ export function DataTable({
   grid,
   columnSizing,
   columnWeights,
+  mobileMinWidth,
 }: {
   children: ReactNode
   className?: string
   /** 列の幅の割合（1,2.2,…）。均等割りにせず、条件のような長い列に幅を取る。列の数と同じだけ渡す。 */
   columnWeights?: readonly number[]
+  /** 狭い画面で列を保つ必要がある一覧だけ、表内を横に送る。 */
+  mobileMinWidth?: string
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表。指定した表だけに適用する。 */
   cellPresentation?: 'friends'
@@ -156,7 +159,8 @@ export function DataTable({
   columns ??= tableDensity && !grid && !columnLayout ? recordTableColumns(children) : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <CreatedRowHighlight.Provider value={urlState.highlight || createdId}><div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} data-cell-presentation={cellPresentation} className={[shell.frame, cellPresentation === 'friends' && cellPresentations.friendList, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <CreatedRowHighlight.Provider value={urlState.highlight || createdId}><div ref={actionWidthRef} data-shared-part="list-table" data-mobile-scroll={mobileMinWidth ? "" : undefined} data-column-sizing={columnSizing} data-cell-presentation={cellPresentation} className={[shell.frame, cellPresentation === 'friends' && cellPresentations.friendList, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout || mobileMinWidth ? ({
+      ...(mobileMinWidth ? { '--table-mobile-min-width': mobileMinWidth } : {}),
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,

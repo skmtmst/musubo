@@ -52,11 +52,11 @@ it('タグは選んだ札だけを出し、全件は選ぶ窓の中にだけ並�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '常連さま' })) })
   expect(screen.getByRole('button', { name: '常連さまを外す' })).toBeTruthy()
   expect(container.textContent).not.toContain('はじめての方')
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'タグ：変える' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'タグ：変更する' })) })
   const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
   expect(within(dialog).getByRole('checkbox', { name: /常連さま/ })).toBeTruthy()
   await act(async () => { fireEvent.click(within(dialog).getByRole('checkbox', { name: /はじめての方/ })) })
-  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /決める|選ぶ|決定/ })) })
+  await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /決める|選択する|決定/ })) })
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
     choices: [expect.objectContaining({ addTagIds: ['tag-vip', 'tag-new'] }), expect.anything()],
   }))
@@ -65,7 +65,7 @@ it('タグは選んだ札だけを出し、全件は選ぶ窓の中にだけ並�
 it('友だち情報欄は、欄を選ぶ口と書き込む値の欄を分けて置き、値を直すと保存値に入る', async () => {
   const { onChange } = await renderEditor()
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '会員ランク' })) })
-  expect(screen.getByRole('button', { name: '友だち情報欄：変える' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '友だち情報欄：変更する' })).toBeTruthy()
   const value = screen.getByRole('textbox', { name: '友だち情報欄に書き込む値' }) as HTMLInputElement
   expect(value.value).toBe('ゴールド')
   await act(async () => { fireEvent.change(value, { target: { value: 'プラチナ' } }) })

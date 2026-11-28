@@ -119,6 +119,9 @@ function AutoReplyWizardV8Inner() {
   // 作る②の1152（）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string }>>([])
+  const [templateState, setTemplateState] = useState<'loading' | 'ready' | 'error' | 'retrying'>('loading')
+  const templateRequest = useRef(0)
+  const templateInFlight = useRef<number | null>(null)
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
   const folderRequest = useRef(0)
@@ -203,7 +206,44 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 読み込み ===== */
   const creationAccountId = autoReplyId ? null : selectedAccountId ?? accounts[0]?.id ?? null
-  const load = useCallback(() => loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }), [autoReplyId, creationAccountId, saveErrors])
+  const templateAccountId = matchedAccountId ?? creationAccountId ?? null
+  const templateAccountRef = useRef<string | null>(templateAccountId)
+  templateAccountRef.current = templateAccountId
+  useEffect(() => () => {
+    templateRequest.current += 1
+    templateInFlight.current = null
+  }, [])
+  const load = useCallback(() => loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setTemplateState, setVersionNumber, setWasPublished }), [autoReplyId, creationAccountId, saveErrors])
+
+  const loadTemplates = useCallback(async () => {
+    if (templateInFlight.current !== null) return
+    const request = ++templateRequest.current
+    const accountId = templateAccountRef.current
+    templateInFlight.current = request
+    setTemplateState('retrying')
+    try {
+      const response = await api.templates.list(undefined, accountId ?? undefined)
+      if (request !== templateRequest.current || templateAccountRef.current !== accountId) return
+      if (!response.success || !Array.isArray(response.data)) throw new Error('templates_not_loaded')
+      setTemplates(
+        response.data.map((t) => ({
+          id: t.id,
+          name: t.name,
+          messageType: t.messageType,
+          messageContent: t.messageContent,
+          folderId: t.folderId,
+          updatedAt: t.updatedAt,
+        })),
+      )
+      setTemplateState('ready')
+    } catch {
+      if (request === templateRequest.current && templateAccountRef.current === accountId) {
+        setTemplateState('error')
+      }
+    } finally {
+      if (templateInFlight.current === request) templateInFlight.current = null
+    }
+  }, [])
 
   useEffect(() => {
     void load()
@@ -898,7 +938,7 @@ function AutoReplyWizardV8Inner() {
           )}
 
           {step === 'response' && (
-            <WizardResponseStep {...{ actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates, disabled: inputsDisabled, lockedReason }} />
+            <WizardResponseStep {...{ actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates, templateState, loadTemplates, disabled: inputsDisabled, lockedReason }} />
           )}
 
           {step === 'priority' && (

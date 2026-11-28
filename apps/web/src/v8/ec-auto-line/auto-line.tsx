@@ -38,6 +38,8 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
   const [error, setError] = useState<unknown>(null)
   const [rules, setRules] = useState<AutoLineRule[]>([])
   const [counts, setCounts] = useState<Counts>({})
+  const [countsLoading, setCountsLoading] = useState(false)
+  const [countsFailed, setCountsFailed] = useState(false)
   const [notice, setNotice] = useState('')
   const [confirmTarget, setConfirmTarget] = useState<{ kind: AutoLineKind; accountId: string; scope: object } | null>(null)
   const [busyKind, setBusyKind] = useState<AutoLineKind | null>(null)
@@ -47,40 +49,83 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
   const accountScope = useRef({ accountId })
   if (accountScope.current.accountId !== accountId) accountScope.current = { accountId }
   const loadedScope = useRef<object | null>(null)
+  const loadSeq = useRef(0)
+  const loadInFlight = useRef(false)
+  const countsSeq = useRef(0)
+  const countsInFlight = useRef(false)
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
   const errors = useSaveFormErrors()
 
-  const load = useCallback(async () => {
+  const fetchCounts = useCallback(async (targetAccountId: string, scope: object, { userInitiated = false } = {}) => {
+    if (userInitiated && countsInFlight.current) return
+    const seq = ++countsSeq.current
+    countsInFlight.current = true
+    setCountsLoading(true)
+    try {
+      /* 送った数（試験運転で記録した件数）。取れなかった種類は「—」のままにし、再取得できる案内を出す。 */
+      const sent = await Promise.allSettled(KIND_ORDER.map((kind) => ecAutoLineApi.sends(targetAccountId, kind, 'simulated', 0)))
+      if (current.current !== targetAccountId || accountScope.current !== scope || countsSeq.current !== seq) return
+      const next: Counts = {}
+      let failed = false
+      sent.forEach((item, index) => {
+        if (item.status === 'fulfilled' && item.value.success) next[KIND_ORDER[index]] = item.value.data.total
+        else failed = true
+      })
+      setCounts(next)
+      setCountsFailed(failed)
+    } finally {
+      if (countsSeq.current === seq) {
+        countsInFlight.current = false
+        setCountsLoading(false)
+      }
+    }
+  }, [])
+
+  const reloadCounts = useCallback(async () => {
     if (!accountId) return
+    await fetchCounts(accountId, accountScope.current, { userInitiated: true })
+  }, [accountId, fetchCounts])
+
+  const load = useCallback(async ({ userInitiated = false } = {}) => {
+    if (!accountId) return
+    if (userInitiated && loadInFlight.current) return
     const scope = accountScope.current
+    const seq = ++loadSeq.current
+    loadInFlight.current = true
     loadedScope.current = null
     current.current = accountId
     setStatus('loading')
+    setCounts({})
+    setCountsFailed(false)
+    let loadedRules = false
     try {
       const response = await ecAutoLineApi.rules(accountId)
       if (!response.success) throw new Error('rules_failed')
-      if (current.current !== accountId || accountScope.current !== scope) return
+      if (current.current !== accountId || accountScope.current !== scope || loadSeq.current !== seq) return
       setRules(response.data)
       loadedScope.current = scope
       setStatus('ready')
-      /* 送った数（試験運転で記録した件数）。取れなかった種類は「—」のまま。 */
-      const sent = await Promise.allSettled(KIND_ORDER.map((kind) => ecAutoLineApi.sends(accountId, kind, 'simulated', 0)))
-      if (current.current !== accountId || accountScope.current !== scope) return
-      const next: Counts = {}
-      sent.forEach((item, index) => {
-        if (item.status === 'fulfilled' && item.value.success) next[KIND_ORDER[index]] = item.value.data.total
-      })
-      setCounts(next)
+      loadedRules = true
     } catch (reason) {
-      if (current.current !== accountId || accountScope.current !== scope) return
+      if (current.current !== accountId || accountScope.current !== scope || loadSeq.current !== seq) return
       setError(reason)
       setStatus('error')
+    } finally {
+      if (loadSeq.current === seq) loadInFlight.current = false
     }
-  }, [accountId])
+    if (loadedRules) await fetchCounts(accountId, scope)
+  }, [accountId, fetchCounts])
 
   useEffect(() => { void load() }, [load])
-  useEffect(() => { setConfirmTarget(null); setBusyKind(null) }, [accountId])
+  useEffect(() => {
+    countsSeq.current += 1
+    countsInFlight.current = false
+    setCountsLoading(false)
+    setCountsFailed(false)
+    setConfirmTarget(null)
+    setBusyKind(null)
+  }, [accountId])
 
   const ruleOf = (kind: AutoLineKind) => rules.find((rule) => rule.kind === kind)
 
@@ -140,7 +185,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
 
   if (!accountId) return <ListState kind="empty" emptyPreset="readonly" title="LINEアカウントを選んでください" description="共通メニューで、自動の LINE を設定するアカウントを選んでください。" />
   if (status === 'loading' && rules.length === 0) return <ListState kind="loading" title="自動の LINE を読み込んでいます" />
-  if (status === 'error') return <ListState kind="error" error={error} onRetry={() => void load()} />
+  if (status === 'error') return <ListState kind="error" error={error} onRetry={() => void load({ userInitiated: true })} />
 
   return (
     <SaveErrorScope errors={errors}><section className={styles.panel} aria-label="自動の LINE">
@@ -149,6 +194,23 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
         message="閲覧落ち・カゴ落ちには、お店のサイトに musubo の計測の読み込みが要ります。今は試験運転で、LINE へは送りません。"
         action={<Button variant="secondary" onClick={() => preparing.open('計測の入れ方')}>入れ方を見る</Button>}
       />
+      {countsFailed ? (
+        <Notice
+          tone="warn"
+          message="送った件数の一部を読み込めませんでした。設定の確認や変更は続けられます。"
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => void reloadCounts()}
+              disabled={countsLoading}
+              busy={countsLoading}
+              busyLabel="読み込んでいます…"
+            >
+              件数を読み直す
+            </Button>
+          }
+        />
+      ) : null}
       {notice ? <Notice tone="danger" message={notice} /> : null}
       <div className={styles.head}>
         <h3 className={styles.headTitle}>自動の LINE</h3>

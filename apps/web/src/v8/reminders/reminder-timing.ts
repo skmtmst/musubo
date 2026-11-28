@@ -6,7 +6,8 @@
  * ここに切り出して符号で「前」・「後」を分ける。
  */
 export function formatTriggerOffset(offsetMinutes: number | null | undefined): string {
-  const offset = offsetMinutes ?? 0
+  if (offsetMinutes == null || !Number.isFinite(offsetMinutes)) return '当日'
+  const offset = offsetMinutes
   const minutes = Math.abs(offset)
   if (minutes < 60) return '当日'
   const suffix = offset < 0 ? '前' : '後'

@@ -80,7 +80,7 @@ function respond(method: string, url: URL, body: unknown): Response | Promise<Re
   if (path === '/api/friends/friend-a') {
     return json({ success: true, data: {
       id: 'friend-a', displayName: '表示名の人', pictureUrl: null, isFollowing: true, metadata: {}, lineAccountId: 'account-a',
-      realName: '山本 恭平', systemDisplayName: null, refCode: null, createdAt: at, tags: [], formSubmissions: [], support: null,
+      realName: '山本 恭平', systemDisplayName: null, refCode: null, createdAt: at, updatedAt: at, tags: [], formSubmissions: [], support: null,
     } })
   }
   if (path.endsWith('/read')) return json({ success: true, data: { isUnread: false } })
@@ -168,12 +168,12 @@ describe('受信箱V4で既存機能を失わない', () => {
 
   it('頭の担当で「未割り当て」を選ぶと担当なしで保存する。候補に「すべて」は無い', async () => {
     await openLineChat()
-    fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '担当者を変更する' }))
     const dialog = screen.getAllByRole('dialog').at(-1)!
     const names = within(dialog).getAllByRole('radio').map((radio) => radio.getAttribute('aria-label'))
     expect(names).not.toContain('すべて')
     fireEvent.click(within(dialog).getByRole('radio', { name: '未割り当て' }))
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
     await eventually(() => {
       const put = calls.find((call) => call.method === 'PUT' && call.path === '/api/chats/chat-1')
       expect(put?.body).toMatchObject({ operatorId: null, revision: 4 })
@@ -182,7 +182,7 @@ describe('受信箱V4で既存機能を失わない', () => {
 
   it('頭の対応状況で選んだ状態を、そのまま保存する', async () => {
     await openLineChat()
-    fireEvent.click(screen.getByRole('button', { name: '対応状況を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '対応状況を変更する' }))
     await act(async () => { fireEvent.click(screen.getByRole('option', { name: '対応中' }).querySelector('button')!) })
     await eventually(() => {
       const put = calls.find((call) => call.method === 'PUT' && call.path === '/api/chats/chat-1')
@@ -205,12 +205,12 @@ describe('受信箱V4で既存機能を失わない', () => {
     const row = () => [...host.querySelectorAll<HTMLElement>('[data-inbox-v4="conversation-list"] button')].find((button) => button.textContent?.includes('メールの人'))
     await eventually(() => expect(row()).toBeTruthy())
     await act(async () => { row()!.click() })
-    await eventually(() => expect(screen.getByRole('button', { name: '担当者を変える' })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
+    await eventually(() => expect(screen.getByRole('button', { name: '担当者を変更する' })).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: '担当者を変更する' }))
     const dialog = screen.getAllByRole('dialog').at(-1)!
     await eventually(() => expect(within(dialog).getByRole('radio', { name: '佐々木' })).toBeTruthy())
     fireEvent.click(within(dialog).getByRole('radio', { name: '佐々木' }))
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
     await eventually(() => {
       const patch = calls.find((call) => call.method === 'PATCH' && call.path === '/api/support/email/threads/thread-1/assignee')
       expect(patch?.body).toMatchObject({ staffId: 'op-m', revision: 1 })
@@ -273,12 +273,12 @@ describe('受信箱V4で既存機能を失わない', () => {
       return null
     }
     await openLineChat()
-    fireEvent.click(screen.getByRole('button', { name: '担当者を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '担当者を変更する' }))
     const dialog = screen.getAllByRole('dialog').at(-1)!
     fireEvent.click(within(dialog).getByRole('radio', { name: '佐々木' }))
-    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '選択する' })) })
     await eventually(() => expect(detailReads).toBe(2))
-    fireEvent.click(screen.getByRole('button', { name: '対応状況を変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '対応状況を変更する' }))
     await act(async () => { fireEvent.click(screen.getByRole('option', { name: '対応中' }).querySelector('button')!) })
     await eventually(() => expect(host.textContent).toContain('新しい本文'))
 

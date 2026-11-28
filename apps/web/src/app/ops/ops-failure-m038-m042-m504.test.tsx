@@ -42,9 +42,6 @@ class MemoryStorage implements Storage {
 }
 
 const src = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8')
-const ANN = src('v8', 'ops', 'announcements.tsx')
-const LOG = src('v8', 'ops', 'login.tsx')
-const TEN = src('v8', 'ops', 'tenants.tsx')
 const TFA = src('v8', 'ops', 'two-factor.tsx')
 
 /**
@@ -52,22 +49,6 @@ const TFA = src('v8', 'ops', 'two-factor.tsx')
  * 一覧の読み込み失敗は捕まえた失敗をそのまま ListState へ渡し、
  * 403 で再試行を隠し・429 で待ち案内にする。再読み込みの口は残す。
  */
-
-describe('M038/M042 一覧の403契約（ソース）', () => {
-  it('M038 お知らせは捕まえた失敗を ListState へ渡して読み直す', () => {
-    expect(ANN).toContain('setLoadError(caught)')
-    expect(ANN).toContain('error={loadError ?? undefined}')
-    expect(ANN).toContain('description={loadDescription(loadError)}')
-    expect(ANN).toContain('onRetry={() => void load()}')
-  })
-
-  it('M042 契約先は捕まえた失敗を ListState へ渡して読み直す', () => {
-    expect(TEN).toContain('setListLoadError(caught)')
-    expect(TEN).toContain('error={listLoadError ?? undefined}')
-    expect(TEN).toContain('description={loadDescription(listLoadError)}')
-    expect(TEN).toContain('onRetry={() => void load()}')
-  })
-})
 
 describe('M039/M041/M504 の契約（ソース）', () => {
   it.each([503, 404, 410])('招待の確認失敗%sを一時的な失敗と使えない招待に分ける', async status => {
@@ -99,13 +80,7 @@ describe('M039/M041/M504 の契約（ソース）', () => {
     }
   })
 
-  it('M041 ログインの csrf 保存は投げても固まらない', () => {
-    expect(LOG).toContain("try { localStorage.setItem('lh_csrf', res.csrfToken) } catch")
-  })
-
   it('M504 二段階認証のQR失敗は表示し直しの口を出す', () => {
-    expect(TFA).toContain('qrFailed')
-    expect(TFA).toContain('QRをもう一度表示する')
     expect(TFA).toContain('もう一度読み込む')
   })
 })
@@ -275,6 +250,7 @@ describe('M504 QRの表示失敗（動作）', () => {
     await act(async () => { root.render(<OpsTwoFactorPage />) })
     await flush()
 
+    expect(host.textContent).toContain('QRコードを表示できませんでした')
     const qrRetry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('QRをもう一度表示する'))
     expect(qrRetry).not.toBeUndefined()
     await act(async () => {
@@ -284,5 +260,50 @@ describe('M504 QRの表示失敗（動作）', () => {
     await flush()
 
     expect(host.querySelector('img[alt="認証アプリ登録用のQRコード"]')).not.toBeNull()
+  })
+})
+
+describe.each([
+  ['お知らせ', '/api/ops/announcements', <OpsAnnouncementsPage key="announcements" />],
+  ['契約先', '/api/ops/tenants', <OpsTenantsPage key="tenants" />],
+])('%sの取得失敗', (_name, endpoint, page) => {
+  it('制限中は待つ案内を出す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === endpoint) return new Response(JSON.stringify({ success: false, error: 'secret' }), { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '30' } })
+      return new Response(JSON.stringify({ success: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(page) }); await flush()
+    expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
+    expect(host.textContent).toContain('30')
+    expect(host.textContent).not.toContain('secret')
+  })
+  it('通信断ではネットワークの案内を出す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (new URL(String(input)).pathname === endpoint) throw new TypeError('private error')
+      return new Response(JSON.stringify({ success: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(page) }); await flush()
+    expect(host.textContent).toContain('通信できませんでした。接続を確かめて、もう一度お試しください。')
+    expect(host.textContent).not.toContain('private error')
+  })
+  it('一時的な失敗を読み直して復帰する', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input))
+      if (url.pathname === endpoint) {
+        calls += 1
+        if (calls === 1) return new Response(JSON.stringify({ success: false, error: 'secret' }), { status: 503, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: true, data: [], summary: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(page) }); await flush()
+    expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
+    expect(host.textContent).not.toContain('secret')
+    const retry = retryButton()
+    expect(retry).toBeTruthy()
+    await act(async () => { retry!.click() }); await flush()
+    expect(calls).toBe(2)
+    expect(host.querySelector('[data-list-state="error"]')).toBeNull()
   })
 })

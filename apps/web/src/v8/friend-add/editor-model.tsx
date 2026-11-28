@@ -100,15 +100,19 @@ export function toEditorRule(rule: FriendAddRule): EditorRule {
 
 
 import { type SegmentCondition } from '@/lib/segment-condition';
+function isFriendCondition(value: unknown): value is SegmentCondition {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const condition = value as Record<string, unknown>
+  if (condition.operator !== 'AND' && condition.operator !== 'OR') return false
+  if (!Array.isArray(condition.rules) || !condition.rules.every(rule => rule && typeof rule === 'object' && !Array.isArray(rule) && typeof rule.type === 'string')) return false
+  return condition.groups === undefined || (Array.isArray(condition.groups) && condition.groups.every(isFriendCondition))
+}
 export function parseFriendConditionJson(value: string): SegmentCondition | null {
   const raw = value.trim()
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as SegmentCondition
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    if (parsed.operator !== 'AND' && parsed.operator !== 'OR') return null
-    if (!Array.isArray(parsed.rules)) return null
-    return parsed
+    const parsed: unknown = JSON.parse(raw)
+    return isFriendCondition(parsed) ? parsed : null
   } catch {
     return null
   }

@@ -36,7 +36,8 @@ export async function deleteMediaSelection({ items, latestAccountRef, load, load
       if (!isCurrent()) return
       const name = [...items, ...selectionItems].find((m) => m.id === id)?.filename ?? id
       try {
-        await api.media.delete(id, accountAtRequest)
+        const result = await api.media.delete(id, accountAtRequest)
+        if (!result.success) throw new Error('delete_failed')
       } catch (saveFailure) {
         if (!isCurrent()) return
         saveErrors.capture(saveFailure)
@@ -67,8 +68,8 @@ export async function deleteMediaSelection({ items, latestAccountRef, load, load
     setBulkConfirm(null)
     setBulkBusy(false)
     setBulkProgress(null)
-    if (result.tone === 'success') notifyToast(result.message)
-    else setError(result.message)
     void load()
     void loadKpis()
+    if (result.tone === 'success') notifyToast(result.message)
+    else setError(result.message)
   }

@@ -754,7 +754,12 @@ export default function WebhooksOutgoingV8() {
             outgoing: ready ? displayed : null,
             incomingCount: overview.incomingCount,
             summary,
+            outgoingLoading: outgoingStatus === 'loading' && Boolean(selectedAccountId),
+            incomingLoading: overview.incomingStatus === 'loading' && Boolean(selectedAccountId),
+            summaryLoading: overview.summaryStatus === 'loading' && Boolean(selectedAccountId),
           })}
+          summaryError={ready && overview.summaryStatus === 'error'}
+          onRetrySummary={() => void overview.reloadSummary()}
         />
       </>}
       folders={<>

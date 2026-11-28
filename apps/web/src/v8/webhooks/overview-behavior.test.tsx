@@ -290,12 +290,17 @@ describe('アカウントを替えたら、前のアカウントの応答・窓�
       ? new Promise<Response>(() => {})
       : undefined
     await render(<WebhooksIncomingV8 />)
-    accountId = 'account-b'
-    await render(<WebhooksIncomingV8 />)
-    // 前のアカウントの口は、新しい一覧が届くまで画面に残っている。
     const toggle = host.querySelector('[role="switch"]') as HTMLElement
     expect(toggle).not.toBeNull()
-    await act(async () => { toggle.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    const key = Object.keys(toggle).find(item => item.startsWith('__reactProps$'))!
+    const handler = (toggle as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    accountId = 'account-b'
+    await render(<WebhooksIncomingV8 />)
+    // 新しいアカウントの一覧を待つ間、前のアカウントの口を表示しない。
+    expect(host.querySelector('[role="switch"]')).toBeNull()
+    expect(host.querySelector('[aria-label="受け取り口「申込フォーム」を見る"]')).toBeNull()
+    // 表示が外れる前に持たれた古い操作も、送信されない。
+    await act(async () => { await handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: toggle, target: toggle }) })
     expect(host.textContent).toContain('LINEアカウントの一覧を読み直してください')
     expect(writes()).toHaveLength(0)
   })

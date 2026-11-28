@@ -26,12 +26,23 @@ export function rowVersionKey(row:FollowupCardModel){return JSON.stringify([row.
 function span(minutes:number){return minutes%1440===0?`${minutes/1440}日`:minutes%60===0?`${minutes/60}時間`:`${minutes}分`}
 export function followupTimingLabel(trigger:RestaurantFollowupTrigger,timing:RestaurantFollowupTiming){
  const origin=trigger==='anniversary_before'?'記念日':'予約'
- if(timing.mode==='next_day')return `退店の翌日 ${timing.sendAtTime} に送る`
- if(timing.mode==='time')return `${origin}の${timing.offsetDays===-1?'前日':timing.offsetDays===0?'当日':`${Math.abs(timing.offsetDays)}日前`} ${timing.sendAtTime} に送る`
+ if(timing.mode==='next_day'){
+  const sendAt=timing.sendAtTime?.trim()
+  return sendAt?`退店の翌日 ${sendAt} に送る`:'退店の翌日に送る'
+ }
+ if(timing.mode==='time'){
+  const sendAt=timing.sendAtTime?.trim()
+  if(!Number.isFinite(timing.offsetDays)||!sendAt)return '送るタイミング未設定'
+  const days=Math.trunc(timing.offsetDays)
+  const dayLabel=days===-1?'前日':days===0?'当日':days<0?`${Math.abs(days)}日前`:`${days}日後`
+  return `${origin}の${dayLabel} ${sendAt} に送る`
+ }
  const minutes=timing.offsetMinutes
+ if(!Number.isFinite(minutes))return '送るタイミング未設定'
  if(trigger==='reservation_24h'||trigger==='reservation_2h'||trigger==='anniversary_before')return `${origin}の${span(Math.abs(minutes))}前に送る`
  const event=trigger==='waitlist_invited'?'席が空いたら':trigger==='reservation_created'?'予約が入ったら':'退店から'
- return minutes===0?`${event}すぐに送る`:`${event}${span(minutes)}後に送る`
+ const safeMinutes=Math.max(0,minutes)
+ return safeMinutes===0?`${event}すぐに送る`:`${event}${span(safeMinutes)}後に送る`
 }
 export function followupTimingError(trigger:RestaurantFollowupTrigger,timing:RestaurantFollowupTiming):string|null{
  const reminder=['reservation_24h','reservation_2h','anniversary_before'].includes(trigger)

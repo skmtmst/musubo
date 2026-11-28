@@ -39,16 +39,18 @@ export function DateEditor({ today, initialDates=[], original, initialMode='date
   writeGuideDraft(draftKey,{version:draftVersion,mode,dates,start,end,month,closed,periods,memo,memoOpen,remove} satisfies DateDraft)
  },[draftKey,draftVersion,mode,dates,start,end,month,closed,periods,memo,memoOpen,remove])
  const max=hoursDateAdd(today,366)
- const selected=mode==='range'?hoursDateRange(start,end).filter(d=>d>=today&&d<=max):dates
- const emit=(overrides:Partial<DateEditorValue>={})=>{const v={dates:selected,closed,periods,memo,remove,...overrides};onChange(v.dates.length&&(v.closed||v.remove||!hoursPeriodsProblem(v.periods))?v:null)}
+ const inRange=(list:string[])=>list.filter(d=>d>=today&&d<=max)
+ const selected=mode==='range'?inRange(hoursDateRange(start,end)):inRange(dates)
+ const emit=(overrides:Partial<DateEditorValue>={})=>{const v={dates:selected,closed,periods,memo,remove,...overrides};const clamped={...v,dates:inRange(v.dates)};onChange(clamped.dates.length&&(clamped.closed||clamped.remove||!hoursPeriodsProblem(clamped.periods))?clamped:null)}
  const choose=(date:string)=>{
+   if(disabled||date<today||date>max)return
    if(mode==='range'){if(!start||(start&&end)){setStart(date);setEnd('');onChange(null)}else{const a=date<start?date:start,b=date<start?start:date;setStart(a);setEnd(b);emit({dates:hoursDateRange(a,b)})}}
    else{const next=dates.includes(date)?dates.filter(d=>d!==date):[...dates,date].sort();setDates(next);emit({dates:next})}
  }
  const shortDate=(date:string)=>`${Number(date.slice(5,7))}/${Number(date.slice(8))}`
  const next=selected.length?hoursDateAdd(selected.at(-1)!,1):''
  const returnsWeekly=next&&weekly&&JSON.stringify(original(next).periods)===JSON.stringify(weekly[hoursWeekday(next)])
- const clear=()=>{setDates([]);setStart('');setEnd('');onChange(null)}
+ const clear=()=>{if(disabled)return;setDates([]);setStart('');setEnd('');onChange(null)}
  const notice=groupDates?groupDates.filter(d=>!selected.includes(d.date)&&individualDates.includes(d.date)).map(d=>`${Number(d.date.slice(5,7))}月${Number(d.date.slice(8))}日`).join('・'):''
  return <div className={styles.stackLarge}>
   {groupDates?<>
@@ -56,7 +58,7 @@ export function DateEditor({ today, initialDates=[], original, initialMode='date
    <p className={styles.bodyText}>同じ時間を設定する日を選んでください。</p>
    <div className={styles.stack}>{groupDates.map(d=><Checkbox key={d.date} checked={dates.includes(d.date)} disabled={disabled} onCheckedChange={()=>choose(d.date)} description={individualDates.includes(d.date)?'休業 · 個別に変更済み':d.name??'通常の営業時間'}><strong className={styles.groupDayLabel}>{dateLabel(d.date,today,Boolean(d.name))}</strong></Checkbox>)}</div>
   </>:<>
-   <SegmentedControl size="hours" aria-label="日付の選び方" options={[{value:'dates',label:'日付を選ぶ'},{value:'range',label:'期間で選ぶ'}]} value={mode} onChange={v=>{setMode(v);onChange(null)}}/>
+   <SegmentedControl size="hours" aria-label="日付の選び方" disabled={disabled} options={[{value:'dates',label:'日付を選ぶ'},{value:'range',label:'期間で選ぶ'}]} value={mode} onChange={v=>{setMode(v);emit({dates:v==='range'?hoursDateRange(start,end):dates})}}/>
    {mode==='range'?<div className={styles.twoFields}><Field optional={false} label="開始日"><DateField size="hours" value={start} min={today} max={max} disabled={disabled} onChange={v=>{setStart(v);setMonth(v.slice(0,7)||month);emit({dates:hoursDateRange(v,end)})}}/></Field><Field optional={false} label="終了日"><DateField size="hours" value={end} min={start||today} max={max} disabled={disabled} onChange={v=>{setEnd(v);emit({dates:hoursDateRange(start,v)})}}/></Field></div>:null}
    <HoursDateCalendar month={month} onMonth={setMonth} selected={selected} onSelect={choose} min={today} max={max} disabled={disabled}/>
   </>}

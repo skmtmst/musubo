@@ -84,6 +84,7 @@ export function InboxSection({ onSummaryChange }: {
       )
       if (seq !== loadSeq.current) return
       if (response.success) {
+        if (!response.data?.summary || !Number.isInteger(response.data.summary.total) || response.data.summary.total < 0 || !Array.isArray(response.data.items) || response.data.items.some((item) => !item || typeof item.id !== 'string' || !['line', 'email'].includes(item.channel) || typeof item.customerName !== 'string' || typeof item.preview !== 'string' || typeof item.lastIncomingAt !== 'string')) throw new Error('invalid_inbox_result')
         setSummary(response.data.summary)
         onSummaryChange(response.data.summary, true)
         setItems(response.data.items)

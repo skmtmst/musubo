@@ -147,7 +147,7 @@ describe('V8 イベント予約の一覧', () => {
   it('フォルダ編集で色だけ変えても移動前に確認する', async () => {
     await render()
     fireEvent.click(await screen.findByRole('button', { name: 'フォルダ「教室」の操作' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '色を変える' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '色を変更する' }))
     fireEvent.click(screen.getByRole('button', { name: /フォルダの色/ }))
     fireEvent.click(screen.getByRole('radio', { name: '赤' }))
     const link = document.createElement('a'); link.href = '/templates'; document.body.appendChild(link)

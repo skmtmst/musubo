@@ -92,7 +92,7 @@ describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', 
     const submit = vi.fn()
     const view = render(React.createElement(StoreForm, { accounts, stores: [store], busy: false, onSubmit: submit, onCancel: () => {} }))
     // ：作ってあるアカウントは選ぶ窓で選ぶ。他店舗で使用中の候補は押せない。
-    fireEvent.click(screen.getByRole('button', { name: 'LINE公式アカウント：選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'LINE公式アカウント：選択する' }))
     const dialog = screen.getByRole('dialog', { name: 'LINE公式アカウントを選ぶ' })
     const usedRadio = within(dialog).getByRole('radio', { name: '使用中公式' }) as HTMLInputElement
     expect(usedRadio.disabled).toBe(true)
@@ -102,7 +102,7 @@ describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', 
     expect(screen.queryByRole('button', { name: /店舗を削除/ })).toBeNull()
     view.unmount()
     render(React.createElement(StoreForm, { store, accounts, stores: [store], busy: false, onSubmit: submit, onCancel: () => {} }))
-    expect(screen.getByRole('button', { name: 'LINE公式アカウント：変える' }).closest('[data-entity-picker-field]')?.textContent).toContain('使用中公式')
+    expect(screen.getByRole('button', { name: 'LINE公式アカウント：変更する' }).closest('[data-entity-picker-field]')?.textContent).toContain('使用中公式')
     fireEvent.click(screen.getByRole('button', { name: '状態' }))
     expect(screen.getByRole('option', { name: 'アーカイブ' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /店舗を削除/ })).toBeNull()

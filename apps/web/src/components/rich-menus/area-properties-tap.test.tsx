@@ -76,9 +76,9 @@ describe('リッチメニューの押したら', () => {
     render(<Harness />)
     pick('回答フォーム')
     expect(last()).toMatchObject({ intent: 'form', actionType: 'uri' })
-    fireEvent.click(screen.getByRole('button', { name: 'このボタンの回答フォームを選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'このボタンの回答フォームを選択する' }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('radio', { name: 'アンケート' }))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '選択する' }))
     expect(last()).toMatchObject({ intent: 'form', formId: 'f1' })
   })
 

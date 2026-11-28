@@ -150,21 +150,23 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
 
   useEffect(() => { if (!canView) setMenuFor(null) }, [canView])
 
+  const loadRequestId = useRef(0)
   const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current
     const requestScope = scope.current.generation
     setLoading(true)
     setLoadError('')
     try {
       const result = await restaurantGoogleApi.posts(accountId, { filter, kind, page, perPage })
-      if (!alive.current || requestScope !== scope.current.generation) return
+      if (!alive.current || requestScope !== scope.current.generation || requestId !== loadRequestId.current) return
       setData(result)
       loadedScope.current = requestScope
     } catch (err) {
-      if (!alive.current || requestScope !== scope.current.generation) return
+      if (!alive.current || requestScope !== scope.current.generation || requestId !== loadRequestId.current) return
       setData(null)
       setLoadError(errorMessage(err, '投稿を読み込めませんでした。'))
     } finally {
-      if (alive.current && requestScope === scope.current.generation) setLoading(false)
+      if (alive.current && requestScope === scope.current.generation && requestId === loadRequestId.current) setLoading(false)
     }
   }, [accountId, filter, kind, page, perPage])
 
@@ -257,7 +259,10 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
 
-  const pageCount = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1
+  const validTotal = data && Number.isFinite(data.total) && data.total >= 0 ? Math.trunc(data.total) : null
+  const validPerPage = data && Number.isFinite(data.perPage) && data.perPage > 0 ? data.perPage : null
+  const pageCount = validTotal !== null && validPerPage !== null ? Math.max(1, Math.ceil(validTotal / validPerPage)) : 1
+  const safePage = Math.min(Math.max(1, Number.isFinite(page) ? Math.trunc(page) : 1), pageCount)
 
   return (
     <>
@@ -279,8 +284,8 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
       {loadError ? <div className={styles.stateBox}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} /></div> : null}
       {data ? (
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
-          <SectionHeader size="small" title={<>{`投稿 ${formatNumber(data.total)} 件`}</>} />
-          {data.total === 0 && !loading ? (
+          <SectionHeader size="small" title={<>{validTotal !== null ? `投稿 ${formatNumber(validTotal)} 件` : '投稿 件数を確認できません'}</>} />
+          {validTotal === 0 && !loading ? (
             <ListState kind="empty" title={filter === 'all' ? 'まだ投稿がありません' : 'その状態の投稿はありません'} description="「投稿を作る」から最新情報・イベント・特典を作れます。" emptyPreset="readonly" />
           ) : (
             <div className={styles.postList}>
@@ -304,8 +309,8 @@ export function PostsBoard({ accountId, go, store, googleLocation, connection, o
               })}
             </div>
           )}
-          {data.total > 0 && pageCount > 1 ? (
-            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} summary={`${formatNumber(data.total)} 件・時刻はすべて日本時間（Asia/Tokyo）`} />
+          {validTotal !== null && validTotal > 0 && pageCount > 1 ? (
+            <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={`${formatNumber(validTotal)} 件・時刻はすべて日本時間（Asia/Tokyo）`} />
           ) : null}
         </Card>
       ) : null}
@@ -418,7 +423,7 @@ function PostImagePanel({ target, filename, url, editable, busy, lockedReason, o
   return <div className={styles.platformImagePanel}>
     <div className={styles.platformImageHead}><strong>{isGoogle ? 'Google ビジネス用の画像' : 'Instagram 用の画像'}</strong><span className={isGoogle ? styles.optionalLabel : styles.requiredLabel}>{isGoogle ? '任意' : '必須'}</span><span className={styles.platformImageRatio}>{isGoogle ? '4:3' : '4:5'} の投稿画像</span></div>
     <div className={styles.platformImageContent}>
-      {url ? <><div className={`${styles.platformThumb} ${isGoogle ? styles.platformThumbGoogle : styles.platformThumbInstagram}`}><img src={url} alt={`${isGoogle ? 'Google' : 'Instagram'}用の投稿画像`} /></div><div className={styles.platformImageInfo}><strong>{filename}</strong><span>{isGoogle ? 'Google 表示範囲 4:3' : 'Instagram 表示範囲 4:5'}</span><b>切り取り位置を確認済み</b></div></> : <div className={styles.platformImageEmpty}><p>画像を選んで、投稿前に切り取り位置を確認</p>{editable ? <div className={styles.platformImageActions}><Button lockedReason={lockedReason} onClick={() => fileInput.current?.click()} disabled={busy}>画像を選ぶ</Button><Button lockedReason={lockedReason} onClick={onMediaPick} disabled={busy}>登録メディアから選ぶ</Button>{onUseGoogle ? <Button lockedReason={lockedReason} variant="text" onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}</div>}
+      {url ? <><div className={`${styles.platformThumb} ${isGoogle ? styles.platformThumbGoogle : styles.platformThumbInstagram}`}><img src={url} alt={`${isGoogle ? 'Google' : 'Instagram'}用の投稿画像`} /></div><div className={styles.platformImageInfo}><strong>{filename}</strong><span>{isGoogle ? 'Google 表示範囲 4:3' : 'Instagram 表示範囲 4:5'}</span><b>切り取り位置を確認済み</b></div></> : <div className={styles.platformImageEmpty}><p>画像を選んで、投稿前に切り取り位置を確認</p>{editable ? <div className={styles.platformImageActions}><Button lockedReason={lockedReason} onClick={() => fileInput.current?.click()} disabled={busy}>画像を選択する</Button><Button lockedReason={lockedReason} onClick={onMediaPick} disabled={busy}>登録メディアから選択する</Button>{onUseGoogle ? <Button lockedReason={lockedReason} variant="text" onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}</div>}
     </div>
     {url && editable ? <div className={styles.platformImageLinks}><Button variant="text" lockedReason={lockedReason} onClick={() => fileInput.current?.click()} disabled={busy}>画像を変更</Button><Button variant="text" lockedReason={lockedReason} onClick={onAdjust} disabled={busy}>切り取りを調整</Button>{onUseGoogle ? <Button variant="text" lockedReason={lockedReason} onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}
     <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) onFile(file); event.target.value = '' }} />
@@ -458,7 +463,16 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const igAvailable = igState === 'connected'
 
   useEffect(() => {
-    if (!postId) { setForm(emptyForm(kindFromUrl)); setInitial(emptyForm(kindFromUrl)); setLoading(false); return }
+    setLoadError('')
+    setActionError('')
+    setFieldErrors({})
+    if (!postId) {
+      setForm(emptyForm(kindFromUrl))
+      setInitial(emptyForm(kindFromUrl))
+      setEditable(true)
+      setLoading(false)
+      return
+    }
     let alive = true
     setLoading(true)
     restaurantGoogleApi.post(accountId, postId)
@@ -806,31 +820,45 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
   const [sent, setSent] = useState<{ alreadyPublished: boolean } | null>(null)
+  const loadRequestId = useRef(0)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  useEffect(() => {
+    setChecked(false)
+    setSent(null)
+    setActionError('')
+  }, [accountId, id])
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current
     setLoading(true)
     setLoadError('')
     try {
       const response = await restaurantGoogleApi.post(accountId, id)
-      setPost(response.post)
+      if (!alive.current || requestId !== loadRequestId.current) return
       const instagramMediaId = response.post.instagram?.mediaId
+      let nextIgPreview: { filename: string; url: string } | null = null
       if (instagramMediaId && instagramMediaId === response.post.media[0]?.mediaId) {
-        setIgPreview({ filename: response.post.media[0].filename, url: response.post.media[0].sourceUrl })
+        nextIgPreview = { filename: response.post.media[0].filename, url: response.post.media[0].sourceUrl }
       } else if (instagramMediaId) {
         const media = await api.media.detail(instagramMediaId, accountId)
-        setIgPreview(media.success ? media.data.item : null)
-      } else setIgPreview(null)
+        if (!alive.current || requestId !== loadRequestId.current) return
+        nextIgPreview = media.success ? media.data.item : null
+      }
+      setPost(response.post)
+      setIgPreview(nextIgPreview)
       setStoreName(response.store.name)
       setStoreId(response.store.id)
       setWriteEnabled(response.writeEnabled)
       setCanPublish(response.canPublish)
     } catch (err) {
+      if (!alive.current || requestId !== loadRequestId.current) return
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
       setLoadError(errorMessage(err, '投稿を読み込めませんでした。')) }
     } finally {
-      setLoading(false)
+      if (alive.current && requestId === loadRequestId.current) setLoading(false)
     }
   }, [accountId, id, saveErrors])
 

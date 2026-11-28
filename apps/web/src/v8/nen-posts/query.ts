@@ -23,7 +23,7 @@ export interface PhotoReviewEntry {
   q?: string
 }
 
-const STATUS_ALIASES: Record<string, PhotoReviewStatus> = {
+const STATUS_ALIASES: Record<string, PhotoReviewStatus> = Object.assign(Object.create(null), {
   pending: 'pending',
   pending_review: 'pending',
   'pending-review': 'pending',
@@ -32,7 +32,7 @@ const STATUS_ALIASES: Record<string, PhotoReviewStatus> = {
   approved: 'adopted',
   rejected: 'rejected',
   returned: 'rejected',
-}
+})
 
 const DEFAULT_ENTRY: PhotoReviewEntry = { view: 'list', status: 'pending' }
 

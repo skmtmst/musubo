@@ -269,6 +269,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
       await drainMicrotasks()
     })
     expect(el.textContent).toContain('商品1')
+    expect(el.textContent).toContain('111')
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const committed = waitForCommit(el)
@@ -280,6 +281,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
     // Bのcommitは終わっているが、useEffect(load)はまだ動いていない。
     // 境界fenceが効いていれば、この時点でAの商品はもう見えない。
     expect(el.textContent).not.toContain('商品1')
+    expect(el.textContent).not.toContain('111')
   })
 
   it('M4: Aの再試行応答待ち中にBへ切り替えても、Bの一覧読込は古いクロージャに邪魔されない', async () => {
@@ -325,6 +327,27 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
     // Bの正常応答はseq不一致で捨てられ、一覧は読み込み中のまま固まる。
     expect(el.textContent).toContain('商品77')
     expect(el.querySelector('[data-list-state]')?.getAttribute('data-list-state')).not.toBe('loading')
+  })
+
+  it('集計だけ失敗しても一覧を表示し、集計だけを読み直せる', async () => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    await act(async () => {
+      overviewFor('account-a').reject(new Error('offline'))
+      eventsDeferreds[0].resolve(ok(recordsList([action('7')])))
+      await drainMicrotasks()
+    })
+    expect(el.textContent).toContain('商品7')
+    expect(el.textContent).toContain('集計だけを読み込めませんでした')
+    const retry = [...el.querySelectorAll('button')].find(button => button.textContent?.includes('集計をもう一度読む'))!
+    expect(retry).toBeTruthy()
+    await act(async () => { retry.click(); await drainMicrotasks() })
+    expect(eventsCalls).toHaveLength(1)
+    await act(async () => { overviewFor('account-a', 2).resolve(ok(overview(23))); await drainMicrotasks() })
+    expect(el.textContent).toContain('商品7')
+    expect(el.textContent).toContain('23')
+    expect(el.textContent).not.toContain('集計だけを読み込めませんでした')
   })
 
   it('M5: 一覧の読込失敗は、確認済みの集計(overview)まで消さない', async () => {
@@ -637,3 +660,22 @@ describe('取り込みの記録の器（監査A2）', () => {
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', async (importOriginal) => ({...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner'}))
+
+it('未知の出来事が継承名でも、未対応と正しい状態を一覧に表示する', async () => {
+  const { container: el, root: r } = mount()
+  await render(el, r)
+  await act(async () => { await drainMicrotasks() })
+  await act(async () => {
+    overviewFor('account-a').resolve(ok(overview(2)))
+    eventsDeferreds[0].resolve(ok(recordsList([
+      action('unknown', { eventType: 'constructor', eventLabel: '未知の出来事' }),
+      action('known', { eventType: 'ec.customer.profile_updated', eventLabel: '会員情報更新' }),
+    ])))
+    await drainMicrotasks()
+  })
+  expect(el.textContent).toContain('未対応の出来事（constructor）')
+  const unknownRow = Array.from(el.querySelectorAll('tr')).find((row) => row.textContent?.includes('未知の出来事'))
+  expect(unknownRow?.textContent).toContain('処理完了')
+  expect(el.textContent).toContain('会員情報を更新')
+  expect(el.textContent).toContain('更新完了')
+})

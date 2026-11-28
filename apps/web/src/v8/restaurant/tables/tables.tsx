@@ -186,7 +186,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
       code: table.code, label: table.label, seatType: table.seat_type,
       minCapacity: String(table.min_capacity), maxCapacity: String(table.max_capacity),
       floorX: String(table.floor_x), floorY: String(table.floor_y), joinGroup: table.join_group || '',floorId:table.floor_id??'floor-'+table.store_id,
-      shape:table.shape==='circle'?'circle':table.shape==='long'?'long':'rectangle',orientation:(table.height??64)>(table.width??80)?'vertical':'horizontal',smokingPolicy:table.smoking_policy??'non_smoking',partition:table.partition_type??'open',shoesAllowed:table.shoes_allowed!==0,isActive:!!table.is_active,visibleOnMap:table.visible_on_map!==0,chairArrangement:table.chair_arrangement??'both',chairSide:table.chair_side??'left',
+      shape:table.shape==='circle'?'circle':table.shape==='long'?'long':'rectangle',orientation:(table.height??64)>(table.width??80)?'vertical':'horizontal',smokingPolicy:table.smoking_policy??'non_smoking',partition:table.partition_type??'open',shoesAllowed:table.shoes_allowed!==0,isActive:!!table.is_active,visibleOnMap:table.visible_on_map!==0,chairArrangement:table.shape==='circle'&&!table.chair_side?'all':table.chair_arrangement??'both',chairSide:table.chair_side??'left',
       seatDetailType:(table.seat_detail_type??table.seat_type) as Draft['seatDetailType'],
     })
     setFieldErrors({})
@@ -258,7 +258,7 @@ function TablesBoard({ ctx, initialAutomationOpen = false }: { ctx: RestaurantV8
       seatDetailType:draft.seatDetailType,
       width:draft.shape==='long'?(draft.orientation==='vertical'?64:120):draft.seatType==='counter'?(draft.orientation==='vertical'?64:80):80,
       height:draft.shape==='long'?(draft.orientation==='vertical'?120:64):draft.seatType==='counter'?(draft.orientation==='vertical'?80:64):80,
-      rotation:0,smokingPolicy:draft.smokingPolicy,partition:draft.partition,shoesAllowed:draft.shoesAllowed,visibleOnMap:draft.visibleOnMap,chairArrangement:draft.shape==='long'?draft.chairArrangement:'both',chairSide:draft.seatType==='counter'||(draft.shape==='long'&&draft.chairArrangement==='one')?draft.chairSide:null,
+      rotation:0,smokingPolicy:draft.smokingPolicy,partition:draft.partition,shoesAllowed:draft.shoesAllowed,visibleOnMap:draft.visibleOnMap,chairArrangement:draft.shape==='long'||draft.shape==='circle'?draft.chairArrangement:'both',chairSide:draft.seatType==='counter'||(draft.shape==='long'&&draft.chairArrangement==='one')||(draft.shape==='circle'&&draft.chairArrangement!=='all')?draft.chairSide:null,
       ...(!editing?{isActive:draft.isActive}:{}),
       ...(editing&&draft.isActive&&!editing.is_active?{isActive:true}:{}),
     }

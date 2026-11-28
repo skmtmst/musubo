@@ -8,7 +8,7 @@ import Disclosure from '@/components/shared/disclosure'
 import { emptyValue } from '@/components/shared/empty-value'
 import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
 import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RowActions } from '@/components/shared/row-actions'
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -19,7 +19,7 @@ import { restaurantTestApi,type RestaurantStore } from '@/lib/restaurant-test-ap
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { Check,Plus } from 'lucide-react'
-import { useCallback,useContext,useEffect,useState } from 'react'
+import { useCallback,useContext,useEffect,useRef,useState } from 'react'
 import { RestaurantFrame, type RestaurantContext } from '@/v8/restaurant/common-a/public/frame/index'
 import { Panel, StatRow, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
@@ -62,15 +62,50 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
   const closeEditor = (close: () => void) => guard.guarded(() => { if (!dirty) close() })
   const accountId = selectedAccountId || ''
   const { gate, prompt, cancel } = useStepUpGate()
-  const [loginsError,setLoginsError]=useState(false)
-  const [loginsRetry,setLoginsRetry]=useState(0)
+  const [loginsError, setLoginsError] = useState(false)
+  const [loginsLoading, setLoginsLoading] = useState(false)
   const [logins, setLogins] = useState<RestaurantLoginMember[]>([])
+  const loginsSeqRef = useRef(0)
+  const loginsInFlightRef = useRef(false)
+  const loadLogins = useCallback(async (options?: { force?: boolean }) => {
+    if (!accountId) {
+      loginsSeqRef.current += 1
+      loginsInFlightRef.current = false
+      setLogins([])
+      setLoginsError(false)
+      setLoginsLoading(false)
+      return
+    }
+    if (!options?.force && loginsInFlightRef.current) return
+    const seq = ++loginsSeqRef.current
+    loginsInFlightRef.current = true
+    setLoginsLoading(true)
+    try {
+      const res = await restaurantTestApi.loginMembers(accountId)
+      if (seq !== loginsSeqRef.current) return
+      if (!Array.isArray(res?.data)) throw new Error('invalid_login_members')
+      setLogins(res.data)
+      setLoginsError(false)
+    } catch {
+      if (seq !== loginsSeqRef.current) return
+      setLoginsError(true)
+    } finally {
+      if (seq === loginsSeqRef.current) {
+        loginsInFlightRef.current = false
+        setLoginsLoading(false)
+      }
+    }
+  }, [accountId])
   useEffect(() => {
-    let current = true
     setLogins([])
-    if (accountId) void restaurantTestApi.loginMembers(accountId).then((res) => { if (current) {setLogins(res.data);setLoginsError(false)} }).catch(() => { if (current) setLoginsError(true) })
-    return () => { current = false; cancel() }
-  }, [accountId, cancel,loginsRetry])
+    setLoginsError(false)
+    void loadLogins({ force: true })
+    return () => {
+      loginsSeqRef.current += 1
+      loginsInFlightRef.current = false
+      cancel()
+    }
+  }, [accountId, cancel, loadLogins])
 
   /* 役割・停止の変更は本人確認（step-up）を挟むことがある（今の画面と同じ）。 */
   const updateMember = async (id: string, body: Record<string, unknown>) => {
@@ -145,7 +180,11 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      {loginsError?<ListState kind="error" title="ログインメンバーを読み込めませんでした" onRetry={()=>setLoginsRetry(n=>n+1)}/>:null}
+      {loginsError ? (
+        <Notice tone="danger" action={<Button onClick={() => void loadLogins()} disabled={loginsLoading} busy={loginsLoading} busyLabel="読み込み中…">もう一度読み込む</Button>}>
+          ログインメンバーを読み込めませんでした。店舗管理や名簿の確認は続けられます。
+        </Notice>
+      ) : null}
       {readOnly ? (
         <ReadOnlyNotice role="note" />
       ) : null}

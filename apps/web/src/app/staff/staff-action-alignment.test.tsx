@@ -141,7 +141,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ほかの人と同じにする' }))
     fireEvent.click(screen.getByRole('button', { name: 'コピー元のログインユーザー' }))
     fireEvent.click(screen.getByRole('radio', { name: 'コピー元さん（閲覧のみ）' }))
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する' }))
 
     expect(fixture.updateStaff).not.toHaveBeenCalled()
     // 画面の中の知らせ（role=status）。置き場所の知らせの入れ物も role=status なので、全部の中から文で見る

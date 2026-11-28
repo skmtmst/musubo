@@ -23,6 +23,7 @@
 .header[data-steps-below] > .heading { flex: 1 1 auto; }
 .stepsBelow { order: 3; flex-basis: 100%; min-width: 0; margin-top: var(--space-20); }
 .input { min-width: 0; padding: var(--space-24); display: flex; flex-direction: column; gap: var(--space-16); }
+.draftNotice { margin-inline: var(--space-24); }
 .section { display: flex; flex-direction: column; gap: var(--space-14); min-width: 0; }
 .root h3 { font-size: 13px; font-weight: 600; line-height: 20px; }
 .section > :global(fieldset) { margin: 0; }
@@ -69,7 +70,7 @@
 .reachRows > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-4) 0; }
 .reachRows dt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); }
 .reachRows dd { flex-shrink: 0; white-space: nowrap; font-variant-numeric: var(--font-numeric); color: var(--color-ink); }
-.previewCaption { font-size: var(--text-micro); color: var(--color-ink-faint); text-align: center; }
+.previewCaption { margin-top: var(--polish-space-field); font-size: var(--text-micro); color: var(--color-ink-faint); text-align: center; }
 .previewSummary { border-top: 1px solid var(--color-hairline); padding-top: var(--space-14); width: 100%; }
 .previewSummary dl { margin-top: var(--space-8); font-size: 12px; }
 .previewSummary dl > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); padding: var(--space-4) 0; }
@@ -85,7 +86,7 @@
  * 2段にすると帯が倍の高さになり、1024 で本文の［アクションを追加する］に重なって押せない。
  * 狭い幅では理由（左・伸びる）と操作（右）の1段に保ち、長い理由は左の中で折る。
  */
-@media (max-width: 1100px) {
+@container broadcast-create (max-width: 1100px) {
   .root .footer { display: flex; align-items: center; }
   .root .footer > [data-sticky-lead] { flex: 1 1 0; }
   .root .footer > [data-sticky-actions] { flex: 0 0 auto; justify-content: flex-end; }
@@ -116,7 +117,8 @@
   .previewToggle { display: inline-flex; margin-left: auto; }
   .header { flex-wrap: wrap; gap: var(--space-12); }
   .stepRail { order: 3; flex-basis: 100%; }
-  .preview[data-open='true'] { display: flex; position: fixed; top: 60px; bottom: 72px; right: 12px; z-index: 30; width: min(380px, calc(100vw - 24px)); overflow-y: auto; border: 1px solid var(--color-hairline); border-radius: var(--radius-panel); box-shadow: var(--v8-popover-shadow); }
+  /* 開いた見え方は入力の後ろに並べ、本文や下の操作を覆わない。 */
+  .root .preview[data-open='true'] { display: flex; position: static; contain: none; width: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--color-hairline); justify-content: center; }
   .previewClose { display: inline-flex; }
   .input { max-width: 900px; width: 100%; margin-inline: auto; }
 }

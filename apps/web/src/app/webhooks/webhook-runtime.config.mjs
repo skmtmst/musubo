@@ -66,7 +66,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `node ${REPO_ROOT}scripts/visual-qa/mock-api.mjs`,
+      command: `node "${REPO_ROOT}scripts/visual-qa/mock-api.mjs"`,
       url: `${API_BASE}/api/webhooks/outgoing`,
       /*
         使い回さない。前の実行が残っていると古い固定値を返し続け、直したはず

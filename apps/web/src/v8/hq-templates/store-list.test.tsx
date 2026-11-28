@@ -337,7 +337,7 @@ describe('フォルダの配布口を出す範囲（G-7）', () => {
 it.each(['template', 'rich_menu', 'form', 'tag', 'scenario'] as const)('%s のひな形も色を変えて保存できる', async (type) => {
   const h = await render({ type })
   await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
-  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変える') as HTMLElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '色を変更する') as HTMLElement).click())
   await act(async () => (document.querySelector('[aria-label^="フォルダの色："]') as HTMLButtonElement).click())
   await act(async () => (document.querySelector('[role="radio"][aria-label="ピンク"]') as HTMLButtonElement).click())
   await act(async () => (buttons().find((el) => el.textContent === '保存する') as HTMLButtonElement).click())
@@ -361,7 +361,7 @@ it('フォルダの保存が 409（ほかの人が先に直した）なら理由
   }
   await act(async () => { root.render(<Harness />) })
   await act(async () => (host.querySelector('[aria-label="フォルダ「お問い合わせ」の操作"]') as HTMLButtonElement).click())
-  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '名前を変える') as HTMLElement).click())
+  await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '名前を変更する') as HTMLElement).click())
   const input = document.querySelector('[role="dialog"] input') as HTMLInputElement
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!

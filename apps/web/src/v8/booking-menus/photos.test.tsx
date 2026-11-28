@@ -59,14 +59,14 @@ async function movePhoto(name: string, key: 'ArrowLeft' | 'ArrowRight', destinat
 }
 
 async function pick(name: string) {
-  fireEvent.click(await screen.findByRole('button', { name: `${name}の写真を選ぶ` }))
+  fireEvent.click(await screen.findByRole('button', { name: `${name}の写真を選択する` }))
   fireEvent.click(await screen.findByRole('option', { name: /候補new/ }))
 }
 
 describe('BA-19 予約写真の編集', () => {
   it('同店メディアだけを選び、版付き保存・差替え・解除を行う', async () => {
     show()
-    fireEvent.click(await screen.findByRole('button', { name: 'カットの写真を選ぶ' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'カットの写真を選択する' }))
     await screen.findByRole('option', { name: /候補new/ })
     expect(screen.queryByRole('option', { name: /候補shared|候補foreign/ })).toBeNull()
     fireEvent.click(screen.getByRole('option', { name: /候補new/ }))
@@ -128,8 +128,8 @@ describe('BA-19 予約写真の編集', () => {
     await screen.findByRole('region', { name: 'カットの写真' })
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     view.rerender(<Photos accountId="a" canEditMenus canEditSettings={false} />)
-    expect(await screen.findByRole('button', { name: 'カットの写真を選ぶ' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '山田の写真を選ぶ' })).toBeNull()
+    expect(await screen.findByRole('button', { name: 'カットの写真を選択する' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '山田の写真を選択する' })).toBeNull()
     expect(screen.queryByRole('button', { name: '外観の写真を並べ替え' })).toBeNull()
     expect(storeCards().map(card => card.querySelector('[data-photo-position]')?.textContent)).toEqual(['1', '2', '3'])
   })
@@ -138,7 +138,7 @@ describe('BA-19 予約写真の編集', () => {
     show()
     expect(await screen.findByText('写真を読み込めませんでした')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /もう一度|読み直す/ }))
-    expect(await screen.findByRole('button', { name: 'カットの写真を選ぶ' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'カットの写真を選択する' })).toBeTruthy()
   })
   it('写真の入力エラーは保存したメニューの欄へ出し、選び直すと消す', async () => {
     net.saveMenu.mockRejectedValueOnce({ status: 400, fields: { mediaId: 'この写真は退避されています' } })
@@ -189,10 +189,10 @@ describe('BA-19 予約写真の編集', () => {
     net.list.mockResolvedValueOnce({ success: true, data: next })
     const view = show()
     view.rerender(<Photos key="b" accountId="b" canEditMenus canEditSettings />)
-    await screen.findByRole('button', { name: 'B店の相談の写真を選ぶ' })
+    await screen.findByRole('button', { name: 'B店の相談の写真を選択する' })
     await act(async () => finish({ success: true, data: catalog() }))
-    expect(screen.queryByRole('button', { name: 'カットの写真を選ぶ' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'B店の相談の写真を選ぶ' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'カットの写真を選択する' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'B店の相談の写真を選択する' })).toBeTruthy()
   })
   it('切替前の保存の返事で、新しいアカウントの写真や保存通知を変えない', async () => {
     let finish!: (value: unknown) => void
@@ -203,7 +203,7 @@ describe('BA-19 予約写真の編集', () => {
     const next = catalog(); next.menus[0]!.name = 'B店の相談'
     net.list.mockResolvedValueOnce({ success: true, data: next })
     view.rerender(<Photos key="b" accountId="b" canEditMenus canEditSettings />)
-    await screen.findByRole('button', { name: 'B店の相談の写真を選ぶ' })
+    await screen.findByRole('button', { name: 'B店の相談の写真を選択する' })
     await act(async () => finish({ success: true, data: { version: 99 } }))
     expect(screen.getByRole('region', { name: 'B店の相談の写真' }).querySelector('img')?.getAttribute('src')).toContain('/old/')
     expect(net.saved).not.toHaveBeenCalled()

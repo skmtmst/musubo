@@ -1,4 +1,4 @@
-export const CONSUMER_LABELS: Record<string, string> = {
+export const CONSUMER_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   scenario: 'シナリオ',
   automation: 'オートメーション',
   auto_reply: '自動応答',
@@ -7,4 +7,4 @@ export const CONSUMER_LABELS: Record<string, string> = {
   form: '回答フォーム',
   rich_menu: 'リッチメニュー',
   entry_route: '流入リンク',
-}
+})

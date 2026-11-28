@@ -7,7 +7,7 @@ import { BellPanel, isSystemNotification, notificationQueryForTab, type BellPane
 import type { TopBarNotificationsPopover } from '@/components/shared/top-bar'
 import { notificationDestination, notificationLinkLabel } from '@/v8/notifications/public/destination/index'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
-import { formatRelative, formatYmd } from '@/lib/format'
+import { formatDateTime, formatRelative, formatYmd } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { notifyToast } from '@/components/shared/toast'
@@ -173,6 +173,7 @@ export default function BellNotifications({
       kind: isSystemNotification(item) ? 'system' : 'other',
       unread: !item.isRead,
       time: formatRelative(item.createdAt, undefined, '日時不明'),
+      timeTitle: formatDateTime(item.createdAt, '日時不明'),
       period: day === '' ? 'unknown' : day === today ? 'today' : 'earlier',
       linkLabel: notificationLinkLabel(item, { accountId: item.sourceAccountId }),
     }

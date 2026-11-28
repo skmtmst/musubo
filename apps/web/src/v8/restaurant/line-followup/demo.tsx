@@ -20,11 +20,11 @@ export function RestaurantFollowupDemo({ phase }: { phase: number }) {
     <div className={styles.screen} aria-hidden="true" inert>
       <ListPageCards columns={4} narrowColumns={2} inset="parent">
         <Card as="article" padding="compact" layout="vertical" gap="tight">
-          <strong>予約の回答フォーム</strong><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent">変える</Button><div className={styles.sample}>予約日時・人数を入力</div>
+          <strong>予約の回答フォーム</strong><p>リッチメニューの「予約」で開く</p><Button variant="text" size="inline" textTone="accent">変更する</Button><div className={styles.sample}>予約日時・人数を入力</div>
         </Card>
         {FOLLOWUP_ORDER.map(trigger => <Card as="article" key={trigger} padding="compact" layout="vertical" gap="tight">
           <div className={styles.head}><strong>{FOLLOWUP_NAMES[trigger]}</strong><Toggle label={`${FOLLOWUP_NAMES[trigger]}を使う`} checked={phase >= 3 && trigger === 'reservation_24h'} /></div>
-          <div className={styles.head}><span>{trigger === 'reservation_24h' ? '予約の1日前に送る' : '送る時期を設定'}</span><span className={phase === 1 && trigger === 'reservation_24h' ? styles.target : undefined}><Button variant="text" size="inline" textTone="accent">変える</Button>{phase === 1 && trigger === 'reservation_24h' && <Hand className={styles.hand} size={22} />}</span></div>
+          <div className={styles.head}><span>{trigger === 'reservation_24h' ? '予約の1日前に送る' : '送る時期を設定'}</span><span className={phase === 1 && trigger === 'reservation_24h' ? styles.target : undefined}><Button variant="text" size="inline" textTone="accent">変更する</Button>{phase === 1 && trigger === 'reservation_24h' && <Hand className={styles.hand} size={22} />}</span></div>
           <StatusBadge tone="neutral">{trigger === 'reservation_24h' && phase === 3 ? '未保存' : saved && trigger === 'reservation_24h' ? '準備済み・送信停止中' : '止めています'}</StatusBadge>
           <div className={styles.sample}><small>LINEでの見え方</small><p>{RESTAURANT_TRIGGER_ROWS.find(row => row.trigger === trigger)?.sampleText}</p></div>
         </Card>)}

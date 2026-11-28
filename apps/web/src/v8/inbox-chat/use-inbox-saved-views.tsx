@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InboxSavedView, SAVED_VIEW_URL_KEY, StatusFilter, buildInboxUrl } from './inbox-model';
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types';
 
+export const SAVED_VIEWS_LOAD_ERROR = '保存した検索を読み込めませんでした'
+
 type Options = {
   operators: { id: string; name: string; }[]
   setNameQuery: Dispatch<SetStateAction<string>>
@@ -42,6 +44,8 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
   const [savedViewName, setSavedViewName] = useState('')
 
   const [savedViewError, setSavedViewError] = useState('')
+  const [failedAccountId, setFailedAccountId] = useState<string | null>(null)
+  const loadError = selectedAccountId && failedAccountId === selectedAccountId ? SAVED_VIEWS_LOAD_ERROR : ''
 
   const [savingView, setSavingView] = useState(false)
 
@@ -68,6 +72,10 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
   // 保存検索一覧の取得がどのアカウントに向けたものか。切替中に遅れて届いた
   // 旧アカウントの応答で、新しいアカウントの一覧を上書きしない(N-021)。
   const savedViewsRequestAccountRef = useRef<string | null>(null)
+  const savedViewsRequestSeq = useRef(0)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
+  useEffect(() => () => { savedViewsRequestSeq.current += 1 }, [])
 
   /*
    * 処理済みのURL savedView値。router.replace の反映より描画が先に走る
@@ -118,8 +126,10 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
 
   const loadSavedViews = useCallback(async () => {
     const accountId = selectedAccountId
-    // 切替中に前のアカウントの応答が遅れて届いても、新しい一覧を上書きしない。
+    const seq = ++savedViewsRequestSeq.current
+    // 切替や再読み込み後の古い応答では、新しい一覧を上書きしない。
     savedViewsRequestAccountRef.current = accountId
+    const current = () => savedViewsRequestSeq.current === seq && savedViewsRequestAccountRef.current === accountId && selectedAccountRef.current === accountId
     if (!accountId) {
       setSavedViews([])
       setSavedViewsAccountId(null)
@@ -127,17 +137,19 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     }
     try {
       const response = await api.chats.savedViews.list(accountId)
-      if (savedViewsRequestAccountRef.current !== accountId) return
+      if (!current()) return
+      if (!response.success) throw new Error('saved_views_load_failed')
       if (response.success) {
         setSavedViews(response.data.map((view) => ({
           ...view,
           conditions: normalizeSavedViewConditions(view.conditions),
         })))
         setSavedViewsAccountId(accountId)
+        setFailedAccountId(null)
       }
     } catch {
-      if (savedViewsRequestAccountRef.current !== accountId) return
-      setSavedViewError('保存した検索を読み込めませんでした')
+      if (!current()) return
+      setFailedAccountId(accountId)
     }
   }, [selectedAccountId])
 
@@ -229,5 +241,5 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     router.push(buildInboxUrl(nextChannel, view.id))
     setSavedViewsOpen(false)
   }
-  return { saveDialogOpen, setSaveDialogOpen, savedViews, savedViewsOpen, setSavedViewsOpen, savedViewMenuId, setSavedViewMenuId, setSavedViewName, savedViewError, setSavedViewError, savingView, savedViewSuccess, setSavedViewSuccess, savedViewNotice, operatorNames, dropSavedViewParam, loadSavedViews, currentSavedViewConditions, savedViewName, setSavingView, applySavedView }
+  return { saveDialogOpen, setSaveDialogOpen, savedViews, savedViewsOpen, setSavedViewsOpen, savedViewMenuId, setSavedViewMenuId, setSavedViewName, savedViewError: savedViewError || loadError, setSavedViewError, savingView, savedViewSuccess, setSavedViewSuccess, savedViewNotice, operatorNames, dropSavedViewParam, loadSavedViews, currentSavedViewConditions, savedViewName, setSavingView, applySavedView }
 }

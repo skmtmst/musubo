@@ -101,7 +101,7 @@ function folderMenuItems(
    * ★V8（V8.pen 共通部品4 の H・nH0fZ、 2026-10-08）：言葉は 名前を変える・色を変える・並べ替える・消す。
    * 印を左に付ける。並べ替えは隣と入れ替える口なので、上へ・下へを括弧で添える。互換経路は今までの言葉のまま。
    */
-  const label = { rename: '名前を変える', color: '色を変える', up: '並べ替える（上へ）', down: '並べ替える（下へ）', remove: '消す' }
+  const label = { rename: '名前を変更する', color: '色を変更する', up: '並べ替える（上へ）', down: '並べ替える（下へ）', remove: '消す' }
   const icon = (node: ReactNode) => (node)
   const items: ActionMenuItem[] = []
   if (row.onEdit) {

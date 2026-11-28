@@ -25,7 +25,12 @@ export function pickTemplateExamples(value: unknown): TemplateExample[] {
 }
 
 export async function loadTemplateExamples(): Promise<TemplateExample[]> {
-  return pickTemplateExamples(await fetchApi<unknown>('/api/templates/examples'))
+  const response = await fetchApi<unknown>('/api/templates/examples')
+  if (!response || typeof response !== 'object' || (response as { success?: unknown }).success !== true || !Array.isArray((response as { data?: unknown }).data)) throw new Error('見本の応答を確認できません')
+  const data = (response as { data: unknown[] }).data
+  const examples = pickTemplateExamples(response)
+  if (data.length > 0 && examples.length === 0) throw new Error('見本の内容を確認できません')
+  return examples
 }
 
 /** 見本から作るときの行き先（メッセージを作る画面。`?example=` で見本の番号を渡す）。 */

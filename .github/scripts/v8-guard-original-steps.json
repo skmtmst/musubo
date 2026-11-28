@@ -1,0 +1,31 @@
+[
+  {
+    "name": "No V8 layout breaks at 1152, 1440 and 1920",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json"
+  },
+  {
+    "name": "Broken fixtures must fail the V8 layout guard",
+    "if": "steps.scope.outputs.run == 'true'",
+    "env": {
+      "V8_GUARD_BASE": "http://127.0.0.1:4310",
+      "V8_GUARD_DETAIL_OUT": "/tmp/detail-out"
+    },
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/layout-overflow.test.mjs apps/web/scripts/v8-guard/scenarios-list-layout.test.mjs apps/web/scripts/v8-guard/salon-filters-row.test.mjs apps/web/scripts/v8-guard/ui-layout-alignment.test.mjs\nnode apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/heading-band.test.mjs\n"
+  },
+  {
+    "name": "No new V8 layout or owner-rule defects",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'"
+  },
+  {
+    "name": "Store comparison delta labels stay inside their values",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs"
+  },
+  {
+    "name": "Inventory edge insets, folder dots and page actions on all admin screens",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'"
+  }
+]

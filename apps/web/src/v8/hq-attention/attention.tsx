@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -9,6 +9,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import EntitySelect from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
 import { AttentionCount } from '@/components/shared/attention-count'
@@ -19,7 +20,9 @@ import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/s
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAccount } from '@/contexts/account-context'
+import { useAccount, type AccountWithStats } from '@/contexts/account-context'
+import { lineAccountConnectionState } from '@/lib/line-account-state'
+import { connectionReasonLine } from '@/lib/line-account-connection-reasons'
 import { api } from '@/lib/api'
 import { notifyToast } from '@/components/shared/toast'
 import type { AccountStyle } from '@line-crm/shared'
@@ -61,6 +64,8 @@ export default function HqAttentionV8() {
   usePageTitle('対応が要るもの')
   const router = useRouter()
   const { accounts, setSelectedAccountId } = useAccount()
+  const [connectionError, setConnectionError] = useState(false)
+  const [connectionAccounts, setConnectionAccounts] = useState<AccountWithStats[] | null>(null)
   const [items, setItems] = useState<HqAttentionItem[] | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -72,21 +77,50 @@ export default function HqAttentionV8() {
   const [folder, setFolder] = useState('all')
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
 
+  const requestSeq = useRef(0)
+
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current
     setLoading(true)
     setError('')
+    setConnectionError(false)
     try {
       const res = await hqStyleApi.attention()
+      if (seq !== requestSeq.current) return
       if (!res.success) throw new Error('attention failed')
-      setItems(res.data.items)
+      const byId = new Map<string, HqAttentionItem>(res.data.items.map(item => [item.accountId, item]))
+      try {
+        const accountRes = await api.lineAccounts.list()
+        if (!accountRes.success) throw new Error('accounts failed')
+        const accountRows = accountRes.data as AccountWithStats[]
+        setConnectionAccounts(accountRows)
+        setConnectionError(false)
+        for (const [id, item] of byId) byId.set(id, { ...item, counts: { ...item.counts, otherConnections: item.counts.connections ?? 0, connections: 0 } })
+        for (const account of accountRows) {
+          const state = lineAccountConnectionState(account).label
+          const existing = byId.get(account.id)
+          if (!existing && state !== '要確認' && state !== '未確認') continue
+          const item = existing ?? { accountId: account.id, name: account.name, counts: {}, details: {} }
+          const needsAttention = state === '要確認' || state === '未確認'
+          byId.set(account.id, { ...item, counts: { ...item.counts, otherConnections: needsAttention ? 0 : item.counts.otherConnections ?? 0, connections: needsAttention ? 1 : 0 } })
+        }
+      } catch {
+        setConnectionAccounts(null)
+        setConnectionError(true)
+      }
+      setItems([...byId.values()])
     } catch (caught) {
+      if (seq !== requestSeq.current) return
       setError(describeApiFailure(caught, '読み込み', { scope: 'hq' }))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { requestSeq.current += 1 }
+  }, [load])
   useEffect(() => {
     void api.lineAccountFolders.list().then((res) => { if (res.success) setFolders(res.data.folders.map((item) => ({ id: item.id, name: item.name }))) }).catch(() => { /* フォルダが読めなくても全部は出す */ })
   }, [])
@@ -108,6 +142,7 @@ export default function HqAttentionV8() {
     router.push(href)
   }
 
+  const otherConnections = (items ?? []).filter(item => (item.counts.otherConnections ?? 0) > 0)
   const sum = (key: HqAttentionKind) => (items ? items.reduce((value, item) => value + count(item, key), 0) : null)
   const accountsWith = (key: HqAttentionKind) => (items ?? []).filter((item) => count(item, key) > 0)
 
@@ -122,8 +157,8 @@ export default function HqAttentionV8() {
             value={sum(item.key)}
             unit="件"
             icon={null}
-            loading={items === null}
-            detail={withCount.length === 1 && item.key === 'connections' ? withCount[0].name : `${withCount.length} アカウント`}
+            loading={items === null && !error}
+            detail={items === null ? (error ? '読み込めませんでした' : '読み込んでいます') : withCount.length === 1 && item.key === 'connections' ? withCount[0].name : `${withCount.length} アカウント`}
           />
         )
       })}
@@ -150,12 +185,14 @@ export default function HqAttentionV8() {
       toolbar={toolbar}
       tableInset
     >
+      {otherConnections.length > 0 ? <Notice tone="warn"><Disclosure appearance="section" size="compact" title={`別の接続点検に異常 ${otherConnections.length} アカウント`}>{otherConnections.map(item => <div key={item.accountId}>{item.name} <Button onClick={() => open(item.accountId, `/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>設定を開く</Button></div>)}</Disclosure></Notice> : null}
+      {connectionError ? <Notice tone="warn">アカウントの接続状態を読み込めませんでした。接続の数は従来の点検件数です。読み直してください。</Notice> : null}
       {error ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度試す</Button>}>{error}</Notice> : null}
       <div className={styles.stack}>
       {items === null ? (error ? null : <ListState kind="loading" title="読み込んでいます…" />) : shown.length === 0 && !error ? (
         <ListState kind="empty" title="今、対応が要るものはありません" emptyPreset="readonly" />
       ) : (
-        <div className={styles.table}><GridTable label="対応が要るもの" design={{ columns: 'minmax(0, 1fr) var(--hqa-col-wide) var(--hqa-col-wide) var(--hqa-col-narrow) var(--hqa-col-mid) var(--hqa-col-mid) var(--hqa-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hqa-row-h)', fontSize: 'var(--text-body)' }}>
+        <div className={styles.table}><GridTable label="対応が要るもの" design={{ columns: 'minmax(0, 1fr) var(--hqa-col-wide) var(--hqa-col-wide) var(--hqa-col-narrow) var(--hqa-col-mid) var(--hqa-col-mid) var(--hqa-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '8px var(--polish-space-section)', rowHeight: 'auto', fontSize: 'var(--text-body)' }}>
           <GridHeadRow>
             <GridCell role="columnheader">アカウント</GridCell>
             {KINDS.map((item) => <GridCell key={item.key} role="columnheader">{item.label}</GridCell>)}
@@ -165,7 +202,8 @@ export default function HqAttentionV8() {
             <GridRow key={item.accountId}>
               <GridCell className={styles.account}>
                 <RowNameButton className={styles.name} title={item.name} onClick={() => router.push(`/accounts/detail?id=${encodeURIComponent(item.accountId)}`)}>{item.name}</RowNameButton>
-                {item.style ? <span className={styles.style}>{styleLabel(item.style)}</span> : null}
+                {item.style ? <span className={styles.style} title={styleLabel(item.style)}>{styleLabel(item.style)}</span> : null}
+                {count(item, 'connections') > 0 && (() => { const account = connectionAccounts?.find(a => a.id === item.accountId); if (!account) return null; const state = lineAccountConnectionState(account).label; return <span className={styles.connectionReason} title={state === '要確認' ? connectionReasonLine(account).title : '未確認：接続を確認できていません'}>{state}：{state === '未確認' ? '接続を確認できていません' : connectionReasonLine(account).text}</span> })()}
               </GridCell>
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)
@@ -173,7 +211,7 @@ export default function HqAttentionV8() {
                 return <GridCell key={entry.key}><AttentionCount value={value} urgent={entry.key === 'connections' || entry.key === 'unpaid'} onClick={() => open(item.accountId, href)} label={`${item.name}の${entry.label} ${value}件を開く`} /></GridCell>
               })}
               <GridCell>
-                <RowMenu appearance="box" size="row" label={`${item.name}の操作`} items={KINDS.filter((entry) => count(item, entry.key) > 0).map((entry) => ({ id: entry.key, label: `${entry.label}を開く`, onSelect: () => open(item.accountId, hrefOf(item, entry)) }))} />
+                <RowMenu appearance="box" size="row" label={`${item.name}の操作`} items={KINDS.filter((entry) => count(item, entry.key) > 0 || (entry.key === 'connections' && (item.counts.otherConnections ?? 0) > 0)).map((entry) => ({ id: entry.key, label: entry.key === 'connections' ? '設定を開く' : `${entry.label}を開く`, onSelect: () => open(item.accountId, hrefOf(item, entry)) }))} />
               </GridCell>
             </GridRow>
           ))}

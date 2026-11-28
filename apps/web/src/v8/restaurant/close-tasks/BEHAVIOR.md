@@ -5,7 +5,7 @@
 入口：`app/restaurant-test/close-tasks/page.tsx`（新しい画面なので V8 だけ）。絵：提案 E-5 `YMVFD`。今日のお店の帯の「すべて見る」から。
 
 ## 読む口・書く口
-- 店舗：選んでいる店舗（`store-context`）→ 無ければ先頭。
+- 店舗：選択中のアカウントに属する店舗だけを使う。選択が無く候補が1店ならその店を使い、複数店または選択した店が候補外なら確認先を案内する。選択の取得に失敗したときは読み直せる。
 - `GET /api/restaurant-test/channel-close-tasks?storeId=`：知らせ（枠×媒体で1件）。`GET /api/restaurant-test/channels`：媒体の名前。
 - ［閉じた］：`POST /api/restaurant-test/channel-close-tasks/:id/done`（媒体ごと）。
 

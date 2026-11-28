@@ -185,11 +185,15 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [error, setError] = useState('')
   const [loadFailed, setLoadFailed] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [createdAccountId, setCreatedAccountId] = useState<string | null>(null)
   const [saveFailed, setSaveFailed] = useState(false)
   const editVersion = useRef<{ expectedVersion?: number; expectedDraftRevision?: number }>({})
   const savingRef = useRef(false)
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<{ account: string; state: 'ready' | 'error' } | null>(null)
+  const [folderRetry, setFolderRetry] = useState(0)
+  const [folderDraftAccount, setFolderDraftAccount] = useState(selectedAccountId)
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
   const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>(hostInitial ? hostInitial.tapLimitMode : 'none')
   const [tapLimitText, setTapLimitText] = useState(hostInitial ? hostInitial.tapLimitText : '')
@@ -209,20 +213,30 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const readOnlyReason = usePermissionLockReason(!readOnly)
   const actionOptions = useActionOptions()
 
-  const folderAccountId = host?.composer?.accountId ?? (id ? templateAccountId : selectedAccountId)
+  const folderAccountId = host?.composer?.accountId ?? (id ? templateAccountId : createdId ? createdAccountId : selectedAccountId)
+  const createdAccountMismatch = Boolean(!host && createdId && createdAccountId !== selectedAccountId)
+  if (folderDraftAccount !== selectedAccountId) {
+    setFolderDraftAccount(selectedAccountId)
+    if (!host && !id && !createdId) setFolderId(null)
+  }
+  const foldersReady = Boolean(host) || Boolean(folderAccountId && folderState?.account === folderAccountId && folderState.state === 'ready')
+  const foldersFailed = !host && Boolean(folderAccountId && folderState?.account === folderAccountId && folderState.state === 'error')
   /* 回答フォーム・予約・予約履歴の URL に入れる LIFF ID（テンプレートのアカウントのもの）。統括は使わない。 */
   const liffId = hqHost ? null : (accounts.find((account) => account.id === folderAccountId)?.liffId ?? null) || null
   /* 押したらの中身で選ぶ回答フォーム・予約メニュー・スタンプカード（店・店の作成の引き出し）。 */
   const tapSources = useTapActionSources(hqHost ? null : folderAccountId)
   useEffect(() => {
     setFolders([])
+    setFolderState(null)
     if (!folderAccountId || host) return
     let cancelled = false
     void api.folders.list('template', folderAccountId).then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
-    }).catch(() => {})
+      if (cancelled) return
+      if (res.success) { setFolders(res.data); setFolderState({ account: folderAccountId, state: 'ready' }) }
+      else setFolderState({ account: folderAccountId, state: 'error' })
+    }).catch(() => { if (!cancelled) setFolderState({ account: folderAccountId, state: 'error' }) })
     return () => { cancelled = true }
-  }, [folderAccountId])
+  }, [folderAccountId, host, folderRetry])
   /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
   const carouselDraftSnapshot = JSON.stringify([name, panels, tapLimitMode, tapLimitText, uploadedMedia])
   useEffect(() => {
@@ -233,14 +247,23 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carouselDraftSnapshot])
 
+  const [loadRetry, setLoadRetry] = useState(0)
   useEffect(() => {
     if (!id) return
+    let cancelled = false
+    setLoading(true)
+    setLoadFailed(false)
+    setSnapshotTaken(false)
+    setSavedSnapshot(null)
+    setError('')
     const markLoadFailed = (caught?: unknown) => {
+      if (cancelled) return
       setLoadFailed(true)
-      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, 'カルーセル') : '読み込めませんでした。開き直してください。')
+      setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, 'カルーセル') : '読み込めませんでした。もう一度お試しください。')
     }
     void api.templates.get(id)
       .then((res) => {
+        if (cancelled) return
         if (!res.success) { markLoadFailed(); return }
         editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
         setName(res.data.name)
@@ -261,14 +284,15 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         }
       })
       .catch((caught: unknown) => markLoadFailed(caught))
-      .finally(() => setLoading(false))
-  }, [id, saveErrors])
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id, saveErrors, loadRetry])
 
   useEffect(() => {
-    if (loading || snapshotTaken) return
+    if (loading || loadFailed || snapshotTaken) return
     setSavedSnapshot(carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
     setSnapshotTaken(true)
-  }, [loading, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
+  }, [loading, loadFailed, snapshotTaken, name, panels, folderId, tapLimitMode, tapLimitText])
   const dirty = uploading || (savedSnapshot !== null && savedSnapshot !== carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, subject: 'カルーセルの作成内容', busy: saving || publishing || uploading || Boolean(host?.busy) })
 
@@ -314,6 +338,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const saveNow = async (): Promise<string | null> => {
     if (savingRef.current || uploadLock.current) return null
     if (loadFailed) { setError('読み込めませんでした。開き直してください。'); return null }
+    if (createdAccountMismatch) { setError('作成したLINEアカウントに切り替えてから保存してください。'); return null }
     if (!id && !createdId && !selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください'); return null }
     if (fields.submit().length > 0) { setError(''); return null }
     savingRef.current = true
@@ -323,7 +348,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     try {
       const res = await saveCarousel({ ...editVersion.current, templateId: id ?? createdId, selectedAccountId, name, panels, folderId, tapLimitMode, tapLimitText, liffId })
       if (!res.ok) {
-        if (res.createdId) { setCreatedId(res.createdId); editVersion.current = { expectedVersion: res.expectedVersion, expectedDraftRevision: res.expectedDraftRevision } }
+        if (res.createdId) { setCreatedId(res.createdId); setCreatedAccountId(selectedAccountId); editVersion.current = { expectedVersion: res.expectedVersion, expectedDraftRevision: res.expectedDraftRevision } }
         if (res.tapExtraError) fields.setServerErrors(Object.fromEntries(panels.flatMap((p, ci) => p.actions.flatMap((a, ai) => a.tapExtras ? [[`card-${ci}-button-${ai}`, res.tapExtraError]] : []))))
         else setError(res.error)
         setSaveFailed(true)
@@ -331,7 +356,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
       }
       /* 作成だけ済んだあとのやり直しが「作り直し」にならないよう覚える。 */
       editVersion.current = { expectedVersion: res.expectedVersion, expectedDraftRevision: res.expectedDraftRevision }
-      if (!id) setCreatedId(res.id)
+      if (!id) { setCreatedId(res.id); setCreatedAccountId(selectedAccountId) }
       setSavedSnapshot(carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
       return res.id
     } finally {
@@ -494,7 +519,24 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         )}
       >
         {host?.notice}
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Notice
+            tone="danger"
+            message={error}
+            action={loadFailed && id ? (
+              <Button
+                variant="text"
+                size="inline"
+                data-notice-inline-action
+                type="button"
+                disabled={loading}
+                onClick={() => setLoadRetry((value) => value + 1)}
+              >
+                もう一度読み込む
+              </Button>
+            ) : undefined}
+          />
+        ) : null}
         {publishError ? <Notice tone="danger" message={publishError} /> : null}
         {saveFailed ? <Notice tone="warn" message="入力した内容はそのまま残っています。もう一度保存を押してください。" /> : null}
         {loading ? <ListState kind="loading" title="カルーセルを読み込んでいます" /> : (
@@ -507,9 +549,11 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                   <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                     size="full"
                     aria-label="フォルダ"
+                    key={host ? 'host' : folderAccountId ?? 'no-account'}
+                    disabled={!foldersReady || createdAccountMismatch}
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => setFolderId(value || null)}
-                    folders={host ? host.folders : folders.map(folderById)}
+                    folders={host ? host.folders : foldersReady ? folders.map(folderById) : []}
                     colors
                     onCreate={host
                       ? hostFolderCreate(host)
@@ -517,6 +561,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
                   /></SaveErrorField>
+                  {createdAccountMismatch ? <Notice tone="warn">作成したLINEアカウントに切り替えてからフォルダを変更してください。</Notice> : null}
+                  {foldersFailed ? <Notice tone="danger" action={<Button onClick={() => setFolderRetry(n => n + 1)}>もう一度読み込む</Button>}>フォルダを読み込めませんでした。</Notice> : null}
                 </Field>
               </SettingsFormRow>
             </Card>}

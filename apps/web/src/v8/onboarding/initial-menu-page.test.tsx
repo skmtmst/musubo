@@ -35,7 +35,7 @@ it('使い方が未選択なら題と使い方への案内を表示する', asyn
   calls.style.mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 1 } })
   render(<InitialMenuPage />)
 
-  const action = await screen.findByRole('link', { name: '使い方を選ぶ' })
+  const action = await screen.findByRole('link', { name: '使い方を選択する' })
   expect(action.getAttribute('href')).toBe('/?setup=0&setupReturn=accounts')
   expect(screen.getByRole('heading', { level: 1, name: 'リッチメニュー' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'このメニューで進む' })).toBeNull()

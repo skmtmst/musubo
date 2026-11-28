@@ -10,5 +10,6 @@ export function historyBadge(run: UidMigrationRun): { tone: 'ok' | 'muted' | 'da
   if (run.status === 'failed') return { tone: 'danger', label: run.counts.applied > 0 ? '一部失敗' : '失敗' }
   if (run.status === 'executing') return { tone: 'warn', label: '実行中' }
   if (run.status === 'ready') return { tone: 'ok', label: '確認完了' }
-  return { tone: 'muted', label: 'テスト移行' }
+  if (run.status === 'dry_run' || run.status === 'review') return { tone: 'muted', label: 'テスト移行' }
+  return { tone: 'warn', label: '状態を確認できません' }
 }

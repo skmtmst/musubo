@@ -202,7 +202,7 @@ it('V8の掲載順を動かして、読み込んだ版と全件を送る', async
   render(<PhotoReviewV8 accountId="account-a" />)
   await screen.findByText('散歩のあと', {exact:false})
   fireEvent.click(screen.getByRole('tab',{name:'公式サイト掲載'}))
-  fireEvent.click(await screen.findByRole('button',{name:'並び順を変える'}))
+  fireEvent.click(await screen.findByRole('button',{name:'並び順を変更する'}))
   fireEvent.click(await screen.findByRole('button',{name:'あずきを上へ'}))
   fireEvent.click(screen.getByRole('button',{name:'並び順を保存する'}))
   await flush()

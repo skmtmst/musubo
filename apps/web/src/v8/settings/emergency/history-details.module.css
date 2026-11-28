@@ -1,0 +1,7 @@
+/* 運用状態の履歴詳細モーダル。Dialog の中身を横幅いっぱいに広げて KPI 帯・エラー案内を潰さない。 */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  width: 100%;
+}

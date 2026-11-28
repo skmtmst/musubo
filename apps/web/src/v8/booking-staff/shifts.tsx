@@ -156,7 +156,7 @@ type DayRow =
 function exceptionBadge(item: BookingException): string {
   if (item.kind === 'closed') return '休み'
   const first = item.intervals[0]
-  return first ? `${first.start}〜${first.end}` : '時間を変える'
+  return first ? `${first.start}〜${first.end}` : '時間を変更する'
 }
 
 /* ───────────── 入口 ───────────── */
@@ -1207,7 +1207,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                     {canEdit ? <>
                     <Button variant="text" size="compact" textTone="ink"
                       aria-expanded={openDaysFor === group.key}
-                      aria-label={`休憩の曜日（${weekdaySetLabel(group.weekdays)}）を選ぶ`}
+                      aria-label={`休憩の曜日（${weekdaySetLabel(group.weekdays)}）を選択する`}
                       title="押すと曜日を選べます"
                       onClick={() => setOpenDaysFor((current) => (current === group.key ? null : group.key))}
                     >

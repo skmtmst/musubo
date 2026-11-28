@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import CloseButton from '@/components/shared/close-button'
 import { eventsApi } from '@/lib/api';
 
@@ -821,7 +823,7 @@ export default function ActionEditor({
           <div className="flex-1 px-6 pb-5 pt-0">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p className="text-ink text-sm font-bold">
-                {actions.indexOf(editing) + 1}. [{KIND_LABEL[editing.actionType]}] の条件設定
+                {actions.indexOf(editing) + 1}. [{knownValue(KIND_LABEL, editing.actionType, '処理')}] の条件設定
               </p>
               <div className="flex shrink-0 items-center gap-2">
                 <Button variant="secondary" className="text-ink-secondary h-9 px-4 whitespace-normal" type="button" onClick={() => conditionGuard.guarded(() => setConditionFor(null))}>
@@ -873,7 +875,7 @@ export default function ActionEditor({
                     {actions.length === 0
                       ? '未設定'
                       : actions
-                          .map((action, index) => `${index + 1}. ${KIND_LABEL[action.actionType]}`)
+                          .map((action, index) => `${index + 1}. ${knownValue(KIND_LABEL, action.actionType, '処理')}`)
                           .join(' → ')}
                   </p>
                 </section>
@@ -904,7 +906,7 @@ export default function ActionEditor({
                     タグは付け直しても、加算はもう一度足したくない、といった使い分けができます。
                   </p>
                   <div className="mt-1 space-y-2">
-                    {reorder.shown.map((action, index) => <ActionRow key={action.id} number={index + 1} kind={KIND_LABEL[action.actionType]} title={describeAction(action, lookups)}
+                    {reorder.shown.map((action, index) => <ActionRow key={action.id} number={index + 1} kind={knownValue(KIND_LABEL, action.actionType, '処理')} title={describeAction(action, lookups)}
                       icon={ACTION_KINDS.find(kind => kind.type === action.actionType)?.icon} open={expandedId === action.id} onToggle={() => setExpandedId(expandedId === action.id ? null : action.id)}
                       rowProps={reorder.rowProps(action.id)} handle={<ActionDragHandle label={`${index + 1}つ目の行うこと`} ariaLabel={`${index + 1}つ目の行うことを並べ替える`} {...reorder.handle(action.id)} {...reorder.handleProps(action.id)} />}
                       menuItems={reorder.menuItems(action.id)} onRemove={() => remove(action)} extra={<>

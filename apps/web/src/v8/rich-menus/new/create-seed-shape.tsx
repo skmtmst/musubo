@@ -37,6 +37,14 @@ export async function seedMenuShape({ audience, chatBarText, defaultOpen, folder
       setError('面の分けかたを選び直してください')
       return null
     }
+    if (!Number.isInteger(tabCount) || tabCount < 0 || tabCount > 2) {
+      setError('タブの数を選び直してください')
+      return null
+    }
+    if (!Number.isFinite(targetingPriority)) {
+      setError('表示順を確認してください')
+      return null
+    }
     const imageKeys: Array<string | null> = []
     for (let index = 0; index <= tabCount; index += 1) {
       const file = pendingImages[index]?.file ?? null

@@ -11,6 +11,7 @@ import { ListPage, ListPageCards, ListPageSection } from '@/components/templates
 import Card from '@/components/shared/card'
 import TruncatedText from '@/components/shared/truncated-text'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import {
@@ -79,6 +80,10 @@ export default function AutomationTemplatesV8() {
   const [actionError, setActionError] = useState('')
   const operationKeysRef = useRef<Record<string, string>>({})
   const requestRef = useRef(0)
+  const saveScope = useRef({ accountId: selectedAccountId, generation: 0, mounted: true })
+  if (saveScope.current.accountId !== selectedAccountId) saveScope.current = { ...saveScope.current, accountId: selectedAccountId, generation: saveScope.current.generation + 1 }
+  useEffect(() => { saveScope.current.mounted = true; return () => { saveScope.current.mounted = false } }, [])
+  useEffect(() => { setCreating(null) }, [selectedAccountId])
 
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
@@ -132,6 +137,8 @@ export default function AutomationTemplatesV8() {
 
   const create = async (item: AutomationTemplateSummary) => {
     if (!selectedAccountId || creating || !canEdit) return
+    const generation = saveScope.current.generation
+    const current = () => saveScope.current.mounted && saveScope.current.generation === generation
     setCreating(item.key)
     setActionError('')
     // 同じ操作のやり直しだけが同じ鍵を使う（別の新規作成は別の鍵）。
@@ -139,10 +146,13 @@ export default function AutomationTemplatesV8() {
     const operationKey = operationKeysRef.current[slot] ?? (operationKeysRef.current[slot] = crypto.randomUUID())
     try {
       const response = await api.automations.createDraftFromTemplate(item.key, selectedAccountId, operationKey)
+      if (!current()) return
       if (!response.success) throw new Error(response.error)
       delete operationKeysRef.current[slot]
+      notifySaved('見本から下書きを作りました。')
       router.push(`/automations/drafts?id=${encodeURIComponent(response.data.id)}`)
     } catch (saveFailure) {
+      if (!current()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)

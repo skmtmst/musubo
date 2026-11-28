@@ -176,7 +176,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
             <section className={styles.card} aria-labelledby="uid-review">
               <div className={styles.cardHead}>
                 <h3 id="uid-review" className={styles.cardTitle}>要確認の判断</h3>
-                <p className={styles.cardSub}>{`1人ずつ、どう引き継ぐかを決めます。テスト移行までは実データを変えません（${statusView?.badgeLabel ?? ''}）`}</p>
+                <p className={styles.cardSub}>{`1人ずつ、どう引き継ぐかを決めます。${statusView?.description ?? ''}（${statusView?.badgeLabel ?? ''}）`}</p>
               </div>
               <div className={styles.toolRow}>
                 <div role="group" aria-label="分類で絞り込む" className={styles.chipRow}>

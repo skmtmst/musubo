@@ -427,7 +427,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         onConfirm={() => { if (pendingStoreId) setStoreId(pendingStoreId); setPendingStoreId(null) }}
       />)
   const storePicker = stores.length > 1 || (!storeSelection.id && stores.length > 0) ? (
-    <EntitySelect aria-label="店舗" noun="店舗" placeholder="店舗を選んでください" valuePrefix="店舗：" value={storeSelection.id} disabled={storeSelection.switching} onChange={(value) => { if (value === storeSelection.id) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={[...stores.map(store => ({ ...entityOptionMetadata(store), value: store.id, label: store.name, hint: `${store.status === 'paused' ? '一時停止' : '現役'} · ID: ${store.id}` }))]} />
+    <EntitySelect aria-label="店舗" noun="店舗" placeholder="店舗を選んでください" valuePrefix="店舗：" hideSelectedMeta width={240} value={storeSelection.id} disabled={storeSelection.switching} onChange={(value) => { if (value === storeSelection.id) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={[...stores.map(store => ({ ...entityOptionMetadata(store), value: store.id, label: store.name, hint: `${store.status === 'paused' ? '一時停止' : '現役'} · ID: ${store.id}` }))]} />
   ) : null
   if (!storeId) {
     const desired = stores.find(store => store.id === storeSelection.id)
@@ -481,7 +481,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
                     <RowActions
                       subjectName={row.name}
                       menuItems={[
-                        { id: 'edit', label: 'URL を変える', onSelect: () => openEdit(row) },
+                        { id: 'edit', label: 'URL を変更する', onSelect: () => openEdit(row) },
                         ...(row.acceptsReservations ? [{
                           id: 'close',
                           label: row.closeOnBooking ? '枠を閉じる知らせの対象から外す' : '枠を閉じる知らせの対象にする',
@@ -521,6 +521,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
           )}
         />
         <div className={styles.body}>
+          {storeSelection.contextId === null && storeSelection.id && (role === 'owner' || role === 'admin' || role === 'staff') ? <Notice tone="info" action={<Button onClick={() => void storeSelection.switchContext(true)} busy={storeSelection.switching}>この店舗を表示店舗にする</Button>}>管理画面の表示店舗はまだ選ばれていません。必要なら、この店舗を表示店舗にできます。</Notice> : null}
           {conflict ? (
             <Notice tone="warn" role="alert" action={<Button size="compact" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>}>
               ほかの人が先にこの店の媒体の設定を変えました。読み直してから、もう一度変えてください。
@@ -652,7 +653,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         title={editing ? `${editing.name}の URL` : 'URL'}
         headerIcon={<Link2 />}
         description="https:// で始まる URL を入れます。空にすると消えます。保存は画面の下の［保存する］で行います。"
-        confirmLabel="変える"
+        confirmLabel="変更する"
         onConfirm={applyEdit}
         onCancel={() => setEditing(null)}
       >

@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * ★V8 テンプレートの一覧で使う言葉と、読み込みの状態の分け方。
  * 今までの一覧（app/templates の list-state-kind・template-message-type・
@@ -74,7 +75,7 @@ const MESSAGE_TYPE_LABELS: Record<string, string> = {
 }
 
 export function messageTypeText(type: string): string {
-  return MESSAGE_TYPE_LABELS[type] ?? 'その他'
+  return knownValue(MESSAGE_TYPE_LABELS, type, 'その他')
 }
 
 /** 削除の確認窓の説明。使っていないものだけがここへ来る。 */
@@ -91,7 +92,8 @@ function broadcastStatusText(status: string): string {
   if (status === 'scheduled') return '予約済み'
   if (status === 'sending') return '送信中'
   if (status === 'sent') return '送信済み'
-  return '下書き'
+  if (status === 'draft') return '下書き'
+  return '状態を確認できません'
 }
 
 /** 削除できない窓に出す「使っている所」の明細（`api.templates.usages` の返り）。 */
@@ -150,7 +152,7 @@ export function usageRows(detail: UsageDetail): UsageRow[] {
     ...(detail.reminderEnrollments ?? []).map((u) => ({
       key: `reminder-enrollment-${u.enrollmentId}`,
       kind: 'リマインダ',
-      name: `${u.reminderName} 第${u.versionNumber}版（${u.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+      name: `${u.reminderName} 第${u.versionNumber}版（${u.enrollmentStatus === 'cancelled' ? '取消ずみ' : u.enrollmentStatus === 'active' ? '送信待ち' : u.enrollmentStatus === 'completed' ? '完了' : '状態を確認できません'}）`,
       href: `/reminders/detail?id=${u.reminderId}`,
     })),
     ...(detail.richMenuAreas ?? []).map((u) => ({

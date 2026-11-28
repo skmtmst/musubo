@@ -16,7 +16,7 @@ describe('確認の行の変更操作', () => {
     const run = vi.fn()
     render(preview(true, run))
     const rows = screen.getByRole('region', { name: '設定の確認' })
-    const links = within(rows).getAllByRole('link', { name: '変える' })
+    const links = within(rows).getAllByRole('link', { name: '変更する' })
     expect(links).toHaveLength(6)
     expect(links[0].getAttribute('href')).toBe('/friend-add-settings/new?step=basic')
     for (const link of links) expect(link.getAttribute('data-variant')).toBe('text')
@@ -31,8 +31,8 @@ describe('確認の行の変更操作', () => {
     render(preview(false, run))
     const rows = screen.getByRole('region', { name: '設定の確認' })
     const checks = screen.getByRole('region', { name: '有効にする前の確認' })
-    expect(within(rows).queryByRole('link', { name: '変える' })).toBeNull()
-    const actions = [...within(rows).getAllByRole('button', { name: '変える' }), ...within(checks).getAllByRole('button', { name: /見直す|直す/ })]
+    expect(within(rows).queryByRole('link', { name: '変更する' })).toBeNull()
+    const actions = [...within(rows).getAllByRole('button', { name: '変更する' }), ...within(checks).getAllByRole('button', { name: /見直す|直す/ })]
     expect(actions).toHaveLength(10)
     for (const action of actions) {
       expect(action.getAttribute('href')).toBeNull()

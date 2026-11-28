@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ResumeFollowerHandover from './resume-handover'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetStaffIdentity, readStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import { registrationStorageKey } from './registration-storage'
 import { REGISTRATION_STYLE_KEY } from './use-registration-style'
+import { LIST_REQUEST_TIMEOUT_MS } from '@/lib/request-timeout'
 
 const mocks = vi.hoisted(() => ({
   entry: vi.fn(), state: vi.fn(), step: vi.fn(), select: vi.fn(), push: vi.fn(), replace: vi.fn(),
@@ -42,6 +43,38 @@ beforeEach(() => {
 afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('統括から友だち引き継ぎへ戻る画面', () => {
+  it('状態確認が時間切れなら失敗を表示して再試行できる', async () => {
+    vi.useFakeTimers()
+    try {
+      let resolveRetry!: (value: unknown) => void
+      mocks.state.mockReturnValueOnce(new Promise(() => {})).mockReturnValueOnce(new Promise(done => { resolveRetry = done }))
+      render(<ResumeFollowerHandover />)
+      await act(async () => { for (let i = 0; i < 8; i++) await Promise.resolve() })
+      expect(mocks.state).toHaveBeenCalledTimes(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(LIST_REQUEST_TIMEOUT_MS + 5000) })
+      expect(screen.getByText('引き継ぎの状態を確認できません')).toBeTruthy()
+      expect(mocks.state).toHaveBeenCalledTimes(2)
+      await act(async () => { resolveRetry({ success: true, data: importState({ phase: 'not_started' }) }) })
+      expect(screen.getByText('引き継ぎが開始されていません')).toBeTruthy()
+    } finally { vi.useRealTimers() }
+  })
+  it('状態確認が遅い間は定期確認を重ねず、完了後に再確認できる', async () => {
+    let resolve!: (value: unknown) => void
+    mocks.state.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValue({ success: true, data: importState({ phase: 'not_started' }) })
+    const interval = vi.spyOn(globalThis, 'setInterval')
+    render(<ResumeFollowerHandover />)
+    await waitFor(() => expect(mocks.state).toHaveBeenCalledTimes(1))
+    const tick = interval.mock.calls.find(([, delay]) => delay === 5000)?.[0] as (() => void)
+    expect(tick).toBeTypeOf('function')
+    await act(async () => { tick(); tick() })
+    expect(mocks.state).toHaveBeenCalledTimes(1)
+    await act(async () => { resolve({ success: true, data: importState({ phase: 'not_started' }) }) })
+    await screen.findByText('引き継ぎが開始されていません')
+    await act(async () => { tick() })
+    await waitFor(() => expect(mocks.state).toHaveBeenCalledTimes(2))
+    interval.mockRestore()
+  })
+
   it('古い引き継ぎリンクでも本人の登録が途中なら同じ登録へ進み、引き継ぎを動かさない', async () => {
     mocks.entry.mockResolvedValue({ success: true, data: { destination: 'registration', canResume: true } })
     render(<ResumeFollowerHandover />)

@@ -110,7 +110,7 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
   it('左の列の「…」から消すと、中身は未分類に残ると確かめてから選択中のアカウントで消し、読み直す', async () => {
     await render()
     await click(sidePanel()?.querySelector('button[aria-label="フォルダ「店舗案内」の操作"]'))
-    expect(menuItem('名前を変える')).toBeDefined()
+    expect(menuItem('名前を変更する')).toBeDefined()
     await click(menuItem('消す'))
     expect(document.body.textContent).toContain('中の共通情報 1 件は消えずに「未分類」へ移ります')
     expect(removeFolder).not.toHaveBeenCalled()
@@ -123,7 +123,7 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
   it('左の列の「…」の名前変更は、同じフォルダを入れた名前の窓を開く', async () => {
     await render()
     await click(sidePanel()?.querySelector('button[aria-label="フォルダ「店舗案内」の操作"]'))
-    await click(menuItem('名前を変える'))
+    await click(menuItem('名前を変更する'))
     const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="text"], [role="dialog"] input:not([type])')
     expect(input?.value).toBe('店舗案内')
   })
@@ -133,7 +133,7 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
     const collapsed = [...(toolbarRegion()?.querySelectorAll<HTMLButtonElement>('button[aria-label="フォルダ「店舗案内」の操作"]') ?? [])]
     expect(collapsed).toHaveLength(1)
     await click(collapsed[0])
-    expect(menuItem('フォルダ名を変える')).toBeDefined()
+    expect(menuItem('フォルダ名を変更する')).toBeDefined()
     await click(menuItem('フォルダを削除する'))
     expect(document.body.textContent).toContain('「店舗案内」を削除しますか？')
     await click(button('削除する'))
@@ -141,7 +141,7 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
 
     await renderInShop()
     await click(toolbarRegion()?.querySelector('button[aria-label="フォルダ「店舗案内」の操作"]'))
-    await click(menuItem('フォルダ名を変える'))
+    await click(menuItem('フォルダ名を変更する'))
     expect(document.querySelector<HTMLInputElement>('[role="dialog"] input[type="text"], [role="dialog"] input:not([type])')?.value).toBe('店舗案内')
   })
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { jstDate } from '@/lib/jst-datetime'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -25,7 +26,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '@/v8/restaurant/dashboard/public/summarize/index'
-import { type StoreMedium, loadStoreMedia } from '@/v8/restaurant/dashboard/public/use-store-today/index'
+import { type StoreMedium, loadStoreMedia, selectAccountStore } from '@/v8/restaurant/dashboard/public/use-store-today/index'
 import styles from './close-tasks.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
@@ -53,6 +54,24 @@ const STATE_BADGE: Record<CloseGroup['state'], { label: string; tone: 'danger' |
   done: { label: '閉じた', tone: 'success' },
 }
 
+function ledgerHref(startsAt: string): string {
+  const trimmed = startsAt.trim()
+  const iso = /Z$|[+-]\d{2}:?\d{2}$/i.test(trimmed) ? trimmed : `${trimmed.replace(' ', 'T')}Z`
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return '/restaurant-test/reservations'
+  return `/restaurant-test/reservations?date=${jstDate(new Date(ms))}`
+}
+
+function safeExternalHttpUrl(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url.trim())
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.toString() : null
+  } catch {
+    return null
+  }
+}
+
 export default function CloseTasksPage() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
@@ -68,6 +87,7 @@ export default function CloseTasksPage() {
   const [query, setQuery] = useListUrlValue('q', '')
   const [medium, setMedium] = useState('all')
   const [busyId, setBusyId] = useState('')
+  const busyRef = useRef(false)
   const [page, setPage] = useState(1)
 
   const latest = useRef(0)
@@ -80,8 +100,7 @@ export default function CloseTasksPage() {
         restaurantTestApi.listStores(selectedAccountId),
         restaurantTestApi.storeContext(selectedAccountId),
       ])
-      const selected = context?.data.selectedStore?.id
-      const storeId = stores.data.stores.some(s => s.id === selected) ? selected! : stores.data.stores[0]?.id
+      const storeId = selectAccountStore(stores.data.stores, selectedAccountId, context.data.selectedStore?.id)
       if (!storeId) { if (ticket === latest.current) { setTasks([]); setMedia([]) }; return }
       const [list, channels] = await Promise.all([
         restaurantTestApi.channelCloseTasks(selectedAccountId, storeId),
@@ -113,7 +132,8 @@ export default function CloseTasksPage() {
   const mediaOptions = [...new Map(groups.flatMap((g) => g.items).map((item) => [item.channel, item.name])).entries()]
 
   const close = async (taskId: string, name: string) => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !canWrite || busyRef.current) return
+    busyRef.current = true
     setBusyId(taskId)
     try {
       await restaurantTestApi.completeChannelCloseTask(selectedAccountId, taskId)
@@ -125,13 +145,17 @@ export default function CloseTasksPage() {
       if (!fieldFailure) {
       notifyToast(describeApiFailure(caught, '保存'), { tone: 'error' }) }
     } finally {
-      await load()
-      setBusyId('')
+      try {
+        await load()
+      } finally {
+        busyRef.current = false
+        setBusyId('')
+      }
     }
   }
 
   let content
-  if (error) content = <ListState kind="error" error={error} onRetry={() => void load()} />
+  if (error) content = <ListState kind="error" error={error} onRetry={() => void load()} action={canWrite ? <Button href="/settings/booking-media">店舗の選択を確認する</Button> : undefined} description={!canWrite ? '読み直しても解決しない場合は管理者にお問い合わせください。' : undefined} />
   else if (tasks === null) content = <ListState kind="loading" />
   else if (shown.length === 0) {
     content = <ListState kind="empty" title={tab === 'open' ? '未対応の知らせはありません' : '閉じた知らせはありません'} description={tab === 'open' ? '他の予約サイトの枠を閉じる必要があると、ここに出ます。' : undefined} />
@@ -157,6 +181,8 @@ export default function CloseTasksPage() {
              */
             const linkItem = target ?? (group.state === 'reopen' ? group.items[0] ?? null : null)
             const targetMedium = linkItem ? media.find((m) => m.code === linkItem.channel) ?? null : null
+            const adminHref = safeExternalHttpUrl(targetMedium?.adminUrl)
+            const targetLedgerHref = ledgerHref(group.startsAt)
             const badge = STATE_BADGE[group.state]
             return (
               <Tr key={group.slotId} data-table-layout="columns">
@@ -180,11 +206,11 @@ export default function CloseTasksPage() {
                 </Td>
                 <Td className={styles.colActions}>
                   <span className={styles.actions}>
-                    {targetMedium?.adminUrl ? (
-                      <Button external size="compact" href={targetMedium.adminUrl}  >管理画面を開く</Button>
+                    {adminHref ? (
+                      <Button external size="compact" href={adminHref}  >管理画面を開く</Button>
                     ) : null}
                     {canWrite && target ? (
-                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId === target.id} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
+                      <Button size="compact" onClick={() => void close(target.id, target.name)} disabled={busyId !== ''} aria-label={`${target.name}の枠を閉じた`} title={`${target.name}の枠を閉じた`} busy={Boolean(busyId === target.id)} busyLabel="処理中…">
                         <Check size={16} aria-hidden="true" />閉じた
                       </Button>
                     ) : null}
@@ -192,8 +218,8 @@ export default function CloseTasksPage() {
                       appearance="box"
                       label={`${slotTitle(group.startsAt)}の操作`}
                       items={[
-                        ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),
-                        { id: 'ledger', label: '予約台帳でこの日を見る', external: false, href: `/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`, onSelect: () => { router.push(`/restaurant-test/reservations?date=${group.startsAt.slice(0, 10)}`) } },
+                        ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, disabled: busyId !== '', onSelect: () => void close(item.id, item.name) })) : []),
+                        { id: 'ledger', label: '予約台帳でこの日を見る', external: false, href: targetLedgerHref, onSelect: () => { router.push(targetLedgerHref) } },
                       ]}
                     />
                   </span>

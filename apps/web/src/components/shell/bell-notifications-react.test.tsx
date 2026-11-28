@@ -14,6 +14,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { act, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NotificationCenterItem } from '@line-crm/shared'
+import { formatDateTime } from '@/lib/format'
 
 const fixture = vi.hoisted(() => ({
   role: 'owner' as string | null,
@@ -242,6 +243,16 @@ describe('★V8 ベルの小窓', () => {
     cleanup()
     vi.useRealTimers()
     delete document.documentElement.dataset.theme
+  })
+
+  it('相対時刻に元の日時を添え、本文の案内も残す', async () => {
+    const recent = new Date(Date.now() - 2 * 60 * 60_000).toISOString()
+    fixture.list.mockResolvedValue(centerData([item('recent', { title: '最近の通知', body: '通知の本文', createdAt: recent })]))
+    render(<Harness />)
+    const panel = await openPopover()
+    const row = (await within(panel).findByText('最近の通知')).closest('button')!
+    expect(row.getAttribute('title')).toBe('通知の本文')
+    expect(within(row).getByText('2時間前').getAttribute('title')).toBe(formatDateTime(recent, '日時不明'))
   })
 
   it('ベルを押すとページを移らずに小窓が開き、もう一度押すと閉じる', async () => {

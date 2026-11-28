@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useEffect, useRef } from 'react'
 
 import type { SupportMarkArchiveImpact, SupportMarkListItem } from '@/lib/api'
@@ -32,7 +34,7 @@ export const DISPLAY_TARGET_LABELS: Record<NonNullable<MarkRow['displayTargets']
  * 言い切ると、消してよいマークだと読めてしまうので `—` を出す。
  */
 export function usageLabel(mark: MarkRow): string {
-  const display = mark.displayTargets?.map((target) => DISPLAY_TARGET_LABELS[target]) ?? []
+  const display = mark.displayTargets?.map((target) => knownValue(DISPLAY_TARGET_LABELS, target, '表示先を確認できません')) ?? []
   const usedIn = mark.usedIn
   const parts: string[] = []
   if (usedIn?.broadcasts) parts.push(`配信${usedIn.broadcasts}件`)

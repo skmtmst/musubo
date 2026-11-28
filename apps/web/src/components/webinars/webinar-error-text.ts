@@ -44,6 +44,6 @@ export function webinarErrorText(error: unknown, fallback: string): string {
   const code = error instanceof ApiError
     ? error.code
     : extractApiErrorCode(error instanceof Error ? error.message : String(error))
-  if (code && WEBINAR_ERROR_TEXT[code]) return WEBINAR_ERROR_TEXT[code]
+  if (code && Object.prototype.hasOwnProperty.call(WEBINAR_ERROR_TEXT, code)) return WEBINAR_ERROR_TEXT[code]
   return fallback
 }

@@ -153,7 +153,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
             </tbody>
           </DataTable>
           <p className={styles.caption}>{`${periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)} ／ 利用関係を最後に確認: ${formatAnalyticsDateTime(overview.checkedAt)}`}</p>
-          <Disclosure title="集計期間を変える" hint={periodLabel} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
+          <Disclosure title="集計期間を変更する" hint={periodLabel} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
         </div>
       </DetailColumns>
     </div>

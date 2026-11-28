@@ -5,7 +5,9 @@ import { handoverProgress, latestFollowerImportState } from './check-rows'
 
 export function useRegistrationImport(createdId: string, enabled: boolean, initialPhase: FollowerImportState['phase'] | undefined, preference: boolean | undefined, resumed: boolean) {
   const [importState, setImportState] = useState<FollowerImportState | null>(null)
-  const [importRequestError, setImportRequestError] = useState(false)
+  const [importReadError, setImportReadError] = useState(false)
+  const [importStepError, setImportStepError] = useState(false)
+  const importRequestError = importReadError || importStepError
   const [importRefreshing, setImportRefreshing] = useState(false)
   const [idleSeconds, setIdleSeconds] = useState(0)
   const importProgressRef = useRef('')
@@ -25,20 +27,20 @@ export function useRegistrationImport(createdId: string, enabled: boolean, initi
         const response = await api.lineAccounts.stepFollowerImport(createdId)
         if (!active) return
         if (!response.success) {
-          setImportRequestError(true)
+          setImportStepError(true)
           timer = setTimeout(() => void advance(), 5000)
           return
         }
-        setImportRequestError(false)
+        setImportStepError(false)
         setImportState((current) => latestFollowerImportState(current, response.data.state))
         if (['importing_ids', 'hydrating_profiles'].includes(response.data.state.phase)) {
           /* 進めた直後は待たない（0.5秒は、何も進まない応答が続いたときの空回り止め）。 */
           timer = setTimeout(() => void advance(), response.data.busy ? 3000 : 500)
         }
       } catch (saveFailure) {
-        if (saveFailure instanceof ApiError && [403, 404, 409].includes(saveFailure.status)) { if (active) setImportRequestError(true); return }
+        if (saveFailure instanceof ApiError && [403, 404, 409].includes(saveFailure.status)) { if (active) setImportStepError(true); return }
         if (active) {
-          setImportRequestError(true)
+          setImportStepError(true)
           timer = setTimeout(() => void advance(), 5000)
         }
       }
@@ -57,10 +59,11 @@ export function useRegistrationImport(createdId: string, enabled: boolean, initi
         const response = await api.lineAccounts.followerImportState(createdId)
         if (active && response.success) {
           setImportState((current) => latestFollowerImportState(current, response.data))
-          setImportRequestError(false)
-        } else if (active) setImportRequestError(true)
+          setImportReadError(false)
+          if (response.data.phase === 'completed') setImportStepError(false)
+        } else if (active) setImportReadError(true)
       } catch {
-        if (active) setImportRequestError(true)
+        if (active) setImportReadError(true)
       }
       if (active) timer = setTimeout(() => void poll(), 5000)
     }
@@ -101,10 +104,11 @@ export function useRegistrationImport(createdId: string, enabled: boolean, initi
       const response = await api.lineAccounts.followerImportState(createdId)
       if (response.success) {
         setImportState((current) => latestFollowerImportState(current, response.data))
-        setImportRequestError(false)
-      } else setImportRequestError(true)
+        setImportReadError(false)
+        if (response.data.phase === 'completed') setImportStepError(false)
+      } else setImportReadError(true)
     } catch {
-      setImportRequestError(true)
+      setImportReadError(true)
     } finally {
       setImportRefreshing(false)
     }

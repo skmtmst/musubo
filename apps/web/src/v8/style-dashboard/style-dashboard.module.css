@@ -4,7 +4,7 @@
 .muted, .cellMuted { color: var(--color-ink-faint); font-size: var(--text-label); line-height: var(--text-caption--line-height); white-space: nowrap; }
 
 /* 頭の下の段（日付・担当・比べる・読み直す） */
-.head { padding-inline: var(--polish-space-section); padding-block-end: var(--polish-space-field); }
+.head { display: flex; flex-direction: column; gap: var(--polish-space-row); }
 .filters { display: flex; align-items: center; gap: var(--polish-space-row); min-inline-size: 0; }
 .filters > * { flex: 0 0 auto; }
 .filters > .grow { flex: 1 1 auto; }
@@ -29,6 +29,8 @@
 .sideCard { min-inline-size: 0; }
 .sideHead { display: flex; align-items: center; gap: var(--polish-space-row); min-inline-size: 0; }
 .sideTitle { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--text-callout); font-weight: 700; line-height: var(--text-body--line-height); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.todayHeader { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-row); min-inline-size: 0; }
+.todayHeader > button { margin-inline-start: auto; }
 .todayTitle { margin: var(--tpl-sd-text-margin); color: var(--color-ink); font-size: var(--tpl-sd-today-title-size); font-weight: var(--font-weight-bold); line-height: var(--text-lead--line-height); }
 .sideLink { display: inline-flex; align-items: center; gap: var(--polish-space-row); color: var(--color-accent-deep); font-size: var(--text-label); font-weight: 500; white-space: nowrap; text-decoration: none; }
 .sideRow { display: flex; align-items: baseline; gap: var(--polish-space-row); min-inline-size: 0; }

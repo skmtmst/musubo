@@ -32,7 +32,7 @@ function walk(value: unknown, depth: number, seen: WeakSet<object>): unknown {
   seen.add(value)
   try {
     if (Array.isArray(value)) return value.map((item) => walk(item, depth + 1, seen) ?? null)
-    const out: Record<string, unknown> = {}
+    const out: Record<string, unknown> = Object.create(null)
     for (const [key, item] of Object.entries(value)) {
       out[key] = SENSITIVE_KEY.test(key) && item !== null && item !== undefined && item !== '' ? REDACTED : walk(item, depth + 1, seen)
     }

@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics, type WebinarUserComment } from '@/lib/api'
@@ -32,6 +33,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrome: DetailChrome }) {
   const { webinar, analytics, analyticsState } = ctx
   const [permission, setPermission] = useState<'loading' | 'ready' | 'denied' | 'error'>('loading')
+  const [permissionRetrying, setPermissionRetrying] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -48,6 +50,8 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
       if (request === generation.current) setPermission('ready')
     }).catch((cause) => {
       if (request === generation.current) setPermission(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
+    }).finally(() => {
+      if (request === generation.current) setPermissionRetrying(false)
     })
     return () => { generation.current += 1 }
   }, [webinar.id, attempt])
@@ -70,16 +74,25 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
     })
   }, [permission, webinar.id])
 
+  const retryPermission = useCallback(() => {
+    if (permission === 'loading' || permissionRetrying) return
+    setPermissionRetrying(true)
+    setAttempt((value) => value + 1)
+  }, [permission, permissionRetrying])
+
   const csvButton = permission === 'ready' && analyticsState === 'ready'
     ? <Button onClick={download} disabled={busy} busy={busy} busyLabel="書き出しています…"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
     : null
 
   const summary = analytics?.summary ?? null
+  const analyticsError = analyticsState === 'error'
+  const analyticsLoading = analyticsState === 'loading' || (!analytics && !analyticsError)
+  const unavailableDetail = analyticsError ? '読み込めませんでした' : analyticsLoading ? '読み込んでいます' : emptyValue('unknown')
   const kpis = [
-    { key: 'reservations', title: '申込', icon: History, value: summary?.reservations ?? null, unit: '人', detail: summary ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : emptyValue('unknown'), help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
-    { key: 'viewers', title: '参加', icon: LogIn, value: summary?.viewers ?? null, unit: '人', detail: summary ? `申込の ${percent(summary.viewers, summary.reservations)}` : emptyValue('unknown'), help: '入場した人の数です。予約せず直接入場した人も含みます。' },
-    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: summary?.completed ?? null, unit: '人', detail: summary ? `参加の ${percent(summary.completed, summary.viewers)}` : emptyValue('unknown'), help: '動画の9割以上を実際に見た人です。' },
-    { key: 'forms', title: 'フォーム送信', icon: Send, value: summary?.formSubmissions ?? null, unit: '人', detail: summary ? `案内ボタンを押した ${formatNumber(summary.ctaClicks)} 人のうち` : emptyValue('unknown'), help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
+    { key: 'reservations', title: '申込', icon: History, value: analyticsError ? null : (summary?.reservations ?? null), unit: '人', detail: summary && !analyticsError ? `今月 +${formatNumber(thisMonthReservations(analytics?.daily ?? []))}` : unavailableDetail, help: '予約した人の数です。今月の数はサーバーの集計日（UTC）を基準にしています。' },
+    { key: 'viewers', title: '参加', icon: LogIn, value: analyticsError ? null : (summary?.viewers ?? null), unit: '人', detail: summary && !analyticsError ? `申込の ${percent(summary.viewers, summary.reservations)}` : unavailableDetail, help: '入場した人の数です。予約せず直接入場した人も含みます。' },
+    { key: 'completed', title: '視聴完了', icon: CircleCheck, value: analyticsError ? null : (summary?.completed ?? null), unit: '人', detail: summary && !analyticsError ? `参加の ${percent(summary.completed, summary.viewers)}` : unavailableDetail, help: '動画の9割以上を実際に見た人です。' },
+    { key: 'forms', title: 'フォーム送信', icon: Send, value: analyticsError ? null : (summary?.formSubmissions ?? null), unit: '人', detail: summary && !analyticsError ? `案内ボタンを押した ${formatNumber(summary.ctaClicks)} 人のうち` : unavailableDetail, help: 'フォームを送信した人の数です。同じ人が複数回送信しても1人に数えます。各段の人数差は、同じ人が順番に進んだ割合を表すものではありません。' },
   ]
 
   return (
@@ -88,19 +101,19 @@ export default function AnalyticsPane({ ctx, chrome }: { ctx: EditContext; chrom
       <div className={styles.stats} data-template-region="stats">
         <KpiBand>
           {kpis.map((kpi) => (
-            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} help={kpi.help} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={kpi.detail} />
+            <KpiCard key={kpi.key} presentation="band" title={kpi.title} icon={<kpi.icon size={16} aria-hidden="true" />} help={kpi.help} loading={analyticsLoading} value={kpi.value} unit={kpi.value === null ? '' : kpi.unit} detail={kpi.detail} />
           ))}
         </KpiBand>
       </div>
       <div className={styles.body} data-wc-pane="analytics">
-        {analyticsState === 'error' ? (
+        {analyticsError ? (
           <Notice tone="info" action={<Button onClick={ctx.retryAnalytics}>もう一度読み込む</Button>}>分析データを読み込めませんでした。通信を確認してください。</Notice>
         ) : !analytics ? (
-          <p className={styles.loading} role="status">分析データを読み込んでいます…</p>
+          <ListState kind="loading" title="分析データを読み込んでいます" />
         ) : (
           <>
-            {permission === 'error'
-              ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVで書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice>
+            {permission === 'error' || permissionRetrying
+              ? <Notice tone="info" action={<Button onClick={retryPermission} disabled={permissionRetrying} busy={permissionRetrying} busyLabel="確認しています…">もう一度読み込む</Button>}>CSVで書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice>
               : error ? <Notice tone="info">{error}</Notice> : null}
             <Funnel summary={analytics.summary} />
             <Retention analytics={analytics} durationSeconds={webinar.durationSeconds} />
@@ -258,22 +271,43 @@ function Details({ analytics }: { analytics: WebinarAnalytics }) {
 function ViewerComments({ webinarId }: { webinarId: string }) {
   const [comments, setComments] = useState<WebinarUserComment[] | null>(null)
   const [error, setError] = useState('')
+  const [denied, setDenied] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [attempt, setAttempt] = useState(0)
+  const inFlight = useRef(false)
   useEffect(() => {
     let active = true
+    inFlight.current = true
+    setLoading(true)
     setComments(null)
     setError('')
+    setDenied(false)
     void webinarApi.userComments(webinarId).then((response) => {
       if (!Array.isArray(response.data)) throw new Error('invalid_comments')
       if (active) setComments(response.data)
     }).catch((cause) => {
-      if (active) setError(cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '視聴者コメントを読み込めませんでした。')
+      if (!active) return
+      const isDenied = cause instanceof ApiError && cause.status === 403
+      setDenied(isDenied)
+      setError(isDenied ? permissionDeniedMessage('store') : '視聴者コメントを読み込めませんでした。')
+    }).finally(() => {
+      if (active) {
+        inFlight.current = false
+        setLoading(false)
+      }
     })
     return () => { active = false }
   }, [webinarId, attempt])
+  const retry = () => {
+    if (inFlight.current) return
+    inFlight.current = true
+    setLoading(true)
+    setAttempt((count) => count + 1)
+  }
+  const hint = comments ? `${formatNumber(comments.length)}件` : error ? (denied ? '権限なし' : '読み込めませんでした') : loading ? '読み込み中' : emptyValue('unknown')
   return (
-    <Disclosure size="compact" title="視聴者コメント" hint={comments ? `${formatNumber(comments.length)}件` : emptyValue('unknown')}>
-      {error ? <Notice tone="danger" action={<> <Button size="compact" onClick={() => setAttempt((count) => count + 1)}>もう一度読み込む</Button> </>} >{error}</Notice>
+    <Disclosure size="compact" title="視聴者コメント" hint={hint}>
+      {error ? <Notice tone="danger" action={<> <Button size="compact" onClick={retry} disabled={loading} busy={loading}>もう一度読み込む</Button> </>} >{error}</Notice>
         : comments === null ? <p role="status" className={styles.cardText}>コメントを読み込んでいます…</p>
           : comments.length === 0 ? <p className={styles.cardText}>まだコメントはありません。</p>
             : (

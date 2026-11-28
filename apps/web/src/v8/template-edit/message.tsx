@@ -90,6 +90,8 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const [editorState, setEditor] = useState<TemplateEditorState>(initialState)
   const [clean, setClean] = useState(() => snapshot(initialState().draft))
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<{ account: string; status: 'loading' | 'ready' | 'error' } | null>(null)
+  const [folderRetry, setFolderRetry] = useState(0)
   const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
   const [referenceState, setReferenceState] = useState<TemplateReferenceState>('idle')
   const [saving, setSaving] = useState(false)
@@ -123,6 +125,14 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setConflict(null)
     setAutoCreated(null)
   }
+  const [draftAccount, setDraftAccount] = useState(selectedAccountId)
+  if (draftAccount !== selectedAccountId) {
+    setDraftAccount(selectedAccountId)
+    if (!id && !host && !autoCreated && editor.draft.folderId) {
+      editor = { ...editor, draft: { ...editor.draft, folderId: null } }
+      setEditor(editor)
+    }
+  }
   const { name, folderId, messageType, messageContent } = editor.draft
   /* H-18原文の再読込対策：入力が変わるたび呼ぶ側へ一時下書きを渡す。保存と同じ形。 */
   const draftSnapshot = snapshot(editor.draft)
@@ -151,6 +161,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     : binding
   /* 統括の入口では店のアカウントに結びつけない（差し込み候補・フォルダは店のものを使わない）。 */
   const editorAccountId = host ? null : resolveEditorAccountId(binding)
+  const foldersReady = Boolean(host) || (folderState?.account === editorAccountId && folderState.status === 'ready')
   const saveGuard = host ? null : templateSaveGuard(binding)
   const loadFailed = editor.status === 'failed'
   const loading = Boolean(id) && (editor.status === 'idle' || editor.status === 'loading')
@@ -171,11 +182,15 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setFolders([])
     if (!editorAccountId) return
     let cancelled = false
-    void api.folders.list('template', editorAccountId)
-      .then((res) => { if (!cancelled && res.success) setFolders(res.data) })
-      .catch(() => undefined)
+    setFolderState({ account: editorAccountId, status: 'loading' })
+    void api.folders.list('template', editorAccountId).then(res => {
+      if (cancelled) return
+      if (!res.success) throw new Error('folders unavailable')
+      setFolders(res.data)
+      setFolderState({ account: editorAccountId, status: 'ready' })
+    }).catch(() => { if (!cancelled) setFolderState({ account: editorAccountId, status: 'error' }) })
     return () => { cancelled = true }
-  }, [editorAccountId])
+  }, [editorAccountId, folderRetry])
 
   const referenceGeneration = useRef(0)
   useEffect(() => {
@@ -624,14 +639,15 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
                     aria-label="フォルダ"
                     value={host ? host.folder : folderId ?? ''}
                     onChange={host ? host.onFolderChange : (value) => updateDraft({ folderId: value || null })}
-                    folders={host ? host.folders : folders.map(folderById)}
+                    folders={host ? host.folders : foldersReady ? folders.map(folderById) : []}
+                    disabled={!foldersReady}
                     colors
                     onCreate={host
                       ? hostFolderCreate(host)
                       : canMutate && editorAccountId
                         ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: editorAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                         : undefined}
-                  /></SaveErrorField></Field></div>
+                  /></SaveErrorField>{!host && folderState?.account === editorAccountId && folderState.status === 'error' ? <Notice tone="danger">フォルダを読み込めませんでした。 <Button variant="text" size="inline" onClick={() => setFolderRetry(value => value + 1)}>もう一度読み込む</Button></Notice> : null}</Field></div>
               </SettingsFormRow>
             </Card>
 

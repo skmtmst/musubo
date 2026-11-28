@@ -1,20 +1,27 @@
+import { isCalendarDate } from '@line-crm/shared'
 import type { IndustryStyle, StyleAnalyticsData, StyleMetric } from '@line-crm/shared'
 import type { StyleAnalytics } from './model'
 
 const count = (metric: StyleMetric | undefined): number | null => metric?.status === 'available'
   && typeof metric.value === 'number' && Number.isFinite(metric.value) && metric.value >= 0 ? metric.value : null
+const validDate = isCalendarDate
 
 /** Pair the same ordinal day of the selected and comparison periods. */
 export function dailyAnalyticsSeries(style: IndustryStyle, comparison: StyleAnalyticsData['dailyComparison']): NonNullable<StyleAnalytics['chart']> {
   const key = style === 'restaurant' ? 'bookings' : 'visits'
-  const points = (comparison?.current ?? []).map((day, index) => {
-    const previous = comparison?.previous?.[index]
-    return { label: day.date, now: count(day.metrics[key]), prev: count(previous?.metrics[key]), previousLabel: previous?.date }
+  const currentDays = Array.isArray(comparison?.current) ? comparison.current : []
+  const previousDays = Array.isArray(comparison?.previous) ? comparison.previous : []
+  const points = currentDays.map((day, index) => {
+    const previous = previousDays[index]
+    const currentDate = validDate(day?.date) ? day.date : null
+    const previousDate = validDate(previous?.date) ? previous.date : null
+    return { label: currentDate ?? '日付不明', now: currentDate ? count(day?.metrics?.[key]) : null, prev: previousDate ? count(previous?.metrics?.[key]) : null, previousLabel: previousDate ?? undefined }
   })
   const values = points.flatMap(p => [p.now, p.prev]).filter((value): value is number => value !== null)
   const max = Math.max(1, ...values)
   const axisIdx = points.length ? [0, Math.floor(points.length / 4), Math.floor(points.length / 2), Math.floor(points.length * 3 / 4), points.length - 1] : []
   const axis = [...new Set(axisIdx)].map(index => {
+    if (!validDate(points[index].label)) return '日付不明'
     const date = new Date(`${points[index].label}T00:00:00Z`)
     return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`
   })

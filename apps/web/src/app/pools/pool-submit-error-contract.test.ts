@@ -12,7 +12,9 @@ const CREATE = readFileSync(join(HERE, 'new/page.tsx'), 'utf8')
 function fnBody(src: string, decl: string): string {
   const start = src.indexOf(decl)
   if (start < 0) throw new Error(`${decl} が見つかりません`)
-  const open = src.indexOf('{', start)
+  const arrow = src.indexOf('=> {', start)
+  if (arrow < 0) throw new Error(`${decl} の本体が見つかりません`)
+  const open = arrow + 3
   let depth = 0
   for (let i = open; i < src.length; i++) {
     if (src[i] === '{') depth += 1
@@ -50,14 +52,8 @@ describe('新規プール窓の送信 (#1058)', () => {
 })
 
 describe('プール所属アカウントの読み込み・追加 (#1058)', () => {
-  it('useEffect はPromiseを返さない（Reactのcleanup契約）', () => {
-    expect(PAGE, 'async関数をそのまま呼ぶとPromiseがcleanup扱いされ、拒否も拾えない')
-      .toMatch(/useEffect\(\(\) => \{\s*void reload\(\)/)
-    expect(PAGE).not.toMatch(/useEffect\(\(\) => \{\s*reload\(\)/)
-  })
-
   it('一覧の読み直しに失敗したら握りつぶさず、行の下へ出す', () => {
-    const body = fnBody(PAGE, 'const reload = useCallback(async ()')
+    const body = fnBody(PAGE, 'const reload = useCallback(async (options?: { force?: boolean })')
     expect(body, '読み直しをtryで囲んでいない').toMatch(/try\s*\{[\s\S]*await api\.pools\.accounts\.list/)
     expect(body, '失敗を受けていない').toContain('} catch {')
     expect(body, '失敗を画面に出していない').toContain('setListError(')

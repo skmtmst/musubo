@@ -11,17 +11,27 @@ export function replaceCampaignSamples(value: string): string {
     .reduce((result, [from, to]) => result.replaceAll(from, to), value)
 }
 
+const SAFE_HTTP_URL = /^https?:\/\//i
+
 /** 旧一覧の紹介文→記事カードの見本を、共通のLINE表示へ引き継ぐ。送信はしない。 */
 export function ColumnPreviewCard({ column, buttonLabel }: { column: Pick<NenColumn, 'imageUrl' | 'category' | 'title' | 'excerpt' | 'articleUrl'>; buttonLabel: string }) {
+  const imageUrl = column.imageUrl?.trim() ?? ''
+  const category = column.category?.trim() ?? ''
+  const title = column.title.trim() || '（題名がまだありません）'
+  const excerpt = column.excerpt?.trim() ?? ''
+  const label = buttonLabel.trim()
+  const articleUrl = column.articleUrl.trim()
+  const hasSafeImage = SAFE_HTTP_URL.test(imageUrl)
+  const hasSafeButton = Boolean(label) && SAFE_HTTP_URL.test(articleUrl)
   const content = JSON.stringify({
     type: 'bubble',
-    ...(column.imageUrl ? { hero: { type: 'image', url: column.imageUrl, size: 'full', aspectRatio: '16:9', aspectMode: 'cover' } } : {}),
+    ...(hasSafeImage ? { hero: { type: 'image', url: imageUrl, size: 'full', aspectRatio: '16:9', aspectMode: 'cover' } } : {}),
     body: { type: 'box', layout: 'vertical', contents: [
-      ...(column.category ? [{ type: 'text', text: column.category, size: 'sm', wrap: true }] : []),
-      { type: 'text', text: column.title, weight: 'bold', wrap: true },
-      ...(column.excerpt ? [{ type: 'text', text: replaceColumnSamples(column.excerpt), wrap: true }] : []),
+      ...(category ? [{ type: 'text', text: category, size: 'sm', wrap: true }] : []),
+      { type: 'text', text: title, weight: 'bold', wrap: true },
+      ...(excerpt ? [{ type: 'text', text: replaceColumnSamples(excerpt), wrap: true }] : []),
     ] },
-    ...(buttonLabel ? { footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', action: { type: 'uri', label: buttonLabel, uri: column.articleUrl } }] } } : {}),
+    ...(hasSafeButton ? { footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', action: { type: 'uri', label, uri: articleUrl } }] } } : {}),
   })
   return <LinePreviewFlex content={content} />
 }

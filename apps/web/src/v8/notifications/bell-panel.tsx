@@ -14,6 +14,8 @@ export type BellPanelItem = {
   unread: boolean
   /** 「5分前」「昨日 18:20」など。 */
   time: string
+  /** 元の日時（相対表示に指を乗せて確認する）。 */
+  timeTitle?: string
   /** 作成日時を日本時間で分けた日付の組。日時が不正なら不明として残す。 */
   period: 'today' | 'earlier' | 'unknown'
   /** 行き先の言葉（「配信を開く」「更新する」など。→ は部品が付ける）。 */

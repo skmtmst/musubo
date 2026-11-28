@@ -335,7 +335,7 @@ export default function PhoneReservationDrawer({ staffRole, storeName, tableDefi
                 : time ? candidates.length ? '卓を選んでください' : '人数が入る空いた卓がありません' : '時刻を選ぶと自動で割り当てます'}
             </span>
           </div>
-          <Button variant="text" disabled={!candidates.length} title={!candidates.length ? '空いている時刻を選ぶと卓を変えられます' : undefined} onClick={() => { if (changingTable) { setChangingTable(false); setFloorId('all') } else setChangingTable(true) }}>{changingTable ? '決める' : '変える'}</Button>
+          <Button variant="text" disabled={!candidates.length} title={!candidates.length ? '空いている時刻を選ぶと卓を変えられます' : undefined} onClick={() => { if (changingTable) { setChangingTable(false); setFloorId('all') } else setChangingTable(true) }}>{changingTable ? '決める' : '変更する'}</Button>
         </div>
         {changingTable && candidates.length > 0 ? <>
           {floorError && <Notice tone="warn" message="階・エリアを読み込めませんでした。卓はすべて表示しています。" />}

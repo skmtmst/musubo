@@ -30,15 +30,21 @@ export function distributionFolderRows({ accounts, folders, membership, selected
   onChange: (ids: string[]) => void
   disabled?: boolean
 }): FolderPanelRow[] {
+  const folderIds = new Set(folders.map((folder) => folder.id))
+  const incomplete = membership !== null && accounts.some((account) => {
+    const member = membership.get(account.id)
+    return !member || (member.folderId !== null && (typeof member.folderId !== 'string' || !folderIds.has(member.folderId)))
+  })
   const row = (id: string, label: string, folder?: Folder | null): FolderPanelRow => {
     const ids = accountsInFolder(accounts, id, membership).map((account) => account.id)
     const count = ids.filter((accountId) => selected.includes(accountId)).length
+    const unknown = id !== ALL_ACCOUNTS && incomplete
     return {
-      id, label, count: ids.length,
+      id, label, count: unknown ? null : ids.length,
       icon: id === ALL_ACCOUNTS ? undefined : <FolderDot folder={folder} />,
       leading: <SaveErrorField names={["length","ids.length","count"]}><Checkbox aria-label={`${label}をまとめて選ぶ`} checked={ids.length > 0 && count === ids.length}
-        title={ids.length === 0 ? 'このフォルダには配れるアカウントがありません。' : disabled ? '配布の確認中は選択を変更できません。' : undefined}
-        indeterminate={count > 0 && count < ids.length} disabled={disabled || ids.length === 0}
+        title={unknown ? '一部のアカウントの所属を確認できません。' : ids.length === 0 ? 'このフォルダには配れるアカウントがありません。' : disabled ? '配布の確認中は選択を変更できません。' : undefined}
+        indeterminate={count > 0 && count < ids.length} disabled={disabled || unknown || ids.length === 0}
         onCheckedChange={(checked) => onChange(checked ? [...new Set([...selected, ...ids])] : selected.filter((accountId) => !ids.includes(accountId)))} /></SaveErrorField>,
     }
   }
@@ -52,6 +58,6 @@ export function DistributionFolderPanel({ rows, activeId, onSelect, failed, comp
 }) {
   return <>
     <FolderPanel showHeading={!hideHeading} heading={compact ? 'フォルダ' : 'アカウントのフォルダ'} headingHelp="フォルダごとに選べます。" rows={rows} activeId={activeId} onSelect={onSelect} />
-    {failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。ページを再読み込みしてください。" /> : null}
+    {failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。ページを再読み込みしてください。" /> : rows.some((row) => row.id !== ALL_ACCOUNTS && row.count === null) ? <Notice tone="warn" message="一部のアカウントの所属を確認できません。すべてから選ぶか、ページを再読み込みしてください。" /> : null}
   </>
 }

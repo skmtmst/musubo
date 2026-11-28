@@ -56,8 +56,11 @@ export interface TapAreaEditorProps {
   listLabel?: string
 }
 
-/** 0 番目→A。 */
-export const tapAreaLetter = (index: number) => String.fromCharCode(65 + index)
+/** 0 番目→A、26 番目以降（27 番目〜）は数字。 */
+export const tapAreaLetter = (index: number) => {
+  if (!Number.isInteger(index) || index < 0) return ''
+  return index < 26 ? String.fromCharCode(65 + index) : String(index + 1)
+}
 
 export default function TapAreaEditor({
   title = '画像の上で面を選ぶ',
@@ -99,7 +102,7 @@ export default function TapAreaEditor({
                       className={styles.area}
                       data-selected={selected ? '' : undefined}
                       aria-pressed={selected}
-                      aria-label={`面 ${tapAreaLetter(index)}「${item.name}」を選ぶ`}
+                      aria-label={`面 ${tapAreaLetter(index)}「${item.name}」を選択する`}
                       onClick={() => onSelect(item.id)}
                       style={{ left: `${item.x ?? 0}%`, top: `${item.y ?? 0}%`, width: `${item.width ?? 100}%`, height: `${item.height ?? 100}%` }}
                     >

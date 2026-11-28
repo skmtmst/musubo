@@ -36,7 +36,8 @@ test('接続済みなら設定を残してリッチメニューから始めら�
   await page.reload()
   await expect(picker).toBeVisible()
   await picker.getByRole('button', { name: 'あとで', exact: true }).click()
-  await expect(page).toHaveURL(/\/restaurant-test\/tables/)
+  await expect(picker).toBeHidden()
+  await expect(page.getByRole('button', { name: '続きから進める', exact: true })).toBeVisible()
 })
 
 test('Webhookが一致した時だけ0/8から次へ進める', async ({ page }) => {
@@ -136,7 +137,7 @@ test('Penの5つの型を表示し、欄のエラーを確認してから保存�
   expect(noteBounds.x + noteBounds.width).toBeLessThan(bounds.x + bounds.width)
   await page.screenshot({ path: testInfo.outputPath('guide-menu-picker.png') })
   await page.setViewportSize({ width: 390, height: 900 })
-  await expect(menuPicker.getByRole('button', { name: '0から自分で作る' })).toBeVisible()
+  await expect(menuPicker.getByRole('article', { name: '0から自分で作る' }).getByRole('button', { name: '自分で作る' })).toBeVisible()
   const mobile = await menuPicker.boundingBox()
   expect(mobile.x + mobile.width).toBeLessThanOrEqual(390)
   await page.screenshot({ path: testInfo.outputPath('guide-menu-picker-mobile.png') })
@@ -245,7 +246,7 @@ test('一時停止中に受付を止めても最初の未完了項目から始�
   await page.getByRole('link', { name: 'ダッシュボード', exact: true }).click()
   await expect(page.getByRole('banner').getByRole('link', { name: /開店準備 6\/8。はじめの設定を開く/ })).toBeVisible()
   await page.getByRole('button', { name: '最初から始める', exact: true }).click()
-  await page.getByRole('dialog', { name: /リッチメニューを選ぶ/ }).getByRole('button', { name: 'あとで', exact: true }).click()
+  await page.getByRole('dialog', { name: /リッチメニューを選ぶ/ }).getByRole('button', { name: 'これにする', exact: true }).first().click()
   await expect(page).toHaveURL(/\/restaurant-test\/inventory$/, { timeout: 15000 })
   await expect(page.locator(guideBar)).toContainText('予約枠と在庫を設定する')
 })

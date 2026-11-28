@@ -55,6 +55,7 @@ export default function FileOpen() {
   const [state, setState] = useState<State>({ name: 'loading' });
   const generation = useRef(0);
   const blobUrl = useRef<string | null>(null);
+  const openingGeneration = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     const mine = ++generation.current;
@@ -62,6 +63,7 @@ export default function FileOpen() {
     setState({ name: 'loading' });
     try {
       const file = await issueFile(id);
+      if (!file || typeof file.id !== 'string' || typeof file.url !== 'string' || typeof file.expiresAt !== 'string' || typeof file.filename !== 'string' || typeof file.mimeType !== 'string' || !Number.isSafeInteger(file.size) || file.size < 0 || !['image', 'video', 'file'].includes(file.kind)) throw new FileDownloadError('retry');
       if (mine === generation.current) setState({ name: 'ready', file });
     } catch (err) {
       logFailure('file-issue', err);
@@ -79,12 +81,14 @@ export default function FileOpen() {
   useEffect(() => () => { if (blobUrl.current) URL.revokeObjectURL(blobUrl.current); }, []);
 
   const open = useCallback(async (file: IssuedFile) => {
+    const mine = generation.current;
+    if (openingGeneration.current === mine) return;
     // 取得リンクは最長15分。過ぎていたら通信せず期限切れにする。
     if (!Number.isFinite(Date.parse(file.expiresAt)) || Date.parse(file.expiresAt) <= Date.now()) {
       setState({ name: 'failed', kind: 'expired' });
       return;
     }
-    const mine = generation.current;
+    openingGeneration.current = mine;
     setState({ name: 'fetching', file });
     try {
       const blob = await fetchFileBlob(file);
@@ -99,6 +103,8 @@ export default function FileOpen() {
       logFailure('file-fetch', err);
       const e = err instanceof FileDownloadError ? err : new FileDownloadError('retry');
       setState({ name: 'failed', kind: e.kind, waitSeconds: e.retryAfterSeconds });
+    } finally {
+      if (openingGeneration.current === mine) openingGeneration.current = null;
     }
   }, []);
 

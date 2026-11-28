@@ -202,10 +202,13 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   /** サーバーの値を受け取るまでは、控えの値で進む操作を保存しない（古い値で上書きしない）。 */
   const pending = useRef<Promise<boolean>>(Promise.resolve(true))
   const generation = useRef(0)
+  const completing = useRef(false)
 
   useEffect(() => {
     const current = ++generation.current
+    completing.current = false
     setState(readGuideEngineState(accountId, staffId))
+    setSkipped(EMPTY_SKIPPED)
     setLoadedScope(null)
     pending.current = Promise.resolve(true)
     if (!accountId) return
@@ -221,20 +224,22 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
       .then(() => true, () => true)
       .finally(() => { if (generation.current === current) setLoadedScope(scope) })
     pending.current = request
-    return () => { generation.current += 1 }
+    return () => { generation.current += 1; completing.current = false }
   }, [accountId, scope, staffId])
 
   const persist = useCallback((next: GuideEngineState, acknowledged = false) => {
     if (!accountId) return Promise.resolve(false)
+    const currentGeneration = generation.current
     if (!acknowledged) writeGuideEngineState(accountId, next, staffId)
     const request = pending.current.then(async () => {
+      if (generation.current !== currentGeneration) return false
       try {
         const response = await api.gettingStarted.guide.save(accountId, {
           phase: next.phase, stepKey: next.stepKey, procedureIndex: next.procedureIndex,
         })
         if (response?.success) return true
       } catch { /* 保存されたが返答が途切れた場合に、下で読み直す。 */ }
-      if (!acknowledged) return false
+      if (!acknowledged || generation.current !== currentGeneration) return false
       try {
         const response = await api.gettingStarted.guide.get(accountId)
         return Boolean(response?.success && response.data?.phase === 'done')
@@ -266,15 +271,20 @@ export function useGuideEngine(accountId: string | null, summary: GuideSummary |
   const anchor = useMemo(() => guideAnchor(summary, skipped), [summary, skipped])
   const finished = Boolean(summary && summary.total > 0 && summary.done === summary.total)
   const complete = useCallback(async () => {
-    if (!accountId || loading || !finished) return false
+    if (!accountId || loading || !finished || completing.current) return false
     if (state.phase === 'done') return true
     const next = nextGuideEngineState(state, 'complete')
     const currentGeneration = generation.current
-    const saved = await persist(next, true)
-    if (!saved || generation.current !== currentGeneration) return false
-    setState(next)
-    writeGuideEngineState(accountId, next, staffId)
-    return true
+    completing.current = true
+    try {
+      const saved = await persist(next, true)
+      if (!saved || generation.current !== currentGeneration) return false
+      setState(next)
+      writeGuideEngineState(accountId, next, staffId)
+      return true
+    } finally {
+      if (generation.current === currentGeneration) completing.current = false
+    }
   }, [accountId, loading, finished, persist, staffId, state])
 
   /* 9項目が済んだら案内を閉じる。まだ始めていない人の記録は作らない。 */

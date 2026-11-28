@@ -31,6 +31,22 @@ import styles from './inventory.module.css'
 
 type InventoryTab = 'stock' | 'channels' | 'closures' | 'rules'
 
+function InventorySwitch({ tab, onTab }: { tab: InventoryTab; onTab: (tab: InventoryTab) => void }) {
+  return (
+    <SegmentedControl<InventoryTab>
+      aria-label="予約枠・在庫の切り替え"
+      value={tab}
+      onChange={onTab}
+      options={[
+        { value: 'stock', label: '時間帯ごとの在庫' },
+        { value: 'channels', label: '予約経路の連携' },
+        { value: 'rules', label: '自動で合わせるルール' },
+        { value: 'closures', label: '休業日・貸切' },
+      ]}
+    />
+  )
+}
+
 function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
   ctx: RestaurantV8Context
   tab: InventoryTab
@@ -46,25 +62,19 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
   const canEdit = canManageRole(role)
   const today = todayIn(ctx.store?.timezone)
   /* 88: 店の行き来（上の段）が下線のタブなので、中の切り替え（下の段）は灰の箱の切り替えにする。 */
-  const tabs = (
-    <SegmentedControl<InventoryTab>
-      aria-label="予約枠・在庫の切り替え"
-      value={tab}
-      onChange={onTab}
-      options={[
-        { value: 'stock', label: '時間帯ごとの在庫' },
-        { value: 'channels', label: '予約経路の連携' },
-        { value: 'rules', label: '自動で合わせるルール' },
-        { value: 'closures', label: '休業日・貸切' },
-      ]}
-    />
-  )
+
+  const tabs = <InventorySwitch tab={tab} onTab={onTab} />
   let body: ReactNode
   if (tab === 'stock') {
     return <StockBoard key={ctx.selectedStoreId} ctx={ctx} canEdit={canEdit} heading={heading} notice={notice} tabs={tabs} />
   }
   if (!selectedAccountId || !ctx.selectedStoreId) {
-    body = <ListState kind="empty" title="店舗を選んでください" description={tab === 'channels' ? '予約経路を見たい店舗を選んでください。' : '休業日・貸切を見たい店舗を選んでください。'} />
+    const emptyDescription = tab === 'channels'
+      ? '予約経路を見たい店舗を選んでください。'
+      : tab === 'rules'
+        ? '自動で合わせるルールを見たい店舗を選んでください。'
+        : '休業日・貸切を見たい店舗を選んでください。'
+    body = <ListState kind="empty" title="店舗を選んでください" description={emptyDescription} />
   } else if (tab === 'rules') {
     body = <RulesBoard key={`${selectedAccountId}:${ctx.selectedStoreId}`} accountId={selectedAccountId} storeId={ctx.selectedStoreId} today={today} timezone={ctx.store?.timezone} canEdit={canEdit} />
   } else if (tab === 'channels') {
@@ -95,6 +105,8 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
 function closuresDescription(ctx: RestaurantV8Context | null): string {
   if (!ctx?.store) return '日付を選んで、席の予約を閉じます。'
   const active = ctx.data.tables.filter((t) => t.store_id === ctx.selectedStoreId && t.is_active)
+  const allValid = active.every((t) => typeof t.max_capacity === 'number' && Number.isFinite(t.max_capacity) && t.max_capacity >= 0)
+  if (!allValid) return `${ctx.store.name}・1つの時間帯の総数 確認できません（有効な卓 ${active.length} 卓）`
   const seats = active.reduce((sum, t) => sum + t.max_capacity, 0)
   return `${ctx.store.name}・1つの時間帯の総数 ${seats}席（有効な卓 ${active.length} 卓）`
 }
@@ -107,7 +119,7 @@ export default function InventoryPage() {
   const changeTab = setTab
   const closures = tab === 'closures'
   return (
-    <RestaurantShell initialStoreId={initialStoreId} templateHeading
+    <RestaurantShell initialStoreId={initialStoreId} templateHeading pendingContent={<InventorySwitch tab={tab} onTab={changeTab} />}
       boardId={closures ? 'UVnvR' : tab === 'rules' ? 'nGcY1' : 'Y8SjT2'}
       title="予約枠・在庫"
       explanation={tab === 'stock' ? 'ここは「席（卓）」に対して受ける予約の枠です。担当スタッフなど「人」に対して受ける予約は、予約設定（メニュー・受付枠・担当スタッフ）で決めます。' : undefined}

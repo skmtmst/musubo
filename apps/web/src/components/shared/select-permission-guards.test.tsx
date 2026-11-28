@@ -36,7 +36,7 @@ describe('UIの拒否だけを迂回したFieldの守り', () => {
   it('開くhandler自体が、権限のない選択窓を開かない', () => {
     fault.bypassTipHandlers = true
     render(<EntityPickerField label="物" noun="物" value="a" items={items} onChange={vi.fn()} lockedReason={reason} />)
-    fireEvent.click(screen.getByRole('button', { name: '物：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '物：変更する' }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
   it('外すhandler自体が、値を消さない', () => {
@@ -58,7 +58,7 @@ describe('UIの拒否だけを迂回したFieldの守り', () => {
 it('Summaryの開く・外すUIは、Fieldの守りがなくても理由付きで拒む', () => {
   const open = vi.fn(), clear = vi.fn()
   render(<EntityPickerSummary label="物" noun="物" name="現在の物" onOpen={open} onClear={clear} lockedReason={reason} />)
-  fireEvent.click(screen.getByRole('button', { name: '物：変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '物：変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '物を外す' }))
   expect(open).not.toHaveBeenCalled()
   expect(clear).not.toHaveBeenCalled()
@@ -103,11 +103,11 @@ describe('閉じるeffectを保留した実在する窓の守り', () => {
     const Multi = ({ lockedReason }: { lockedReason?: string }) => <EntityPickerField label="物" noun="物" multiple value={['a']} items={items} onChange={change} lockedReason={lockedReason} />
     const Field = multiple ? Multi : Single
     const view = render(<Field />)
-    fireEvent.click(screen.getByRole('button', { name: '物：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '物：変更する' }))
     const dialog = await screen.findByRole('dialog')
     holdClosing(() => view.rerender(<Field lockedReason={reason} />))
     expect(screen.getByRole('dialog')).toBe(dialog)
-    const confirm = within(dialog).getByRole('button', { name: /^選ぶ/ }) as HTMLButtonElement
+    const confirm = within(dialog).getByRole('button', { name: /^選択する/ }) as HTMLButtonElement
     expect(confirm.isConnected).toBe(true)
     expect(confirm.disabled).toBe(false)
     fireEvent.click(confirm)
@@ -117,7 +117,7 @@ describe('閉じるeffectを保留した実在する窓の守り', () => {
     const create = vi.fn()
     const props = { label: '物', noun: '物', value: 'a', items, onChange: vi.fn(), createAction: { label: () => 'この名前で作る', onCreate: create } }
     const view = render(<EntityPickerField {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: '物：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '物：変更する' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: '新しい物' } })
     await within(dialog).findByRole('button', { name: 'この名前で作る' })
@@ -129,7 +129,7 @@ describe('閉じるeffectを保留した実在する窓の守り', () => {
     const create = vi.fn(async () => ({ id: 'created', name: '新しい物' }))
     const props = { label: '物', noun: '物', value: ['a'], items, onChange: vi.fn(), multiple: true as const, headerCreate: { label: '新しく作る', onCreate: create } }
     const view = render(<EntityPickerField {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: '物：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '物：変更する' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: '新しく作る' }))
     fireEvent.change(within(dialog).getByRole('textbox', { name: '新しい名前' }), { target: { value: '新しい物' } })

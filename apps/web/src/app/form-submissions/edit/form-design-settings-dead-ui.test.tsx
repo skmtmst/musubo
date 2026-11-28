@@ -140,7 +140,7 @@ describe('デザイン設定に無反応な操作面を残さない(#725)', () =
   it('背景画像は登録メディアへ繋がったので選択欄を戻した（#725 の条件が解消）', async () => {
     await render()
     // 「なし」一択だった頃は欄ごと消していた。選べる中身ができたので戻す。
-    expect(host.textContent).toContain('登録メディアから選ぶ')
+    expect(host.textContent).toContain('登録メディアから選択する')
     // 選べる中身がある欄は残っている。
     expect(host.querySelector('[aria-label="書体"]')).toBeTruthy()
     expect(host.querySelector('[aria-label="角の丸み"]')).toBeTruthy()

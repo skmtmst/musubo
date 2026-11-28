@@ -20,9 +20,9 @@ export interface AiSettings {
   /** 止まっている理由（提供元の障害・月の上限）。止まっていないときは null。 */
   suspendedReason: 'provider' | 'monthly_limit' | null
   /** 公開中の Q&A の件数（自動で答えるを選べるかの判断と窓の文に使う）。 */
-  publishedQaCount: number
+  publishedQaCount: number | null
   /** 確かめ待ち（下書き）の件数。窓の「確かめ待ちの 1 件は使いません」に使う。 */
-  draftQaCount: number
+  draftQaCount: number | null
   version: number
   /** 組2：Q&A の自動応答は今の段では使えない（false）。使えないときは選ぶ欄に出さない。 */
   autoReplyAvailable?: boolean
@@ -89,9 +89,8 @@ const write = (input: { questions: string[]; answerText: string }) => ({ questio
 export const aiReplyApi = {
   settings: async (accountId: string): Promise<Result<AiSettings>> => {
     const [res, qa] = await Promise.all([gap2.settings(accountId), gap2.qa(accountId, '', 0).catch(() => null)])
-    /* Q&A の件数が読めなくても、段の読み込みは成功させる（件数は 0 と数えず「不明」を 0 件扱いにするだけ）。 */
-    const items = qa?.success ? qa.data : null
-    const countOf = (status: string) => (items ? items.filter((row) => row.status === status).length : 0)
+    const items = qa?.success && Array.isArray(qa.data) && qa.data.every((row) => row && typeof row.status === 'string') ? qa.data : null
+    const countOf = (status: string) => items ? items.filter((row) => row.status === status).length : null
     return { success: true, data: { mode: res.data.mode, suspendedReason: null, publishedQaCount: countOf('published'), draftQaCount: countOf('draft'), version: res.data.version, autoReplyAvailable: res.data.autoReplyAvailable } }
   },
   saveSettings: async (accountId: string, input: { mode: AiMode; expectedVersion: number; reason?: string }, _stepUpToken?: string): Promise<Result<AiSettings>> => {

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 // 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
@@ -62,7 +62,7 @@ it('店舗を替えても元のメニューと支払いを全部保存し、新�
  fixture.updateMenu.mockImplementationOnce(() => new Promise(resolve => { old = resolve })).mockImplementationOnce(() => new Promise(resolve => { fresh = resolve }))
  const view = render(<><MenuEditPage /><ToastHost /></>)
  fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '前の店の名前' } })
- fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変える/ }))
+ fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
  fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
  await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledTimes(1))
  fixture.account = 'account-2'
@@ -81,4 +81,27 @@ it('店舗を替えても元のメニューと支払いを全部保存し、新�
  await act(async () => { fresh({ success: true }) })
  await waitFor(() => expect(nav.push).toHaveBeenCalledExactlyOnceWith('/restaurant-test/menu'))
  expect(payment.saveCourseMode).toHaveBeenCalledTimes(1)
+})
+
+it('公開だけ成功し支払いが競合したら、公開済みの状態を下書きに戻せない', async () => {
+ const { ApiError } = await import('@/lib/api')
+ nav.params = new URLSearchParams('id=m4')
+ payment.saveCourseMode.mockRejectedValueOnce(new ApiError(409, 'conflict', 'version_conflict'))
+ render(<MenuEditPage />)
+ const status = await screen.findByLabelText('保存する状態')
+ fireEvent.click(status)
+ fireEvent.click(within(await screen.findByRole('listbox')).getByRole('button', { name: '公開', exact: true }))
+ fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
+ fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+ const confirmation = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
+ fireEvent.click(within(confirmation).getByRole('button', { name: '公開して保存する' }))
+ await waitFor(() => expect(payment.saveCourseMode).toHaveBeenCalledTimes(1))
+ expect(await within(confirmation).findByText(/メニュー本体は保存しました/)).toBeTruthy()
+ fireEvent.click(within(confirmation).getByRole('button', { name: 'キャンセル' }))
+ expect(await screen.findByText('メニューは公開済みです。状態を変えるには一覧から操作してください。')).toBeTruthy()
+ expect(screen.getByLabelText('保存する状態').textContent).toContain('公開')
+ expect((screen.getByLabelText('保存する状態') as HTMLButtonElement).disabled).toBe(true)
+ fireEvent.click(screen.getByLabelText('保存する状態'))
+ expect(screen.queryByRole('listbox')).toBeNull()
+ expect(fixture.updateMenu).toHaveBeenCalledTimes(1)
 })

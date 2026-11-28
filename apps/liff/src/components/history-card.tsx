@@ -38,8 +38,9 @@ export default function HistoryCard({
 }) {
   const words = useCustomerWords();
   const statusWords: Record<string, string> = { requested: words.approvalPending, completed: words.completed, no_show: words.noShow, rejected: 'お受けできませんでした' };
-  const base = STATUS_META[booking.status];
-  const meta = (base ? { ...base, label: statusWords[booking.status] ?? base.label } : null) ?? { label: booking.status, tone: 'neutral' as const };
+  const base = Object.hasOwn(STATUS_META, booking.status) ? STATUS_META[booking.status] : undefined;
+  const meta = (base ? { ...base, label: statusWords[booking.status] ?? base.label } : null) ?? { label: '予約状態を確認できません', tone: 'neutral' as const };
+  const validStart = typeof booking.starts_at === 'string' && Number.isFinite(Date.parse(booking.starts_at));
   const hasActions = Boolean(onChange || onCancel || onPay);
   // 支払いの札があるときは、予約の状態は「確定」以外だけを札の右に文字で添える（絵の「返金済み キャンセル」）。
   const statusAside = payment && booking.status !== 'confirmed' && booking.status !== 'completed' && meta.label !== payment.label ? meta.label : null;
@@ -49,9 +50,9 @@ export default function HistoryCard({
         <div className="flex items-center gap-3">
           <div className="flex w-14 shrink-0 flex-col items-center gap-0.5 rounded-(--liff-radius) bg-liff-off-bg py-2">
             <span className="liff-num text-[15px] leading-[18px] font-bold whitespace-nowrap text-ink">
-              {utcToJstMd(booking.starts_at)}
+              {validStart ? utcToJstMd(booking.starts_at) : '日時不明'}
             </span>
-            <span className="liff-num text-[11px] leading-[13px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span>
+            {validStart ? <span className="liff-num text-[11px] leading-[13px] text-liff-sub">{utcToJstHm(booking.starts_at)}</span> : null}
           </div>
           <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
             <div className="w-full truncate text-[15px] leading-normal font-bold text-ink" title={booking.menu_name}>
@@ -64,7 +65,7 @@ export default function HistoryCard({
           </div>
         </div>
         {payment?.actionRequired ? <p role="status" className="text-xs leading-5 text-liff-sub">{PAYMENT_UNKNOWN}</p> : null}
-        <OnlineMeetingCard bookingId={booking.id} status={booking.status} booking={booking} />
+        {validStart ? <OnlineMeetingCard bookingId={booking.id} status={booking.status} booking={booking} /> : <p role="status" className="text-xs text-liff-sub">予約日時を確認できません</p>}
         {onReceipt && (
           <div className="flex items-center justify-between gap-2">
             <Button variant="link" onClick={onReceipt} disabled={disabled}>

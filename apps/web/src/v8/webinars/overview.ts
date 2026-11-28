@@ -4,7 +4,7 @@ import { formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 
 export function metricValue(metric: WebinarOverviewMetric | undefined): number | null {
-  return metric && metric.state === 'available' && metric.value !== null ? metric.value : null
+  return metric?.state === 'available' && typeof metric.value === 'number' && Number.isFinite(metric.value) && metric.value >= 0 ? metric.value : null
 }
 
 /** 同じ理由は一度だけ、別の理由は指標名と合わせて既存の補足へ出す。 */

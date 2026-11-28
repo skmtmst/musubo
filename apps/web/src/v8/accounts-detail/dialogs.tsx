@@ -625,7 +625,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
           <div className={styles.labelRow}>
 
             <Button type="button" variant="text" presentation="account-inline" aria-expanded={showOgMore} onClick={() => setShowOgMore((value) => !value)}>
-              {showOgMore ? '説明と画像を閉じる' : '説明と画像も変える'}
+              {showOgMore ? '説明と画像を閉じる' : '説明と画像も変更する'}
             </Button>
           </div>
           <SaveErrorField names={["ogSiteName","og_site_name"]}><Field label="ブランド設定（OGP）" htmlFor={ids.og}><TextField id={ids.og} placeholder="共有したときに出る名前" value={ogSiteName} onChange={(event) => setOgSiteName(event.target.value)} disabled={busy} /></Field></SaveErrorField>

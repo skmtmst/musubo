@@ -38,6 +38,10 @@ const RANGES = [7, 28, 90] as const
 type RangeDays = typeof RANGES[number]
 const DEVICE_LABELS: Record<string, string> = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }
 
+export function deviceLabel(key: string): string {
+  return Object.prototype.hasOwnProperty.call(DEVICE_LABELS, key) ? DEVICE_LABELS[key] : 'その他のデバイス'
+}
+
 function pagePath(key: string) {
   try { const url = new URL(key); return `${url.pathname}${url.search}` || '/' } catch { return key }
 }
@@ -115,7 +119,7 @@ export default function SearchConsoleV8() {
       ['区分', '項目', '表示回数', 'クリック数', 'クリックされた割合(%)', '掲載順位'],
       ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), formatNumber(data.summary.ctr * 100, { digits: 1 }), formatNumber(data.summary.position, { digits: 1 })],
       ...data.daily.map((row) => ['日別', row.key, '', String(row.clicks), '', '']),
-      ...data.devices.map((device) => ['デバイス', DEVICE_LABELS[device.key] ?? device.key, '', String(device.clicks), '', '']),
+      ...data.devices.map((device) => ['デバイス', deviceLabel(device.key), '', String(device.clicks), '', '']),
       ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), formatNumber(row.ctr * 100, { digits: 1 }), formatNumber(row.position, { digits: 1 })]),
       ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), formatNumber(row.ctr * 100, { digits: 1 }), formatNumber(row.position, { digits: 1 })]),
     ]
@@ -177,7 +181,7 @@ export default function SearchConsoleV8() {
               <CardHeader size="stacked" titleId="sc-devices-title" title="デバイス別" />
               <DataTable label="デバイス別のクリック数" grid={{ columns: 'minmax(0, 1fr) max-content', padding: '0 var(--polish-space-field)', headPadding: '0 var(--polish-space-field)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--text-caption)' }}><tbody>{data.devices.map((device) => {
                 const ratio = data.summary.clicks ? device.clicks / data.summary.clicks * 100 : 0
-                const label = DEVICE_LABELS[device.key] ?? device.key
+                const label = deviceLabel(device.key)
                 return <Tr key={device.key} title={`${label}：${ratio.toFixed(1)}%`}><Td><TruncatedText value={label} /></Td><Td align="right">{formatNumber(device.clicks)}</Td></Tr>
               })}</tbody></DataTable>
             </Card>

@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /**
  * 権限の表示名の正本（一覧と追加の両画面で共有）。
  *
@@ -48,7 +49,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
 
 /** 知らない権限パスが来たら件数表示に落とす前の名前解決。 */
 export function permissionLabel(path: string): string {
-  return PERMISSION_LABELS[path] ?? ''
+  return knownValue(PERMISSION_LABELS, path, '')
 }
 
 /** 成果承認の表示権限と操作権限。操作だけ・表示なしの組み合わせは作らない。 */

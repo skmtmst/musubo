@@ -80,7 +80,7 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
     const metrics = await page.evaluate(() => {
       const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom}}
       const cards=[...document.querySelectorAll('button[data-placement="timeline"]')].map(e=>{
-        const b=box(e),s=getComputedStyle(e),texts=[e.firstElementChild,e.lastElementChild.firstElementChild,...e.lastElementChild.lastElementChild.children].map(t=>({text:t.textContent,box:box(t),scroll:t.scrollHeight,client:t.clientHeight,title:t.title,warning:t.hasAttribute('data-booking-warning')}))
+        const b=box(e),s=getComputedStyle(e),texts=[e.firstElementChild,e.lastElementChild.firstElementChild,...e.lastElementChild.lastElementChild.children].map(t=>({text:t.textContent,box:box(t),scroll:t.scrollHeight,client:t.clientHeight,title:t.title,warning:t.hasAttribute('data-booking-warning'),source:t.hasAttribute('data-booking-source'),display:getComputedStyle(t).display}))
         return {state:e.dataset.bookingState,box:b,border:parseFloat(s.borderTopWidth),menu:box(e.lastElementChild.firstElementChild),meta:box(e.lastElementChild.lastElementChild),description:e.getAttribute('aria-description'),texts}
       })
       const now=document.querySelector('[data-booking-now]'),label=box(now.firstElementChild)
@@ -96,13 +96,36 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
       assert.equal(card.texts.filter(t=>t.text==='2名').length,1,'飲食の人数も省かない')
       assert.ok(card.menu.w>0 && card.menu.right<=card.meta.x,'メニューと札の領域を分け、メニューを消さない')
       if(card.state==='hold'){assert.ok(card.description.includes('そば・小麦'));assert.equal(card.texts.find(t=>t.warning).title,'⚠ そば・小麦')}
+      const source = card.texts.find(t => t.source)
+      assert.equal(source?.text, '電話', '予約元の情報を保持する')
+      assert.equal((card.description.match(/電話/g) || []).length, 1, '予約元は読み上げで1回伝える')
       for (const t of card.texts) {
+        if (t.source && t.display === 'none') {
+          assert.ok(card.box.w <= 14 * 16, '狭い予約枠だけ予約元を畳む')
+          continue
+        }
         assert.ok(t.box.h>=16 && t.client>=t.scroll,JSON.stringify(t))
         assert.ok(t.box.y>=card.box.y+card.border && t.box.bottom<=card.box.bottom-card.border,JSON.stringify({card,t}))
         assert.ok(t.box.x>=card.box.x+card.border && t.box.right<=card.box.right-card.border,JSON.stringify({card,t}))
       }
-      assert.deepEqual(card.texts.slice(0,3).map(t=>Math.round(t.box.y-card.box.y)),metrics.cards[0].texts.slice(0,3).map(t=>Math.round(t.box.y-metrics.cards[0].box.y)))
+      for (const [index, text] of card.texts.slice(0, 2).entries()) {
+        const reference = metrics.cards[0].texts[index]
+        assert.ok(Math.abs((text.box.y-card.box.y)-(reference.box.y-metrics.cards[0].box.y)) <= 2, `名前・時刻とメニューの縦位置をそろえる: ${JSON.stringify({ index, state: card.state, y: text.box.y-card.box.y, border: card.border, reference: reference.box.y-metrics.cards[0].box.y, referenceBorder: metrics.cards[0].border, text: text.text })}`)
+      }
     }
+    // 十分に広い予約枠では、予約元も実際に読めることを確かめる。
+    const wideSource = await page.locator('button[data-placement="timeline"]').first().evaluate(card => {
+      const original = card.style.cssText
+      card.style.width = '300px'
+      const source = card.querySelector('[data-booking-source]')
+      const r = source.getBoundingClientRect()
+      const result = { text: source.textContent, display: getComputedStyle(source).display, width: r.width, height: r.height, client: source.clientHeight, scroll: source.scrollHeight }
+      card.style.cssText = original
+      return result
+    })
+    assert.equal(wideSource.text, '電話')
+    assert.notEqual(wideSource.display, 'none')
+    assert.ok(wideSource.width > 0 && wideSource.height >= 16 && wideSource.client >= wideSource.scroll, '広い枠の予約元は切れずに見える')
     const accessibility = await page.context().newCDPSession(page)
     try {
       const tree = await accessibility.send('Accessibility.getFullAXTree')
@@ -240,6 +263,8 @@ for (const touch of [false, true]) test(`予約の空き枠は操作領域を保
         await page.keyboard.press('Tab')
         await button.focus()
         await paint(page)
+        await button.waitFor({ state: 'attached' })
+        await page.waitForFunction(el => Number(getComputedStyle(el.querySelector('[class*=\"slotLabel\"]') || el).opacity) === 1, await button.elementHandle(), { timeout: 2000 })
         const focused = await button.evaluate(el=>({active:document.activeElement===el,focus:el.matches(':focus'),focusVisible:el.matches(':focus-visible'),within:el.parentElement.matches(':focus-within'),className:el.className,opacity:getComputedStyle(el).opacity,tabIndex:el.tabIndex,disabled:el.disabled}))
         assert.equal(await opacity(button), 1, `${name}: 焦点でも案内が出る ${JSON.stringify(focused)}`)
         const after = await button.boundingBox()

@@ -167,11 +167,11 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
         onCancel={() => { if (!busy) clearDraft() }}
       >
         <div className={styles.iconRow}>
-          <button type="button" className={styles.iconTile} onClick={() => setIconPickerOpen(true)} aria-label={icon ? '画像を変える' : '画像を選ぶ'}>
+          <button type="button" className={styles.iconTile} onClick={() => setIconPickerOpen(true)} aria-label={icon ? '画像を変更する' : '画像を選択する'}>
             {icon?.url
               // eslint-disable-next-line @next/next/no-img-element -- 登録メディアの画像
               ? <img width={88} height={88} src={icon.url} alt="" className={styles.iconTileImage} />
-              : <><ImagePlus size={20} aria-hidden="true" /><span>画像を選ぶ</span></>}
+              : <><ImagePlus size={20} aria-hidden="true" /><span>画像を選択する</span></>}
           </button>
           <div className={styles.iconText}>
             <strong>アイコン<OptionalBadge /></strong>

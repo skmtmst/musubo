@@ -145,6 +145,8 @@ export function useScenarioDraft<T>({
   const [savedJson, setSavedJson] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [readyToken, setReadyToken] = useState<string | null>(null)
+  const [failedToken, setFailedToken] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [pending, setPending] = useState<{ value: T; savedAt: number } | null>(null)
   const [conflict, setConflict] = useState<Remote<T> | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -177,6 +179,7 @@ export function useScenarioDraft<T>({
     setPending(null)
     setConflict(null)
     setReadyToken(null)
+    setFailedToken(null)
     if (!token || !account || !draftKey) return
     let cancelled = false
     const canContinue = captureWritePermission()
@@ -189,9 +192,15 @@ export function useScenarioDraft<T>({
         if (res.success) {
           versionRef.current = res.data.version
           remote = toRemote<T>(res.data)
+          if (!remote) throw new Error('invalid_draft')
+        } else {
+          throw new Error('draft_load_failed')
         }
-      } catch {
-        // 404 は「無い」。ほかの失敗も「無い」として進め、保存の 409 で読み直す。
+      } catch (caught) {
+        if (!isStatus(caught, 404)) {
+          if (!cancelled) setFailedToken(token)
+          return
+        }
       }
       if (cancelled) return
       if (remote) setSavedJson(JSON.stringify(remote.value))
@@ -242,9 +251,14 @@ export function useScenarioDraft<T>({
     return () => { cancelled = true }
     // link と legacyKey はキーと一緒に決まる。権限だけの切替ではGETを増やさず、古い処理の書込は参照と世代で止める。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token])
+  }, [token, loadAttempt])
 
   const ready = token !== null && readyToken === token
+  const loadFailed = token !== null && failedToken === token
+  const retryLoad = useCallback(() => {
+    setFailedToken(null)
+    setLoadAttempt((attempt) => attempt + 1)
+  }, [])
   /** 下書きがいまの入力と違う（送る必要がある）か。保存済みの形に戻ったら「消す」必要があるか。 */
   const draftDirty = ready && (dirty ? savedJson !== valueJson : savedJson !== null)
 
@@ -368,6 +382,7 @@ export function useScenarioDraft<T>({
 
   /** 「捨てる」・本物を保存できた・キャンセル。下書きを消す。 */
   const clear = useCallback(() => {
+    if (!ready) return
     if (!captureWritePermission()()) return
     clearGenRef.current += 1
     setPending(null)
@@ -381,7 +396,7 @@ export function useScenarioDraft<T>({
       void api.scenarioDrafts.delete(target.account, target.key, version).catch(() => {})
     }
     if (legacyKey) removeBrowserDraft(legacyKey)
-  }, [active, legacyKey, captureWritePermission])
+  }, [active, legacyKey, captureWritePermission, ready])
 
   /** 競合の帯「最新の下書きを読み込む」。最新の値を返す（画面が自分の state へ入れる）。 */
   const loadLatest = useCallback((): T | null => {
@@ -423,5 +438,7 @@ export function useScenarioDraft<T>({
     loadLatest,
     overwrite,
     label,
+    loadFailed,
+    retryLoad,
   }
 }

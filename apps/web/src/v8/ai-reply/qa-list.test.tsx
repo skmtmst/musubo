@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -36,7 +37,7 @@ beforeEach(() => {
   apiMock.saveSettings.mockResolvedValue({ success: true, data: { mode: 'auto_qa', suspendedReason: null, publishedQaCount: 18, draftQaCount: 1, version: 5 } })
   apiMock.listQa.mockResolvedValue({ success: true, data: { items: [QA], total: 1 } })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetSessionSnapshot() })
 
 async function open() {
   render(<QaListV8 />)
@@ -106,7 +107,7 @@ it('アカウント切替後は古い Q&A 削除確定を送らない', async ()
 
 it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓で押すまで段は変わらない', async () => {
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '自動で答える' }))
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByText('自動で答える前の確かめ')).toBeTruthy()
@@ -121,7 +122,7 @@ it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓�
 
 it('AI を使わない確認に操作先と環境を示す', async () => {
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '使わない' }))
   const dialog = screen.getByRole('dialog')
   expect(within(dialog).getByText('LINEアカウント')).toBeTruthy()
@@ -131,7 +132,7 @@ it('AI を使わない確認に操作先と環境を示す', async () => {
 
 it('AI の使い方を選んだ後に切り替えて戻しても古い確定を送らない', async () => {
   const view = render(<QaListV8 />)
-  fireEvent.click(await screen.findByRole('button', { name: '変える' }))
+  fireEvent.click(await screen.findByRole('button', { name: '変更する' }))
   fireEvent.click(screen.getByRole('button', { name: '自動で答える' }))
   const button = within(screen.getByRole('dialog')).getByRole('button', { name: /自動で答えるをオンにする/ })
   const key = Object.keys(button).find(item => item.startsWith('__reactProps$'))!
@@ -145,32 +146,36 @@ it('AI の使い方を選んだ後に切り替えて戻しても古い確定を�
 it('切替先の AI 設定を読んでいる間は前のアカウントの操作を出さない', async () => {
   const seen: boolean[] = []
   function Probe() {
-    React.useLayoutEffect(() => { if (account.id === 'acc-2') seen.push(Boolean(screen.queryByRole('button', { name: '変える' }))) })
+    React.useLayoutEffect(() => { if (account.id === 'acc-2') seen.push(Boolean(screen.queryByRole('button', { name: '変更する' }))) })
     return <QaListV8 />
   }
   const view = render(<Probe />)
-  expect(await screen.findByRole('button', { name: '変える' })).toBeTruthy()
+  expect(await screen.findByRole('button', { name: '変更する' })).toBeTruthy()
   apiMock.settings.mockReturnValueOnce(new Promise(() => {}))
   account.id = 'acc-2'; view.rerender(<Probe />)
   expect(seen).toEqual([false])
-  expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
 })
 
 it('管理者には自動で答えるの選択肢を出さない（オーナーだけ）', async () => {
   role.value = verifiedStaffRole('admin')
   await open()
-  fireEvent.click(screen.getByRole('button', { name: '変える' }))
+  fireEvent.click(screen.getByRole('button', { name: '変更する' }))
   expect(screen.queryByRole('button', { name: '自動で答える' })).toBeNull()
   expect(screen.getByText('自動で答えるのオンはオーナーだけが変えられます')).toBeTruthy()
 })
 
-it('閲覧のみには追加・取り込み・変える・行の「…」を出さず、帯を出す', async () => {
+it('閲覧のみの追加・取り込みは理由付きで止め、編集操作を出さず帯を出す', async () => {
   role.value = verifiedStaffRole('viewer')
   await open()
   expect(screen.getByText(/閲覧のみで見ています。Q&A の追加/)).toBeTruthy()
-  expect(screen.queryByRole('button', { name: /Q&A を追加/ })).toBeNull()
-  expect(screen.queryByRole('button', { name: /取り込む/ })).toBeNull()
-  expect(screen.queryByRole('button', { name: '変える' })).toBeNull()
+  for (const name of [/Q&A を追加/, /取り込む/]) {
+    const button = screen.getByRole('button', { name })
+    expect(button.getAttribute('aria-disabled') === 'true' || (button as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(button)
+  }
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(screen.queryByRole('button', { name: '変更する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '「駐車場はありますか」の操作' })).toBeNull()
   expect(screen.getByText('駐車場はありますか')).toBeTruthy()
 })
@@ -194,4 +199,26 @@ it.each(['owner', 'viewer'])('Q&Aの説明は %s が使える操作に合う', a
   expect(note).toBeTruthy()
   expect(Boolean(note.textContent?.includes('行を押すと編集'))).toBe(currentRole === 'owner')
   expect(Boolean(note.textContent?.includes('公開・止める・削除'))).toBe(currentRole === 'owner')
+})
+
+it('書き込み代理ログイン中も Q&A 作成と取り込みを理由付きで止める', async () => {
+  rememberSessionSnapshot({ impersonation: { id: 'imp', tenantId: 'tenant', mode: 'write', piiRevealed: false, startedAt: '2026-11-26T00:00:00Z' }, unfamiliarAt: null, stepUpMethod: 'none' })
+  apiMock.listQa.mockResolvedValue({ success: true, data: { items: [], total: 0 } })
+  await open()
+  for (const button of screen.getAllByRole('button', { name: /Q&A を追加|取り込む/ })) {
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(button)
+  }
+  expect(document.body.textContent).toContain('代理ログイン中は Q&A の追加・取り込みができません。')
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it('スタッフには Q&A の取り込みが管理者だけの操作だと伝える', async () => {
+  role.value = verifiedStaffRole('staff')
+  await open()
+  const button = screen.getByRole('button', { name: /取り込む（PDF・Web）/ })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(document.body.textContent).toContain('この操作はオーナーか管理者だけができます。')
+  fireEvent.click(button)
+  expect(screen.queryByRole('dialog')).toBeNull()
 })

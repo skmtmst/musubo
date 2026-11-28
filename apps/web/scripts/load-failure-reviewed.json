@@ -224,20 +224,6 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/hq-deliveries/console.tsx",
-    "fingerprint": "043cc8fc12a0ffbf",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/v8/hq-deliveries/console.tsx",
-    "fingerprint": "7964f9735595ec4b",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/v8/hq/support.tsx",
     "fingerprint": "42501536277d6ab2",
     "disposition": "error-visible",
@@ -315,13 +301,6 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/restaurant/organization/organization-forms.tsx",
-    "fingerprint": "32dbd7c759d8c097",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/v8/settings/emergency/health.tsx",
     "fingerprint": "defbb1e54cc37234",
     "disposition": "error-visible",
@@ -390,20 +369,6 @@
     "disposition": "error-visible",
     "count": 1,
     "reason": "B-246：失敗は保存の知らせへ表示。空配列は完了した工程の記録で、取得データを空にしていない。"
-  },
-  {
-    "filename": "src/v8/hq-deliveries/action-resource-picker.tsx",
-    "fingerprint": "79ed278543b7c212",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "2026-10-22 独立確認：HQ候補の取得失敗はNoticeと再読込を出し、候補とcursorを破棄して確定を禁止する。空の正常結果には変換しない。検索変更・取消後の応答はrequest世代とeffectのcleanupで破棄する。auto-reply-actions.test.tsxとconsole.test.tsxで拒否・再読込・候補選択・取消時0変更・閲覧のみを確認済み。"
-  },
-  {
-    "filename": "src/v8/restaurant/google/post-media-picker-dialog.tsx",
-    "fingerprint": "060b670e3d817c47",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "登録メディアの取得失敗は候補を空にしたうえで窓の中に失敗文を出し、件数は不明（null）にする。古い要求の応答は request の世代で捨てる。空の正常結果には見せない。"
   },
   {
     "filename": "src/v8/friend-detail/delivery-consent.tsx",

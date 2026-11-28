@@ -772,6 +772,8 @@ export default function BroadcastListV8() {
     if (!canEditBroadcastNow()) { notifyToast(`権限が変わったため、配信の${action}を中止しました。`, { tone: 'error' }); return }
     run()
   }
+  const openNewBroadcast = withCurrentEdit(() => { setCreateMenuOpen(false); router.push('/broadcasts/new') }, '作成')
+
   const lockedWriteItems = (items: ActionMenuItem[]) => items.map(item => ({
     ...item,
     lockedReason: editAccess.reason,
@@ -822,7 +824,7 @@ export default function BroadcastListV8() {
         setMenuMoveFor(broadcast.id)
       },
     })
-    items.push({
+    if (broadcast.status === 'draft' || broadcast.status === 'scheduled') items.push({
       id: 'delete',
       label: '削除する',
       tone: 'danger',
@@ -1072,7 +1074,7 @@ export default function BroadcastListV8() {
       icon={<Send aria-hidden="true" />}
       title="まだ一斉配信がありません"
       description="友だちみんなや絞り込んだ人に、お知らせをまとめて送ります。"
-      create={{ label: '最初の一斉配信を作る', onClick: () => openCreate(false) }}
+      create={{ label: '最初の一斉配信を作る', onClick: openNewBroadcast }}
       canCreate={canEdit}
       lockedReason={editAccess.reason ?? null}
       filtered={filterActive}
@@ -1236,7 +1238,7 @@ export default function BroadcastListV8() {
             /* 絵  の分け方：かんたんに送る（1画面・板 ）と詳しく作る（5つの手順 `/broadcasts/new`）。
                テンプレートから作るは絵に無いが今ある機能なので、その下に残す。 */
             { id: 'create-quick', label: 'かんたんに送る', description: '文字1通を、全員かタグで。1画面で送れる', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); setQuickSendOpen(true) }, '作成') },
-            { id: 'create-new', label: '詳しく作る', description: '画像・カード・絞り込み・承認（5手順）', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); router.push('/broadcasts/new') }, '作成') },
+            { id: 'create-new', label: '詳しく作る', description: '画像・カード・絞り込み・承認（5手順）', onSelect: openNewBroadcast },
             { id: 'create-template', label: 'テンプレートから作る', onSelect: () => openCreate(true) },
           ])}
         />
@@ -1297,7 +1299,7 @@ secondary: ((canResume) ? <Button
                     編集を続ける
                   </Button> : null),
 menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
-...((!(fromHq)) ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
+...(canResume ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
              status={<StatusBadge broadcast={panelRow} />}>
 <DetailContent>
 <DetailField label={panelRow.status === 'sent' ? '送信日時' : '送る日時'}>{panelRow.status === 'sent' ? (panelRow.sentAt ? formatDateTime(panelRow.sentAt) : '送信済み') : (panelRow.scheduledAt ? formatDateTime(panelRow.scheduledAt) : '下書き')}</DetailField>

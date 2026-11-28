@@ -114,12 +114,14 @@ type DeleteTarget =
 
 /** 「大・6面・切替タブ 2」の形にする。面数が取れないときは大きさだけ。 */
 function menuShapeText(g: RichMenuGroupListItem): string {
-  const size = g.size === 'large' ? '大' : '小'
-  const areas = g.defaultPageAreaCount != null && g.defaultPageAreaCount > 0
-    ? ` ${g.defaultPageAreaCount} ボタン`
+  const size = g.size === 'large' ? '大' : g.size === 'compact' || (g.size as string) === 'small' ? '小' : 'サイズ不明'
+  const areas = typeof g.defaultPageAreaCount === 'number' && Number.isFinite(g.defaultPageAreaCount) && g.defaultPageAreaCount > 0
+    ? ` ${Math.trunc(g.defaultPageAreaCount)} ボタン`
     : ''
-  const pages = g.pageCount ?? 0
-  const tabs = pages > 1 ? `・切替タブ ${pages}` : g.pageCount != null ? '・切替タブ なし' : ''
+  const pages = typeof g.pageCount === 'number' && Number.isFinite(g.pageCount) && g.pageCount >= 0
+    ? Math.trunc(g.pageCount)
+    : null
+  const tabs = pages !== null ? (pages > 1 ? `・切替タブ ${pages}` : '・切替タブ なし') : ''
   return `${size}${areas}${tabs}`
 }
 
@@ -146,7 +148,9 @@ function audienceMainText(g: RichMenuGroupListItem, tagNameById: Map<string, str
 function audienceSubText(g: RichMenuGroupListItem): string | null {
   if (g.publishingAt && g.isDefaultForAll) return `${shortDay(g.publishingAt)} から既定`
   if (g.targetingEnabled && g.targetingCondition) {
-    return g.audienceCount != null ? `対象 ${formatNumber(g.audienceCount)} 人` : '対象の人数は未取得'
+    return typeof g.audienceCount === 'number' && Number.isFinite(g.audienceCount) && g.audienceCount >= 0
+      ? `対象 ${formatNumber(Math.trunc(g.audienceCount))} 人`
+      : '対象の人数は未取得'
   }
   if (g.isDefaultForAll) return '（既定）'
   return null
@@ -206,6 +210,8 @@ export default function RichMenusListV8() {
   const canEdit = featureAccess
 
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
+  const listRequestIdRef = useRef(0)
+  const foldersRequestIdRef = useRef(0)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
   const [detailId, setDetailId] = useDetailPanelUrl('menu')
@@ -286,8 +292,11 @@ export default function RichMenusListV8() {
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
+    listRequestIdRef.current += 1
+    foldersRequestIdRef.current += 1
     importRequestGenerationRef.current += 1
     setGroups([])
+    setFolders([])
     setGroupTotal(0)
     setGroupFacets(null)
     setExternal(null)
@@ -320,6 +329,7 @@ export default function RichMenusListV8() {
 
   /* 一覧の検索・ページングはD1の一覧だけを取り直す（PERF-05）。 */
   const loadList = useCallback(async () => {
+    const requestId = ++listRequestIdRef.current
     if (!selectedAccount?.id) {
       setLoading(false)
       return
@@ -337,23 +347,22 @@ export default function RichMenusListV8() {
         filter: savedFilter,
         sort: sortKey,
       })
-      if (activeAccountRef.current !== accountId) return
+      if (activeAccountRef.current !== accountId || listRequestIdRef.current !== requestId) return
       if (!groupsRes.success) throw new Error('load_failed')
       setGroups(groupsRes.data.items)
       setGroupTotal(groupsRes.data.total)
       setGroupFacets(groupsRes.data.facets ?? null)
     } catch (e) {
+      if (activeAccountRef.current !== accountId || listRequestIdRef.current !== requestId) return
       const fieldFailure = saveErrors.capture(e);
 
-      if (activeAccountRef.current === accountId) {
-        { if (!fieldFailure)
+      { if (!fieldFailure)
 
-        setError(richMenuError(e, 'load')) }
-        { if (!fieldFailure)
-        setLoadError(e) }
-      }
+      setError(richMenuError(e, 'load')) }
+      { if (!fieldFailure)
+      setLoadError(e) }
     } finally {
-      if (activeAccountRef.current === accountId) setLoading(false)
+      if (activeAccountRef.current === accountId && listRequestIdRef.current === requestId) setLoading(false)
     }
   }, [deferredQuery, folderFilter, page, pageSize, savedFilter, selectedAccount?.id, sortKey, saveErrors])
 
@@ -435,16 +444,27 @@ export default function RichMenusListV8() {
   }, [loadList, loadTapStats, loadExternal])
 
   const loadFolders = useCallback(async () => {
+    const accountId = selectedAccount?.id ?? null
+    const requestId = ++foldersRequestIdRef.current
+    if (!accountId) {
+      setFolders([])
+      return
+    }
     try {
-      const res = await api.folders.list('rich_menu', selectedAccount?.id ?? undefined)
+      const res = await api.folders.list('rich_menu', accountId)
+      if (activeAccountRef.current !== accountId || foldersRequestIdRef.current !== requestId) return
       if (res.success) setFolders(res.data)
     } catch (saveFailure) {
+      if (activeAccountRef.current !== accountId || foldersRequestIdRef.current !== requestId) return
       saveErrors.capture(saveFailure)
       // 置き場が取れなくても一覧は出す。
     }
   }, [selectedAccount?.id, saveErrors])
 
-  useEffect(() => { void loadList() }, [loadList])
+  useEffect(() => {
+    void loadList()
+    return () => { listRequestIdRef.current += 1 }
+  }, [loadList])
   useEffect(() => { void loadTapStats() }, [loadTapStats])
   useEffect(() => { void loadTags() }, [loadTags])
   useEffect(() => {
@@ -804,7 +824,7 @@ export default function RichMenusListV8() {
     if (g.status === 'published') {
       items.push({
         id: 'apply',
-        label: '表示先を変える',
+        label: '表示先を変更する',
         onSelect: () => setApplyTo(g),
       })
     }

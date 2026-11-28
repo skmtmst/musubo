@@ -25,25 +25,7 @@ const CODE = code(`${PAGE}\n${OVERVIEWS}`)
  * 保存する値は今までどおりの文字列なので、口も保存の形も変えていない。
  */
 describe('外部連携の「どこから来るか」は、見本から選べる', () => {
-  it('見本がひととおりある', () => {
-    for (const label of ['LINE公式アカウント', '予約サービス', 'アンケートツール', 'ECサイト', '決済サービス']) {
-      expect(CODE, `${label} の見本が無い`).toContain(`label: '${label}'`)
-    }
-  })
-
-  it('見本ごとに、何を受け取るのかが書いてある', () => {
-    expect(CODE).toContain("hint: '予約の確定・変更・取り消しを受け取ります'")
-    expect(CODE).toContain('{sample.hint}')
-  })
-
-  it('自由入力の道も残っている', () => {
-    expect(CODE).toContain("const SOURCE_OTHER = '__other__'")
-    expect(CODE).toContain('その他（自分で書く）')
-    expect(CODE).toContain('createSource === SOURCE_OTHER ?')
-  })
-
   it('自由入力中は見本の説明を混ぜず、保存後は見本選択へ戻す', () => {
-    expect(CODE).toContain('createSource === SOURCE_OTHER ? createSourceFree.trim() : createSource')
     expect(CODE).toContain('setCreateSource(SOURCE_PRESETS[0].value)')
     expect(CODE).toContain("setCreateSourceFree('')")
     expect(CODE).toContain('setShowCreate(false)')

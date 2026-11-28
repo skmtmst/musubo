@@ -23,7 +23,7 @@ import ListState from '@/components/shared/list-state'
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import { canSubmitDecision } from '@/components/identity/identity-view'
-import { CONFIDENCE_WORD, STATUS_WORD, slashDateTime } from '../duplicates/words'
+import { candidateStatusWord, confidenceWord, slashDateTime } from '../duplicates/words'
 import styles from './compare.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -48,6 +48,9 @@ import { usePermissionLockReason } from '@/components/shared/use-permission-lock
 
 const STRENGTH_WORD = { strong: '決め手', medium: '手がかり', weak: '参考' } as const
 const ATTRIBUTE_WORD: Record<string, string> = { メールアドレス: 'メール', 電話番号: '電話' }
+function lookupWord(table: object, key: string, fallback: string): string {
+  return Object.prototype.hasOwnProperty.call(table, key) ? (table as Record<string, string>)[key] : fallback
+}
 const DECISIONS: Array<{ value: IdentityCandidateDecision; label: string }> = [
   { value: 'linked', label: '同じ人' },
   { value: 'different', label: '別の人' },
@@ -151,7 +154,7 @@ function CompareInner() {
   return (
     <PageFrame kind="detail" heightMode="content" hasFooter={review.state === 'ready' && Boolean(detail)} boardId="fcg2D">
       <PageHeading title={detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}
-        help={<>{detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}</>} />
+        help={<>{detail ? `確からしさ：${confidenceWord(detail.confidence.label)}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}</>} />
 
       {!canManage ? <ReadOnlyNotice need="manager" /> : null}
       <div className={styles.body} data-template-region="body">
@@ -185,7 +188,7 @@ function CompareInner() {
                   <dl className={styles.attrs}>
                     {subject.attributes.filter((attribute) => !differencesOnly || !sameAttribute(attribute.label)).map((attribute) => (
                       <div key={attribute.label} className={styles.attr}>
-                        <dt>{ATTRIBUTE_WORD[attribute.label] ?? attribute.label}</dt>
+                        <dt>{lookupWord(ATTRIBUTE_WORD, attribute.label, attribute.label)}</dt>
                         <dd className={styles.mono}>{attribute.valuePreview ?? '—（未取得）'}</dd>
                         <dd><StatusBadge dot={false} tone={attribute.verified ? 'success' : 'neutral'}>{attribute.verified ? '確認済み' : '未確認'}</StatusBadge></dd>
                       </div>
@@ -202,7 +205,7 @@ function CompareInner() {
                   {detail.evidence.map((item) => (
                     <li key={item.key} className={styles.line}>
                       <span title={item.valuePreview ?? undefined}>{item.label}</span>
-                      <span className={item.strength === 'strong' ? styles.strong : styles.weak}>{STRENGTH_WORD[item.strength]}</span>
+                      <span className={item.strength === 'strong' ? styles.strong : styles.weak}>{lookupWord(STRENGTH_WORD, item.strength, '未確認')}</span>
                     </li>
                   ))}
                 </ul>
@@ -284,7 +287,7 @@ function CompareInner() {
                       {detail.history.map((item) => (
                         <li key={item.id} className={styles.historyLine}>
                           <span>{slashDateTime(item.decidedAt)}</span>
-                          <span>{`${STATUS_WORD[item.toStatus]}・${item.actorName}「${item.reason}」`}</span>
+                          <span>{`${candidateStatusWord(item.toStatus)}・${item.actorName}「${item.reason}」`}</span>
                         </li>
                       ))}
                       <li className={styles.historyLine}>

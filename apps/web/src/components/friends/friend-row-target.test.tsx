@@ -142,7 +142,7 @@ describe('友だち行の行き先', () => {
     const onAction = vi.fn()
     render(BASE, true, onAction)
     const menu = openMenu()
-    const edit = [...menu.querySelectorAll('button')].find((button) => button.textContent === '担当者を変える')
+    const edit = [...menu.querySelectorAll('button')].find((button) => button.textContent === '担当者を変更する')
     if (!edit) throw new Error('担当者の編集項目がありません')
     act(() => edit.click())
     expect(onAction).toHaveBeenCalledWith('operator')

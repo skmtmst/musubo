@@ -25,8 +25,8 @@ it('空の形：題・説明・制限・文字リンク。［ファイルを選�
   expect(frameOf().dataset.designNode).toBe('Z7vd2')
   expect(screen.getByText('（PNG・JPEG・10MB まで）')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'URL で入れる' })).toBeTruthy()
-  expect(screen.getByRole('button', { name: '登録メディアから選ぶ' })).toBeTruthy()
-  expect(screen.queryByRole('button', { name: 'ファイルを選ぶ' })).toBeNull()
+  expect(screen.getByRole('button', { name: '登録メディアから選択する' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'ファイルを選択する' })).toBeNull()
 })
 
 it('枠のどこを押してもファイルを選ぶ窓が開く。文字リンクは窓を開かない', () => {
@@ -188,7 +188,7 @@ it.each(['regular', 'compact'] as const)('補足は%sの枠の外に置き、開
 it('URL と登録メディアの口は共通の文字ボタンで、枠のファイル選択へ伝わらない', () => {
  const onFile=vi.fn(),onMediaPick=vi.fn()
  render(<MediaSlot title="画像を追加" onFile={onFile} onMediaPick={onMediaPick} urlEntry={{value:'',onChange:()=>{},label:'画像URL'}} />)
- for(const name of ['URL で入れる','登録メディアから選ぶ']){
+ for(const name of ['URL で入れる','登録メディアから選択する']){
   const button=screen.getByRole('button',{name})
   expect(button.hasAttribute('data-shared-button')).toBe(true)
   expect(button.getAttribute('data-variant')).toBe('text')

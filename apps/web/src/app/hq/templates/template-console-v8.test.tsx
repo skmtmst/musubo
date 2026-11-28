@@ -79,7 +79,7 @@ describe('配布の V8（meBRB）', () => {
     render(<TemplateConsole type="template"/>)
     fireEvent.click(await screen.findByLabelText('テンプレート「ご案内」の操作'))
     fireEvent.click(screen.getByRole('menuitem',{name:'配る'}))
-    await screen.findByRole('checkbox',{name:'銀座本店'}); fireEvent.click(screen.getByRole('checkbox',{name:'銀座本店'})); fireEvent.click(screen.getByRole('button',{name:'本文を変える'})); const input=await screen.findByLabelText('銀座本店に配る本文'); expect((input as HTMLTextAreaElement).value).toBe('原本の案内')
+    await screen.findByRole('checkbox',{name:'銀座本店'}); fireEvent.click(screen.getByRole('checkbox',{name:'銀座本店'})); fireEvent.click(screen.getByRole('button',{name:'本文を変更する'})); const input=await screen.findByLabelText('銀座本店に配る本文'); expect((input as HTMLTextAreaElement).value).toBe('原本の案内')
     fireEvent.change(input,{target:{value:'本店の案内'}})
     fireEvent.click(screen.getByRole('button',{name:'1アカウントの重複を確認'}))
     await screen.findByRole('button', {name:'この内容で1アカウントへ配る'})

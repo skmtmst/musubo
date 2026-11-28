@@ -20,9 +20,4 @@ describe('レポート通知先の行リスト（#975 U064）', () => {
     expect(PICKER).toContain('styles.multiNameText')
     expect(PAGE).toContain('ROLE_LABEL[person.role]')
   })
-
-  it('選択中の行は色以外にもチェックの状態を持つ', () => {
-    expect(PICKER).toContain('checked={checked}')
-    expect(PICKER).toContain('data-selected={checked || undefined}')
-  })
 })

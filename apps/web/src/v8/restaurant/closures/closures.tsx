@@ -342,7 +342,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                     </>
                   )
                   return clickable ? (
-                    <button key={day} type="button" role="gridcell" className={`${styles.cell} ${styles.cellButton} ${tone === 'closed' ? styles.cellClosed : tone === 'private' ? styles.cellPrivate : ''}`} aria-label={`${label}${hit ? 'を変える' : 'を閉じる'}`} onClick={() => openDay(day)}>
+                    <button key={day} type="button" role="gridcell" className={`${styles.cell} ${styles.cellButton} ${tone === 'closed' ? styles.cellClosed : tone === 'private' ? styles.cellPrivate : ''}`} aria-label={`${label}${hit ? 'を変更する' : 'を閉じる'}`} onClick={() => openDay(day)}>
                       {content}
                     </button>
                   ) : (
@@ -376,7 +376,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
                 const warn = t.open.length > 0
                 const items = [
                   ...(canWrite ? [
-                    { id: 'edit', label: '変える', onSelect: () => onDialog({ mode: 'edit', closure }) },
+                    { id: 'edit', label: '変更する', onSelect: () => onDialog({ mode: 'edit', closure }) },
                   ] : []),
                   { id: 'ledger', label: '予約台帳でこの日を見る', onSelect: () => { router.push(`/restaurant-test/reservations?date=${closure.startDate}`) } },
                   ...(canWrite ? [

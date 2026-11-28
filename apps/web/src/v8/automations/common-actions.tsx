@@ -315,7 +315,7 @@ export default function CommonActionsV8() {
   } else if (items.length === 0) {
     listBody = query || filter !== 'all' || folderFilter
       ? <ListState kind="empty" title="条件に合う共通アクションはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button variant="secondary" onClick={() => { setQuery(''); setFilter('all'); setFolderFilter('') }}>条件を外す</Button>} />
-      : <ListState kind="empty" title="まだ、共通アクションはありません" description="よく使う処理をまとめると、設定の重複を減らせます。" action={canEdit ? <Button variant="primary" href="/common-actions/new"><Plus size={16} aria-hidden="true" />共通アクションを作る</Button> : undefined} />
+      : <ListState kind="empty" title="まだ、共通アクションはありません" description="よく使う処理をまとめると、設定の重複を減らせます。" action={<PermissionGatedButton allowed={canEdit} variant="primary" href="/common-actions/new"><Plus size={16} aria-hidden="true" />共通アクションを作る</PermissionGatedButton>} />
   } else {
     listBody = (
       <>

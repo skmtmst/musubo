@@ -1,21 +1,22 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, expect, test, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ create: vi.fn(), role: 'admin' as string | null }))
+const net = vi.hoisted(() => ({ create: vi.fn(), tags: vi.fn(), account: 'acc', role: 'admin' as string | null }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/tags/new' }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.ComponentProps<'a'>) => <a href={href} {...props}>{children}</a> }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: net.account }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => net.role, canManageRole: (role: string | null) => role === 'admin' || role === 'owner' }))
 vi.mock('@/lib/use-unsaved-guard', () => ({ useUnsavedGuard: () => ({ disarm: vi.fn(), dialogOpen: false }) }))
 vi.mock('@/lib/unsaved-leave-dialog', () => ({ UnsavedLeaveDialog: () => null }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }), createDefinition: net.create }, tagGroups: { ...actual.api.tagGroups, list: async () => ({ success: true, data: [] }) } } }
+  return { ...actual, api: { ...actual.api, tags: { ...actual.api.tags, list: net.tags, createDefinition: net.create }, tagGroups: { ...actual.api.tagGroups, list: async () => ({ success: true, data: [] }) } } }
 })
 import TagCreate from './create'
+beforeEach(() => { net.account = 'acc'; net.tags.mockReset().mockResolvedValue({ success: true, data: [] }) })
 afterEach(() => { cleanup(); vi.clearAllMocks(); net.role = 'admin' })
 
 test.each(['admin', 'viewer'])('役割%sでも題の説明を読み、閉じて入力を保てる', async role => {
@@ -98,4 +99,37 @@ test('付け方のリンクだけに操作の印があり、右欄は共通の�
   const description = screen.getByText('タグ連動').closest('[data-design-part="card"]')!
   expect(description.querySelector('[data-link-indicator]')).toBeNull()
   expect(document.querySelector('[data-template-region="preview"]')?.getAttribute('data-preview-surface')).toBe('plain')
+})
+
+test('重複候補を読み込めなければ知らせ、名前を保って読み直せる', async () => {
+  net.tags.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true, data: [{ id: 't', name: '同じ名前' }] })
+  render(<TagCreate />)
+  const name = await screen.findByLabelText('タグ名')
+  fireEvent.change(name, { target: { value: '同じ名前' } })
+  await screen.findByText(/同じ名前のタグを確認できませんでした/)
+  fireEvent.click(screen.getByRole('button', { name: '重複を確認し直す' }))
+  await waitFor(() => expect(screen.queryByText(/同じ名前のタグを確認できませんでした/)).toBeNull())
+  expect((name as HTMLInputElement).value).toBe('同じ名前')
+  expect(screen.getByText(/タグがすでにあります/)).toBeTruthy()
+})
+
+test('アカウントを替えた後の古い重複候補は出さない', async () => {
+  let resolve!: (value: unknown) => void
+  net.tags.mockReturnValueOnce(new Promise(done => { resolve = done })).mockResolvedValueOnce({ success: true, data: [] })
+  const view = render(<TagCreate />)
+  const name = await screen.findByLabelText('タグ名')
+  fireEvent.change(name, { target: { value: '古い名前' } })
+  net.account = 'other'; view.rerender(<TagCreate />)
+  await waitFor(() => expect(net.tags).toHaveBeenCalledTimes(2))
+  await act(async () => { resolve({ success: true, data: [{ id: 'old', name: '古い名前' }] }) })
+  expect(screen.queryByText(/タグがすでにあります/)).toBeNull()
+})
+
+test('切替先の読み込み中は前のアカウントの重複候補を見せない', async () => {
+  net.tags.mockResolvedValueOnce({ success: true, data: [{ id: 'old', name: '同名' }] }).mockReturnValueOnce(new Promise(() => {}))
+  const view = render(<TagCreate />)
+  fireEvent.change(await screen.findByLabelText('タグ名'), { target: { value: '同名' } })
+  await screen.findByText(/タグがすでにあります/)
+  net.account = 'other'; view.rerender(<TagCreate />)
+  expect(screen.queryByText(/タグがすでにあります/)).toBeNull()
 })

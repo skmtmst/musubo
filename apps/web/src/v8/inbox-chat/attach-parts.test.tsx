@@ -14,7 +14,7 @@ describe('左下のクリップ', () => {
   it('押すと「画像・動画」「ファイル」の2つを出し、選んだ口ごとに合う形式だけを選ばせる', () => {
     const onPick = vi.fn()
     const { container } = render(<AttachMenu onPick={onPick} />)
-    fireEvent.click(screen.getByRole('button', { name: '添付するものを選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '添付するものを選択する' }))
     expect(screen.getByRole('menuitem', { name: /画像・動画/ })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /ファイル/ })).toBeTruthy()
     expect(document.body.textContent).toContain('ダウンロードのリンクとして届く')
@@ -31,7 +31,7 @@ describe('左下のクリップ', () => {
 
   it('会話を選んでいないときは押せない', () => {
     render(<AttachMenu disabled onPick={vi.fn()} />)
-    expect((screen.getByRole('button', { name: '添付するものを選ぶ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '添付するものを選択する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 })
 

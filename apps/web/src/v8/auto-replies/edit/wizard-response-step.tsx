@@ -2,7 +2,9 @@
 
 import { useActionOptions } from '@/components/auto-replies/inline-action-list';
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8';
+import Button from '@/components/shared/button';
 import Card,{ CardHeader } from '@/components/shared/card';
+import Notice from '@/components/shared/notice';
 import Toggle from '@/components/shared/toggle';
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import { Field,FieldError } from '@/components/shared/form-controls';
@@ -38,9 +40,11 @@ type WizardResponseStepContext = {
   matchedAccountId: string | null
   patch: (part: Partial<WizardForm>) => void
   templates: { id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string; }[]
+  templateState?: 'loading' | 'ready' | 'error' | 'retrying'
+  loadTemplates?: () => Promise<void>
 }
 
-export function WizardResponseStep({ disabled = false, lockedReason, actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates }: WizardResponseStepContext) {
+export function WizardResponseStep({ disabled = false, lockedReason, actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates, templateState = 'ready', loadTemplates }: WizardResponseStepContext) {
   const { references, state: referenceState } = useInsertReferences(matchedAccountId)
   const tokenNames = referenceTokenNames(references)
   return (<>
@@ -105,6 +109,26 @@ export function WizardResponseStep({ disabled = false, lockedReason, actionOptio
                       onChange={(v) => patch({ templateId: v || null })}
                     /></SaveErrorField>
                     {fieldError('wiz-template') ? <FieldError id="wiz-template-error">{fieldError('wiz-template')}</FieldError> : null}
+                    {templateState === 'error' || templateState === 'retrying' ? (
+                      <Notice
+                        tone="warn"
+                        message="テンプレートを読み込めませんでした。入力中の内容はそのまま残ります。"
+                        action={
+                          loadTemplates ? (
+                            <Button
+                              variant="text"
+                              size="inline"
+                              onClick={() => void loadTemplates()}
+                              disabled={templateState === 'retrying'}
+                              busy={templateState === 'retrying'}
+                              busyLabel="読み込んでいます"
+                            >
+                              テンプレートを読み直す
+                            </Button>
+                          ) : undefined
+                        }
+                      />
+                    ) : null}
                     <p className={styles.hint}>テンプレートの管理は「ひな形を管理」からできます。</p>
                   </div>
                 )}

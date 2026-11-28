@@ -219,3 +219,15 @@ it('確認した一件のリマインダを停止する', async () => {
   await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' })) })
   expect(net.update).toHaveBeenCalledWith('r1', { isActive: false })
 })
+
+it('閲覧のみでは折り畳んだリマインダの作成入口を止める', async () => {
+  verifiedStaffRole('viewer')
+  render(<RemindersList />)
+  await screen.findByText('お知らせ1')
+  const buttons = screen.getAllByRole('button', { name: /リマインダを作る/ })
+  expect(buttons).toHaveLength(2)
+  for (const b of buttons) {
+    expect((b as HTMLButtonElement).disabled || b.getAttribute('aria-disabled') === 'true').toBe(true)
+    expect(b.getAttribute('href')).toBeNull()
+  }
+})

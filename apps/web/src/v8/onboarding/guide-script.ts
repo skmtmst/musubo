@@ -222,9 +222,15 @@ export function receptionGuideCopy(mode: string | null, seatCount: string | null
     title: 'もう一度保存する',
     body: '入力した席数は残っています。「配分を保存する」をもう一度押してください。',
   }
-  if (seatCount && Number(seatCount) > 0) return {
-    title: '配分を保存する',
-    body: `保存すると、営業日の全時間帯に${seatCount}席ずつ適用します。今後の営業日にも自動で適用します。`,
+  const trimmedSeats = seatCount?.trim() ?? ''
+  if (/^\d+$/.test(trimmedSeats)) {
+    const seats = Number(trimmedSeats)
+    if (Number.isSafeInteger(seats) && seats > 0) {
+      return {
+        title: '配分を保存する',
+        body: `保存すると、営業日の全時間帯に${seats}席ずつ適用します。今後の営業日にも自動で適用します。`,
+      }
+    }
   }
   return null
 }

@@ -38,7 +38,7 @@ it('予約後に付けるタグを実際の窓で名前検索し、確定した�
   expect(await within(dialog).findByRole('radio', { name: '常連さん' })).toBeTruthy()
   await waitFor(() => expect(within(dialog).queryByRole('radio', { name: '予約中' })).toBeNull())
   fireEvent.click(within(dialog).getByRole('radio', { name: '常連さん' }))
-  fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: '選択する', exact: true }))
   await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0))
   expect(await screen.findByLabelText('選択中のタグ：常連さん')).toBeTruthy()
 })

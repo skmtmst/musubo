@@ -215,9 +215,9 @@ export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsRead
           {dryRun.candidates.find((c) => c.autoReplyId === autoReplyId)?.reasonCodes.length ? (
             <p className={styles.testResultNote}>
               見送った理由：
-              {dryRun.candidates
+              {[...new Set(dryRun.candidates
                 .find((c) => c.autoReplyId === autoReplyId)!
-                .reasonCodes.map((code) => REASON_WORDS[code] ?? code)
+                .reasonCodes.map((code) => Object.prototype.hasOwnProperty.call(REASON_WORDS, code) ? REASON_WORDS[code] : '理由を確認できませんでした'))]
                 .join('・')}
             </p>
           ) : null}

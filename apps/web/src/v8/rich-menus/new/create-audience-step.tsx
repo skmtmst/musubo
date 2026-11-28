@@ -217,7 +217,7 @@ export function renderAudienceStep({ aggregateOnly, audience, canOperate, condit
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="出す順番" actions={editGroupId && canOperate ? <Button type="button" variant="text" size="inline" onClick={() => {
               setPriorityInput(String(targetingPriority + 1)); setPriorityOpen(true)
-            }}>順番を変える</Button> : undefined} />
+            }}>順番を変更する</Button> : undefined} />
             <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます</p>
           </div>
           {orderRows.length > 0 ? (

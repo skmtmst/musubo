@@ -125,12 +125,17 @@ export function useApiTokens() {
     void load()
   }, [load])
 
-  // アカウントを替えたら、前のアカウントの鍵は見せない。
+  // アカウントを替えたら、前のアカウントの鍵や作成中の状態を残さない。
   useEffect(() => {
     setIssued(null)
     setCopied(false)
     setStepUp(null)
     setMutating(false)
+    setCreating(false)
+    setCreateOpen(false)
+    setCreateError('')
+    setDialogError('')
+    setMenuId(null)
   }, [selectedAccountId])
 
   const toggleScope = (scope: string) => {
@@ -148,13 +153,14 @@ export function useApiTokens() {
   }
 
   const handleCreate = async (stepUpToken?: string) => {
+    if (accountScope.current.generation !== generation) return
     if (!canManageWebhooksNow(true)) { setCreateError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     const canContinue = captureWebhookWriteAccess(true)
     setCreateError('')
     setNameError('')
     setScopesError('')
     const requestAccountId = selectedAccountId
-    if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId) return
+    if (!requestAccountId || accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
     const trimmed = name.trim()
     if (!trimmed) {
       setNameError('名前を入力してください')
@@ -169,7 +175,7 @@ export function useApiTokens() {
     setCreating(true)
     try {
       const res = await api.webhooks.apiTokens.create(requestAccountId, { name: trimmed, scopes }, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
+      if (accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setCreateError(res.error)
         return
@@ -180,20 +186,20 @@ export function useApiTokens() {
       setName('')
       await load()
     } catch (caught) {
+      if (accountScope.current.generation !== generation || selectedAccountIdRef.current !== requestAccountId) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: async (token) => { if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleCreate(token); setCreateError('権限やLINEアカウントが変わったため中止しました。') } });
+        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: async (token) => { if (accountScope.current.generation !== generation) return; if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleCreate(token); setCreateError('権限やLINEアカウントが変わったため中止しました。') } });
 
         return
       }
-      if (selectedAccountIdRef.current !== requestAccountId) return
       { if (!fieldFailure)
       setCreateError(describeApiFailure(caught, '発行', {
         scope: 'store',
       })) }
     } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setCreating(false)
+      if (accountScope.current.generation === generation && selectedAccountIdRef.current === requestAccountId) setCreating(false)
     }
   }
 

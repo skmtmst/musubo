@@ -13,7 +13,7 @@ import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
 import { api } from '@/lib/api'
 import type { DeliveryMode, ScenarioStep } from '@line-crm/shared'
-import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { DuplicateAborted, ScenarioWithSteps, stepScheduleForClone } from './detail-model'
 
 export function useScenarioCopy({
@@ -47,8 +47,31 @@ export function useScenarioCopy({
   setDeleteScenarioOpen: Dispatch<SetStateAction<boolean>>
   router: ReturnType<typeof useRouter>
 }) {
+  const mounted = useRef(true)
+  const scope = useRef({ id, accountId: scenario?.lineAccountId ?? null, generation: 0 })
+  if (scope.current.id !== id || (scope.current.accountId !== null && (scenario?.lineAccountId ?? null) !== null && scope.current.accountId !== (scenario?.lineAccountId ?? null))) {
+    scope.current = { id, accountId: scenario?.lineAccountId ?? null, generation: scope.current.generation + 1 }
+  } else if (scope.current.accountId === null && scenario?.lineAccountId) {
+    scope.current.accountId = scenario.lineAccountId
+  }
+  const prevIdRef = useRef(id)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  useEffect(() => {
+    if (prevIdRef.current === id) return
+    prevIdRef.current = id
+    setDuplicating(false)
+    setDiscardingDuplicate(false)
+    setDeletingScenario(false)
+  }, [id, setDuplicating, setDiscardingDuplicate, setDeletingScenario])
+
   const handleDuplicate = async (name?: string) => {
     if (!scenario || duplicating) return
+    const targetId = id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.id === targetId && scope.current.generation === targetGeneration
     setDuplicating(true)
     setError('')
     const copyName = (name?.trim() || `${scenario.name} のコピー`)
@@ -71,6 +94,7 @@ export function useScenarioCopy({
           allowConcurrent: scenario.allowConcurrent,
           folderId: scenario.folderId ?? null,
         })
+        if (!sameScope()) return
         if (!created.success) throw new Error(created.error)
         copyId = created.data.id
       }
@@ -88,8 +112,10 @@ export function useScenarioCopy({
           onCompleteMode: scenario.onCompleteMode ?? 'pause',
           onCompleteScenarioId: scenario.onCompleteScenarioId ?? null,
         })
+        if (!sameScope()) return
         if (!updated.success) throw new Error(updated.error)
       } catch (cause) {
+        if (!sameScope()) return
         saveErrors.capture(cause)
         throw new DuplicateAborted(copy, 'シナリオ全体の設定（配信対象・終了後の処理）', cause)
       }
@@ -99,6 +125,7 @@ export function useScenarioCopy({
        * 読む。読めないと「どこまで写ったか」が分からないので止める。
        */
       const existing = await api.scenarios.get(copy).catch(() => null)
+      if (!sameScope()) return
       if (!existing?.success) {
         throw new DuplicateAborted(
           copy,
@@ -112,6 +139,7 @@ export function useScenarioCopy({
       // 時刻・絞り込み・質問・下書きの別まで写す。落とすと別物の流れに
       // なる。時刻は方式に合う欄だけ送る（余分な欄があると 400 で止まる）。
       for (const step of sortedSteps) {
+        if (!sameScope()) return
         const already = existingByOrder.get(step.stepOrder)
         if (already) {
           stepIdMap.set(step.id, already)
@@ -130,6 +158,7 @@ export function useScenarioCopy({
           question: (step.question as ScenarioQuestion | null) ?? null,
           isDraft: step.isDraft === true,
         }).catch((cause) => ({ success: false as const, error: japaneseDetailOf(cause) || '通をコピーできませんでした' }))
+        if (!sameScope()) return
         // 途中で止める。続けると通が欠けた別物の流れが残る。
         if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder} 通目のコピー`, new Error(copied.error))
         stepIdMap.set(step.id, copied.data.id)
@@ -141,18 +170,22 @@ export function useScenarioCopy({
        */
       try {
         const [sourceTriggers, copyTriggers] = await Promise.all([
-          api.scenarios.triggers.list(id),
+          api.scenarios.triggers.list(targetId),
           api.scenarios.triggers.list(copy),
         ])
+        if (!sameScope()) return
         if (!sourceTriggers.success) throw new Error(sourceTriggers.error)
         if (!copyTriggers.success) throw new Error(copyTriggers.error)
         const have = new Set(copyTriggers.data.map((t) => `${t.kind}:${t.tagId ?? ''}`))
         for (const trigger of sourceTriggers.data) {
+          if (!sameScope()) return
           if (have.has(`${trigger.kind}:${trigger.tagId ?? ''}`)) continue
           const added = await api.scenarios.triggers.add(copy, trigger.kind, trigger.tagId)
+          if (!sameScope()) return
           if (!added.success) throw new Error(added.error)
         }
       } catch (cause) {
+        if (!sameScope()) return
         saveErrors.capture(cause)
         throw new DuplicateAborted(copy, '開始のきっかけ', cause)
       }
@@ -163,9 +196,10 @@ export function useScenarioCopy({
        */
       try {
         const [sourceActions, copyActions] = await Promise.all([
-          api.scenarios.actions.list(id),
+          api.scenarios.actions.list(targetId),
           api.scenarios.actions.list(copy),
         ])
+        if (!sameScope()) return
         if (!sourceActions.success) throw new Error(sourceActions.error)
         if (!copyActions.success) throw new Error(copyActions.error)
         const keyOf = (
@@ -179,6 +213,7 @@ export function useScenarioCopy({
           copyActions.data.map((a) => keyOf(a.hook, a.stepId, a.choiceIndex, a.actionType, a.sortOrder)),
         )
         for (const action of sourceActions.data) {
+          if (!sameScope()) return
           const mappedStepId = action.stepId === null ? null : stepIdMap.get(action.stepId) ?? null
           if (action.stepId !== null && mappedStepId === null) {
             // 写せなかった通にぶら下がるアクションは足さない。
@@ -196,19 +231,23 @@ export function useScenarioCopy({
             repeatOnRefire: action.repeatOnRefire,
             sortOrder: action.sortOrder,
           })
+          if (!sameScope()) return
           if (!createdAction.success) throw new Error(createdAction.error)
           have.add(key)
         }
       } catch (cause) {
+        if (!sameScope()) return
         saveErrors.capture(cause)
         throw new DuplicateAborted(copy, 'アクション', cause)
       }
 
+      if (!sameScope()) return
       setDuplicateRemainder(null)
       setDuplicateOpen(false)
       /*  ③：複製はその場にとどまり、下書きで作ったことをトーストで知らせる。コピーは一覧に下書きで並ぶ。 */
       notifyToast(copyName === `${scenario.name} のコピー` ? `「${scenario.name}」のコピーを下書きで作りました` : `「${copyName}」を下書きで作りました`)
     } catch (e) {
+      if (!sameScope()) return
       const fieldFailure = saveErrors.capture(e);
 
       if (e instanceof DuplicateAborted) {
@@ -228,7 +267,7 @@ export function useScenarioCopy({
         setError(japaneseDetailOf(e) || '複製に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
-      setDuplicating(false)
+      if (sameScope()) setDuplicating(false)
     }
   }
 
@@ -238,36 +277,47 @@ export function useScenarioCopy({
    */
   const handleDiscardDuplicate = async () => {
     if (!duplicateRemainder || discardingDuplicate) return
+    const targetId = id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.id === targetId && scope.current.generation === targetGeneration
     setDiscardingDuplicate(true)
     setDiscardDuplicateError('')
     try {
       const res = await api.scenarios.delete(duplicateRemainder.copyId)
+      if (!sameScope()) return
       if (!res.success) throw new Error(res.error)
       setDiscardDuplicateOpen(false)
       setDuplicateRemainder(null)
     } catch (saveFailure) {
+      if (!sameScope()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setDiscardDuplicateError('作りかけのコピーを削除できませんでした。コピーを開いて状態を確認し、もう一度お試しください。') }
     } finally {
-      setDiscardingDuplicate(false)
+      if (sameScope()) setDiscardingDuplicate(false)
     }
   }
 
   const handleDeleteScenario = async () => {
     if (!scenario || deletingScenario || !deleteConfirmation || !deleteConfirmationValid()) return
+    const targetId = id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.id === targetId && scope.current.generation === targetGeneration
     setDeletingScenario(true)
     setDeleteScenarioError('')
     try {
       if (!deleteConfirmationValid()) return
-      const res = await api.scenarios.delete(id, deleteConfirmation)
+      const res = await api.scenarios.delete(targetId, deleteConfirmation)
+      if (!sameScope()) return
       if (!res.success) throw new Error(res.error)
       setDeleteScenarioOpen(false)
       router.push('/scenarios')
     } catch (saveFailure) {
+      if (!sameScope()) return
       if (isConflictResponse(saveFailure) && saveFailure.code === 'scenario_confirmation_conflict') {
         await refreshDeleteConfirmation()
+        if (!sameScope()) return
         setDeleteScenarioError('確認した内容が変わりました。もう一度確認してください。')
         return
       }
@@ -276,7 +326,7 @@ export function useScenarioCopy({
       { if (!fieldFailure)
       setDeleteScenarioError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeletingScenario(false)
+      if (sameScope()) setDeletingScenario(false)
     }
   }
 

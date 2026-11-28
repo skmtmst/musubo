@@ -12,6 +12,8 @@ import { DetailPage } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { formatNumber } from '@/lib/format';
@@ -85,12 +87,14 @@ function Connections() {
   const router = useRouter()
   const groupId = useSearchParams().get('id') ?? ''
   const canEdit = useFeatureAccess('richMenus')
+  const editReason = usePermissionLockReason(canEdit)
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const activeAccountIdRef = useRef(selectedAccountId)
   const requestGenerationRef = useRef(0)
   const [group, setGroup] = useState<RichMenuGroup | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState<unknown>(null)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
 
@@ -109,6 +113,7 @@ function Connections() {
     setLoading(true)
     setGroup(null)
     setError('')
+    setLoadError(null)
     setMissing(false)
     try {
       const response = await api.richMenuGroups.get(groupId)
@@ -123,6 +128,7 @@ function Connections() {
         setMissing(true)
         return
       }
+      setLoadError(caught)
       setError('切替のつながりを表示できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
       if (!stale()) setLoading(false)
@@ -145,13 +151,17 @@ function Connections() {
     return <TargetMissing kind="not-found" title="このメニューは見つかりません" description="削除されたか、別の記録です。一覧から選び直してください。" backHref="/rich-menus" backLabel="メニュー一覧へ戻る" />
   }
   if (error || !group || !analysis) {
-    return <TargetMissing kind="error" title="切替のつながりを表示できませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void load()} />
+    return <TargetMissing kind="error" title="切替のつながりを表示できませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" error={loadError ?? undefined} onRetry={() => void load()} />
   }
   if (group.accountId !== selectedAccountId) {
     return <ListState kind="forbidden" title="選択中のアカウントでは表示できません" description="このメニューが所属するLINE公式アカウントへ切り替えてください。" />
   }
 
-  const pages = [...group.pages].sort((a, b) => a.orderIndex - b.orderIndex)
+  const pages = [...group.pages].sort((a, b) => {
+    const aIdx = Number.isFinite(a.orderIndex) ? a.orderIndex : Number.MAX_SAFE_INTEGER
+    const bIdx = Number.isFinite(b.orderIndex) ? b.orderIndex : Number.MAX_SAFE_INTEGER
+    return aIdx - bIdx
+  })
   const entryId = analysis.entryPageId ?? pages[0]?.id ?? ''
   const entry = pages.find((page) => page.id === entryId) ?? null
   const others = pages.filter((page) => page.id !== entryId)
@@ -161,11 +171,13 @@ function Connections() {
   const noReturn = others.filter((page) => analysis.cannotReturnPageIds.has(page.id))
   const draftTargets = group.status === 'published' ? others.filter((page) => !page.lineRichmenuId) : []
   const audienceText = group.isDefaultForAll || !group.targetingEnabled || !group.targetingCondition ? 'すべての友だち（既定）' : '条件で出し分け'
-  const reach = group.monthlyStats?.uniqueAudience?.value ?? group.audienceCount ?? null
-  const taps = group.monthlyStats?.taps ?? null
+  const rawReach = group.monthlyStats?.uniqueAudience?.value ?? group.audienceCount ?? null
+  const reach = typeof rawReach === 'number' && Number.isFinite(rawReach) && rawReach >= 0 ? rawReach : null
+  const rawTaps = group.monthlyStats?.taps ?? null
+  const taps = typeof rawTaps === 'number' && Number.isFinite(rawTaps) && rawTaps >= 0 ? rawTaps : null
 
   const menuItems: ActionMenuItem[] = [
-    ...(canEdit && pages.length >= MAX_PAGES ? [{ id: 'buttons', label: 'ボタンの動きを直す', href: buttonsHref, onSelect: () => router.push(buttonsHref) }] : []),
+    ...(pages.length >= MAX_PAGES ? [{ id: 'buttons', label: 'ボタンの動きを直す', ...(canEdit ? { href: buttonsHref, onSelect: () => router.push(buttonsHref) } : { lockedReason: editReason, disabled: !editReason }) }] : []),
     { id: 'list', label: 'メニュー一覧へ', onSelect: () => router.push('/rich-menus') },
   ]
 
@@ -226,15 +238,15 @@ function Connections() {
           })}
         </div>
         <div className={styles.addRow}>
-          {canEdit && pages.length < MAX_PAGES ? (
-            <Button variant="text" href={buttonsHref}><Plus size={16} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</Button>
+          {pages.length < MAX_PAGES ? (
+            <PermissionGatedButton allowed={canEdit} variant="text" href={buttonsHref}><Plus size={16} aria-hidden="true" />{`切替先のメニューを足す（最大${MAX_PAGES} 枚）`}</PermissionGatedButton>
           ) : pages.length >= MAX_PAGES ? <span className={styles.cardNote}>{`切替先は最大${MAX_PAGES} 枚です`}</span> : null}
           <span className={styles.count}>{`${pages.length} 枚`}</span>
         </div>
       </Card>
       <CreateSummaryCard title="よくある事故の見張り" beforeRows={noReturn.map(page => (
         <Notice key={page.id} tone="warn" message={`「${page.name}」に${entry ? `${entry.name}へ` : ''}戻るタブがありません。押した人が元のメニューに帰れません。`}
-          action={canEdit ? <Button href={buttonsHref}>{`${page.name}を開いて直す`}</Button> : undefined} />
+          action={<PermissionGatedButton allowed={canEdit} href={buttonsHref}>{`${page.name}を開いて直す`}</PermissionGatedButton>} />
       ))} rows={[
         ...(analysis.missingTargetEdges.length > 0 ? [{ label: '切替先が見つからないタブ', value: <StatusBadge tone="danger">{`${formatNumber(analysis.missingTargetEdges.length)} 件`}</StatusBadge> }] : []),
         ...(analysis.unreachablePageIds.size > 0 ? [{ label: 'どこからも来られないメニュー', value: <StatusBadge tone="danger">{`${analysis.unreachablePageIds.size} 件`}</StatusBadge> }] : []),

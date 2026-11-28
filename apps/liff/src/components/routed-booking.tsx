@@ -10,7 +10,7 @@ import Icon from './ui/icon.js';
  */
 export function RoutedBanner({ target }: { target: RoutedTarget }) {
   const words = useCustomerWords();
-  const mode = target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : target.meetingMode === 'in_person' ? '対面' : null;
+  const mode = target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : target.meetingMode === 'in_person' ? '対面' : target.meetingMode == null ? null : '形式を確認できません';
   const meta = [target.staffName ? `${words.staff}：${target.staffName}` : null, mode, bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')].filter(Boolean).join('・');
   return (
     <section data-routed-banner aria-label="ご案内" className="space-y-2 rounded-(--liff-radius-lg) bg-liff-soft p-3.5 outline-2 -outline-offset-1 outline-liff-primary">
@@ -26,11 +26,12 @@ export function RoutedBanner({ target }: { target: RoutedTarget }) {
 /** 行き先に空きが無いとき（R02q7）。白い画面にせず、ご利用先へ問い合わせる道を出す。 */
 export function NoRoutedSlots({ target, days }: { target: RoutedTarget; days: number }) {
   const words = useCustomerWords();
+  const validDays = Number.isSafeInteger(days) && days > 0;
   return (
     <Card className="flex flex-col items-center gap-2 px-5 py-8 text-center">
       <Icon name="calendar-x" className="h-8 w-8 text-liff-sub" />
-      <p className="text-[15px] font-bold text-ink">ご案内できる日時がありません</p>
-      <p className="text-xs leading-[18px] text-liff-sub">{`${Math.ceil(days / 7)} 週間先まで、${target.menuName}の空きがありません。${words.contact}にご相談ください。`}</p>
+      <p className="text-[15px] font-bold text-ink">{validDays ? 'ご案内できる日時がありません' : '空き状況を確認できません'}</p>
+      <p className="text-xs leading-[18px] text-liff-sub">{validDays ? `今日から ${days} 日間、${target.menuName}の空きがありません。${words.contact}にご相談ください。` : `${words.contact}にご相談ください。`}</p>
     </Card>
   );
 }
@@ -42,7 +43,7 @@ export function RoutedConfirm({ target, whenText }: { target: RoutedTarget; when
     [words.bookingContent, target.menuName],
     ['日時', whenText],
     ...(target.staffName ? [[words.staff, target.staffName] as [string, string]] : []),
-    ...(target.meetingMode ? [['形式', target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : '対面'] as [string, string]] : []),
+    ...(target.meetingMode ? [['形式', target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : target.meetingMode === 'in_person' ? '対面' : '確認できません'] as [string, string]] : []),
     ['料金', bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')],
   ];
   return (

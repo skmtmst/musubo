@@ -37,7 +37,7 @@ describe('条件の足し口（m22c）', () => {
   it('15個の札ボタンは並べず、窓への足し口が1つある', () => {
     renderBuilder()
     // 最初は「すべて」の足し口だけ。OR追加後も、各かたまりに1つ。
-    expect(screen.getAllByRole('button', { name: '追加する条件を選ぶ' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: '追加する条件を選択する' })).toHaveLength(1)
     // 札ボタンに戻っていたら赤：15種の名前がボタンとして並ぶ。
     for (const label of ['メモ', 'ステータスメッセージ', '友だち登録日', '対応マーク', '行動スコア']) {
       expect(screen.queryByRole('button', { name: label })).toBeNull()
@@ -49,7 +49,7 @@ describe('条件の足し口（m22c）', () => {
     renderBuilder((next) => {
       seen.push(next)
     })
-    fireEvent.click(screen.getByRole('button', { name: '追加する条件を選ぶ' }))
+    fireEvent.click(screen.getByRole('button', { name: '追加する条件を選択する' }))
     const dialog = screen.getByRole('dialog', { name: '条件を選ぶ' })
     expect(dialog.textContent).toContain('タグ・記入欄')
     fireEvent.change(within(dialog).getByRole('searchbox'), { target: { value: 'タグ' } })
@@ -67,7 +67,7 @@ describe('条件の足し口（m22c）', () => {
 it('条件の選ぶ窓を取り消すと、条件も保存口も変わらない', () => {
   const onChange = vi.fn()
   renderBuilder(onChange)
-  fireEvent.click(screen.getByRole('button', { name: '追加する条件を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '追加する条件を選択する' }))
   fireEvent.click(within(screen.getByRole('dialog', { name: '条件を選ぶ' })).getByRole('button', { name: 'キャンセル' }))
   expect(onChange).not.toHaveBeenCalled()
   expect(screen.queryByRole('dialog', { name: '条件を選ぶ' })).toBeNull()

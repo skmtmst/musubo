@@ -161,7 +161,7 @@ export function MessageButtonsSection({ buttons, error, onChange, liffId, accoun
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-sm font-bold text-ink">ボタン</h3>
-          <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。1通目のメッセージの下に付きます。最大4つまで。</p>
+          <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。すべてのメッセージの後に付きます。最大4つまで。</p>
         </div>
         <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加する</Button>
       </div>

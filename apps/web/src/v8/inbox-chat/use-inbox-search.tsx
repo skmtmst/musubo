@@ -79,7 +79,8 @@ export function useInboxSearch({ chatDetail, messagesHasMore, selectedChatIdRef,
           })
           if (stale()) return
           if (!res.success) break
-          const rows = res.data.messages ?? []
+          if (!Array.isArray(res.data?.messages)) throw new Error('invalid_search_messages')
+          const rows = res.data.messages
           const seen = new Set(list.map((m) => m.id))
           list = [...rows.filter((m) => !seen.has(m.id)), ...list]
           chatMessagesRef.current = list
@@ -98,7 +99,10 @@ export function useInboxSearch({ chatDetail, messagesHasMore, selectedChatIdRef,
       }
       if (stale()) return
       setChatSearchFilling(false)
-      if (list.some((m) => m.id === hit.id)) setChatSearchTarget({ id: hit.id, seq })
+      if (list.some((m) => m.id === hit.id)) {
+        setError((current) => current === '当たったメッセージまで読み込めませんでした。もう一度お試しください。' ? '' : current)
+        setChatSearchTarget({ id: hit.id, seq })
+      }
       else setError('当たったメッセージまで読み込めませんでした。もう一度お試しください。')
     })()
     return () => { searchRevealSeqRef.current += 1; setChatSearchFilling(false) }

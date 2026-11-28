@@ -9,6 +9,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { MessageTemplateDefinition } from '@line-crm/shared'
 import { BubblePreview } from '@/components/broadcasts/broadcast-form'
+import Button from '@/components/shared/button'
 import { EntityPickerDialog, type EntityPickerFolder } from '@/components/shared/entity-picker'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
@@ -50,6 +51,8 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
 }) {
   const [list, setList] = useState<HqTemplateListItem[] | null>(null)
   const [folders, setFolders] = useState<EntityPickerFolder[]>([])
+  const [foldersFailed, setFoldersFailed] = useState(false)
+  const [folderRetry, setFolderRetry] = useState(0)
   const [loadError, setLoadError] = useState<unknown>(null)
   const [reload, setReload] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -60,10 +63,19 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
     let current = true
     setLoadError(null)
     void hqTemplatesApi.listByKind().then((rows) => { if (current) setList(rows) }).catch((caught) => { if (current) setLoadError(caught) })
-    // フォルダは読めなくても選べる（すべてから選ぶ）。
-    void Promise.resolve().then(() => hqTemplatesApi.folders.list()).then((rows) => { if (current && Array.isArray(rows)) setFolders(rows) }).catch(() => undefined)
     return () => { current = false }
   }, [open, list, reload])
+
+  useEffect(() => {
+    if (!open) return
+    let current = true
+    setFolders([]); setFoldersFailed(false)
+    void Promise.resolve().then(() => hqTemplatesApi.folders.list()).then((rows) => {
+      if (!Array.isArray(rows)) throw new Error('invalid folders')
+      if (current) setFolders(rows)
+    }).catch(() => { if (current) setFoldersFailed(true) })
+    return () => { current = false }
+  }, [open, folderRetry])
 
   if (!open) return null
   const pick = async (id: string) => {
@@ -74,7 +86,8 @@ export default function HqTemplatePicker({ open, onClose, onPick, kind }: {
     onClose()
   }
   return <EntityPickerDialog title="テンプレートから選ぶ" description="統括のテンプレートを選ぶと、開いているメッセージをその内容に置き換えます。" confirmLabel="このテンプレートを使う"
-    items={(list ?? []).filter((t) => !kind || t.kind === kind).map(templatePickerItem)} folders={folders} categories={KINDS} busy={busy} error={error || undefined}
+    items={(list ?? []).filter((t) => !kind || t.kind === kind).map(templatePickerItem)} folders={folders} foldersFailed={foldersFailed} categories={KINDS} busy={busy} error={error || undefined}
+    listFooter={foldersFailed ? <Button size="compact" onClick={() => setFolderRetry((value) => value + 1)}>フォルダを読み直す</Button> : undefined}
     createHref="/hq/templates" createLabel="テンプレートを作る"
     state={loadError && !list ? <ListState permissionScope="hq" kind="error" error={loadError} onRetry={() => { setLoadError(null); setReload((value) => value + 1) }} />
       : !list ? <ListState permissionScope="hq" kind="loading" />

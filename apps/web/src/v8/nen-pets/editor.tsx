@@ -5,7 +5,7 @@ const FIELD_REQUIREMENTS = {
   name: requiredText("ペットの名前を入れてください。"),
 }
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Radio from '@/components/shared/radio'
@@ -57,6 +57,25 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [version, setVersion] = useState<string>(pet.updatedAt)
+  const savingRef = useRef(false)
+  const mounted = useRef(true)
+  const scope = useRef({ accountId, petId: pet.id, generation: 0 })
+  if (scope.current.accountId !== accountId || scope.current.petId !== pet.id) {
+    scope.current = { accountId, petId: pet.id, generation: scope.current.generation + 1 }
+  }
+  const prevScopeKey = useRef(`${accountId}:${pet.id}`)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  useEffect(() => {
+    const key = `${accountId}:${pet.id}`
+    if (prevScopeKey.current === key) return
+    prevScopeKey.current = key
+    savingRef.current = false
+    setSaving(false)
+    setError('')
+  }, [accountId, pet.id])
 
   const normalized = normalizeBirthdayInput(birthday)
   const weightText = weight.replace(/kg/i, '').trim()
@@ -69,13 +88,18 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   ])
 
   const save = async () => {
-
+    if (savingRef.current) return
     setError('')
     if (!fields.submit()) return
+    const targetAccountId = accountId
+    const targetPetId = pet.id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.accountId === targetAccountId && scope.current.petId === targetPetId && scope.current.generation === targetGeneration
+    savingRef.current = true
     setSaving(true)
     setError('')
     try {
-      const result = await api.nenCampaigns.updatePet(accountId, pet.id, {
+      const result = await api.nenCampaigns.updatePet(targetAccountId, targetPetId, {
         name: name.trim(),
         animalType,
         gender,
@@ -84,10 +108,12 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         weightKg,
         expectedUpdatedAt: version,
       })
+      if (!sameScope()) return
       if (!result.success) throw new Error('ペットを保存できませんでした。時間をおいて、もう一度お試しください。')
       onSaved()
       onClose()
     } catch (caught) {
+      if (!sameScope()) return
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
@@ -103,12 +129,16 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
         scope: 'store',
       })) }
     } finally {
-      setSaving(false)
+      if (sameScope()) {
+        savingRef.current = false
+        setSaving(false)
+      }
     }
   }
 
   return (
     <SaveErrorScope errors={saveErrors}><Dialog
+      key={`${accountId}:${pet.id}`}
       open
       designNode="eLjeQ"
       designWidth={560}

@@ -297,6 +297,38 @@ async function renderEditor(viewOnly = false) {
 }
 
 describe('店舗営業時間の編集', () => {
+  test('受付時間の取得失敗は設定を見せず、読み直し後に表示する', async () => {
+    fixture.getSettings.mockRejectedValueOnce(new Error('private error'))
+    render(<><StaffShiftsPage /><ToastHost /></>)
+    await screen.findByText('受付枠を読み込めませんでした')
+    expect(screen.queryByText('private error')).toBeNull()
+    expect(document.querySelector('[data-design="Week"]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByText('営業時間')
+    expect(document.querySelector('[data-design="Week"]')).not.toBeNull()
+  })
+
+  test.each(['success', 'failure'])('店を切り替えた後の古い受付時間の%s応答を表示しない', async (result) => {
+    let resolveOld!: (value: unknown) => void
+    let rejectOld!: (reason: unknown) => void
+    fixture.getSettings.mockImplementation((accountId: string) => accountId === 'account-a'
+      ? new Promise((resolve, reject) => { resolveOld = resolve; rejectOld = reject })
+      : Promise.resolve({ success: true, data: settings(accountId) }))
+    render(<><StaffShiftsPage /><ToastHost /></>)
+    expect(document.querySelector('[data-design="Week"]')).toBeNull()
+    expect(screen.queryByText('受付枠を読み込めませんでした')).toBeNull()
+    switchAccount('account-b')
+    await screen.findByText('営業時間')
+    await act(async () => {
+      if (result === 'success') resolveOld({ success: true, data: settings('account-a', { openingHoursSource: 'google_business' }) })
+      else rejectOld(new Error('old failure'))
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('営業時間はGoogleビジネスプロフィールから読み込んでいます。予約の定員・担当者・設備はmusuboで設定します。')).toBeNull()
+    expect(screen.queryByText('受付枠を読み込めませんでした')).toBeNull()
+    expect(screen.getByText('曜日ごとに受付の時間と休憩を決めます')).toBeTruthy()
+  })
+
   test('未設定の0行曜日は定休日と断定せず、保存後の意味を案内する', async () => {
     await renderEditor()
     expect(screen.getByText(/まだ週全体の営業時間を保存していません/)).toBeTruthy()
@@ -730,9 +762,9 @@ describe('日時を指定して空きを確認 (IDEA-28)', () => {
   test('日時を入れて確かめるとAPIを呼び、取れる旨と残数を表示する', async () => {
     await renderEditor()
     await fillCheckForm()
-    fireEvent.click(await screen.findByRole('button', { name: '確かめる担当：選ぶ' }))
+    fireEvent.click(await screen.findByRole('button', { name: '確かめる担当：選択する' }))
     fireEvent.click(await screen.findByRole('radio', { name: '担当A' }))
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: '選択する', exact: true }))
     fireEvent.click(screen.getByRole('button', { name: '確かめる' }))
 
     await waitFor(() => expect(fixture.checkAvailability).toHaveBeenCalledWith('account-a', {

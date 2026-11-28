@@ -73,10 +73,10 @@ describe('ボタンのタグ選び（・R19/R20）', () => {
   it('設定済みの行からタグを外せる', () => {
     render(<Harness initial={['tag-1']} />)
     fireEvent.click(screen.getByRole('button', { name: 'NEN会員' }))
-    fireEvent.click(screen.getByRole('button', { name: 'タグを付ける：変える' }))
+    fireEvent.click(screen.getByRole('button', { name: 'タグを付ける：変更する' }))
     const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'NEN会員' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（0件）' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選択する（0件）' }))
     expect(screen.getByTestId('tag-ids').textContent).toBe('')
   })
   it('確定まで保存値を変えず、取消しても空の行を作らない', () => {
@@ -88,7 +88,7 @@ describe('ボタンのタグ選び（・R19/R20）', () => {
     expect(screen.queryByRole('button', { name: 'ギフト' })).toBeNull()
     dialog = openTags()
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'ギフト' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: '選択する（1件）' }))
     expect(screen.getByTestId('tag-ids').textContent).toBe('tag-4')
   })
 })

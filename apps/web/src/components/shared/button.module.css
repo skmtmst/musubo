@@ -561,3 +561,6 @@ html:root .button.button[data-presentation='quiet-text']:hover:not(:disabled) {
   filter: none;
 }
 html:root .button.button[data-presentation='quiet-text']:active:not(:disabled) { filter: none; }
+
+:root .button[role='menuitem']:not(.textDanger) > svg { color: var(--color-ink-faint); }
+:root .button[role='menuitem'].textDanger > svg { color: var(--color-danger); }

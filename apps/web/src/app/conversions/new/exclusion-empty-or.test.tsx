@@ -125,7 +125,7 @@ describe('S4-OR 成果地点の数えない条件', () => {
     await renderPage()
     setName()
     addOrGroup()
-    const fields = screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
+    const fields = screen.getAllByRole('button', { name: '追加する条件を選択する' })
     expect(fields).toHaveLength(2)
     pickKind(fields[1], '行動スコア')
     /* 作る画面は数えない条件の人数を出さないので、条件を入れても数え上げの口は呼ばない。 */

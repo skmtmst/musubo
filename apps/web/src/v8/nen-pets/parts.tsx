@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { statusLabel } from '@/lib/status-labels'
 
 
@@ -24,7 +26,7 @@ export type PetTab = 'pets' | 'feeding'
 export type PetsQuery = { q: string; species: string; product: string; weight: NenPetWeightFilter; sort: NenPetSort }
 export const EMPTY_QUERY: PetsQuery = { q: '', species: '', product: '', weight: '', sort: 'updated_desc' }
 
-export const NEUTERED_LABEL = { yes: '済み', no: 'していない', unknown: 'わからない' } as const
+export const NEUTERED_LABEL: Readonly<Record<'yes' | 'no' | 'unknown', string>> = Object.assign(Object.create(null), { yes: '済み', no: 'していない', unknown: 'わからない' })
 
 /*
  * #999 DEEP-25: CSV の1マス整形は共通の csvCell（先頭の = + - @ に ' を足す）。
@@ -34,8 +36,8 @@ export const NEUTERED_LABEL = { yes: '済み', no: 'していない', unknown: '
 export function petsToCsv(items: NenPetRow[]): string {
   const header = ['ペット名', '呼び名', '性別', '種類', '品種', '誕生日', '年齢', '体重(kg)', '避妊去勢', '運動量', '主食', '1日の目安(g)', '1日の必要カロリー(kcal)', '然の鹿肉の目安(g)', '体重の更新日', '飼い主', 'EC会員ID']
   const lines = items.map((p) => [
-    p.name, p.callName, p.gender === 'male' ? '男の子' : p.gender === 'female' ? '女の子' : '未回答', petAnimalTypeLabel(p.animalType), p.breed, p.birthday ?? '', p.ageLabel, p.weightKg ?? '', NEUTERED_LABEL[p.neutered], p.activityLabel,
-    p.productName ?? '', p.feeding?.dailyGrams ?? '', p.feeding?.dailyKcal ?? '', p.feeding?.venisonGrams ?? '', p.weightUpdatedAt.slice(0, 10), p.owner.name, p.owner.customerId ?? '',
+    p.name, p.callName, p.gender === 'male' ? '男の子' : p.gender === 'female' ? '女の子' : '未回答', petAnimalTypeLabel(p.animalType), p.breed, p.birthday ?? '', p.ageLabel, p.weightKg ?? '', knownValue<string>(NEUTERED_LABEL, p.neutered, '状態を確認できません'), p.activityLabel,
+    p.productName ?? '', p.feeding?.dailyGrams ?? '', p.feeding?.dailyKcal ?? '', p.feeding?.venisonGrams ?? '', typeof p.weightUpdatedAt === 'string' ? p.weightUpdatedAt.slice(0, 10) : '', p.owner.name, p.owner.customerId ?? '',
   ].map(csvCell).join(','))
   return `﻿${[header.join(','), ...lines].join('\n')}`
 }
@@ -50,12 +52,25 @@ export function downloadCsv(text: string, name: string) {
   URL.revokeObjectURL(url)
 }
 
+function isValidCalendarMonthDay(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  const check = new Date(Date.UTC(year, month - 1, day))
+  return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day
+}
+
 /** 誕生日の入力。空＝未登録（null）、「2020-03-15」か月日だけ「03-15」。ほかは 'invalid'。 */
 export function normalizeBirthdayInput(value: string): string | null | 'invalid' {
   const trimmed = value.trim()
   if (!trimmed) return null
-  if (/^\d{2}-\d{2}$/.test(trimmed)) return trimmed
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  const mdMatch = /^(\d{2})-(\d{2})$/.exec(trimmed)
+  if (mdMatch) {
+    // 年なし入力では 2月29日（うるう年）を許容するため 2000 年で検証する。
+    return isValidCalendarMonthDay(2000, Number(mdMatch[1]), Number(mdMatch[2])) ? trimmed : 'invalid'
+  }
+  const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed)
+  if (ymdMatch) {
+    return isValidCalendarMonthDay(Number(ymdMatch[1]), Number(ymdMatch[2]), Number(ymdMatch[3])) ? trimmed : 'invalid'
+  }
   return 'invalid'
 }
 
@@ -79,9 +94,14 @@ export function feedingLines(pet: NenPetRow): { main: string; sub: string } {
   if (!f) {
     return { main: '—', sub: pet.animalType === 'other' ? '犬・猫以外は目安の計算対象外' : pet.weightKg == null ? '体重が未登録' : '誕生日が未登録' }
   }
-  const kcal = `約${formatNumber(f.dailyKcal)}kcal`
+  const hasKcal = typeof f.dailyKcal === 'number' && Number.isFinite(f.dailyKcal) && f.dailyKcal >= 0
+  const kcal = hasKcal ? `約${formatNumber(f.dailyKcal)}kcal` : 'カロリーを確認できません'
   if (f.dailyGrams == null) return { main: '—', sub: `${kcal}・主食が未設定` }
-  const extra = f.venisonGrams != null ? `・鹿肉 ${f.venisonGrams}g` : /子|シニア/.test(f.stageLabel) ? `・${f.stageLabel}` : ''
+  if (typeof f.dailyGrams !== 'number' || !Number.isFinite(f.dailyGrams) || f.dailyGrams < 0) {
+    return { main: '—', sub: kcal }
+  }
+  const hasVenison = typeof f.venisonGrams === 'number' && Number.isFinite(f.venisonGrams) && f.venisonGrams >= 0
+  const extra = hasVenison ? `・鹿肉 ${formatNumber(f.venisonGrams)}g` : f.venisonGrams == null && /子|シニア/.test(f.stageLabel) ? `・${f.stageLabel}` : ''
   return { main: `${formatNumber(f.dailyGrams)}g／日`, sub: `${kcal}${extra}` }
 }
 

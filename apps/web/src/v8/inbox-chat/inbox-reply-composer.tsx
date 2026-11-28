@@ -331,7 +331,14 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         ref={textareaRef}
         value={messageContent}
         onValueChange={setMessageContent}
-        onKeyDown={handleKeyDown}
+        onKeyDown={(event) => {
+          const sendKey = event.key === 'Enter' && (sendMode === 'enter' ? !event.shiftKey : event.shiftKey)
+          if (imageUploading && sendKey && !event.nativeEvent.isComposing && !isComposingRef.current && event.keyCode !== 229) {
+            event.preventDefault()
+            return
+          }
+          handleKeyDown(event)
+        }}
         onCompositionStart={() => { isComposingRef.current = true }}
         onCompositionEnd={() => { isComposingRef.current = false }}
         placeholder="メッセージを入力"
@@ -373,11 +380,11 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
             <AttachMenu disabled={!selectedChatId} onPick={(file, slot) => void handlePickAttachment(file, slot)} />
             <span
               className={chatStyles.attachNote}
-              data-error={imageError ? '' : undefined}
-              role={imageError ? 'alert' : undefined}
-              title={imageError || ATTACH_NOTE_TITLE}
+              data-error={imageError && !imageUploading ? '' : undefined}
+              role={imageError && !imageUploading ? 'alert' : undefined}
+              title={imageUploading ? '画像を読み込み中' : imageError || ATTACH_NOTE_TITLE}
             >
-              {imageError ? imageError : imageUploading ? '画像を読み込み中…' : ATTACH_NOTE}
+              {imageUploading ? '画像を読み込み中' : imageError || ATTACH_NOTE}
             </span>
           </span>
         )}
@@ -396,7 +403,8 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           <Button variant="primary"
             size="standard"
             onClick={handleSendMessage}
-            disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(pendingAttachment?.status === 'ready'))}>
+            aria-description={imageUploading ? '画像を読み込み中' : undefined}
+            disabled={sending || imageUploading || messageOverLimit || ((pendingAttachment !== null) && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(pendingAttachment?.status === 'ready'))}>
             {(!sending) ? <Send aria-hidden="true" size={16} /> : null}
             {sending ? '送っています…' : '送信する'}
           </Button>

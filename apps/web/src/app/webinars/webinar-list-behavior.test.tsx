@@ -125,7 +125,7 @@ describe('ウェビナー一覧の表示状態と操作', () => {
     expect(view.container.querySelectorAll('[data-list-state]')).toHaveLength(1)
     expect(view.container.querySelector('[data-row-id]')).toBeNull()
     mocks.grand = 0; mocks.list.mockResolvedValue(response([]))
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    fireEvent.click(within(view.container.querySelector('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む' }))
     // 全体件数の補助取得も失敗している。未知の件数を0件にしない。
     await screen.findByText('条件に合うものがありません')
     expect(view.container.querySelectorAll('[data-empty-list]')).toHaveLength(1)
@@ -145,7 +145,8 @@ describe('ウェビナー一覧の表示状態と操作', () => {
     await screen.findByText('ウェビナーを表示できませんでした')
     expect(row()).toBeTruthy()
     mocks.list.mockResolvedValue(response([webinar({ title: '再取得した結果' })]))
-    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    const notice = screen.getByText('ウェビナーを表示できませんでした').closest('[data-design-part="notice"]') as HTMLElement
+    fireEvent.click(within(notice).getByRole('button', { name: 'もう一度読み込む' }))
     await screen.findByRole('link', { name: '「再取得した結果」の詳細を見る' })
     expect(screen.queryByText('ウェビナーを表示できませんでした')).toBeNull()
   })

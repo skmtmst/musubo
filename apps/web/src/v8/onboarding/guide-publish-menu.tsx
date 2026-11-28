@@ -46,7 +46,7 @@ export function GuidePublishMenu({ accountId, onLater, onReview }: {
         <span>{title}</span>
       </span>}
       description="あとはリッチメニューを公開するだけ。公開すると、LINEの友だちのトーク画面にメニューが表示され、予約の入口ができます。"
-      onCancel={onLater} footerDivider={false}
+      onCancel={onLater} showCloseButton plainCloseButton footerDivider={false}
       footer={<div className={styles.footer}>
         <DialogActions align="center">
           <Button onClick={onLater}>あとで</Button>

@@ -170,13 +170,13 @@ test('シナリオが未選択なら選べる赤い欄へ移り、選ぶと誤�
   const next = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('次へ：あわせて行うこと')) ?? querySupplementaryPageAction('次へ：あわせて行うこと'))!
   await act(async () => next.click())
   const field = () => host.querySelector<HTMLElement>('#fa-scenario')!
-  const open = () => host.querySelector<HTMLButtonElement>('button[aria-label="実際に配信するシナリオ：選ぶ"]')!
+  const open = () => host.querySelector<HTMLButtonElement>('button[aria-label="実際に配信するシナリオ：選択する"]')!
   await eventually(() => expect(document.activeElement).toBe(open()))
   expect(field().getAttribute('aria-invalid')).toBe('true')
   expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1)
   await act(async () => open().click())
   await act(async () => document.querySelector<HTMLInputElement>('input[type="radio"][aria-label="新規登録7日間フォロー"]')!.click())
-  const confirm = ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ') ?? querySupplementaryPageAction('選ぶ'))!
+  const confirm = ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選択する') ?? querySupplementaryPageAction('選択する'))!
   await act(async () => confirm.click())
   expect(host.querySelector('[role="alert"]')).toBeNull()
 })

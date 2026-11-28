@@ -292,7 +292,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
             {rows.map((row) => (
               <Tr key={row.id} className={styles.row} data-row-id={row.id}>
                 <Td className={styles.colState}><span className={styles.faint}>{jpDateTime(row.createdAt)}</span></Td>
-                <Td className={styles.colStore}><span className={styles.store}>{ACTIVITY_LABEL[row.action] ?? '操作'}</span></Td>
+                <Td className={styles.colStore}><span className={styles.store}>{Object.prototype.hasOwnProperty.call(ACTIVITY_LABEL, row.action) ? ACTIVITY_LABEL[row.action] : '操作'}</span></Td>
                 <Td className={styles.colState}><span className={styles.faint} title={account(row.accountId)}>{account(row.accountId)}</span></Td>
                 <Td className={styles.colState}><span className={styles.faint}>{names.get(row.actorId) ?? '統括の担当者'}</span></Td>
               </Tr>

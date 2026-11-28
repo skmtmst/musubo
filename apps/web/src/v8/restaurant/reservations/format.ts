@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * 予約台帳（l9NlC0・Z3FoM・・xzCK6）の表示の形。今の画面
@@ -10,11 +11,11 @@ export type LedgerView = 'today' | 'week' | 'month' | 'list'
 
 export const INACTIVE_STATUSES = ['cancelled', 'no_show']
 
-export const SOURCE_LABEL: Record<string, string> = {
+export const SOURCE_LABEL: Record<string, string> = Object.assign(Object.create(null) as Record<string, string>, {
   restaurant_board: 'レストランボード', reszaiko: 'RESZAIKO', hotpepper: 'Hot Pepper',
   tabelog: '食べログ', gurunavi: 'ぐるなび', ikyu: '一休', retty: 'Retty',
   line: 'LINE', phone: '電話', manual: '手動', google_business_profile: 'Google',
-}
+})
 
 /** 予約元の色の組。LINE・レストランボード＝緑、予約媒体＝赤、電話・手動＝灰。 */
 export function sourceKind(source: string): 'line' | 'media' | 'phone' {
@@ -24,7 +25,7 @@ export function sourceKind(source: string): 'line' | 'media' | 'phone' {
 }
 
 export function sourceName(source: string): string {
-  return SOURCE_LABEL[source] ?? source
+  return knownValue(SOURCE_LABEL, source, source)
 }
 
 /** 押さえ（期限付きの仮押さえ）か。 */
@@ -34,8 +35,9 @@ export function isHold(item: RestaurantReservation): boolean {
 
 /** 「秋の鹿肉コース」→「秋の鹿肉」（箱と次の予約は短く）。 */
 export function shortCourse(name: string | null): string {
-  if (!name) return '席のみ'
-  return name.replace(/コース$/, '')
+  const trimmed = (name ?? '').trim()
+  if (!trimmed) return '席のみ'
+  return trimmed.replace(/コース$/, '') || trimmed
 }
 
 export function pad2(value: number): string {
@@ -46,8 +48,20 @@ export function toYmd(day: Date): string {
   return formatYmd(day)
 }
 
+function parseReservationDate(value: string | Date): Date {
+  if (value instanceof Date) return value
+  if (typeof value !== 'string') return new Date(Number.NaN)
+  const trimmed = value.trim()
+  if (!trimmed) return new Date(Number.NaN)
+  // SQLite のオフセットなし日時は UTC。端末の時間帯に左右されないよう補う。
+  const normalized = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmed) && !/Z$|[+-]\d{2}:?\d{2}$/i.test(trimmed)
+    ? `${trimmed.replace(' ', 'T')}Z`
+    : trimmed
+  return new Date(normalized)
+}
+
 export function hm(value: string | Date): string {
-  const date = typeof value === 'string' ? new Date(value) : value
+  const date = parseReservationDate(value)
   if (Number.isNaN(date.getTime())) return '—'
   return formatDate(date,{style:'time'})
 }
@@ -79,7 +93,7 @@ export function dayShort(day: Date): string {
 
 /** 年をまたぐ予約も区別できる、日本時間の日時。 */
 export function mdhm(value: string): string {
-  const date = new Date(value)
+  const date = parseReservationDate(value)
   if (Number.isNaN(date.getTime())) return '—'
   const civil = civilDay(date)
   return `${civil.getUTCFullYear()}/${pad2(civil.getUTCMonth() + 1)}/${pad2(civil.getUTCDate())} ${hm(date)}`
@@ -120,11 +134,14 @@ export function floorOrder(a: RestaurantTable, b: RestaurantTable): number {
 }
 
 export function minutesOf(value: string): number {
-  const date = new Date(value)
+  const date = parseReservationDate(value)
+  if (Number.isNaN(date.getTime())) return Number.NaN
   const jst=japanCalendar(date)
   return jst.getUTCHours() * 60 + jst.getUTCMinutes()
 }
 
 export function slotLabel(minutes: number): string {
-  return `${Math.floor(minutes / 60)}:${pad2(minutes % 60)}`
+  if (!Number.isFinite(minutes) || minutes < 0) return '—'
+  const total = Math.floor(minutes)
+  return `${Math.floor(total / 60)}:${pad2(total % 60)}`
 }

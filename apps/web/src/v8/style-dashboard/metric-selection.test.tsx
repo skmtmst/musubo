@@ -23,7 +23,7 @@ const metric = (value: number, unit = '件') => ({ value, status: 'available' as
 const snapshot: StyleSnapshot = { style: 'salon', from: '2026-10-20T15:00:00Z', to: '2026-10-21T15:00:00Z', timeZone: 'Asia/Tokyo', asOf: '2026-10-21T05:00:00Z', dateBasis: 'visit', range: 'today', metrics: { bookings: metric(4), attention: metric(2), nextBookingRate: metric(0.2, '%'), recall: metric(9), noShowRate: metric(0.1, '%'), visits: metric(3, '人') }, previous: {}, items: [], newBookings: [], resultId: 'real' }
 const schedule: StyleSchedule = { style: 'salon', from: snapshot.from, to: snapshot.to, timeZone: snapshot.timeZone, asOf: snapshot.asOf, range: 'today', display: 'list', calendarView: 'day', entries: [], columns: [], days: [], closures: [], availability: { status: 'available', reason: null, resources: [], slots: [], closedDates: [] } }
 function labels() { return Array.from(document.querySelectorAll('[data-style-dashboard] [data-kpi-label]')).map(node => node.getAttribute('title')) }
-async function open() { await waitFor(() => expect(state.summary).toHaveBeenCalled()); fireEvent.click(getPageAction({ name: '表示を変える' })); const drawer = await screen.findByRole('dialog', { name: /表示を変える/ }); await within(drawer).findByRole('switch', { name: '分析', exact: true }); return drawer }
+async function open() { await waitFor(() => expect(state.summary).toHaveBeenCalled()); fireEvent.click(getPageAction({ name: '表示を変更する' })); const drawer = await screen.findByRole('dialog', { name: /表示を変える/ }); await within(drawer).findByRole('switch', { name: '分析', exact: true }); return drawer }
 beforeEach(() => {
   /* ここは数の帯の選択だけを見る。初回ポップアップ（枠02）は閉じた後の状態にして見出しの操作に重ねない。 */
   for (const id of ['a', 'b']) localStorage.setItem(firstRunPopupDismissedKey(id), '1')
@@ -141,7 +141,7 @@ it('閲覧のみには表示設定の変更入口を出さず、保存もしな�
   state.role = 'viewer'; state.customized = true; state.ids = ['recall', 'bookings']
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toEqual(['呼び戻し待ち', '今日の予約']))
-  expect(screen.queryByRole('button', { name: '表示を変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '表示を変更する' })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
 })
 
@@ -164,7 +164,7 @@ it('32項目の閲覧だけでも内容と順序を保ち、未取得を0にせ�
   expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 5, 5, 5, 5, 5, 2])
   const pending = (await screen.findByRole('button', { name: '支払い待ちの説明' })).closest('[data-design-version]')!
   expect(within(pending as HTMLElement).getByText('—', { exact: true })).toBeTruthy()
-  expect(screen.queryByRole('button', { name: '表示を変える' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '表示を変更する' })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
 })
 

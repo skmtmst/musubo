@@ -44,8 +44,11 @@ const fixedTimingByCampaign: Record<string, string> = {
 export function formatCampaignTiming(setting: Pick<NenCampaignSetting, 'campaignKey' | 'delayDays' | 'deliveryTime'>): string {
   const known = fixedTimingByCampaign[setting.campaignKey]
   if (known) return known
-  if (setting.delayDays === 0) return `発送当日 ${setting.deliveryTime}`
-  return `発送から${setting.delayDays}日後 ${setting.deliveryTime}`
+  if (!Number.isFinite(setting.delayDays) || setting.delayDays < 0) return '配信日時を確認できません'
+  const days = Math.trunc(setting.delayDays)
+  const time = typeof setting.deliveryTime === 'string' ? setting.deliveryTime.trim() : ''
+  const dayLabel = days === 0 ? '発送当日' : `発送から${days}日後`
+  return time ? `${dayLabel} ${time}` : `${dayLabel}（配信時刻を確認できません）`
 }
 
 const audienceByCampaign: Record<string, string> = {

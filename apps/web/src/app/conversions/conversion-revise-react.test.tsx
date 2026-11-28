@@ -356,7 +356,7 @@ describe('S4-OR 編集の数えない条件は空のかたまりを黙って落�
   /** 編集の窓の中の条件の足し口。最初は1つ、or 追加で2つ。 */
   function kindPickers(): HTMLElement[] {
     return [...document.body.querySelectorAll('button')]
-      .filter((node) => node.getAttribute('aria-label') === '追加する条件を選ぶ')
+      .filter((node) => node.getAttribute('aria-label') === '追加する条件を選択する')
   }
 
   async function pickKind(field: HTMLElement, query: string) {

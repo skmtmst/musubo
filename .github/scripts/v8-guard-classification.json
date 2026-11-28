@@ -1,0 +1,260 @@
+{
+  "fixtures": [
+    {
+      "path": "apps/web/scripts/v8-guard/layout-defects.test.mjs",
+      "category": "behavior",
+      "reason": "実物の表CSS：窓内のコンテナ幅を壊すと取消が押せず、修復後は押せる"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/create-footer-choices.test.mjs",
+      "category": "behavior",
+      "reason": "本物の作成型の選択肢は切れず、鍵盤選択と下書きを保つ"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs",
+      "category": "behavior",
+      "reason": "知らせの点は題・本文の1行目にそろう（操作・閉じる・小さい帯・説明付き、${width}px）"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/affixed-input-layout.test.mjs",
+      "category": "behavior",
+      "reason": "接頭辞付きの欄は入力でき、読取専用と無効な欄の値・状態を保つ"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs",
+      "category": "behavior",
+      "reason": "numeric support columns reserve the full note instead of the old truncation budget"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/action-row-narrow.test.mjs",
+      "category": "visual",
+      "reason": "狭い幅の設定欄は重ならず画面内に収まり、はみ出し故障を検出する"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/button-content-width.test.mjs",
+      "category": "behavior",
+      "reason": "実Buttonの短→長→短を3幅で測り、古い固定幅の故障は文字/印の切れで落ちる"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/control-feedback.test.mjs",
+      "category": "behavior",
+      "reason": "塗りと絞り込み状態があってもキーボードの焦点を見失わない"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/window-focus-clip.test.mjs",
+      "category": "behavior",
+      "reason": "窓内の入力と選択の焦点が切れず、本文だけを送れる ${kind} ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/automation-field-error.test.mjs",
+      "category": "behavior",
+      "reason": "保存の入力エラーは1440・1152で名前の下へ出し、画面の右端を越えない"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/fix-patterns.test.mjs",
+      "category": "behavior",
+      "reason": "Y14 detects static trailing text overlapping a filter and accepts separate rows and owned controls"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/owner-rules.test.mjs",
+      "category": "behavior",
+      "reason": "a framed box clipped by its parent fails; scrollable and restored boxes remain usable"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/pendec2-rules.test.mjs",
+      "category": "behavior",
+      "reason": "card spill is detected only when its content is visible, and restoration is clean"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/shared-surface-layout.test.mjs",
+      "category": "behavior",
+      "reason": "権限メニューは理由と焦点を保ち、実キー・タップでも起動しない"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/b244-rules.test.mjs",
+      "category": "behavior",
+      "reason": "入力の必須/任意・エラー理由・危険操作の分離を故障注入し、復旧後0を確認する"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/dialog-layout.test.mjs",
+      "category": "behavior",
+      "reason": "picker actions stay visible with long content at ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/table-column-alignment.test.mjs",
+      "category": "visual",
+      "reason": "同じ行の横3列は通す"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/visual-state.test.mjs",
+      "category": "behavior",
+      "reason": "capture proves the requested conflict instead of another validation error"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/bar-chart-layout.test.mjs",
+      "category": "visual",
+      "reason": "基準線上下と凡例どおりの出来事は通る"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/reservation-reading.test.mjs",
+      "category": "behavior",
+      "reason": "詳細は型の幅を使い、予約名を省略しても全文を確認できる"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/input-retention.test.mjs",
+      "category": "behavior",
+      "reason": "${kind} keeps the first controlled input and still confirms discard"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/record-columns.test.mjs",
+      "category": "visual",
+      "reason": "record tracks align all four columns and detect the former stacked layout at every desktop width"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/drawer-layout.test.mjs",
+      "category": "behavior",
+      "reason": "full-height drawer keeps footer visible for short and long content at ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/layout-overflow.test.mjs",
+      "category": "visual",
+      "reason": "本文が親の大きい文字を引き継ぐと検出し、本文の大きさに戻すと消える"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/form-rules.test.mjs",
+      "category": "behavior",
+      "reason": "disabled actions require a visible reason and colour choices have one selected value"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/active-modal-audit.test.mjs",
+      "category": "behavior",
+      "reason": "requested state is read from the visible modal instead of its background"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/edge-inset.test.mjs",
+      "category": "behavior",
+      "reason": "数の帯・カード・知らせが板の端にくっつくと落ち、題と同じ内側の余白に収めると通る"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/inbox-filter-layout.test.mjs",
+      "category": "behavior",
+      "reason": "受信箱の内容幅と期限窓・補助操作を保つ ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/scenarios-list-layout.test.mjs",
+      "category": "visual",
+      "reason": "シナリオの実表で人数と操作を収め、固定名列の故障を検出する ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/salon-filters-row.test.mjs",
+      "category": "visual",
+      "reason": "1152 で日付の段は1段・担当欄は143px以上・横はみ出しなし（B27/B28）"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/list-name-open.test.mjs",
+      "category": "behavior",
+      "reason": "一覧の名前を押したら一覧のままにならず詳細が開く"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/ui-layout-alignment.test.mjs",
+      "category": "visual",
+      "reason": "${name}（中央に戻すと赤）"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/ui-layout-tabrow.test.mjs",
+      "category": "behavior",
+      "reason": "タブ段は${viewport}px相当でも分析タブと操作が重ならず押せる"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/viewport-footer.test.mjs",
+      "category": "behavior",
+      "reason": "保存帯付きの在庫は本文だけが送り、旧高さの故障を検出して復元する"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/heading-band.test.mjs",
+      "category": "visual",
+      "reason": "閲覧帯は見出しと操作の行の下で頭いっぱいにあり、題の列に戻すと検出して復元する"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/store-heading.test.mjs",
+      "category": "behavior",
+      "reason": "店舗数と長い名前でも題を隠さず、故障を検出して復元する ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/dashboard-content.test.mjs",
+      "category": "behavior",
+      "reason": "${style} ${width} ${delay}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/home-pending-heading.test.mjs",
+      "category": "behavior",
+      "reason": "${style} ${width} ${delay}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/document-title.test.mjs",
+      "category": "behavior",
+      "reason": "文書の題 ${width} API+${delay}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/canonical-route.test.mjs",
+      "category": "behavior",
+      "reason": "正規の入口 ${width} API+${delay}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/dialog-footer.test.mjs",
+      "category": "behavior",
+      "reason": "dialog footer ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/dialog-leading.test.mjs",
+      "category": "behavior",
+      "reason": "every leadingAction caller has a browser recipe"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/patrol-layout.test.mjs",
+      "category": "behavior",
+      "reason": "settings navigation ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/scheduled-message.test.mjs",
+      "category": "behavior",
+      "reason": "scheduled message ${kind} ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/route-pending.test.mjs",
+      "category": "behavior",
+      "reason": "route pending and fixed headings ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/style-switcher.test.mjs",
+      "category": "behavior",
+      "reason": "style switcher ${entry} ${width}"
+    },
+    {
+      "path": "apps/web/scripts/v8-guard/monthly-flow.test.mjs",
+      "category": "behavior",
+      "reason": "monthly flow ${width} ${partial ? "
+    }
+  ],
+  "behavior_steps": [
+    "2000 friends meet absolute speed targets",
+    "Booking preview date agrees through settings and preview tabs",
+    "Common V8 speed checks (11 scenes, five medians)",
+    "List row rules",
+    "Narrow preview opens once and preserves form input",
+    "No permission copy flashes during navigation",
+    "PERF-01 fixed list speed targets",
+    "Report speed reference results (including incomplete measurements)",
+    "Sidebar, booking and pagination details stay as designed",
+    "Speed measurement and reference policy controls",
+    "Train 17 absolute targets",
+    "Train 17 waitlist failure and inflow mouse regressions",
+    "Virtual table selection, keyboard and layout"
+  ],
+  "visual_steps": [
+    "No V8 layout breaks at 1152, 1440 and 1920",
+    "No new V8 layout or owner-rule defects",
+    "Store comparison delta labels stay inside their values",
+    "Inventory edge insets, folder dots and page actions on all admin screens"
+  ]
+}

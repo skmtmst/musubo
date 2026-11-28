@@ -1,7 +1,7 @@
 import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import BookingHistoryCancelDialog from '../components/booking-history-cancel-dialog.js';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type BookingHistoryItem } from '../lib/api.js';
 import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday } from '../lib/datetime.js';
@@ -56,6 +56,7 @@ export default function BookingHistory() {
   const [payments, setPayments] = useState<Record<string, PaymentView | null>>({});
   const [paymentKey, setPaymentKey] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const changeRequest = useRef(0);
 
   useEffect(() => {
     setFailed(false);
@@ -160,11 +161,14 @@ export default function BookingHistory() {
 
   async function openChange(booking: BookingHistoryItem) {
     if (busy || !canChange(booking) || !withinDeadline(booking, Date.now())) return;
+    const request = ++changeRequest.current;
     setActionError(null);
     setPendingChange({ booking, slots: null, slotsFailed: false, selected: null, error: null });
     const from = jstToday();
     try {
       const res = await api.availability(booking.menu_id, booking.staff_id, from, addDays(from, CHANGE_RANGE_DAYS - 1));
+      if (!Array.isArray(res.by_staff) || res.by_staff.some((bucket) => !bucket || !Array.isArray(bucket.slots))) throw new Error('invalid_availability');
+      if (request !== changeRequest.current) return;
       const current = booking.starts_at;
       const slots: ChangeSlot[] = [];
       for (const bucket of res.by_staff ?? []) {
@@ -181,6 +185,7 @@ export default function BookingHistory() {
         prev && prev.booking.id === booking.id ? { ...prev, slots: slots.slice(0, CHANGE_SLOT_LIMIT) } : prev,
       );
     } catch (err) {
+      if (request !== changeRequest.current) return;
       logFailure('booking-history-change-slots', err);
       setPendingChange((prev) => (prev && prev.booking.id === booking.id ? { ...prev, slotsFailed: true } : prev));
     }

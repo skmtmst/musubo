@@ -37,6 +37,8 @@ type Props = {
   lockedReason?: string
   onChanged: () => void
   onScopeGuardChange?: (guard: ((action: () => void) => void) | null) => void
+  query: string
+  setQuery: (value: string) => void
 }
 type AssetFolder = { id: string; name: string }
 
@@ -45,16 +47,16 @@ export default function AssetTemplatesList(props: Props) {
     renderLayout={state => <AssetListLayout {...props} {...state} />} />
 }
 
-function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items, loadState,
+function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, query, setQuery, items, loadState,
   reload, onEdit, onDelete, editor, deleteDialog }: Props & BroadcastAssetListLayout) {
   const saveErrors = useSaveFormErrors()
   const [folders, setFolders] = useState<AssetFolder[]>([])
   const [folderError, setFolderError] = useState('')
   const [folderRetry, setFolderRetry] = useState(0)
   const [folderId, setFolderId] = useState('all')
-  const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [query])
   const [folderOpen, setFolderOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [folderBusy, setFolderBusy] = useState(false)
@@ -96,7 +98,7 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
   ]
   const filtered = items.filter(item => (folderId === 'all'
     || (folderId === 'unfiled' ? !item.folderId : item.folderId === folderId))
-    && (status === 'all' || item.status === status)
+    && (status === 'all' || item.status === status || (status === 'published' && item.status === 'published_with_draft'))
     && `${item.name} ${assetDescription(item)}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
   const create = <Button variant="primary" {...(canMutate ? { href: meta.href } : { disabled: true })}
     lockedReason={lockedReason}><Plus size={16} aria-hidden="true" />{meta.title}を作る</Button>
@@ -160,6 +162,7 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
 }
 
 function assetDescription(item: BroadcastMessageAsset): string {
+  if (!item.payload || typeof item.payload !== 'object' || Array.isArray(item.payload)) return '内容を確認できません'
   return typeof item.payload.description === 'string' ? item.payload.description
     : typeof item.payload.altText === 'string' ? item.payload.altText : '—'
 }
@@ -174,8 +177,8 @@ function AssetTable({ items, label, canMutate, lockedReason, onEdit, onDelete }:
     <tbody>{items.map(item => <Tr key={item.id}>
       <Td><TruncatedText value={item.name} /></Td>
       <Td><TruncatedText value={assetDescription(item)} /></Td>
-      <Td>{item.status ? <StatusBadge tone={item.status === 'published' ? 'success' : 'neutral'}>
-        {item.status === 'published' ? (item.hasDraft ? '未公開の変更' : '公開中') : '下書き'}
+      <Td>{item.status ? <StatusBadge tone={item.status === 'published' || item.status === 'published_with_draft' ? 'success' : 'neutral'}>
+        {item.status === 'published_with_draft' ? '未公開の変更' : item.status === 'published' ? (item.hasDraft ? '未公開の変更' : '公開中') : item.status === 'draft' ? '下書き' : '状態を確認できません'}
       </StatusBadge> : '—'}</Td>
       <Td><TruncatedText value={formatDateTime(item.updatedAt)} /></Td>
       <Td columnKind="menu"><RowMenu label={`${item.name}の操作`} items={[

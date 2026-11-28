@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 
 import { jstDate } from '@/lib/jst-datetime'
 /*
@@ -60,7 +61,7 @@ export const TIMELINE_TYPE_LABELS: Record<string, string> = {
 
 /** 知らない種別が来ても落とさず「記録」に倒す。 */
 export function timelineTypeLabel(type: string) {
-  return TIMELINE_TYPE_LABELS[type] ?? '記録'
+  return knownValue(TIMELINE_TYPE_LABELS, type, '記録')
 }
 
 const TIMELINE_STATUS_LABELS: Record<string, Record<string, string>> = {
@@ -75,7 +76,8 @@ const TIMELINE_STATUS_LABELS: Record<string, Record<string, string>> = {
 /** 知らない値は生の値を出す（隠すと「状態が取れたのに見えない」になる）。 */
 export function timelineStatusLabel(type: string, status: string | null) {
   if (!status) return null
-  return TIMELINE_STATUS_LABELS[type]?.[status] ?? status
+  const labels = knownValue(TIMELINE_STATUS_LABELS, type, {})
+  return knownValue(labels, status, status)
 }
 
 /**

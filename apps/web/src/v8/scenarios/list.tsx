@@ -1348,7 +1348,7 @@ export default function ScenariosListV8() {
     return (
       <SaveErrorScope errors={saveErrors}><NoPermissionBoard
         featureName="シナリオ配信"
-        roleLabel={staffRole && staffRole in ROLE_LABELS ? ROLE_LABELS[staffRole as keyof typeof ROLE_LABELS] : null}
+        roleLabel={staffRole && Object.prototype.hasOwnProperty.call(ROLE_LABELS, staffRole) ? ROLE_LABELS[staffRole as keyof typeof ROLE_LABELS] : null}
         capabilitiesHref="/staff"
       /></SaveErrorScope>
     )

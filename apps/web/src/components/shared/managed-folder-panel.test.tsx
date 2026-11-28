@@ -131,11 +131,11 @@ describe('一覧の左のフォルダの列（共通）', () => {
     expect(icon.getAttribute('fill')).toBe('currentColor')
   })
 
-  it('「…」は 名前を変える・色を変える・並べ替える・消す。消すと DELETE を送り、選んでいたら「すべて」へ戻して読み直す', async () => {
+  it('「…」は 名前を変更する・色を変更する・並べ替える・消す。消すと DELETE を送り、選んでいたら「すべて」へ戻して読み直す', async () => {
     const onSelect = vi.fn()
     await act(async () => { root.render(<Screen kind="scenario" canManage onSelectSpy={onSelect} />) })
     await click(menuButton('キャンペーン'))
-    expect(menuItems()).toEqual(['名前を変える', '色を変える', '並べ替える（下へ）', '消す'])
+    expect(menuItems()).toEqual(['名前を変更する', '色を変更する', '並べ替える（下へ）', '消す'])
     await click([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('消す')))
     expect(document.body.textContent).toContain('中のシナリオ 2 件は消えずに「未分類」へ移ります')
     list.mockClear()

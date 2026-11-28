@@ -29,7 +29,10 @@ const payload = {
   members: [
     { id: 's1', name: '検証 一郎', email: null, role: 'owner', access_level: 'admin', is_active: 1, invite_status: 'accepted', last_login_at: '2026-09-07T08:00:00+09:00' },
   ],
-  audit: [],
+  audit: [
+    { id: 'audit-1', action: 'constructor', staff_name: '見本 担当', reason: '表示の確認', created_at: '2026-11-01T00:00:00Z' },
+    { id: 'audit-2', action: 'pii.reveal', staff_name: '見本 担当', reason: '表示の確認', created_at: '2026-11-01T00:00:00Z' },
+  ],
 }
 
 let host: HTMLDivElement
@@ -59,6 +62,16 @@ afterEach(() => {
 async function flush() {
   for (let i = 0; i < 8; i += 1) await act(async () => { await Promise.resolve() })
 }
+
+describe('契約先の操作履歴', () => {
+  it('未知の操作が継承名でも空欄にせず、既知の操作も表示する', async () => {
+    await act(async () => { root.render(<OpsTenantDetailPage />) })
+    await flush()
+    const audit = host.querySelector('[aria-label="運営の操作（監査）"]')!
+    expect(audit.textContent).toContain('constructor')
+    expect(audit.textContent).toContain('個人情報の表示')
+  })
+})
 
 describe('契約先の詳細の概要', () => {
   it('2つのカードの見出しと契約情報が出る', async () => {

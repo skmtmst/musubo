@@ -624,3 +624,9 @@ html:root .frame[data-column-layout][data-content-stacked] .table tr[data-table-
 }
 html:root .frame[data-column-layout][data-content-stacked] .table tr[data-table-layout='columns'] > [data-content-name-column] { flex: 1 0 100%; }
 html:root .frame[data-column-layout][data-content-stacked] .table tr[data-table-layout='columns'] > [data-content-support-column] { flex: 0 0 var(--list-content-column-width); }
+
+/* 長い内容を省けない一覧のみ、狭い画面では表の中を横に送る。 */
+@media (max-width: 640px) {
+  html:root .frame[data-mobile-scroll] { overflow-x: auto; }
+  html:root .frame[data-mobile-scroll] .table { min-width: var(--table-mobile-min-width); }
+}

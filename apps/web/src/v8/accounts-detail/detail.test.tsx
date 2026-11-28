@@ -167,7 +167,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
     // 隠さず灰色＋理由の吹き出し（全画面）。
-    for (const name of ['編集する', '差し替える', '送受信を止める', 'アーカイブする', '変える']) {
+    for (const name of ['編集する', '差し替える', '送受信を止める', 'アーカイブする', '変更する']) {
       const found = buttons(name)
       expect(found.length, name).toBeGreaterThan(0)
       for (const el of found) expect(el.getAttribute('aria-disabled'), name).toBe('true')

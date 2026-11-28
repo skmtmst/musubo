@@ -6,6 +6,7 @@ import {
   mobileHrefForPcPath,
   mobileTabForPath,
   visibleMobileTabs,
+  mobileTodayPermission,
 } from './mobile-shell'
 
 describe('電話の専用の画面（/m）の住所', () => {
@@ -14,17 +15,29 @@ describe('電話の専用の画面（/m）の住所', () => {
     for (const path of ['/', '/mileage', '/mcp-connect', '/ops', '/chats', '/m-old', null, undefined]) expect(isMobileShellPath(path), String(path)).toBe(false)
   })
 
-  it('タブは作った 2 つ（トーク・対応）だけで、中身の無いタブを持たない', () => {
-    expect(MOBILE_TABS.map((tab) => tab.label)).toEqual(['トーク', '対応'])
+  it('4つのタブは対応する画面を開く', () => {
+    expect(MOBILE_TABS.map((tab) => tab.label)).toEqual(['今日', 'トーク', '対応', 'もっと'])
+    expect(mobileTabForPath('/m/today')?.id).toBe('today')
+    expect(mobileTabForPath('/m/more')?.id).toBe('more')
     expect(mobileTabForPath('/m/chats')?.id).toBe('talk')
     expect(mobileTabForPath('/m/todo')?.id).toBe('todo')
     expect(mobileTabForPath('/m')).toBeNull()
   })
 
   it('受信箱の鍵が無い人にはトークのタブを出さない。権限の確認が済むまでは何も出さない', () => {
-    expect(visibleMobileTabs(null)).toEqual([])
-    expect(visibleMobileTabs(() => true).map((tab) => tab.id)).toEqual(['talk', 'todo'])
-    expect(visibleMobileTabs((key) => key !== '/chats').map((tab) => tab.id)).toEqual(['todo'])
+    expect(visibleMobileTabs(null, 'salon')).toEqual([])
+    expect(visibleMobileTabs(() => true, 'salon').map((tab) => tab.id)).toEqual(['today', 'talk', 'todo', 'more'])
+    expect(visibleMobileTabs((key) => key !== '/chats', 'salon').map((tab) => tab.id)).toEqual(['today', 'todo', 'more'])
+  })
+
+  it('今日のタブは業種に合う予約台帳の鍵だけを見る', () => {
+    const has = (key: string) => (actual: string) => actual === key
+    expect(mobileTodayPermission('restaurant')).toBe('/restaurant-test/reservations')
+    expect(mobileTodayPermission('salon')).toBe('/booking/bookings')
+    expect(visibleMobileTabs(has('/booking/bookings'), 'restaurant').map(tab => tab.id)).not.toContain('today')
+    expect(visibleMobileTabs(has('/restaurant-test/reservations'), 'restaurant').map(tab => tab.id)).toContain('today')
+    expect(visibleMobileTabs(has('/booking/bookings'), 'salon').map(tab => tab.id)).toContain('today')
+    expect(visibleMobileTabs(() => true, null).map(tab => tab.id)).not.toContain('today')
   })
 
   it('PC の受信箱の住所は /m の会話へ、/m に無い画面は null（PC の画面で開く）', () => {

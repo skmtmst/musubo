@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import SharedButton from '@/components/shared/button'
 import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
@@ -203,7 +205,7 @@ export default function AppTopBar() {
     return () => { cancelled = true }
   }, [hqShell])
   const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
-  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
+  const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? knownValue(ROLE_LABELS, staffRole, '') : '')
   const accountEntryRequest = useRef(0)
   useEffect(() => () => { accountEntryRequest.current += 1 }, [pathname])
   const changeAccount = (accountId: string, after?: () => void) => {

@@ -450,7 +450,7 @@ describe('Issue #684 イベント予約の実操作', () => {
     })
     apiMocks.reorderOccurrenceWaitlist.mockResolvedValue({ success: true, occurrence_version: 5, order: ['wait-2', 'wait-1'], log_id: 'log-2' })
     const view = await mount(<EventBookingsPage />)
-    const reorderButtons = elements(view.container).filter((element) => element.tagName === 'BUTTON' && element.textContent === '待ち順を変える')
+    const reorderButtons = elements(view.container).filter((element) => element.tagName === 'BUTTON' && element.textContent === '待ち順を変更する')
     expect(reorderButtons).toHaveLength(2)
     await click(reorderButtons[1])
     await click(buttonByText(view.container, '上へ'))

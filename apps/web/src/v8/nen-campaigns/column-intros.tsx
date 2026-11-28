@@ -43,6 +43,7 @@ export default function ColumnIntros() {
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [forbidden, setForbidden] = useState(false)
   /*
    * U102: カードごとの保存状態。保存の成否は「どの紹介文か」と一緒に
    * 持つ。ページ上端の共通帯に出すと、どのカードの話か見失う。
@@ -71,30 +72,42 @@ export default function ColumnIntros() {
   const gate = useResponseGate()
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
+  const loadedAccountRef = useRef<string | null>(null)
 
   const load = useCallback(async (preserveDrafts = false) => {
     const token = gate.begin()
     setLoading(true)
     setError('')
+    setForbidden(false)
     setLatestIntro(null)
     if (!selectedAccountId) {
+      loadedAccountRef.current = null
       setColumns([])
+      setDrafts({})
       setLoading(false)
-      setError('LINEアカウントを選んでください')
       return
+    }
+    if (loadedAccountRef.current !== selectedAccountId) {
+      loadedAccountRef.current = null
+      setColumns([])
+      setDrafts({})
     }
     try {
       const res = await api.nenCampaigns.columns(selectedAccountId)
       if (!gate.current(token)) return
-      if (res.success) {
-        setColumns(res.data)
-        const next: Record<string, string> = {}
-        for (const c of res.data) next[c.id] = c.introText ?? ''
-        setDrafts((current) => preserveDrafts ? Object.fromEntries(res.data.map((c) => [c.id, current[c.id] ?? c.introText ?? ''])) : next)
-      }
-    } catch {
+      if (!res.success) throw new Error(res.error || 'コラムの紹介文を読み込めませんでした')
+      loadedAccountRef.current = selectedAccountId
+      setColumns(res.data)
+      const next: Record<string, string> = {}
+      for (const c of res.data) next[c.id] = c.introText ?? ''
+      setDrafts((current) => preserveDrafts ? Object.fromEntries(res.data.map((c) => [c.id, current[c.id] ?? c.introText ?? ''])) : next)
+    } catch (reason) {
       if (!gate.current(token)) return
-      setError('読み込みに失敗しました。もう一度読み込んでください。')
+      if (reason instanceof ApiError && reason.status === 403) {
+        setForbidden(true)
+      } else {
+        setError(describeApiFailure(reason, 'コラムの紹介文の読み込み'))
+      }
     } finally {
       if (gate.current(token)) setLoading(false)
     }
@@ -158,8 +171,18 @@ export default function ColumnIntros() {
 
   {/* 119: いつも同じ説明は帯・題下に出さず、題の横の「？」へ。 */}
   return <SaveErrorScope errors={saveErrors}><DetailPage title="コラムの紹介文" readOnly={!canEdit} help="コラムの本文はEC側にあります。ここで直せるのは、LINEで配るときに前に付ける一言だけです。">
-    {error ? <Notice tone="danger" message={error} action={<Button onClick={() => void load()}>読み直す</Button>} /> : null}
-    {loading ? <ListState kind="loading" /> : columns.length === 0 ? error ? null : <ListState kind="empty" title="コラムがまだありません。EC側で公開されると、ここに出ます。" /> : columns.map((column) => <FormSection
+    {!selectedAccountId ? (
+      <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、コラムの紹介文を編集するLINEアカウントを選びます。" />
+    ) : forbidden ? (
+      <ListState kind="forbidden" onRetry={() => void load()} />
+    ) : (
+      <>
+        {error && columns.length > 0 ? <Notice tone="danger" message={error} action={<Button type="button" onClick={() => void load(true)}>読み直す</Button>} /> : null}
+        {loading && columns.length === 0 ? <ListState kind="loading" /> : columns.length === 0 && error ? (
+          <ListState kind="error" title="コラムの紹介文を読み込めませんでした" description={error} onRetry={() => void load()} />
+        ) : columns.length === 0 ? (
+          <ListState kind="empty" title="コラムがまだありません。EC側で公開されると、ここに出ます。" />
+        ) : columns.map((column) => <FormSection
       key={column.id} id={`column-intro-${column.id}`} title={column.title}
       description={column.publishedAt ? formatDay(column.publishedAt) : '未公開'}
       action={canEdit ? <Button onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} disabledReason={(drafts[column.id] ?? '') === (column.introText ?? '') ? '変えたところはありません' : null} busy={savingId === column.id} done={savedId === column.id}>保存する</Button> : undefined}>
@@ -176,6 +199,8 @@ export default function ColumnIntros() {
         : savedId === column.id ? <Notice tone="success" message="この紹介文を保存しました" />
         : (drafts[column.id] ?? '') !== (column.introText ?? '') ? <Notice tone="info" message="変更があります。保存するまで反映されません。" /> : null}
     </FormSection>)}
+      </>
+    )}
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した紹介文" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </DetailPage></SaveErrorScope>
 }

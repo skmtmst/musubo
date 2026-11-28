@@ -44,6 +44,8 @@
 .success .dot { background: var(--color-success); }
 .warn .dot { background: var(--color-status-warn); }
 .danger .dot { background: var(--color-status-danger); }
+.detailAction { display: flex; flex-direction: column; align-items: flex-start; gap: var(--polish-space-field); margin-top: var(--polish-space-field); }
+.detailAction > p { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .message { min-width: 0; flex: 1; overflow-wrap: anywhere; text-wrap: pretty; }
 /* 全体の自動句切りで文の途中に空きを残さず、本文・リンク・強調も同じ改行規則で幅を使う。 */
 .message, .message :where(:not([data-notice-heading], [data-notice-heading] *, [data-notice-status-word])) { word-break: normal; }
@@ -59,7 +61,7 @@
 .action .close { align-self: center; }
 .action > a:not([data-shared-button]) { white-space: nowrap; color: var(--color-link); font-weight: var(--font-weight-ui); }
 .close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--space-32); height: var(--space-32); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); cursor: pointer; }
-.close:hover { background: var(--color-surface-pearl); }
+.close:is(:hover, :focus-visible) { background: var(--color-surface-pearl); }
 .close:focus-visible, .notice a:focus-visible { outline: revert; }
 .twoLine { align-items: flex-start; }
 .states { display: flex; flex-wrap: wrap; gap: var(--polish-space-row) var(--polish-space-card); padding: 0; margin: var(--polish-space-field) 0 0; list-style: none; font-size: var(--text-micro); }
@@ -79,6 +81,8 @@
 .notice[data-action-layout='stack-on-narrow'] .content { flex-basis: 24em; }
 
 }
+
+:root .notice .detailAction > [data-shared-button] { align-self: flex-start; }
 
 /* 配置先の帯用クラスや余白の指定に頼らず、前後の部品から最低12px離す。 */
 :root .notice { margin-block: var(--polish-space-field); }

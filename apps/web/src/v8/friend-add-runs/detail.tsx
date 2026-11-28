@@ -40,24 +40,24 @@ import { withHonorific } from '@line-crm/shared'
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
 /** 処理の種類の名前（設定の言葉が読めないとき）。 */
-const ACTION_LABELS: Record<string, string> = {
+const ACTION_LABELS: Record<string, string> = Object.assign(Object.create(null), {
   tag: 'タグ操作',
   friend_field: '友だち情報の更新',
   support_mark: '対応マークの更新',
   scenario: 'シナリオ操作',
   common_var: '共通情報の更新',
   mile: 'マイル付与',
-}
+})
 
 /** 失敗の帯の「〇〇ところで止まりました」。 */
-const ACTION_STOPPED_AT: Record<string, string> = {
+const ACTION_STOPPED_AT: Record<string, string> = Object.assign(Object.create(null), {
   tag: 'タグを付けるところ',
   friend_field: '友だち情報を更新するところ',
   support_mark: '対応マークを付けるところ',
   scenario: 'シナリオを始めるところ',
   common_var: '共通情報を更新するところ',
   mile: 'マイルを付けるところ',
-}
+})
 
 /** 設定の処理（`add_tag` など）と、実行した処理の種類（`tag` など）が同じ仲間か。 */
 const CONFIGURED_KIND: Record<string, string> = { add_tag: 'tag', remove_tag: 'tag', start_scenario: 'scenario' }
@@ -82,7 +82,7 @@ export function pastTense(label: string): string {
 export function actionTitle(action: ActionRun, configured: unknown[] | undefined): string {
   const index = Number(action.stableId.split(':').pop())
   const config = Number.isInteger(index) ? configured?.[index] : undefined
-  const fallback = ACTION_LABELS[action.type] ?? '処理'
+  const fallback = Object.prototype.hasOwnProperty.call(ACTION_LABELS, action.type) ? ACTION_LABELS[action.type] : '処理'
   if (!config || typeof config !== 'object') return fallback
   const { type, label } = config as { type?: unknown; label?: unknown }
   if (typeof label !== 'string' || !label || typeof type !== 'string' || CONFIGURED_KIND[type] !== action.type) return fallback
@@ -277,7 +277,7 @@ function FriendAddRunDetailInner() {
     : '経路が分からない'
   const ruleLabel = detail.rule ? `${detail.rule.name ?? '名前は未取得'}（第${detail.rule.versionNumber ?? emptyValue('unknown')}版）` : '使用ルールは未取得'
   const messageType = detail.rule?.definition?.messageType
-  const messageLabel = messageType ? MESSAGE_TYPE_LABEL[messageType] ?? '案内' : '案内'
+  const messageLabel = messageType && Object.prototype.hasOwnProperty.call(MESSAGE_TYPE_LABEL, messageType) ? MESSAGE_TYPE_LABEL[messageType] : '案内'
   const deliveryUnknown = detail.errorCode === DELIVERY_UNKNOWN_CODE
   /* 案内を送らなかった記録（再追加で案内なし・送れなかった）は「案内を送った」を出さない。 */
   const messageSent = detail.status !== 'suppressed' && !deliveryUnknown && !(detail.status === 'failed' && failedActions.length === 0)
@@ -289,7 +289,7 @@ function FriendAddRunDetailInner() {
     ? `${firstFailed + (messageSent ? 2 : 1)}つ目の処理を完了できませんでした`
     : routingAction(detail.status, detail.errorCode)
   const bandNote = failedActions.length > 0
-    ? `${messageSent ? '案内は届いています。' : ''}${ACTION_STOPPED_AT[actionRuns[firstFailed]?.type ?? ''] ?? '処理のところ'}で止まりました。`
+    ? `${messageSent ? '案内は届いています。' : ''}${Object.prototype.hasOwnProperty.call(ACTION_STOPPED_AT, actionRuns[firstFailed]?.type ?? '') ? ACTION_STOPPED_AT[actionRuns[firstFailed].type] : '処理のところ'}で止まりました。`
     : deliveryUnknown
       ? '届いたか分かりません。二重に届かないよう、自動では送り直しません。トークで確かめてください。'
       : '案内を送れませんでした。理由を確かめて、もう一度実行できます。'

@@ -22,6 +22,11 @@ export default function SeatDone({
   changed: boolean;
   completionMessage?:string;
 }) {
+  if (!Object.hasOwn(STATUS_LABEL, booking.status) || !Number.isFinite(Date.parse(booking.startsAt))) {
+    return <CompletionPanel designNode="kxmnZ">
+      <StatusView icon="calendar" tone="wait" large title="予約の状態を確認してください" body="予約の内容を確認できませんでした。お店へお問い合わせください。" />
+    </CompletionPanel>;
+  }
   const p = zonedParts(booking.startsAt, timeZone);
   const rows: Array<[string, string]> = [
     ['日時', `${longDate(p.date)}${p.hm}〜`],
