@@ -21,6 +21,14 @@ const FAILURE_LABELS: Record<string, string> = Object.assign(Object.create(null)
   stop: '止める', continue: '次へ進む',
 })
 
+export function validVersionActions(actions: unknown): actions is CommonActionStep[] {
+  return Array.isArray(actions) && actions.every((action) =>
+    action !== null && typeof action === 'object' && !Array.isArray(action)
+    && typeof action.id === 'string' && action.id.length > 0
+    && typeof action.type === 'string' && action.type.length > 0
+    && action.params !== null && typeof action.params === 'object' && !Array.isArray(action.params))
+}
+
 function stepLabel(type: string): string {
   return Object.prototype.hasOwnProperty.call(ACTION_LABELS, type) ? ACTION_LABELS[type] : '処理'
 }
@@ -105,6 +113,7 @@ export function describeVersionChanges(
   previous: CommonActionStep[],
   current: CommonActionStep[],
 ): string[] {
+  if (!validVersionActions(previous) || !validVersionActions(current)) return ['変更内容を確認できません']
   const lines: string[] = []
   const previousById = new Map(previous.map((step) => [step.id, step]))
   const currentById = new Map(current.map((step) => [step.id, step]))
@@ -132,10 +141,12 @@ export function versionChangeLines(
   version: { versionNumber: number; actions: CommonActionStep[] },
   versions: Array<{ versionNumber: number; actions: CommonActionStep[] }>,
 ): string[] {
+  if (!validVersionActions(version.actions)) return ['変更内容を確認できません']
   const previous = versions
     .filter((item) => item.versionNumber < version.versionNumber)
     .sort((left, right) => right.versionNumber - left.versionNumber)[0]
   if (!previous) return ['はじめて公開した']
+  if (!validVersionActions(previous.actions)) return ['変更内容を確認できません']
   if (previous.actions.length !== version.actions.length) {
     return [`処理を${formatNumber(previous.actions.length)} 個から${formatNumber(version.actions.length)} 個にした`]
   }
