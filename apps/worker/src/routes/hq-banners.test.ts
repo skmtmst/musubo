@@ -756,8 +756,10 @@ describe('WEB206 server-owned continuation',()=>{
     });
     const legacyResponse = await call('POST', path, body, { headers: legacyKey });
     const replayResponse = await call('POST', path, body, { headers: legacyKey, env: staging });
+    const blockedResponse = await call('POST', path, body, { env: { ...staging, STAGING_QA_OUTBOUND_DISABLED: 'true' } });
     const freshResponse = await call('POST', path, body, { env: staging });
-    expect([legacyResponse.status, replayResponse.status, freshResponse.status]).toEqual([201, 201, 201]);
+    expect([legacyResponse.status, replayResponse.status, blockedResponse.status, freshResponse.status])
+      .toEqual([201, 201, 503, 201]);
     const legacy = (await legacyResponse.json<{ data: { id: string } }>()).data;
     const replay = (await replayResponse.json<{ data: { id: string } }>()).data;
     const fresh = (await freshResponse.json<{ data: { id: string } }>()).data;

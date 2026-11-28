@@ -7,7 +7,7 @@ import {requireAccountAi} from '../services/account-ai-features.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hqBannerFolders } from './hq-banner-folders.js';
 import { processBannerGeneration, BannerJobFailure } from '../services/banner-jobs.js';
-import { qaEnvironment } from '../services/staging-qa-safety.js';
+import { qaEnvironment, qaOutboundStopped } from '../services/staging-qa-safety.js';
 import { bannerGenerationOperationId, bannerGenerationRequestMatches } from '../services/banner-generation-retry.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -403,6 +403,9 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), 
     }
     if (project.archived_at) {
       return c.json({ success: false, error: 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください' }, 409);
+    }
+    if (qaOutboundStopped(c.env)) {
+      return c.json({ success: false, error: '検証環境で画像生成を一時停止しています' }, 503);
     }
     if (!c.env.OPENAI_API_KEY) {
       return c.json({ success: false, error: '画像生成の接続設定がまだありません。運営にお問い合わせください' }, 503);
