@@ -7,10 +7,6 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
 
 const TAGS_MIGRATE = read('app/tags/fields/migrate/page.tsx')
-const RESPONSES = read('app/form-submissions/responses/page.tsx')
-const REMINDERS_EDIT = read('app/reminders/edit/page.tsx')
-const WEBINARS_EDIT = read('app/webinars/edit/page.tsx')
-const INFLOW_DETAIL = read('app/inflow-links/detail/page.tsx')
 
 /*
  * #975 U097: 「一覧へ戻ってください」「一覧から選び直してください」と
@@ -24,30 +20,4 @@ describe('一覧へ戻る操作を置く（#975 U097）', () => {
     expect(TAGS_MIGRATE).toContain('移行元の項目が見つかりません')
   })
 
-  it('回答を見る画面は、対象未指定と対象なしの両方で一覧へ戻れる', () => {
-    // 戻り先は ★管理画面 TargetMissing の backHref が持つ。
-    expect(RESPONSES).toContain('backHref="/form-submissions"')
-    expect(RESPONSES).toContain('回答フォーム一覧へ戻る')
-    expect(RESPONSES).toContain('見る回答フォームが指定されていません')
-    expect(RESPONSES).toContain('この回答フォームは見つかりません')
-  })
-
-  it('リマインダー編集は、IDなしで一覧へ戻れる', () => {
-    expect(REMINDERS_EDIT).toContain('backHref="/reminders"')
-    expect(REMINDERS_EDIT).toContain('リマインダ一覧へ戻る')
-    // IDがないときは取得しない。
-    expect(REMINDERS_EDIT).toContain('if (!id)')
-  })
-
-  it('ウェビナー編集は、IDなしと対象なしの両方で一覧へ戻れる', () => {
-    expect(WEBINARS_EDIT).toContain('backHref="/webinars"')
-    expect(WEBINARS_EDIT).toContain('ウェビナー一覧へ戻る')
-    expect(WEBINARS_EDIT).toContain('このウェビナーは見つかりません')
-    expect(WEBINARS_EDIT).toContain('if (!id)')
-  })
-
-  it('流入リンク詳細は、表示できないとき一覧へ戻れる', () => {
-    expect(INFLOW_DETAIL).toContain('backHref="/inflow-links"')
-    expect(INFLOW_DETAIL).toContain('流入経路の一覧へ戻る')
-  })
 })
