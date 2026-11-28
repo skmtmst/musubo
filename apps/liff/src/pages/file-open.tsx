@@ -52,6 +52,10 @@ export default function FileOpen() {
   const params = useParams();
   const [search] = useSearchParams();
   const id = params.id ?? search.get('id') ?? '';
+  return <FileOpenForId key={id} id={id} />;
+}
+
+function FileOpenForId({ id }: { id: string }) {
   const [state, setState] = useState<State>({ name: 'loading' });
   const generation = useRef(0);
   const blobUrl = useRef<string | null>(null);
