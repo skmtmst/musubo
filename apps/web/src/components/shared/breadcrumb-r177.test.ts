@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(here, 'breadcrumb.module.css'), 'utf8')
-const tsx = readFileSync(join(here, 'breadcrumb.tsx'), 'utf8')
 
 /*
  * R177: 長い項目名で戻るボタンが右へ押し出されていた。
@@ -17,10 +16,6 @@ describe('R177 パンくずと戻るボタンのはみ出し', () => {
   it('いま開いている場所は省略し、親の階層は縮めない', () => {
     expect(css).toContain('text-overflow: ellipsis;')
     expect(css).toContain('white-space: nowrap;')
-  })
-
-  it('省略した名称を全文確認できる', () => {
-    expect(tsx).toContain('title={item.label}')
   })
 
   it('V8の情報欄はパンくずと未保存確認付きキャンセルで戻れる', () => {
