@@ -4,6 +4,8 @@ import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { STAGING_BANNER_GENERATION_CRON } from '../services/scheduled-job-isolation.js';
+import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
 
 const openai = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock('../services/openai-images.js', async (importOriginal) => {
@@ -740,6 +742,42 @@ describe('WEB205 idempotent generation creation', () => {
 });
 
 describe('WEB206 server-owned continuation',()=>{
+  it('starts only newly accepted staging jobs from the dedicated cron', async () => {
+    const { scheduled } = await import('../cron/scheduled.js');
+    const project = await createProject();
+    const path = `/api/hq/banners/projects/${project.id}/generations`;
+    const body = { ...GENERATE_BODY, count: 1 };
+    const legacyKey = { 'Idempotency-Key': 'before-staging-cron' };
+    const staging = env({
+      DEPLOY_ENV: 'staging',
+      WORKER_NAME: 'nen-line-stg',
+      WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp',
+      D1_DATABASE_ID: QA_STAGING_DATABASE,
+    });
+    const legacyResponse = await call('POST', path, body, { headers: legacyKey });
+    const replayResponse = await call('POST', path, body, { headers: legacyKey, env: staging });
+    const blockedResponse = await call('POST', path, body, { env: { ...staging, STAGING_QA_OUTBOUND_DISABLED: 'true' } });
+    const freshResponse = await call('POST', path, body, { env: staging });
+    expect([legacyResponse.status, replayResponse.status, blockedResponse.status, freshResponse.status])
+      .toEqual([201, 201, 503, 201]);
+    const legacy = (await legacyResponse.json<{ data: { id: string } }>()).data;
+    const replay = (await replayResponse.json<{ data: { id: string } }>()).data;
+    const fresh = (await freshResponse.json<{ data: { id: string } }>()).data;
+    expect(replay.id).toBe(legacy.id);
+    expect(openai.generate).not.toHaveBeenCalled();
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg' });
+
+    const tick = () => scheduled({ cron: STAGING_BANNER_GENERATION_CRON, scheduledTime: Date.now() } as ScheduledEvent,
+      staging, {} as ExecutionContext);
+    await tick();
+    await tick();
+
+    expect(openai.generate).toHaveBeenCalledOnce();
+    const progress = testDb.raw.prepare('SELECT status, done_count FROM banner_generations WHERE id = ?');
+    expect(progress.get(fresh.id)).toEqual({ status: 'done', done_count: 1 });
+    expect(progress.get(legacy.id)).toEqual({ status: 'queued', done_count: 0 });
+  });
+
  it('finishes every image from the existing cron without any browser run requests',async()=>{
   const {processDueBannerGenerations}=await import('../services/banner-jobs.js');
   const project=await createProject();const created=await call('POST',`/api/hq/banners/projects/${project.id}/generations`,{...GENERATE_BODY,count:3,cropPosition:'top'});

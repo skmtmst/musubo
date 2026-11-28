@@ -7,6 +7,7 @@ import {requireAccountAi} from '../services/account-ai-features.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hqBannerFolders } from './hq-banner-folders.js';
 import { processBannerGeneration, BannerJobFailure } from '../services/banner-jobs.js';
+import { qaEnvironment, qaOutboundStopped } from '../services/staging-qa-safety.js';
 import { bannerGenerationOperationId, bannerGenerationRequestMatches } from '../services/banner-generation-retry.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -403,6 +404,9 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), 
     if (project.archived_at) {
       return c.json({ success: false, error: 'アーカイブ済みのプロジェクトでは生成できません。復元してからお試しください' }, 409);
     }
+    if (qaOutboundStopped(c.env)) {
+      return c.json({ success: false, error: '検証環境で画像生成を一時停止しています' }, 503);
+    }
     if (!c.env.OPENAI_API_KEY) {
       return c.json({ success: false, error: '画像生成の接続設定がまだありません。運営にお問い合わせください' }, 503);
     }
@@ -466,6 +470,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), 
       cropGravity: crop,
       references: v.references,
       createdBy: c.get('staff')?.id ?? null,
+      scheduleInStaging: qaEnvironment(c.env),
     });
     // 同時要求は主キーを共有し、最初に確定した選択を正本として保つ。
     if (operationId && (generation.ai_account_id!==c.req.query('account_id') || !bannerGenerationRequestMatches(generation, v) || (generation.crop_gravity ?? 'center')!==crop)) {

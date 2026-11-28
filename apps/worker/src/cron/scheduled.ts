@@ -40,8 +40,8 @@ import { processOperationAlertNotificationOutbox } from '../services/operation-a
 import { sweepBillingFailureNotices, sweepBillingRecoveryNotices } from '../services/billing-invoice-notifications.js';
 import { OPERATOR_NOTIFICATION_SWEEP_LIMIT, sweepOperatorNotifications } from '../services/operator-notification-dispatch.js';
 
-import { runIsolatedScheduledJobs, scheduledLane, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
-import { qaEnvironment } from '../services/staging-qa-safety.js';
+import { runIsolatedScheduledJobs, scheduledLane, STAGING_BANNER_GENERATION_CRON, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
+import { qaEnvironment, qaOutboundStopped } from '../services/staging-qa-safety.js';
 
 import { runFrequentHeavyJobs } from './frequent.js';
 import { runSixHourlyHeavyJobs } from './six-hourly.js';
@@ -60,6 +60,13 @@ export async function scheduled(
         credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         syncProfiles: false,
       });
+    }
+    return;
+  }
+  if (event.cron === STAGING_BANNER_GENERATION_CRON) {
+    if (qaEnvironment(env) && !qaOutboundStopped(env)) {
+      const { processDueBannerGenerations } = await import('../services/banner-jobs.js');
+      await processDueBannerGenerations(env, { stagingOnly: true });
     }
     return;
   }
