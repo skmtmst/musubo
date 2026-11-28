@@ -498,6 +498,7 @@
 
 ## 反映履歴
 
+- [バナーの即時生成の反映履歴](release-log/unreleased/276-masato-immediate-banner-generation.md)（説明・2026-11-28確認）
 - [検証環境のバナー生成の反映履歴](release-log/unreleased/275-masato-staging-banner-generation.md)（説明・2026-11-28確認）
 - [統括課金の決済通知を修正](release-log/unreleased/272-masato-stripe-webhook.md)
 

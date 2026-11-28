@@ -6,6 +6,9 @@ import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { STAGING_BANNER_GENERATION_CRON } from '../services/scheduled-job-isolation.js';
 import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
+import { BannerGenerationWorkflow } from '../services/banner-generation-workflow.js';
+import type { WorkflowStep } from 'cloudflare:workers';
+import type { BannerGenerationRequest } from '../worker-bindings.js';
 
 const openai = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock('../services/openai-images.js', async (importOriginal) => {
@@ -104,6 +107,15 @@ const GENERATE_BODY = {
   accentColor: '#FFD400',
   personOption: 'without',
 };
+
+function fakeWorkflowStep(): WorkflowStep {
+  return {
+    do: vi.fn().mockImplementation((_name: string, _options: unknown, run: () => Promise<boolean>) => run()),
+    sleep: vi.fn(),
+    sleepUntil: vi.fn(),
+    waitForEvent: vi.fn(),
+  };
+}
 
 beforeEach(() => {
   testDb = createTestD1();
@@ -742,6 +754,67 @@ describe('WEB205 idempotent generation creation', () => {
 });
 
 describe('WEB206 server-owned continuation',()=>{
+  it('starts the saved request immediately and completes every image without a cron tick', async () => {
+    const project = await createProject();
+    const recordsAtDispatch: unknown[] = [];
+    const create = vi.fn(async (options?: WorkflowInstanceCreateOptions<BannerGenerationRequest>) => {
+      recordsAtDispatch.push(testDb.raw.prepare('SELECT status FROM banner_generations WHERE id = ?').get(options?.id ?? ''));
+      return { id: options?.id } as WorkflowInstance;
+    });
+    const staging = env({
+      DEPLOY_ENV: 'staging',
+      WORKER_NAME: 'nen-line-stg',
+      WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp',
+      D1_DATABASE_ID: QA_STAGING_DATABASE,
+      BANNER_GENERATION_WORKFLOW: { create, get: vi.fn(), createBatch: vi.fn() },
+    });
+    const path = `/api/hq/banners/projects/${project.id}/generations`;
+    const options = { env: staging, headers: { 'Idempotency-Key': 'start-once' } };
+    const response = await call('POST', path, GENERATE_BODY, options);
+    expect(response.status).toBe(201);
+    const { data: generation } = await response.json<{ data: { id: string } }>();
+    expect((await call('POST', path, GENERATE_BODY, options)).status).toBe(201);
+    expect(create).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledWith({ id: generation.id, params: { generationId: generation.id, tenantId: DEFAULT_TENANT_ID } });
+    expect(recordsAtDispatch).toEqual([{ status: 'queued' }]);
+
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg' });
+    const workflow = new BannerGenerationWorkflow({} as ExecutionContext, staging);
+    const step = fakeWorkflowStep();
+    const event = {
+      payload: { generationId: generation.id, tenantId: DEFAULT_TENANT_ID },
+      instanceId: generation.id,
+      timestamp: new Date(),
+    };
+    const paused = new BannerGenerationWorkflow({} as ExecutionContext, { ...staging, STAGING_QA_OUTBOUND_DISABLED: 'true' });
+    await expect(paused.run(event, step)).rejects.toThrow('banner_generation_outbound_paused');
+    expect(openai.generate).not.toHaveBeenCalled();
+    await workflow.run(event, step);
+    await workflow.run(event, step);
+
+    expect(openai.generate).toHaveBeenCalledTimes(GENERATE_BODY.count);
+    expect(testDb.raw.prepare('SELECT status, done_count FROM banner_generations WHERE id = ?').get(generation.id))
+      .toEqual({ status: 'done', done_count: GENERATE_BODY.count });
+  });
+
+  it('keeps the request for cron recovery if the immediate workflow cannot be started', async () => {
+    const { processDueBannerGenerations } = await import('../services/banner-jobs.js');
+    const project = await createProject();
+    const create = vi.fn().mockRejectedValue(new Error('workflow unavailable'));
+    const response = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, {
+      ...GENERATE_BODY, count: 1,
+    }, { env: { BANNER_GENERATION_WORKFLOW: { create, get: vi.fn(), createBatch: vi.fn() } } });
+    expect(response.status).toBe(201);
+    expect(create).toHaveBeenCalledOnce();
+    expect(openai.generate).not.toHaveBeenCalled();
+
+    openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg' });
+    await processDueBannerGenerations(env());
+    expect(openai.generate).toHaveBeenCalledOnce();
+    expect(testDb.raw.prepare('SELECT status, done_count FROM banner_generations').get())
+      .toEqual({ status: 'done', done_count: 1 });
+  });
+
   it('starts only newly accepted staging jobs from the dedicated cron', async () => {
     const { scheduled } = await import('../cron/scheduled.js');
     const project = await createProject();
@@ -766,6 +839,15 @@ describe('WEB206 server-owned continuation',()=>{
     expect(replay.id).toBe(legacy.id);
     expect(openai.generate).not.toHaveBeenCalled();
     openai.generate.mockResolvedValue({ bytes: JPEG, mimeType: 'image/jpeg' });
+
+    const workflow = new BannerGenerationWorkflow({} as ExecutionContext, staging);
+    const step = fakeWorkflowStep();
+    await workflow.run({
+      payload: { generationId: legacy.id, tenantId: DEFAULT_TENANT_ID },
+      instanceId: legacy.id,
+      timestamp: new Date(),
+    }, step);
+    expect(openai.generate).not.toHaveBeenCalled();
 
     const tick = () => scheduled({ cron: STAGING_BANNER_GENERATION_CRON, scheduledTime: Date.now() } as ScheduledEvent,
       staging, {} as ExecutionContext);

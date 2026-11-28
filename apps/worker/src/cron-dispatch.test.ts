@@ -5,7 +5,10 @@ import { SCHEDULED_CRONS, type ScheduledJob } from './services/scheduled-job-iso
 import { DELIVERY_DISPATCH_JOB_NAMES, FEATURE_JOB_MANIFEST } from './services/feature-enforcement.js';
 import { OPERATION_DISPATCH_JOB_CROSSWALK } from './services/operation-dispatch-health.js';
 
-vi.mock('cloudflare:workers', () => ({ env: { LINE_CREDENTIAL_ENCRYPTION_KEY: 'A'.repeat(43) } }));
+vi.mock('cloudflare:workers', async (original) => ({
+  ...await original<typeof import('cloudflare:workers')>(),
+  env: { LINE_CREDENTIAL_ENCRYPTION_KEY: 'A'.repeat(43) },
+}));
 
 const observed = vi.hoisted(() => ({ jobs: [] as ScheduledJob[], deliveries: [] as string[],
   scheduled: vi.fn(async () => ({results: []})), overdue: vi.fn(async () => []),
