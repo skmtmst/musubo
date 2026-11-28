@@ -60,7 +60,13 @@ export function useMergedPerson(personId: string, selectedAccountId: string | nu
           setPhase('error')
           return
         }
-        setPerson({ ...res.data, profileCandidates: res.data.profileCandidates ?? [], tagCandidates: res.data.tagCandidates ?? [] })
+        if (!Array.isArray(res.data?.profileCandidates)) {
+          setPerson(null)
+          setFailure(failureOf(null))
+          setPhase('error')
+          return
+        }
+        setPerson({ ...res.data, tagCandidates: res.data.tagCandidates ?? [] })
         setPhase('ready')
       })
       .catch((error: unknown) => {
