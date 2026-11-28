@@ -31,6 +31,7 @@ import {
   featureSettingsErrorMessage,
   featureSettingsSaveConflictMessage,
   normalizeFeatureSettings,
+  normalizeItemOrder,
   splitFeatureGroups,
 } from './feature-settings-view'
 import { formatDay, formatNumber } from '@/lib/format'
@@ -275,12 +276,12 @@ export function useFeatureSettings() {
         setLoadFailed(true)
         return
       }
+      const nextOrder = normalizeItemOrder(response.data.sidebarItemOrder)
       const next = restaurantStyle
         ? withRestaurantMenuFeatures(normalizeFeatureSettings(response.data.features), response.data.restaurantHiddenItemIds)
         : normalizeFeatureSettings(response.data.features)
       setSavedFeatures(next)
       setFeatures(next)
-      const nextOrder = response.data.sidebarItemOrder ?? {}
       setSavedItemOrder(nextOrder)
       setSettingsVersion(response.data.version ?? 0)
       setItemOrder(nextOrder)
@@ -291,6 +292,7 @@ export function useFeatureSettings() {
       void loadUsage()
     } catch (error) {
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
+      clearFeatureSettingsCache(selectedAccountId)
       const status = error instanceof ApiError ? error.status : undefined
       setError(featureSettingsErrorMessage(status, 'load'))
       setLoadFailed(true)
@@ -424,10 +426,11 @@ export function useFeatureSettings() {
       const latest = await api.featureSettings.get(selectedAccountId)
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (latest.success) {
+        const latestOrder = normalizeItemOrder(latest.data.sidebarItemOrder)
         setSavedFeatures(restaurantStyle
           ? withRestaurantMenuFeatures(normalizeFeatureSettings(latest.data.features), latest.data.restaurantHiddenItemIds)
           : normalizeFeatureSettings(latest.data.features))
-        setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
+        setSavedItemOrder(latestOrder)
         setSavedFavorites(latest.data.favoriteItemIds ?? [])
         setSettingsVersion(latest.data.version ?? 0)
       }
@@ -514,12 +517,12 @@ export function useFeatureSettings() {
         const latest = await loadFeatureSettings(selectedAccountId)
         if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         if (latest.success) {
+          const serverOrder = normalizeItemOrder(latest.data.sidebarItemOrder)
           const serverFeatures = restaurantStyle
             ? withRestaurantMenuFeatures(normalizeFeatureSettings(latest.data.features), latest.data.restaurantHiddenItemIds)
             : normalizeFeatureSettings(latest.data.features)
           setSavedFeatures(serverFeatures)
           setFeatures(serverFeatures)
-          const serverOrder = latest.data.sidebarItemOrder ?? {}
           setSavedItemOrder(serverOrder)
           setItemOrder(serverOrder)
           setSavedFavorites(latest.data.favoriteItemIds ?? [])

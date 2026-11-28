@@ -17,6 +17,16 @@ export function normalizeFeatureSettings(raw: Record<string, boolean>): Record<F
   ])) as Record<FeatureId, boolean>
 }
 
+/** 未設定は既定順。壊れた並び順は既定順と誤認せず読み直す。 */
+export function normalizeItemOrder(raw: unknown): MenuItemOrder {
+  if (raw == null) return {}
+  if (typeof raw !== 'object' || Array.isArray(raw)
+    || Object.values(raw).some((ids) => !Array.isArray(ids) || ids.some((id) => typeof id !== 'string'))) {
+    throw new Error('並び順を確認できませんでした。')
+  }
+  return raw as MenuItemOrder
+}
+
 /** 保存順を定義順へ当てる。画面表示と変更判定の両方がこの結果を見る。 */
 export function applyItemOrder(groups: FeatureGroup[], itemOrder: MenuItemOrder): FeatureGroup[] {
   return groups.map((group) => {
