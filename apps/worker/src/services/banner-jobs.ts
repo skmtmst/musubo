@@ -2,7 +2,7 @@ import { checkMediaGate } from './file-scan.js';
 import { getPinnedMediaObject } from './media-upload-storage.js';
 import {requireAccountAi} from './account-ai-features.js';
 import {
-  bannerReferencesFromRow,claimWorkflowStep,ensureWorkflowStep,failWorkflowStep,finishWorkflowStep,
+  bannerGenerationWorkflowRef,bannerReferencesFromRow,claimWorkflowStep,ensureWorkflowStep,failWorkflowStep,finishWorkflowStep,
   getBannerGeneration,getBannerImageWithDetail,getBannerUsageThisMonth,getBannerUsageToday,getTenantBilling,
   countRecentFailedBannerGenerations,toJstString,releaseWorkflowStep,workflowFence,getWorkflowStep,
   type BannerGeneration,type WorkflowStepRef,
@@ -21,7 +21,7 @@ export class BannerJobFailure extends Error { constructor(message:string,public 
 /** 1回に画像1枚を永続的に処理し、定期処理が未完了の続きへ進む。 */
 export async function processBannerGeneration(env:Env['Bindings'],generationId:string,tenantId:string):Promise<string|null>{
   const db=env.DB;
-  const ref:WorkflowStepRef={scopeId:`tenant:${tenantId}`,processKind:'banner_generation',subjectId:generationId,stepKey:'__run'};
+  const ref=bannerGenerationWorkflowRef(tenantId,generationId);
   await ensureWorkflowStep(db,ref,{maxAttempts:50});
   const root=await claimWorkflowStep(db,ref,{leaseMs:300_000});
   if(!root){
@@ -189,12 +189,19 @@ async function reconcileBannerProgress(db:D1Database,g:BannerGeneration):Promise
     WHERE id=? AND tenant_id=?`).bind(counts!.done,counts!.failed,finished?(counts!.done>0?'done':'failed'):'running',
       toJstString(new Date()),finished?1:0,toJstString(new Date()),counts!.failed,g.id,g.tenant_id).run();
 }
-export async function processDueBannerGenerations(env:Env['Bindings']):Promise<number>{
-  const due=await env.DB.prepare(`SELECT g.id,g.tenant_id FROM banner_generations g WHERE g.status IN ('queued','running') AND g.stop_requested_at IS NULL
-    AND NOT EXISTS(SELECT 1 FROM workflow_steps w WHERE w.scope_id='tenant:' || g.tenant_id
-      AND w.process_kind='banner_generation' AND w.subject_id=g.id AND w.step_key='__run'
-      AND ((w.status='running' AND w.lease_expires_at>?) OR w.next_attempt_at>?))
-    ORDER BY g.created_at LIMIT 20`).bind(Date.now(),Date.now()).all<{id:string;tenant_id:string}>();
+export async function processDueBannerGenerations(env:Env['Bindings'], options: { stagingOnly?: boolean } = {}):Promise<number>{
+  const now = Date.now();
+  const due = await env.DB.prepare(`SELECT g.id, g.tenant_id FROM banner_generations g
+    WHERE g.status IN ('queued', 'running') AND g.stop_requested_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM workflow_steps w WHERE w.scope_id = 'tenant:' || g.tenant_id
+        AND w.process_kind = 'banner_generation' AND w.subject_id = g.id AND w.step_key = '__run'
+        AND ((w.status = 'running' AND w.lease_expires_at > ?) OR w.next_attempt_at > ?))
+      AND (? = 0 OR EXISTS(SELECT 1 FROM workflow_steps w WHERE w.scope_id = 'tenant:' || g.tenant_id
+        AND w.process_kind = 'banner_generation' AND w.subject_id = g.id AND w.step_key = '__run'
+        AND json_extract(w.input_json, '$.stagingAccepted') = 1))
+    ORDER BY g.created_at LIMIT ?`)
+    .bind(now, now, options.stagingOnly ? 1 : 0, options.stagingOnly ? 4 : 20)
+    .all<{ id: string; tenant_id: string }>();
   for(const row of due.results)await processBannerGeneration(env,row.id,row.tenant_id).catch(()=>undefined);
   return due.results.length;
 }

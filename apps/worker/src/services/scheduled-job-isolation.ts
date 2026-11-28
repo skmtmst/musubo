@@ -17,6 +17,7 @@ export const SCHEDULED_CRONS = {
 } as const;
 
 export const STAGING_LINE_TOKEN_REFRESH_CRON = '2-57/5 * * * *';
+export const STAGING_BANNER_GENERATION_CRON = '*/2 * * * *';
 
 export type ScheduledLane = keyof typeof SCHEDULED_CRONS | 'ignored';
 

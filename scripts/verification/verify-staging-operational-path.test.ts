@@ -27,7 +27,7 @@ describe('staging operational verification safety', () => {
     vi.restoreAllMocks();
   });
 
-  test('accepts only the dedicated staging resources with only the token renewal cron', () => {
+  test('accepts only the dedicated staging resources and approved crons', () => {
     expect(readVerificationTarget(stagingConfig)).toMatchObject({
       workerUrl: 'https://stg-api.musubo.jp',
     });

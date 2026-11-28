@@ -187,7 +187,7 @@ describe('Deploy Cloudflare Staging workflow', () => {
     );
   });
 
-  it('allows only the LINE token renewal cron and keeps migrations separate', () => {
+  it('enforces the staging cron allowlist and keeps migrations separate', () => {
     expect(workflow).toContain('node scripts/deploy/staging-cron-policy.mjs apps/worker/wrangler.staging.toml');
     expect(workflow).not.toContain('d1 migrations apply');
     expect(workflow).not.toContain('apply-d1-migrations');

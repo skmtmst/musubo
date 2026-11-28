@@ -1097,7 +1097,7 @@ export type {
 } from './friend-bulk-runs';
 export {
   BANNER_GENERATION_STATUSES, BANNER_IMAGE_SOURCES, BANNER_MAX_REFERENCE_IMAGES, BANNER_MODES, BANNER_PERSON_OPTIONS, BANNER_QUALITIES,
-  BANNER_REFERENCE_MODES, bannerReferencesFromRow, countBannerImages, countRecentFailedBannerGenerations, createBannerGeneration, createBannerImage,
+  BANNER_REFERENCE_MODES, bannerGenerationWorkflowRef, bannerReferencesFromRow, countBannerImages, countRecentFailedBannerGenerations, createBannerGeneration, createBannerImage,
   createBannerImageDelivery, createBannerProject, getBannerGeneration, getBannerImage, getBannerImageDelivery, getBannerImageWithDetail,
   getBannerProject, getBannerStats, getBannerUsageThisMonth, getBannerUsageToday, isBannerReferenceMode, listBannerGenerations,
   listBannerImages, listBannerProjects, recordBannerUsage, touchBannerProject, updateBannerGenerationProgress, updateBannerImage,
