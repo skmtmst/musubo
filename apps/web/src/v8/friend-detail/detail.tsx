@@ -112,6 +112,12 @@ function FriendDetailV8Inner() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [supportAlert, setSupportAlert] = useState('')
   const [scenarioNotice, setScenarioNotice] = useState('')
+  useEffect(() => {
+    setActionMenuOpen(false)
+    setMoreMenuOpen(false)
+    setSupportAlert('')
+    setScenarioNotice('')
+  }, [friendId, selectedAccountId])
 
   const support = useSupportEditor(
     friendId,
@@ -173,8 +179,9 @@ function FriendDetailV8Inner() {
   }
 
   const status = friend?.support?.status
+  const createdValid = Boolean(friend?.createdAt && Number.isFinite(Date.parse(friend.createdAt)))
   const subtitle = friend
-    ? `LINE 表示名：${friend.displayName || emptyValue('unknown')}・${friend.createdAt ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : emptyValue('unknown')}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
+    ? `LINE 表示名：${friend.displayName || emptyValue('unknown')}・${createdValid ? `${formatDay(friend.createdAt).replace(/（.）$/, '')}に友だち追加` : emptyValue('unknown')}・担当 ${friend.support?.operatorName ?? '未割り当て'}`
     : '読み込んでいます…'
   const realName = data.fields.find((f) => f.fixedKey === 'name')?.value ?? data.friend?.realName ?? ''
 
@@ -253,7 +260,9 @@ function FriendDetailV8Inner() {
             <FriendSummaryRail friend={friend} friendId={friendId} data={data} perms={perms} fields={data.fields} values={data.values} realName={realName} onEditSupport={() => void support.openEditor()} />
             <InfoTab friendId={friendId} group={group} data={data} perms={perms} />
           </div>
-        ) : <FeatureDisabledScreen featureId="friend_fields" />
+        ) : visibility.status === 'ready' ? <FeatureDisabledScreen featureId="friend_fields" />
+          : visibility.status === 'error' ? <ListState kind="error" title="機能の設定を確認できませんでした" />
+          : <ListState kind="loading" title="機能の設定を確認しています" />
       ) : tab === 'forms' ? (
         <FormsTab data={data} />
       ) : tab === 'scenario' ? (
