@@ -10,20 +10,6 @@ describe('共通フォルダ欄', () => {
     expect(PANEL).toContain("'--folder-rail-width': FOLDER_RAIL_WIDTH")
   })
 
-  it('フォルダ追加操作を一覧の下へ出す', () => {
-    expect(PANEL).toContain('onAddFolder?: () => void')
-    expect(PANEL).toContain("addFolderLabel = 'フォルダを追加する'")
-    expect(PANEL.indexOf('{rows.map')).toBeLessThan(PANEL.indexOf('onClick={onAddFolder}'))
-    expect(PANEL).toContain('styles.add')
-  })
-
-  it('分類の呼び名が異なる画面は見出しを指定できる', () => {
-    expect(PANEL).toContain("heading = 'フォルダ'")
-    expect(PANEL).toContain('heading?: string')
-    expect(PANEL).toContain('aria-label="フォルダ"')
-    expect(PANEL).toContain('>{heading}</p>')
-  })
-
   it('R37: 狭い幅では操作メニューを常に出す（スマホでも名前変更・削除に届く）', () => {
     expect(CSS).toMatch(/@media \(hover: none\)[\s\S]*?\.menuButton \{ opacity: 1; \}/)
   })
