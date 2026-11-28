@@ -42,6 +42,14 @@ const MINUTES_PER_DAY = 1440
 /** elapsed の offsetMinutes は worker が 0..1439 しか受け付けない。 */
 const MAX_ELAPSED_OFFSET_MINUTES = MINUTES_PER_DAY - 1
 
+function requireDeliveryMode(mode: DeliveryMode): void {
+  if (mode !== 'relative' && mode !== 'elapsed' && mode !== 'absolute_time') throw new Error('配信方式を確認できませんでした。')
+}
+
+function validStoredOffset(value: number | null | undefined): boolean {
+  return value == null || (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+}
+
 function splitDayMinutes(totalMinutes: number): {
   days: number
   hours: number
@@ -62,6 +70,12 @@ function splitDayMinutes(totalMinutes: number): {
  * 互換変換で、ここ以外では delayMinutes を読まない。
  */
 export function scheduleFromStep(mode: DeliveryMode, step: ScenarioStep): FirstStepSchedule {
+  requireDeliveryMode(mode)
+  const valid = mode === 'absolute_time' ? validStoredOffset(step.offsetDays)
+    : mode === 'elapsed' && (step.offsetDays != null || step.offsetMinutes != null)
+      ? validStoredOffset(step.offsetDays) && validStoredOffset(step.offsetMinutes)
+      : validStoredOffset(step.delayMinutes)
+  if (!valid) throw new Error('配信の時間を確認できませんでした。')
   if (mode === 'absolute_time') {
     return {
       offsetDays: Math.max(0, step.offsetDays ?? 0),
@@ -104,6 +118,7 @@ export function scheduleToPayload(
   offsetMinutes?: number
   deliveryTime?: string
 } {
+  requireDeliveryMode(mode)
   const days = Math.max(0, Math.floor(value.offsetDays) || 0)
   const hours = Math.max(0, Math.floor(value.offsetHours) || 0)
   const minutes = Math.max(0, Math.floor(value.offsetMinutesRemainder) || 0)
