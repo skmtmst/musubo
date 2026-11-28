@@ -8,8 +8,33 @@ import type { WizardForm } from './wizard-model'
  * 細かい1件ずつは追わず、手順の名前で言う（嘘の行は出さない）。
  */
 
-function sameJson(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+function sameValue(
+  left: unknown,
+  right: unknown,
+  seen = new WeakMap<object, WeakSet<object>>(),
+): boolean {
+  if (Object.is(left, right)) return true
+  if (typeof left !== typeof right || left === null || right === null) return false
+  if (typeof left !== 'object' || typeof right !== 'object') return false
+  let rightSeen = seen.get(left)
+  if (rightSeen?.has(right)) return true
+  if (!rightSeen) {
+    rightSeen = new WeakSet()
+    seen.set(left, rightSeen)
+  }
+  rightSeen.add(right)
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false
+    return left.every((item, index) => sameValue(item, right[index], seen))
+  }
+  const leftObj = left as Record<string, unknown>
+  const rightObj = right as Record<string, unknown>
+  const leftKeys = Object.keys(leftObj).filter((key) => leftObj[key] !== undefined)
+  const rightKeys = Object.keys(rightObj).filter((key) => rightObj[key] !== undefined)
+  if (leftKeys.length !== rightKeys.length) return false
+  return leftKeys.every(
+    (key) => Object.prototype.hasOwnProperty.call(rightObj, key) && sameValue(leftObj[key], rightObj[key], seen),
+  )
 }
 
 function basicOf(form: WizardForm): unknown {
@@ -56,16 +81,16 @@ export function describeAutoReplyDiff(mine: WizardForm, incoming: WizardForm): s
     lines.push(
       `ルール名が違います（最新「${incoming.ruleName || '（無題）'}」／あなた「${mine.ruleName || '（無題）'}」）`,
     )
-  } else if (!sameJson(basicOf(mine), basicOf(incoming))) {
+  } else if (!sameValue(basicOf(mine), basicOf(incoming))) {
     lines.push('基本設定（フォルダ・メモ）が違います')
   }
-  if (!sameJson(triggerOf(mine), triggerOf(incoming))) {
+  if (!sameValue(triggerOf(mine), triggerOf(incoming))) {
     lines.push('「どんなときに動くか」（言葉・曜日・時間帯・相手）が違います')
   }
-  if (!sameJson(responseOf(mine), responseOf(incoming))) {
+  if (!sameValue(responseOf(mine), responseOf(incoming))) {
     lines.push('「何を返すか」（返信・処理・間隔）が違います')
   }
-  if (mine.priority !== incoming.priority) {
+  if (!Object.is(mine.priority, incoming.priority)) {
     lines.push('優先順位が違います')
   }
   return lines
