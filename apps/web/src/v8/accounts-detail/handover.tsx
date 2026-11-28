@@ -83,6 +83,7 @@ export default function AccountHandoverV8() {
   const [missing, setMissing] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [refreshing, setRefreshing] = useState(false)
+  const refreshingRef = useRef(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [executeConfirmation, setExecuteConfirmation] = useState<{ id: string; revision: number | undefined } | null>(null)
   const [executing, setExecuting] = useState(false)
@@ -199,20 +200,40 @@ export default function AccountHandoverV8() {
 
   /** 事前確認をやり直す。申告の数も一緒に送る。 */
   const rerunPreview = async () => {
-    if (!handover?.counts || !countsAreComplete) return
+    if (!handover?.counts || !countsAreComplete || refreshing || refreshingRef.current) return
+    const declared = declaredTotalInput.trim()
+    let declaredFriendTotal: number | null = null
+    if (declared !== '') {
+      const parsed = Number(declared)
+      if (!Number.isSafeInteger(parsed) || parsed < 0) {
+        setDecisionError('申告の数は 0 以上の整数で入力してください。')
+        return
+      }
+      declaredFriendTotal = parsed
+    }
+    refreshingRef.current = true
     setRefreshing(true)
+    setDecisionError('')
     try {
       const { sourceTotal, auto, review, unmatched, lookalike } = handover.counts
-      const declared = declaredTotalInput.trim()
       const result = await api.accountHandovers.preview(handover.id, {
         sourceFriendTotal: sourceTotal,
         counts: { auto, review, unmatched, lookalike },
-        declaredFriendTotal: declared === '' ? null : Number(declared),
+        declaredFriendTotal,
       })
-      if (!result.success) return
+      if (!result.success) {
+        setDecisionError(result.error || '事前確認をやり直せませんでした。しばらくおいてから、もう一度お試しください。')
+        return
+      }
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
+    } catch (caught) {
+      const fieldFailure = saveErrors.capture(caught)
+      if (!fieldFailure) {
+        setDecisionError(apiMessage(caught, '事前確認をやり直せませんでした。しばらくおいてから、もう一度お試しください。'))
+      }
     } finally {
+      refreshingRef.current = false
       setRefreshing(false)
     }
   }
@@ -247,7 +268,7 @@ export default function AccountHandoverV8() {
       setLinkCode('')
       const detail = await api.accountHandovers.get(res.data.id)
       if (detail.success && detail.data.fromAccountId) {
-        window.location.href = `/accounts/handover?id=${detail.data.fromAccountId}`
+        window.location.href = `/accounts/handover?id=${encodeURIComponent(detail.data.fromAccountId)}`
         return
       }
       await load()
