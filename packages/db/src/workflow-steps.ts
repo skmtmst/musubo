@@ -36,11 +36,11 @@ export async function ensureWorkflowStep(db: D1Database, ref: WorkflowStepRef,
 }
 /** Allows callers to persist the domain input and its root checkpoint atomically. */
 export function prepareWorkflowStep(db:D1Database,ref:WorkflowStepRef,
-  options:{now?:number;input?:unknown;retryKey?:string;maxAttempts?:number;initialAttempts?:number;status?:'pending'|'unknown'}={}):D1PreparedStatement {
+  options:{now?:number;input?:unknown;retryKey?:string;maxAttempts?:number;initialAttempts?:number;status?:'pending'|'unknown';afterChange?:boolean}={}):D1PreparedStatement {
   const now=options.now ?? Date.now();
   return db.prepare(`INSERT OR IGNORE INTO workflow_steps
     (scope_id,process_kind,subject_id,step_key,retry_key,input_json,max_attempts,status,created_at,updated_at,attempt_count)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(...workflowBindings(ref), options.retryKey ?? crypto.randomUUID(),
+    SELECT ?,?,?,?,?,?,?,?,?,?,? ${options.afterChange ? 'WHERE changes() = 1' : ''}`).bind(...workflowBindings(ref), options.retryKey ?? crypto.randomUUID(),
       options.input === undefined ? null : workflowJson(options.input), options.maxAttempts ?? 4,
       options.status ?? 'pending', now, now,options.initialAttempts ?? 0);
 }

@@ -4,6 +4,7 @@ import { sqlIdSet } from './id-queries.js';
 import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
 import type { Media } from './media/primitives/index.js';
+import { prepareWorkflowStep, type WorkflowStepRef } from './workflow-steps.js';
 
 /**
  * 統括の「バナー生成」。
@@ -277,6 +278,10 @@ export async function touchBannerProject(db: D1Database, id: string): Promise<vo
 
 // ------------------------------------------------------------- generations
 
+export function bannerGenerationWorkflowRef(tenantId: string, generationId: string): WorkflowStepRef {
+  return { scopeId: `tenant:${tenantId}`, processKind: 'banner_generation', subjectId: generationId, stepKey: '__run' };
+}
+
 export async function createBannerGeneration(
   db: D1Database,
   input: {
@@ -309,11 +314,12 @@ export async function createBannerGeneration(
     /** 参照画像（最大3枚・画像ごとに使い方）。無ければ空配列。 */
     references?: BannerReference[] | null;
     createdBy?: string | null;
+    scheduleInStaging?: boolean;
   },
 ): Promise<BannerGeneration> {
   const id = input.operationId ?? crypto.randomUUID();
   const references = (input.references ?? []).slice(0, BANNER_MAX_REFERENCE_IMAGES);
-  await db
+  const insert = db
     .prepare(
       `INSERT INTO banner_generations
          (id, tenant_id, project_id, status, mode, preset_key, aspect_ratio, api_size, quality,
@@ -355,8 +361,17 @@ export async function createBannerGeneration(
       jstNow(),
       input.cropGravity ?? 'center',
       input.aiAccountId ?? null,
-    )
-    .run();
+    );
+  if (input.scheduleInStaging) {
+    // Record only newly accepted requests so enabling the staging schedule cannot replay the backlog.
+    await db.batch([insert, prepareWorkflowStep(db, bannerGenerationWorkflowRef(input.tenantId, id), {
+      afterChange: true,
+      input: { stagingAccepted: true },
+      maxAttempts: 50,
+    })]);
+  } else {
+    await insert.run();
+  }
   return (await getBannerGeneration(db, id, input.tenantId))!;
 }
 

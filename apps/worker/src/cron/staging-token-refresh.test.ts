@@ -4,7 +4,7 @@ import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
-import { SCHEDULED_CRONS, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
+import { SCHEDULED_CRONS, STAGING_BANNER_GENERATION_CRON, STAGING_LINE_TOKEN_REFRESH_CRON } from '../services/scheduled-job-isolation.js';
 import { scheduled } from './scheduled.js';
 
 const staging = {
@@ -29,10 +29,10 @@ describe('staging LINE token renewal', () => {
     vi.useRealTimers();
   });
 
-  it('registers exactly the token renewal tick in the deployed staging configuration', async () => {
+  it('registers only dedicated token renewal and banner generation ticks in staging', async () => {
     const { unstable_readConfig } = await import('wrangler');
     const config = unstable_readConfig({ config: fileURLToPath(new URL('../../wrangler.staging.toml', import.meta.url)) });
-    expect(config.triggers?.crons).toEqual([STAGING_LINE_TOKEN_REFRESH_CRON]);
+    expect(config.triggers?.crons).toEqual([STAGING_LINE_TOKEN_REFRESH_CRON, STAGING_BANNER_GENERATION_CRON]);
   });
 
   it('renews an expired token from stored credentials and skips fresh and inactive accounts', async () => {
@@ -71,6 +71,8 @@ describe('staging LINE token renewal', () => {
     await tick(SCHEDULED_CRONS.delivery, { ...staging, DB: db });
     await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, D1_DATABASE_ID: 'incorrect-db' });
     await tick(STAGING_LINE_TOKEN_REFRESH_CRON, { ...staging, DB: db, DEPLOY_ENV: 'production' });
+    await tick(STAGING_BANNER_GENERATION_CRON, { ...staging, DB: db, DEPLOY_ENV: 'production' });
+    await tick(STAGING_BANNER_GENERATION_CRON, { ...staging, DB: db, STAGING_QA_OUTBOUND_DISABLED: 'true' });
     await tick(SCHEDULED_CRONS.delivery, { ...staging, DB: db, DEPLOY_ENV: 'production' });
     expect(db.prepare).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
