@@ -1,17 +1,41 @@
 import { ApiError, type BookingSettings } from '@/lib/api'
 import { permissionDeniedMessage, describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { DAYS, type BusinessHoursDay } from './shared'
-export function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] {
-  const list = Array.isArray(settings?.businessHours) ? settings.businessHours : []
-  return DAYS.map(({ weekday }) => {
-    const rawIntervals = list.find((day) => day && day.weekday === weekday)?.intervals
-    const intervals = Array.isArray(rawIntervals)
-      ? rawIntervals
-          .filter((interval): interval is BusinessHoursDay['intervals'][number] => Boolean(interval) && typeof interval === 'object')
-          .map((interval) => ({ ...interval, capacity: interval.capacity ?? 1 }))
-      : []
-    return { weekday, intervals }
-  })
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+export function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] | null {
+  if (!isRecord(settings) || !Array.isArray(settings.businessHours)) return null
+  const byWeekday = new Map<number, BusinessHoursDay['intervals']>()
+  for (let dayIndex = 0; dayIndex < settings.businessHours.length; dayIndex += 1) {
+    if (!Object.prototype.hasOwnProperty.call(settings.businessHours, dayIndex)) return null
+    const rawDay: unknown = settings.businessHours[dayIndex]
+    if (!isRecord(rawDay)) return null
+    const weekday = rawDay.weekday
+    if (typeof weekday !== 'number' || !Number.isInteger(weekday) || weekday < 0 || weekday > 6) return null
+    if (byWeekday.has(weekday)) return null
+    if (!Array.isArray(rawDay.intervals)) return null
+    const intervals: BusinessHoursDay['intervals'] = []
+    for (let i = 0; i < rawDay.intervals.length; i += 1) {
+      if (!Object.prototype.hasOwnProperty.call(rawDay.intervals, i)) return null
+      const rawInterval: unknown = rawDay.intervals[i]
+      if (!isRecord(rawInterval)) return null
+      if (typeof rawInterval.start !== 'string' || typeof rawInterval.end !== 'string') return null
+      const rawCap = rawInterval.capacity
+      if (rawCap !== undefined && (typeof rawCap !== 'number' || !Number.isFinite(rawCap))) return null
+      intervals.push({
+        start: rawInterval.start,
+        end: rawInterval.end,
+        capacity: rawCap ?? 1,
+      })
+    }
+    byWeekday.set(weekday, intervals)
+  }
+  return DAYS.map(({ weekday }) => ({
+    weekday,
+    intervals: byWeekday.get(weekday) ?? [],
+  }))
 }
 
 // 管理画面 /booking/staff/shifts の BusinessHoursEditor と同じ検査。

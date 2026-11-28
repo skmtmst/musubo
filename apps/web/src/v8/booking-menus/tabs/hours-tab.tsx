@@ -70,26 +70,33 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
     return () => { saveGenerationRef.current += 1 }
   }, [accountId])
 
+  const parsedHours = useMemo(() => (settings ? initialBusinessHours(settings) : null), [settings])
+  const hoursInvalid = settingsStatus !== 'loading' && settings !== null && parsedHours === null
+
   useEffect(() => {
-    if (settings) setDraft(initialBusinessHours(settings))
-  }, [settings])
+    setDraft(parsedHours)
+    if (parsedHours === null) {
+      setCopySource(null)
+      setBadHours(null)
+    }
+  }, [parsedHours])
 
   const manualHours = !settings?.openingHoursSource || settings.openingHoursSource === 'manual'
-  const dirty = manualHours && draft !== null && settings !== null
-    && JSON.stringify(draft) !== JSON.stringify(initialBusinessHours(settings))
+  const dirty = manualHours && !hoursInvalid && draft !== null && parsedHours !== null
+    && JSON.stringify(draft) !== JSON.stringify(parsedHours)
 
   useV8TabEdit({
     dirty,
     saving,
     subject: '受付時間への変更',
     saveLabel: settings?.version === 0 ? '受付枠を作る' : '開ける時間を保存',
-    saveDisabled: !canEdit || !manualHours,
+    saveDisabled: !canEdit || !manualHours || hoursInvalid || draft === null,
     onSave: () => void submit(),
-    onReset: () => { if (settings) { setDraft(initialBusinessHours(settings)); setSaveError(null) } },
+    onReset: () => { if (parsedHours) { setDraft(parsedHours); setSaveError(null) } },
   })
 
   function updateDay(weekday: number, update: (intervals: BusinessHourInterval[]) => BusinessHourInterval[]) {
-    if (!canEdit) return
+    if (!canEdit || parsedHours === null) return
     setDraft((current) => current?.map((day) => day.weekday === weekday
       ? { ...day, intervals: update(day.intervals) }
       : day) ?? current)
@@ -100,7 +107,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const isBad = (weekday: number, index: number, part: 'start' | 'end' | 'capacity') => Boolean(badHours && badHours.weekday === weekday && badHours.index === index && badHours.parts.includes(part))
 
   async function submit() {
-    if (!canEdit || !settings || !manualHours || !draft || inFlightRef.current) return
+    if (!canEdit || !settings || !manualHours || parsedHours === null || !draft || inFlightRef.current) return
     const generation = saveGenerationRef.current
     const alive = () => generation === saveGenerationRef.current
     const validationError = validateBusinessHours(draft)
@@ -167,6 +174,16 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         icon={<AccountIcon />}
         title="受付枠を読み込めませんでした"
         description={settingsError ?? '通信状態を確認して、もう一度お試しください。'}
+        action={<Button onClick={onReload}>もう一度読み込む</Button>}
+      /></SaveErrorScope>
+    )
+  }
+  if (hoursInvalid) {
+    return (
+      <SaveErrorScope errors={saveErrors}><StateCard
+        icon={<AccountIcon />}
+        title="営業時間を読み込めませんでした"
+        description="営業時間の形式を確認できませんでした。最新の内容を読み直してください。"
         action={<Button onClick={onReload}>もう一度読み込む</Button>}
       /></SaveErrorScope>
     )
