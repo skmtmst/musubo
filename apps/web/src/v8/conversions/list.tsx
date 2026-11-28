@@ -489,7 +489,9 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     }
     if (editForm.exclusionMemo.trim().length > 500) { invalid('cv-edit-memo', '数えない条件のメモは500文字以内で入力してください'); return }
     const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
-    if (exclusionIssue) { invalid('cv-edit-exclusion', exclusionIssue); return }
+    const unchangedExclusion = editForm.exclusion !== null
+      && JSON.stringify(editForm.exclusion) === JSON.stringify(readExclusionCondition(editTarget.sourceConfig))
+    if (exclusionIssue && !(unchangedExclusion && exclusionIssue.startsWith('空の「いずれか」'))) { invalid('cv-edit-exclusion', exclusionIssue); return }
     setEditFieldIssue(null)
     setEditSaving(true)
     setEditError('')
@@ -500,7 +502,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
         sourceType: editForm.sourceType,
         sourceConfig: {
           ...editTarget.sourceConfig,
-          exclusion: pruneCondition(editForm.exclusion),
+          exclusion: unchangedExclusion ? editForm.exclusion : pruneCondition(editForm.exclusion),
           exclusionMemo: editForm.exclusionMemo.trim() || null,
         },
         deduplicationMode: editForm.deduplicationMode,
