@@ -59,6 +59,9 @@ function validNonNegInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0
 }
 
+const validCount = (count: number | null): number | null =>
+  typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : null
+
 const md = (value?: string | null) => {
   if (typeof value !== 'string') return '—'
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
@@ -96,7 +99,11 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       const response = await customerSegmentsApi.get(accountId, basis, measure)
       if (seq !== loadSeqRef.current) return
       if (!response.success || !response.data || !Array.isArray(response.data.cells)) throw new Error('segments_failed')
-      setData(response.data)
+      setData({
+        ...response.data,
+        total: validCount(response.data.total),
+        cells: response.data.cells.map((cell) => ({ ...cell, count: validCount(cell.count) })),
+      })
       setStatus('ready')
     } catch (reason) {
       if (seq !== loadSeqRef.current) return
@@ -130,7 +137,7 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       <div className={styles.summary}>
         <span>
           <span className={styles.summaryStrong}>{`全員 ${data.total === null ? '—' : formatNumber(data.total)} 人`}</span>
-          {outside === null ? '' : `（${BASIS_WORD[basis]}なし ${formatNumber(outside)} 人は表の外）`}
+          {outside === null ? '' : `（${BASIS_WORD[basis]}なし ${validCount(outside) === null ? '—' : formatNumber(outside)} 人は表の外）`}
         </span>
         <Button variant="secondary" onClick={() => setPick({ r: 0, f: 0 })} disabled={notComputed}>全員を見る</Button>
       </div>
