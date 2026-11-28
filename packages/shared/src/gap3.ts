@@ -27,4 +27,4 @@ export interface AiAnswerLog {testMode?:boolean;id:string;createdAt:string;chatI
 
 export interface MemberCard {memberNumber:string;name:string;benefits:string[];benefitDetails:{couponCode:string|null;mileMultiplier:number;tagId?:string};since:string;downgradeDueAt:string|null;next:{name:string;remaining:number;metric:string;progress:number}|null}
 export type AccountAiFeature='banner'|'google_review';
-export interface AccountAiSetting {feature:AccountAiFeature;enabled:boolean;version:number;consentBy:string|null;consentAt:string|null;disclosureVersion:string|null}
+export interface AccountAiSetting {feature:AccountAiFeature;enabled:boolean;alwaysOn:boolean;version:number;consentBy:string|null;consentAt:string|null;disclosureVersion:string|null}

@@ -1,4 +1,5 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+- [検証環境の店ごとの AI 利用設定](release-log/unreleased/PR-kenta-ai-always-on-staging-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
