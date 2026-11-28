@@ -37,6 +37,7 @@
 .choice:has(:checked) { background: var(--color-choice-selected); color: var(--color-accent-deep); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
 .choice:has(:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 .choice:hover:not(:has(:checked)) { background: var(--color-canvas-sunken); }
+.choices[data-wrap-choice] .choice .readText { white-space: normal; word-break: auto-phrase; overflow-wrap: anywhere; }
 
 .row .kind {
   flex: 0 0 var(--tap-action-kind-w);
@@ -147,6 +148,7 @@
 }
 
 @container tap-action (max-width: 479px) {
+  .choices[data-wrap-choice] .choice { gap: var(--space-4); padding-inline: var(--space-4); }
   .row { flex-direction: column; align-items: stretch; }
   .row .kind { flex: none; width: 100%; }
 }

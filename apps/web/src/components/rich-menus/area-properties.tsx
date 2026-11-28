@@ -2,25 +2,28 @@
 
 import { INTENT_OPTIONS } from './area-intent-options'
 import TagPickerField from '@/components/shared/tag-picker-field'
-import { useId } from 'react'
-import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Zap } from 'lucide-react'
+import { useId, useState } from 'react'
+import { ArrowLeftRight, CalendarClock, Copy, Phone, Send, Utensils, Zap } from 'lucide-react'
 import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import TapActionField, { type TapActionExtraKind } from '@/components/shared/tap-action-field'
 import { tapLiffIdOf, useTapActionAccount, useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { HQ_RICH_MENU_INTENTS } from '@/lib/hq-rich-menu-create'
 import {
-  tapActionDef, tapActionFromUri, tapActionLiffUrl, tapActionNeedsLiff,
+  RESTAURANT_MENU_ACTION, RESTAURANT_RICH_MENU_TAP_ORDER,
+  tapActionDef, tapActionFromSavedUri, tapActionFromUri, tapActionLiffUrl, tapActionNeedsLiff,
   type TapActionKind, type TapActionValue,
 } from '@/lib/tap-actions'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { FieldError } from '@/components/shared/form-controls'
 import type { Area } from './area-types'
-import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, restaurantMenuLiffToken, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import TapSideEffects from '@/components/shared/tap-side-effects'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import RestaurantMenuAction, { RESTAURANT_MENU_DRAFT_URL } from './restaurant-menu-action'
 
 type Option = { id: string; name: string; folderId?: string | null; updatedAt?: string | null }
 
@@ -77,6 +80,7 @@ export function actionTypeForIntent(intent: RichMenuAreaIntent): Area['actionTyp
 /** ボタンの動きを人間の言葉で返す。キャンバスのエリア一覧でも使う。 */
 export function intentLabelOf(area: Area): string {
   const kind = tapKindOf(area)
+  if (kind === RESTAURANT_MENU_ACTION.kind) return RESTAURANT_MENU_ACTION.label
   return tapActionDef(kind)?.label ?? INTENT_OPTIONS.find((o) => o.value === intentOf(area))?.label ?? 'ボタン'
 }
 
@@ -94,18 +98,22 @@ const INTENT_ICONS: Partial<Record<RichMenuAreaIntent, TapActionExtraKind['icon'
 export function tapKindOf(area: Area): string {
   const intent = intentOf(area)
   if (intent === 'url') {
-    const parsed = tapActionFromUri(String((area.actionData as Record<string, unknown> | undefined)?.uri ?? ''))
+    const uri = String((area.actionData as Record<string, unknown> | undefined)?.uri ?? '')
+    if (!area.trackedLinkId && (uri === RESTAURANT_MENU_DRAFT_URL || restaurantMenuLiffToken(uri))) return RESTAURANT_MENU_ACTION.kind
+    const parsed = tapActionFromUri(uri)
     return URL_LIFF_KINDS.includes(parsed.kind) ? parsed.kind : 'uri'
   }
   if (intent === 'text') return 'message'
   return intent
 }
 
-function tapValueOf(area: Area): TapActionValue {
+function tapValueOf(area: Area, hasRestaurantMenu: boolean): TapActionValue {
   const data = (area.actionData ?? {}) as Record<string, unknown>
   const kind = tapKindOf(area)
-  if (URL_LIFF_KINDS.includes(kind as TapActionKind)) return { kind, uri: '', text: '', refId: tapActionFromUri(String(data.uri ?? '')).refId }
-  return { kind, uri: String(data.uri ?? ''), text: String(data.text ?? ''), refId: kind === 'form' ? area.formId ?? '' : '' }
+  const uri = String(data.uri ?? '')
+  if (!hasRestaurantMenu && kind === RESTAURANT_MENU_ACTION.kind) return tapActionFromSavedUri(uri)
+  if (URL_LIFF_KINDS.includes(kind as TapActionKind)) return { kind, uri: '', text: '', refId: tapActionFromUri(uri).refId }
+  return { kind, uri, text: String(data.text ?? ''), refId: kind === 'form' ? area.formId ?? '' : '' }
 }
 
 /** LIFF ID がまだ無いときの仮の URL（公開の前に isAreaActionConfigured が止める）。 */
@@ -233,7 +241,12 @@ export function AreaProperties({
     ? scope === 'hq'
     : Boolean(allowedIntents) && allowedIntents!.length === HQ_RICH_MENU_INTENTS.length && HQ_RICH_MENU_INTENTS.every((value) => allowedIntents!.includes(value))
   const account = useTapActionAccount()
+  const accountId = isHq ? null : account?.selectedAccountId ?? null
   const liffId = isHq ? null : liffIdProp !== undefined ? liffIdProp : tapLiffIdOf(account)
+  const style = useAccountStyle(accountId)
+  const hasRestaurantMenu = Boolean(accountId && allowed('url') && (style.data?.style === 'restaurant' || tapKindOf(area) === RESTAURANT_MENU_ACTION.kind))
+  const menuScope = JSON.stringify([accountId, area.id])
+  const [provisionedChoice, setProvisionedChoice] = useState<string | null>(null)
   const shopSources = useTapActionSources(isHq ? null : account?.selectedAccountId, { booking: true, visit_stamp: true })
   /* 6つのうち使えるもの（並びは絵の順）。予約・予約履歴・来店スタンプは url の intent で保存するので url が要る。 */
   const tapKinds: TapActionKind[] = [
@@ -247,11 +260,24 @@ export function AreaProperties({
   const extraKinds: TapActionExtraKind[] = intentOptions
     .filter((option) => !['url', 'text', 'form'].includes(option.value))
     .map((option) => ({ value: option.value, label: option.label, description: option.hint, icon: INTENT_ICONS[option.value] ?? Zap }))
+  if (hasRestaurantMenu) extraKinds.push({
+    value: RESTAURANT_MENU_ACTION.kind, label: RESTAURANT_MENU_ACTION.label, description: RESTAURANT_MENU_ACTION.description, icon: Utensils,
+  })
   const extraIntentOf = (kind: string) => extraKinds.some((extra) => extra.value === kind)
 
+  const tapValue = tapValueOf(area, hasRestaurantMenu)
   function changeTap(patch: Partial<TapActionValue>) {
-    const nextKind = patch.kind ?? tapKindOf(area)
-    if (patch.kind !== undefined && patch.kind !== tapKindOf(area)) {
+    const nextKind = patch.kind ?? tapValue.kind
+    if (patch.kind !== undefined && patch.kind !== tapValue.kind) {
+      setProvisionedChoice(nextKind === RESTAURANT_MENU_ACTION.kind ? menuScope : null)
+      if (nextKind === RESTAURANT_MENU_ACTION.kind) return onUpdate({
+        intent: 'url',
+        actionType: actionTypeForIntent('url'),
+        actionData: { uri: RESTAURANT_MENU_DRAFT_URL },
+        templateId: null,
+        formId: null,
+        trackedLinkId: null,
+      })
       if (nextKind === 'uri') return changeIntent('url')
       if (nextKind === 'message') return changeIntent('text')
       if (nextKind === 'form') return changeIntent('form')
@@ -417,17 +443,29 @@ export function AreaProperties({
             layout="stack"
             name="このボタン"
             kindLabel="押したときの動き"
-            value={tapValueOf(area)}
+            value={tapValue}
             onChange={changeTap}
             kinds={tapKinds}
             extraKinds={extraKinds}
+            kindOrder={hasRestaurantMenu ? RESTAURANT_RICH_MENU_TAP_ORDER : undefined}
             scope={isHq ? 'hq' : 'shop'}
             hasLiff={Boolean(liffId)}
             liffSettingsHref={account?.selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(account.selectedAccountId)}` : '/accounts'}
             readOnly={readOnly}
             sources={{ ...shopSources, form: forms.map((f) => ({ id: f.id, name: f.name, folderId: f.folderId, updatedAt: f.updatedAt })) }}
             textMax={300}
-            renderBody={(kind) => kind === 'uri' ? urlBody : kind === 'form' && forms.length === 0 ? formEmpty : extraIntentOf(kind) ? null : undefined}
+            renderBody={(kind) => {
+              if (kind === RESTAURANT_MENU_ACTION.kind && hasRestaurantMenu && accountId) {
+                return <RestaurantMenuAction key={JSON.stringify([menuScope, liffId])} accountId={accountId}
+                  liffId={liffId} uri={String(data.uri ?? '')} readOnly={readOnly}
+                  provisionOnSelect={provisionedChoice === menuScope}
+                  onUrl={uri => {
+                    setProvisionedChoice(null)
+                    onUpdate({ actionData: { ...data, uri } })
+                  }} />
+              }
+              return kind === 'uri' ? urlBody : kind === 'form' && forms.length === 0 ? formEmpty : extraIntentOf(kind) ? null : undefined
+            }}
           /></SaveErrorField>
         </div>
         {intent === 'switch' ? null : <FieldError id={`${inputId}-action-error`}>{error}</FieldError>}
@@ -567,7 +605,7 @@ export function AreaProperties({
       )}
 
       {/* 押されたときの追加の動き */}
-      <div className="border-hairline space-y-3 border-t pt-3">
+      {tapValue.kind !== RESTAURANT_MENU_ACTION.kind && <div className="border-hairline space-y-3 border-t pt-3">
         <p className="text-ink-secondary text-xs font-medium">押されたときに、あわせて行うこと</p>
 
         {!sideEffectsAvailable ? (
@@ -591,7 +629,7 @@ export function AreaProperties({
             ) : null}
           </>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

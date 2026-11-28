@@ -510,6 +510,8 @@
 
 - [飲食メニューの画像とアレルギーの追加](release-log/unreleased/198-kenta-menu-image-upload.md)
 
+- [料理メニューのLINE表示の反映履歴](release-log/unreleased/271-masato-restaurant-menu-liff.md)（説明・2026-11-28確認）
+
 - [休業日カレンダーの過去の日付の表示を修正](release-log/unreleased/199-kenta-closures-day-click.md)
 
 - [イベント編集と公開設定を修正](release-log/unreleased/200-kenta-event-edit.md)

@@ -21,7 +21,7 @@ export default function Button({
   ref,
   ...rest
 }: {
-  variant?: 'counter' | 'compact-secondary' | 'stamp-primary' | 'stamp-choice' | 'stamp-reward' | 'inline-action' | 'inline-danger' | 'notify-text' | 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend' | 'switch' | 'link' | 'plain' | 'menuRow';
+  variant?: 'counter' | 'compact-secondary' | 'stamp-primary' | 'stamp-choice' | 'stamp-reward' | 'inline-action' | 'inline-danger' | 'notify-text' | 'restaurant-select' | 'restaurant-date' | 'restaurant-primary' | 'restaurant-control' | 'restaurant-time' | 'choice' | 'backdrop' | 'calendar' | 'weekday' | 'row' | 'night-cta' | 'night-text' | 'sound' | 'send' | 'slot-row' | 'reward-row' | 'overlay-bell' | 'segment' | 'primary' | 'secondary' | 'danger' | 'text' | 'text-action' | 'icon' | 'arrow' | 'notify' | 'chip' | 'tab' | 'panels-tab' | 'option' | 'optionRow' | 'day' | 'time' | 'calendarDay' | 'overlay' | 'nightAction' | 'nightText' | 'nightSound' | 'nightSend' | 'switch' | 'link' | 'plain' | 'menuRow';
   selected?: boolean;
   unavailable?: boolean;
   waitlisted?: boolean;
@@ -66,11 +66,13 @@ export default function Button({
     danger: `${action} min-h-12 bg-danger text-[15px] text-white focus-visible:outline-danger active:opacity-90`,
     secondary: `${action} min-h-11 border border-liff-line-strong bg-canvas text-sm font-semibold text-ink active:bg-liff-off-bg`,
     text: 'liff-hit inline-flex min-h-9 items-center justify-center gap-1 px-2 text-xs text-liff-sub',
+    'text-action': 'liff-hit inline-flex min-h-11 items-center justify-center gap-1 px-5 text-sm font-bold text-liff-primary',
     icon: 'liff-hit inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-ink disabled:text-liff-off-ink',
     arrow: 'liff-hit flex h-10 w-[18px] shrink-0 items-center justify-center text-ink disabled:text-liff-off-ink',
     notify: 'liff-hit flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong',
     chip: `liff-hit inline-flex shrink-0 items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${selected ? 'border border-liff-primary bg-liff-soft text-liff-primary' : 'border border-transparent bg-liff-chip text-liff-sub'}`,
     tab: `liff-hit flex min-h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs ${selected ? 'bg-canvas font-bold text-ink' : 'font-semibold text-liff-sub'}`,
+    'panels-tab': `liff-hit flex min-h-8 flex-1 items-center justify-center rounded-lg px-1 text-sm ${selected ? 'bg-canvas font-bold text-liff-primary shadow-(--liff-control-shadow)' : 'font-semibold text-liff-sub'}`,
     option: `liff-hit flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left text-sm text-ink ${choice} ${selected || unavailable ? '' : 'shadow-(--liff-card-shadow)'}`,
     optionRow: `liff-hit flex min-h-11 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-2.5 text-left disabled:cursor-not-allowed ${unavailable ? 'border-hairline bg-liff-off-bg' : selected && waitlisted ? 'border-liff-wait-ink bg-liff-wait-bg' : selected ? 'border-liff-primary bg-liff-soft' : 'border-hairline bg-canvas'}`,
     day: `liff-hit flex min-w-0 flex-col items-center gap-0.5 rounded-(--liff-radius) py-2 disabled:opacity-100 ${choice}`,

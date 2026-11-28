@@ -19,6 +19,7 @@ export type RestaurantStoreRow = {
   line_account_id: string | null;
   line_account_name: string | null;
   friend_count?: number | null;
+  reservation_token?: string | null;
   created_at: string;
   updated_at: string;
 };
