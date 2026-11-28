@@ -29,13 +29,13 @@ describe('version-diff ガード', () => {
     } as unknown as CommonActionStep
     expect(describeVersionChanges([nullParams], [nextBranch])).toContain('条件分岐の条件の中身を変えた')
 
-    // actions が配列でない破損データは fail-closed で「変更内容を読み取れません」を返す
+    // actions が配列でない破損データは fail-closed で「変更内容を確認できません」を返す
     expect(
       versionChangeLines(
         { versionNumber: 2, actions: null as unknown as CommonActionStep[] },
         [{ versionNumber: 1, actions: [prevStep] }],
       ),
-    ).toEqual(['変更内容を読み取れません'])
+    ).toEqual(['変更内容を確認できません'])
   })
 
   it('ID にカンマが含まれていても順序変更の判定を誤らず、負の待ち時間や循環参照でも壊れない', () => {
@@ -59,7 +59,7 @@ describe('version-diff ガード', () => {
     expect(describeVersionChanges([legacyWait], [modernWait])).toEqual(['内容の変更はありません'])
   })
 
-  it('初版で actions が不正なときも、件数違いで不正要素を含むときも「変更内容を読み取れません」を返す', () => {
+  it('初版で actions が不正なときも、件数違いで不正要素を含むときも「変更内容を確認できません」を返す', () => {
     const validStep = { id: 's1', type: 'add_tag', onFailure: 'continue', params: {} } as unknown as CommonActionStep
 
     // 初版で actions が null や [null] の場合は「はじめて公開した」と偽らない
@@ -68,26 +68,26 @@ describe('version-diff ガード', () => {
         { versionNumber: 1, actions: null as unknown as CommonActionStep[] },
         [],
       ),
-    ).toEqual(['変更内容を読み取れません'])
+    ).toEqual(['変更内容を確認できません'])
     expect(
       versionChangeLines(
         { versionNumber: 1, actions: [null] as unknown as CommonActionStep[] },
         [],
       ),
-    ).toEqual(['変更内容を読み取れません'])
+    ).toEqual(['変更内容を確認できません'])
 
-    // 件数違いでも不正要素を含めば「1個から2個にした」ではなく「変更内容を読み取れません」
+    // 件数違いでも不正要素を含めば「1個から2個にした」ではなく「変更内容を確認できません」
     expect(
       versionChangeLines(
         { versionNumber: 2, actions: [validStep, null] as unknown as CommonActionStep[] },
         [{ versionNumber: 1, actions: [validStep] }],
       ),
-    ).toEqual(['変更内容を読み取れません'])
+    ).toEqual(['変更内容を確認できません'])
     expect(
       versionChangeLines(
         { versionNumber: 2, actions: [validStep] },
         [{ versionNumber: 1, actions: [validStep, null] as unknown as CommonActionStep[] }],
       ),
-    ).toEqual(['変更内容を読み取れません'])
+    ).toEqual(['変更内容を確認できません'])
   })
 })
