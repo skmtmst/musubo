@@ -18,7 +18,8 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   const available = room - gap * (count - 1)
   const headFontSizes = headCells.map(cell => number(getComputedStyle(cell).fontSize))
 
-  // DOM が変わった呼び出しは必ず測り直す。省くのは DOM 変更の無い再呼び出しだけ。
+  // 同じ1コマの中で DOM 変更無く重ねて呼ばれたときだけ省く。
+  // 1コマをまたいだ呼び出しや DOM 変更があった呼び出しは必ず測り直す。
   const siblingAttrs = new Set(['data-list-content-lines', 'data-list-density-scope'])
   const isProbeNode = node => node?.nodeType === 1 && (
     node.hasAttribute('data-column-probe')
@@ -53,9 +54,18 @@ export function fitGridContentColumns(frame, deferCommit = false) {
     const pending = tracker.observer.takeRecords()
     if (pending.some(isExternalMutation)) tracker.dirty = true
   }
-  const drainOwnMutations = () => {
-    if (tracker.observer) tracker.observer.takeRecords()
-    tracker.dirty = false
+
+  const scheduleTurnExpiry = () => {
+    frame.gridContentSameTurn = true
+    if (frame.__gridContentTurnExpiryScheduled) return
+    frame.__gridContentTurnExpiryScheduled = true
+    const expire = () => {
+      frame.__gridContentTurnExpiryScheduled = false
+      frame.gridContentSameTurn = false
+      frame.gridContentCache = undefined
+    }
+    if (typeof queueMicrotask === 'function') queueMicrotask(expire)
+    else Promise.resolve().then(expire)
   }
 
   const formControls = frame.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]),select,textarea')
@@ -67,16 +77,40 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   const styleScope = `${rows.length}:${count}:${frame.className}|${frame.dataset.tablePresentation ?? ''}|${css.fontFamily}|${css.fontSize}|${css.fontWeight}|${css.letterSpacing}|${headFontSizes.join(',')}:${formState}`
   const scope = `${clientWidth}:${Math.round(room)}:${Math.round(gap)}:${styleScope}`
   const hasMedia = rows.some(row => row.querySelector('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,input[type="image"]'))
-  const appliedIntact = !tracker.dirty
+  const appliedIntact = frame.gridContentSameTurn
+    && !tracker.dirty
     && frame.gridContentScope === scope
     && (frame.gridContentWasStacked
       ? frame.hasAttribute('data-stacked') && Boolean(frame.style.getPropertyValue('--grid-table-content-rest-columns'))
       : Boolean(frame.style.getPropertyValue('--grid-table-content-columns')))
   if (appliedIntact) return
 
+  const canReuseSameTurnMeasured = frame.gridContentSameTurn
+    && !tracker.dirty
+    && !hasMedia
+    && frame.gridContentScope !== ''
+    && frame.gridContentCache?.styleScope === styleScope
+
+  // この時点より前の通知を基準としてクリアする（計測後〜commit 前の外部変更は commit 冒頭で検知）。
+  if (tracker.observer) tracker.observer.takeRecords()
+  tracker.dirty = false
+
+  const recordOwnWrite = (ownWrites, target, attrName) => {
+    let attrs = ownWrites.get(target)
+    if (!attrs) {
+      attrs = new Set()
+      ownWrites.set(target, attrs)
+    }
+    attrs.add(attrName)
+  }
+  const isOwnWriteRecord = (ownWrites, record) =>
+    record.type === 'attributes'
+    && Boolean(record.attributeName)
+    && Boolean(ownWrites.get(record.target)?.has(record.attributeName))
+
   const fontKeys = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing', 'lineHeight']
   let measured
-  if (!tracker.dirty && !hasMedia && frame.gridContentScope !== '' && frame.gridContentCache?.styleScope === styleScope) {
+  if (canReuseSameTurnMeasured) {
     measured = frame.gridContentCache.measured
   } else {
     // 写しは contain:strict の常駐ホストにすべて置いてから幅を読み、最後にまとめて外す。
@@ -180,23 +214,46 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   const minimum = wanted.map((width, index) => fixed[index] ? width : Math.min(width, Math.max(measured[0][index] ?? 0, headFontSizes[index])))
   const minimumTotal = minimum.reduce((sum, width) => sum + width, 0)
 
+  const finalizeCommit = (ownWrites, hadExternalBeforeCommit) => {
+    const postRecords = tracker.observer ? tracker.observer.takeRecords() : []
+    const hadUnexpectedDuringCommit = postRecords.some(record => !isOwnWriteRecord(ownWrites, record) && isExternalMutation(record))
+    if (hadExternalBeforeCommit || hadUnexpectedDuringCommit) {
+      tracker.dirty = true
+      frame.gridContentSameTurn = false
+      frame.gridContentCache = undefined
+    } else {
+      tracker.dirty = false
+      scheduleTurnExpiry()
+    }
+    return ownWrites
+  }
+
   let commit
   if (minimumTotal > available) {
     const rest = minimum.slice(1)
     const minTrack = Math.min(room, Math.max(...rest, 1))
     const restColumns = `repeat(auto-fit,minmax(${minTrack}px,1fr))`
     commit = () => {
+      const preRecords = tracker.observer ? tracker.observer.takeRecords() : []
+      const hadExternalBeforeCommit = tracker.dirty || preRecords.some(isExternalMutation)
+      const ownWrites = new Map()
       // 既存の2段表示へ戻す。残りの列も必要なら段を増やし、操作を隠さない。
-      if (!frame.hasAttribute('data-stacked')) { frame.gridContentStacked = true; frame.dataset.stacked = '' }
+      if (!frame.hasAttribute('data-stacked')) {
+        frame.gridContentStacked = true
+        frame.dataset.stacked = ''
+        recordOwnWrite(ownWrites, frame, 'data-stacked')
+      }
       if (frame.style.getPropertyValue('--grid-table-content-rest-columns') !== restColumns) {
         frame.style.setProperty('--grid-table-content-rest-columns', restColumns)
+        recordOwnWrite(ownWrites, frame, 'style')
       }
       if (frame.style.getPropertyValue('--grid-table-content-columns')) {
         frame.style.removeProperty('--grid-table-content-columns')
+        recordOwnWrite(ownWrites, frame, 'style')
       }
       frame.gridContentWasStacked = true
       frame.gridContentScope = scope
-      drainOwnMutations()
+      return finalizeCommit(ownWrites, hadExternalBeforeCommit)
     }
   } else {
     let low = 0, high = Math.max(...wanted)
@@ -212,17 +269,25 @@ export function fitGridContentColumns(frame, deferCommit = false) {
     if (growIndex >= 0) widths[growIndex] += spare
     const columns = widths.map(width => `${width}px`).join(' ')
     commit = () => {
-      if (frame.gridContentStacked) delete frame.dataset.stacked
+      const preRecords = tracker.observer ? tracker.observer.takeRecords() : []
+      const hadExternalBeforeCommit = tracker.dirty || preRecords.some(isExternalMutation)
+      const ownWrites = new Map()
+      if (frame.gridContentStacked) {
+        delete frame.dataset.stacked
+        recordOwnWrite(ownWrites, frame, 'data-stacked')
+      }
       delete frame.gridContentStacked
       if (frame.style.getPropertyValue('--grid-table-content-rest-columns')) {
         frame.style.removeProperty('--grid-table-content-rest-columns')
+        recordOwnWrite(ownWrites, frame, 'style')
       }
       if (frame.style.getPropertyValue('--grid-table-content-columns') !== columns) {
         frame.style.setProperty('--grid-table-content-columns', columns)
+        recordOwnWrite(ownWrites, frame, 'style')
       }
       frame.gridContentWasStacked = false
       frame.gridContentScope = scope
-      drainOwnMutations()
+      return finalizeCommit(ownWrites, hadExternalBeforeCommit)
     }
   }
   if (deferCommit) return commit
@@ -237,6 +302,7 @@ export function clearGridContentColumns(frame) {
   delete frame.gridContentStacked
   delete frame.gridContentWasStacked
   delete frame.gridContentScope
+  delete frame.gridContentSameTurn
   delete frame.gridContentCache
   frame.__gridColumnDomTracker?.observer?.disconnect()
   delete frame.__gridColumnDomTracker

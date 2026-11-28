@@ -189,18 +189,27 @@ test('Grid内容列は見出し幅を守り、境界で既存段組みへ戻し�
       window.restoreGridProbe = () => { Element.prototype.getBoundingClientRect = original }
       return frame.querySelectorAll('[role="row"] > *').length
     })
-    // 同じ幅・同じ内容の再実行では計測を省く。
-    await page.locator('.table').evaluate(fitGridContentColumns)
-    assert.equal(await page.evaluate(() => window.gridProbeCounts.length), 0)
-    // scope を外して再計測するときは常駐の隔離ホストでまとめて測り、表の行へは挿さない。
-    await page.locator('.table').evaluate(frame => { frame.gridContentScope = '' })
-    await page.locator('.table').evaluate(fitGridContentColumns)
-    const { counts, liveCounts } = await page.evaluate(() => {
+    // 別のコマで呼び直したときは常駐の隔離ホストでまとめて測り直し、表の行へは挿さない。
+    // 同じコマの中で続けて2回目を呼んだときは重複計測を省く。
+    await page.locator('.table').evaluate((frame, fnSrc) => {
+      const fit = eval(`(${fnSrc})`)
+      fit(frame)
+      window.gridProbeCountAfterFirst = window.gridProbeCounts.length
+      fit(frame)
+      window.gridProbeCountAfterSecond = window.gridProbeCounts.length
+    }, fitGridContentColumns.toString())
+    const { counts, liveCounts, afterFirst, afterSecond } = await page.evaluate(() => {
       window.restoreGridProbe()
-      return { counts: window.gridProbeCounts, liveCounts: window.gridLiveProbeCounts }
+      return {
+        counts: window.gridProbeCounts,
+        liveCounts: window.gridLiveProbeCounts,
+        afterFirst: window.gridProbeCountAfterFirst,
+        afterSecond: window.gridProbeCountAfterSecond,
+      }
     })
     assert.ok(counts.length > 0 && counts.every(count => count === batching), JSON.stringify(counts))
     assert.ok(liveCounts.every(count => count === 0), JSON.stringify(liveCounts))
+    assert.equal(afterSecond, afterFirst)
     assert.equal(await page.locator('[data-column-probe]').count(), 0)
   } finally { await browser.close() }
 })
@@ -370,5 +379,60 @@ test('同じ文字で余白が違うボタンへ入れ替わったときも必�
     assert.ok(after.buttonWidth >= 90, JSON.stringify(after))
     assert.ok(after.cellWidth >= after.buttonWidth, `action column must grow for wider button: ${JSON.stringify({ before, after })}`)
     assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+  } finally { await browser.close() }
+})
+
+test('先祖（body）の class が変わってボタンの余白が増えたあと、次のコマで測り直すと操作列が広がる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{font:inherit;white-space:nowrap;padding:0 4px}body.wide-buttons button{padding:0 36px}</style><main><div class="frame" data-column-layout data-column-sizing="content"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 1</span></td><td><button>開く</button></td></tr></tbody></table></div></main>`)
+    await page.locator('.frame').evaluate(fitListColumns)
+    const before = await page.locator('tbody tr td:last-child').evaluate(cell => ({
+      cellWidth: Math.round(cell.getBoundingClientRect().width),
+      buttonWidth: Math.round(cell.querySelector('button').getBoundingClientRect().width),
+    }))
+    assert.ok(before.cellWidth < 60, JSON.stringify(before))
+
+    // frame の外（body）の class を変え、次のコマで測り直す
+    await page.evaluate(() => { document.body.classList.add('wide-buttons') })
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => resolve(undefined))))
+    await page.locator('.frame').evaluate(fitListColumns)
+
+    const after = await page.locator('tbody tr td:last-child').evaluate(cell => ({
+      cellWidth: Math.round(cell.getBoundingClientRect().width),
+      buttonWidth: Math.round(cell.querySelector('button').getBoundingClientRect().width),
+    }))
+    assert.ok(after.buttonWidth >= 90, JSON.stringify(after))
+    assert.ok(after.cellWidth >= after.buttonWidth, `ancestor class change must remeasure on next frame: ${JSON.stringify({ before, after })}`)
+    assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+  } finally { await browser.close() }
+})
+
+test('deferCommit で測ったあと commit する前にセルの文字が変わっても、次の呼び出しで取りこぼさず広げる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><main><div class="frame" data-column-layout data-column-sizing="content"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>補足</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 1</span></td><td><span class="note">短い</span></td></tr></tbody></table></div></main>`)
+    const result = await page.locator('.frame').evaluate((frame, fnSrc) => {
+      const fit = eval(`(${fnSrc})`)
+      const note = frame.querySelector('.note')
+      const cell = note.closest('td')
+      // 1. 短いセルを deferCommit で測る
+      const commit = fit(frame, true)
+      // 2. commit する前に外から長い文字へ変える
+      note.textContent = 'とても長い補足テキストに変更されました'
+      // 3. 古い計測結果の commit を実行する
+      if (typeof commit === 'function') commit()
+      const afterStaleCommit = Math.round(cell.getBoundingClientRect().width)
+      // 4. 同じコマの中で続けて測り直しを呼ぶ（commit 前の変化を捨てていなければ必ず再計測される）
+      fit(frame)
+      const afterRemeasure = Math.round(cell.getBoundingClientRect().width)
+      const textWidth = Math.round(note.scrollWidth)
+      return { afterStaleCommit, afterRemeasure, textWidth }
+    }, fitListColumns.toString())
+    assert.ok(result.afterStaleCommit < 80, JSON.stringify(result))
+    assert.ok(result.afterRemeasure > result.afterStaleCommit + 100, `external text edit before commit must not be dropped: ${JSON.stringify(result)}`)
+    assert.ok(result.afterRemeasure >= result.textWidth, JSON.stringify(result))
   } finally { await browser.close() }
 })

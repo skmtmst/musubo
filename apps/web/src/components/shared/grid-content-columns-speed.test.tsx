@@ -317,10 +317,50 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     expect((fresh.children[1] as HTMLElement).style.getPropertyValue('--list-content-column-width')).toBe(expectedWidth)
     expect(fresh.children[2].hasAttribute('data-content-support-column')).toBe(true)
 
-    // 変更が無い再実行では測り直しを省略する
+    // 同じコマの中の変更が無い再実行では測り直しを省略する
     rangeCalls = 0
     expect(fitListColumns(frame, true)).toBeUndefined()
     expect(rangeCalls).toBe(0)
+  })
+
+  it('1コマをまたぐと DOM 変更が無くても測り直し、また deferCommit の計測後〜commit 前の外部変更を捨てない', async () => {
+    let rangeCalls = 0
+    vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
+      rangeCalls += 1
+      return [rect(Math.max(24, this.toString().trim().length * 10), 20)] as unknown as DOMRectList
+    })
+    vi.spyOn(Range.prototype, 'getBoundingClientRect').mockImplementation(function (this: Range) {
+      return rect(Math.max(24, this.toString().trim().length * 10), 20)
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.testid === 'tpl-frame' || this.tagName === 'TABLE' || this.tagName === 'TR') return rect(1100, 40)
+      return rect(180, 24)
+    })
+
+    const { getByTestId } = render(
+      <TemplateLikeTable rows={[{ name: 'テンプレート1', preview: '短い', status: '公開中' }]} />,
+    )
+    const frame = getByTestId('tpl-frame')
+    const previewCell = getByTestId('tpl-preview-0')
+
+    // 1. 同じコマの中は省略し、マイクロタスク（コマ境界）をまたぐと必ず再計測する
+    fitListColumns(frame)
+    rangeCalls = 0
+    fitListColumns(frame)
+    expect(rangeCalls).toBe(0)
+    await Promise.resolve()
+    fitListColumns(frame)
+    expect(rangeCalls).toBeGreaterThan(0)
+
+    // 2. deferCommit で測ったあと commit する前に外部から文字を変えると、commit はその変更を捨てない
+    await Promise.resolve()
+    const staleCommit = fitListColumns(frame, true)
+    previewCell.firstElementChild!.textContent = 'とても長いテキストに変更されました'
+    staleCommit?.()
+
+    rangeCalls = 0
+    fitListColumns(frame)
+    expect(rangeCalls).toBeGreaterThan(0)
   })
 
   it('非 flexibleContent 表のリサイズ時でも deferCommit の読取フェーズ中は DOM へ書き込まず、書込フェーズ後に測り直す', async () => {

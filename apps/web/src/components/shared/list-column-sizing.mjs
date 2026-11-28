@@ -23,7 +23,8 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   const cols = [...table.querySelectorAll(':scope > colgroup > col')]
   for (const col of cols) if (col.listColumnOriginalWidth === undefined) col.listColumnOriginalWidth = col.style.width
 
-  // DOM が変わった呼び出しは必ず測り直す。省くのは DOM 変更も幅変更も無い再呼び出しだけ。
+  // 同じ1コマの中で DOM 変更も幅変更も無く重ねて呼ばれたときだけ省く。
+  // 1コマをまたいだ呼び出しや DOM 変更があった呼び出しは必ず測り直す。
   const siblingAttrs = new Set(['data-list-content-lines', 'data-list-density-scope'])
   const isProbeNode = node => node?.nodeType === 1 && (
     node.hasAttribute('data-column-probe')
@@ -58,9 +59,17 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
     const pending = tracker.observer.takeRecords()
     if (pending.some(isExternalMutation)) tracker.dirty = true
   }
-  const drainOwnMutations = () => {
-    if (tracker.observer) tracker.observer.takeRecords()
-    tracker.dirty = false
+
+  const scheduleTurnExpiry = () => {
+    frame.listColumnSameTurn = true
+    if (frame.__listColumnTurnExpiryScheduled) return
+    frame.__listColumnTurnExpiryScheduled = true
+    const expire = () => {
+      frame.__listColumnTurnExpiryScheduled = false
+      frame.listColumnSameTurn = false
+    }
+    if (typeof queueMicrotask === 'function') queueMicrotask(expire)
+    else Promise.resolve().then(expire)
   }
 
   const layoutScope = `${frameWidth}:${tableWidth}:${rows.length}:${bodyCells.length}:${nameIndex}:${visibleMask}:${flexibleContent ? 'F' : controlsOnly ? 'C' : 'S'}:${cols.map(col => col.listColumnOriginalWidth).join(',')}`
@@ -72,13 +81,33 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
       : `${el.value ?? ''}`)).join('\x1f')
   const usesGridColumns = frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')
 
-  if (!tracker.dirty
+  if (frame.listColumnSameTurn
+    && !tracker.dirty
     && frame.listColumnScope === layoutScope
     && frame.listColumnFormState === formState
     && bodyCells[nameIndex]?.hasAttribute('data-content-name-column')
     && (!usesGridColumns || frame.style.getPropertyValue('--table-content-columns') === frame.listColumnAppliedGrid)) {
     return
   }
+
+  // ここから今回分の計測を開始するため、この時点より前の通知を基準としてクリアする。
+  // 計測後〜commit 前に起きた外部変更は commit 冒頭で必ず検知する。
+  if (tracker.observer) tracker.observer.takeRecords()
+  tracker.dirty = false
+
+  const recordOwnWrite = (ownWrites, target, attrName) => {
+    let attrs = ownWrites.get(target)
+    if (!attrs) {
+      attrs = new Set()
+      ownWrites.set(target, attrs)
+    }
+    attrs.add(attrName)
+  }
+
+  const isOwnWriteRecord = (ownWrites, record) =>
+    record.type === 'attributes'
+    && Boolean(record.attributeName)
+    && Boolean(ownWrites.get(record.target)?.has(record.attributeName))
 
   const hasAppliedSizing = () =>
     cols.some(col => col.style.width !== col.listColumnOriginalWidth)
@@ -89,15 +118,30 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
     ))
     || (usesGridColumns && Boolean(frame.style.getPropertyValue('--table-content-columns')))
 
-  const resetAppliedSizing = () => {
-    for (const col of cols) if (col.style.width !== col.listColumnOriginalWidth) col.style.width = col.listColumnOriginalWidth
+  const resetAppliedSizing = ownWrites => {
+    for (const col of cols) {
+      if (col.style.width !== col.listColumnOriginalWidth) {
+        col.style.width = col.listColumnOriginalWidth
+        if (ownWrites) recordOwnWrite(ownWrites, col, 'style')
+      }
+    }
     if (usesGridColumns && frame.style.getPropertyValue('--table-content-columns')) {
       frame.style.removeProperty('--table-content-columns')
+      if (ownWrites) recordOwnWrite(ownWrites, frame, 'style')
     }
     for (const row of rows) for (const cell of row.children) {
-      if (cell.hasAttribute('data-content-name-column')) cell.removeAttribute('data-content-name-column')
-      if (cell.hasAttribute('data-content-support-column')) cell.removeAttribute('data-content-support-column')
-      if (cell.style.getPropertyValue('--list-content-column-width')) cell.style.removeProperty('--list-content-column-width')
+      if (cell.hasAttribute('data-content-name-column')) {
+        cell.removeAttribute('data-content-name-column')
+        if (ownWrites) recordOwnWrite(ownWrites, cell, 'data-content-name-column')
+      }
+      if (cell.hasAttribute('data-content-support-column')) {
+        cell.removeAttribute('data-content-support-column')
+        if (ownWrites) recordOwnWrite(ownWrites, cell, 'data-content-support-column')
+      }
+      if (cell.style.getPropertyValue('--list-content-column-width')) {
+        cell.style.removeProperty('--list-content-column-width')
+        if (ownWrites) recordOwnWrite(ownWrites, cell, 'style')
+      }
     }
   }
 
@@ -109,15 +153,23 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
         if (deferCommit && typeof onReset === 'function') {
           // 読取フェーズではDOMへ書き込まず、書込フェーズで初期化してから次フレームで本来の列幅を測る。
           return () => {
-            resetAppliedSizing()
+            const preRecords = tracker.observer ? tracker.observer.takeRecords() : []
+            const hadExternal = tracker.dirty || preRecords.some(isExternalMutation)
+            const ownWrites = new Map()
+            resetAppliedSizing(ownWrites)
             frame.listColumnScope = ''
             frame.listColumnCeilingScope = ''
-            drainOwnMutations()
+            frame.listColumnSameTurn = false
+            const postRecords = tracker.observer ? tracker.observer.takeRecords() : []
+            const unexpected = postRecords.some(record => !isOwnWriteRecord(ownWrites, record) && isExternalMutation(record))
+            tracker.dirty = hadExternal || unexpected
             onReset()
+            return ownWrites
           }
         }
-        resetAppliedSizing()
+        resetAppliedSizing(null)
         ceilings = bodyCells.map(cell => cell.getBoundingClientRect().width)
+        if (tracker.observer) tracker.observer.takeRecords()
       } else {
         ceilings = bodyWidths
       }
@@ -254,9 +306,20 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   const bodyIsFlex = getComputedStyle(body).display === 'flex'
   const gridColumns = usesGridColumns ? widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ') : ''
   const commit = () => {
-    if (frame.hasAttribute('data-content-stacked') !== mustStack) frame.toggleAttribute('data-content-stacked', mustStack)
+    // 計測後〜commit 前に起きた外部 DOM 変更を先に拾う（絶対に捨てない）。
+    const preRecords = tracker.observer ? tracker.observer.takeRecords() : []
+    const hadExternalBeforeCommit = tracker.dirty || preRecords.some(isExternalMutation)
+    const ownWrites = new Map()
+
+    if (frame.hasAttribute('data-content-stacked') !== mustStack) {
+      frame.toggleAttribute('data-content-stacked', mustStack)
+      recordOwnWrite(ownWrites, frame, 'data-content-stacked')
+    }
     if (usesGridColumns) {
-      if (frame.style.getPropertyValue('--table-content-columns') !== gridColumns) frame.style.setProperty('--table-content-columns', gridColumns)
+      if (frame.style.getPropertyValue('--table-content-columns') !== gridColumns) {
+        frame.style.setProperty('--table-content-columns', gridColumns)
+        recordOwnWrite(ownWrites, frame, 'style')
+      }
       frame.listColumnAppliedGrid = gridColumns
     }
     // A native fixed-layout table reads <col> before the first row's cell width.
@@ -264,24 +327,48 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
     if (!bodyIsFlex) {
       for (const [index, col] of cols.entries()) {
         const nextWidth = widths[index] != null ? `${widths[index]}px` : col.listColumnOriginalWidth
-        if (col.style.width !== nextWidth) col.style.width = nextWidth
+        if (col.style.width !== nextWidth) {
+          col.style.width = nextWidth
+          recordOwnWrite(ownWrites, col, 'style')
+        }
       }
     }
     for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
       const isName = index === nameIndex
       const isSupport = widths[index] !== null && widths[index] !== undefined
-      if (cell.hasAttribute('data-content-name-column') !== isName) cell.toggleAttribute('data-content-name-column', isName)
-      if (cell.hasAttribute('data-content-support-column') !== isSupport) cell.toggleAttribute('data-content-support-column', isSupport)
+      if (cell.hasAttribute('data-content-name-column') !== isName) {
+        cell.toggleAttribute('data-content-name-column', isName)
+        recordOwnWrite(ownWrites, cell, 'data-content-name-column')
+      }
+      if (cell.hasAttribute('data-content-support-column') !== isSupport) {
+        cell.toggleAttribute('data-content-support-column', isSupport)
+        recordOwnWrite(ownWrites, cell, 'data-content-support-column')
+      }
       if (isSupport) {
         const value = `${widths[index]}px`
-        if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
+        if (cell.style.getPropertyValue('--list-content-column-width') !== value) {
+          cell.style.setProperty('--list-content-column-width', value)
+          recordOwnWrite(ownWrites, cell, 'style')
+        }
       } else if (cell.style.getPropertyValue('--list-content-column-width')) {
         cell.style.removeProperty('--list-content-column-width')
+        recordOwnWrite(ownWrites, cell, 'style')
       }
     }
     frame.listColumnScope = layoutScope
     frame.listColumnFormState = formState
-    drainOwnMutations()
+
+    // commit 中の記録を1件ずつ確認し、自分が書いた変更だけを除く。
+    const postRecords = tracker.observer ? tracker.observer.takeRecords() : []
+    const hadUnexpectedDuringCommit = postRecords.some(record => !isOwnWriteRecord(ownWrites, record) && isExternalMutation(record))
+    if (hadExternalBeforeCommit || hadUnexpectedDuringCommit) {
+      tracker.dirty = true
+      frame.listColumnSameTurn = false
+    } else {
+      tracker.dirty = false
+      scheduleTurnExpiry()
+    }
+    return ownWrites
   }
   if (deferCommit) return commit
   commit()
