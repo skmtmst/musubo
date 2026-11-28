@@ -17,10 +17,13 @@ export type ScrollMetrics = {
   scrollHeight: number
 }
 
-/** 最後まで読んだ（または読む量がスクロール不要）か。 */
+/** 最後まで読んだ（または読む量がスクロール不要）か。未計測（高さ0以下・非有限）や負のスクロール位置は読了にしない。 */
 export function hasReadTerms(metrics: ScrollMetrics): boolean {
-  const noScrollNeeded = metrics.scrollHeight <= metrics.clientHeight + TERMS_SCROLL_TOLERANCE_PX
-  const reachedBottom = metrics.scrollTop + metrics.clientHeight >= metrics.scrollHeight - TERMS_SCROLL_TOLERANCE_PX
+  const { scrollTop, clientHeight, scrollHeight } = metrics
+  if (!Number.isFinite(scrollTop) || !Number.isFinite(clientHeight) || !Number.isFinite(scrollHeight)) return false
+  if (clientHeight <= 0 || scrollHeight <= 0 || scrollTop < 0) return false
+  const noScrollNeeded = scrollHeight <= clientHeight + TERMS_SCROLL_TOLERANCE_PX
+  const reachedBottom = scrollTop + clientHeight >= scrollHeight - TERMS_SCROLL_TOLERANCE_PX
   return noScrollNeeded || reachedBottom
 }
 

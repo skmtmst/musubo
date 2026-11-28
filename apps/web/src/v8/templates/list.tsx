@@ -257,7 +257,15 @@ export default function TemplatesListV8() {
     try {
       const res = await api.templates.list(undefined, accountId)
       if (renderedScope !== accountScope.current || activeAccountRef.current !== accountId || requestGeneration !== loadGenerationRef.current) return
-      if (res.success) { loadedScope.current = renderedScope; setTemplates(res.data as Template[]) }
+      if (res.success) {
+        loadedScope.current = renderedScope
+        // 件数が不正なときは、一覧や集計で確定した数として扱わない。
+        setTemplates((res.data as Template[]).map((item) => ({
+          ...item,
+          usageCount: (Number.isSafeInteger(item.usageCount) && item.usageCount >= 0 ? item.usageCount : undefined) as number,
+          monthlySendCount: Number.isSafeInteger(item.monthlySendCount) && (item.monthlySendCount ?? -1) >= 0 ? item.monthlySendCount : null,
+        })))
+      }
       else setFailure(failureOfResponse())
     } catch (e) {
       if (!mounted.current || renderedScope !== accountScope.current || activeAccountRef.current !== accountId || requestGeneration !== loadGenerationRef.current) return
@@ -1045,6 +1053,7 @@ export default function TemplatesListV8() {
   if (!isTemplateSection && selectedAccountId) {
     return <>{detailGuard.dialog}<AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
       accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates} onScopeGuardChange={setAssetScopeGuard}
+      query={templateQuery} setQuery={setTemplateQuery}
       lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} /></>
   }
 

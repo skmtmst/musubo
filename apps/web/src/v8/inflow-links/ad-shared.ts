@@ -21,7 +21,9 @@ export const AD_PROVIDER_LABEL: Record<string, string> = {
 
 export function adPlatformLabel(platform: AdPlatform | undefined): string {
   if (!platform) return '—'
-  return AD_PROVIDER_LABEL[platform.name] ?? platform.displayName ?? platform.name
+  return Object.prototype.hasOwnProperty.call(AD_PROVIDER_LABEL, platform.name)
+    ? AD_PROVIDER_LABEL[platform.name]
+    : platform.displayName ?? platform.name
 }
 
 /** 送信の状態（絵の札：待っている・送れた・断られた）。 */

@@ -1,6 +1,6 @@
 'use client'
 
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { ManualPublishAttempt } from '@/v8/rich-menus/edit/manual-publish-attempt'
 import {
 clearPublishPlanDraft
@@ -75,13 +75,15 @@ export async function publishMenuNow({ audience, group, confirmedImages, loadChe
       setError(
         targetingPriorityInvalid
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
-          : isValidationMessage
-            ? describeApiFailure(e, '公開')
-            : draftSaved
-              ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
-              : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
+          : isForbiddenOrRateLimited(e)
+            ? describeApiFailure(e, '公開', { scope: 'store' })
+            : isValidationMessage
+              ? describeApiFailure(e, '公開')
+              : draftSaved
+                ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
+                : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       ) }
-      void loadChecks()
+      void loadChecks().catch(() => undefined)
       return false
     } finally {
       setPublishing(false)

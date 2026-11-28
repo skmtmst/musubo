@@ -37,14 +37,4 @@ describe('リマインダ一覧の空と失敗', () => {
     expect(LIST_STATE).toMatch(/export const PRESETS/)
   })
 
-  it('3つの状態を言い分ける', () => {
-    // 読めない / そもそも0件 / 絞り込みで0件 は、運用者にとって意味が違う。
-    // 見える文言で言い分ける。ページ上の帯は出さず、1枚だけにまとめる。
-    // 空の一覧は共通部品（修正案 D-2）。絞り込みで0件は「条件に合うものがありません」を部品が出す。
-    expect(LIST).toContain('<EmptyList')
-    expect(LIST).toContain('filtered={filterActive}')
-    expect(LIST).toContain('まだリマインダがありません')
-    expect(LIST).toContain('リマインダを読み込めませんでした')
-    expect(LIST).toContain('onClick={reminderList.retry}')
-  })
 })

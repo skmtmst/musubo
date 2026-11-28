@@ -181,3 +181,12 @@ describe('一斉配信の複数吹き出し契約', () => {
     expect(varied[2]).toEqual(buildMessages(labelled)[2]);
   });
 });
+
+it('追加ボタンの送信 JSON は URI と postback の順序・値を保つ', () => {
+  const parts = parseBroadcastMessageParts({ messageType: 'text', messageContent: '本文', messageOptions: { buttons: [
+    { type: 'url', label: '詳細', value: 'https://example.com/a' },
+    { type: 'postback', label: '返事', value: 'reply=1' },
+  ] } });
+  expect(parts[1]).toMatchObject({ id: 'message-buttons', messageType: 'flex', altText: 'ボタン' });
+  expect(parts[1].messageContent).toBe('{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[{"type":"button","action":{"type":"uri","label":"詳細","uri":"https://example.com/a"}},{"type":"button","action":{"type":"postback","label":"返事","data":"reply=1"}}]}}');
+});

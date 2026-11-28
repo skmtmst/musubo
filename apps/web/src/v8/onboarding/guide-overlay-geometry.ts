@@ -26,18 +26,26 @@ export function spotlightRing(target: Rect, inflate = SPOTLIGHT_INFLATE): Rect {
   }
 }
 
-/** 対象の穴を残した暗幕4枚（上・左・右・下）。負の大きさは作らない。 */
+/** 対象の穴を残した暗幕4枚（上・左・右・下）。負の大きさや画面外へのはみ出しを作らない。 */
 export function dimPanels(target: Rect, viewport: Viewport): Rect[] {
-  const top = Math.max(0, target.top)
-  const bottom = Math.min(viewport.height, target.top + target.height)
-  const left = Math.max(0, target.left)
-  const right = Math.min(viewport.width, target.left + target.width)
+  const vw = Number.isFinite(viewport.width) ? Math.max(0, viewport.width) : 0
+  const vh = Number.isFinite(viewport.height) ? Math.max(0, viewport.height) : 0
+  if (vw <= 0 || vh <= 0) return []
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
+  const rawTop = Number.isFinite(target.top) ? target.top : 0
+  const rawLeft = Number.isFinite(target.left) ? target.left : 0
+  const rawWidth = Number.isFinite(target.width) ? Math.max(0, target.width) : 0
+  const rawHeight = Number.isFinite(target.height) ? Math.max(0, target.height) : 0
+  const top = clamp(rawTop, 0, vh)
+  const bottom = clamp(rawTop + rawHeight, top, vh)
+  const left = clamp(rawLeft, 0, vw)
+  const right = clamp(rawLeft + rawWidth, left, vw)
   const band = Math.max(0, bottom - top)
   return [
-    { left: 0, top: 0, width: viewport.width, height: top },
+    { left: 0, top: 0, width: vw, height: top },
     { left: 0, top, width: left, height: band },
-    { left: right, top, width: Math.max(0, viewport.width - right), height: band },
-    { left: 0, top: bottom, width: viewport.width, height: Math.max(0, viewport.height - bottom) },
+    { left: right, top, width: Math.max(0, vw - right), height: band },
+    { left: 0, top: bottom, width: vw, height: Math.max(0, vh - bottom) },
   ].filter(panel => panel.width > 0 && panel.height > 0)
 }
 

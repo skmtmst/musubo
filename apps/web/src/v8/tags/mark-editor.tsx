@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import Card, { CardHeader } from '@/components/shared/card'
 import IconButton from '@/components/shared/icon-button'
 import { markNameRequirement } from '@/v8/tags/mark-requirement'
@@ -448,7 +450,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const back = null
   const description = editing && selected
-    ? `${formatNumber(selected.friendCount)} 人に付いている・${shownTargets.map((target) => PLACE_LABELS[target]).filter(Boolean).join('・')}に出る`
+    ? `${formatNumber(selected.friendCount)} 人に付いている・${shownTargets.map((target) => knownValue(PLACE_LABELS, target, '表示先を確認できません')).filter(Boolean).join('・')}に出る`
     : '対応の状態を、色つきの印で管理します。'
 
   const aside = hideForm ? null : (
@@ -529,7 +531,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                   {rules.map((rule) => (
                     <div key={rule.id} className={styles.ruleRow} data-off={rule.isActive ? undefined : ''}>
                       <Zap className={styles.ruleIcon} aria-hidden="true" />
-                      <span className={styles.ruleWhen} title={rule.name}>{`${WHEN_WORDS[rule.event] ?? eventLabel(rule.event)}${rule.isActive ? '' : '（止めています）'}`}</span>
+                      <span className={styles.ruleWhen} title={rule.name}>{`${knownValue(WHEN_WORDS, rule.event, eventLabel(rule.event))}${rule.isActive ? '' : '（止めています）'}`}</span>
                       <span className={styles.ruleThen}>{`→ ${name.trim() || 'このマーク'}にする`}</span>
                       <IconButton size="small" aria-label={`きまり「${rule.name}」を直す`} title="直す" onClick={() => setRulesOpen(true)}>
                         <Pencil className={styles.wayIcon} aria-hidden="true" />

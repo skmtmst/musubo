@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * ★V8 外部連携で使う言葉と小さな変換（一覧・作る画面で共有）。
  * 送れる出来事の正本は packages/db/src/webhooks.ts の KNOWN_OUTGOING_EVENT_TYPES。
@@ -52,7 +53,9 @@ const PAYLOAD_WORD: Record<string, string> = {
 }
 
 export function eventWord(type: string): string {
-  if (EVENT_WORD[type]) return EVENT_WORD[type]
+  if (typeof type !== 'string') return '出来事を確認できません'
+  const known = knownValue(EVENT_WORD, type, '')
+  if (known) return known
   if (type.startsWith('ec.')) return ecEventLabel(type)
   if (type.startsWith('incoming_webhook.')) return '受け取った知らせ'
   return type
@@ -68,8 +71,10 @@ export function eventLabel(types: readonly string[]): string {
 
 export function payloadLabel(types: readonly string[]): string {
   const first = types[0]
+  if (types.length > 0 && typeof first !== 'string') return '送る内容を確認できません'
   if (!first) return 'まだ決めていません'
-  if (PAYLOAD_WORD[first]) return PAYLOAD_WORD[first]
+  const known = knownValue(PAYLOAD_WORD, first, '')
+  if (known) return known
   if (first.startsWith('ec.order')) return '注文の中身'
   return '選んだ出来事の項目'
 }

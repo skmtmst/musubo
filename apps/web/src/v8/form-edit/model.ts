@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * 回答フォームの編集（V8）で使う決まりごと。
  * 今までの画面（app/form-submissions/edit）の処理を写したもの。src/v8 からは
@@ -118,13 +119,13 @@ export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide,
   const incomingBlocks = collect(incoming.layout)
   for (const [blockId, entry] of mineBlocks) {
     const other = incomingBlocks.get(blockId)
-    if (!other) push('add', `「${sectionNameOf(entry.sectionId)}」に${KIND_WORD[entry.block.kind]}「${blockTitle(entry.block)}」を足そうとしています`)
+    if (!other) push('add', `「${sectionNameOf(entry.sectionId)}」に${knownValue(KIND_WORD, entry.block.kind, '項目')}「${blockTitle(entry.block)}」を足そうとしています`)
     else if (other.block.kind !== entry.block.kind || blockTitle(other.block) !== blockTitle(entry.block)) {
-      push('change', `「${sectionNameOf(entry.sectionId)}」の${KIND_WORD[entry.block.kind]}「${blockTitle(other.block)}」の中身を変えようとしています`)
+      push('change', `「${sectionNameOf(entry.sectionId)}」の${knownValue(KIND_WORD, entry.block.kind, '項目')}「${blockTitle(other.block)}」の中身を変えようとしています`)
     }
   }
   for (const [blockId, entry] of incomingBlocks) {
-    if (!mineBlocks.has(blockId)) push('remove', `「${sectionNameOf(entry.sectionId)}」の${KIND_WORD[entry.block.kind]}「${blockTitle(entry.block)}」を消そうとしています（最新にあります）`)
+    if (!mineBlocks.has(blockId)) push('remove', `「${sectionNameOf(entry.sectionId)}」の${knownValue(KIND_WORD, entry.block.kind, '項目')}「${blockTitle(entry.block)}」を消そうとしています（最新にあります）`)
   }
   if (JSON.stringify(mine.layout.options) !== JSON.stringify(incoming.layout.options)) {
     push('change', '答え終わったあと・受付のきまり・見た目の言葉のどれかが違います')
@@ -167,7 +168,7 @@ export function inputTypeLabel(block: FormInputBlock): string {
     if (format === 'email') return 'メール'
     if (format === 'tel') return '電話'
   }
-  return INPUT_TYPE_LABEL[block.type]
+  return knownValue(INPUT_TYPE_LABEL, block.type, '種類を確認できません')
 }
 
 /** 畳んだ行の2行目（「飾り・見出し1」「入力・5段階」など）。 */

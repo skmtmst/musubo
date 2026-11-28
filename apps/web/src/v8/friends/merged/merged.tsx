@@ -141,11 +141,12 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             <KpiCard
               key={kpi.key}
               presentation="band"
+              loading={kpi.key === 'people' ? u.summaryStatus === 'loading' : u.loading}
               icon={<Inbox size={16} />}
               title={kpi.title}
               value={kpi.value}
               unit="人"
-              detail={kpi.key === 'people' ? u.summaryStatus === 'loading' ? '読み込んでいます' : u.summaryStatus === 'error' ? '読み込めませんでした' : null : null}
+              detail={kpi.key === 'people' ? (u.summaryStatus === 'loading' ? '読み込んでいます' : u.summaryStatus === 'error' ? '読み込めませんでした' : null) : u.error ? '読み込めませんでした' : null}
               onRetry={kpi.key === 'people' && u.summaryStatus === 'error' ? () => void u.loadSummary() : undefined}
               retryLabel="再読み込み"
               help={kpi.help}
@@ -186,6 +187,25 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
             ]}
           /></SaveErrorField>
         </div>
+        {u.accountOptionsError ? (
+          <Notice
+            tone="warn"
+            className={styles.alertPlacement}
+            message="所属アカウントの候補を読み込めませんでした。一覧の確認はそのまま続けられます。"
+            action={
+              <Button
+                variant="text"
+                size="inline"
+                onClick={() => void u.loadAccountOptions()}
+                disabled={u.accountOptionsLoading}
+                busy={u.accountOptionsLoading}
+                busyLabel="読み込んでいます"
+              >
+                候補を読み直す
+              </Button>
+            }
+          />
+        ) : null}
 
         <div className={styles.listArea}>
           <div className={styles.searchRow}>

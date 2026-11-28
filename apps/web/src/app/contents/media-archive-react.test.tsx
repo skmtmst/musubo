@@ -234,7 +234,7 @@ describe('登録メディアの退避と復帰（N-201）', () => {
     await waitForText(MEDIA.filename)
 
     expect(host.textContent).toContain('退避済み')
-    expect(document.querySelector(`button[aria-label="${MEDIA.filename}の名前を変える"]`)).toBeNull()
+    expect(document.querySelector(`button[aria-label="${MEDIA.filename}の名前を変更する"]`)).toBeNull()
     expect(document.querySelector(`button[aria-label="${MEDIA.filename}を削除"]`)).toBeNull()
     const checkbox = document.querySelector<HTMLInputElement>(`input[aria-label="${MEDIA.filename}を選ぶ"]`)
     expect(checkbox?.disabled).toBe(true)
@@ -293,7 +293,7 @@ async function tryLeave() {
 }
 it('メディア名を編集中は移動前に確認する', async () => {
   await renderPage(); await waitForText(MEDIA.filename); await openCardMenu()
-  await act(async () => { buttonByLabel('名前を変える').click(); await settle() })
+  await act(async () => { buttonByLabel('名前を変更する').click(); await settle() })
   const input = document.querySelector<HTMLInputElement>('input[aria-label="ファイル名"]')!
   await act(async () => { setNativeValue(input, '編集中.png'); await settle() })
   await tryLeave()

@@ -25,6 +25,7 @@ export { default as StickyBarAction } from './sticky-bar-action'
  */
 export default function StickyBar({
   destructive,
+  leadAction,
   status,
   info,
   actions,
@@ -38,6 +39,7 @@ export default function StickyBar({
    * 無ければ左端は空く（中央の位置は変わらない）。
    */
   destructive?: ReactNode
+  leadAction?: ReactNode
   /**
    * いまの状態。「下書き・最終保存 10:24」など。
    * 設計の2画面には無いので、**無い画面を作ってよい。**
@@ -111,6 +113,7 @@ export default function StickyBar({
       <div className={styles.lead} data-sticky-lead>
         {normalizeStickyDestructiveActions(destructive)}
         {status ? <p className={styles.status} title={typeof status === 'string' ? status : undefined}>{status}</p> : null}
+        {leadAction}
         {info ? <div className={styles.info}>{info}</div> : null}
       </div>
       <div className={styles.actions} data-sticky-actions>{sharedActions}</div>

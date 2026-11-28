@@ -11,7 +11,7 @@ import { api, ApiError } from '@/lib/api'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import type { DeliveryMode, MessageType, ScenarioStep } from '@line-crm/shared'
-import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { captureScenarioWriteAccess } from '@/v8/scenarios'
@@ -63,6 +63,8 @@ export function useScenarioStepActions({
 }) {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const mounted = useRef(true)
+  const movingStepRef = useRef(false)
+  const [movingStep, setMovingStep] = useState(false)
   const scope = useRef({ id, accountId: selectedAccountId, scenarioAccountId: scenario?.lineAccountId, accountLoading })
   if (scope.current.id !== id || scope.current.accountId !== selectedAccountId
     || scope.current.scenarioAccountId !== scenario?.lineAccountId || scope.current.accountLoading !== accountLoading) {
@@ -91,6 +93,8 @@ export function useScenarioStepActions({
     setStepSaving(false)
     setDuplicatingStepId(null)
     setDeletingStepId(null)
+    movingStepRef.current = false
+    setMovingStep(false)
   }, [renderedScope, setStepSaving, setDuplicatingStepId, setDeletingStepId])
 
   const openAddStep = () => {
@@ -451,21 +455,30 @@ export function useScenarioStepActions({
   }
 
   const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
-    if (!scenario || !checkWrite(setError)) return
+    if (movingStepRef.current || !scenario || !checkWrite(setError)) return
     const sorted = [...scenario.steps].sort((a, b) => a.stepOrder - b.stepOrder)
     const idx = sorted.findIndex((s) => s.id === stepId)
     const swap = direction === 'up' ? idx - 1 : idx + 1
     if (idx < 0 || swap < 0 || swap >= sorted.length) return
     const a = sorted[idx]
     const b = sorted[swap]
+    movingStepRef.current = true
+    setMovingStep(true)
+    setError('')
     try {
       if (!checkWrite(setError)) return
-      await api.scenarios.reorderSteps(id, [
+      const res = await api.scenarios.reorderSteps(id, [
         { stepId: a.id, stepOrder: b.stepOrder },
         { stepId: b.id, stepOrder: a.stepOrder },
       ])
       if (!checkWrite(setError)) return
-      loadScenario(true)
+      if (!res.success) {
+        setError(res.error || '並び替えに失敗しました。通信を確かめて、もう一度お試しください。')
+        await loadScenario(true)
+        return
+      }
+      await loadScenario(true)
+      if (!currentScope()) return
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
     } catch (saveFailure) {
@@ -475,6 +488,12 @@ export function useScenarioStepActions({
       { if (!fieldFailure)
 
       setError('並び替えに失敗しました。通信を確かめて、もう一度お試しください。') }
+      await loadScenario(true)
+    } finally {
+      if (currentScope()) {
+        movingStepRef.current = false
+        setMovingStep(false)
+      }
     }
   }
 
@@ -485,5 +504,5 @@ export function useScenarioStepActions({
    * 設定内容は「1分後」なのにプレビューが「すぐに」のまま残る（#616 SC-02b）。
    */
 
-  return { saveErrors, handleSaveStep, closeStepForm, openInsertStep, openEditStep, handleMoveStep, handleDuplicateStep, openAddStep, openAddTemplateStep, openAddQuestionStep, handleDeleteStep }
+  return { saveErrors, movingStep, handleSaveStep, closeStepForm, openInsertStep, openEditStep, handleMoveStep, handleDuplicateStep, openAddStep, openAddTemplateStep, openAddQuestionStep, handleDeleteStep }
 }

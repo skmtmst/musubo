@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import CloseButton from '@/components/shared/close-button'
 import { useContentChangeAccess, type ContentChangeAccess } from '@/components/shared/use-content-change-access'
@@ -686,6 +687,8 @@ const TEST_MESSAGE_TYPE_LABEL: Record<string, string> = {
   carousel: 'カルーセル',
 }
 
+export const testMessageKindLabel = (type: string) => knownValue(TEST_MESSAGE_TYPE_LABEL, type, type)
+
 /** 最終確認で本当に必要なチェックの数。文言は選択した相手の名前を含めて組み立てる。 */
 const REQUIRED_CONFIRMATION_COUNT = 2
 
@@ -889,7 +892,7 @@ export function TestSendDialog({
             stepOrder: Number(order),
             displayOrder: 0,
             timing: '',
-            kind: TEST_MESSAGE_TYPE_LABEL[body.messageType] ?? body.messageType,
+            kind: testMessageKindLabel(body.messageType),
           }))
           .sort((a, b) => a.stepOrder - b.stepOrder).map((row, index) => ({ ...row, displayOrder: index + 1 }))
 

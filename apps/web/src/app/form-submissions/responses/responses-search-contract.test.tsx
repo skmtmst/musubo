@@ -140,6 +140,48 @@ describe('N-171/N-179 検索条件の一覧・CSV共有', () => {
       expect(url).toContain(`q=${encodeURIComponent('駐車場')}`)
     }
   })
+
+  it('選んだ期間の回答をCSVに書き出す', async () => {
+    let filename = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { filename = this.download })
+    await act(async () => { root.render(<FormResponsesPage />) })
+    await settle(50)
+    const lastMonth = [...host.querySelectorAll('button')].find((button) => button.textContent === '先月')
+    expect(lastMonth).toBeTruthy()
+    await act(async () => { lastMonth!.click() })
+    await settle(50)
+    fetchUrls.length = 0
+    await act(async () => { csvButton().click() })
+    await settle(50)
+    const exported = fetchUrls.filter((url) => url.includes('/submissions'))
+    expect(exported.length).toBeGreaterThan(0)
+    expect(exported.every((url) => new URL(url, 'http://localhost').searchParams.get('period') === 'last_month')).toBe(true)
+    expect(filename).toContain('フォーム回答_先月')
+  })
+
+  it('CSVの連打を防ぎ、画面を離れると取得を中止する', async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    let resolveExport!: (value: unknown) => void
+    let signal: AbortSignal | undefined
+    fetchApi.mockImplementation((async (url: string, options?: { signal?: AbortSignal }) => {
+      fetchUrls.push(url)
+      if (url.includes('/submissions') && url.includes('limit=200')) {
+        signal = options?.signal
+        return new Promise((resolve) => { resolveExport = resolve })
+      }
+      if (url.includes('/submissions')) return { success: true, data: submissionsPage }
+      return { success: true, data: formDetail }
+    }) as typeof fetchApi)
+    await act(async () => { root.render(<FormResponsesPage />) })
+    await settle(50)
+    await act(async () => { const button = csvButton(); button.click(); button.click() })
+    expect(fetchUrls.filter((url) => url.includes('/submissions') && url.includes('limit=200'))).toHaveLength(1)
+    expect(signal?.aborted).toBe(false)
+    await act(async () => root.unmount())
+    expect(signal?.aborted).toBe(true)
+    await act(async () => { resolveExport({ success: true, data: submissionsPage }) })
+    expect(click).not.toHaveBeenCalled()
+  })
 })
 
 describe('MKQyJ 後処理の札（済み・未完）', () => {

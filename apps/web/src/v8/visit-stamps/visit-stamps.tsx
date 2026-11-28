@@ -457,11 +457,23 @@ function VisitStampsScreen() {
 
   const photoUrl = usePhotoUrl(selectedAccountId, photo?.photo_url)
 
-  if (loadError && cards === null) {
-    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="error" error={loadError} onRetry={() => void loadCards()} /></PageFrame></SaveErrorScope>
-  }
+  const stampTabs = <div className={tpl.tabs} data-template-region="tabs">
+    <Tabs label="来店スタンプの表示" items={STAMP_TABS.map(item => ({
+      id: `visit-stamp-tab-${item.key}`,
+      controls: `visit-stamp-panel-${item.key}`,
+      label: item.label,
+      current: tab === item.key,
+      count: item.key === 'paper' && paper !== null ? paper.filter(row => row.status === 'pending').length : undefined,
+      countTone: item.key === 'paper' && paper?.some(row => row.status === 'pending') ? 'warning' : undefined,
+      onClick: () => selectTab(item.key),
+    }))} />
+  </div>
   if (cards === null) {
-    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}><PageHeading headingSize="regular" title="来店スタンプ" /><ListState kind="loading" /></PageFrame></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><PageFrame kind="visit-stamps" boardId={STAMP_TABS.find(t => t.key === tab)?.board}>
+      <PageHeading headingSize="regular" title="来店スタンプ" />
+      {stampTabs}
+      <div className={tpl.split} data-template-region="body" role="tabpanel" id={`visit-stamp-panel-${tab}`} aria-labelledby={`visit-stamp-tab-${tab}`}>{loadError ? <ListState kind="error" error={loadError} onRetry={() => void loadCards()} /> : <ListState kind="loading" />}</div>
+    </PageFrame></SaveErrorScope>
   }
 
   const ro = !canManage
@@ -484,17 +496,7 @@ function VisitStampsScreen() {
         actions={stampable&&selectedAccountId&&card?.accountIds.includes(selectedAccountId)?<Button variant="primary" onClick={()=>setQrOpen(true)}><QrCode size={16} aria-hidden="true"/>QR を出す</Button>:undefined}
         help="お店に来たお客さまへ押すスタンプカードです。マイル（オンラインでの動きにたまるもの）とは別に数えます。決まった数がたまると特典を使えます。特典はお客さまの LINE の画面を店員に見せ、店員が暗証番号を打つと使用済みになります。"
       />
-      <div className={tpl.tabs} data-template-region="tabs">
-        <Tabs label="来店スタンプの表示" items={STAMP_TABS.map(item => ({
-          id: `visit-stamp-tab-${item.key}`,
-          controls: `visit-stamp-panel-${item.key}`,
-          label: item.label,
-          current: tab === item.key,
-          count: item.key === 'paper' && paper !== null ? paper.filter(row => row.status === 'pending').length : undefined,
-          countTone: item.key === 'paper' && paper?.some(row => row.status === 'pending') ? 'warning' : undefined,
-          onClick: () => selectTab(item.key),
-        }))} />
-      </div>
+      {stampTabs}
       {role === 'viewer' ? <div className={tpl.notice}><ReadOnlyNotice >閲覧のみで見ています。変える操作は管理者に頼んでください。</ReadOnlyNotice></div> : null}
       <div className={tpl.split} data-template-region="body" role="tabpanel" id={`visit-stamp-panel-${tab}`} aria-labelledby={`visit-stamp-tab-${tab}`}>
         <div className={styles.body}>
@@ -503,7 +505,7 @@ function VisitStampsScreen() {
               {/* ① カードの設定 */}
               <section className={styles.card} aria-label="① カードの設定">
                 <SectionTitle extra={canManage ? <RowActions subjectName="カードの設定" menuItems={[
-                  { id: 'stores', label: '押せる店を選ぶ', onSelect: () => setStoresOpen(true) },
+                  { id: 'stores', label: '押せる店を選択する', onSelect: () => setStoresOpen(true) },
                   { id: 'pin', label: '店員の暗証番号', onSelect: () => { setDialogError(''); setPinOpen(true) } },
                 ]} /> : undefined} help="カードの名前・マスの数・期限と、何個で何を渡すか（特典）を決めます。マスの数と特典の個数は別々に決めます（特典はマスの数以下）。特典を使うと、その個数だけスタンプが減ります。">① カードの設定</SectionTitle>
                 <Field label="カードの名前"><SaveErrorField names={["name","issue"]}><TextField {...fieldProps('name')} value={name} onChange={(e) => { setIssue(null); setName(e.target.value) }} readOnly={ro} maxLength={100} /></SaveErrorField>
@@ -565,7 +567,7 @@ function VisitStampsScreen() {
                         <span className={styles.sub}>{rewardNote(reward, settings)}</span>
                       </span>
                       {ro ? null : (
-                        <RowActions subjectName={reward.name} menuItems={[{ id: 'edit', label: '特典を変える', onSelect: () => setRewardEdit(reward) }]}
+                        <RowActions subjectName={reward.name} menuItems={[{ id: 'edit', label: '特典を変更する', onSelect: () => setRewardEdit(reward) }]}
                           destructiveItem={settings.rewards.length > 1 ? { id: 'delete', label: '特典を消す', onSelect: () => set({ rewards: settings.rewards.filter((r) => r.id !== reward.id) }) } : undefined} />
                       )}
                     </div>
@@ -637,7 +639,7 @@ function VisitStampsScreen() {
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています・${multiplierDetail(m)}` : multiplierDetail(m)}</span>
                     </span>
-                    {ro ? null : <RowActions subjectName={multiplierName(m)} menuItems={[{ id: 'edit', label: '倍率を変える', onSelect: () => setMultEdit(i) }]}
+                    {ro ? null : <RowActions subjectName={multiplierName(m)} menuItems={[{ id: 'edit', label: '倍率を変更する', onSelect: () => setMultEdit(i) }]}
                       destructiveItem={{ id: 'delete', label: '倍率を消す', onSelect: () => set({ multipliers: settings.multipliers.filter((_, k) => k !== i) }) }} />}
                   </div>
                 ))}
@@ -647,7 +649,7 @@ function VisitStampsScreen() {
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus} 個` : 'はじめての来店で多めに押します'}</span>
                   </span>
-                  {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
+                  {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変更する', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
                   <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" disabled={ro} onChange={ro ? () => {} : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
@@ -655,7 +657,7 @@ function VisitStampsScreen() {
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>
                   </span>
-                  {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変える', onSelect: () => setRankOpen(true) }]} />}
+                  {ro ? null : <RowActions subjectName="会員ランクの倍率" menuItems={[{ id: 'edit', label: 'ランクと倍率を変更する', onSelect: () => setRankOpen(true) }]} />}
                 </div>
                 <div className={styles.receiptRow}>
                   <span className={styles.texts}>
@@ -865,5 +867,5 @@ function HistoryColumns({ canStamp, expanded, onExpandedChange, children }: {
 }
 
 export default function VisitStampsV8() {
-  return <Suspense fallback={<ListState kind="loading" />}><VisitStampsScreen /></Suspense>
+  return <Suspense fallback={<PageFrame kind="visit-stamps"><PageHeading headingSize="regular" title="来店スタンプ" /><div className={tpl.tabs} data-template-region="tabs"><Tabs label="来店スタンプの表示" items={STAMP_TABS.map(item => ({ label: item.label, current: item.key === 'settings', onClick: () => { const url = new URL(window.location.href); url.searchParams.set('tab', item.key); window.location.assign(url.toString()) } }))} /></div><div className={tpl.split}><ListState kind="loading" /></div></PageFrame>}><VisitStampsScreen /></Suspense>
 }

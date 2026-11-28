@@ -18,7 +18,7 @@ export function isMobileShellPath(pathname: string | null | undefined): boolean 
   return pathname === MOBILE_ROOT || pathname.startsWith(`${MOBILE_ROOT}/`)
 }
 
-export type MobileTabId = 'talk' | 'todo'
+export type MobileTabId = 'today' | 'talk' | 'todo' | 'more'
 
 export type MobileTab = {
   id: MobileTabId
@@ -28,10 +28,12 @@ export type MobileTab = {
   permission: string | null
 }
 
-/** 下のタブ。段①はトークと対応だけ（今日・もっとは作ったら足す）。 */
+/** 下のタブ。権限に応じて見せる。 */
 export const MOBILE_TABS: readonly MobileTab[] = [
+  { id: 'today', label: '今日', href: '/m/today', permission: '/booking/bookings' },
   { id: 'talk', label: 'トーク', href: '/m/chats', permission: '/chats' },
   { id: 'todo', label: '対応', href: '/m/todo', permission: null },
+  { id: 'more', label: 'もっと', href: '/m/more', permission: null },
 ]
 
 /** 今の住所に当たるタブ。どれにも当たらなければ null。 */
@@ -39,10 +41,19 @@ export function mobileTabForPath(pathname: string): MobileTab | null {
   return MOBILE_TABS.find((tab) => pathname === tab.href || pathname.startsWith(`${tab.href}/`)) ?? null
 }
 
-/** 見せてよいタブだけ。権限の確認が済むまで（canView が null）は何も出さない。 */
-export function visibleMobileTabs(canView: ((permission: string) => boolean) | null): MobileTab[] {
+/** 予約画面の鍵は業種で異なる。業種未確認なら判定しない。 */
+export function mobileTodayPermission(style: string | null | undefined): string | null {
+  if (!style) return null
+  return style === 'restaurant' ? '/restaurant-test/reservations' : '/booking/bookings'
+}
+
+/** 見せてよいタブだけ。権限や業種が未確認のタブは表示しない。 */
+export function visibleMobileTabs(canView: ((permission: string) => boolean) | null, style: string | null | undefined): MobileTab[] {
   if (!canView) return []
-  return MOBILE_TABS.filter((tab) => tab.permission === null || canView(tab.permission))
+  return MOBILE_TABS.filter((tab) => {
+    const permission = tab.id === 'today' ? mobileTodayPermission(style) : tab.permission
+    return tab.id === 'today' ? permission !== null && canView(permission) : permission === null || canView(permission)
+  })
 }
 
 /** 会話の住所。友だちの ID で開く（PC の `/chats?friend=` と同じ指定）。 */

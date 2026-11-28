@@ -696,7 +696,7 @@ function CommonVarsListInner() {
   const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
   const folderRows = managedFolderNavRows('common_var', folders, { allId: '', unfiledId: UNGROUPED }).map(row => ({ ...row,
     leadingActions: canWrite && selectedUserFolder?.id === row.id ? [
-      { id: 'edit-folder', label: 'フォルダ名を変える', onSelect: () => folderControlRef.current?.startEdit(selectedUserFolder) },
+      { id: 'edit-folder', label: 'フォルダ名を変更する', onSelect: () => folderControlRef.current?.startEdit(selectedUserFolder) },
       { id: 'delete-folder', label: 'フォルダを削除する', tone: 'danger' as const, onSelect: () => folderControlRef.current?.startDelete(selectedUserFolder) },
     ] : [],
   }))

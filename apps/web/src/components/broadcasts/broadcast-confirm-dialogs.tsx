@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import type { BroadcastSendMode } from './broadcast-schedule'
 
 import type { UnsavedLeaveTarget } from '@/lib/use-unsaved-guard'
@@ -178,7 +180,7 @@ export function renderBroadcastConfirmDialogs({ bDraftUnsupported, canConfirm, c
           ? '同じ時刻の前後 1 時間に別の予約配信があります'
           : sendMode === 'scheduled' ? '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます' : undefined}
       sender={currentStep ? sendPreview.data?.sender ?? null : null}
-      bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
+      bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${knownValue(TYPE_LABELS, bubbles[0]?.type ?? 'text', 'メッセージ')}を送ります`}
       bubbleCount={bubbles.length}
       allRecipients={targetMode === 'all' && !sendPreview.data?.stoppable}
       extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}

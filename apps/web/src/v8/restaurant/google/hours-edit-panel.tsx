@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HOURS_WEEKDAYS, HOURS_SERVICE_LABELS, hoursPeriodsProblem, type HoursWorkspace, type HoursWeekday, type HoursService, type HolidayHoursRule, type OpeningPeriod } from '@line-crm/shared'
 import '@/components/shared/google-hours-tokens.css'
 import Drawer from '@/components/shared/drawer'
@@ -51,6 +51,9 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
  const [question,setQuestion]=useState('')
  const [valid,setValid]=useState(restored?.valid??false)
  const [editing,setEditing]=useState(restored?.editing??false)
+ const aliveRef=useRef(true),parseSeqRef=useRef(0),parsingRef=useRef(false)
+ useEffect(()=>{aliveRef.current=true;return()=>{aliveRef.current=false;parseSeqRef.current+=1;parsingRef.current=false}},[])
+ useEffect(()=>{parseSeqRef.current+=1;parsingRef.current=false;setParsing(false)},[data.store.lineAccountId,panelKey])
  useEffect(()=>{
   if(!draftKey)return
   writeGuideDraft(draftKey,{version:draftVersion,panel:panelKey,weekdays,weekPeriods,weekClosed,dateValue,service,text,parsed,valid,editing} satisfies HoursEditorDraft)
@@ -80,9 +83,15 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
   if(ok)onDraft({...workspace,services:[...workspace.services.filter(s=>s.id!==next.id),next],draft:{...workspace.draft,serviceIds:[...new Set([...workspace.draft.serviceIds,...(panel.kind==='service'&&panel.service?.googleTypeId&&panel.service.googleTypeId!==next.googleTypeId?[`remove:${panel.service.googleTypeId}`]:[]),next.id])],reviewIds:[]}})
  }
  const parse=async()=>{
-  if(!text.trim()||disabled||parsing)return;setParsing(true);setParseError('');setQuestion('')
-  try{const result=await restaurantGoogleApi.proposeHours(data.store.lineAccountId,{source:'text',text:text.trim()});if(result.change){setParsed(result.change);setValid(true);const change=result.change;if(change.kind==='special_hours'){const days=new Map(workspace.draft.days.map(d=>[d.date,d]));for(const day of change.after as import('@line-crm/shared').OpeningDate[])days.set(day.date,day);onDraft({...workspace,draft:{...workspace.draft,days:[...days.values()].sort((a,b)=>a.date.localeCompare(b.date)),reviewIds:[]}})}else if(change.kind==='regular_hours')onDraft({...workspace,draft:{...workspace.draft,weekly:change.after as import('@line-crm/shared').OpeningWeek,reviewIds:[]}})}else setQuestion(result.question??'変更する日付と時間を入力してください。')}
-  catch(e){setParseError(errorMessage(e,'変更案を読み取れませんでした。入力内容は残っています。'))}finally{setParsing(false)}
+  if(!text.trim()||disabled||parsing||parsingRef.current)return
+  const seq=++parseSeqRef.current;parsingRef.current=true;setParsing(true);setParseError('');setQuestion('')
+  try{
+   const result=await restaurantGoogleApi.proposeHours(data.store.lineAccountId,{source:'text',text:text.trim()})
+   if(!aliveRef.current||parseSeqRef.current!==seq)return
+   if((result as {success?:boolean}|null)?.success===false)throw new Error((result as {error?:string}).error||'変更案を読み取れませんでした。入力内容は残っています。')
+   if(result.change){setParsed(result.change);setValid(true);const change=result.change;if(change.kind==='special_hours'){const days=new Map(workspace.draft.days.map(d=>[d.date,d]));for(const day of change.after as import('@line-crm/shared').OpeningDate[])days.set(day.date,day);onDraft({...workspace,draft:{...workspace.draft,days:[...days.values()].sort((a,b)=>a.date.localeCompare(b.date)),reviewIds:[]}})}else if(change.kind==='regular_hours')onDraft({...workspace,draft:{...workspace.draft,weekly:change.after as import('@line-crm/shared').OpeningWeek,reviewIds:[]}})}else setQuestion(result.question??'変更する日付と時間を入力してください。')
+  }catch(e){if(aliveRef.current&&parseSeqRef.current===seq)setParseError(errorMessage(e,'変更案を読み取れませんでした。入力内容は残っています。'))}
+  finally{if(parseSeqRef.current===seq){parsingRef.current=false;if(aliveRef.current)setParsing(false)}}
  }
  return <><Drawer guideSlot="hours.confirm" open title={title} width="hours" headerIcon={false} heightMode="viewport" dirty={localUnsaved} showDirtyIndicator={false} busy={parsing} onClose={onClose} footer={<div className={styles.panelFooter}><span className={styles.muted} role="status">{saving?'下書きを保存しています…':saved&&(!editing||valid)?'入力内容は保存されています':'入力内容を確認してください'}</span><div className={styles.actions}><Button presentation="hours" size="field" onClick={onClose} disabled={saving}>{panel.kind==='text'?'キャンセル':'閉じる'}</Button><Button presentation="hours" size="field" variant="primary" lockedReason={lockedReason} disabled={disabled||saving||!valid} data-guide-anchor="hours.confirm" onClick={onReview}>変更内容を確認</Button></div></div>}>
   <div className={styles.editorSections}>
@@ -107,7 +116,7 @@ export function HoursEditPanel({ panel, data, workspace, holidays, serviceTypes,
     {panel.service?<Button presentation="hours" variant="text" textTone="danger" size="compact" disabled={disabled} lockedReason={lockedReason} onClick={()=>setDeleteOpen(true)}>{service.label}の営業時間を削除</Button>:null}
   </>:<>
     <p className={styles.editorIntro}>変更したい内容を、そのまま入力できます。</p>
-    <TextArea aria-label="文章で入力" value={text} rows={3} maxLength={500} disabled={disabled||!data.aiAvailable} placeholder="例：12月30日から1月3日まで年末年始のため休業。1月4日から通常どおり営業します。" onChange={e=>{setEditing(true);setText(e.target.value);setParsed(null);setValid(false)}} action={data.aiAvailable?<Button presentation="hours" variant="text" size="compact" disabled={disabled||!text.trim()} busy={parsing} onMouseDown={event=>event.preventDefault()} onClick={parse}>{parsed?'変更案を作り直す':'変更案を作る'}</Button>:undefined}/>
+    <TextArea aria-label="文章で入力" value={text} rows={3} maxLength={500} disabled={disabled||!data.aiAvailable} placeholder="例：12月30日から1月3日まで年末年始のため休業。1月4日から通常どおり営業します。" onChange={e=>{parseSeqRef.current+=1;parsingRef.current=false;setParsing(false);setEditing(true);setText(e.target.value);setParsed(null);setParseError('');setQuestion('');setValid(false)}} action={data.aiAvailable?<Button presentation="hours" variant="text" size="compact" disabled={disabled||!text.trim()} busy={parsing} onMouseDown={event=>event.preventDefault()} onClick={parse}>{parsed?'変更案を作り直す':'変更案を作る'}</Button>:undefined}/>
     {!data.aiAvailable?<p className={styles.muted}>文章で入力できる環境ではありません。日付を選んで変更できます。</p>:null}
     {question?<Notice tone="info">{question}</Notice>:null}{parseError?<Notice tone="danger">{parseError}</Notice>:null}
     {parsed?<HoursTextProposal change={parsed} data={data} workspace={workspace} holidays={holidays} onEditDates={onEditDates}/>:null}

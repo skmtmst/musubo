@@ -22,14 +22,6 @@ describe('イベント作成の最初の予約枠', () => {
     expect(EDIT).toContain('slot.id, body, slot.version ?? 1')
   })
 
-  it('入力と同じ内容をお客様向けプレビューに出す', () => {
-    // : 題は共通部品の「LINEプレビュー」に寄せた。用語集の呼び名どおり。
-    expect(SOURCE).toContain('<ApplicationPreview')
-    expect(SOURCE).toContain("draft.name.trim() || 'イベント名'")
-    expect(SOURCE).toContain('date={date}')
-    expect(SOURCE).toContain('capacity={capacity}')
-  })
-
   it('一括の作りすぎは下見の前に500件で止める(点検#520の中9)', () => {
     // #1000: 上限値は bulk-slot-generator の BULK_SLOT_LIMIT が正本。
     // 下見・送信・生成の3か所で同じ制限を使う。

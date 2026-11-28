@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -266,7 +268,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
         ? <TableStateRow colSpan={6} kind="loading" title="記録を読み込んでいます…" />
         : visible.length === 0
           ? <TableStateRow colSpan={6} kind="empty" title="条件に合う記録はありません。条件を変えてお試しください。" />
-          : visible.map((row) => <Tr key={row.id} interactive><Td><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></Td><Td className={`truncate font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</Td><Td className="truncate text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</Td><Td className="truncate text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</Td><Td className={`truncate ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</Td><ActionCell><Button variant="secondary" onClick={() => setDetail(row)}>開く</Button></ActionCell></Tr>)}</tbody></DataTable></div>}
+          : visible.map((row) => <Tr key={row.id} interactive><Td><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? knownValue(ROLE_LABELS, row.actor.role, row.actor.role) : '権限を取得できませんでした'}</p></Td><Td className={`truncate font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</Td><Td className="truncate text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</Td><Td className="truncate text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</Td><Td className={`truncate ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</Td><ActionCell><Button variant="secondary" onClick={() => setDetail(row)}>開く</Button></ActionCell></Tr>)}</tbody></DataTable></div>}
     {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><ListRange label="記録" total={total} first={first} last={last} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /></div>}
     <Dialog
       open={detail !== null}

@@ -123,7 +123,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /タグを付ける/ })))
     const dialog = screen.getByRole('dialog', { name: 'タグを選ぶ' })
     await act(async () => fireEvent.click(within(dialog).getByRole('checkbox', { name: '会員' })))
-    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: '選ぶ（1件）' })))
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: '選択する（1件）' })))
     await settle(50)
     // acc-2（タグ「予約」だけ）へ切り替える
     accountState.id = 'acc-2'
@@ -145,7 +145,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     window.history.replaceState({}, '', '/rich-menus/new')
     await act(async () => root.render(<NewRichMenuPage />))
     await settle(100)
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' })))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' })))
     const picker = screen.getByRole('button', { name: '登録画像を選ぶ（試験）' })
     expect(picker.getAttribute('data-media-account')).toBe('acc-1')
     await act(async () => fireEvent.click(picker))

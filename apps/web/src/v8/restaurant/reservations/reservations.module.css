@@ -67,7 +67,9 @@
   min-width: 0;
 }
 
+.datePicker { width: var(--tpl-rs-date-picker-width); flex: none; }
 .calendarWrap {
+  container-type: inline-size;
   flex: 1 1 0;
   min-width: 0;
 }
@@ -163,10 +165,10 @@
 /* 右の4枚 */
 .side {
   display: flex;
-  flex: 0 0 var(--tpl-board-side-w);
+  flex: 0 0 var(--tpl-rs-rsv-side-min);
   flex-direction: column;
   gap: var(--tpl-rs-panel-head-gap);
-  min-width: var(--tpl-board-side-w);
+  min-width: var(--tpl-rs-rsv-side-min);
 }
 
 .sideCard {
@@ -552,7 +554,7 @@
 .noteCell { display: block; min-height: calc(var(--tpl-rs-lh-12) + var(--tpl-rs-lh-11) + var(--tpl-rs-panel-head-text-gap)); }
 
 .formError, .formErrorNoticePlacement { margin: 0; }
-@container (max-width: 1100px) { .todayColumns > .side { display:none; } }
+@container (max-width: 1100px) { .todayColumns > .calendarWrap, .todayColumns > .side { flex-basis: 100%; min-width: 0; } }
 
 .sourcePicker{margin-left:auto;}
 
@@ -571,3 +573,9 @@
 
 .filterField[data-filter='period'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-period-w); }
 .filterField[data-filter='status'] { --tpl-rs-rsv-filter-w: var(--tpl-rs-rsv-status-w); }
+
+.sideHeader { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-row); min-width: 0; }
+.sideHeader h3 { margin: 0; font-size: var(--text-callout); font-weight: var(--font-weight-bold); }
+.sideHeader > button { margin-inline-start: auto; }
+
+.sideLinks { display: grid; gap: var(--polish-space-row); }

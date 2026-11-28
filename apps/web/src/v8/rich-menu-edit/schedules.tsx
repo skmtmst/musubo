@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import Dialog from '@/components/shared/dialog'
@@ -27,6 +27,7 @@ export default function RichMenuSchedules({ groupId, canOperate, restoreMenus }:
   const [open, setOpen] = useState(false)
   const [schedules, setSchedules] = useState<Schedule[] | null>(null)
   const [error, setError] = useState('')
+  const [errorRetryable, setErrorRetryable] = useState(true)
   const [notice, setNotice] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const cancelling = useRef(false)
@@ -39,13 +40,26 @@ export default function RichMenuSchedules({ groupId, canOperate, restoreMenus }:
       if (!res.success || !Array.isArray(res.data)) throw new Error('schedule response')
       setSchedules(res.data)
       setError('')
-    } catch {
+      setErrorRetryable(true)
+    } catch (e) {
       if (request !== generation.current) return
-      setError('公開予約の一覧を読み込めませんでした。時間をおいて、もう一度お試しください。')
+      if (e instanceof ApiError && e.status === 403) {
+        setError('公開予約の一覧を見る権限がありません。')
+        setErrorRetryable(false)
+      } else {
+        setError('公開予約の一覧を読み込めませんでした。時間をおいて、もう一度お試しください。')
+        setErrorRetryable(true)
+      }
     }
   }, [groupId])
   useEffect(() => {
-    if (open) void load()
+    if (open) {
+      setSchedules(null)
+      setError('')
+      setErrorRetryable(true)
+      setNotice('')
+      void load()
+    }
     return () => { generation.current += 1 }
   }, [open, load])
 
@@ -83,14 +97,14 @@ export default function RichMenuSchedules({ groupId, canOperate, restoreMenus }:
     <Dialog open={open} title="公開予約の一覧" size="large" cancelLabel="閉じる" onCancel={() => { if (!cancelling.current) setOpen(false) }}>
       <div className={styles.stack}>
         {notice ? <Notice tone={notice === '予約を取り消しました。' ? 'success' : 'warn'} message={notice} /> : null}
-        {error ? <Notice tone="danger" message={error} action={<Button type="button" variant="text" size="inline" onClick={() => void load()}>再試行</Button>} />
+        {error ? <Notice tone="danger" message={error} action={errorRetryable ? <Button type="button" variant="text" size="inline" onClick={() => { setError(''); setSchedules(null); void load() }}>再試行</Button> : undefined} />
           : schedules === null ? <p className={styles.cardNote} role="status">読み込み中…</p>
             : schedules.length === 0 ? <p className={styles.cardNote}>まだ公開予約はありません。日時を決めて予約するとここに出ます。</p>
               : <DataTable label="公開予約の一覧">
                 <thead><TableHeadRow><Th>開始・終了</Th><Th>状態・戻し先</Th><Th>操作</Th></TableHeadRow></thead>
                 <tbody>{schedules.map(item => <Tr key={item.id}>
                   <Td>{formatDateTime(item.startsAt)}{item.mode === 'period' && item.endsAt ? ` 〜 ${formatDateTime(item.endsAt)}` : ''}</Td>
-                  <Td><p title={item.status === 'failed' ? item.lastErrorCode?.slice(0, 40) : undefined}>{STATUS[item.status] ?? '状態を確認しています'}</p>
+                  <Td><p title={item.status === 'failed' ? item.lastErrorCode?.slice(0, 40) : undefined}>{Object.prototype.hasOwnProperty.call(STATUS, item.status) ? STATUS[item.status] : '状態を確認しています'}</p>
                     {restoreText(item) ? <p className={styles.cardNote}>{restoreText(item)}</p> : null}
                     {item.nextRetryAt ? <p className={styles.cardNote}>次回 {formatDateTime(item.nextRetryAt)}</p> : null}</Td>
                   <Td>{item.status === 'scheduled' ? <PermissionGatedButton allowed={canOperate} type="button" size="compact" disabled={cancellingId !== null} busy={cancellingId === item.id} busyLabel="取消中…" onClick={() => void cancelSchedule(item.id)}>予約を取り消す</PermissionGatedButton> : null}</Td>

@@ -235,3 +235,9 @@ it('開けない行は白のまま札だけ赤で、件数の札は表の上', a
   // 表の下に赤い文は出さない（添え文は札の横の1か所だけ）。
   expect(view.container.textContent?.match(/押しても何も出ません/g)?.length).toBe(1)
 })
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('知らないマニュアルの状態 %s は確認できないと表示する', async status => {
+  mocks.list.mockResolvedValue({ success: true, data: { items: [{ ...link, status }], total: 1 } })
+  render(<ManualLinksScreen />)
+  expect(await screen.findByText('状態を確認できません')).toBeTruthy()
+})

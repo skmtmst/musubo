@@ -39,7 +39,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 async function ready() { render(React.createElement(LineFollowupV8)); await screen.findByRole('article', { name: '予約の回答フォーム' }) }
 const postVisit = () => screen.getByRole('article', { name: RESTAURANT_FOLLOWUP_LABELS.post_visit })
-async function editPostVisit() { await ready(); fireEvent.click(within(postVisit()).getByRole('button', { name: '変える' })); await screen.findByRole('dialog') }
+async function editPostVisit() { await ready(); fireEvent.click(within(postVisit()).getByRole('button', { name: '変更する' })); await screen.findByRole('dialog') }
 
 describe('LINE来店フォローの接続後の契約', () => {
   it('8枚のカードと7つのスイッチを保ち、来店後は保存済みの時期と本文を描く', async () => {
@@ -49,7 +49,7 @@ describe('LINE来店フォローの接続後の契約', () => {
     expect(within(screen.getByRole('article', { name: '予約の回答フォーム' })).queryByRole('switch')).toBeNull()
     for (const name of Object.values(RESTAURANT_FOLLOWUP_LABELS)) expect(screen.getByRole('article', { name })).toBeTruthy()
     expect(within(postVisit()).getByText('退店から3時間後に送る')).toBeTruthy()
-    fireEvent.click(within(postVisit()).getByRole('button', { name: '変える' }))
+    fireEvent.click(within(postVisit()).getByRole('button', { name: '変更する' }))
     expect(screen.getByRole('textbox', { name: '本文' }).textContent).toBe('ありがとうございました')
     expect((screen.getByRole('spinbutton', { name: 'きっかけから待つ時間' }) as HTMLInputElement).value).toBe('3')
     expect(fixture.read).toHaveBeenCalledWith('account-1', 'store-1')

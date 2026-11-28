@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * 1通目の入力欄と、保存されている通（ScenarioStep）のあいだの変換。
  *
@@ -208,7 +209,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 
 export function messageKindLabel(type: string): string {
-  return KIND_LABEL[type] ?? type
+  return knownValue(KIND_LABEL, type, type)
 }
 
 /**

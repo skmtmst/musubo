@@ -108,6 +108,7 @@ it('自分の行の「二段階認証を解除する」で、止まる物と戻�
   fireEvent.click(await screen.findByRole('menuitem', { name: '二段階認証を解除する' }))
   const dialog = await screen.findByRole('dialog', { name: 'ログイン中の人 の二段階認証を解除しますか？' })
   expect(dialog.textContent).toContain('ログイン中の人 の二段階認証を解除しますか？')
+  expect(dialog.querySelector('[data-dialog-actions]')).not.toBeNull()
   expect(dialog.textContent).toContain('LINEログインだけでログインできるようになります。')
   expect(dialog.textContent).toContain('あとから「二段階認証を設定する」で、設定し直せます。')
 })

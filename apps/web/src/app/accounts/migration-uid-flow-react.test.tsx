@@ -808,7 +808,7 @@ it.each(['legacy', 'v8'])('移行先を未選択で開き、候補の状態とID
   expect(text).toContain('現役 · ID: active-id')
   expect(text.indexOf('現役 · ID: active-id')).toBeLessThan(text.indexOf('保管済み · ID: archive-id'))
   expect(within(dialog).queryByRole('radio', { name: '移行先アカウントを選択' })).toBeNull()
-  const choose = within(dialog).getByRole('button', { name: '選ぶ', exact: true }) as HTMLButtonElement
+  const choose = within(dialog).getByRole('button', { name: '選択する', exact: true }) as HTMLButtonElement
   expect(choose.disabled).toBe(true)
   const candidates = within(dialog).getAllByRole('radio')
   expect(candidates).toHaveLength(2)

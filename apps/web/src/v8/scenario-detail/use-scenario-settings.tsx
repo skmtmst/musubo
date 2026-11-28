@@ -6,7 +6,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { api, ApiError } from '@/lib/api'
 import type { ScenarioTriggerType } from '@line-crm/shared'
 import type { Dispatch, SetStateAction } from 'react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ScenarioWithSteps } from './detail-model'
 import type { ScenarioConfirmation } from '@/lib/api/types/scenarios'
 
@@ -50,11 +50,34 @@ export function useScenarioSettings({
   setDuplicateOpen: Dispatch<SetStateAction<boolean>>
   setEditForm: Dispatch<SetStateAction<{ name: string; description: string; triggerType: ScenarioTriggerType; isActive: boolean; allowConcurrent: boolean; folderId: string; }>>
 }) {
+  const mounted = useRef(true)
+  const scope = useRef({ id, accountId: scenario?.lineAccountId ?? null, generation: 0 })
+  if (scope.current.id !== id || (scope.current.accountId !== null && (scenario?.lineAccountId ?? null) !== null && scope.current.accountId !== (scenario?.lineAccountId ?? null))) {
+    scope.current = { id, accountId: scenario?.lineAccountId ?? null, generation: scope.current.generation + 1 }
+  } else if (scope.current.accountId === null && scenario?.lineAccountId) {
+    scope.current.accountId = scenario.lineAccountId
+  }
+  const prevIdRef = useRef(id)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  useEffect(() => {
+    if (prevIdRef.current === id) return
+    prevIdRef.current = id
+    setSaving(false)
+    setStartBusy(false)
+    setStopBusy(false)
+  }, [id, setSaving, setStartBusy, setStopBusy])
+
   const handleSaveScenario = async () => {
     if (!editForm.name.trim()) return
+    const targetId = id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.id === targetId && scope.current.generation === targetGeneration
     setSaving(true)
     try {
-      const res = await api.scenarios.update(id, {
+      const res = await api.scenarios.update(targetId, {
         name: editForm.name,
         description: editForm.description || null,
         folderId: editForm.folderId || null,
@@ -62,6 +85,7 @@ export function useScenarioSettings({
         isActive: editForm.isActive,
         allowConcurrent: editForm.allowConcurrent,
       })
+      if (!sameScope()) return
       if (res.success) {
         setEditing(false)
         setRenameOpen(false)
@@ -71,6 +95,7 @@ export function useScenarioSettings({
         setError(res.error)
       }
     } catch (caught) {
+      if (!sameScope()) return
       const fieldFailure = saveErrors.capture(caught)
       /*
        * ★V8 ：ほかの人が先に保存していた（409）。入力は残し、帯で知らせて
@@ -79,9 +104,11 @@ export function useScenarioSettings({
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(true)
         try {
-          const latest = await api.scenarios.get(id)
+          const latest = await api.scenarios.get(targetId)
+          if (!sameScope()) return
           if (latest.success) setConflictLatest(latest.data as ScenarioWithSteps)
         } catch (saveFailure) {
+          if (!sameScope()) return
           saveErrors.capture(saveFailure)
           // 最新が取れなくても帯は出す。「最新を読み込んで続ける」で取り直せる。
         }
@@ -91,7 +118,7 @@ export function useScenarioSettings({
         setError('保存に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
-      setSaving(false)
+      if (sameScope()) setSaving(false)
     }
   }
 
@@ -127,10 +154,14 @@ export function useScenarioSettings({
    */
   const handleStart = async () => {
     if (!scenario || startBusy || !startConfirmed) return
+    const targetId = id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.id === targetId && scope.current.generation === targetGeneration
     setStartBusy(true)
     setStartError('')
     try {
-      const res = await api.scenarios.update(id, { isActive: true })
+      const res = await api.scenarios.update(targetId, { isActive: true })
+      if (!sameScope()) return
       if (!res.success) {
         setStartError(res.error)
         return
@@ -141,12 +172,13 @@ export function useScenarioSettings({
       loadScenario(true)
       reloadStats()
     } catch (saveFailure) {
+      if (!sameScope()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setStartError('配信を始められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
-      setStartBusy(false)
+      if (sameScope()) setStartBusy(false)
     }
   }
 
@@ -158,11 +190,15 @@ export function useScenarioSettings({
    */
   const handleStop = async () => {
     if (!scenario || stopBusy || !stopConfirmation || !stopConfirmationValid()) return
+    const targetId = id
+    const targetGeneration = scope.current.generation
+    const sameScope = () => mounted.current && scope.current.id === targetId && scope.current.generation === targetGeneration
     setStopBusy(true)
     setStopError('')
     try {
       if (!stopConfirmationValid()) return
-      const res = await api.scenarios.update(id, { isActive: false, expectedContentRevision: stopConfirmation.contentRevision, expectedSubscriptions: { activeCount: stopConfirmation.activeCount, rowIdSum: stopConfirmation.rowIdSum, rowIdSquareSum: stopConfirmation.rowIdSquareSum } })
+      const res = await api.scenarios.update(targetId, { isActive: false, expectedContentRevision: stopConfirmation.contentRevision, expectedSubscriptions: { activeCount: stopConfirmation.activeCount, rowIdSum: stopConfirmation.rowIdSum, rowIdSquareSum: stopConfirmation.rowIdSquareSum } })
+      if (!sameScope()) return
       if (!res.success) {
         setStopError(res.error)
         return
@@ -172,12 +208,13 @@ export function useScenarioSettings({
       loadScenario(true)
       reloadStats()
     } catch (saveFailure) {
+      if (!sameScope()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setStopError('配信を止められませんでした。通信を確かめて、もう一度お試しください。') }
     } finally {
-      setStopBusy(false)
+      if (sameScope()) setStopBusy(false)
     }
   }
 

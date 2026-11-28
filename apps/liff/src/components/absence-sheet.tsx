@@ -28,6 +28,7 @@ export default function AbsenceSheet({ booking, onClose, onDone }: {
   onDone: (result: { credit: MakeupCredit | null; reason?: string }) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   /* 二重に押しても 1 回だけ（同じキーで送り直す）。 */
   const key = useRef(crypto.randomUUID());
@@ -36,15 +37,20 @@ export default function AbsenceSheet({ booking, onClose, onDone }: {
   const when = mdHm(booking.slot_starts_at);
 
   async function run() {
-    if (busy) return;
+    if (sending.current) return;
+    sending.current = true;
     setBusy(true); setError(null);
     try {
       const res = await api.eventAbsence(booking.id, key.current);
+      if (!res || !(res.credit === null || (res.credit && typeof res.credit.id === 'string' && res.credit.id.trim()))) {
+        setError('欠席の結果を確認できませんでした。もう一度お試しください。');
+        return;
+      }
       onDone({ credit: res.credit, reason: res.credit ? undefined : absenceReasonMessage(res.reason_if_none) });
     } catch (e) {
       logFailure('event-absence', e);
       setError('欠席を送れませんでした。もう一度お試しください。');
-    } finally { setBusy(false); }
+    } finally { sending.current = false; setBusy(false); }
   }
 
   return (

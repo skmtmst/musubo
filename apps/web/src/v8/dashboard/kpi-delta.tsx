@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react'
 import { kpiChangeTone, type KpiBetterDirection } from '@line-crm/shared'
 import DeltaChip from '@/components/shared/delta-chip'
 import StatusBadge from '@/components/shared/status-badge'
@@ -42,6 +42,6 @@ export default function KpiDelta({ current, previous, better, unit, basis = SAME
     </span>
   }
   return <span data-kpi-delta={tone} title={text.reading}>
-    <StatusBadge tone="neutral" size="compact" dot={false}>{tone === 'flat' ? <ArrowRight size={16} aria-hidden="true" /> : null}{body}</StatusBadge>
+    <StatusBadge tone="neutral" size="compact" dot={false}>{diff === 0 ? <ArrowRight size={16} aria-hidden="true" /> : diff > 0 ? <ArrowUp size={16} aria-hidden="true" /> : <ArrowDown size={16} aria-hidden="true" />}{body}</StatusBadge>
   </span>
 }

@@ -61,7 +61,7 @@ it('既存画像と差し替え・消去・URL・登録メディアの口を残�
   const { container } = render(<MediaSlot title={title} value="https://cdn.test/old.png" onFile={vi.fn()} onChange={onChange} onRemove={onRemove} onUrl={onUrl} onMediaPick={onMediaPick} controlsBelow lockedReason={reason} />)
   const open = vi.spyOn(input(container), 'click')
   expect(screen.getByRole('img').getAttribute('src')).toBe('https://cdn.test/old.png')
-  for (const name of ['差し替える', '消す', 'URL で入れる', '登録メディアから選ぶ']) {
+  for (const name of ['差し替える', '消す', 'URL で入れる', '登録メディアから選択する']) {
     const button = screen.getByRole('button', { name }) as HTMLButtonElement
     expect(button.disabled).toBe(false)
     expect(button.tabIndex).toBe(0)
@@ -176,10 +176,10 @@ it('口が未指定なら権限属性・余分な包み・Tabの変更を足さ�
   expect(view.container.querySelector('[data-permission-locked], [hidden], [aria-disabled]')).toBeNull()
   const buttons = screen.getAllByRole('button') as HTMLButtonElement[]
   expect(buttons.map((button) => [button.textContent, button.disabled, button.tabIndex])).toEqual([
-    ['差し替える', false, 0], ['消す', false, 0], ['URL で入れる', false, 0], ['登録メディアから選ぶ', false, 0],
+    ['差し替える', false, 0], ['消す', false, 0], ['URL で入れる', false, 0], ['登録メディアから選択する', false, 0],
   ])
   fireEvent.click(screen.getByRole('button', { name: 'URL で入れる' }))
-  fireEvent.click(screen.getByRole('button', { name: '登録メディアから選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: '登録メディアから選択する' }))
   fireEvent.click(screen.getByRole('button', { name: '消す' }))
   expect(onUrl).toHaveBeenCalledExactlyOnceWith()
   expect(onMediaPick).toHaveBeenCalledExactlyOnceWith()

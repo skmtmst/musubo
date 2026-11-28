@@ -62,3 +62,42 @@ it('時間帯の軸は等間隔を守り、最後の棒も読み上げられる'
  expect(labels).toEqual(Array.from({ length: 12 }, (_, i) => `${i * 2}時台`))
  expect(screen.getByRole('button', { name: '23時台 23' })).toBeTruthy()
 })
+
+it('summary棒グラフでも列幅を超える両端ラベルは枠内へ寄せ、短い月名は中央を保つ', async () => {
+ let width = 852
+ let resized: () => void = () => {}
+ vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+  const edge = this.getAttribute('data-axis-edge')
+  if (edge === 'first') return { x: 0, y: 0, top: 0, left: 0, right: 35.5, bottom: 16, width: 35.5, height: 16, toJSON: () => ({}) }
+  if (edge === 'last') return { x: 0, y: 0, top: 0, left: 0, right: 107.5, bottom: 16, width: 107.5, height: 16, toJSON: () => ({}) }
+  return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: 100, width, height: 100, toJSON: () => ({}) }
+ })
+ vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resized = callback } observe() {} disconnect() {} })
+ const daily = Array.from({ length: 30 }, (_, i) => ({
+  key: String(i),
+  label: i === 29 ? '10/01（反映待ち）' : `09/${String(i + 2).padStart(2, '0')}`,
+  value: 10 + i,
+ }))
+ const { container, unmount } = render(<ValueBarChart label="日別クリック数の推移" presentation="summary" unit="クリック" items={daily} />)
+ expect(container.querySelector('[data-axis-edge="first"]')?.getAttribute('data-axis-clamp')).toBe('first')
+ expect(container.querySelector('[data-axis-edge="last"]')?.getAttribute('data-axis-clamp')).toBe('last')
+ unmount()
+
+ // 短い月名（7本・広めの棒）は中央揃えのまま内寄せしない
+ width = 520
+ vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+  const edge = this.getAttribute('data-axis-edge')
+  if (edge === 'first') return { x: 0, y: 0, top: 0, left: 0, right: 20, bottom: 16, width: 20, height: 16, toJSON: () => ({}) }
+  if (edge === 'last') return { x: 0, y: 0, top: 0, left: 0, right: 26, bottom: 16, width: 26, height: 16, toJSON: () => ({}) }
+  return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: 100, width, height: 100, toJSON: () => ({}) }
+ })
+ const months = Array.from({ length: 7 }, (_, i) => ({ key: `${i + 4}月`, label: `${i + 4}月`, value: (i + 1) * 1000 }))
+ const shortView = render(<ValueBarChart label="月ごとの売上" presentation="summary" unit="円" items={months} />)
+ expect(shortView.container.querySelector('[data-axis-edge="first"]')?.getAttribute('data-axis-clamp')).toBeNull()
+ expect(shortView.container.querySelector('[data-axis-edge="last"]')?.getAttribute('data-axis-clamp')).toBeNull()
+ // 幅が極端に狭まり列幅をラベルが超えたら動的に内寄せへ切り替わる
+ width = 140
+ const { act } = await import('@testing-library/react')
+ act(() => resized())
+ expect(shortView.container.querySelector('[data-axis-edge="last"]')?.getAttribute('data-axis-clamp')).toBe('last')
+})

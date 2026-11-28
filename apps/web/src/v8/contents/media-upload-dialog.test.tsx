@@ -134,6 +134,15 @@ it('コース写真では残り枚数の範囲で画像だけ登録し、登録�
 const png = (name: string) => new File(['x'], name, { type: 'image/png' })
 
 describe('メディアを入れる窓', () => {
+  it('登録できるファイルが必要な理由を示し、選ぶと登録できる', async () => {
+    await render()
+    expect(dialog().textContent).toContain('登録できるファイルを選んでください。')
+    expect(dialog().querySelector<HTMLButtonElement>('button[disabled]')?.textContent).toContain('0件を登録する')
+    await pick(png('example.png'))
+    expect(dialog().textContent).not.toContain('登録できるファイルを選んでください。')
+    await press('1件を登録する')
+    expect(calls.prepare).toHaveLength(1)
+  })
   it('LINEで送れる大きさと、保存先へ直接送ることを先に書く', async () => {
     await render()
     const text = dialog().textContent ?? ''

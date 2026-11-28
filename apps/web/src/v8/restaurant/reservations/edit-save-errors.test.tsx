@@ -157,7 +157,7 @@ it.each(['同じ版', '別の版'] as const)('今日の自動更新が%sでも�
     fixture.updateReservation.mockRejectedValueOnce(new ApiError(409, reason, 'availability_conflict'))
     render(<TestPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変更する' }))
     const dialog = screen.getByRole('dialog')
     const input = within(dialog).getByLabelText('人数') as HTMLInputElement
     fireEvent.change(input, { target: { value: '9' } })
@@ -208,7 +208,7 @@ it('今日の一覧から予約が消えても編集内容を保ち保存を止�
   try {
     render(<TestPage />)
     fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
-    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変更する' }))
     const dialog = screen.getByRole('dialog')
     const input = within(dialog).getByLabelText('人数') as HTMLInputElement
     fireEvent.change(input, { target: { value: '9' } })
@@ -225,7 +225,7 @@ it('今日の一覧から予約が消えても編集内容を保ち保存を止�
 it('今日の見方で版競合後に日別と全体が更新されても入力を残す', async () => {
   render(<TestPage />)
   fireEvent.click(await screen.findByRole('button', { name: /^見本 114 2名/ }))
-  fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+  fireEvent.click(await screen.findByRole('button', { name: '内容を変更する' }))
   const dialog = screen.getByRole('dialog')
   const input = within(dialog).getByLabelText('人数') as HTMLInputElement
   fireEvent.change(input, { target: { value: '9' } })
@@ -255,7 +255,7 @@ it('今日以外の予約を詳細リンクから開いても編集できる', a
   window.history.replaceState({}, '', '?id=r4')
   try {
     render(<TestPage />)
-    fireEvent.click(await screen.findByRole('button', { name: '内容を変える' }))
+    fireEvent.click(await screen.findByRole('button', { name: '内容を変更する' }))
     const dialog = screen.getByRole('dialog')
     expect((within(dialog).getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(false)
     expect(within(dialog).queryByText(/別の操作で予約が変更されたか/)).toBeNull()

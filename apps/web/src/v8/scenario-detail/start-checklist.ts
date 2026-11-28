@@ -28,13 +28,15 @@ type ScenarioForCheck = Pick<Scenario, 'triggerType'> & {
  * - 送信枠：**LINE側の残枠を読む口がこの画面に無い**ので `unknown`
  */
 export function startChecklist(scenario: ScenarioForCheck): StartCheckItem[] {
-  const steps = scenario.stepCount
+  const hasTrigger = typeof scenario.triggerType === 'string' && scenario.triggerType.trim().length > 0
+  const rawSteps = scenario.stepCount
+  const steps = typeof rawSteps === 'number' && Number.isFinite(rawSteps) && rawSteps >= 0 ? Math.floor(rawSteps) : undefined
 
   return [
     {
       label: '開始条件が設定されています',
-      state: scenario.triggerType ? 'ok' : 'warn',
-      detail: scenario.triggerType
+      state: hasTrigger ? 'ok' : 'warn',
+      detail: hasTrigger
         ? 'きっかけが決まっています'
         : 'きっかけが決まっていません。編集画面で選んでください',
     },

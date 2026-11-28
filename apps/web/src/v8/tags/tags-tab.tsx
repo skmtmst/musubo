@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import { DetailContent, DetailFields } from '@/components/shared/detail-content'
@@ -83,7 +84,7 @@ const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   manual: '手動',
   birthday: '誕生日のきまり',
 }
-const sourceLabel = (tag: Tag): string => (tag.assignSource ? SOURCE_LABELS[tag.assignSource] : emptyValue('unknown'))
+export const sourceLabel = (tag: Tag): string => (tag.assignSource ? knownValue(SOURCE_LABELS, tag.assignSource, '付け方を確認できません') : emptyValue('unknown'))
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -281,8 +282,15 @@ export default function TagsTab({
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return
       // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
       if (!tags.success) throw new Error(tags.error)
+      if (!Array.isArray(tags.data)) throw new Error('タグの応答を確認できません')
       setItems(tags.data)
-      if (folders.success) setGroups(folders.data)
+      if (folders.success && Array.isArray(folders.data)) {
+        setGroups(folders.data)
+        setFolderError('')
+      } else {
+        setGroups([])
+        setFolderError('フォルダを読み込めませんでした。')
+      }
       setStatus('ready')
     } catch (reason) {
       if (!isCurrentTagListRequest(loadRequestRef.current, request)) return

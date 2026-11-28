@@ -1,4 +1,5 @@
 'use client'
+import { SAVED_VIEWS_LOAD_ERROR } from './use-inbox-saved-views'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { formatNumber } from '@/lib/format'
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
@@ -22,7 +23,8 @@ import { api, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
 import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
-import { InboxChannelTabs } from './inbox-channel-tabs';
+import { InboxChannelTabs, type InboxChannelTabsState, type UnconfiguredInboxChannel } from './inbox-channel-tabs';
+import { InboxChannelSetupGuide } from './inbox-empty-guide';
 import { ArrowUpDown, Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -100,9 +102,13 @@ type Props = {
   loadingMoreEmails: boolean
   sortOrder: InboxSort
   setSortOrder: (next: InboxSort) => void
+  channelTabs: InboxChannelTabsState
+  unconfiguredChannel: UnconfiguredInboxChannel
+  narrowDesktop: boolean
+  staffRole: string | null
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder, channelTabs, unconfiguredChannel, narrowDesktop, staffRole }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
@@ -110,6 +116,14 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const sortButtonRef = useRef<HTMLButtonElement>(null)
   const savedSearchRef = useRef<HTMLDivElement>(null)
+  const [, setClock] = useState(() => Date.now())
+  const clock = Date.now()
+  useEffect(() => {
+    const refreshClock = () => { if (document.visibilityState === 'visible') setClock(Date.now()) }
+    const timer = window.setInterval(refreshClock, 60_000)
+    document.addEventListener('visibilitychange', refreshClock)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refreshClock) }
+  }, [])
   useEffect(() => {
     if (!savedViewsOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -176,7 +190,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             <SavedSearchMenuSurface data-saved-views-panel>
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
-                {savedViews.length === 0 ? (
+                {savedViews.length === 0 ? savedViewError === SAVED_VIEWS_LOAD_ERROR ? null : (
                   <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-3 text-xs">
                     まだ保存した検索はありません。
                   </p>
@@ -247,6 +261,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   今の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
+                {savedViewError === SAVED_VIEWS_LOAD_ERROR ? <Button variant="text" onClick={() => void loadSavedViews()}>もう一度読み込む</Button> : null}
               </div>
             </SavedSearchMenuSurface>
           </MenuPortal>
@@ -280,7 +295,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           </>
         ) : null}
       </InboxListHeadline>
-      <InboxChannelTabs />
+      <InboxChannelTabs state={channelTabs} />
       <SavedViewDialog
         open={saveDialogOpen}
         emailInboxEnabled={emailInboxEnabled}
@@ -371,6 +386,19 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
     ) : null}
     {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
     <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
+        {unconfiguredChannel ? (
+          narrowDesktop ? (
+            <div data-inbox-list-state="empty">
+              <InboxChannelSetupGuide
+                channel={unconfiguredChannel}
+                staffRole={staffRole}
+                onOpenSettings={(href) => router.push(href)}
+              />
+            </div>
+          ) : (
+            <InboxListEmpty channel={unconfiguredChannel} unconfigured filtered={false} onClear={clearInboxFilters} />
+          )
+        ) : (<>
         {/*
                   メール一覧の失敗行。LINEだけ見ているときは出さない。
                   以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
@@ -460,7 +488,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                           </div>
                         </div>
                         <div className={styles.rowAside}>
-                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt) || undefined}>{formatListRecent(item.lastIncomingAt)}</span>
+                          <span className={styles.rowTime} data-unread={item.isUnread || undefined} title={formatListRecentTitle(item.lastIncomingAt, { now: clock }) || undefined}>{formatListRecent(item.lastIncomingAt, { now: clock })}</span>
                         </div>
                       </div>
                     </div>
@@ -545,7 +573,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                             </div>
                           </div>
                           <div className={styles.rowAside}>
-                            <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>
+                            <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt, { now: clock }), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt, { now: clock })}</span>
                             <StatusBadge data-status-pill="" tone={SUPPORT_STATUS_TONES[chat.status]}>{STATUS_WORD[chat.status]}</StatusBadge>
                             <SlaBadge fields={chat as ChatSlaFields} now={Date.now()} />
                           </div>
@@ -632,6 +660,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             メールの続きを読み込む
           </InboxHistoryButton>
         )}
+        </>)}
     </div>
   </InboxListPane>)
 }

@@ -83,10 +83,12 @@ export function useInboxActions({ chatDetail, selectedChatId, loadChatDetail, lo
       const detail = await fetchApi<{ success: boolean; data: { updatedAt: string } }>(
         `/api/friends/${chatDetail.friendId}`,
       )
-      await fetchApi<{ success: boolean; data: unknown }>(
+      if (!detail?.success || typeof detail.data?.updatedAt !== 'string' || !detail.data.updatedAt.trim()) throw new Error('friend_version_unavailable')
+      const saved = await fetchApi<{ success: boolean; data: unknown }>(
         `/api/friends/${chatDetail.friendId}/metadata?expectedUpdatedAt=${encodeURIComponent(detail.data.updatedAt)}`,
         { method: 'PUT', body: JSON.stringify({ __attention: next ? '1' : null }) },
       )
+      if (!saved?.success) throw new Error('attention_update_failed')
       apply(next)
     } catch (error) {
       apply(!next)

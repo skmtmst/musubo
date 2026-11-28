@@ -194,7 +194,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     })
     await mount()
 
-    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる：選ぶ"]')!
+    const toggle = container.querySelector<HTMLButtonElement>('button[aria-label="回答フォームを開かせる：選択する"]')!
     expect(toggle).toBeTruthy()
     await click(toggle)
     const options = [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')]
@@ -206,7 +206,7 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     await click(draft)
     expect(container.querySelector('#nen-edit-form')?.parentElement?.textContent).not.toContain('下書きフォーム')
     await click(live)
-    await click([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選ぶ')!)
+    await click([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent === '選択する')!)
     await settle()
     expect(container.querySelector('#nen-edit-form')?.parentElement?.textContent).toContain('公開中のフォーム')
     await click(saveButton())

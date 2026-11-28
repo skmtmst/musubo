@@ -120,7 +120,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       description={`${withHonorific(target.customerName, 'さん', { space: true })}・${target.ruleText}・${target.menuName}・${target.index} 回目 ${dayOf(target.startsAt)}`}
       tone={changing ? 'default' : 'destructive'}
       confirmation
-      confirmLabel={`${formatNumber(count)} 件を${changing ? '変える' : '取り消す'}`}
+      confirmLabel={`${formatNumber(count)} 件を${changing ? '変更する' : '取り消す'}`}
       busyLabel={changing ? '変えています…' : '取り消しています…'}
       confirmDisabled={!items || !impact || count === 0 || (changing && !newStartsAt)}
       footerAlign="center"

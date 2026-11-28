@@ -23,7 +23,7 @@ import { ArrowRight, Hourglass, Info, Play } from 'lucide-react'
 import { SetupIcon } from './icons'
 import { choiceLabel, styleLabel } from './model'
 import { useWizard } from './use-wizard'
-import { KIND_WORD } from './wizard-item-kinds'
+import { setupItemKind } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { InitialMenuChoice } from './initial-menu-choice'
 import SetupLinks from './setup-links'
@@ -134,14 +134,16 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, st
           <Card as="section" className={styles.card} contentPadding="var(--polish-space-card)" aria-labelledby="setup-inserted">
             <div className={styles.cardHead}><h3 id="setup-inserted" className={styles.cardTitle}>入った物</h3><span className={styles.cardMeta}>{`${formatNumber(groupInserted(summary.inserted).length)}件`}</span></div>
             <ul className={styles.rows}>
-              {groupInserted(summary.inserted).map((group) => (
+              {groupInserted(summary.inserted).map((group) => {
+                const kind = setupItemKind(group.kind)
+                return (
                 <li key={group.kind} className={styles.row}>
-                  <SetupIcon name={KIND_WORD[group.kind].icon} className={styles.rowIcon} />
-                  <span className={styles.rowText}><span className={styles.rowTitle}>{KIND_WORD[group.kind].label}</span><span className={styles.rowNote}>{group.note}</span></span>
+                  <SetupIcon name={kind?.icon ?? 'file'} className={styles.rowIcon} />
+                  <span className={styles.rowText}><span className={styles.rowTitle}>{kind?.label ?? '種類を確認できません'}</span><span className={styles.rowNote}>{group.note}</span></span>
                   <StatusBadge tone="neutral" dot>見本</StatusBadge>
-                  <Link href={KIND_WORD[group.kind].href(style)} className={styles.link}>見る</Link>
+                  {kind ? <Link href={kind.href(style)} className={styles.link}>見る</Link> : null}
                 </li>
-              ))}
+              )})}
             </ul>
           </Card>
           <Card as="section" className={styles.card} contentPadding="var(--polish-space-card)" aria-labelledby="setup-activate">

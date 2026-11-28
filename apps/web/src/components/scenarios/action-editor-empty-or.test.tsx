@@ -105,7 +105,7 @@ function orAddButton() {
 }
 
 function kindPickers() {
-  return screen.getAllByRole('button', { name: '追加する条件を選ぶ' })
+  return screen.getAllByRole('button', { name: '追加する条件を選択する' })
 }
 
 function pickKind(field: HTMLElement, query: string) {

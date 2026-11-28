@@ -98,6 +98,7 @@
 
 .bodyTight {
   gap: var(--tpl-rs-rsv-gap);
+  padding-inline: var(--space-24);
 }
 
 /* 検証環境の帯：薄い金色の地＋緑の札＋右の注意 */

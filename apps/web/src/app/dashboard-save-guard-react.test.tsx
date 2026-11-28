@@ -73,7 +73,7 @@ function button(text: string): HTMLButtonElement {
 
 async function openEditor() {
   await act(async () => { root.render(<DashboardPage />) })
-  await act(async () => { button('表示を変える').click() })
+  await act(async () => { button('表示を変更する').click() })
   await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
 }
 
@@ -96,7 +96,7 @@ describe('N-006 ダッシュボード保存の連打防止 (#758)', () => {
     await act(async () => { pending[0].resolve(json({ success: true, data: { version: 8 } })) })
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     expect(document.body.textContent).not.toContain('別の画面で配置が更新されました')
-    await act(async () => { button('表示を変える').click() })
+    await act(async () => { button('表示を変更する').click() })
   await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
     await act(async () => { button('ダッシュボードに反映').click() })
     expect(pending).toHaveLength(2)

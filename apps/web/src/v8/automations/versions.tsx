@@ -55,10 +55,14 @@ export function stepChain(actions: CommonActionStep[]): string {
   if (actions.length === 0) return '処理はありません'
   return actions.map((step) => {
     if (step.type === 'wait') return automationWaitLabel(step.params)
-    const base = STEP_SHORT[step.type] ?? '処理'
+    const base = Object.prototype.hasOwnProperty.call(STEP_SHORT, step.type) ? STEP_SHORT[step.type] : '処理'
     const name = typeof step.params.templateName === 'string' ? step.params.templateName : ''
     return step.type === 'send_message' && name ? `${base}「${name}」` : base
   }).join(' → ')
+}
+
+function consumerLabel(kind: string): string {
+  return Object.prototype.hasOwnProperty.call(CONSUMER_LABELS, kind) ? CONSUMER_LABELS[kind] : 'ほか'
 }
 
 /** 「オートメーション 3・シナリオ 1」。 */
@@ -66,7 +70,7 @@ export function consumerBreakdown(bindings: Array<{ consumerType: string }>): st
   if (bindings.length === 0) return 'まだどこからも呼ばれていません'
   const counts = new Map<string, number>()
   for (const binding of bindings) counts.set(binding.consumerType, (counts.get(binding.consumerType) ?? 0) + 1)
-  return [...counts].map(([kind, count]) => `${CONSUMER_LABELS[kind] ?? 'ほか'} ${count}`).join('・')
+  return [...counts].map(([kind, count]) => `${consumerLabel(kind)} ${count}`).join('・')
 }
 
 /** 「9/24」（日本時間）。 */
@@ -319,7 +323,8 @@ function VersionsInner() {
                   <Tr key={binding.id} data-table-layout="columns" data-row-id={binding.id}>
                     <Td grow>
                       <TruncatedText value={binding.consumerPath || '全体'} />
-                      <span className={styles.whereSub}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>
+                      <span className={styles.whereSub}>{consumerLabel(binding.consumerType)}</span>
+                      {!Object.prototype.hasOwnProperty.call(CONSUMER_LABELS, binding.consumerType) ? <span className={styles.whereSub}>{binding.consumerType}</span> : null}
                     </Td>
                     <Td className={styles.colPinned}><span className={styles.cell}>{`第${binding.versionNumber}版`}</span></Td>
                     <Td className={styles.colNum}>

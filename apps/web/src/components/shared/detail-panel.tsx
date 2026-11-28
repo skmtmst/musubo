@@ -6,7 +6,8 @@ import { flushListUrlState, notifyListLocation, useListLocation, useOnAccountSwi
 
 import { createPortal } from 'react-dom'
 import React, { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import CloseButton from './close-button'
 import styles from './detail-panel.module.css'
 import detailStyles from './detail-content.module.css'
 import DetailActions, { hasDetailActions, type DetailActionsProps } from './detail-actions'
@@ -145,9 +146,7 @@ export default function DetailPanel({
           <button type="button" className={styles.navButton} onClick={onNext} disabled={!onNext || !hasNext || busy} aria-label="次の行">
             <ChevronDown aria-hidden="true" size={16} />
           </button>
-          <button type="button" className={styles.navButton} onClick={onClose} disabled={busy} aria-label="閉じる">
-            <X aria-hidden="true" size={16} />
-          </button>
+          <CloseButton size="row" onClick={onClose} disabled={busy} />
         </div>
       </header>
       <div className={styles.body} data-content-spacing={contentSpacing}>{children}</div>

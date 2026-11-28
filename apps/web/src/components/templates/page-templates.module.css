@@ -27,6 +27,9 @@
 /* 「この画面の説明」を開いても、右の操作（店舗の欄・主ボタン）を題の行に残す。説明の長い1行が幅を取り、操作が次の行へ落ちていた。 */
 :global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
 :global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
+/* 閲覧帯の文が長くても、右の操作を題の行に保つ。 */
+:global(:root) .heading:has(> .actions) > .headingText:has(> .headingNotice) { flex-basis: 0; }
+:global(:root) .heading:has(> .headingText > .headingNotice) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 :global(:root) .title { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
 :global(:root) .pageTitle { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); letter-spacing: var(--tpl-title-tracking); }
@@ -312,6 +315,11 @@
 :global(:root) .frame[data-has-footer] > .settingsFlow > .settings { min-height: 0; overflow-y: auto; }
 :global(:root) .frame[data-has-footer] > [data-template-region='body'],
 :global(:root) .frame[data-has-footer] > .settingsFlow > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
+/* 下部の操作帯があるウィザードは、本文末尾を帯の上へ送れる余白を持つ。 */
+:global(:root) .frame[data-page-template='wizard'][data-has-footer]:has(> .footer) > [data-template-region='body']::after {
+  --tpl-wizard-footer-clearance: 96px;
+  content: ''; display: block; flex: none; height: var(--tpl-wizard-footer-clearance);
+}
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
 :global(:root) .footer[data-shadow-inset] { margin-inline: calc(var(--polish-space-section) * 2); margin-bottom: calc(var(--polish-space-section) * 2 + var(--space-8)); }

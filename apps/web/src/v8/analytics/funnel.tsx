@@ -92,15 +92,20 @@ function funnelCohortRange(days: number, now = new Date()) {
 }
 const circled = (n: number) => '①②③④⑤⑥⑦⑧⑨⑩'[n - 1] ?? String(n)
 
-export default function FunnelV8({ accountId, canManage, presetConversion, renderForm, renderSave, stepKindsLabel }: {
+export default function FunnelV8({ accountId, canManage, canRun = canManage, presetConversion, renderForm, renderSave, stepKindsLabel }: {
   accountId: string
   canManage: boolean
+  canRun?: boolean
   presetConversion?: { id: string; name: string } | null
   renderForm?: FunnelFormSlot
   renderSave?: FunnelSaveSlot
   /** 段に置ける種類（入口が正本の一覧から渡す）。 */
   stepKindsLabel?: string
 }) {
+  const canRunRef = useRef(canRun)
+  canRunRef.current = canRun
+  const canManageRef = useRef(canManage)
+  canManageRef.current = canManage
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const [funnels, setFunnels] = useState<FunnelSummary[]>([])
@@ -164,7 +169,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   useEffect(() => { setRunning(false) }, [accountId, selected, funnelDays])
 
   const runNow = async () => {
-    if (!selected || runningScopes.current.has(scope) || selectedFunnel?.status !== 'active') return
+    if (!canRunRef.current || !selected || runningScopes.current.has(scope) || selectedFunnel?.status !== 'active') return
     runningScopes.current.add(scope)
     setStartedAt(new Date().toISOString())
     const generation = viewGeneration.current
@@ -202,7 +207,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const [editTarget, setEditTarget] = useState<FunnelEditDraft | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const startEdit = async (windowDaysOverride?: string) => {
-    if (!selected) return
+    if (!canManageRef.current || !selected) return
     setEditLoading(true); setRunError('')
     try {
       const res = await api.analytics.v6Funnels.get(accountId, selected)
@@ -228,13 +233,15 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
   const statusMounted = useRef(false)
   useEffect(() => { statusMounted.current = true; return () => { statusMounted.current = false } }, [])
   const openStatus = (funnel: { id: string; name: string; status: FunnelStatus; confirmationRevision: number }, to: FunnelStatus) => {
+    if (!canManageRef.current) return
     if (!Number.isSafeInteger(funnel.confirmationRevision) || funnel.confirmationRevision < 1) { setRunError('ファネルを読み直してから操作してください'); return }
     statusWindow.current = {}
     setStatusTarget({ funnel: { ...funnel }, to, accountId, window: statusWindow.current })
   }
+  useEffect(() => { if (!canManage) { statusWindow.current = {}; setStatusTarget(null) } }, [canManage])
   const [statusBusy, setStatusBusy] = useState(false)
   const applyStatusChange = async () => {
-    if (!statusTarget || statusBusy || !statusMounted.current || currentAccount.current !== statusTarget.accountId || statusWindow.current !== statusTarget.window) return
+    if (!canManageRef.current || !statusTarget || statusBusy || !statusMounted.current || currentAccount.current !== statusTarget.accountId || statusWindow.current !== statusTarget.window) return
     setStatusBusy(true); setRunError('')
     try {
       const res = await api.analytics.v6Funnels.setStatus(accountId, statusTarget.funnel.id, { status: statusTarget.to, expectedStatus: statusTarget.funnel.status, expectedRevision: statusTarget.funnel.confirmationRevision })
@@ -298,7 +305,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
 
   /** 選んだ段の対象者を24時間の対象者として作り、その先（友だち一覧・配信）へ進む。 */
   const openAudience = async (to: 'friends' | 'broadcast') => {
-    if (!measurable || !run?.runId || shownPick === null || !result?.[shownPick] || !activeGroup || selectedFunnel?.status !== 'active') return
+    if (!canManageRef.current || !measurable || !run?.runId || shownPick === null || !result?.[shownPick] || !activeGroup || selectedFunnel?.status !== 'active') return
     const generation = viewGeneration.current
     setRunError(''); setAudienceBusy(true)
     try {
@@ -336,7 +343,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       <KpiCard presentation="band" title="平均の到達日数" icon={<CalendarClock size={16} aria-hidden="true" />} value={null} unit="日" detail="到達日時が無く未取得" />
     </KpiBand></ListPageStats> : null}
     <div className={styles.body} data-gap="tab">
-      {showForm && renderForm ? renderForm({
+      {canManage && showForm && renderForm ? renderForm({
         edit: editTarget ?? undefined,
         presetConversion: editTarget ? null : (presetConversion ?? null),
         onCancel: () => { setCreating(false); setEditTarget(null) },
@@ -347,7 +354,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         },
       }) : null}
       {listError ? <ListState kind="error" title="ファネルを読み込めませんでした。" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setFunnelsReload((n) => n + 1)} />
-        : funnels.length === 0 ? <ListState kind="empty" title="ファネルがまだありません" description={canManage ? '段を2つ以上つないで、どこで離れているかを見られます。' : '段を2つ以上つないで、どこで離れているかを見られます。作成は統括・管理者へ依頼してください。'} action={canManage ? <Button variant="secondary" onClick={() => requestUnsavedAction(() => setCreating(true))}><Plus size={16} aria-hidden="true" />ファネルを作る</Button> : undefined} />
+        : funnels.length === 0 ? <ListState kind="empty" title="ファネルがまだありません" description={canManage ? '段を2つ以上つないで、どこで離れているかを見られます。' : '段を2つ以上つないで、どこで離れているかを見られます。作成は統括・管理者へ依頼してください。'} action={<PermissionGatedButton allowed={canManage} need="manager" variant="secondary" onClick={() => requestUnsavedAction(() => setCreating(true))}><Plus size={16} aria-hidden="true" />ファネルを作る</PermissionGatedButton>} />
         : <>
           <div className={styles.controls}>
             <Field label="ファネル"><SaveErrorField names={["selected"]}><EntitySelect id="funnel-select" value={selected} onChange={(value) => { if (value !== selected) requestUnsavedAction(() => setSelected(value)) }} aria-label="ファネル" size="full" options={funnels.some((f) => f.status === 'active' || f.id === selected)
@@ -383,10 +390,10 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
                 <SaveErrorField names={["audienceSelection"]}><SegmentedControl aria-label="対象者の種類" value={audienceSelection} onChange={setAudienceSelection} options={[{ value: 'reached', label: '到達した人' }, { value: 'stopped', label: '止まった人' }, { value: 'in_progress', label: '進行中の人' }]} /></SaveErrorField>
                 <p className={styles.audienceCount}>{`${audienceTitle} ${formatNumber(audienceCount)} 人`}</p>
                 <p className={styles.caption}>{audienceNote}</p>
-                {canManage ? <>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => requestUnsavedAction(() => void openAudience('friends'))} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={16} aria-hidden="true" />対象者を開く</Button></span>
-                  <span><Button variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => requestUnsavedAction(() => void openAudience('broadcast'))} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={16} aria-hidden="true" />この対象者へ配信を作る</Button></span>
-                </> : <p className={styles.caption}>対象者づくりは統括・管理者が行えます。</p>}
+                <>
+                  <span><PermissionGatedButton allowed={canManage} need="manager" variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => requestUnsavedAction(() => void openAudience('friends'))} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Users size={16} aria-hidden="true" />対象者を開く</PermissionGatedButton></span>
+                  <span><PermissionGatedButton allowed={canManage} need="manager" variant="secondary" disabled={audienceBusy || audienceCount === 0} onClick={() => requestUnsavedAction(() => void openAudience('broadcast'))} busy={Boolean(audienceBusy)} busyLabel="処理中…"><Send size={16} aria-hidden="true" />この対象者へ配信を作る</PermissionGatedButton></span>
+                </>
               </> : <p className={styles.caption}>停止中・保管したファネルでは対象者づくりはできません。結果の確認だけができます。</p>)
                 : <p className={styles.caption}>{run && !measurable ? 'この結果は判定不能のため、対象者は選べません。' : '段を押すと、到達・停止・進行中の人を選べます。'}</p>}
               {run && run.groups.length > 1 ? <>
@@ -405,22 +412,22 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
           <Disclosure title="定義の操作と集計の詳細" size="compact">
             <div className={styles.toolbar}>
               <RangePickerV8 customRange={customRange} onRangeChange={(range) => { setRange(range); setPicked(null) }} days={funnelDays} onChange={(days) => { setFunnelDays(days); setPicked(null); setRunning(false) }} />
-              <Button onClick={() => requestUnsavedAction(() => void runNow())} disabled={running || selectedFunnel?.status !== 'active'} variant="secondary" busy={running} busyLabel="再集計中">{`この${funnelDays}日を再集計`}</Button>
+              <PermissionGatedButton allowed={canRun} onClick={() => requestUnsavedAction(() => void runNow())} disabled={running || selectedFunnel?.status !== 'active'} variant="secondary" busy={running} busyLabel="再集計中">{`この${funnelDays}日を再集計`}</PermissionGatedButton>
             </div>
             {selectedFunnel ? <p className={styles.caption}>{`${selectedFunnel.windowDays}日以内に通った人を数えます。${selectedFunnel.currentVersion ? ` 定義版 ${selectedFunnel.currentVersion.versionNumber}` : ' 現行定義の移行が必要です'}${selectedFunnel.status === 'stopped' ? ' 停止中です。再集計や対象者づくりはできません。' : ''}${selectedFunnel.status === 'archived' ? ' アーカイブです。過去の結果だけを見られます。' : ''}`}</p> : null}
-            {canManage && selectedFunnel ? <div className={styles.rowActions} data-gap="wide">
+            {selectedFunnel ? <div className={styles.rowActions} data-gap="wide">
               {selectedFunnel.status === 'active' ? <>
-                <Button onClick={() => requestUnsavedAction(() => void startEdit())} disabled={editLoading || !selectedFunnel.currentVersion} variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集</Button>
-                <Button onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'stopped'))} variant="secondary">停止</Button>
-                <Button onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'archived'))} variant="secondary">削除する</Button>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => void startEdit())} disabled={editLoading || !selectedFunnel.currentVersion} variant="secondary" busy={editLoading} busyLabel="定義を読み込み中">定義を編集</PermissionGatedButton>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'stopped'))} variant="secondary">停止</PermissionGatedButton>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'archived'))} variant="secondary">削除する</PermissionGatedButton>
               </> : null}
               {selectedFunnel.status === 'stopped' ? <>
-                <Button onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'active'))} variant="secondary">再開</Button>
-                <Button onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'archived'))} variant="secondary">削除する</Button>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'active'))} variant="secondary">再開</PermissionGatedButton>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => openStatus(selectedFunnel, 'archived'))} variant="secondary">削除する</PermissionGatedButton>
               </> : null}
             </div> : null}
           </Disclosure>
-          {run?.runId && !running && canManage && renderSave ? <Disclosure title="この結果を保存する" size="compact">{renderSave({ sourceResultId: run.runId, defaultName: selectedFunnel?.name ?? 'ファネル分析' })}</Disclosure> : null}
+          {run?.runId && !running && renderSave ? (canManage ? <Disclosure title="この結果を保存する" size="compact">{renderSave({ sourceResultId: run.runId, defaultName: selectedFunnel?.name ?? 'ファネル分析' })}</Disclosure> : <PermissionGatedButton allowed={false} need="manager" variant="secondary">この結果を保存する</PermissionGatedButton>) : null}
           <Disclosure title="段の作り方" size="compact">
             <ul className={styles.plainList}>
               {stepKindsLabel ? <li>{`・段には ${stepKindsLabel} を置けます`}</li> : null}
@@ -437,9 +444,9 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
               <span className={styles.cellStrong}>{funnel.name}</span>
               <StatePill tone={funnel.status === 'stopped' ? 'warn' : 'neutral'}>{funnel.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatePill>
               <button type="button" className={styles.linkButton} onClick={() => { if (funnel.id !== selected) requestUnsavedAction(() => setSelected(funnel.id)) }}>結果を見る</button>
-              {canManage && funnel.status === 'stopped' ? <>
-                <Button onClick={() => requestUnsavedAction(() => openStatus(funnel, 'active'))} variant="secondary">再開</Button>
-                <Button onClick={() => requestUnsavedAction(() => openStatus(funnel, 'archived'))} variant="secondary">削除する</Button>
+              {funnel.status === 'stopped' ? <>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => openStatus(funnel, 'active'))} variant="secondary">再開</PermissionGatedButton>
+                <PermissionGatedButton allowed={canManage} need="manager" onClick={() => requestUnsavedAction(() => openStatus(funnel, 'archived'))} variant="secondary">削除する</PermissionGatedButton>
               </> : null}
               {funnel.status === 'archived' ? <span className={styles.caption}>戻せません</span> : null}
             </div>)}
@@ -447,7 +454,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
         </>}
     </div>
     <ConfirmDialog
-      open={statusTarget !== null && statusTarget.accountId === accountId && statusTarget.window === statusWindow.current}
+      open={canManage && statusTarget !== null && statusTarget.accountId === accountId && statusTarget.window === statusWindow.current}
       title={statusTarget?.to === 'stopped' ? 'ファネルを停止しますか' : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除しますか？` : 'ファネルを再開しますか'}
       description={statusTarget?.to === 'stopped' ? `「${statusTarget.funnel.name}」の再集計と対象者づくりを止めます。過去の結果は残り、あとから再開できます。`
         : statusTarget?.to === 'archived' ? `「${statusTarget.funnel.name}」を削除すると、選ぶ一覧から外れ、再集計と対象者づくりはできません。あとから戻せません。過去の結果は残ります。`

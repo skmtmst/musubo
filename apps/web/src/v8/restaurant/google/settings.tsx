@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
+import { notifySaved } from '@/components/shared/toast'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Notice from '@/components/shared/notice'
@@ -26,6 +27,8 @@ import { emitGuideSignal } from '@/v8/onboarding/public/guide-signal/index'
 export default function SettingsBoard({ accountId, data, onChanged, connectSource }: { accountId: string; data: GoogleConnectionData; onChanged: () => void; connectSource?: 'hours' }) {
   const scope = useRef({ accountId, generation: 0 })
   if (scope.current.accountId !== accountId) scope.current = { accountId, generation: scope.current.generation + 1 }
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const saveErrors = useSaveFormErrors()
   const { allowed: canManage, lockedReason } = useGooglePermission('tenantWide', data.permissions.canManageConnection)
   const [busy, setBusy] = useState(false)
@@ -35,6 +38,7 @@ export default function SettingsBoard({ accountId, data, onChanged, connectSourc
   const [selectedLocation, setSelectedLocation] = useState('')
   const [confirmSwitch, setConfirmSwitch] = useState(false)
   const [confirmation, setConfirmation] = useState<{ accountId: string; generation: number; connectionId?: string; revision?: number; locationName?: string; locationTitle?: string | null; previousTitle?: string | null } | null>(null)
+  useEffect(() => { setSelectedLocation(''); setLocationSaved(false); setConfirmSwitch(false); setConfirmation(null); setActionError('') }, [accountId])
   const { connection } = data
   const disconnectKey = JSON.stringify([accountId, data.store.id, connection.status, connection.locationName, connection.googleAccountEmail, connection.connectedAt])
   const disconnectScope = useRef({ key: disconnectKey })
@@ -82,24 +86,29 @@ export default function SettingsBoard({ accountId, data, onChanged, connectSourc
 
   const selectLocation = async (confirmedSwitch = false) => {
     if (!canManage || busy || !selectedLocation || (confirmedSwitch && !confirmSwitch)) return
+    const request = scope.current
+    const current = () => alive.current && scope.current === request
     setBusy(true)
     setActionError('')
     try {
       if (confirmedSwitch && (!confirmation || confirmation.accountId !== accountId || confirmation.generation !== scope.current.generation || !confirmation.connectionId || !Number.isSafeInteger(confirmation.revision) || !confirmation.locationName)) throw new Error('確認した版がありません')
       await restaurantGoogleApi.selectLocation(accountId, confirmedSwitch ? confirmation!.locationName! : selectedLocation, confirmedSwitch,
         confirmedSwitch ? { expectedConnectionId: confirmation!.connectionId!, expectedConfirmationRevision: confirmation!.revision! } : undefined)
+      if (!current()) return false
       setLocationSaved(true)
+      notifySaved('Google の連携先の店舗を設定しました。')
       setConfirmSwitch(false)
       onChanged()
       return true
     } catch (err) {
+      if (!current()) return false
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
       setActionError(errorMessage(err, '店舗を選べませんでした。')) }
       return false
     } finally {
-      setBusy(false)
+      if (alive.current) setBusy(false)
     }
   }
 

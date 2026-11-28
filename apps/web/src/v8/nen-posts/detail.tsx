@@ -324,7 +324,7 @@ export function PhotoReviewDetail({
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
         <Button variant="primary" disabled={reviewing} onClick={adoptWithoutReward} busy={reviewing} busyLabel="処理中…">報酬なしで採用</Button>
         </> : <>
-        <Button variant="text" textTone="danger" disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
+        <Button variant="text" textTone="danger" disabled={reviewing} onClick={onReturn}>見送る（理由を選択する）</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
         <Button variant="primary" disabled={reviewing} onClick={onApprove} busy={reviewing} busyLabel="処理中…">このまま採用</Button>
         </>}

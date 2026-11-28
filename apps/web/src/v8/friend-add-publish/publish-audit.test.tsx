@@ -16,7 +16,7 @@ it('WEB154: doneのURLでも停止中を有効化完了と表示しない',async
  expect(view.container.querySelector('[data-design-node="e0FD1J"]')).toBeNull()
  expect(view.container.textContent).toContain('停止中')
  expect(screen.getByRole('list',{name:'設定済みの内容'}).textContent).toContain('案内')
- expect(screen.getByRole('button',{name:'初回案内を変える'})).toBeTruthy()
+ expect(screen.getByRole('button',{name:'初回案内を変更する'})).toBeTruthy()
 })
 it('WEB156: テスト待ちで切り替えても新しいアカウントを処理中にしない',async()=>{
  net.query='id=r';let resolve!: (value:unknown)=>void

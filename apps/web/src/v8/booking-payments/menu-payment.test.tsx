@@ -50,7 +50,7 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); saveRef = null })
 
 it('コースは読んだ版を添えて保存する', async () => {
   render(<Course />)
-  fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変える/ }))
+  fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
   await act(async () => { await saveRef?.() })
   expect(net.saveCourseMode).toHaveBeenCalledWith('acc-1', 'c1', 'online', 3)
 })
@@ -58,12 +58,12 @@ it('コースは読んだ版を添えて保存する', async () => {
 it('版が古い（409）ときは入力を残し、共通の帯から最新と比べられる', async () => {
   net.saveCourseMode.mockRejectedValueOnce(new ApiError(409, 'conflict', 'version_conflict'))
   render(<Course />)
-  fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変える/ }))
+  fireEvent.click(await screen.findByRole('radio', { name: /このメニューだけ変更する/ }))
   let thrown: unknown = null
   await act(async () => { try { await saveRef?.() } catch (cause) { thrown = cause } })
   expect(thrown).toBeInstanceOf(PaymentConflictError)
   expect(await screen.findByText(/ほかの人が先に/)).toBeTruthy()
-  expect((screen.getByRole('radio', { name: /このメニューだけ変える/ }) as HTMLInputElement).checked).toBe(true)
+  expect((screen.getByRole('radio', { name: /このメニューだけ変更する/ }) as HTMLInputElement).checked).toBe(true)
   net.courseMode.mockResolvedValueOnce({ success: true, data: { mode: 'onsite', version: 4 } })
   fireEvent.click(screen.getByRole('button', { name: /違いを比べる/ }))
   expect(await screen.findByText(/お支払い：あなた「オンラインで先払い」／最新「お店で払う」/)).toBeTruthy()

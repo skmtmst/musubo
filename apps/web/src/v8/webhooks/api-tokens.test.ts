@@ -20,3 +20,8 @@ describe('API 接続（V8）', () => {
     expect(scopeLabel('friends:read')).toBe('friends:read')
   })
 })
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の接続権限 %s を文字として表示する', value => {
+  expect(scopeLabel(value)).toBe(value)
+})

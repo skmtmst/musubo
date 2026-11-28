@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const push = vi.hoisted(() => vi.fn())
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }), usePathname: () => '/' }))
 import CommandPalette from './command-palette'
 beforeEach(() => { push.mockClear(); document.documentElement.dataset.theme = 'v8' })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })

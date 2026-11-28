@@ -70,26 +70,26 @@ export function describeConditionRule(
     }
     case 'scenario_state': {
       const id = typeof v?.scenarioId === 'string' ? v.scenarioId : ''
-      const states: Record<string, string> = {
+      const states: Record<string, string> = Object.assign(Object.create(null), {
         subscribed: 'を購読中',
         not_subscribed: 'を購読していない',
         completed: 'を読み終えた',
         ever: 'を1度でも購読した',
-      }
-      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'を購読中'}の人`
+      })
+      return `シナリオ「${scenarioName(id)}」${states[String(v?.state ?? 'subscribed')] ?? 'の購読状態が不明'}の人`
     }
     case 'form_answered':
       return typeof rule.value === 'string' && rule.value
         ? '選んだフォームに回答した人'
         : 'いずれかのフォームに回答した人'
     case 'reaction_state': {
-      const labels: Record<string, string> = {
+      const labels: Record<string, string> = Object.assign(Object.create(null), {
         reply_or_postback: '返信・応答のある人',
         reply: '返信のある人',
         postback: 'ボタン応答のみの人',
         none: '返信・応答の無い人',
-      }
-      return labels[String(rule.value)] ?? '反応状態で絞る人'
+      })
+      return labels[String(rule.value)] ?? '反応状態を確認できない人'
     }
     case 'score_range': {
       const min = typeof v?.min === 'number' ? v.min : null
@@ -136,6 +136,28 @@ export const storedConditionToForm = (
     ) && (node.groups ?? []).every(nodeUsable)
   if (!nodeUsable(candidate as SegmentCondition)) return { condition: null, unreadable: true }
   return { condition: candidate as SegmentCondition, unreadable: false }
+}
+
+/** 画面で意味を確かめられない条件は、公開前に選び直してもらう。 */
+const EDITABLE_CONDITION_TYPES = new Set(['name', 'private_memo', 'status_message', 'registered_at', 'support_mark', 'tag_exists', 'tag_not_exists', 'tag_all', 'tag_not_all', 'friend_field', 'scenario_subscribed', 'scenario_state', 'form_answered', 'last_reaction_at', 'reaction_state', 'score_range', 'visit_count', 'purchase_amount', 'last_activity_at', 'member_tier', 'is_following', 'is_hidden', 'analytics_audience', 'broadcast_link_clicked'])
+const SCENARIO_CONDITION_STATES = new Set(['subscribed', 'not_subscribed', 'completed', 'ever'])
+const REACTION_CONDITION_STATES = new Set(['reply_or_postback', 'reply', 'postback', 'none'])
+const FIELD_OPERATORS = new Set(['equals', 'contains', 'exists', 'not_exists', 'not_equals', 'not_contains', 'gte', 'gt', 'lte', 'lt'])
+export const UNKNOWN_CONDITION_REASON = '確認できない条件があります。条件を選び直してから公開してください。'
+export function hasUnknownCondition(condition: SegmentCondition | null | undefined): boolean {
+  if (!condition) return false
+  if (condition.operator !== 'AND' && condition.operator !== 'OR') return true
+  return condition.rules.some((rule) => {
+    if (!EDITABLE_CONDITION_TYPES.has(rule.type)) return true
+    if (rule.type === 'is_following' || rule.type === 'is_hidden') return typeof rule.value !== 'boolean'
+    if (rule.type === 'scenario_state' || rule.type === 'friend_field') {
+      if (!rule.value || typeof rule.value !== 'object' || Array.isArray(rule.value)) return true
+      const value = rule.value as Record<string, unknown>
+      if (rule.type === 'scenario_state') return !SCENARIO_CONDITION_STATES.has(String(value.state ?? 'subscribed'))
+      return !FIELD_OPERATORS.has(String(value.op ?? 'contains'))
+    }
+    return rule.type === 'reaction_state' && !REACTION_CONDITION_STATES.has(String(rule.value))
+  }) || (condition.groups ?? []).some(hasUnknownCondition)
 }
 
 /**

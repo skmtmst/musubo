@@ -118,9 +118,9 @@ export default function ReferencesPanel({ readOnly, accountId, layout, reference
                 {canEdit ? (reference ? (
                   <Button type="button" onClick={() => onChangeReferences?.(references.filter((row) => row.blockId !== block.id))}>外す</Button>
                 ) : block.kind === 'image' ? (
-                  <Button type="button" onClick={() => setImageFlow({ blockId: block.id, alt: block.alt ?? '' })}>固定版を選ぶ</Button>
+                  <Button type="button" onClick={() => setImageFlow({ blockId: block.id, alt: block.alt ?? '' })}>固定版を選択する</Button>
                 ) : (
-                  <Button type="button" onClick={() => setStoreFlow({ blockId: block.id, fields: {} })}>共通情報を選ぶ</Button>
+                  <Button type="button" onClick={() => setStoreFlow({ blockId: block.id, fields: {} })}>共通情報を選択する</Button>
                 )) : null}
               </div>
             </li>

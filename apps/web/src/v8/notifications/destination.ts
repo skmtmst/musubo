@@ -16,11 +16,12 @@ export type NotificationDestinationContext = {
  * LINE の鍵の知らせ（`line_token_`）からは、そのアカウントの接続状況を確認できる。
  */
 export function notificationDestination(item: NotificationCenterItem, context: NotificationDestinationContext = {}): string {
+  const eventType = typeof item.eventType === 'string' ? item.eventType : ''
   if (isLineTokenNotification(item)) {
     return context.accountId ? `/accounts/detail?id=${encodeURIComponent(context.accountId)}` : '/accounts'
   }
-  if (item.eventType.startsWith('ec.') || item.eventType.startsWith('ec_')) return '/ec-commerce'
-  const destination = dashboardNotificationDestination(item)
+  if (eventType.startsWith('ec.') || eventType.startsWith('ec_')) return '/ec-commerce'
+  const destination = dashboardNotificationDestination({ ...item, eventType })
   return context.hqOrigin && (destination === '/updates' || destination === '/emergency') ? `${destination}?from=hq` : destination
 }
 
@@ -33,6 +34,6 @@ export function notificationLinkLabel(item: NotificationCenterItem, context: Not
   if (to.startsWith('/broadcasts')) return '配信を開く'
   if (to.startsWith('/settings/manual-links')) return 'マニュアルの表を開く'
   // メンテナンスの予告は版の履歴ではないので「詳細を見る」（行き先は同じお知らせ一覧）。
-  if (to.startsWith('/updates') && item.category === 'update' && !item.eventType.includes('maintenance')) return '更新履歴を見る'
+  if (to.startsWith('/updates') && item.category === 'update' && typeof item.eventType === 'string' && item.eventType.length > 0 && !item.eventType.includes('maintenance')) return '更新履歴を見る'
   return '詳細を見る'
 }

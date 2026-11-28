@@ -24,6 +24,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import Card from '@/components/shared/card'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null; stepUpMethod?: string }
 
@@ -44,12 +45,14 @@ export default function OpsTwoFactorV8() {
   const [typedCode, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [setupError, setSetupError] = useState<unknown>(null)
   const [qrFailed, setQrFailed] = useState(false)
   const [qrAttempt, setQrAttempt] = useState(0)
   const cancelledRef = useRef(false)
 
   const load = useCallback(async () => {
     setError('')
+    setSetupError(null)
     setQrFailed(false)
     setState('loading')
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -69,16 +72,20 @@ export default function OpsTwoFactorV8() {
       }
       // QR の準備の失敗はログイン切れではない。ログイン中のまま理由と取り直しを出す。
       let setup: Awaited<ReturnType<typeof api.staff.beginTwoFactorSetup>> | null = null
+      let caughtSetupError: unknown = null
       try {
         setup = await api.staff.beginTwoFactorSetup(body.data.id)
       } catch (saveFailure) {
         saveErrors.capture(saveFailure)
+        caughtSetupError = saveFailure
         setup = null
       }
       if (cancelledRef.current)
  return
       if (!setup || !setup.success) {
-        setError(!setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした。時間をおいて、もう一度お試しください。' : setup.error)
+        const fallbackMessage = !setup || typeof setup.error !== 'string' || !setup.error ? 'QRコードを用意できませんでした。時間をおいて、もう一度お試しください。' : setup.error
+        setSetupError(caughtSetupError ?? new Error(fallbackMessage))
+        setError(fallbackMessage)
         setState('ready')
         return
       }
@@ -153,10 +160,19 @@ export default function OpsTwoFactorV8() {
             <NoteBar tone="info">二段階認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
             <Button fullWidth variant="primary" onClick={() => logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
           </>
+        ) : !uri && setupError !== null ? (
+          /* QR準備の失敗時は原因（403/429/5xx）を言い分け、ListState の「もう一度読み込む」から取り直す。 */
+          <ListState
+            permissionScope="hq"
+            kind="error"
+            title={isForbiddenOrRateLimited(setupError) ? undefined : 'QRコードを用意できませんでした'}
+            description={isForbiddenOrRateLimited(setupError) ? undefined : (error || '時間をおいて、もう一度お試しください。')}
+            error={setupError}
+            onRetry={() => void load()}
+          />
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
             {error ? <Notice tone="danger" message={error} /> : null}
-            {error && !uri ? <Button fullWidth onClick={() => load()} className={styles.wide} busyLabel="処理中…">もう一度読み込む</Button> : null}
             <div className={styles.qrRow}>
               <div className={styles.qr}>
                 {qr ? (

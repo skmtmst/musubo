@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * ★V8 保存した検索の編集で使う小さな計算（画面から切り出して試験で確かめる）。
  */
@@ -35,7 +36,7 @@ export function usageRowsOf(usedIn: SavedSearch['usedIn']): Array<{ label: strin
     .filter((kind) => kind === 'broadcast' || kind === 'automation' || (usedIn ?? []).some((usage) => usage.kind === kind))
     .map((kind) => {
       if (usedIn === undefined) return { label: KIND_LABELS[kind], value: '—' }
-      const names = usedIn.filter((usage) => usage.kind === kind).map((usage) => `${usage.name}${usage.mode === 'live' ? '' : '（固定）'}`)
+      const names = usedIn.filter((usage) => usage.kind === kind).map((usage) => `${usage.name}${usage.mode === 'live' ? '' : usage.mode === 'fixed' ? '（固定）' : '（固定か確認できません）'}`)
       return { label: KIND_LABELS[kind], value: names.length ? names.join('・') : 'なし' }
     })
 }
@@ -45,5 +46,5 @@ export function headUsageText(usedIn: SavedSearch['usedIn']): string {
   if (usedIn === undefined) return '使っている所は確かめられません'
   if (usedIn.length === 0) return '使っている所はありません'
   const first = usedIn[0]!
-  return `${KIND_LABELS[first.kind]}「${first.name}」で使っている${usedIn.length > 1 ? `（ほか${usedIn.length - 1} 件）` : ''}`
+  return `${knownValue(KIND_LABELS, first.kind, '種類を確認できません')}「${first.name}」で使っている${usedIn.length > 1 ? `（ほか${usedIn.length - 1} 件）` : ''}`
 }

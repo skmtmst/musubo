@@ -17,10 +17,10 @@ it('ライブラリを選ぶ操作でファイル選択を開かず、処理中�
   const { rerender } = render(<ImageMultiUpload presentation="reference" onUpload={onUpload} onPickLibrary={onPickLibrary} />)
   const input = document.querySelector('input[type="file"]') as HTMLInputElement
   input.addEventListener('click', opened)
-  fireEvent.click(screen.getByRole('button', { name: 'ライブラリから選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: 'ライブラリから選択する' }))
   expect(onPickLibrary).toHaveBeenCalledOnce()
   expect(opened).not.toHaveBeenCalled()
   rerender(<ImageMultiUpload presentation="reference" busy onUpload={onUpload} onPickLibrary={onPickLibrary} />)
-  expect(screen.queryByRole('button', { name: 'ライブラリから選ぶ' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'ライブラリから選択する' })).toBeNull()
   expect(onPickLibrary).toHaveBeenCalledOnce()
 })

@@ -34,3 +34,12 @@ it('担当がいない公開中のメニューは黄の札で理由を言い、�
   expect(rowOf('カット').querySelector('[data-status-pill]')?.textContent).toBe('公開中')
   expect(rowOf('お休み中').querySelector('[data-status-pill]')?.textContent).toBe('停止中')
 })
+
+it('閲覧のみでは予約メニューの作成入口を両方止める', () => {
+  render(<MenusTabV8 accountId="a" status="ready" error={null} menuCount={0} canEdit={false} onReload={() => {}} onOpenStaff={() => {}} menus={[]} />)
+  for (const name of ['予約メニューを作る', '最初の予約メニューを作る']) {
+    const b = screen.getByRole('button', { name }) as HTMLButtonElement
+    expect(b.disabled || b.getAttribute('aria-disabled') === 'true').toBe(true)
+    expect(b.getAttribute('href')).toBeNull()
+  }
+})

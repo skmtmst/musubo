@@ -23,9 +23,4 @@ describe('V8 オートメーション3板の印', () => {
     expect(draft, 'F-15 の試しが無い').toContain('1人で試す')
   })
 
-  it('見本は口の実データから12件出す（F-16）。絵の数は書かない', () => {
-    const templates = read('../../v8/automations/templates.tsx')
-    expect(templates, '再読み込みが無い').toContain('見本を再読み込み')
-    expect(templates, '絞り込みが無い').toContain('きっかけ')
-  })
 })

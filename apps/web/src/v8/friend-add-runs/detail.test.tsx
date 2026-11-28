@@ -127,6 +127,14 @@ describe('処理の名前', () => {
 })
 
 describe('実行の詳細の画面（N43uVX）', () => {
+  it.each(['toString', 'constructor', '__proto__'])('未知の処理 %s があっても実行結果を表示する', async (type) => {
+    detail.actionRuns = [actionRun({ type: type as ActionRun['type'], status: 'failed', errorCode: 'action_failed', completedAt: null })]
+    await render()
+    expect(host.textContent).toContain('処理のところで止まりました。')
+    expect(host.textContent).toContain('処理')
+    expect(host.textContent).not.toContain('[native code]')
+  })
+
   it('失敗の帯は何つ目で止まったかを出し、行ったことを順に並べる', async () => {
     await render()
     expect(host.querySelector('[data-design-node="N43uVX"]')).toBeTruthy()
@@ -191,4 +199,20 @@ describe('実行の詳細の画面（N43uVX）', () => {
     expect(host.textContent).not.toContain('トークを開く')
     expect(host.querySelector('a[href^="/chats"]')).toBeNull()
   })
+})
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の処理 %s も詳細画面に安全な言葉で表示する', async value => {
+  detail.actionRuns = [actionRun({ id: 'unknown', stableId: 'v1:0', type: value, status: 'failed', errorCode: 'action_failed', completedAt: null })]
+  expect(actionTitle(detail.actionRuns[0], undefined)).toBe('処理')
+  await render()
+  expect(host.textContent).toContain('処理のところで止まりました。')
+  expect(host.textContent).not.toContain('function Object')
+})
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('未知の案内種類 %s も詳細画面に表示する', async value => {
+  detail.rule = { ...detail.rule!, definition: { messageType: value } as NonNullable<FriendAddRunDetail['rule']>['definition'] }
+  await render()
+  expect(host.textContent).toContain('案内（案内）を送った')
+  expect(host.textContent).not.toContain('function Object')
 })

@@ -11,6 +11,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { MessageSquareText, Plus, Upload } from 'lucide-react'
 import Button from '@/components/shared/button'
+import PermissionGatedButton from '@/components/shared/permission-gated-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import Dialog from '@/components/shared/dialog'
@@ -123,8 +124,8 @@ export default function QaListV8() {
   const failure = load.kind === 'error' ? loadFailureCopy(load.error, 'Q&A') : null
 
   const actions = <>
-    {permissions.importQa ? <Button onClick={() => setImportOpen(true)}><Upload size={16} aria-hidden="true" />取り込む（PDF・Web）</Button> : null}
-    {permissions.editQa ? <Button variant="primary" onClick={() => setEdit({})}><Plus size={16} aria-hidden="true" />Q&A を追加</Button> : null}
+    <PermissionGatedButton allowed={permissions.importQa} need="manager" deniedReason={ai.impersonating ? '代理ログイン中は Q&A の追加・取り込みができません。' : undefined} onClick={() => setImportOpen(true)}><Upload size={16} aria-hidden="true" />取り込む（PDF・Web）</PermissionGatedButton>
+    <PermissionGatedButton allowed={permissions.editQa} deniedReason={ai.impersonating ? '代理ログイン中は Q&A の追加・取り込みができません。' : undefined} variant="primary" onClick={() => setEdit({})}><Plus size={16} aria-hidden="true" />Q&A を追加</PermissionGatedButton>
   </>
 
   return (
@@ -148,6 +149,7 @@ export default function QaListV8() {
           />
         ) : null}
         {ai.status === 'error' ? <ListState kind="error" title="AI の使い方を読み込めませんでした" description="もう一度読み込んでください。" onRetry={() => void ai.reload()} /> : null}
+        {accountId && ai.status === 'ready' && ai.settings && (ai.settings.publishedQaCount === null || ai.settings.draftQaCount === null) ? <ListState kind="error" title="Q&A の件数を読み込めませんでした" onRetry={() => void ai.reload()} /> : null}
       </div>}
       toolbar={<ListToolbarFrame singleRow><ListToolbarRow>
         <ListToolbarSearchSlot search={{ placeholder: '質問・答えで探す', value: url.q, onChange: (q) => setUrl({ q, page: '1' }), width: 280 }} />
@@ -195,6 +197,7 @@ export default function QaListV8() {
           description="よくある質問と答えを登録すると、返信案の元になります。自動で答えるは、Q&A を 1 件以上公開すると選べます。"
           create={{ label: 'Q&A を追加', onClick: () => setEdit({}) }}
           canCreate={permissions.editQa}
+          lockedReason={ai.impersonating ? '代理ログイン中は Q&A の追加・取り込みができません。' : undefined}
           filtered={filtered}
           onClearFilters={() => setUrl({ q: '', status: '', page: '1' })}
           action={permissions.importQa && !filtered ? <Button onClick={() => setImportOpen(true)}><Upload size={16} aria-hidden="true" />取り込む</Button> : undefined}

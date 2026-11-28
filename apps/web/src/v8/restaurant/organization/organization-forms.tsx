@@ -20,7 +20,7 @@ import { ApiError } from '@/lib/api'
 import { restaurantTestApi,type RestaurantIntakeAddress,type RestaurantMembership,type RestaurantStore } from '@/lib/restaurant-test-api'
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { Check,MailPlus,MessageCircle,Plus,type LucideIcon } from 'lucide-react'
-import { useCallback,useEffect,useLayoutEffect,useState,type FormEvent,type ReactNode } from 'react'
+import { useCallback,useEffect,useLayoutEffect,useRef,useState,type FormEvent,type ReactNode } from 'react'
 import { useFormInputDirty } from '@/components/shared/form-input-dirty'
 import { formatStamp, Panel, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
@@ -159,53 +159,95 @@ export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel, o
   )
 }
 
+type IntakeLoadState =
+  | { scope: string; status: 'idle' }
+  | { scope: string; status: 'loading' }
+  | { scope: string; status: 'ready'; addresses: RestaurantIntakeAddress[] }
+  | { scope: string; status: 'error'; error: string }
+
 /** 予約メール取り込みアドレス（今の画面と同じ口：一覧・発行・再発行の確認・コピー）。 */
 export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: string; store: RestaurantStore | null; readOnly: boolean }) {
-  const [addresses, setAddresses] = useState<RestaurantIntakeAddress[]>([])
-  const [loading, setLoading] = useState(false)
+  const storeId = store?.id || ''
+  const scope = accountId && storeId ? `${accountId}:${storeId}` : ''
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
+  const loadSeqRef = useRef(0)
+  const issuingRef = useRef(false)
+  const [loadState, setLoadState] = useState<IntakeLoadState>(() => ({ scope, status: scope ? 'loading' : 'idle' }))
   const [issuing, setIssuing] = useState(false)
   const [reissueOpen, setReissueOpen] = useState(false)
-  const [error, setError] = useState('')
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
-  const [copiedId, setCopiedId] = useState('')
-  const storeId = store?.id || ''
 
-  const loadAddresses = useCallback(async () => {
-    if (!accountId || !storeId) { setAddresses([]); setError(''); return }
-    setLoading(true)
-    setError('')
+  const loadAddresses = useCallback(async (preserveNotice = false) => {
+    const seq = ++loadSeqRef.current
+    const requestScope = accountId && storeId ? `${accountId}:${storeId}` : ''
+    if (!requestScope) {
+      setLoadState({ scope: '', status: 'idle' })
+      setActionError('')
+      setNotice('')
+      return
+    }
+    setLoadState({ scope: requestScope, status: 'loading' })
     setActionError('')
-    setNotice('')
+    if (!preserveNotice) setNotice('')
     try {
       const response = await restaurantTestApi.listIntakeAddresses(accountId, storeId)
-      setAddresses(response.data)
+      if (loadSeqRef.current !== seq || scopeRef.current !== requestScope) return
+      if ((response as { success?: boolean } | null)?.success === false || !Array.isArray(response?.data)) {
+        setLoadState({ scope: requestScope, status: 'error', error: '取り込みアドレスを読み込めませんでした。' })
+        return
+      }
+      setLoadState({ scope: requestScope, status: 'ready', addresses: response.data })
     } catch (caught) {
-      setAddresses([])
-      setError(intakeAddressError(caught))
-    } finally {
-      setLoading(false)
+      if (loadSeqRef.current !== seq || scopeRef.current !== requestScope) return
+      setLoadState({ scope: requestScope, status: 'error', error: intakeAddressError(caught) })
     }
   }, [accountId, storeId])
 
-  useEffect(() => { void loadAddresses() }, [loadAddresses])
+  useEffect(() => {
+    setReissueOpen(false)
+    setActionError('')
+    setNotice('')
+    issuingRef.current = false
+    setIssuing(false)
+    void loadAddresses(false)
+    return () => { loadSeqRef.current += 1 }
+  }, [loadAddresses])
+
+  const scopedState: IntakeLoadState = loadState.scope === scope ? loadState : { scope, status: scope ? 'loading' : 'idle' }
+  const loading = scopedState.status === 'loading'
+  const error = scopedState.status === 'error' ? scopedState.error : ''
+  const addresses = scopedState.status === 'ready' ? scopedState.addresses : []
 
   const issue = async () => {
-    if (!storeId || error) return
+    if (!scope || error || issuingRef.current) return false
+    const requestScope = scope
+    const hadExisting = addresses.length > 0
+    issuingRef.current = true
     setIssuing(true)
     setNotice('')
     setActionError('')
     try {
-      await restaurantTestApi.issueIntakeAddress(accountId, storeId)
+      const result = await restaurantTestApi.issueIntakeAddress(accountId, storeId)
+      if (scopeRef.current !== requestScope) return false
+      if ((result as { success?: boolean } | null)?.success === false) {
+        setActionError('取り込みアドレスを発行できませんでした。もう一度お試しください。')
+        return false
+      }
       setReissueOpen(false)
-      void loadAddresses()
-      setNotice(addresses.length > 0 ? '新しいアドレスを発行しました。旧アドレスは90日後に失効します。' : '取り込みアドレスを発行しました。')
+      setNotice(hadExisting ? '新しいアドレスを発行しました。旧アドレスは90日後に失効します。' : '取り込みアドレスを発行しました。')
+      void loadAddresses(true)
       return true
     } catch (caught) {
+      if (scopeRef.current !== requestScope) return false
       setActionError(intakeAddressError(caught))
       return false
     } finally {
-      setIssuing(false)
+      if (scopeRef.current === requestScope) {
+        issuingRef.current = false
+        setIssuing(false)
+      }
     }
   }
 
@@ -220,7 +262,7 @@ export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: 
       ) : loading ? (
         <p className={styles.muted}>取り込みアドレスを確認中…</p>
       ) : error ? (
-        <p className={styles.intakeError}>{error}</p>
+        <Notice tone="danger" action={<Button onClick={() => void loadAddresses(false)}>もう一度読み込む</Button>}>{error}</Notice>
       ) : addresses.length === 0 ? (
         <Notice tone="info">{emptyValue('unconfigured')}</Notice>
       ) : (

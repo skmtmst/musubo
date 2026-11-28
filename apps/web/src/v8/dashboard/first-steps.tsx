@@ -10,11 +10,11 @@ import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared
 import { lockUnless } from '@/components/shared/permission-lock'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { DisclosureToggle } from '@/components/shared/disclosure'
 import styles from './first-steps.module.css'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 
-import { nextFirstStepKey, type FirstStepsGuide, type FirstStepsSummary } from './first-steps-model'
+import { isFirstStepsComplete, nextFirstStepKey, type FirstStepsGuide, type FirstStepsSummary } from './first-steps-model'
 
 /* 状態・保存・実測は first-steps-model に置く。呼び出し元の入口を変えないため、ここから名前を通す。 */
 export {
@@ -23,6 +23,7 @@ export {
   nextFirstStepKey,
   readFirstStepsFolded,
   shouldShowFirstSteps,
+  shouldKeepFirstStepsVisible,
   summarizeFirstSteps,
   useFirstMessageArrived,
   useFirstSteps,
@@ -51,8 +52,9 @@ export function FirstStepsGuideFooter({ guide }: { guide: FirstStepsGuide }) {
   カードは「見出し → 手順 → 続きから/最初から」を表示する。
   「選んだ機能の設定」ブロックと「使い方の設定を開く」は置かない（利用者判断）。
 */
-export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false, firstMessageInline = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; firstMessageInline?: boolean }) {
-  const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total)
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, feedback, guide, readOnly = false, firstMessageInline = false, keepVisible = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onRetry?: () => void; feedback?: ReactNode; guide?: FirstStepsGuide; readOnly?: boolean; firstMessageInline?: boolean; keepVisible?: boolean }) {
+  const complete = isFirstStepsComplete(summary)
+  if (isFirstStepsComplete(summary) && !keepVisible) return null
   const nextKey = summary ? nextFirstStepKey(summary) : null
   /* 再開の導線はガイド進行中だけ（承認済み Pen：通常 la9o6/FJ6Xd には無く、進行中 sL2CD/rvGC6 にだけある）。
      始めるのは各行の「開く」なので、まだ始めていない間はカードに同じ操作を増やさない。 */
@@ -69,10 +71,7 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onRetry, 
         <span className={styles.spacer} />
         {onRetry && summary?.steps.some(step => step.state === 'unknown') ? <Button size="compact" onClick={onRetry}>設定を読み直す</Button> : null}
         {onRecheck ? <Button size="compact" onClick={onRecheck} title="最初の1通の自動の確かめを止めました">もう一度確かめる</Button> : null}
-        {summary && !complete ? <button type="button" className={styles.fold} onClick={onToggle} aria-expanded={!folded} aria-controls="first-steps-list">
-          {folded ? '開く' : '畳む'}
-          {folded ? <ChevronDown className={styles.foldIcon} aria-hidden="true" /> : <ChevronUp className={styles.foldIcon} aria-hidden="true" />}
-        </button> : null}
+        {summary && !complete ? <DisclosureToggle open={!folded} controls="first-steps-list" onToggle={onToggle} subject="はじめにやること" /> : null}
       </div>
       {feedback}
       {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>

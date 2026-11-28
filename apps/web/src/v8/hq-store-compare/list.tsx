@@ -3,7 +3,7 @@ import { DetailContent, DetailField, DetailSection, DetailSectionTitle } from '@
 
 import PeriodPicker from '@/components/shared/period-picker'
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Download } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { StoreComparisonDetail, HqAttentionKind, StoreComparisonResult, StoreComparisonRow } from '@line-crm/shared'
@@ -13,6 +13,7 @@ import Card from '@/components/shared/card'
 import { ValueBarChart } from '@/components/shared/charts'
 import DeltaChip from '@/components/shared/delta-chip'
 import Drawer from '@/components/shared/drawer'
+import DisplayItemsDialog from '@/components/shared/display-items-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -35,6 +36,8 @@ import styles from './list.module.css'
 import { formatNumber } from '@/lib/format'
 import { EmptyCell } from '@/components/shared/empty-value'
 import { notifyToast } from '@/components/shared/toast'
+import { readStaffIdentity, subscribeStaffIdentity } from '@/lib/staff-identity-state'
+import { columnPreferenceKey, readColumnPreference } from './column-preference'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
@@ -69,7 +72,9 @@ export default function StoreComparisonList() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [diffOnly, setDiffOnlyState] = useState(() => searchParams.get('diffOnly') === '1')
-  const { accounts, refreshAccounts } = useAccount()
+  const { accounts, refreshAccounts, selectedAccountId } = useAccount()
+  const identity = useSyncExternalStore(subscribeStaffIdentity, readStaffIdentity, () => null)
+  const preferenceKey = identity?.tenantId && identity.id ? columnPreferenceKey(identity.tenantId, identity.id, selectedAccountId) : null
   const role = useStaffRole()
   const canManage = readSessionSnapshot()?.impersonation?.mode !== 'read' && canManageRole(role)
   const [checkingId, setCheckingId] = useState<string | null>(null)
@@ -82,21 +87,39 @@ export default function StoreComparisonList() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<10 | 20 | 50>(20)
   const [status, setStatus] = useState<Status>('loading')
+  const loadSequence = useRef(0)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<StoreComparisonResult | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const [preference, setPreference] = useState<{ key: string | null; metrics: MetricDef['key'][] }>(() => ({ key: null, metrics: METRICS.map(metric => metric.key) }))
+  const visibleMetrics = preference.key === preferenceKey ? preference.metrics : METRICS.map(metric => metric.key)
   const period = useMemo(() => pastPeriod(days), [days])
 
+  useEffect(() => {
+    let metrics: MetricDef['key'][] | null = null
+    try { if (preferenceKey) metrics = readColumnPreference(window.localStorage, preferenceKey) } catch { /* 保存領域を使えないときは既定値。 */ }
+    const next = metrics ?? METRICS.map(metric => metric.key)
+    setPreference({ key: preferenceKey, metrics: next })
+    const initialSort = next.includes('bookings') ? 'bookings' : next[0]
+    setSort(initialSort)
+    setOrder(METRICS.find(metric => metric.key === initialSort)?.good === 'low' ? 'desc' : 'asc')
+    setPage(1)
+  }, [preferenceKey])
+
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setStatus('loading')
     try {
       const response = await storeComparisonApi.get({ from: period.from, to: period.to, compare, sort, order, page, pageSize })
       if (!response.success) throw new Error('store_comparison_failed')
+      if (sequence !== loadSequence.current) return
       setData(response.data)
       setStatus('ready')
     } catch (reason) {
+      if (sequence !== loadSequence.current) return
       setError(reason)
       setStatus('error')
     }
@@ -152,7 +175,8 @@ export default function StoreComparisonList() {
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1
   const last = Math.min(page * pageSize, total)
   const openRow = data?.rows.find((row) => row.accountId === openId) ?? null
-  const columns = data && diffOnly ? columnsWithDiff(data.rows, data.average) : METRICS
+  const matchingColumns = data && diffOnly ? columnsWithDiff(data.rows, data.average) : METRICS
+  const columns = visibleMetrics.flatMap(key => matchingColumns.filter(metric => metric.key === key))
 
   /* 切り替えは URL に残す（再読込・共有でも同じ表示）。ほかの URL の条件は消さない。 */
   const setDiffOnly = (next: boolean) => {
@@ -179,6 +203,7 @@ export default function StoreComparisonList() {
         <DiffOnlyToggle checked={diffOnly} onChange={setDiffOnly} />
       </>}
       trailing={<>
+        <Button variant="secondary" onClick={() => setColumnsOpen(true)}>表示する列</Button>
         <PageSizeSelect value={pageSize} onChange={(next) => { setPage(1); setPageSize(next as 10 | 20 | 50) }} />
         <Button variant="secondary" icon={<Download size={16} aria-hidden="true" />} onClick={() => void exportCsv()} busy={exporting} disabled={exporting}>CSVで書き出す</Button>
       </>}
@@ -192,7 +217,7 @@ export default function StoreComparisonList() {
   ) : !data || data.rows.length === 0 ? (
     <ListState kind="empty" emptyPreset="readonly" title="比べる店がまだありません" description="統括に店が入ると、ここで数を並べて見られます。" />
   ) : columns.length === 0 ? (
-    <ListState kind="empty" emptyPreset="filtered" title="全店の平均と違う数はありません" description="どの店も、7 つの数が全店の平均と同じです。" action={<Button variant="secondary" onClick={() => setDiffOnly(false)}>すべて表示</Button>} />
+    <ListState kind="empty" emptyPreset="filtered" title={matchingColumns.length === 0 ? '全店の平均と違う数はありません' : '表示する列に、全店の平均と違う数はありません'} description={matchingColumns.length === 0 ? 'どの店も、7 つの数が全店の平均と同じです。' : '列を変更するか、違いだけ表示を解除してください。'} action={<Button variant="secondary" onClick={() => setDiffOnly(false)}>すべて表示</Button>} />
   ) : (
     <ListPageSection>
       <DataTable columns={`minmax(0, 1.1fr) repeat(${columns.length}, minmax(0, 1fr))`}>
@@ -274,6 +299,16 @@ export default function StoreComparisonList() {
         ) : null}
         {body}
       </ListPage>
+      {columnsOpen ? <DisplayItemsDialog title="表示する列" presentation="columns" fixedLabel="店" minSelected={1} description="表に出す指標を選んで並べ替えます。CSV にはすべての指標が入ります。" items={METRICS.map(metric => ({ key: metric.key, label: metric.label, group: '指標' }))} selected={visibleMetrics} onCancel={() => setColumnsOpen(false)} onConfirm={keys => {
+        const next = keys as MetricDef['key'][]
+        setPreference({ key: preferenceKey, metrics: next })
+        if (preferenceKey) { try { window.localStorage.setItem(preferenceKey, JSON.stringify(next)) } catch { /* この画面では選択を保持する。 */ } }
+        if (!next.includes(sort)) {
+          const first = next.find(key => matchingColumns.some(metric => metric.key === key)) ?? next[0]
+          if (first) { setPage(1); setSort(first); setOrder(METRICS.find(metric => metric.key === first)?.good === 'low' ? 'desc' : 'asc') }
+        }
+        setColumnsOpen(false)
+      }} /> : null}
       <StoreDrawer row={openRow} period={period} compare={compare} average={data?.average ?? null} diffOnly={diffOnly} onDiffOnly={setDiffOnly} onClose={() => setOpenId(null)} />
     </>
   )
@@ -282,7 +317,7 @@ export default function StoreComparisonList() {
 function DiffOnlyToggle({ checked, onChange }: { checked: boolean; onChange: (next: boolean) => void }) {
   return (
     <span className={styles.diffToggle}>
-      <Toggle checked={checked} label="違いだけ表示" onChange={onChange} />
+      <Toggle size="toolbar" checked={checked} label="違いだけ表示" onChange={onChange} />
       <span aria-hidden="true">違いだけ表示</span>
     </span>
   )
@@ -297,7 +332,7 @@ function DiffCountLine({ row, average }: { row: StoreComparisonRow; average: Sto
 }
 
 function MetricCell({ def, metric, compare, computed, coverage }: { def: MetricDef; metric: StoreComparisonRow['metrics'][MetricDef['key']] | undefined; compare: 'previous' | 'average'; computed: boolean; coverage: string | null }) {
-  if (!metric || !metric.available || metric.value === null) {
+  if (!metric || !metric.available || typeof metric.value !== 'number' || !Number.isFinite(metric.value)) {
     return <span className={styles.cellEmpty} title={computed ? 'この数はまだ取れていません' : NOT_COMPUTED}>—</span>
   }
   const diff = formatDiff(def.key, metric.diff)

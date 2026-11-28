@@ -181,7 +181,7 @@ describe('管理画面 保存タブの定期レポート', () => {
     const menu = host.querySelector('button[aria-label="定期レポート「週次まとめ」の操作"]') as HTMLButtonElement
     expect(menu).not.toBeNull()
     await act(async () => { menu.click() })
-    expect(document.body.textContent).toContain('内容を変える')
+    expect(document.body.textContent).toContain('内容を変更する')
   })
 
   it('止める・また送るを読み取った版つきで送る', async () => {
@@ -248,7 +248,7 @@ describe('管理画面 保存タブの定期レポート', () => {
     fixture.role = 'staff'
     await render()
     expect(host.textContent).toContain('週次まとめ')
-    const edit = [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === '内容を変える')!
+    const edit = [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === '内容を変更する')!
     expect(edit.getAttribute('aria-disabled') === 'true' || edit.hasAttribute('disabled')).toBe(true)
     expect(host.querySelector('a[title="条件を変えるときは、元の分析で集計し直してから保存します"]')).toBeNull()
     for (const label of ['止める', 'また送る', 'しまう', '定期レポートを作る']) {

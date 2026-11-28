@@ -284,7 +284,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
     await act(async () => { root.render(<FeatureSettingsScreen />) })
     await flush()
     expect(host.querySelectorAll('[role="switch"]:not([aria-label*="まとめて"])').length).toBeGreaterThan(0)
-    expect(buttonNames()).toContain('並びを変える')
+    expect(buttonNames()).toContain('並びを変更する')
     expect(host.querySelector('[role="switch"][aria-label*="まとめて"]')).toBeNull()
     expect(buttonNames()).toContain('すべてオン')
     expect(buttonNames()).toContain('すべてオフ')
@@ -308,7 +308,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
       expect(controls.length).toBeGreaterThan(0)
       const before = controls.map(button => button.getAttribute('aria-checked'))
       const actions = within(host)
-      const locked = [...controls, actions.getByRole('button', { name: '並びを変える' }) as HTMLButtonElement,
+      const locked = [...controls, actions.getByRole('button', { name: '並びを変更する' }) as HTMLButtonElement,
         ...actions.getAllByRole('button', { name: /をすべて(?:オン|オフ)$/ }) as HTMLButtonElement[]]
       const reason = role === 'viewer' ? PERMISSION_LOCK_REASON.viewer : PERMISSION_LOCK_REASON.manager
       for (const button of locked) {
@@ -341,7 +341,7 @@ describe('★V8 機能設定の閲覧のみ', () => {
         expect(button.hasAttribute('data-permission-locked')).toBe(false)
         await act(async () => { fireEvent.click(button) })
       }
-      expect((within(host).getByRole('button', { name: '並びを変える' }) as HTMLButtonElement).disabled).toBe(true)
+      expect((within(host).getByRole('button', { name: '並びを変更する' }) as HTMLButtonElement).disabled).toBe(true)
       expect(host.querySelector('[data-read-only-notice]')).toBeNull()
       expect(within(document.body).queryByRole('tooltip')).toBeNull()
       const writes = fetchSpy.mock.calls.filter(([, init]) => !['GET', 'HEAD'].includes((init?.method ?? 'GET').toUpperCase()))

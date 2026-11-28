@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import TextLink from '@/components/shared/text-link'
 import FilterLink from '@/components/shared/filter-link'
 import HelpTip from '@/components/shared/help-tip'
@@ -208,7 +210,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
               const changed = (field.value ?? '') !== (values[field.id] ?? '')
               return (
                 <div key={field.id} className={styles.field} data-changed={changed || undefined}>
-                  <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${label}（${FIELD_TYPE_LABELS[field.type] ?? field.type}）`}>
+                  <label htmlFor={id} id={`${id}-label`} className={styles.fieldLabel} title={`${label}（${knownValue(FIELD_TYPE_LABELS, field.type, field.type)}）`}>
                     {field.isStarred ? <span aria-label="★つき">★</span> : null}
                     <span className={styles.fieldLabelText}>{label}</span>
                     {/* 値の出どころ（手で入れた・回答フォーム…）は題の横に1行で（vX3wQ）。全文は title。 */}

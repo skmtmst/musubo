@@ -19,3 +19,9 @@ describe('保存した検索の行の文（絵 IWnYX）', () => {
     expect(usageSummary(undefined)).toBe('—')
   })
 })
+
+
+it.each(['constructor', 'toString', '__proto__', 'future'])('知らない検索の使用先 %s はそのほかとして数える', kind => {
+  expect(usageSummary([{ kind, id: 'a', name: '確認用' }] as never)).toBe('そのほか「確認用」')
+  expect(usageSummary([{ kind, id: 'a', name: '確認用' }, { kind: 'broadcast', id: 'b', name: '配信' }] as never)).toBe('そのほか 1・一斉配信 1')
+})

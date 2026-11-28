@@ -144,7 +144,7 @@ describe('段2 使う機能の初期セット', () => {
   it('まだ選んでいなければ機能設定へ誘う', () => {
     const step = featureSetStep({ kind: 'picker' })
     expect(step.state).toBe('todo')
-    expect(step.action).toEqual({ label: '使う機能を選ぶ', href: '/settings' })
+    expect(step.action).toEqual({ label: '使う機能を選択する', href: '/settings' })
   })
 
   it('権限が無ければ進めないと言う', () => {

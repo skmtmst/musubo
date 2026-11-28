@@ -285,7 +285,7 @@ export function Toast({
           {item.actionLabel}
         </button>
       ) : null}
-      {dismiss ? <button type="button" className={styles.close} onClick={dismiss} aria-label="知らせを閉じる"><X aria-hidden="true" size={16} /></button> : null}
+      {dismiss ? <button data-close-control="" type="button" className={styles.close} onClick={dismiss} aria-label="知らせを閉じる"><X aria-hidden="true" size={16} /></button> : null}
     </div>
   )
 }

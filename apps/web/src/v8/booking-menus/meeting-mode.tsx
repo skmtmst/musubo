@@ -13,6 +13,8 @@ import { Field } from '@/components/shared/form-controls'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { bookingCalendarApi } from '@/lib/api/helpers/gap1'
 import { fetchApi } from '@/lib/api'
+import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button'
 import styles from './meeting-mode.module.css'
 
 /*
@@ -27,17 +29,21 @@ export function useMenuMeeting(accountId: string | null, menuId: string | null, 
   const [savedMode, setSavedMode] = useState<MeetingMode>(initialMode ?? 'in_person')
   const [mode, setMode] = useState<MeetingMode>(initialMode ?? 'in_person')
   const [url, setUrl] = useState<{ value: string; saved: string; version: number } | null>(null)
+  const [urlStatus, setUrlStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [urlAttempt, setUrlAttempt] = useState(0)
   useEffect(() => { setSavedMode(initialMode ?? 'in_person'); setMode(initialMode ?? 'in_person') }, [initialMode, menuId])
   useEffect(() => {
-    if (!accountId) { setUrl(null); return }
+    if (!accountId) { setUrl(null); setUrlStatus('loading'); return }
     /* 作る画面：空の URL から始め、メニューができてから同じ口へ送る（版 0）。 */
-    if (!menuId) { setUrl({ value: '', saved: '', version: 0 }); return }
+    if (!menuId) { setUrl({ value: '', saved: '', version: 0 }); setUrlStatus('ready'); return }
     let alive = true
+    setUrl(null)
+    setUrlStatus('loading')
     void Promise.resolve().then(() => bookingCalendarApi.getMenuUrl(accountId, menuId))
-      .then((response) => { if (alive) setUrl({ value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version }) })
-      .catch(() => { if (alive) setUrl(null) })
+      .then((response) => { if (alive) { setUrl({ value: response.data.url ?? '', saved: response.data.url ?? '', version: response.data.version }); setUrlStatus('ready') } })
+      .catch(() => { if (alive) { setUrl(null); setUrlStatus('error') } })
     return () => { alive = false }
-  }, [accountId, menuId])
+  }, [accountId, menuId, urlAttempt])
   const urlDirty = url !== null && url.value.trim() !== url.saved
   const dirty = mode !== savedMode || urlDirty
   const urlInvalid = url !== null && url.value.trim() !== '' && !/^https:\/\/\S+$/.test(url.value.trim())
@@ -57,15 +63,17 @@ export function useMenuMeeting(accountId: string | null, menuId: string | null, 
     }
     return version
   }, [accountId, mode, savedMode, url, urlDirty, urlInvalid])
-  return { mode, setMode, url, setUrl, dirty, urlInvalid, save, reset: () => { setMode(savedMode); if (url) setUrl({ ...url, value: url.saved }) } }
+  return { mode, setMode, url, setUrl, urlStatus, retryUrl: () => setUrlAttempt(value => value + 1), dirty, urlInvalid, save, reset: () => { setMode(savedMode); if (url) setUrl({ ...url, value: url.saved }) } }
 }
 export type MenuMeetingState = ReturnType<typeof useMenuMeeting>
 
 export function MeetingModeCard({ state, readOnly }: { state: MenuMeetingState; readOnly: boolean }) {
   const preparing = usePreparingDialog()
   const online = state.mode !== 'in_person'
+  const urlNotice = online && state.urlStatus !== 'ready' ? <Notice tone={state.urlStatus === 'error' ? 'danger' : 'info'}>{state.urlStatus === 'error' ? '会議の URL を読み込めませんでした。' : '会議の URL を読み込んでいます。'}</Notice> : null
+  const retry = online && state.urlStatus === 'error' ? <Button type="button" variant="secondary" onClick={state.retryUrl}>会議の URL を読み直す</Button> : null
   if (readOnly) {
-    return <Card variant="form" gap="normal"><CardHeader size="stacked" title="会い方" /><p className={styles.readValue}>{state.mode === 'online' ? 'オンライン' : state.mode === 'customer_choice' ? 'お客さまが選ぶ' : '対面'}{state.url?.saved ? `・${state.url.saved}` : ''}</p></Card>
+    return <Card variant="form" gap="normal"><CardHeader size="stacked" title="会い方" /><p className={styles.readValue}>{state.mode === 'online' ? 'オンライン' : state.mode === 'customer_choice' ? 'お客さまが選ぶ' : '対面'}{state.url?.saved ? `・${state.url.saved}` : ''}</p>{urlNotice}{retry}</Card>
   }
   return (
     <Card variant="form" gap="normal">
@@ -87,6 +95,7 @@ export function MeetingModeCard({ state, readOnly }: { state: MenuMeetingState; 
             <Radio name="menu-meeting-url" checked={false} onChange={() => preparing.open('会議の自動発行')}>自動で発行（予約が決まったら作る）</Radio>
           </RadioGroup>
           <div className={styles.infoBox}><Video size={16} aria-hidden="true" /><span><strong>担当の固定の URL を先に使います</strong><span className={styles.minor}>担当に URL が無いときは、このメニューの URL を使います。</span></span></div>
+          {urlNotice}{retry}
           <Field label="メニューの固定の URL（担当に固定の URL が無いとき・作れなかったときに使います）" optional error={state.urlInvalid ? 'https:// で始まる URL を入れてください' : undefined}>
             <TextField aria-label="メニューの固定の URL" value={state.url?.value ?? ''} placeholder="https://zoom.us/j/…" disabled={state.url === null}
               onChange={(event) => state.url && state.setUrl({ ...state.url, value: event.target.value })} />

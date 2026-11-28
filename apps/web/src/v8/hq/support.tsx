@@ -24,7 +24,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { EMPTY_SUPPORT_INPUT, SUPPORT_ATTACHMENT_MAX, SUPPORT_BODY_MAX, SUPPORT_SUBJECT_MAX, validateSupportAttachment, validateSupportInput, type HqSupportContext, type HqSupportInput, type HqSupportKind, type HqSupportRequest } from '@/lib/hq-support'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import NoticeLineDialogV8 from './notice-line-dialog'
-import { SUPPORT_STATUS_WORDS, supportKindWord, supportTime } from './support-words'
+import { supportStatusWord, supportStatusTone, supportKindWord, supportTime } from './support-words'
 import styles from './support.module.css'
 import ImageFrame from '@/components/shared/image-frame'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -376,7 +376,7 @@ export default function HqSupportV8() {
                   </GridCell>
                   <GridCell>{supportKindWord(item.kind, item.kindLabel)}</GridCell>
                   <GridCell>
-                    <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>
+                    <StatusBadge tone={supportStatusTone(item.status)}>{supportStatusWord(item.status)}</StatusBadge>
                   </GridCell>
                   <GridCell><span className={styles.shortText}>{supportTime(latestReply?.createdAt ?? item.createdAt)}</span></GridCell>
                 </GridRow>

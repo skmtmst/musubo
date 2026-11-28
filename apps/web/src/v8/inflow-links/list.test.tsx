@@ -142,6 +142,34 @@ describe('V8 流入と計測の一覧', () => {
     expect(buttons.find(button => button.textContent?.includes('友だち追加なし'))?.textContent?.trim()).toBe('友だち追加なし')
   })
 
+  it('クリックが0件で名前や日時が空の集計も読み込める', async () => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input)).pathname === '/api/analytics/ref-summary') return json({ success: true, data: { ...SUMMARY, routes: [{ ...SUMMARY.routes[0], name: null, latestAt: null, clickCount: 0 }] } })
+      return originalFetch(input, init)
+    })
+    await render()
+    expect(rowOf('summer-ig')?.querySelector('[class*="colFriends"]')?.textContent).toContain('31 人')
+    expect(rowOf('summer-ig')?.querySelector('[class*="colClicks"]')?.textContent).toContain('0')
+  })
+
+  it.each([
+    ['合計が負数', { ...SUMMARY, totalFriends: -1 }],
+    ['経路の件数が不正', { ...SUMMARY, routes: [{ ...SUMMARY.routes[0], friendCount: '31' }] }],
+  ])('%sの集計は確かな数として表示しない', async (_label, data) => {
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (new URL(String(input)).pathname === '/api/analytics/ref-summary') return json({ success: true, data })
+      return originalFetch(input, init)
+    })
+    await render()
+    expect(rowOf('summer-ig')?.querySelector('[class*="colFriends"]')?.textContent).toBe('—')
+    const presets = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('よく使う絞り込み'))!
+    await act(async () => { presets.click() })
+    const dialog = host.querySelector('[role="dialog"][aria-label="よく使う絞り込みと並び順"]')!
+    expect([...dialog.querySelectorAll('button')].find(button => button.textContent?.includes('友だち追加あり'))?.textContent?.trim()).toBe('友だち追加あり')
+  })
+
   it('アカウントを切り替えて戻しても古い停止確認は実行しない', async () => {
     const originalFetch = globalThis.fetch
     const updates: string[] = []

@@ -37,8 +37,15 @@ export function useNextBroadcast(accountId: string | null, start: boolean) {
     void api.dashboard.upcoming(accountId, NEXT_BROADCAST_DAYS)
       .then((response) => {
         if (cancelled) return
-        const item = response.success ? response.data.items.filter((entry) => entry.kind === 'broadcast').sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0] ?? null : null
-        setState({ accountId, item, failed: !response.success })
+        if (!response.success) {
+          setState({ accountId, item: null, failed: true })
+          return
+        }
+        if (!Array.isArray(response.data?.items) || response.data.items.some((entry) => !entry || typeof entry !== 'object')) throw new Error('invalid upcoming broadcasts')
+        const broadcasts = response.data.items.filter((entry) => entry.kind === 'broadcast')
+        if (broadcasts.some((entry) => typeof entry.startsAt !== 'string' || !Number.isFinite(Date.parse(entry.startsAt)) || typeof entry.title !== 'string')) throw new Error('invalid upcoming broadcasts')
+        const item = broadcasts.sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0] ?? null
+        setState({ accountId, item, failed: false })
       })
       .catch(() => { if (!cancelled) setState({ accountId, item: null, failed: true }) })
     return () => { cancelled = true }

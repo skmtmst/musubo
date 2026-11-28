@@ -74,11 +74,13 @@ const WHEN_USED = [
 export function buildUsageRows(dependencies: TagDependencies | null, usedIn: Tag['usedIn']): UsageRow[] {
   const counts = dependencies?.referenceCounts as Record<string, number> | undefined
   const fallback = (usedIn ?? {}) as Record<string, number | undefined>
-  const hrefOf = (kind: string) => dependencies?.references.find((ref) => ref.kind === kind)?.href ?? null
-  const row = (entry: { key: string; kind: string; label: string }): UsageRow => {
+  const references = Array.isArray(dependencies?.references) ? dependencies.references : []
+  const hrefOf = (kind: string) => references.find((ref) => ref?.kind === kind)?.href ?? null
+  const row = (entry: { key: string; kind: string; label: string }): UsageRow & { invalid: boolean } => {
     const fromDeps = counts?.[entry.key]
-    const value = typeof fromDeps === 'number' ? fromDeps : fallback[entry.key]
-    return { label: entry.label, count: value ?? 0, href: hrefOf(entry.kind), known: typeof value === 'number' || Boolean(counts) }
+    const value = fromDeps != null ? fromDeps : fallback[entry.key]
+    const valid = typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    return { label: entry.label, count: valid ? value : 0, href: hrefOf(entry.kind), known: valid || (value === undefined && Boolean(counts)), invalid: value !== undefined && !valid }
   }
-  return [...ALWAYS.map(row), ...WHEN_USED.map(row).filter((r) => r.count > 0)]
+  return [...ALWAYS.map(row), ...WHEN_USED.map(row).filter((r) => r.count > 0 || r.invalid)].map(({ invalid: _invalid, ...result }) => result)
 }

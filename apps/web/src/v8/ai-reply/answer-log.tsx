@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 
 import { PAGE_SIZES, pageSizeOptions } from '@/components/shared/page-size-options'
@@ -176,7 +177,7 @@ export default function AnswerLogV8() {
           closeAppearance="box"
           heightMode="viewport"
           onClose={() => setUrl({ log: '' })}
-          status={opened ? <StatusBadge tone={ACTION_TONE[opened.action]}>{ACTION_LABEL[opened.action]}</StatusBadge> : null}
+          status={opened ? <StatusBadge tone={knownValue(ACTION_TONE, opened.action, 'neutral' as const)}>{knownValue(ACTION_LABEL, opened.action, '内容を確認できません')}</StatusBadge> : null}
           actions={{ primary: opened ? <Button variant="primary" href={`/chats?friend=${encodeURIComponent(opened.friendId)}`}>受信箱で会話を開く</Button> : null, menuItems: [...(opened?.qa ? [{id: 'open-qa', label: 'Q&A を開く', href: '/auto-replies?tab=qa'}] : []), ...(opened && opened.qa && opened.qa.status === 'published' && opened.action === 'answered' ? [{ allowed: permissions.publishQa, id: 'detail-0', label: "この答えを止める", onSelect: () => { if (!detailScope || detailScope !== accountScope.current) return; setStopError(''); const ticket = {}; stopTicket.current = ticket; setStopTarget({ qaEntryId: opened.qa!.id, title: opened.qa!.title, version: opened.qa!.version, scope: detailScope, ticket }); } }] : [])] }}
         >
 <DetailContent>
@@ -235,7 +236,7 @@ export default function AnswerLogV8() {
                 <Td grow weight={1}>{at(log.createdAt)}</Td>
                 <Td grow weight={1} title={log.friendName}><TruncatedText value={log.friendName} /></Td>
                 <Td grow weight={3} title={log.questionText}><TruncatedText value={log.questionText} /></Td>
-                <Td><StatusBadge tone={ACTION_TONE[log.action]}>{ACTION_LABEL[log.action]}</StatusBadge></Td>
+                <Td><StatusBadge tone={knownValue(ACTION_TONE, log.action, 'neutral' as const)}>{knownValue(ACTION_LABEL, log.action, '内容を確認できません')}</StatusBadge></Td>
                 <Td grow weight={2} title={log.qaTitle ?? handoffReasonText(log.handoffReason)}><TruncatedText value={log.qaTitle ?? '—'} /></Td>
                 <ActionCell>
                   <RowMenu
@@ -275,7 +276,7 @@ function LogDetailBody({ log }: { log: AiAnswerLogDetail }) {
       </DetailSection>
       <DetailSection title="元の Q&A">
         {log.qa ? (
-          <DetailField label="Q&A" note={`${QA_STATUS_LABEL[log.qa.status]}・使われた ${formatNumber(log.qa.useCount)} 回・最後に直した ${formatDate(log.qa.updatedAt, { style: 'list-day', fallback: '—' })}`}>{log.qa.title}
+          <DetailField label="Q&A" note={`${knownValue(QA_STATUS_LABEL, log.qa.status, '状態を確認できません')}・使われた ${formatNumber(log.qa.useCount)} 回・最後に直した ${formatDate(log.qa.updatedAt, { style: 'list-day', fallback: '—' })}`}>{log.qa.title}
             {differs ? <p className={styles.differs}>今の答えと違います（送った時の答えを出しています）</p> : null}
           </DetailField>
         ) : <p className={styles.after}>—</p>}

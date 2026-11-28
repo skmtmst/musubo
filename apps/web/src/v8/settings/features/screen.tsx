@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ReorderDialog } from './reorder-dialog'
+import AiFeatures from './ai-features'
 export { ReorderDialog } from './reorder-dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle, { ToggleGroupActions } from '@/components/shared/toggle'
@@ -451,7 +452,7 @@ export default function FeatureSettingsScreen() {
             <span className={styles.spacer} />
             <Button variant="secondary" lockedReason={permissionReason} onClick={() => { if (canManage) setReorderOpen(true) }} disabled={saving || !canManage}>
                   <ArrowUpDown className={styles.btnIcon} aria-hidden="true" />
-                  並びを変える
+                  並びを変更する
                 </Button>
             <RowMenu appearance="box" label="機能設定のほかの操作" triggerProps={{ disabled: saving || staffRole === null }}
                   items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', icon: null, disabled: saving || !canManage, lockedReason: permissionReason, onSelect: () => { if (canManage) setResetToDefaultsOpen(true) } }]} />
@@ -498,6 +499,8 @@ export default function FeatureSettingsScreen() {
               ))}
             </div>
           )}
+
+          <AiFeatures key={selectedAccountId} accountId={selectedAccountId} canManage={canManage} lockedReason={permissionReason} />
 
           {/* N-444：変更があるときだけ理由の欄を出す。 */}
           {canManage && dirty && (

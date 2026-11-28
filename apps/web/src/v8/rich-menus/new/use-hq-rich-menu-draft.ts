@@ -31,18 +31,24 @@ function valid(value: unknown): value is HqMenuDraft {
 }
 export function useHqRichMenuDraft(scope: string | undefined, snapshot: HqMenuDraft, restore: (draft: HqMenuDraft) => void) {
   const [readyScope, setReadyScope] = useState<string | undefined>()
-  const [failed, setFailed] = useState(false)
+  const [failedScope, setFailedScope] = useState<string | undefined>()
+  const failed = Boolean(scope && failedScope === scope)
   const restoreRef = useRef(restore)
   restoreRef.current = restore
   useEffect(() => {
-    if (!scope) return
+    if (!scope) {
+      setReadyScope(undefined)
+      setFailedScope(undefined)
+      return
+    }
     let active = true
     const restoredUrls: string[] = []
-    setFailed(false)
+    setReadyScope(undefined)
+    setFailedScope((prev) => (prev === scope ? undefined : prev))
     void readHqRichMenuDraft(scope).then(value => {
       if (!active) return
       if (value !== undefined) {
-        if (!valid(value)) { setFailed(true); return }
+        if (!valid(value)) { setFailedScope(scope); return }
         restoreRef.current({ ...value, pendingImages: value.pendingImages.map(image => {
           if (!image) return null
           const url = image.file ? URL.createObjectURL(image.file) : null
@@ -50,13 +56,15 @@ export function useHqRichMenuDraft(scope: string | undefined, snapshot: HqMenuDr
           return { ...image, url }
         }) })
       }
-    }).catch(() => { if (active) setFailed(true) }).finally(() => { if (active) setReadyScope(scope) })
+    }).catch(() => { if (active) setFailedScope(scope) }).finally(() => { if (active) setReadyScope(scope) })
     return () => { active = false; restoredUrls.forEach(url => URL.revokeObjectURL(url)) }
   }, [scope])
   useEffect(() => {
     if (!scope || readyScope !== scope || failed) return
+    let active = true
     const value = { ...snapshot, pendingImages: snapshot.pendingImages.map(image => image ? { ...image, url: null } : null) }
-    void writeHqRichMenuDraft(scope, value).catch(() => setFailed(true))
+    void writeHqRichMenuDraft(scope, value).catch(() => { if (active) setFailedScope(scope) })
+    return () => { active = false }
   }, [scope, readyScope, failed, snapshot.step, snapshot.maxStepIndex, snapshot.group, snapshot.pages, snapshot.activePageId,
     snapshot.selectedAreaId, snapshot.name, snapshot.chatBarText, snapshot.folderId, snapshot.size, snapshot.tabCount,
     snapshot.templateKey, snapshot.pendingImages, snapshot.tabNames, snapshot.audience, snapshot.hqTagName,

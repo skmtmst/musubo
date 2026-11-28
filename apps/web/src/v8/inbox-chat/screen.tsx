@@ -26,6 +26,7 @@ import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,S
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
 import InboxList from './inbox-list-view';
+import { useInboxChannelTabs } from './inbox-channel-tabs';
 import { savedViewFailureMessage } from './saved-view-failure';
 import { useInboxActions } from './use-inbox-actions';
 import { useInboxConversation } from './use-inbox-conversation';
@@ -58,13 +59,16 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   const { selectedAccountId, loading: accountsLoading } = useAccount()
 
+  const channelTabs = useInboxChannelTabs()
+  const unconfiguredChannel = channelTabs.unconfiguredChannel
+
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
-  const visibleThreadId = emailInboxEnabled && channel !== 'line' ? selectedThreadId : null
+  const visibleThreadId = !unconfiguredChannel && emailInboxEnabled && channel !== 'line' ? selectedThreadId : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const visibleChatId = channel === 'email' ? null : selectedChatId
+  const visibleChatId = unconfiguredChannel || channel === 'email' ? null : selectedChatId
 
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
@@ -99,7 +103,17 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
-  const [nameQuery, setNameQuery] = useState('')
+  const urlNameQuery = params.get('q')
+  const [nameQuery, setNameQuery] = useState(() => (urlNameQuery ?? '').slice(0, 200))
+  useEffect(() => { if (urlNameQuery !== null) setNameQuery(urlNameQuery.slice(0, 200)) }, [urlNameQuery])
+  useEffect(() => {
+    const onPaletteSearch = (event: Event) => {
+      const value: unknown = (event as CustomEvent).detail
+      if (typeof value === 'string') setNameQuery(value.slice(0, 200))
+    }
+    window.addEventListener('musubo:command-palette-chat-search', onPaletteSearch)
+    return () => window.removeEventListener('musubo:command-palette-chat-search', onPaletteSearch)
+  }, [])
 
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
@@ -820,6 +834,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
           handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
+          channelTabs, unconfiguredChannel, narrowDesktop, staffRole,
         }} />
 
         <InboxConversation {...{
@@ -841,6 +856,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
           imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
           overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
+          unconfiguredChannel, onOpenChannelSettings: (href: string) => router.push(href),
         }} />
 
         <InboxCustomerPanel

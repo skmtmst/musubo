@@ -30,7 +30,13 @@ export default function WaitlistSection({ onChanged, upcomingHeading }: { onChan
   useEffect(() => {
     let alive = true;
     setLoadFailed(false);
-    Promise.resolve().then(() => api.bookingWaitlists()).then((r) => { if (alive) setRows(r.waitlist as WaitlistRow[]); }).catch((e) => { logFailure('waitlist-section', e); if (alive) setLoadFailed(true); });
+    Promise.resolve().then(() => api.bookingWaitlists()).then((r) => {
+      if (!r || !Array.isArray(r.waitlist) || !r.waitlist.every(row => row &&
+        ['waiting', 'invited', 'converted', 'cancelled', 'finished'].includes(row.status))) {
+        throw new Error('Invalid waitlist response');
+      }
+      if (alive) setRows(r.waitlist as WaitlistRow[]);
+    }).catch((e) => { logFailure('waitlist-section', e); if (alive) setLoadFailed(true); });
     return () => { alive = false; };
   }, [reload]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);

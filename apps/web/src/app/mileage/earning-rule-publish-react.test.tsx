@@ -86,7 +86,7 @@ const friendsOverview = {
 /*
  * 通信の差し替え。呼ばれた口を全部残す。公開の返事だけ試験ごとに変える。
  */
-function stubFetch(options: { publish: () => Response; draftOnly?: boolean }) {
+function stubFetch(options: { publish: () => Response; draftOnly?: boolean; conditional?: boolean }) {
   const calls: Call[] = []
   globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
     const url = String(input)
@@ -102,7 +102,7 @@ function stubFetch(options: { publish: () => Response; draftOnly?: boolean }) {
       return new Response(JSON.stringify({
         success: true,
         data: {
-          items: [{ ...ruleFixture(), ...(options.draftOnly ? { publishedVersion: null } : {}) }],
+          items: [{ ...ruleFixture(), ...(options.draftOnly ? { publishedVersion: null } : {}), ...(options.conditional ? { draft: { ...ruleFixture().draft, targetConditions: { rules: [{}], groups: [] } } } : {}) }],
           pagination: { total: 1, limit: 20, offset: 0 },
           unassignedLegacyCount: 0,
           measuredAt: '2026-09-10T00:00:00.000Z',
@@ -263,6 +263,22 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     const content = document.querySelector('[role="dialog"]')!
     expect(content.textContent).toContain('公開中の第1版')
     expect(content.textContent).toContain('に反映')
+    expect(content.textContent).toContain('利用対象：すべての友だち')
+  })
+
+  it('未公開は下書きと条件付き対象を表示する', async () => {
+    stubFetch({ publish: () => { throw new Error('公開しない') }, draftOnly: true, conditional: true })
+    await renderPage()
+    await act(async () => { (await waitForRowMenuButton()).click() })
+    const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+    expect(items.some(node => node.textContent?.trim() === '公開版の中身を見る')).toBe(false)
+    const item = items.find(node => node.textContent?.trim() === '下書きの内容を見る')!
+    expect(item).toBeTruthy()
+    await act(async () => { item.click() })
+    const content = document.querySelector('[role="dialog"]')!
+    expect(content.textContent).toContain('下書き 第7版')
+    expect(content.textContent).toContain('まだ公開版はありません')
+    expect(content.textContent).toContain('利用対象：条件 1件')
   })
 
   it('確定したときだけpublishを1回送り、版と確認ヘッダーを添える', async () => {
@@ -282,6 +298,8 @@ describe('たまる決めごとの公開確認(本物のReact)', () => {
     expect(dialog()?.textContent).toContain('LINEアカウント')
     expect(dialog()?.textContent).toContain('環境')
     expect(dialog()?.textContent).toContain('公式A')
+    expect(dialog()?.textContent).toContain('の下書きを公開して反映しますか？')
+    expect(dialog()?.textContent).toContain('取り消せません')
 
     // 確定で1回だけ送る。いまの下書き版と取消不可の確認・冪等キーを添える。
     await act(async () => { dialogConfirm()?.click() })

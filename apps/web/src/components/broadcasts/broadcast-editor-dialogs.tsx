@@ -1,4 +1,6 @@
 'use client'
+
+import { knownValue } from '@/lib/known-value'
 import { broadcastSendLabel, type BroadcastSendMode } from './broadcast-schedule'
 
 import dynamic from 'next/dynamic'
@@ -138,7 +140,7 @@ export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmation
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">送る中身</dt>
             <dd className="text-ink text-right font-medium">
-              {formatNumber(bubbles.length)}通（{bubbles.map((b) => TYPE_LABELS[b.type] ?? b.type).join('・')}）
+              {formatNumber(bubbles.length)}通（{bubbles.map((b) => knownValue(TYPE_LABELS, b.type, b.type)).join('・')}）
             </dd>
           </div>
           <div className="flex justify-between gap-4 px-4 py-3">

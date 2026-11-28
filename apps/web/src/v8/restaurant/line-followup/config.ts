@@ -73,6 +73,8 @@ export const UNIT_LABEL: Record<OffsetUnit, string> = { minutes: '分', hours: '
  * 割り切れる一番大きい単位を選び、値は正確に復元できるものにする。
  */
 export function exactTiming(absMinutes: number, units: OffsetUnit[]): { amount: string; unit: OffsetUnit } {
+  const fallbackUnit: OffsetUnit = units[0] ?? 'minutes'
+  if (!Number.isFinite(absMinutes) || absMinutes < 0) return { amount: '', unit: fallbackUnit }
   if (units.includes('days') && absMinutes % 1440 === 0) return { amount: String(absMinutes / 1440), unit: 'days' }
   if (units.includes('hours') && absMinutes % 60 === 0) return { amount: String(absMinutes / 60), unit: 'hours' }
   return { amount: String(absMinutes), unit: 'minutes' }
@@ -82,8 +84,8 @@ export function exactTiming(absMinutes: number, units: OffsetUnit[]): { amount: 
  * Workerと同じ時期の規則。前なら負、後なら0以上。
  */
 export function timingError(trigger: RestaurantFollowupTrigger, offsetMinutes: number): string | null {
-  if (trigger === 'anniversary_before' && offsetMinutes % 1440 !== 0) return '記念日は日単位で入れてください'
   if (!Number.isSafeInteger(offsetMinutes) || Math.abs(offsetMinutes) > 525600) return '時期は525600分（365日）以内で入れてください'
+  if (trigger === 'anniversary_before' && offsetMinutes % 1440 !== 0) return '記念日は日単位で入れてください'
   if ((trigger === 'reservation_24h' || trigger === 'reservation_2h' || trigger === 'anniversary_before') && offsetMinutes >= 0) {
     return '前の日時は0より小さい値で入れてください'
   }
@@ -96,6 +98,7 @@ export function timingError(trigger: RestaurantFollowupTrigger, offsetMinutes: n
 /** 時期の言い方（行の一覧に出す短い文）。 */
 export function timingLabel(trigger: RestaurantFollowupTrigger, offsetMinutes: number | null): string {
   if (offsetMinutes === null) return '時期がまだありません'
+  if (!Number.isFinite(offsetMinutes)) return '時期を確認できません'
   const abs = Math.abs(offsetMinutes)
   const span = abs % 1440 === 0 ? `${abs / 1440}日` : abs % 60 === 0 ? `${abs / 60}時間` : `${abs}分`
   switch (trigger) {

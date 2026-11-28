@@ -41,6 +41,17 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('変更がない場合は保存できない理由を表示し、変更後は確認に進める', async () => {
+  render(<RulesBoard {...props} />)
+  await screen.findByRole('spinbutton')
+  expect(screen.getByText('変更すると保存できます。')).toBeTruthy()
+  expect((screen.getByRole('button', { name: 'ルールを保存する' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.change(threshold(), { target: { value: '4' } })
+  expect(screen.queryByText('変更すると保存できます。')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'ルールを保存する' }))
+  expect(await screen.findByRole('dialog', { name: '自動調整のルールを保存しますか？' })).toBeTruthy()
+})
+
 it('未設定の両停止はオフのまま読み、保存前に確認し、読み込んだ版で一度だけ保存する', async () => {
   render(<RulesBoard {...props} />)
   await screen.findByRole('spinbutton')

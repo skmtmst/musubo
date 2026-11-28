@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { AccountWithStats } from '@/contexts/account-context'
-import { FALLBACK_REASON, connectionNoticeLine, connectionReasonLine, connectionReasons, lineHandle } from './connection-reasons'
+import { FALLBACK_REASON, connectionNoticeLine, connectionReasonLine, connectionReasons, lineHandle } from '@/lib/line-account-connection-reasons'
 import { accountHandle } from './account-dialogs'
 
 const base: AccountWithStats = {

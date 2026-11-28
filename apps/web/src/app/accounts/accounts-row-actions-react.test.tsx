@@ -213,10 +213,10 @@ describe('V7vn3 LINEアカウント一覧の骨組みと道具の段', () => {
     expect(table?.querySelector('tr[data-row-id="branch"] [aria-label="既定のアカウント"]')).toBeNull()
   })
 
-  it('並び替えの部品は一覧に置かず、「並び順と親子を変える」で窓として開く', async () => {
+  it('並び替えの部品は一覧に置かず、「並び順と親子を変更する」で窓として開く', async () => {
     await renderList()
     expect(document.querySelector('[data-testid="account-ordering"]')).toBeNull()
-    const open = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('並び順と親子を変える'))
+    const open = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('並び順と親子を変更する'))
     await act(async () => { open?.click() })
     await flush()
     expect(document.querySelector('[data-testid="account-ordering"]')).toBeTruthy()
@@ -277,7 +277,7 @@ describe('V7vn3 LINEアカウント一覧の骨組みと道具の段', () => {
   it('変更権限のない担当者にも変える操作を理由付きで残し、読取は妨げない', async () => {
     staff.role = 'staff'
     await renderList()
-    const ordering = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('並び順と親子を変える'))!
+    const ordering = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('並び順と親子を変更する'))!
     expect(ordering.getAttribute('aria-disabled')).toBe('true')
     await act(async () => { ordering.click() })
     expect(document.querySelector('[data-testid="account-ordering"]')).toBeNull()

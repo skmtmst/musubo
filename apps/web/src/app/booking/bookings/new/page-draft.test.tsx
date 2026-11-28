@@ -401,7 +401,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     api.getAlternatives.mockResolvedValue({ conflict: { from: NY_1000, to: slot(NY_1000).endUtc, count: 1, source: 'internal_booking' }, nearbySlots: [], alternateStaff: [{ staffId: 'staff-other', displayName: '別の担当', slot: slot(NY_1000) }] })
     seedDraft(); await mount(); await flush()
     await act(async () => { all('button').find((b) => b.textContent?.includes('予約内容を確認する'))!.click() }); await flush()
-    await act(async () => { all('button').find((b) => b.textContent?.includes('この担当に変える'))!.click() }); await flush()
+    await act(async () => { all('button').find((b) => b.textContent?.includes('この担当に変更する'))!.click() }); await flush()
     expect(valueOf(byLabel('スタッフ'))).toBe('staff-other')
     expect(valueOf(byLabel('空いている時間'))).toBe('10:00')
   })

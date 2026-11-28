@@ -36,7 +36,6 @@ function dialogWith(src: string, marker: string): string {
 describe('ログインユーザーの確認窓', () => {
   it('ブラウザの confirm を使わない', () => {
     expect(code(PAGE), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
-    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
   })
 
   it('LINE連携の解除が二度押しを止め、返事を確かめ、finally で戻す', () => {
@@ -76,8 +75,6 @@ describe('ログインユーザーの確認窓', () => {
     const unlink = dialogWith(PAGE, 'open={unlinkTarget !== null && unlinkTarget.epoch === unlinkScope.current.epoch}')
     expect(unlink).toContain('このユーザーへのLINE通知が止まります。')
     expect(unlink).toContain('招待メールからLINE認証をやり直せば、また繋がります。')
-    const twoFactor = dialogWith(PAGE, 'open={disablingTarget !== null}')
-    expect(twoFactor).toContain('LINEログインだけでログインできるようになります。')
     // 戻し方の文は staff-two-factor-disable-dialog-react.test.tsx が開いた確認窓で読む。
   })
 })

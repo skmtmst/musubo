@@ -43,6 +43,16 @@ import styles from './getting-started.module.css'
 /** 板の下の「気をつけること」（絵の2行）。 */
 const CARE_LINES = ['・手順は飛ばしても使えます', '・あとからこの画面に戻れます（設定 › はじめの設定）'] as const
 
+/** 管理者以上だけ開ける行き先（`/recipes` は入口の権限門と一致させる）。 */
+function isManagerOnlyHref(href: string | undefined): boolean {
+  return Boolean(href && (href === '/recipes' || href.startsWith('/recipes/')))
+}
+
+function canOpenStep(step: StepResult, role: string | null): boolean {
+  if (!role || role === 'viewer' || !step.action || step.state === 'forbidden') return false
+  return !isManagerOnlyHref(step.action.href) || canManageRole(role)
+}
+
 export default function GettingStartedV8() {
   usePageTitle('はじめの設定')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -76,7 +86,7 @@ export default function GettingStartedV8() {
 
   const reasons = stoppedReasons(steps)
   const done = doneCount(steps)
-  const firstPending = steps.find(step => step.state !== 'done' && step.state !== 'forbidden' && step.action)
+  const firstPending = steps.find(step => step.state !== 'done' && canOpenStep(step, role))
   const nextKey = role && role !== 'viewer' ? firstPending?.key : null
   const guideMatchesAccount = !shared?.setup || shared.setup.accountId === selectedAccountId
   const needsReview = shared?.guide.stepKey === 'richMenu' ||
@@ -167,8 +177,9 @@ export default function GettingStartedV8() {
 
 /** 1段。済みは緑の丸と札、まだは番号の丸と行き先のボタン。権限で押せない段は灰色のボタンと共通の理由。 */
 function StepRow({ step, role, next }: { step: StepResult; role: string | null; next: boolean }) {
-  const allowed = Boolean(role && role !== 'viewer' && step.action && step.state !== 'forbidden')
-  const reason = role ? lockUnless(allowed, role === 'viewer' ? 'viewer' : 'feature') : undefined
+  const managerOnly = isManagerOnlyHref(step.action?.href)
+  const allowed = canOpenStep(step, role)
+  const reason = role ? lockUnless(allowed, role === 'viewer' ? 'viewer' : managerOnly && !canManageRole(role) ? 'manager' : 'feature') : undefined
   const done = step.state === 'done'
   return (
     <GridRow className={styles.stepRow} data-step-state={step.state}>

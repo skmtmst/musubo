@@ -335,3 +335,7 @@
 html:root .root[data-size='body'] .title { font-size:14px; font-weight:600; }
 /* 全体の焦点輪より優先し、外側の行の輪だけを表示する。 */
 html:root .itemToggle.itemToggle:focus-visible { outline: none; }
+
+.foldToggle { display: inline-flex; align-items: center; gap: var(--tpl-d23-ob-fold-gap); padding: 0; border: 0; background: transparent; color: var(--color-ink-secondary); cursor: pointer; font: inherit; font-size: var(--step-head-text, var(--text-body)); font-weight: var(--font-weight-ui); line-height: var(--step-head-text-lh, var(--text-body--line-height)); white-space: nowrap; }
+.foldToggle:hover { color: var(--color-ink); }
+.foldToggleIcon { width: var(--tpl-d23-ob-fold-icon); height: var(--tpl-d23-ob-fold-icon); flex-shrink: 0; transform: translateY(-0.75px); }

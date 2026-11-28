@@ -61,7 +61,7 @@
 .previewCard { width: var(--tpl-msg-composer-preview-card-w); flex-shrink: 0; border-radius: var(--radius-card); overflow: hidden; background: var(--color-canvas); }
 .previewCard img { width: 100%; height: var(--tpl-msg-composer-preview-image-h); object-fit: cover; }
 .previewCard strong { display: block; padding: 6px 8px; font-size: var(--text-micro); line-height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.previewAction { display: flex; align-items: center; justify-content: center; height: var(--tpl-msg-composer-preview-action-h); border-top: 1px solid var(--color-hairline); color: var(--color-ink); font-size: var(--text-micro); font-weight: 700; }
+.previewAction { display: flex; align-items: center; justify-content: center; height: var(--tpl-msg-composer-preview-action-h); border-top: 1px solid var(--color-hairline); color: var(--tpl-rt-rich-link); font-size: var(--text-micro); font-weight: 400; }
 }
 
 html:root .number { background: var(--color-selection-border); color: var(--color-canvas); }

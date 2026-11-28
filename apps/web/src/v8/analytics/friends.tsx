@@ -1,5 +1,6 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
 import TextLink from '@/components/shared/text-link'
 import { BarChart, BarChartEventMark, BarChartLegend, toBarChartItems } from '@/components/shared/bar-chart'
 
@@ -83,7 +84,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
     if (!overview) return
     downloadCsv(csvFileName("友だち分析"), [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
   }
-  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || overview?.stateReason || (overview ? METRIC_STATE_TEXT[overview.state] : '集計結果を確認できません。')
+  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || overview?.stateReason || (overview ? knownValue(METRIC_STATE_TEXT, overview.state, '集計結果を確認できません。') : '集計結果を確認できません。')
   useRegisterExport(exportCsv, !daysShown, exportReason)
 
   if (!state.data || !overview) {
@@ -134,7 +135,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
           ]} />
           {daysShown
             ? <DailyBars days={overview.days} campaigns={overview.campaigns} selected={selectedDate} onSelect={setSelectedDate} />
-            : <div className={styles.emptyChart} role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' ? <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p> : null}</div>}
+            : <div className={styles.emptyChart} role="status"><p>{reasonShownInBanner ? (knownValue(METRIC_STATE_TEXT, overview.state, '未取得') || '未取得') : pendingReason}</p>{overview.state === 'pending' ? <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p> : null}</div>}
           {daysShown && (selectedDay || overview.campaigns.length > 0) ? <div className={styles.notes}>
             {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人・差し引き ${selectedDay.net} 人`}</p> : null}
             {overview.campaigns.map((item) => <p key={item.id} className={styles.note}><BarChartEventMark tone={item.kind} />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}

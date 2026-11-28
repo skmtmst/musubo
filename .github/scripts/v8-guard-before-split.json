@@ -1,0 +1,114 @@
+[
+  {
+    "name": "No permission copy flashes during navigation",
+    "if": "steps.scope.outputs.run == 'true'",
+    "env": {
+      "V8_GUARD_BASE": "http://127.0.0.1:4310",
+      "V8_GUARD_ARTIFACT_DIR": "/tmp/v8-guard/permission-navigation"
+    },
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs"
+  },
+  {
+    "name": "No V8 layout breaks at 1152, 1440 and 1920",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json"
+  },
+  {
+    "name": "Broken fixtures must fail the V8 layout guard",
+    "if": "steps.scope.outputs.run == 'true'",
+    "env": {
+      "V8_GUARD_BASE": "http://127.0.0.1:4310",
+      "V8_GUARD_DETAIL_OUT": "/tmp/detail-out"
+    },
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/control-feedback.test.mjs apps/web/scripts/v8-guard/window-focus-clip.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/shared-surface-layout.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs apps/web/scripts/v8-guard/layout-overflow.test.mjs apps/web/scripts/v8-guard/form-rules.test.mjs apps/web/scripts/v8-guard/active-modal-audit.test.mjs apps/web/scripts/v8-guard/edge-inset.test.mjs apps/web/scripts/v8-guard/inbox-filter-layout.test.mjs apps/web/scripts/v8-guard/scenarios-list-layout.test.mjs apps/web/scripts/v8-guard/salon-filters-row.test.mjs apps/web/scripts/v8-guard/list-name-open.test.mjs apps/web/scripts/v8-guard/ui-layout-alignment.test.mjs apps/web/scripts/v8-guard/ui-layout-tabrow.test.mjs\nnode apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/viewport-footer.test.mjs\nnode apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/heading-band.test.mjs apps/web/scripts/v8-guard/store-heading.test.mjs apps/web/scripts/v8-guard/dashboard-content.test.mjs apps/web/scripts/v8-guard/home-pending-heading.test.mjs apps/web/scripts/v8-guard/document-title.test.mjs apps/web/scripts/v8-guard/canonical-route.test.mjs apps/web/scripts/v8-guard/dialog-footer.test.mjs apps/web/scripts/v8-guard/dialog-leading.test.mjs apps/web/scripts/v8-guard/patrol-layout.test.mjs apps/web/scripts/v8-guard/scheduled-message.test.mjs apps/web/scripts/v8-guard/route-pending.test.mjs apps/web/scripts/v8-guard/style-switcher.test.mjs apps/web/scripts/v8-guard/monthly-flow.test.mjs\n"
+  },
+  {
+    "name": "Sidebar, booking and pagination details stay as designed",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/nav-detail.test.mjs apps/web/scripts/v8-guard/booking-dialog-layout.test.mjs apps/web/scripts/v8-guard/booking-title.test.mjs"
+  },
+  {
+    "name": "Narrow preview opens once and preserves form input",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs"
+  },
+  {
+    "name": "Train 17 waitlist failure and inflow mouse regressions",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/stgfix17-browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix17"
+  },
+  {
+    "name": "Booking preview date agrees through settings and preview tabs",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview"
+  },
+  {
+    "name": "No new V8 layout or owner-rule defects",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'"
+  },
+  {
+    "name": "Store comparison delta labels stay inside their values",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/store-compare-layout.test.mjs"
+  },
+  {
+    "name": "Inventory edge insets, folder dots and page actions on all admin screens",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/presentation-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/presentation --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'"
+  },
+  {
+    "name": "List row rules",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/list-row-audit.mjs\nnode apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json\nnode apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json\n"
+  },
+  {
+    "name": "Speed measurement and reference policy controls",
+    "if": "${{ !cancelled() && steps.scope.outputs.run == 'true' }}",
+    "run": "node --test apps/web/scripts/v8-guard/mock-local.test.mjs apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs"
+  },
+  {
+    "name": "Common V8 speed checks (11 scenes, five medians)",
+    "id": "speed_budget",
+    "if": "${{ !cancelled() && steps.scope.outputs.run == 'true' }}",
+    "env": {
+      "V8_SPEED_PROFILE": "ci"
+    },
+    "run": "pnpm qa:speed http://127.0.0.1:4310 /tmp/v8-guard/speed.json"
+  },
+  {
+    "name": "Train 17 absolute targets",
+    "if": "${{ !cancelled() && steps.scope.outputs.run == 'true' }}",
+    "run": "node apps/web/scripts/v8-guard/stgfix17-targets.mjs /tmp/v8-guard/speed.json"
+  },
+  {
+    "name": "2000 friends meet absolute speed targets",
+    "id": "stress_speed",
+    "if": "${{ !cancelled() && steps.scope.outputs.run == 'true' }}",
+    "env": {
+      "V8_SPEED_PROFILE": "ci"
+    },
+    "run": "node apps/web/scripts/v8-guard/stress-targets.mjs /tmp/v8-guard/speed.json"
+  },
+  {
+    "name": "PERF-01 fixed list speed targets",
+    "id": "perf3_targets",
+    "if": "${{ !cancelled() && steps.scope.outputs.run == 'true' }}",
+    "run": "node apps/web/scripts/v8-guard/perf3-targets.mjs /tmp/v8-guard/speed.json"
+  },
+  {
+    "name": "Report speed reference results (including incomplete measurements)",
+    "if": "${{ !cancelled() && steps.scope.outputs.run == 'true' }}",
+    "env": {
+      "SPEED_BUDGET_OUTCOME": "${{ steps.speed_budget.outcome }}",
+      "STRESS_SPEED_OUTCOME": "${{ steps.stress_speed.outcome }}",
+      "PERF3_TARGETS_OUTCOME": "${{ steps.perf3_targets.outcome }}"
+    },
+    "run": "node apps/web/scripts/v8-guard/speed-report.mjs /tmp/v8-guard/speed.json"
+  },
+  {
+    "name": "Virtual table selection, keyboard and layout",
+    "if": "steps.scope.outputs.run == 'true'",
+    "run": "node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs\nnode scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table\n"
+  }
+]

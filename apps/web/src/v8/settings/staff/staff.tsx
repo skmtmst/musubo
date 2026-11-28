@@ -1068,7 +1068,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     const resendable = tab === 'invited' && administrator && member !== undefined && member.inviteStatus !== 'active'
     const close = () => setOpenMenuId(null)
     const items: ActionMenuItem[] = []
-    if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
+    if (editable && member) items.push({ id: 'edit', label: '役割を変更する', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
     if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '二段階認証を解除する' : '二段階認証を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })

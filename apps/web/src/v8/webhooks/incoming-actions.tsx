@@ -23,7 +23,8 @@ const KINDS = [
   { id: 'common_action', label: '共通アクションを動かす', resource: 'commonActions' },
 ] as const
 /* 行の印は種類ごとに変える（全部同じ印だと見分けられない）。 */
-const KIND_ICONS: Record<string, LucideIcon> = { tag: Tag, support_mark: Bookmark, template: FileText, scenario: Play, outgoing_webhook: Send, common_action: Workflow, automation: Zap, conversion: Target }
+const KIND_ICONS: Record<string, LucideIcon> = Object.assign(Object.create(null), { tag: Tag, support_mark: Bookmark, template: FileText, scenario: Play, outgoing_webhook: Send, common_action: Workflow, automation: Zap, conversion: Target })
+const LEGACY_KIND_LABELS: Record<string, string> = Object.assign(Object.create(null), { automation: 'オートメーションを動かす', conversion: '成果を記録する' })
 
 /** 既存の版付き config の口につなぐ。照合設定・未対応の既存参照は保持する。 */
 export default function IncomingActions({ detail, accountId, readOnly, onSaved, onGuardReady }: { detail: IncomingWebhookDetail; accountId: string; readOnly: boolean; onSaved: () => void; onGuardReady: (guard: ((action: () => void) => void) | null) => void }) {
@@ -73,7 +74,7 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
   return <SaveErrorScope errors={saveErrors}>
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="行うことの変更" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {loadError ? <Notice tone="danger" message="動きの対象を読み込めませんでした。" action={<Button onClick={() => setAttempt(n => n + 1)}>もう一度読み込む</Button>} /> : null}
-    <ActionList<Ref> value={draft} onChange={setDraft} disabled={busy || (!access.allowed && !access.reason)} lockedReason={access.reason} canChangeNow={canChangeNow} idOf={(_, index) => String(index)} titleOf={action => action.displayName} iconOf={action => KIND_ICONS[action.refKind]} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? ({ automation: 'オートメーションを動かす', conversion: '成果を記録する' }[action.refKind] ?? '登録済みの操作')}
+    <ActionList<Ref> value={draft} onChange={setDraft} disabled={busy || (!access.allowed && !access.reason)} lockedReason={access.reason} canChangeNow={canChangeNow} idOf={(_, index) => String(index)} titleOf={action => action.displayName} iconOf={action => KIND_ICONS[action.refKind]} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? (LEGACY_KIND_LABELS[action.refKind] ?? '登録済みの操作')}
       choices={draft.length >= 20 ? [] : KINDS.map(kind => ({ id: kind.id, label: kind.label, disabled: !resources, disabledReason: loadError ? '候補を読み直してください' : '候補を読み込んでいます', make: () => ({ refKind: kind.id, refId: '', refVersionId: null, displayName: kind.label }),
         picker: { title: `${kind.label}対象を選ぶ`, items: items(kind.id), apply: targetFromIds } }))}
       renderEditor={(action, update, index) => <SaveErrorField names={[`actions.${index}.refId`, "refId", "actions"]}><EntityPickerField label="操作の対象" noun="対象" disabled={!access.allowed && !access.reason} lockedReason={access.reason} canChangeNow={canChangeNow} items={items(action.refKind)} value={action.refId} onChange={id => update(target(action, id))} /></SaveErrorField>} />

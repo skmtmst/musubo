@@ -96,12 +96,27 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const [exportError, setExportError] = useState('')
   const [exportReasonError, setExportReasonError] = useState('')
   const exportReasonRef = useRef<HTMLInputElement>(null)
+  const loadSeqRef = useRef(0)
+  const loadInFlightRef = useRef(false)
 
-  const load = useCallback(async () => {
-    if (!lineAccountId) { setRules([]); setSummary(null); setState('ready'); return }
+  const load = useCallback(async ({ userInitiated = false } = {}) => {
+    if (userInitiated && loadInFlightRef.current) return
+    const seq = ++loadSeqRef.current
+    if (!lineAccountId) {
+      loadInFlightRef.current = false
+      setRules([])
+      setSummary(null)
+      setState('ready')
+      return
+    }
+    loadInFlightRef.current = true
     setState('loading')
     try {
-      const result = await api.lineNotifications.operatorRules.list(lineAccountId)
+      const outcome = await api.lineNotifications.operatorRules.list(lineAccountId)
+        .then((value) => ({ ok: true as const, value }), (reason: unknown) => ({ ok: false as const, reason }))
+      if (seq !== loadSeqRef.current) return
+      if (!outcome.ok) throw outcome.reason
+      const result = outcome.value
       if (!result.success) throw new Error('load failed')
       setRules(result.data.items)
       setSummary(result.data.summary)
@@ -110,10 +125,18 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       setRules([])
       setSummary(null)
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
+    } finally {
+      if (seq === loadSeqRef.current) loadInFlightRef.current = false
     }
   }, [lineAccountId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => {
+      loadSeqRef.current += 1
+      loadInFlightRef.current = false
+    }
+  }, [load])
 
   /* 絞り込みは検索だけ。並びは「よく届く順」（今日届いた数が多い順）。 */
   const visible = useMemo(() => {
@@ -178,13 +201,23 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
   const ready = state === 'ready'
   const listState = !lineAccountId ? 'account-required' : ready && rules.length === 0 ? 'empty' : ready && visible.length === 0 ? 'filtered-empty' : state
+  const kpiLoading = Boolean(lineAccountId) && state === 'loading'
+  const kpiStatusDetail = state === 'forbidden'
+    ? '権限がありません'
+    : state === 'error'
+      ? '読み込めませんでした'
+      : kpiLoading
+        ? '読み込んでいます'
+        : !lineAccountId
+          ? '—'
+          : null
 
   return <>
     <KpiBand presentation="band" data-design="KPIs">
-      <KpiCard presentation="band" icon={<Bell size={16} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={ready ? `止めている ${summary?.stopped ?? '—'}` : '—'} loading={state === 'loading'} />
-      <KpiCard presentation="band" icon={<Send size={16} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail="お店の人へ" loading={state === 'loading'} />
-      <KpiCard presentation="band" icon={<Users size={16} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail="LINEログイン済み" loading={state === 'loading'} />
-      <KpiCard presentation="band" icon={<CircleX size={16} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail="LINE未ログインの人" loading={state === 'loading'} />
+      <KpiCard presentation="band" icon={<Bell size={16} aria-hidden="true" />} title="出しているお知らせ" value={ready ? summary?.published ?? null : null} unit="件" detail={kpiStatusDetail ?? `止めている ${summary?.stopped ?? '—'}`} detailLayout={kpiStatusDetail ? 'single' : undefined} loading={kpiLoading} />
+      <KpiCard presentation="band" icon={<Send size={16} aria-hidden="true" />} title="今日届いた数" value={ready ? summary?.acceptedToday ?? null : null} unit="件" detail={kpiStatusDetail ?? 'お店の人へ'} detailLayout={kpiStatusDetail ? 'single' : undefined} loading={kpiLoading} />
+      <KpiCard presentation="band" icon={<Users size={16} aria-hidden="true" />} title="受け取る人" value={ready ? summary?.recipients ?? null : null} unit="人" detail={kpiStatusDetail ?? 'LINEログイン済み'} detailLayout={kpiStatusDetail ? 'single' : undefined} loading={kpiLoading} />
+      <KpiCard presentation="band" icon={<CircleX size={16} aria-hidden="true" />} title="届かなかった" value={ready ? summary?.excludedToday ?? null : null} unit="件" detail={kpiStatusDetail ?? 'LINE未ログインの人'} detailLayout={kpiStatusDetail ? 'single' : undefined} loading={kpiLoading} />
     </KpiBand>
 
 
@@ -202,8 +235,8 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
     <section className={styles.table} data-design-node="DpxOK" data-list-state={listState}>
       {!lineAccountId ? <ListState kind="empty" title="LINEアカウントを選択してください" description="選択したアカウントごとに分けて管理します。" />
         : state === 'loading' ? <ListState kind="loading" title="運用者へのお知らせを読み込んでいます" />
-        : state === 'error' ? <ListState kind="error" title="運用者へのお知らせを表示できませんでした" onRetry={() => void load()} />
-        : state === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
+        : state === 'error' ? <ListState kind="error" title="運用者へのお知らせを表示できませんでした" onRetry={() => void load({ userInitiated: true })} />
+        : state === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load({ userInitiated: true })} />
         : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={<Button {...(canChange ? { href: "/line-notifications/operator/new" } : { disabled: true })} variant="primary" lockedReason={manageLockReason}>運用者へのお知らせを作る</Button>} />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うお知らせはありません" description="検索語を変えてください。" action={<Button variant="secondary" onClick={() => setQuery('')}>検索を消す</Button>} />
         : <DataTable label="運用者へのお知らせ" grid={{ columns: 'var(--tpl-rest3-op-cols)', compactColumns: 'minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-ml-col-ops-wide)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>

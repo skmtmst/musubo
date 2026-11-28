@@ -63,19 +63,21 @@ export async function openCommonVarDelete({ deleteRequestRef, saveErrors, select
       api.commonVars.replacementCandidates(request.itemId, request.accountId),
     ])
     if (!isCurrentRequest()) return
-    if (impactResult.status === 'rejected' || !impactResult.value.success) {
+    const impact = impactResult.status === 'fulfilled' && impactResult.value?.success ? impactResult.value.data : null
+    if (!impact || !impact.variable || typeof impact.variable.varKey !== 'string' || !Array.isArray(impact.items) || impact.items.some((item) => !item || typeof item !== 'object') || !Array.isArray(impact.unavailableReferences) || typeof impact.canDelete !== 'boolean' || !Number.isInteger(impact.total) || impact.total < 0 || !Number.isInteger(impact.blockingTotal) || impact.blockingTotal < 0) {
       setDeletePhase('error')
       setReplacementPhase('error')
       return
     }
-    setDeleteImpact(impactResult.value.data)
+    setDeleteImpact(impact)
     setDeletePhase('ready')
-    if (candidatesResult.status === 'rejected' || !candidatesResult.value.success) {
+    const candidates = candidatesResult.status === 'fulfilled' && candidatesResult.value?.success ? candidatesResult.value.data?.candidates : null
+    if (!Array.isArray(candidates) || candidates.some((candidate) => !candidate || typeof candidate.id !== 'string' || typeof candidate.name !== 'string' || typeof candidate.varKey !== 'string')) {
       setReplacementPhase('error')
       return
     }
-    setReplacementCandidates(candidatesResult.value.data.candidates)
-    const first = candidatesResult.value.data.candidates[0]
+    setReplacementCandidates(candidates)
+    const first = candidates[0]
     if (!first) {
       setReplacementPhase('ready')
       return

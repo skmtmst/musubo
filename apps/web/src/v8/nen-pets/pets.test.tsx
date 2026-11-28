@@ -118,14 +118,45 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     await click(byLabel('主食で絞り込む'))
     await click(screen.getByRole('radio', { name: 'いつものごはん' }))
     expect(listCalls().some(([path]) => String(path).includes('product=st-1'))).toBe(false)
-    await click(byText('選ぶ'))
+    await click(byText('選択する'))
     expect(listCalls().some(([path]) => String(path).includes('product=st-1'))).toBe(true)
     await click(byLabel('主食で絞り込む'))
     await click(screen.getByRole('radio', { name: 'すべて' }))
     expect(String(listCalls().at(-1)?.[0])).toContain('product=st-1')
-    await click(byText('選ぶ'))
+    await click(byText('選択する'))
     expect(String(listCalls().at(-1)?.[0])).not.toContain('product=st-1')
     LIST.products = []
+  })
+
+  it('ごはんの目安で数の取得に失敗したら読み直せる', async () => {
+    let calls = 0
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/nen/pets?')) return ++calls === 1 ? { success: false, error: 'failed' } : { success: true, data: LIST }
+      if (path.startsWith('/api/nen/feeding-products')) return { success: true, data: FEEDING }
+      return { success: true, data: {} }
+    })
+    await render('feeding')
+    expect(host.textContent).toContain('ペットの数を読み込めませんでした')
+    await click(byText('もう一度読み込む'))
+    expect(host.textContent).not.toContain('ペットの数を読み込めませんでした')
+    expect(host.textContent).toContain('登録ペット 8')
+  })
+
+  it.each(['success', 'failure'])('切替前の遅い一覧%sが今のペット数を上書きしない', async outcome => {
+    let resolve!: (value: unknown) => void
+    const old = new Promise(done => { resolve = done })
+    fetchApi.mockImplementation((path: string) => {
+      if (path.startsWith('/api/nen/pets?') && path.includes('accountId=acc-1')) return old
+      if (path.startsWith('/api/nen/pets?')) return Promise.resolve({ success: true, data: LIST })
+      return Promise.resolve({ success: true, data: {} })
+    })
+    await act(async () => { root.render(<PetsV8 accountId="acc-1" tab="pets" onChangeTab={() => {}} />) })
+    await act(async () => { root.render(<PetsV8 accountId="acc-2" tab="pets" onChangeTab={() => {}} />) })
+    await settle()
+    expect(host.textContent).toContain('登録ペット 8')
+    await act(async () => { resolve(outcome === 'success' ? { success: true, data: { ...LIST, kpis: { ...LIST.kpis, total: 99 } } } : { success: false, error: 'failed' }) })
+    expect(host.textContent).toContain('登録ペット 8')
+    expect(host.textContent).not.toContain('登録ペット 99')
   })
 
   it('一覧は1回だけ取り、数の帯・今日の目安・体重の古い札を出す（取り直しの輪にならない）', async () => {

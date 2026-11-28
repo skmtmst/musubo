@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 
 import { useEffect, useState } from 'react'
 import { FunnelChart } from '@/components/shared/charts'
@@ -26,6 +27,8 @@ const STAGE_LABELS: Record<OpsFirstRunStage, string> = {
   follow: '最初の友だち追加',
   firstMessage: '最初の1通が届いた',
 }
+
+export const firstRunStageWord = (stage: string) => knownValue(STAGE_LABELS, stage, '段を確認できません')
 
 const HELP = '期間にアカウントを作った新しいお店の数です（運営自身と保管したアカウントは入れません）。'
   + '友だち追加は LINE から届いた友だち追加の記録だけを数え、取り込んだ友だちは入れません。'
@@ -91,12 +94,12 @@ export default function OpsFirstRunCard({ period }: { period: OpsDashboardPeriod
             <KpiCard title="6段を全部終えた" valueText={`${data.allStepsDone.percent}%`} icon={null} presentation="band" value={null} unit="" detail={null} />
           </KpiBand>
           {data.biggestDrop ? (
-            <Notice tone="warn">{`いちばん落ちている段：${STAGE_LABELS[data.biggestDrop.key]}（前の段から ${data.biggestDrop.fromPrevious}%・${formatNumber(data.biggestDrop.lost)} 件がここで止まっています）`}</Notice>
+            <Notice tone="warn">{`いちばん落ちている段：${firstRunStageWord(data.biggestDrop.key)}（前の段から ${data.biggestDrop.fromPrevious}%・${formatNumber(data.biggestDrop.lost)} 件がここで止まっています）`}</Notice>
           ) : null}
           <FunnelChart
             label="最初の10分の段ごとの数"
             unit="件"
-            items={data.stages.map((stage) => ({ key: stage.key, label: STAGE_LABELS[stage.key], value: stage.count, detail: <span>{stageDetail(stage)}</span> }))}
+            items={data.stages.map((stage) => ({ key: stage.key, label: firstRunStageWord(stage.key), value: stage.count, detail: <span>{stageDetail(stage)}</span> }))}
           />
           <p className={parts.note}>{`${data.periodLabel}に作られたアカウント ${formatNumber(data.accounts)} 件・最初の1通まで届いた ${formatNumber(data.minutesToFirstMessage.reached)} 件で数えています`}</p>
         </>

@@ -45,7 +45,7 @@ const css=[await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.cs
 const paint=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
 async function mount(page,width,mode){
   await page.setViewportSize({width,height:1600});await page.clock.setFixedTime(new Date('2026-09-03T09:24:00Z'))
-  await page.setContent(`<html data-theme="v8"><style>${css}main{margin-left:240px;padding:24px;min-width:0}</style><div id="root"></div></html>`)
+  await page.setContent(`<html data-theme="v8"><style>${css}main{margin-left:240px;padding:24px;min-width:0}*,*::before,*::after{transition:none!important;animation:none!important}</style><div id="root"></div></html>`)
   await page.evaluate(value=>{globalThis.fixtureMode=value},mode);await page.addScriptTag({content:compiled.outputFiles[0].text})
   await page.locator(mode==='salon'?'[aria-label="台帳の盤"]':mode==='boundaries'?'button[data-placement="cell"]':'button[data-placement="timeline"]').first().waitFor();await paint(page)
 }
@@ -69,7 +69,7 @@ for(const width of [1440,1152,1024])test(`予約の通常幅・最小幅・複�
     await record(page,`normal-${width}`,normal)
     await mount(page,width,'compact');const compact=await page.evaluate(facts)
     assert.ok(compact.every(r=>r.box.width<24),'既存の最小時間幅を引き延ばさない')
-    assert.deepEqual(compact.flatMap(r=>r.bad),[],'人数・明確な省略・注意印は内枠に収まる')
+    assert.deepEqual(compact.filter(r=>r.bad.length).map(r=>({inner:r.inner,bad:r.bad})),[],'人数・明確な省略・注意印は内枠に収まる')
     const actual=['確定','来店中・進行中','終了・来店済み','仮押さえ','要対応（承認待ち）','無断キャンセル','キャンセル','拒否','期限切れ','注意','注意']
     compact.forEach((r,i)=>{
       assert.ok(r.description.includes(actual[i]),'すべての実状態をAX説明に保持')
@@ -89,9 +89,10 @@ for(const width of [1440,1152,1024])test(`予約の通常幅・最小幅・複�
       await page.keyboard.press('Enter');assert.equal(await page.locator('output').textContent(),String(i),'既存詳細操作を保つ')
     }}finally{await ax.detach()}
     await record(page,`compact-${width}`,compact)
-    const count=cards.first().locator('[data-booking-count]');await count.evaluate(el=>{el.style.transform='translateX(24px)' });await paint(page)
-    assert.ok((await page.evaluate(facts)).some(r=>r.bad.length),'人数を箱外へ出す故障を検知する')
-    await count.evaluate(el=>{el.style.removeProperty('transform')});await paint(page);assert.deepEqual((await page.evaluate(facts)).flatMap(r=>r.bad),[],'復元すると内枠へ戻る')
+    const count=cards.first().locator('[data-booking-count]');await count.evaluate(el=>{el.style.display='inline-block'; el.style.transition='none'; el.style.transform='translateX(24px)' });await paint(page)
+    const forced = await page.evaluate(facts)
+    assert.ok(forced.some(r=>r.bad.length),`人数を箱外へ出す故障を検知する ${JSON.stringify(forced[0])}`)
+    await count.evaluate(el=>{el.style.removeProperty('transform'); el.style.removeProperty('display'); el.style.removeProperty('transition')});await paint(page);assert.deepEqual((await page.evaluate(facts)).flatMap(r=>r.bad),[],'復元すると内枠へ戻る')
   }finally{await page.close();await browser.close()}
 })
 
@@ -134,9 +135,23 @@ for(const width of [1152,1440])test(`省略した注意文を電話札の重な�
     await mount(page,width,'normal')
     const overlaps=async()=>(await page.evaluate(scanPolishRules)).filter(f=>f.kind==='badge-overlap')
     assert.deepEqual(await overlaps(),[],'省略されて見えない文字を重なりと判定しない')
-    await page.locator('[data-booking-warning]').evaluateAll(nodes=>nodes.forEach(node=>node.style.overflow='visible'))
+    const card = page.locator('button[data-placement="timeline"]').filter({ has: page.locator('[data-booking-warning]') }).first()
+    await card.evaluate(card => {
+      const badge = card.querySelector('[data-booking-source]')
+      const warning = card.querySelector('[data-booking-warning]')
+      const text = warning.querySelector('[data-booking-warning-text]')
+      badge.style.display = 'inline-flex'
+      warning.style.overflow = 'visible'
+      text.style.display = 'inline-block'
+      text.style.position = 'relative'
+      const badgeBox = badge.getBoundingClientRect(), textBox = text.getBoundingClientRect()
+      text.style.left = `${badgeBox.left - textBox.left}px`
+      text.style.top = `${badgeBox.top - textBox.top}px`
+    })
     assert.ok((await overlaps()).length>0,'省略を壊して実際に電話札へ重ねると必ず検出する')
-    await page.locator('[data-booking-warning]').evaluateAll(nodes=>nodes.forEach(node=>node.style.removeProperty('overflow')))
+    await card.evaluate(card => {
+      for (const selector of ['[data-booking-source]', '[data-booking-warning]', '[data-booking-warning-text]']) card.querySelector(selector).removeAttribute('style')
+    })
     assert.deepEqual(await overlaps(),[],'元の省略表示へ戻すと解消する')
   }finally{await page.close();await browser.close()}
 })

@@ -233,6 +233,11 @@ function FriendAddList() {
   })
   const folderKey = useRef(crypto.randomUUID())
   const requestSequence = useRef(0)
+  const loadInFlightRef = useRef<number | null>(null)
+  useEffect(() => () => {
+    requestSequence.current += 1
+    loadInFlightRef.current = null
+  }, [])
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [highlightedId, setHighlightedId] = useState<string | null>(searchParams.get('highlight'))
@@ -253,14 +258,17 @@ function FriendAddList() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { force?: boolean }) => {
+    if (!options?.force && loadInFlightRef.current !== null) return
     const requestId = ++requestSequence.current
     const generation = accountScope.current.generation
     if (!selectedAccountId) {
+      loadInFlightRef.current = null
       setData(null)
       setLoading(false)
       return
     }
+    loadInFlightRef.current = requestId
     setLoading(true)
     setError('')
     setErrorStatus(null)
@@ -294,11 +302,12 @@ function FriendAddList() {
       setErrorStatus(failure.status)
       setData(null)
     } finally {
+      if (loadInFlightRef.current === requestId) loadInFlightRef.current = null
       if (requestId === requestSequence.current && generation === accountScope.current.generation) setLoading(false)
     }
   }, [appliedSearch, cursor, folder, kind, perPage, selectedAccountId, statusFilter, highlightedId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load({ force: true }) }, [load])
 
   useEffect(() => { resetCursor() }, [selectedAccountId, kind, resetCursor])
 
@@ -608,35 +617,38 @@ function FriendAddList() {
 
   /* ===== 数の帯の4つ ===== */
   const summary = data?.summary
+  const kpiLoading = loading && !error
+  const kpiErrorDetail = errorStatus === 403 ? '表示する権限がありません' : '読み込めませんでした'
   const kpis = [
     {
-      key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${countText(summary.active, '件')}（共通は別）` : error ? '読み込めませんでした' : loading ? '読み込んでいます' : emptyValue('unknown'),
+      key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error || kpiLoading ? null : summary?.rules ?? null, unit: '件',
+      detail: summary ? `有効 ${countText(summary.active, '件')}（共通は別）` : error ? kpiErrorDetail : loading ? '読み込んでいます' : emptyValue('unknown'),
       help: '設定数には共通の案内を含みます。有効の内訳は共通の案内を除きます。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
-      key: 'adds', icon: UserPlus, title: '直近7日の友だち追加', value: error ? null : summary?.recentAdds ?? null, unit: '人',
-      detail: `経路が取れた ${countText(summary?.captured ?? null, '人')}`,
+      key: 'adds', icon: UserPlus, title: '直近7日の友だち追加', value: error || kpiLoading ? null : summary?.recentAdds ?? null, unit: '人',
+      detail: summary ? `経路が取れた ${countText(summary.captured ?? null, '人')}` : error ? kpiErrorDetail : loading ? '読み込んでいます' : `経路が取れた ${emptyValue('unknown')}`,
       help: '直近7日に友だち追加された人数と、そのうち流入リンクが分かった人数です。',
     },
     {
-      key: 'sent', icon: Send, title: '直近7日の送信', value: error ? null : summary?.delivered ?? null, unit: '通',
-      detail: successRate(summary?.delivered ?? null, summary?.failed ?? null),
+      key: 'sent', icon: Send, title: '直近7日の送信', value: error || kpiLoading ? null : summary?.delivered ?? null, unit: '通',
+      detail: summary ? successRate(summary.delivered ?? null, summary.failed ?? null) : error ? kpiErrorDetail : loading ? '読み込んでいます' : '成功率 —',
       help: '直近7日に実際に送った通数です。送信履歴の累計配信と同じ数え方です。',
     },
     {
-      key: 'unknown', icon: CircleHelp, title: narrow ? '経路が不明' : '経路が分からなかった人', value: error ? null : summary?.unknownRoute ?? null, unit: '人',
+      key: 'unknown', icon: CircleHelp, title: narrow ? '経路が不明' : '経路が分からなかった人', value: error || kpiLoading ? null : summary?.unknownRoute ?? null, unit: '人',
       /* 1152 では2行に折れる。行の高さを絵の18にそろえる（帯の高さを134に保つ）。 */
-      detail: <span className={styles.kpiDetail}>共通の案内が動いた</span>,
+      detail: error ? kpiErrorDetail : loading ? '読み込んでいます' : <span className={styles.kpiDetail}>共通の案内が動いた</span>,
       action: { label: '流入リンクを見る', href: '/inflow-links' },
     },
   ]
 
   /* ===== 道具 ===== */
   /* 閲覧のみの人には、作る・追加・編集・削除の操作を置かない（押せない形でも出さない。オーナー 2026-10-06）。 */
+  const folderCountsReady = Boolean(data) && !loading && !error
   const folderRows = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: data?.total ?? items.length },
-    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: entry.count,
+    { kind: 'all' as const, id: '', label: 'すべて', count: folderCountsReady ? (data?.total ?? items.length) : null },
+    ...folders.map((entry) => ({ kind: entry.key === UNFILED ? 'unfiled' as const : 'folder' as const, id: entry.key, label: entry.name, color: entry.color, count: folderCountsReady ? entry.count : null,
       onEdit: canEdit && entry.id && entry.key !== UNFILED ? () => { setFolderName(entry.name); setFolderColor(folderDisplayColor(entry)); setEditingFolder({ id: entry.id!, name: entry.name, color: entry.color }); setFolderError(''); setFolderDialogOpen(true) } : undefined })),
   ]
   const createButton = (
@@ -671,7 +683,7 @@ function FriendAddList() {
     null
   )
   const errorBand = actionError ? (
-    <Notice tone="danger" >{actionError}<Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></Notice>
+    <Notice tone="danger" >{actionError}<Button onClick={() => void load()} disabled={loading} busy={loading} busyLabel="処理中…">もう一度読み込む</Button></Notice>
   ) : null
   // 作る・フォルダは ListPage.folderNav だけが持つ。検索・状態・件数は共通の役目へ。
   const toolbar = <>
@@ -736,9 +748,11 @@ function FriendAddList() {
   } else if (!selectedAccountId) {
     listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (error) {
-    /* 状態の板：読めないときも道具はそのまま。数の帯は「—」。 */
-    listBody = (
-      <ListState kind="error" title="設定を読み込めませんでした" description={errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}  action={<><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
+    /* 状態の板：読めないときも道具はそのまま。数の帯は「—」。403は権限不足として分ける。 */
+    listBody = errorStatus === 403 ? (
+      <ListState kind="forbidden" title="設定を表示する権限がありません" description={error} onRetry={() => void load()} />
+    ) : (
+      <ListState kind="error" title="設定を読み込めませんでした" description="数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。" action={<Button onClick={() => void load()} disabled={loading} busy={loading} busyLabel="読み込んでいます">もう一度読み込む</Button>} />
     )
   } else if (items.length === 0) {
     /* 修正案 D-2：空の一覧。 */
@@ -885,6 +899,7 @@ function FriendAddList() {
             <KpiCard
               key={kpi.key}
               presentation="band"
+              loading={kpiLoading}
               title={kpi.title}
               icon={<kpi.icon size={16} aria-hidden="true" />}
               value={kpi.value}

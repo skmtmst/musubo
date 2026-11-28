@@ -64,7 +64,7 @@ describe('数の帯の前週比', () => {
     expect(cell(container, '今日の予約').textContent).toContain('2 件 先週比')
     expect(band(container).querySelectorAll('[data-kpi-delta]')).toHaveLength(1)
     expect(container.textContent).toContain('10月25日 17:51 時点・先週の同じ曜日と比べています')
-    expect(container.querySelector('[data-design="TodayTasks"]')?.previousElementSibling?.textContent).toBe('10月25日 17:51 時点・先週の同じ曜日と比べています')
+    expect(container.querySelector('[data-design="TodayTasks"]')?.previousElementSibling?.querySelector('p')?.textContent).toBe('10月25日 17:51 時点・先週の同じ曜日と比べています')
   })
 
   it('先週の記録が無い時は札を出さず、基準の言葉も出さない（0 として比べない）', async () => {

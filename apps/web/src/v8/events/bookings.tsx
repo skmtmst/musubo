@@ -690,7 +690,7 @@ function Bookings({ eventId }: { eventId: string }) {
                         }}
                         lockedReason={bookingLockReason} disabled={!canChangeBookings || waitlistBusy || waitingRows.length < 2}
                         title={waitingRows.length < 2 ? '並んでいる人が2人以上いるときに使えます' : undefined}
-                      >待ち順を変える</Button>
+                      >待ち順を変更する</Button>
                       <RowMenu label={`${row.displayName ?? '待機中の方'}の操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'skip', lockedReason: bookingLockReason, label: '見送る', onSelect: () => {
                         setWaitlistReason('')
                         setWaitlistError('')

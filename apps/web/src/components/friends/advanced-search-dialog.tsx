@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import CloseButton from '@/components/shared/close-button'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { memberRanksApi } from '@/lib/api/helpers/gap3';
@@ -305,7 +307,7 @@ export default function AdvancedSearchDialog({
       if (b.kind === 'created_at' && (b.from || b.to)) {
         out.push(`登録日 ${b.from || '…'} 〜 ${b.to || '…'}`)
       }
-      if ((b.kind === 'visit_count' || b.kind === 'purchase_amount') && (b.min || b.max)) out.push(`${BLOCK_LABEL[b.kind]} ${b.min || '…'} 〜 ${b.max || '…'}`)
+      if ((b.kind === 'visit_count' || b.kind === 'purchase_amount') && (b.min || b.max)) out.push(`${knownValue(BLOCK_LABEL, b.kind, '条件を確認できません')} ${b.min || '…'} 〜 ${b.max || '…'}`)
       if (b.kind === 'last_activity_at' && (b.from || b.to)) out.push(`最後の来店・購入 ${b.from || '…'} 〜 ${b.to || '…'}`)
       if (b.kind === 'member_tier' && b.tierId) out.push(`会員ランク ${rankTiers.find((t) => t.id === b.tierId)?.name ?? '選択済み'}`)
       if (b.kind === 'chat_status') {
@@ -504,7 +506,7 @@ export default function AdvancedSearchDialog({
               className="mb-2 grid items-center gap-3 rounded-card bg-canvas-sunken p-3 last:mb-0 sm:grid-cols-12"
             >
               <div className="sm:col-span-3">
-                <h3 className="flex items-center text-sm font-semibold text-ink">{BLOCK_LABEL[b.kind]}<HelpTip label={`${BLOCK_LABEL[b.kind]}の説明`}>{BLOCK_HELP[b.kind]}</HelpTip></h3>
+                <h3 className="flex items-center text-sm font-semibold text-ink">{knownValue(BLOCK_LABEL, b.kind, '条件を確認できません')}<HelpTip label={`${knownValue(BLOCK_LABEL, b.kind, '条件を確認できません')}の説明`}>{knownValue(BLOCK_HELP, b.kind, '条件の説明を確認できません')}</HelpTip></h3>
               </div>
 
               <div className="min-w-0 sm:col-span-8">
@@ -607,9 +609,9 @@ export default function AdvancedSearchDialog({
 
                 {(b.kind === 'visit_count' || b.kind === 'purchase_amount') && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <TextInput className="w-36" type="number" min={0} value={b.min} onChange={(e) => patch(i, { ...b, min: e.target.value })} placeholder="下限なし" aria-label={`${BLOCK_LABEL[b.kind]}の下限`} />
+                    <TextInput className="w-36" type="number" min={0} value={b.min} onChange={(e) => patch(i, { ...b, min: e.target.value })} placeholder="下限なし" aria-label={`${knownValue(BLOCK_LABEL, b.kind, '条件を確認できません')}の下限`} />
                     <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以上〜' : '円以上〜'}</span>
-                    <TextInput className="w-36" type="number" min={0} value={b.max} onChange={(e) => patch(i, { ...b, max: e.target.value })} placeholder="上限なし" aria-label={`${BLOCK_LABEL[b.kind]}の上限`} />
+                    <TextInput className="w-36" type="number" min={0} value={b.max} onChange={(e) => patch(i, { ...b, max: e.target.value })} placeholder="上限なし" aria-label={`${knownValue(BLOCK_LABEL, b.kind, '条件を確認できません')}の上限`} />
                     <span className="text-ink-faint text-sm">{b.kind === 'visit_count' ? '回以下' : '円以下'}</span>
                   </div>
                 )}
@@ -646,7 +648,7 @@ export default function AdvancedSearchDialog({
               <button
                 type="button"
                 onClick={() => drop(i)}
-                aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
+                aria-label={`${knownValue(BLOCK_LABEL, b.kind, `種類を確認できない条件${i + 1}`)}の条件を外す`}
                 className="text-danger text-xs hover:underline"
               >
                 外す

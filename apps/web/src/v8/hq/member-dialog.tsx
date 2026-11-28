@@ -300,7 +300,7 @@ export function MemberChangeConfirmV8({ member, value, accountNames, busy, error
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="処理中…">
             {needsCode ? <ShieldCheck aria-hidden="true" className={styles.icon} /> : null}
-            {needsCode ? '確認コードを入れて変える' : '変える'}
+            {needsCode ? '確認コードを入れて変更する' : '変更する'}
           </Button>
         </DialogActions>
       }

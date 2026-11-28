@@ -92,6 +92,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
+  const [folderState, setFolderState] = useState<{ account: string; state: 'ready' | 'error' } | null>(null)
+  const [folderRetry, setFolderRetry] = useState(0)
+  const [folderDraftAccount, setFolderDraftAccount] = useState(selectedAccountId)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   /* 「押されたら」の窓：開いている選択肢と、窓の中の下書き（［決める］で戻す・［キャンセル］で捨てる）。 */
@@ -118,15 +121,24 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   const [savedSnapshot, setSavedSnapshot] = useState(() => snapshotOf({ name: hostInitial?.name ?? '', category: '未分類', folderId: null, question: initialQuestion }))
 
   const folderAccountId = id ? templateAccountId : selectedAccountId
+  if (folderDraftAccount !== selectedAccountId) {
+    setFolderDraftAccount(selectedAccountId)
+    if (!host && !id) { setFolderId(null); setCategory('未分類') }
+  }
+  const foldersReady = Boolean(host) || Boolean(folderAccountId && folderState?.account === folderAccountId && folderState.state === 'ready')
+  const foldersFailed = !host && Boolean(folderAccountId && folderState?.account === folderAccountId && folderState.state === 'error')
   useEffect(() => {
     setFolders([])
+    setFolderState(null)
     if (!folderAccountId || host) return
     let cancelled = false
     void api.folders.list('template', folderAccountId).then((res) => {
-      if (!cancelled && res.success) setFolders(res.data)
-    }).catch(() => {})
+      if (cancelled) return
+      if (res.success) { setFolders(res.data); setFolderState({ account: folderAccountId, state: 'ready' }) }
+      else setFolderState({ account: folderAccountId, state: 'error' })
+    }).catch(() => { if (!cancelled) setFolderState({ account: folderAccountId, state: 'error' }) })
     return () => { cancelled = true }
-  }, [folderAccountId])
+  }, [folderAccountId, host, folderRetry])
 
   /* 「押されたら」の名前（タグ・シナリオ）。読めなくても設定は消えない（名前の代わりに種類を出す）。 */
   useEffect(() => {
@@ -140,16 +152,20 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     return () => { cancelled = true }
   }, [selectedAccountId])
 
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadRetry, setLoadRetry] = useState(0)
   useEffect(() => {
     if (!id || !selectedAccountId) return
     let cancelled = false
     const requestScope = scope.current.generation
     setLoading(true)
+    setLoadFailed(false)
     setError('')
     void api.templates.get(id)
       .then((template) => {
         if (cancelled || requestScope !== scope.current.generation) return
         if (!template.success || !template.data.question || !isEditableQuestion(template.data.question)) {
+          setLoadFailed(true)
           setError('質問テンプレートを読み込めませんでした。')
           return
         }
@@ -165,11 +181,14 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         setUsageCount(Object.values(template.data.usedBy).reduce((total, items) => total + items.length, 0))
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        if (!cancelled && requestScope === scope.current.generation) {
+          setLoadFailed(true)
+          setError(isForbiddenOrRateLimited(caught) ? loadFailureNotice(caught, '質問テンプレート') : '質問テンプレートを読み込めませんでした。')
+        }
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => { if (!cancelled && requestScope === scope.current.generation) setLoading(false) })
     return () => { cancelled = true }
-  }, [id, selectedAccountId])
+  }, [id, selectedAccountId, loadRetry])
 
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
   /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
@@ -199,6 +218,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       host.onSave({ kind: 'question', name: name.trim(), question: question as unknown as Record<string, unknown>, messageContent: question.intro?.trim() || question.text }, questionStatus === 'published')
       return false
     }
+    if (loadFailed) { setError('質問テンプレートを読み込めませんでした。もう一度読み込んでください。'); return false }
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
     setSaving(true)
@@ -287,7 +307,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     )
   }
 
-  const inputReason = requiredInputReason([
+  const inputReason = loading || loadFailed ? null : requiredInputReason([
     { label: 'テンプレート名', value: name },
     { label: '質問文', value: question.text },
     ...question.choices.map((choice, index) => ({ label: `選択肢 ${index + 1} のボタンの文字`, value: choice.label })),
@@ -326,13 +346,30 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
         footerActions={(
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : requestUnsavedAction(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
-            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || loading || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || loading || loadFailed || Boolean(publishReason)} disabledReason={publishReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
         {host?.notice}
-        {error ? <Notice tone="danger" message={error} /> : null}
+        {error ? (
+          <Notice
+            tone="danger"
+            message={error}
+            action={loadFailed && id ? (
+              <Button
+                variant="text"
+                size="inline"
+                data-notice-inline-action
+                type="button"
+                disabled={loading}
+                onClick={() => setLoadRetry((value) => value + 1)}
+              >
+                もう一度読み込む
+              </Button>
+            ) : undefined}
+          />
+        ) : null}
         <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
 
         <Card variant="form" gap="normal" aria-labelledby="q-name">
@@ -343,6 +380,8 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <SaveErrorField names={["folder","host.folder","folderId","folder_id"]}><FolderSelect
                 size="full"
                 aria-label="フォルダ"
+                key={host ? 'host' : folderAccountId ?? 'no-account'}
+                disabled={!foldersReady}
                 value={host ? host.folder : folderId ?? ''}
                 onChange={(value) => {
                   if (host) { host.onFolderChange(value); return }
@@ -350,7 +389,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                   setFolderId(next)
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}
-                folders={host ? host.folders : folders.map(folderById)}
+                folders={host ? host.folders : foldersReady ? folders.map(folderById) : []}
                 colors
                 onCreate={host
                   ? hostFolderCreate(host)
@@ -358,6 +397,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
                     ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                     : undefined}
               /></SaveErrorField>
+              {foldersFailed ? <Notice tone="danger" action={<Button onClick={() => setFolderRetry(n => n + 1)}>もう一度読み込む</Button>}>フォルダを読み込めませんでした。</Notice> : null}
             </Field>
           </SettingsFormRow>
         </Card>

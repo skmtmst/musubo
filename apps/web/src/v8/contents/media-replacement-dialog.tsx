@@ -174,12 +174,12 @@ export default function MediaReplacementDialog({
       footer={(<DialogActions>
           {impact?.canPartiallyReplace && !impact.canReplace ? (<Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy} busy={busy} busyLabel="差し替えています…">
               {`差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
-            </Button>) : (<Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace} busy={busy} busyLabel="差し替えています…">使用先を差し替える
+            </Button>) : (<Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace} disabledReason={candidatePhase === 'ready' && !replacementId ? '差し替え先を選んでください。' : undefined} busy={busy} busyLabel="差し替えています…">使用先を差し替える
             </Button>)}
         </DialogActions>)}
     >
       <div className="space-y-4">
-        <div><Field label="差し替え先"><form
+        <div><Field label="差し替え先" required><form
             className="mb-2 flex gap-2"
             onSubmit={(event) => {
               event.preventDefault()

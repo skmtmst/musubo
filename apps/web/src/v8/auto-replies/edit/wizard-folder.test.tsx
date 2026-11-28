@@ -45,7 +45,7 @@ it('権限があり一覧取得済みなら同じ所属でフォルダを作り�
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
   fireEvent.change(screen.getByRole('textbox', { name: '新しいフォルダの名前' }), { target: { value: '予約の応答' } })
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選択する' })) })
   expect(network.create).toHaveBeenCalledWith(expect.objectContaining({ kind: 'auto_reply', accountId: 'synthetic-account', name: '予約の応答' }))
   expect(screen.getByRole('button', { name: 'フォルダ', exact: true }).textContent).toBe('予約の応答')
 })

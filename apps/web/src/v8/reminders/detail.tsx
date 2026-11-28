@@ -1,4 +1,5 @@
 'use client'
+import { knownValue } from '@/lib/known-value'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 
 import { JST_LOCAL, dateTimeLocalJst } from './detail-dates'
@@ -70,6 +71,10 @@ const STATUS_VIEW: Record<ReminderDeliveryRunStatus, { label: string; tone: 'ok'
   retry_wait: { label: '再試行待ち', tone: 'warn' },
   permanent_failed: { label: '失敗', tone: 'warn' },
   cancelled: { label: '取り消し', tone: 'muted' },
+}
+
+export function reminderStatusView(status: string) {
+  return knownValue(STATUS_VIEW, status, { label: '状態を確認できません', tone: 'muted' as const })
 }
 
 export type DetailTab = 'overview' | 'schedule' | 'runs' | 'registrants'
@@ -144,7 +149,7 @@ function csvFor(items: ReminderDeliveryRun[]): string {
     ...items.map((item) => [
       item.friendName ?? '削除済みの友だち',
       `${item.stepNumber} 通目`,
-      STATUS_VIEW[item.domainStatus].label,
+      reminderStatusView(item.domainStatus).label,
       formatJst(item.scheduledAt),
       formatJst(item.completedAt ?? item.startedAt),
       item.attemptCount,
@@ -721,7 +726,7 @@ function OverviewTab({
                   </span>
                   <span role="cell" className={styles.colStep}>{item.stepNumber}</span>
                   <span role="cell" className={styles.colResult}>
-                    <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
+                    <StatusPill tone={reminderStatusView(item.domainStatus).tone}>{reminderStatusView(item.domainStatus).label}</StatusPill>
                   </span>
                 </div>
               ))}
@@ -798,7 +803,7 @@ function ScheduleTab({ reminderId, steps }: { reminderId: string; steps: Reminde
                 </span>
                 <span role="cell" className={styles.colWide} title={stepNameByNumber[item.stepNumber] ?? ''}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colResult}>
-                  <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
+                  <StatusPill tone={reminderStatusView(item.domainStatus).tone}>{reminderStatusView(item.domainStatus).label}</StatusPill>
                 </span>
               </div>
             ))}
@@ -940,7 +945,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
                 </span>
                 <span role="cell" className={styles.colStep}>{item.stepNumber} 通目</span>
                 <span role="cell" className={styles.colResult}>
-                  <StatusPill tone={STATUS_VIEW[item.domainStatus].tone}>{STATUS_VIEW[item.domainStatus].label}</StatusPill>
+                  <StatusPill tone={reminderStatusView(item.domainStatus).tone}>{reminderStatusView(item.domainStatus).label}</StatusPill>
                 </span>
                 <span role="cell" className={styles.colReason} title={item.lastErrorMessage ?? undefined}>{item.lastErrorMessage ?? `${item.attemptCount} 回試行`}</span>
                 <span role="cell" className={styles.colOps}>

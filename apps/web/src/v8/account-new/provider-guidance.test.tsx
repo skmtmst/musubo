@@ -80,6 +80,8 @@ function confirmation() {
   const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
   const next = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
   fill('v8-channel-id', '1234567890'); fill('v8-channel-secret', 'a'.repeat(32)); next()
+  expect(screen.getByText('Messaging APIチャネルのプロバイダーIDを入力します。')).toBeTruthy()
+  expect(screen.queryByText('Messaging APIとLINEログインを同じプロバイダーにつなぎます。')).toBeNull()
   fill('v8-provider-id', '2000000001'); next()
   WEBHOOK_ACKS.forEach(ack => fireEvent.click(screen.getByRole('checkbox', { name: ack.label }))); next()
   fill('v8-login-channel-id', '2000000002'); fill('v8-login-channel-secret', 'b'.repeat(32))
@@ -119,21 +121,23 @@ it.each([1, 4])('段%sの認証が失敗したら登録APIを呼ばず、再確�
   expect(calls.connect).not.toHaveBeenCalled()
 })
 
-it('接続情報の必須欄が空の間は次へを止め、入力する内容を示す', () => {
+it('接続情報が空なら理由を示し、次へで最初の誤りへ焦点を移す', () => {
   render(<AccountRegisterV8 />)
   fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
   fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
   fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
   fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
   const next = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
-  expect(next().disabled).toBe(true)
+  expect(next().disabled).toBe(false)
   expect(screen.getByText('チャネルIDとチャネルシークレットを入力してください。')).toBeTruthy()
+  fireEvent.click(next())
+  expect(document.activeElement).toBe(document.getElementById('v8-channel-id'))
   fireEvent.change(document.getElementById('v8-channel-id')!, { target: { value: '1234567890' } })
-  expect(next().disabled).toBe(true)
+  expect(next().disabled).toBe(false)
   fireEvent.change(document.getElementById('v8-channel-secret')!, { target: { value: 'a'.repeat(32) } })
   expect(next().disabled).toBe(false)
   fireEvent.click(next())
-  expect(next().disabled).toBe(true)
+  expect(next().disabled).toBe(false)
   expect(screen.getByText('プロバイダーIDを入力してください。')).toBeTruthy()
   expect(calls.check).not.toHaveBeenCalled()
   expect(calls.connect).not.toHaveBeenCalled()
@@ -148,4 +152,19 @@ it('接続確認の通信失敗を操作内容より先に表示し、再確認�
   expect(notice.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(screen.getByRole('button', { name: 'もう一度確かめる' })).toBeTruthy()
   expect(calls.connect).not.toHaveBeenCalled()
+})
+
+it('入力エラーが出たあと、ほかの欄へ焦点を移せる', () => {
+  render(<AccountRegisterV8 />)
+  fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
+  fireEvent.click(screen.getByRole('radio', { name: 'いいえ、引き継ぎません' }))
+  fireEvent.click(screen.getByRole('radio', { name: '使っていません' }))
+  fireEvent.click(screen.getByRole('button', { name: '次へ', exact: true }))
+  const id = document.getElementById('v8-channel-id') as HTMLInputElement
+  const secret = document.getElementById('v8-channel-secret') as HTMLInputElement
+  id.focus()
+  secret.focus()
+  fireEvent.blur(id, { relatedTarget: secret })
+  expect(screen.getByText('チャネルIDを入力してください。')).toBeTruthy()
+  expect(document.activeElement).toBe(secret)
 })

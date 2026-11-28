@@ -13,10 +13,10 @@ const reason = 'この操作はオーナーだけができます。'
 it.each(['icon', 'quick'] as const)('%sの権限ロックは焦点・マウス・タップを保ち、送信と親操作を止める', async kind => {
   const run = vi.fn(), parent = vi.fn(), submit = vi.fn((event: Event) => event.preventDefault()), pointer = vi.fn()
   const button = kind === 'icon'
-    ? <IconButton aria-label="変える" disabled lockedReason={reason} onClick={run} onPointerDown={pointer} size="compact" variant="attention" pressed>印</IconButton>
-    : <RowQuickAction label="変える" ariaLabel="変える" disabled lockedReason={reason} onClick={run} onPointerDown={pointer} />
+    ? <IconButton aria-label="変更する" disabled lockedReason={reason} onClick={run} onPointerDown={pointer} size="compact" variant="attention" pressed>印</IconButton>
+    : <RowQuickAction label="変更する" ariaLabel="変更する" disabled lockedReason={reason} onClick={run} onPointerDown={pointer} />
   render(<form onSubmit={submit as never}><div onClick={parent}>{button}</div></form>)
-  const control = screen.getByRole('button', { name: '変える' }) as HTMLButtonElement
+  const control = screen.getByRole('button', { name: '変更する' }) as HTMLButtonElement
   expect(control.disabled).toBe(false)
   expect(control.getAttribute('aria-disabled')).toBe('true')
   expect(control.hasAttribute('data-permission-locked')).toBe(true)
@@ -51,10 +51,10 @@ it.each(['icon', 'quick'] as const)('%sの権限ロックは焦点・マウス�
 it.each(['icon', 'quick'] as const)('%sの入力理由はnative disabledのまま、正規操作へ戻れば実行できる', kind => {
   const run = vi.fn()
   const control = (disabled: boolean) => kind === 'icon'
-    ? <IconButton aria-label="変える" disabled={disabled} onClick={run}>印</IconButton>
-    : <RowQuickAction label="変える" ariaLabel="変える" disabled={disabled} onClick={run} />
+    ? <IconButton aria-label="変更する" disabled={disabled} onClick={run}>印</IconButton>
+    : <RowQuickAction label="変更する" ariaLabel="変更する" disabled={disabled} onClick={run} />
   const { rerender } = render(control(true))
-  const button = screen.getByRole('button', { name: '変える' }) as HTMLButtonElement
+  const button = screen.getByRole('button', { name: '変更する' }) as HTMLButtonElement
   expect(button.disabled).toBe(true)
   expect(button.hasAttribute('data-permission-locked')).toBe(false)
   fireEvent.click(button)
@@ -128,9 +128,9 @@ it('下の帯の入力不足はnative disabledと既存の理由1行を保つ', 
 
 it.each(['icon', 'quick'] as const)('%sは既存の読み上げ説明と権限の理由を両方保つ', kind => {
   render(<><p id="action-description">変更した結果は担当者へ通知します</p>{kind === 'icon'
-    ? <IconButton aria-label="変える" aria-describedby="action-description" lockedReason={reason}>印</IconButton>
-    : <RowQuickAction label="変える" ariaLabel="変える" aria-describedby="action-description" lockedReason={reason} />}</>)
-  const button = screen.getByRole('button', { name: '変える' })
+    ? <IconButton aria-label="変更する" aria-describedby="action-description" lockedReason={reason}>印</IconButton>
+    : <RowQuickAction label="変更する" ariaLabel="変更する" aria-describedby="action-description" lockedReason={reason} />}</>)
+  const button = screen.getByRole('button', { name: '変更する' })
   const ids = button.getAttribute('aria-describedby')!.split(' ')
   expect(ids).toHaveLength(2)
   expect(ids[0]).toBe('action-description')

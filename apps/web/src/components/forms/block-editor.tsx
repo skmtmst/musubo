@@ -1,5 +1,7 @@
 'use client'
 
+import { knownValue } from '@/lib/known-value'
+
 import CloseButton from '@/components/shared/close-button'
 import type {
   FormBlock,
@@ -81,7 +83,7 @@ export function blockTypeLabel(block: FormBlock): string {
   if (block.kind !== 'input') {
     return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン' }[block.kind]
   }
-  return INPUT_TYPE_LABEL[block.type]
+  return knownValue(INPUT_TYPE_LABEL, block.type, '種類を確認できません')
 }
 
 export default function BlockEditor({

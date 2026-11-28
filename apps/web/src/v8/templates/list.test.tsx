@@ -9,7 +9,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認、使っているものは削除できない窓。
  */
 import React, { act } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listTemplates = vi.hoisted(() => vi.fn())
@@ -98,6 +98,26 @@ async function renderList() {
     await Promise.resolve()
   })
 }
+
+it.each([
+  ['question', { ...used, id: 'question', name: '予約の質問', question: { type: 'single' } }],
+  ['rich_video', { ...used, id: 'video', name: '予約の動画', messageType: 'imagemap', messageContent: '{"video":{"url":"https://example.com/video"}}' }],
+])('検索語付きの %s タブで一致する行を表示する', async (tab, match) => {
+  window.history.replaceState(null, '', `/templates?q=予約&tab=${tab}`)
+  listTemplates.mockResolvedValue({ success: true, data: [used, match] })
+  await renderList()
+  expect(screen.getByText(match.name)).toBeTruthy()
+  expect(screen.queryByText(used.name)).toBeNull()
+})
+
+it('クーポンの一覧は URL の検索語を表示し、入力を URL に保存する', async () => {
+  window.history.replaceState(null, '', '/templates?q=予約&tab=coupon')
+  await renderList()
+  const search = await screen.findByPlaceholderText('クーポンを探す')
+  expect(search).toHaveProperty('value', '予約')
+  fireEvent.change(search, { target: { value: '誕生日' } })
+  await waitFor(() => expect(new URLSearchParams(currentListLocation().search).get('q')).toBe('誕生日'))
+})
 
 function openMenuAndDelete(name: string) {
   fireEvent.click(screen.getByRole('button', { name: `テンプレート「${name}」の操作` }))
@@ -456,6 +476,28 @@ it('C-10: 保存された複数通だけを絞り込み、複数通の下書き�
   expect(screen.queryByText('予約前日のご案内')).toBeNull()
 })
 
+
+it('URL の検索語を一覧へ引き継ぎ、一致するテンプレートだけを出す', async () => {
+  window.history.replaceState(null, '', '/templates?q=%E4%BA%88%E7%B4%84')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  await renderList()
+  expect(screen.getByText('予約前日のご案内')).toBeTruthy()
+  expect(screen.queryByText('秋の新商品（画像）')).toBeNull()
+})
+
+it('一覧を開いたまま URL の検索語が変わると、検索欄と行を更新する', async () => {
+  window.history.replaceState(null, '', '/templates?q=%E4%BA%88%E7%B4%84')
+  window.dispatchEvent(new PopStateEvent('popstate'))
+  await renderList()
+  expect(screen.getByText('予約前日のご案内')).toBeTruthy()
+  await act(async () => {
+    window.history.pushState(null, '', '/templates?q=%E6%96%B0%E5%95%86%E5%93%81')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  expect((screen.getByRole('searchbox', { name: 'テンプレートを検索' }) as HTMLInputElement).value).toBe('新商品')
+  expect(screen.queryByText('予約前日のご案内')).toBeNull()
+  expect(screen.getByText('秋の新商品（画像）')).toBeTruthy()
+})
 
 it('E-20: 質問タブのURLから開き、タブ切替もURLに残す', async () => {
   window.history.replaceState(null, '', '/templates?tab=question')

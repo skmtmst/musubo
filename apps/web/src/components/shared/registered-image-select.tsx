@@ -23,7 +23,7 @@ export default function RegisteredImageSelect({ accountId, imageId, imageName, d
   return <div className={styles.root}>
     {imageId && accountId && !failed ? <span className={styles.preview} onErrorCapture={() => setFailed(true)}><MediaThumbnail size="compact" kind="image" src={apiUrl(imageId, accountId)} alt="選択したメニューの画像" /></span> : null}
     <div className={styles.actions}>
-      <Button type="button" disabled={!accountId || disabled} disabledReason={!accountId ? '店舗にLINEアカウントを設定すると画像を選べます。' : undefined} onClick={() => setOpen(true)}>登録メディアから選ぶ</Button>
+      <Button type="button" disabled={!accountId || disabled} disabledReason={!accountId ? '店舗にLINEアカウントを設定すると画像を選べます。' : undefined} onClick={() => setOpen(true)}>登録メディアから選択する</Button>
       {imageId ? <Button type="button" onClick={onRemove} disabled={disabled}>選んだ画像を外す</Button> : null}
     </div>
     <p className={styles.note}>{failed ? '画像を読めません。登録メディアから選び直してください。' : imageId ? imageName ? `選択中：${imageName}` : '選択中の画像名を確認しています' : '画像はまだ選んでいません'}</p>

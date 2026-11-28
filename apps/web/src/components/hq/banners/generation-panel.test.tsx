@@ -158,7 +158,7 @@ describe('出力サイズ', () => {
 
   it('大きさを変えると全用途を選べ、選んだ値を親へ伝える', () => {
     const onChange = open()
-    fireEvent.click(screen.getByRole('button', { name: '大きさを変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '大きさを変更する' }))
     expect(screen.getByRole('radio', { name: /リッチメニュー（小）/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('radio', { name: /ストーリー/ }))
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ presetKey: 'sns_story' }))
@@ -167,7 +167,7 @@ describe('出力サイズ', () => {
   it('既存のSNSの用途を開き直しても選択を保つ', () => {
     open('sns_story')
     expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '大きさを変える' }))
+    fireEvent.click(screen.getByRole('button', { name: '大きさを変更する' }))
     expect((screen.getByRole('radio', { name: /ストーリー/ }) as HTMLInputElement).checked).toBe(true)
   })
 })

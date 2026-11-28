@@ -68,8 +68,8 @@ export function useBookingMediaStoreSelection(accountId: string | null) {
     }
   }, [])
 
-  const switchContext = async () => {
-    if (latestAccount.current !== accountId || !accountId || !current.id || !requiresSwitch || current.switching || switchPending.current) return
+  const switchContext = async (setUnselected = false) => {
+    if (latestAccount.current !== accountId || !accountId || !current.id || (!requiresSwitch && !(setUnselected && current.contextId === null)) || current.switching || switchPending.current) return
     const ticket = generation.current, id = current.id
     switchPending.current = true
     setSelection(value => ({ ...value, switching: true, error: null }))

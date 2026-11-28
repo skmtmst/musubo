@@ -73,14 +73,14 @@ describe('はじめにやることを畳む', () => {
   it('「畳む」で手順が隠れて「開く」に替わり、もう一度押すと戻る。閉じるの文字は無い', async () => {
     await act(async () => { render(<Host />) })
     expect(screen.queryByRole('button', { name: '閉じる' })).toBeNull()
-    const fold = screen.getByRole('button', { name: '畳む' })
+    const fold = screen.getByRole('button', { name: 'はじめにやることを畳む' })
     expect(fold.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('LINEアカウントをつなぐ')).toBeTruthy()
     const actions = summary.steps.filter(step => !step.done && step.href)
     expect(screen.getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(actions.map(step => step.href))
     expect(screen.getByRole('button', { name: '友だちの分け方を決めるの未確認の理由' })).toBeTruthy()
     await act(async () => { fireEvent.click(fold) })
-    const open = screen.getByRole('button', { name: '開く' })
+    const open = screen.getByRole('button', { name: 'はじめにやることを開く' })
     expect(open.getAttribute('aria-expanded')).toBe('false')
     expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
     // 畳んでも頭の1行（題・数・進み）は残る。
@@ -122,18 +122,23 @@ it('基本の手順が未取得でも、頭の1行と再試行だけは残す', 
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
   expect(screen.queryByRole('progressbar')).toBeNull()
   expect(screen.queryByRole('heading', { name: '選んだ機能の設定' })).toBeNull()
-  expect(screen.queryByRole('button', { name: '畳む', exact: true })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'はじめにやることを畳む', exact: true })).toBeNull()
   expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む', exact: true }))
   expect(retry).toHaveBeenCalledTimes(1)
 })
 
-it('全部済んだら一覧を出さず、進みの1本だけを残す', async () => {
+it('全部済んだらカードごと隠し、未完了・未確認・取得失敗は残す', () => {
   const allDone = { ...summary, done: summary.total, steps: summary.steps.map(step => ({ ...step, done: true, state: 'done' as const })) }
-  await act(async () => { render(<FirstStepsCard summary={allDone} folded={false} onToggle={() => {}} />) })
-  expect(screen.getAllByRole('progressbar')).toHaveLength(1)
-  expect(document.getElementById('first-steps-list')).toBeNull()
-  expect(screen.queryByRole('button', { name: '畳む', exact: true })).toBeNull()
+  const view = render(<FirstStepsCard summary={allDone} folded={false} onToggle={() => {}} />)
+  expect(screen.queryByRole('heading', { name: 'はじめにやること' })).toBeNull()
+  view.rerender(<FirstStepsCard summary={{ ...allDone, done: allDone.total - 1, steps: allDone.steps.map((step, i) => i === 0 ? { ...step, state: 'todo', done: false } : step) }} folded={false} onToggle={() => {}} />)
+  expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  view.rerender(<FirstStepsCard summary={{ ...allDone, steps: allDone.steps.map((step, i) => i === 0 ? { ...step, state: 'unknown', done: false } : step) }} folded={false} onToggle={() => {}} />)
+  expect(screen.getByRole('heading', { name: 'はじめにやること' })).toBeTruthy()
+  expect(screen.getByRole('list').textContent).toContain('未確認')
+  view.rerender(<FirstStepsCard summary={allDone} keepVisible feedback={<p>読み直してください</p>} folded={false} onToggle={() => {}} />)
+  expect(screen.getByText('読み直してください')).toBeTruthy()
 })
 
 

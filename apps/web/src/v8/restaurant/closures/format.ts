@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 /*
  * 臨時休業・貸切（提案 E-10 ・）の表示の形と数え方。画面から切り離して試験する。
  *
@@ -256,7 +257,7 @@ export const SOURCE_LABEL: Record<string, string> = {
 }
 
 export function sourceLabel(source: string, media: Array<{ code: string; name: string }> = []): string {
-  return SOURCE_LABEL[source] ?? media.find((m) => m.code === source)?.name ?? source
+  return knownValue(SOURCE_LABEL, source, media.find((m) => m.code === source)?.name ?? source)
 }
 
 /**

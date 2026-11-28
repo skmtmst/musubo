@@ -1,6 +1,7 @@
 'use client'
 
 import { automationWaitLabel } from '@line-crm/shared'
+import { knownValue } from '@/lib/known-value'
 
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
@@ -138,14 +139,14 @@ const OPERATOR_LABEL: Record<'AND' | 'OR', string> = {
   OR: 'どれかに当てはまる',
 }
 
-const RULE_TYPE_LABEL: Record<string, string> = {
+const RULE_TYPE_LABEL: Record<string, string> = Object.assign(Object.create(null), {
   tag_exists: 'タグがある',
   tag_not_exists: 'タグがない',
-}
+})
 
 /* 編集画面で扱えない子処理は読み取り専用で残す。消さない。 */
 function readonlyStepSummary(step: CommonActionStep): string {
-  const label = ACTION_LABELS[step.type] ?? step.type
+  const label = knownValue(ACTION_LABELS, step.type, step.type)
   if (step.type === 'wait') {
     return automationWaitLabel(step.params)
   }
@@ -230,7 +231,7 @@ export default function BranchEditors({
                 </div>
               ) : (
                 <p key={`${step.id}-rule-${ruleIndex}`} className="text-ink-secondary text-sm">
-                  条件{ruleIndex + 1}（{RULE_TYPE_LABEL[rule.type] ?? rule.type}。ここでは変えられません）
+                  条件{ruleIndex + 1}（{knownValue(RULE_TYPE_LABEL, rule.type, rule.type)}。ここでは変えられません）
                 </p>
               ))}
               <Button onClick={() => onUpdate(step.id, { kind: 'ruleAdd' })}>条件を足す</Button>

@@ -1,3 +1,4 @@
+import { knownValue } from '@/lib/known-value'
 import type { BookingSlotBlockReason } from '@/lib/api'
 
 /** IDEA-28: 予約できない理由コードを運用者向けの文へ。予定の件名や相手など詳細は API から返らない。 */
@@ -30,5 +31,5 @@ export function slotReasonLabel(reason: BookingSlotBlockReason, slotGranularityM
   if (reason === 'not_on_grid' && slotGranularityMinutes != null) {
     return `開始時刻が受付の刻み（${slotGranularityMinutes}分）に合っていません`
   }
-  return SLOT_REASON_LABELS[reason] ?? 'この日時は受け付けられません'
+  return knownValue(SLOT_REASON_LABELS, reason, 'この日時は受け付けられません')
 }

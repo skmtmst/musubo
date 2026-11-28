@@ -4,11 +4,13 @@ import { formatNumber } from '@/lib/format'
 /** 概要は実際の値と、読めていない理由を既存の説明にまとめる。 */
 export function summaryRows(webinar: Webinar, analytics: WebinarAnalytics | null) {
   const hasVideo = Boolean(webinar.videoPrefix || webinar.videoMediaId)
+  const reservations = analytics?.summary?.reservations
+  const validReservations = typeof reservations === 'number' && Number.isSafeInteger(reservations) && reservations >= 0
   return [
     { label: '動画', value: hasVideo ? 'アップロード済み' : '未設定', note: hasVideo ? undefined : '動画が無いままでは友だちが視聴できません' },
-    { label: '公開', value: webinar.status === 'active' ? '公開中' : webinar.status === 'draft' ? '下書き' : 'アーカイブ' },
+    { label: '公開', value: webinar.status === 'active' ? '公開中' : webinar.status === 'draft' ? '下書き' : webinar.status === 'archived' ? 'アーカイブ' : '確認できません' },
     { label: '配信枠', value: `${formatNumber(webinar.schedule.length)}件`, note: webinar.schedule.length === 0 ? '枠が無いと「次の回」が出ません' : undefined },
-    { label: '申込', value: analytics ? `${formatNumber(analytics.summary.reservations)}人` : '—', note: analytics ? undefined : 'まだ読み込んでいません' },
+    { label: '申込', value: validReservations ? `${formatNumber(reservations)}人` : '—', note: validReservations ? undefined : analytics ? '申込人数を確認できません' : 'まだ読み込んでいません' },
   ]
 }
 

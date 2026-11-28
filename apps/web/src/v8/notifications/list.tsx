@@ -27,7 +27,8 @@ import { Tabs } from '@/components/shared/tabs'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { runOptimistic } from '@/lib/undoable'
-import { isDashboardNotificationData, notificationTime } from '@/components/dashboard/notification-summary'
+import { isDashboardNotificationData } from '@/components/dashboard/notification-summary'
+import { formatDateTime, formatRelative } from '@/lib/format'
 import { useStaffRole } from '@/lib/staff-role'
 import { notificationDestination, notificationLinkLabel } from './destination'
 import {
@@ -59,7 +60,7 @@ export default function NotificationsV8() {
   const [items, setItems] = useState<NotificationCenterItem[]>([])
   // 読み込んだ範囲を未読が先・新しい順にする。追加取得後も同じ順を保つ。
   const orderedItems = useMemo(
-    () => [...items].sort((a, b) => a.isRead !== b.isRead ? (a.isRead ? 1 : -1) : b.createdAt.localeCompare(a.createdAt)),
+    () => [...items].sort((a, b) => a.isRead !== b.isRead ? (a.isRead ? 1 : -1) : (b.createdAt ?? '').localeCompare(a.createdAt ?? '')),
     [items],
   )
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
@@ -68,10 +69,17 @@ export default function NotificationsV8() {
   const [loadError, setLoadError] = useState<unknown>(null)
   const lastListFailure = useRef<string | null>(null)
   const requestId = useRef(0)
+  const markingIdsRef = useRef(new Set<string>())
+  const markingAllRef = useRef(false)
   const viewKeyRef = useRef('')
   const viewGeneration = useRef(0)
   const renderViewKey = `${selectedAccountId ?? ''}|${filter}`
-  if (viewKeyRef.current !== renderViewKey) { viewKeyRef.current = renderViewKey; viewGeneration.current += 1 }
+  if (viewKeyRef.current !== renderViewKey) {
+    viewKeyRef.current = renderViewKey
+    viewGeneration.current += 1
+    markingIdsRef.current.clear()
+    markingAllRef.current = false
+  }
 
   const selectFilter = (next: NotificationTab) => {
     const query = new URLSearchParams(params.toString())
@@ -106,7 +114,11 @@ export default function NotificationsV8() {
       if (id !== requestId.current) return
       if (!response.success) throw new Error(response.error)
       if (!isDashboardNotificationData(response.data)) throw new Error('invalid notification center response')
-      setItems((current) => append ? [...current, ...response.data.items] : response.data.items)
+      setItems((current) => {
+        if (!append) return response.data.items
+        const seen = new Set(current.map((row) => row.id))
+        return [...current, ...response.data.items.filter((row) => !seen.has(row.id))]
+      })
       setCounts(response.data.counts)
       setLoadError(null)
       if (!append) setError('')
@@ -126,7 +138,10 @@ export default function NotificationsV8() {
     }
   }, [accountLoading, filter, selectedAccountId])
 
-  useEffect(() => { void load(0, false) }, [load])
+  useEffect(() => {
+    void load(0, false)
+    return () => { requestId.current += 1 }
+  }, [load])
 
   /*
    * WEB071：既読の楽観更新の「戻す」「読み直す」は、押したときのアカウント・分類に結ぶ。
@@ -136,12 +151,13 @@ export default function NotificationsV8() {
 
   /* 既読は押した瞬間に画面へ反映し、裏で保存する。失敗したら未読へ戻してやり直せる知らせ。 */
   const markRead = (item: NotificationCenterItem) => {
-    if (!canMarkRead || !selectedAccountId || item.isRead) return
+    if (!canMarkRead || !selectedAccountId || item.isRead || markingIdsRef.current.has(item.id)) return
     const accountId = selectedAccountId
     const viewKey = viewKeyRef.current
     const generation = viewGeneration.current
     const request = requestId.current
     const isCurrent = () => sameView(viewKey, generation, request)
+    markingIdsRef.current.add(item.id)
     const apply = (isRead: boolean) => {
       if (!isCurrent()) return
       setItems((current) => current.map((row) => (row.id === item.id ? { ...row, isRead } : row)))
@@ -152,7 +168,7 @@ export default function NotificationsV8() {
     apply(true)
     runOptimistic({
       isCurrent,
-      request: () => api.notifications.center.markRead(item.id, accountId),
+      request: () => api.notifications.center.markRead(item.id, accountId).finally(() => { markingIdsRef.current.delete(item.id) }),
       revert: () => apply(false),
       failureMessage: '通知を既読にできませんでした。',
       retry: () => markRead(item),
@@ -165,7 +181,7 @@ export default function NotificationsV8() {
   }
 
   const markAllRead = () => {
-    if (!canMarkRead || !selectedAccountId || !counts || counts.unread === 0) return
+    if (!canMarkRead || !selectedAccountId || !counts || counts.unread === 0 || markingAllRef.current) return
     const accountId = selectedAccountId
     const viewKey = viewKeyRef.current
     const generation = viewGeneration.current
@@ -173,11 +189,18 @@ export default function NotificationsV8() {
     const isCurrent = () => sameView(viewKey, generation, request)
     const beforeItems = items
     const beforeCounts = counts
+    const scope = markAllCategoryForTab(filter)
+    const unreadInView = items.filter((row) => !row.isRead).length
+    markingAllRef.current = true
     setItems((current) => current.map((row) => ({ ...row, isRead: true })))
-    setCounts((current) => (current ? { ...current, unread: 0 } : current))
+    setCounts((current) => (
+      current
+        ? { ...current, unread: scope === 'all' ? 0 : Math.max(0, current.unread - unreadInView) }
+        : current
+    ))
     runOptimistic({
       isCurrent,
-      request: () => api.notifications.center.markAllRead(accountId, markAllCategoryForTab(filter)),
+      request: () => api.notifications.center.markAllRead(accountId, scope).finally(() => { markingAllRef.current = false }),
       revert: () => {
         if (!isCurrent()) return
         setItems(beforeItems)
@@ -262,7 +285,7 @@ export default function NotificationsV8() {
                         {!item.isRead ? <span className="sr-only">（未読）</span> : null}
                       </span>
                       {isLineTokenNotification(item) && item.body ? <span className={styles.noticeBody}>{item.body}</span> : null}
-                      <span className={styles.time}>{notificationTime(item.createdAt)}</span>
+                      <span className={styles.time} title={formatDateTime(item.createdAt, '日時不明')}>{formatRelative(item.createdAt, undefined, '日時不明')}</span>
                     </span>
                     <span className={styles.go}>{`${notificationLinkLabel(item, destinationContext)} →`}</span>
                   </Link>

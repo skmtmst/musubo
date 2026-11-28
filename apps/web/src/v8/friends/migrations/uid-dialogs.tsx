@@ -44,12 +44,16 @@ export function runStatusView(run: UidMigrationDetail, unresolved: number | null
             badgeLabel: '一部失敗',
           }
         : { description: '本移行は失敗しました。実データは変更されていません。', badgeTone: 'danger', badgeLabel: '失敗' }
-    default:
+    case 'dry_run':
+    case 'review':
+    case 'ready':
       return {
         description: '実データはまだ変更していません。',
         badgeTone: unresolved === 0 ? 'success' : 'warning',
         badgeLabel: unresolved === 0 ? '確認完了' : `要確認 ${unresolved ?? emptyValue('unknown')}件`,
       }
+    default:
+      return { description: '移行の状態を確認できません。最新の状態を確認してください。', badgeTone: 'warning', badgeLabel: '状態を確認できません' }
   }
 }
 

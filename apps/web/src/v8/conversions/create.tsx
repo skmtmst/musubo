@@ -194,6 +194,7 @@ function ConversionCreate() {
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewFailed, setPreviewFailed] = useState(false)
+  const [previewReloadKey, setPreviewReloadKey] = useState(0)
   const previewRequests = useRef(createLatestPreviewRequestGate())
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -265,10 +266,16 @@ function ConversionCreate() {
 
   /* 入力中の条件で、この30日にあてはめた見込みを出す（保存しない）。古い試算は捨てる。 */
   useEffect(() => {
-    if (!lineAccountId) return
+    if (!lineAccountId) {
+      setPreview(null)
+      setPreviewFailed(false)
+      setPreviewLoading(false)
+      return
+    }
     let request: LatestPreviewRequest | null = null
     const timer = window.setTimeout(() => {
       request = previewRequests.current.start()
+      setPreview(null)
       setPreviewLoading(true)
       setPreviewFailed(false)
       void api.conversions.previewDefinition({
@@ -295,7 +302,7 @@ function ConversionCreate() {
       window.clearTimeout(timer)
       request?.abort()
     }
-  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
+  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, previewReloadKey, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
 
   const toggleUsage = (target: UsageTarget) => {
     setSelectedUsageKeys((current) => {
@@ -461,10 +468,18 @@ function ConversionCreate() {
         <div className={styles.sideHead}>
           <h2 className={styles.sideTitle} id="cv-new-preview">この決めごとを この30日に あてはめると</h2>
           <p className={styles.sideNote} aria-busy={previewLoading}>
-            {previewFailed ? '試算を読み込めませんでした（入力は保存されていません）' : '前の日にさかのぼっては数えません（見込みです）'}
+            前の日にさかのぼっては数えません（見込みです）
             <HelpTip label="この試算の説明">{previewNote}</HelpTip>
           </p>
         </div>
+        {previewFailed ? (
+          <Notice tone="danger">
+            試算を読み込めませんでした（入力は保存されていません）。
+            <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setPreviewReloadKey((key) => key + 1)} disabled={!lineAccountId || previewLoading}>
+              もう一度読み込む
+            </Button>
+          </Notice>
+        ) : null}
         <dl className={styles.previewRows}>
           <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : emptyValue('unknown')}</dd></div>
           <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `${formatYen(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
@@ -780,12 +795,18 @@ function ConversionCreate() {
                       </li>
                     ))}
                   </ul>
+                ) : result.state === 'error' ? (
+                  <Notice tone="danger">
+                    {`使える${group.label}を読み込めませんでした。`}
+                    <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => requestUsageKind(group.kind, lineAccountId)} disabled={!lineAccountId}>
+                      もう一度読み込む
+                    </Button>
+                  </Notice>
                 ) : (
                   <p className={styles.fieldNote}>
                     {result.state === 'ok' ? `使える${group.label}がまだありません`
                       : result.state === 'forbidden' ? permissionDeniedMessage('store')
-                        : result.state === 'error' ? `使える${group.label}を読み込めませんでした`
-                          : '候補を読み込んでいます'}
+                        : '候補を読み込んでいます'}
                   </p>
                 )}
               </div>

@@ -37,11 +37,18 @@ function revertNotice(action: RichMenuTestApplyUserMenuAction | undefined): stri
   }
 }
 
+function isValidTestApplyState(value: unknown): value is TestApplyState {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<TestApplyState>
+  return typeof candidate.linked === 'boolean' && Array.isArray(candidate.recent)
+}
+
 /** 要件5-6：本人に連携済みのLINEだけで試し、元の表示へ戻す。 */
 export default function RichMenuTestApply({ groupId, accountId }: { groupId: string; accountId: string }) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<TestApplyState | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [loadErrorRetryable, setLoadErrorRetryable] = useState(true)
   const [confirmKind, setConfirmKind] = useState<'apply' | 'revert' | null>(null)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -66,19 +73,30 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
     try {
       const res = await api.richMenuGroups.testApplyState(groupId)
       if (request !== generation.current) return
-      if (!res.success) throw new Error(res.error)
+      if (!res.success || !isValidTestApplyState(res.data)) throw new Error('invalid test apply state')
       setState(res.data)
       setLoadError('')
+      setLoadErrorRetryable(true)
       return res.data
     } catch (e) {
       if (request !== generation.current) return
-      setLoadError(e instanceof ApiError && e.status === 403
+      const forbidden = e instanceof ApiError && e.status === 403
+      setLoadErrorRetryable(!forbidden)
+      setLoadError(forbidden
         ? 'テスト適用の状態を見る権限がありません。' : 'テスト適用の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
     }
   }, [groupId])
 
   useEffect(() => {
-    if (open) void load()
+    if (open) {
+      confirmation.current = null
+      setState(null)
+      setLoadError('')
+      setLoadErrorRetryable(true)
+      setNotice('')
+      setActionError('')
+      void load()
+    }
     return () => { generation.current += 1 }
   }, [open, load])
 
@@ -153,13 +171,13 @@ export default function RichMenuTestApply({ groupId, accountId }: { groupId: str
     <Dialog open={open} title="自分のLINEで試す" cancelLabel="閉じる" onCancel={close}>
       <div className={styles.stack}>
         <p className={styles.cardNote}>あなたのLINEアカウントにだけ、このメニューを出して見え方を確かめます。ほかの友だちの表示は変わりません。</p>
-        {loadError ? <Notice tone="danger" message={loadError} action={<Button type="button" variant="text" size="inline" onClick={() => void load()}>再試行</Button>} /> : null}
+        {loadError ? <Notice tone="danger" message={loadError} action={loadErrorRetryable ? <Button type="button" variant="text" size="inline" onClick={() => { setLoadError(''); setState(null); void load() }}>再試行</Button> : undefined} /> : null}
         {notice ? <Notice tone="success" message={notice} /> : null}
         {!state && !loadError ? <p className={styles.cardNote} role="status">読み込み中…</p> : null}
         {state && !state.linked ? <Notice tone="warn" message={state.linkGuidance ?? 'テスト適用にはLINE連携が必要です。'} /> : null}
         {state?.linked ? <>
           {destination ? <p className={styles.cardNote}>{destination}</p> : null}
-          {active ? <p className={styles.cardNote} title={active.status === 'failed' ? active.lastErrorCode?.slice(0, 60) : undefined}>いまの状態: {APPLY_STATUS_LABEL[active.status] ?? '状態を確認しています'}</p> : null}
+          {active ? <p className={styles.cardNote} title={active.status === 'failed' ? active.lastErrorCode?.slice(0, 60) : undefined}>いまの状態: {Object.prototype.hasOwnProperty.call(APPLY_STATUS_LABEL, active.status) ? APPLY_STATUS_LABEL[active.status] : '状態を確認しています'}</p> : null}
           {canRevert
             ? <Button type="button" onClick={() => openConfirm('revert')} disabled={busy}>元のメニューに戻す</Button>
             : <Button type="button" variant="primary" onClick={() => openConfirm('apply')} disabled={busy || Boolean(active && active.status !== 'reverted' && active.status !== 'failed')}>自分のLINEに適用して試す</Button>}

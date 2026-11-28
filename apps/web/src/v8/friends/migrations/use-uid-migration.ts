@@ -188,8 +188,20 @@ export function useUidMigration(initialRunId: string | null = null) {
         setMessage(response.error)
         return null
       }
-      setActive(response.data)
-      return response.data
+      const detail = response.data
+      if (!detail || detail.id !== runId || !detail.counts || typeof detail.counts !== 'object'
+        || !(['total', 'auto', 'review', 'unmatched', 'conflict', 'applied', 'failed'] as const)
+          .every((key) => Number.isInteger(detail.counts[key]) && detail.counts[key] >= 0)
+        || (detail.items !== undefined && !Array.isArray(detail.items))
+        || (detail.items?.some((item) => !item || typeof item !== 'object' || typeof item.id !== 'string'
+          || typeof item.oldUid !== 'string' || (item.newUid !== null && typeof item.newUid !== 'string')
+          || !ITEM_CLASSIFICATIONS.includes(item.classification)
+          || !(['pending', 'link', 'create', 'exclude'] as const).includes(item.decision)) ?? false)) {
+        setMessage('対応表を読み直せませんでした。移行履歴からもう一度選んでください。')
+        return null
+      }
+      setActive(detail)
+      return detail
     } catch {
       if (ticket === detailTicket.current) setMessage('対応表を読み直せませんでした。')
       return null
@@ -236,7 +248,15 @@ export function useUidMigration(initialRunId: string | null = null) {
     setMappingsFile(null)
     setFile(selected)
     if (!selected) { setMappings([]); return }
-    const text = await selected.text()
+    let text: string
+    try {
+      text = await selected.text()
+    } catch {
+      if (mounted.current && seq === fileSeq.current && permissionEpoch === accessEpoch.current && canWriteMigrationNow()) {
+        setMessage('CSVを読み込めませんでした。ファイルを確認して、もう一度選んでください。')
+      }
+      return
+    }
     if (!mounted.current) return
     if (seq !== fileSeq.current) return
     if (permissionEpoch !== accessEpoch.current || !canWriteMigrationNow()) {

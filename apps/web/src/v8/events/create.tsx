@@ -531,9 +531,10 @@ function EventsCreateV8Inner() {
               maxLength={200}
               onChange={(event) => setAdding({ ...adding, label: event.target.value })}
             /></SaveErrorField>
-            <SaveErrorField names={["required","adding.required"]}><ToggleField checked={adding.required} onChange={(checked) => setAdding({ ...adding, required: checked })}>必須</ToggleField></SaveErrorField>
+            <span className={styles.questionToggle}><SaveErrorField names={["required","adding.required"]}><ToggleField checked={adding.required} onChange={(checked) => setAdding({ ...adding, required: checked })}>必須</ToggleField></SaveErrorField></span>
             <Button
               disabled={!adding.label.trim()}
+              disabledReason={!adding.label.trim() ? '聞くことを入力してください。' : undefined}
               onClick={() => {
                 setQuestions((current) => [...current, { label: adding.label.trim(), required: adding.required }])
                 setAdding(null)

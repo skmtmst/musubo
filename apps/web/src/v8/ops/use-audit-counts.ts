@@ -11,9 +11,17 @@ export function useAuditCounts(from: string, to: string, filters: ReadonlyArray<
   useEffect(() => {
     let current = true
     void Promise.all([{ key: '', actions: '' }, ...filters].map(async filter => {
-      const response = await opsCall(api.ops.audit({ action: filter.actions || undefined, from: from || undefined, to: to ? `${to}T23:59:59` : undefined, limit: 1, offset: 0 }))
-      return response.success ? [filter.key, response.total] as const : null
-    })).then(rows => { if (current) setResult({ scope, counts: Object.fromEntries(rows.filter(row => row !== null)) }) })
+      try {
+        const response = await opsCall(api.ops.audit({ action: filter.actions || undefined, from: from || undefined, to: to ? `${to}T23:59:59` : undefined, limit: 1, offset: 0 }))
+        return response?.success && typeof response.total === 'number' && Number.isFinite(response.total)
+          ? [filter.key, response.total] as const
+          : null
+      } catch {
+        return null
+      }
+    }))
+      .then(rows => { if (current) setResult({ scope, counts: Object.fromEntries(rows.filter(row => row !== null)) }) })
+      .catch(() => {})
     return () => { current = false }
   }, [from, to, scope, filters])
   return result?.scope === scope ? result.counts : {}

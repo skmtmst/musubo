@@ -24,14 +24,19 @@ const SINGLE = /\{([぀-ヿ一-鿿々ー・]+)\}/g
 function sampleFor(key: string): { value: string; kind: PreviewSampleKind } {
   const k = key.trim()
   if (k === 'name' || k === 'friend.name' || k === '名前' || k === 'お名前' || k === '友だちの名前') return { value: PREVIEW_SAMPLE.name, kind: 'name' }
-  if (k === 'reservation_datetime' || k === '予約日時' || k === '日時') return { value: PREVIEW_SAMPLE.dateTime, kind: 'date' }
+  if (k === 'reservation_datetime' || k === 'var.reservation_datetime' || k === '予約日時' || k === '日時') return { value: PREVIEW_SAMPLE.dateTime, kind: 'date' }
   if (k === 'date' || k.startsWith('date:') || k.startsWith('date+') || k === '日付' || k === '予約日' || k === '来店日') return { value: PREVIEW_SAMPLE.date, kind: 'date' }
   if (k === '時刻' || k === '予約時刻' || k === 'time') return { value: PREVIEW_SAMPLE.time, kind: 'date' }
   if (k.startsWith('days_until:')) return { value: 'あと3日', kind: 'date' }
+  if (k === 'var.guest_count') return { value: '2', kind: 'other' }
+  if (k === 'var.course_name') return { value: 'おまかせコース', kind: 'other' }
+  if (k === 'var.store_phone') return { value: '03-1234-5678', kind: 'other' }
+  if (k === 'var.shop_hours' || k === 'var.hours') return { value: '11:00〜20:00', kind: 'other' }
+  if (k === 'var.store_name') return { value: PREVIEW_SAMPLE.account, kind: 'other' }
   if (k === 'account.name' || k === '店名' || k === 'アカウント名') return { value: PREVIEW_SAMPLE.account, kind: 'other' }
   if (k === 'meet_url' || k.endsWith('_url') || k === 'URL') return { value: PREVIEW_SAMPLE.url, kind: 'other' }
   if (k.startsWith('field.')) return { value: PREVIEW_SAMPLE.field, kind: 'other' }
-  return { value: PREVIEW_SAMPLE.other, kind: 'other' }
+  return { value: '［差し込みの値］', kind: 'other' }
 }
 
 /** 差し込みを見本の値にした文と、置き換えた種類。置き換えが無ければ `kinds` は空。 */

@@ -21,6 +21,16 @@ export type FirstStepsSummary = {
   total: number
 }
 
+/** 全段の状態を確認できた場合だけ、完了した案内を隠せる。 */
+export function isFirstStepsComplete(summary: FirstStepsSummary | null): boolean {
+  return Boolean(summary && summary.total > 0 && summary.done === summary.total && summary.steps.length === summary.total && summary.steps.every(step => step.state === 'done'))
+}
+
+/** 確認中や取得失敗を、完了によるカード非表示より優先する。 */
+export function shouldKeepFirstStepsVisible(start: { status: string; error: unknown }, setup: { status: string; error: unknown }): boolean {
+  return start.status !== 'ready' || setup.status === 'loading' || Boolean(start.error || setup.error)
+}
+
 /** ガイドの操作だけを受け取る。完了判定は持たず、はじめにやることの実測に従う。 */
 export type FirstStepsGuide = GuideControl
 

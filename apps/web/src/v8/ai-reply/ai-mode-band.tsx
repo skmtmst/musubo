@@ -52,7 +52,8 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   /* 組2 の今の段では Q&A の自動応答は使えない（autoReplyAvailable:false）。選ぶ欄に出さない。 */
   const autoUnavailable = settings?.autoReplyAvailable === false
   const choices = autoUnavailable ? permissions.modeChoices.filter((choice) => choice !== 'auto_qa') : permissions.modeChoices
-  const published = settings?.publishedQaCount ?? 0
+  const published = settings?.publishedQaCount ?? null
+  const drafts = settings?.draftQaCount ?? null
 
   const close = () => { if (busy) return; setPending(null); setError('') }
   const save = async (next: Choice, stepUpToken?: string) => {
@@ -82,7 +83,7 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
   const action = mode === 'off'
     ? (choices.includes('draft_only') ? <Button onClick={() => choose('draft_only')}>使ってみる</Button> : null)
     : choices.length > 0 && !choosing
-      ? <Button onClick={() => setChoosing(true)}>変える</Button>
+      ? <Button onClick={() => setChoosing(true)}>変更する</Button>
       : null
 
   const choiceValue: Choice = mode === 'suspended' ? 'draft_only' : mode
@@ -95,6 +96,10 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
         options={choices.map((choice) => ({ value: choice, label: MODE_CHOICE_LABEL[choice] }))}
         onChange={(next) => {
           if (next === choiceValue) return
+          if (next === 'auto_qa' && (published === null || drafts === null)) {
+            notifyToast('Q&A の件数を読み直してください')
+            return
+          }
           if (next === 'auto_qa' && published === 0) {
             setError('')
             notifyToast('Q&A を 1 件以上公開すると選べます')
@@ -143,11 +148,11 @@ export function AiModeBand({ accountId, accountName, settings, permissions, onCh
       </ConfirmDialog>
 
       <AutoAnswerConfirmDialog
-        open={pending === 'auto_qa' && pendingTarget?.scope === accountScope.current}
+        open={pending === 'auto_qa' && published !== null && drafts !== null && pendingTarget?.scope === accountScope.current}
         accountId={pendingTarget?.accountId ?? ''}
         accountName={accountName}
-        published={published}
-        drafts={settings?.draftQaCount ?? 0}
+        published={published ?? 0}
+        drafts={drafts ?? 0}
         busy={busy}
         error={error}
         onConfirm={() => void save('auto_qa')}

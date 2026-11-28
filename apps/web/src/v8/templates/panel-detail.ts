@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { isTemplateDetailData, type TemplateDetailData } from '@/v8/template-detail/public/model/index'
 
 /** 一覧のパネルでも使用先と公開前の版を読む。行・アカウントが替わった応答は捨てる。 */
 export function useTemplatePanelDetail(id: string | null, accountId: string | null, canPublish: boolean, onChanged: () => Promise<void>) {
   const [snapshot, setSnapshot] = useState<{ id: string; accountId: string | null; detail: TemplateDetailData } | null>(null)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const generation = useRef(0)
   const publishLock = useRef(false)
@@ -20,15 +22,35 @@ export function useTemplatePanelDetail(id: string | null, accountId: string | nu
     setSnapshot({ id, accountId, detail: res.data })
   }, [id, accountId])
 
-  useEffect(() => {
+  const reload = useCallback(async () => {
+    if (!id) return
     const token = ++generation.current
-    setSnapshot(null)
+    setLoading(true)
     setError('')
-    if (id) void read(token).catch(() => {
-      if (token === generation.current) setError('使用先と公開前の状態を確認できませんでした。詳細画面で読み直してください。')
-    })
+    try {
+      await read(token)
+    } catch (caught) {
+      if (token === generation.current) {
+        setError(isForbiddenOrRateLimited(caught)
+          ? loadFailureNotice(caught, 'テンプレートの詳細', 'store')
+          : '使用先と公開前の状態を確認できませんでした。もう一度読み込むか、詳細画面で確認してください。')
+      }
+    } finally {
+      if (token === generation.current) setLoading(false)
+    }
+  }, [id, read])
+
+  useEffect(() => {
+    setSnapshot(null)
+    if (!id) {
+      generation.current += 1
+      setError('')
+      setLoading(false)
+      return
+    }
+    void reload()
     return () => { generation.current += 1 }
-  }, [id, accountId, read])
+  }, [id, accountId, reload])
 
   const detail = snapshot?.id === id && snapshot.accountId === accountId ? snapshot.detail : null
   const publish = async () => {
@@ -57,5 +79,5 @@ export function useTemplatePanelDetail(id: string | null, accountId: string | nu
       setPublishing(false)
     }
   }
-  return { detail, error, publishing, publish }
+  return { detail, error, loading, publishing, publish, reload }
 }

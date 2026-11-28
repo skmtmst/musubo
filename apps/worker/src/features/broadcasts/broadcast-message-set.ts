@@ -1,5 +1,5 @@
 import type { Message } from '@line-crm/line-sdk';
-import { normalizeStoreInterpolations, convertBroadcastAsset, isBroadcastAssetKind, splitBroadcastText, validateFlexMessage, validateImagemapMessage } from '@line-crm/shared';
+import { broadcastButtonsFlex, normalizeStoreInterpolations, convertBroadcastAsset, isBroadcastAssetKind, splitBroadcastText, validateFlexMessage, validateImagemapMessage } from '@line-crm/shared';
 import { autoTrackContent } from '../../services/auto-track.js';
 import { buildMessage } from '../../services/line-message.js';
 import {
@@ -242,13 +242,7 @@ export function parseBroadcastMessageParts(input: Parameters<typeof parseStoredB
   let options = input.messageOptions as { buttons?: Array<{ label: string; value: string; type?: string }> } | undefined;
   if (options === undefined && input.messageOptionsJson) options = JSON.parse(input.messageOptionsJson);
   if (options?.buttons?.length) {
-    parts.push({ id: 'message-buttons', messageType: 'flex', altText: 'ボタン', messageContent: JSON.stringify({
-      type: 'bubble', body: { type: 'box', layout: 'vertical', contents: options.buttons.map(button => ({
-        type: 'button', action: button.type === 'postback'
-          ? {type:'postback',label:button.label,data:button.value}
-          : {type:'uri',label:button.label,uri:button.value},
-      })) },
-    }) });
+    parts.push({ id: 'message-buttons', messageType: 'flex', altText: 'ボタン', messageContent: JSON.stringify(broadcastButtonsFlex(options.buttons)) });
   }
   if (parts.length > MAX_BROADCAST_MESSAGES) throw new Error('文章の自動分割とボタンを合わせて5通までです。本文や吹き出しを減らしてください');
   for (const part of parts) {

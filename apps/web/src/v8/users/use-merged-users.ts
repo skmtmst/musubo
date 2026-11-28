@@ -38,9 +38,19 @@ export function useMergedUsers() {
   // フィルタ変更 / ページ移動で複数リクエストが in-flight になり、
   // 古い応答が後着で UI を上書きする事故を防ぐ。
   const requestSeqRef = useRef(0)
+  const mountedRef = useRef(true)
+  const exportingRef = useRef(false)
   // 次の load で最新状態を取り直すフラグ。
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      requestSeqRef.current += 1
+    }
+  }, [])
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -58,7 +68,9 @@ export function useMergedUsers() {
   // アカウント候補は LINE アカウント API から取得（ページ依存させない）。
   // /api/users-grouped は inactive を除外して集計するので、候補も active のみ。
   useEffect(() => {
+    let active = true
     api.lineAccounts.list().then((res) => {
+      if (!active || !mountedRef.current) return
       if (res.success) {
         setAccountOptions(
           res.data
@@ -67,7 +79,12 @@ export function useMergedUsers() {
             .sort((x, y) => x.name.localeCompare(y.name)),
         )
       }
+    }).catch(() => {
+      // アカウント候補の取得失敗でも、統合ユーザー一覧の表示は続ける。
     })
+    return () => {
+      active = false
+    }
   }, [])
 
   const load = useCallback(async () => {
@@ -127,7 +144,8 @@ export function useMergedUsers() {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const exportCsv = async () => {
-    if (exporting) return
+    if (exporting || exportingRef.current) return
+    exportingRef.current = true
     setExporting(true)
     setExportError('')
     try {
@@ -147,7 +165,9 @@ export function useMergedUsers() {
       let complete = false
       // 上限は途中で件数が増えても無限に追い続けないための安全弁。
       for (let p = 1; p <= USERS_CSV_MAX_PAGES; p += 1) {
+        if (!mountedRef.current) return
         const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200 })
+        if (!mountedRef.current) return
         if (!res.success) throw new Error('fetch failed')
         all.push(...res.data.rows)
         exportTotal = res.data.total
@@ -156,6 +176,7 @@ export function useMergedUsers() {
           break
         }
       }
+      if (!mountedRef.current) return
       if (!complete) {
         setExportError(`人数が多すぎるため、CSVに書き出せませんでした（${formatNumber(all.length)}人より先があります）。条件で絞ってからやり直してください。`)
         return
@@ -177,9 +198,10 @@ export function useMergedUsers() {
       anchor.click()
       URL.revokeObjectURL(url)
     } catch {
-      setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
+      if (mountedRef.current) setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
     } finally {
-      setExporting(false)
+      exportingRef.current = false
+      if (mountedRef.current) setExporting(false)
     }
   }
 

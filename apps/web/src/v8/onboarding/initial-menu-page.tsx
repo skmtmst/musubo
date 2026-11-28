@@ -53,7 +53,7 @@ export default function InitialMenuPage() {
   <PageFrame kind="detail">
    <PageHeading title={MENU_TITLE} />
    <PageContent>
-    <Notice tone="info">使い方のスタイルを先に選んでください。<Button href="/?setup=0&setupReturn=accounts">使い方を選ぶ</Button></Notice>
+    <Notice tone="info">使い方のスタイルを先に選んでください。<Button href="/?setup=0&setupReturn=accounts">使い方を選択する</Button></Notice>
    </PageContent>
   </PageFrame>
  )

@@ -213,7 +213,7 @@ export default function AccountsV8() {
   const headActions = (
     <div className={styles.headActions}>
       <Button variant="secondary" disabled={role === null} lockedReason={permissionReason} onClick={() => { if (!canManage || lockReason(canManage, 'manager')) return; setOrderingOpen(true) }}>
-        <ArrowUpDown size={16} aria-hidden="true" />並び順と親子を変える
+        <ArrowUpDown size={16} aria-hidden="true" />並び順と親子を変更する
       </Button>
       <Button variant="primary" lockedReason={permissionReason} {...(role === null ? { disabled: true } : { href: '/accounts/new' })}>
         <Plus size={16} aria-hidden="true" />LINEアカウントを登録

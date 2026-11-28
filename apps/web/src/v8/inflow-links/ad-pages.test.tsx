@@ -165,7 +165,7 @@ describe('広告への送信履歴（p0kA3）', () => {
       const before = host.querySelector('tbody')?.textContent
       await act(async () => { option!.click() })
       expect(host.querySelector('tbody')?.textContent).toBe(before)
-      const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(item => item.textContent?.trim() === '選ぶ')!
+      const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(item => item.textContent?.trim() === '選択する')!
       expect(confirm.disabled).toBe(false)
       await act(async () => { confirm.click() })
     }

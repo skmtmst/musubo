@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MediaItem } from '@line-crm/shared'
 
 /**
- * N-193: テンプレート作成の「登録メディアから選ぶ」は押しても
+ * N-193: テンプレート作成の「登録メディアから選択する」は押しても
  * API呼出0・選択窓なしだった。実Reactで、開く→読む→選ぶ→保存値へ
  * ID・種別が載るところまでを直接証明する。
  */
@@ -132,13 +132,13 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-describe('テンプレート作成の「登録メディアから選ぶ」（N-193）', () => {
+describe('テンプレート作成で登録メディアから選択する', () => {
   it('リッチメッセージ: 押すと選択窓が開き、選んだID・種別・URLが保存値へ載る', async () => {
     await renderEditor('rich_message')
     expect(fixture.listCalls).toEqual([])
 
     // 無反応だった操作: 押すとメディア一覧を読み、選択窓が開く。
-    await act(async () => { buttonByText('登録メディアから選ぶ').click(); await settle() })
+    await act(async () => { buttonByText('登録メディアから選択する').click(); await settle() })
     expect(fixture.listCalls).toEqual([{ accountId: 'account-a', params: { kind: 'image', query: undefined, limit: 20, offset: 0 } }])
     await waitForDialogText('キャンペーン画像.png')
 
@@ -168,9 +168,9 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
     })
   })
 
-  it('クーポン: 「登録メディアから選ぶ」が同じ選択窓へ繋がる', async () => {
+  it('クーポン: 「登録メディアから選択する」が同じ選択窓へ繋がる', async () => {
     await renderEditor('coupon')
-    await act(async () => { buttonByText('登録メディアから選ぶ').click(); await settle() })
+    await act(async () => { buttonByText('登録メディアから選択する').click(); await settle() })
     expect(fixture.listCalls).toHaveLength(1)
     await waitForDialogText('キャンペーン画像.png')
     await act(async () => {
@@ -182,7 +182,7 @@ describe('テンプレート作成の「登録メディアから選ぶ」（N-19
 
   it('アカウントを切り替えると、前のアカウントで選んだ候補は保存対象から外れる', async () => {
     await renderEditor('rich_message')
-    await act(async () => { buttonByText('登録メディアから選ぶ').click(); await settle() })
+    await act(async () => { buttonByText('登録メディアから選択する').click(); await settle() })
     await waitForDialogText('キャンペーン画像.png')
     await act(async () => {
       ;[...dialog().querySelectorAll<HTMLButtonElement>('[role="option"]')].find((b) => b.textContent?.includes('キャンペーン画像.png'))!.click()
