@@ -24,6 +24,22 @@ import { originInfoOf } from './origin-labels'
 import { readExclusionView, type ExclusionCondition } from './exclusion'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { emptyValue } from '@/components/shared/empty-value'
+
+function validNonNegInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+function validFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function formatEventTime(raw: unknown): string {
+  if (typeof raw !== 'string' || raw.length < 16 || !Number.isFinite(Date.parse(raw))) {
+    return emptyValue('unknown')
+  }
+  return raw.slice(0, 16).replace('T', ' ')
+}
 
 
 /*
@@ -69,7 +85,8 @@ function exclusionLine(sourceConfig: Record<string, unknown>): string {
 /** R41: 詳細の「金額」行の1行。起点の対応表と同じ言葉を使う。 */
 function valueModeLine(item: Pick<ConversionDefinitionListItem, 'sourceType' | 'valueMode' | 'value'>): string {
   if (item.valueMode === 'fixed') {
-    return item.value == null ? '決まった額（金額なし）' : `決まった額（1件 ${formatYen(item.value)}）`
+    if (item.value == null) return '決まった額（金額なし）'
+    return validFiniteNumber(item.value) ? `決まった額（1件 ${formatYen(item.value)}）` : `決まった額（${emptyValue('unknown')}）`
   }
   if (item.valueMode === 'source') return `起点の金額を使う（${originInfoOf(item.sourceType).amount}）`
   return '金額を集計しない'
@@ -153,7 +170,8 @@ export function sourceTriggerLabel(point: Pick<ConversionDefinitionListItem, 'me
 }
 export function usageLabel(point: ConversionDefinitionListItem): string {
   if (point.usageCount === 0) return 'どこからも使われていません'
-  if (point.usageNames?.length) return point.usageNames.join('・')
+  if (Array.isArray(point.usageNames) && point.usageNames.length > 0) return point.usageNames.join('・')
+  if (!validNonNegInt(point.usageCount)) return emptyValue('unknown')
   return `${formatNumber(point.usageCount)}か所で使用中`
 }
 
@@ -211,22 +229,26 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
     canReverse,
     openReversal,
   } = props
+  const detailBusy = publishing || ingestBusy !== ''
+  const safeDefinitionEvents = Array.isArray(definitionEvents) ? definitionEvents : []
+  const safeIngestEvents = Array.isArray(ingestEvents) ? ingestEvents : []
   return (
     <Dialog
       open={detailTarget !== null}
+      busy={detailBusy}
       title={detailTarget?.name ?? ''}
       description="この成果地点の数え方と利用状況です。"
-      onCancel={() => setDetailTarget(null)}
+      onCancel={() => { if (!detailBusy) setDetailTarget(null) }}
       footer={detailTarget ? (<DialogActions>
           {canReverse && detailTarget.state === 'draft' ? (<Button
               variant="primary"
-              disabled={publishing}
-              onClick={() => void publishDraft(detailTarget)} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
+              disabled={detailBusy}
+              onClick={() => { if (!detailBusy) void publishDraft(detailTarget) }} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
             </Button>) : null}
-          {canReverse && detailTarget.status !== 'stopped' ? (<Button onClick={() => openEdit(detailTarget)}>
+          {canReverse && detailTarget.status !== 'stopped' ? (<Button disabled={detailBusy} onClick={() => { if (!detailBusy) openEdit(detailTarget) }}>
               編集
             </Button>) : null}
-          {canReverse && detailTarget.status !== 'stopped' ? (<Button onClick={() => void openStop(detailTarget)}>
+          {canReverse && detailTarget.status !== 'stopped' ? (<Button disabled={detailBusy} onClick={() => { if (!detailBusy) void openStop(detailTarget) }}>
               停止・削除する
             </Button>) : null}
         </DialogActions>) : null}
@@ -234,7 +256,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
       {detailTarget ? (
         <div className="space-y-4">
           <dl className="grid grid-cols-2 gap-3 text-sm">
-            <div><dt className="text-ink-faint">状態</dt><dd className="text-ink mt-1 font-semibold">{STATE_LABELS[detailTarget.state]}</dd></div>
+            <div><dt className="text-ink-faint">状態</dt><dd className="text-ink mt-1 font-semibold">{STATE_LABELS[detailTarget.state] ?? emptyValue('unknown')}</dd></div>
             <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
             {/* R41: 対象・金額の説明も対応表と同じものを使う。 */}
             <div><dt className="text-ink-faint">対象</dt><dd className="text-ink mt-1 font-semibold">{originInfoOf(detailTarget.sourceType).target}</dd></div>
@@ -257,7 +279,11 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                 </HelpTip>
               </dt>
               <dd className="text-ink mt-1 font-semibold">
-                {detailTarget.attributionDays == null ? '90日（既定）' : `${detailTarget.attributionDays}日`}
+                {detailTarget.attributionDays == null
+                  ? '90日（既定）'
+                  : validNonNegInt(detailTarget.attributionDays) && detailTarget.attributionDays > 0
+                    ? `${formatNumber(detailTarget.attributionDays)}日`
+                    : emptyValue('unknown')}
               </dd>
             </div>
             <div>
@@ -269,9 +295,13 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
             {/* R40: 数えない条件とメモを詳細でも確認できる。 */}
             <div className="col-span-2"><dt className="text-ink-faint">数えない条件</dt><dd className="text-ink mt-1 font-semibold">{exclusionLine(detailTarget.sourceConfig)}</dd></div>
             <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
-            <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{formatNumber(detailTarget.metrics.netCount)} 件</dd></div>
+            <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{validNonNegInt(detailTarget.metrics?.netCount) ? `${formatNumber(detailTarget.metrics.netCount)} 件` : emptyValue('unknown')}</dd></div>
             <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
-            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${formatNumber(detailTarget.metrics.reversedCount)} 件・${formatYen((detailTarget.metrics.reversedValue ?? 0))}`}</dd></div>
+            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics?.reversedCount == null
+              ? '取消台帳は未接続'
+              : validNonNegInt(detailTarget.metrics.reversedCount)
+                ? `${formatNumber(detailTarget.metrics.reversedCount)} 件・${detailTarget.metrics.reversedValue == null ? formatYen(0) : validFiniteNumber(detailTarget.metrics.reversedValue) ? formatYen(detailTarget.metrics.reversedValue) : emptyValue('unknown')}`
+                : emptyValue('unknown')}</dd></div>
           </dl>
           {detailTarget.stateReason ? (
             <Notice tone="warn" message={detailTarget.stateReason} />
@@ -290,13 +320,13 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
               <p className="text-ink-faint mt-2 text-xs leading-5" role="status">
                 成果の記録を読み込めませんでした。一覧の件数は上の「この30日」を確認してください。
               </p>
-            ) : definitionEvents.length === 0 ? (
+            ) : safeDefinitionEvents.length === 0 ? (
               <p className="text-ink-faint mt-2 text-xs leading-5">
                 まだ成果がありません。検知した成果がここに新しい順で並びます。
               </p>
             ) : (
               <ul className="mt-3 space-y-1 text-xs">
-                {definitionEvents.map((event) => (
+                {safeDefinitionEvents.map((event) => (
                   <li key={event.id} className="text-ink-secondary flex items-baseline justify-between gap-2">
                     <span className="text-ink min-w-0">
                       <span className="font-semibold">{event.friendName ?? '名前のない友だち'}</span>
@@ -308,13 +338,15 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                             : 'bg-success-bg text-success'
                         }`}
                       >
-                        {EVENT_STATUS_LABELS[event.status]}
+                        {EVENT_STATUS_LABELS[event.status] ?? emptyValue('unknown')}
                       </span>
                       {/* R42: 金額なしは0円と区別して出す。 */}
-                      {event.value !== null ? (
+                      {event.value == null ? (
+                        <span className="text-ink-faint ml-2">金額なし</span>
+                      ) : validFiniteNumber(event.value) ? (
                         <span className="text-ink-faint ml-2 tabular-nums">{formatYen(event.value)}</span>
                       ) : (
-                        <span className="text-ink-faint ml-2">金額なし</span>
+                        <span className="text-ink-faint ml-2 tabular-nums">{emptyValue('unknown')}</span>
                       )}
                     </span>
                     <span className="text-ink-faint flex shrink-0 items-baseline gap-3 tabular-nums">
@@ -328,7 +360,8 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                         <button
                           type="button"
                           className="text-action underline"
-                          onClick={() => openReversal(event, 'restore')}
+                          disabled={detailBusy}
+                          onClick={() => { if (!detailBusy) openReversal(event, 'restore') }}
                         >
                           取消を戻す
                         </button>
@@ -336,12 +369,13 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                         <button
                           type="button"
                           className="text-action underline"
-                          onClick={() => openReversal(event, 'reverse')}
+                          disabled={detailBusy}
+                          onClick={() => { if (!detailBusy) openReversal(event, 'reverse') }}
                         >
                           取り消す
                         </button>
                       ) : null}
-                      {event.createdAt.slice(0, 16).replace('T', ' ')}
+                      {formatEventTime(event.createdAt)}
                     </span>
                   </li>
                 ))}
@@ -353,11 +387,11 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
               <h3 className="text-ink text-sm font-bold">外部からの受信</h3>
               <p className="text-ink-faint mt-1 text-xs leading-5">
                 連携先システムがこの成果地点へ成果を送るときの受け口です。
-                送り側は `POST {detailTarget.id ? `/api/conversions/ingest/${detailTarget.id}` : ''}` に
+                送り側は `POST {detailTarget.id ? `/api/conversions/ingest/${encodeURIComponent(detailTarget.id)}` : ''}` に
                 `X-Conversion-Signature` 署名を付けて送ります。
               </p>
               <p className="text-ink-secondary mt-2 text-sm">
-                {detailTarget.ingest.configured
+                {detailTarget.ingest?.configured
                   ? detailTarget.ingest.disabledAt
                     ? '受け口は止まっています（起点停止）。'
                     : '受け口は動いています。鍵は発行済みです。'
@@ -365,15 +399,15 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
               </p>
               {canReverse ? <div className="mt-2 flex flex-wrap gap-2">
                 <Button
-                  disabled={ingestBusy !== '' || detailTarget.state !== 'active'}
-                  onClick={() => void issueIngest(detailTarget)}
+                  disabled={detailBusy || detailTarget.state !== 'active'}
+                  onClick={() => { if (!detailBusy && detailTarget.state === 'active') void issueIngest(detailTarget) }}
                 >
-                  {detailTarget.ingest.configured ? '鍵を出し直す' : '鍵を発行する'}
+                  {detailTarget.ingest?.configured ? '鍵を出し直す' : '鍵を発行する'}
                 </Button>
-                {detailTarget.ingest.configured ? (
+                {detailTarget.ingest?.configured ? (
                   <Button
-                    disabled={ingestBusy !== ''}
-                    onClick={() => void toggleIngest(detailTarget)}
+                    disabled={detailBusy}
+                    onClick={() => { if (!detailBusy) void toggleIngest(detailTarget) }}
                   >
                     {detailTarget.ingest.disabledAt ? '受け口を再開する' : '受け口を止める'}
                   </Button>
@@ -385,9 +419,9 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                   この表示は一度だけです。連携先へ渡して保管してください。
                 </Notice>
               ) : null}
-              {ingestEvents.length > 0 ? (
+              {safeIngestEvents.length > 0 ? (
                 <ul className="mt-3 space-y-1 text-xs">
-                  {ingestEvents.slice(0, 5).map((event) => (
+                  {safeIngestEvents.slice(0, 5).map((event) => (
                     <li key={event.id} className="text-ink-secondary flex justify-between gap-2">
                       <span
                         className={event.result === 'rejected' ? 'text-danger' : event.isTest ? 'text-info' : 'text-ink'}
@@ -395,7 +429,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                       >
                         {ingestionEventLabel(event)}
                       </span>
-                      <span className="text-ink-faint tabular-nums">{event.createdAt.slice(0, 16).replace('T', ' ')}</span>
+                      <span className="text-ink-faint tabular-nums">{formatEventTime(event.createdAt)}</span>
                     </li>
                   ))}
                 </ul>
@@ -451,14 +485,15 @@ export function ConversionReversalDialog(props: ConversionReversalDialogProps) {
       busy={reversalBusy}
       error={reversalError || undefined}
       confirmLabel={reversalKind === 'restore' ? '取消を戻す' : '取り消す'}
-      onConfirm={() => submitReversal()}
-      onCancel={() => setReversalTarget(null)}
+      onConfirm={() => { if (!reversalBusy) submitReversal() }}
+      onCancel={() => { if (!reversalBusy) setReversalTarget(null) }}
     >
       <OperationTargetSummary accounts={[account]} externalTarget={{ label: '友だち', name: reversalTarget?.friendName }} />
       <Field label="理由" required><SaveErrorField names={["reversalReason","reversal_reason"]}><TextField
           className="mt-1 w-full"
           value={reversalReason}
           maxLength={500}
+          disabled={reversalBusy}
           placeholder="例：重複のため"
           onChange={(e) => setReversalReason(e.target.value)}
         /></SaveErrorField></Field>
@@ -500,11 +535,11 @@ export function ConversionEditDialog(props: ConversionEditDialogProps & { surfac
       busy={editSaving}
       title={editTarget ? `「${editTarget.name}」を編集` : ''}
       description="直すと次の版になります。過去に数えた成果と金額は、そのまま残ります。"
-      onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
+      onCancel={() => { if (!editSaving) { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) } }}
       footer={(
         <div className="flex justify-end gap-2">
-          <Button disabled={editSaving} onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>キャンセル</Button>
-          <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()} busy={editSaving} busyLabel="保存中…">この内容にする
+          <Button disabled={editSaving} onClick={() => { if (!editSaving) { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) } }}>キャンセル</Button>
+          <Button variant="primary" disabled={editSaving} onClick={() => { if (!editSaving) void submitEdit() }} busy={editSaving} busyLabel="保存中…">この内容にする
           </Button>
         </div>
       )}
