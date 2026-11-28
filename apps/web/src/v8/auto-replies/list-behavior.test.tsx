@@ -311,6 +311,17 @@ describe('数を 0 に見せない', () => {
     expect(row.textContent).toContain('累計 —回')
     expect(row.textContent).not.toMatch(/(^|[^0-9])0回/)
     expect(host.textContent).not.toContain('累計 0回')
+    // 狭い数の欄でも、今月と累計の全文を title で確かめられる。
+    expect(row.querySelector('td[title^="今月"]')?.getAttribute('title')).toBe('今月 —回 ／ 累計 —回')
+  })
+
+  it('行のヒット数の欄は、今月と累計の全文を title に持つ', async () => {
+    const restore = stubWideViewport()
+    onCleanup.push(restore)
+    net.list.mockImplementation(async () => ({ success: true, data: [ruleA] }))
+    renderList(); await flush()
+    const row = screen.getByText('営業時間外の自動返信').closest('tr') as HTMLElement
+    expect(row.querySelector('td[title^="今月"]')?.getAttribute('title')).toBe('今月 5回 ／ 累計 20回')
   })
 
   it('「今月0回」の絞り込みは、数えられた 0 回だけを残し未取得を混ぜない', async () => {

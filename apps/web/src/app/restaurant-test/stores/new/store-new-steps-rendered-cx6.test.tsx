@@ -9,13 +9,26 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { termsAgreement: fixture.terms, agreeToTerms: fixture.agree, connectStore: fixture.connect } }))
 import Page from './page'
 
+// 規約が枠に収まる高さにして、初めから読み終わった状態で手順を進める。
+const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+const originalClientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+
 beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 400 })
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 400 })
   fixture.terms.mockResolvedValue({ data: { agreedVersion: null, agreedAt: null } })
   fixture.agree.mockResolvedValue({ data: { agreedAt: '2026-09-27 10:00:00' } })
   fixture.connect.mockResolvedValue({ data: { store: { id: 'store-1', name: '試験店舗' }, lineAccountName: '試験LINE' } })
   fixture.account = 'account-1'
 })
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+  if (originalScrollHeight) Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight)
+  else delete (HTMLElement.prototype as { scrollHeight?: number }).scrollHeight
+  if (originalClientHeight) Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeight)
+  else delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight
+})
 
 function expectStep(step: number) {
   const help = screen.getByRole('button', { name: '店舗を追加の説明' })

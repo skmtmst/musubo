@@ -22,7 +22,7 @@ describe('#640 省略表示の全文確認（title）', () => {
   // /scenarios の数のセルの title は v8/scenarios/list-folder-dot-and-reorder.test.tsx が描いて読む。
 
   it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
-    expect(AUTO_REPLIES).toContain('title={`今月 ${r.hits?.period')
+    // 数の欄の title の全文は v8/auto-replies/list-behavior.test.tsx が描いて読む。
     expect(AUTO_REPLIES).toContain('title={name}') // : 条件の補足は名前の下に出さない
     expect(AUTO_REPLIES).not.toContain('sub={') // : 連動の補足は名前の下に出さない
   })
