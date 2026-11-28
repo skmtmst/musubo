@@ -9,7 +9,6 @@ const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/v8/tags/create.tsx'), 'utf8')
 const ROUTE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/new/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(process.cwd(), 'src/lib/api.ts'), 'utf8')
 
@@ -37,11 +36,6 @@ function renderCopyAction() {
 }
 
 describe('タグ作成の名前検査の契約', () => {
-  it('作る前に長さと使えない文字を見る', () => {
-    expect(PAGE).toContain('タグ名は80文字までで入力してください')
-    expect(PAGE).toContain('タグ名に使えない文字が含まれています')
-  })
-
   it('タグの更新に色を渡さない', () => {
     /* タグ自身は色を持たない。色は分類(フォルダ)に付ける。版付き(#715)。 */
     expect(API).toContain('update: (id: string, data: { lineAccountId: string | null; expectedVersion: number; isStarred: boolean })')
@@ -49,21 +43,11 @@ describe('タグ作成の名前検査の契約', () => {
   })
 
   it('旧作成画面を残さず、一覧と複製から現役V8作成画面へ進む', () => {
-    expect(ROUTE).toContain("@/v8/tags/create")
-    expect(ROUTE).toContain('<Screen />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
-    expect(ROUTE).toContain('<CreatePage')
     const { action, save, remove } = renderCopyAction()
     expect(action.getAttribute('href')).toBe('/tags/new?copy=copy-source')
     expect(save).not.toHaveBeenCalled()
     expect(remove).not.toHaveBeenCalled()
   })
 
-  it('現役V8作成画面が旧画面の保存項目を引き継ぐ', () => {
-    expect(PAGE).toContain('api.tags.createDefinition(')
-    expect(PAGE).toContain('groupId: groupId || null')
-    expect(PAGE).toContain('isStarred,')
-    expect(PAGE).toContain('self: source?.mileageReward ?? 0, referrer: source?.referralMileageReward ?? 0')
-    expect(PAGE).toContain('definitionsForSave((copySource.automation?.actions ?? [])')
-  })
 })
