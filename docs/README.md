@@ -2,6 +2,8 @@
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
+- [QRの経路の読み直しの反映履歴](release-log/unreleased/PR-kenta-later2-cx3-02-1128.md)（説明・2026-11-28確認）
+
 # 文書の入口
 
 

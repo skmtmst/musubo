@@ -122,6 +122,8 @@ export default function QrDialog({
   const routesError = Boolean(routesErrorProp || (routesProp===undefined && fetchedError) || lookupState==='error')
   const routesPending = routesProp !== undefined ? (routesPendingProp ?? false) : fetchedRoutes === null
   const [routeId, setRouteId] = useState(initialRouteId)
+  const [syncedInitialRouteId, setSyncedInitialRouteId] = useState(initialRouteId)
+  const routeSelectionPending = open && initialRouteId !== syncedInitialRouteId
   /*
    * 一覧に無いIDを指定されたときだけ取り直す。止めた経路は一覧から
    * 外れるため、「見つからない」と「止めている」を分けるための1回。
@@ -147,6 +149,7 @@ export default function QrDialog({
   useEffect(() => {
     if (open) {
       setRouteId(initialRouteId)
+      setSyncedInitialRouteId(initialRouteId)
       setPdfState('idle')
     }
   }, [open, initialRouteId])
@@ -204,7 +207,7 @@ export default function QrDialog({
   const routeStopped = route != null && !route.isActive
   const routeMissing = routeId !== '' && !route && !routesPending && !routesError && lookupState!=='loading'
   const link = resource?.url ?? (route && route.isActive ? `${base}/r/${route.refCode}` : baseLink)
-  const blocked = resource ? Boolean(resource.stopped) : routesError || Boolean(routeId && !route) || routeStopped
+  const blocked = resource ? Boolean(resource.stopped) : routeSelectionPending || routesError || Boolean(routeId && !route) || routeStopped
 
   useEffect(() => {
     let cancelled = false
@@ -379,7 +382,7 @@ export default function QrDialog({
                   この経路は停止しています。QRコードは表示しません。
                   {stoppedDetail ? <><br />{stoppedDetail}</> : null}
                 </p>
-              ) : routesError || lookupState==='loading' ? null : routeMissing ? (
+              ) : routeSelectionPending || routesError || lookupState==='loading' ? null : routeMissing ? (
                 <p className="text-ink-faint max-w-[220px] px-4 text-center text-xs leading-relaxed">
                   選んだ経路はこのアカウントでは見つかりません。<br />経路を選び直してください。
                 </p>
