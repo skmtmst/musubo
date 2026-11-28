@@ -19,6 +19,7 @@ import IconButton from '@/components/shared/icon-button'
 import styles from './screen.module.css'
 
 const IMPERSONATION_REASON = '代理ログイン中は変更できません。代理ログインを終了してから操作してください。'
+const ALWAYS_ON_REASON = 'AI の機能は常にオンです'
 const CONSENT_UPDATED = '同意文が更新されました。内容を確認してもう一度同意してください。'
 const FEATURES: Array<{ id: AccountAiFeature; label: string; note: string }> = [
   { id: 'banner', label: 'バナー生成', note: '統括のバナー生成でこの店の AI を使います' },
@@ -74,6 +75,16 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
     } catch (cause) {
       if (enabled && !token && isStepUpRequired(cause)) {
         setStepUp({ purpose: 'ai.settings', action: `${FEATURES.find(row => row.id === item.feature)?.label ?? 'AI の機能'}をオンにする`, retry: async grant => { await save(item, true, grant) } })
+      } else if (cause instanceof ApiError && cause.code === 'ai_always_on') {
+        setPending(null); setAgreed(false)
+        try {
+          const refreshed = await accountAiFeaturesApi.get(accountId)
+          if (!refreshed.success) throw new Error('reload failed')
+          setSettings(refreshed.data)
+        } catch (reloadError) {
+          saveErrors.capture(reloadError)
+          setSettings(current => current ? { ...current, items: current.items.map(row => row.feature === item.feature ? { ...row, enabled: true, alwaysOn: true } : row) } : current)
+        }
       } else if (cause instanceof ApiError && (cause.status === 409 || cause.code === 'ai_consent_required')) {
         try {
           const refreshed = await accountAiFeaturesApi.get(accountId)
@@ -94,6 +105,7 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
     } finally { savingRef.current = false; setSaving(false) }
   }
   const enabledCount = settings?.items.filter(item => FEATURES.some(feature => feature.id === item.feature) && item.enabled).length
+  const allAlwaysOn = FEATURES.every(feature => settings?.items.find(row => row.feature === feature.id)?.alwaysOn === true)
   const Chevron = open ? ChevronDown : ChevronRight
   const cancelConsent = () => { if (!saving) { setPending(null); setAgreed(false); setError(current => current === CONSENT_UPDATED ? '' : current) } }
   return <SaveErrorScope errors={saveErrors}><Card as="section" id="ai-features" overflow="hidden" aria-label="AI の機能">
@@ -103,16 +115,17 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
       {canManage ? <span className={styles.groupMeta}>{enabledCount === undefined ? '状態を確認できません' : `${FEATURES.length} 件中 ${enabledCount} 件オン`}</span> : null}
     </div>
     {open ? <>
-      <div className={styles.row}><p className={styles.rowNote}>切り替えるとすぐ保存されます。オンには同意と本人確認が必要です。</p></div>
+      <div className={styles.row}><p className={styles.rowNote}>{allAlwaysOn ? 'AI の機能は常にオンです。' : '切り替えるとすぐ保存されます。オンには同意と本人確認が必要です。'}</p></div>
       {reason ? <Notice tone="info">{reason}</Notice> : null}
       {loading && canManage ? <ListState kind="loading" /> : null}
       {info ? <Notice tone="info" role="status">{info}</Notice> : null}
       {error && !pending ? <Notice tone="danger" action={!error.includes('権限がありません') && error !== IMPERSONATION_REASON ? <Button size="compact" onClick={() => void load()} disabled={saving}>読み直す</Button> : undefined}>{error}</Notice> : null}
       <ul className={styles.rows}>{FEATURES.map(feature => {
         const item = settings?.items.find(row => row.feature === feature.id)
+        const alwaysOn = item?.alwaysOn === true
         return <li className={styles.row} key={feature.id}>
           <div className={styles.rowText}><p className={styles.rowName}><span className={styles.rowLabel}>{feature.label}</span></p><p className={styles.rowNote}>{feature.note}</p></div>
-          <Toggle label={feature.label} checked={item?.enabled ?? false} disabled={loading || saving || (canManage && !item) || (!canEdit && !reason)} lockedReason={!canEdit ? reason : undefined} onChange={next => { if (!item || !canEdit) return; if (next) { setPending(item); setAgreed(false) } else void save(item, false) }} />
+          <Toggle label={feature.label} checked={alwaysOn || (item?.enabled ?? false)} disabled={loading || saving || (canManage && !item) || (!canEdit && !reason && !alwaysOn)} lockedReason={alwaysOn ? ALWAYS_ON_REASON : !canEdit ? reason : undefined} onChange={next => { if (!item || !canEdit || alwaysOn) return; if (next) { setPending(item); setAgreed(false) } else void save(item, false) }} />
         </li>
       })}</ul>
     </> : null}

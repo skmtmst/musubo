@@ -1,7 +1,7 @@
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite} from '../services/gap-common.js';
-import {AI_DISCLOSURE,AI_DISCLOSURE_VERSION,accountAiSetting,type AccountAiFeature} from '../services/account-ai-features.js';
+import {AI_DISCLOSURE,AI_DISCLOSURE_VERSION,accountAiAlwaysOn,accountAiSetting,type AccountAiFeature} from '../services/account-ai-features.js';
 import {sensitiveStepUpSatisfied,stepUpRequiredResponse} from '../lib/step-up.js';
 import {requireRole} from '../middleware/role-guard.js';
 export const accountAiFeatures=new Hono<Env>();
@@ -9,11 +9,14 @@ accountAiFeatures.use('/api/ai-features*',requireRole('owner','admin'));
 accountAiFeatures.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'ai_settings_unavailable'},e instanceof GapError?e.status:503));
 accountAiFeatures.get('/api/ai-features',async c=>{
  const a=await gapAccount(c);
- return c.json({success:true,data:{items:await Promise.all((['banner','google_review'] as const).map(f=>accountAiSetting(c.env.DB,a,f))),disclosure:AI_DISCLOSURE,disclosureVersion:AI_DISCLOSURE_VERSION}});
+ return c.json({success:true,data:{items:await Promise.all((['banner','google_review'] as const).map(f=>accountAiSetting(c.env.DB,a,f,c.env))),disclosure:AI_DISCLOSURE,disclosureVersion:AI_DISCLOSURE_VERSION}});
 });
 accountAiFeatures.put('/api/ai-features/:feature',async c=>{
- gapWrite(c,{admin:true});const a=await gapAccount(c),feature=c.req.param('feature') as AccountAiFeature,b=await gapBody(c),v=gapVersion(b.expectedVersion);
- if(!['banner','google_review'].includes(feature)||typeof b.enabled!=='boolean')throw new GapError('invalid_ai_feature');
+ gapWrite(c,{admin:true});const a=await gapAccount(c),feature=c.req.param('feature') as AccountAiFeature;
+ if(!['banner','google_review'].includes(feature))throw new GapError('invalid_ai_feature');
+ if(accountAiAlwaysOn(c.env))throw new GapError('ai_always_on',409);
+ const b=await gapBody(c),v=gapVersion(b.expectedVersion);
+ if(typeof b.enabled!=='boolean')throw new GapError('invalid_ai_feature');
  if(b.enabled){
   if(b.consent!==true||b.disclosureVersion!==AI_DISCLOSURE_VERSION)throw new GapError('ai_consent_required');
   if(!await sensitiveStepUpSatisfied(c,'ai.settings'))return stepUpRequiredResponse(c,'AIの利用を始めるには本人確認が必要です');
@@ -30,5 +33,5 @@ accountAiFeatures.put('/api/ai-features/:feature',async c=>{
    .bind(crypto.randomUUID(),a,actor,JSON.stringify({feature,enabled:b.enabled,consent:b.enabled?{by:actor,at:now,disclosureVersion:AI_DISCLOSURE_VERSION,text:AI_DISCLOSURE}:null})),
  ]);
  if(!result[0].meta.changes)throw new GapError('version_conflict',409);
- return c.json({success:true,data:await accountAiSetting(db,a,feature)});
+ return c.json({success:true,data:await accountAiSetting(db,a,feature,c.env)});
 });
