@@ -31,8 +31,10 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   const [data, setData] = useState<GoogleProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadFailure, setLoadFailure] = useState<unknown>(null)
   const [syncing, setSyncing] = useState(false)
   const syncLock = useRef(false)
+  const requestSeq = useRef(0)
   const [showDiff, setShowDiff] = useState(false)
   const [showMore, setShowMore] = useState(false)
 
@@ -42,14 +44,20 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       syncLock.current = true
       setSyncing(true)
     } else setLoading(true)
+    const seq = ++requestSeq.current
     setError('')
+    setLoadFailure(null)
     try {
-      setData(sync ? await restaurantGoogleApi.syncProfile(accountId) : await restaurantGoogleApi.profile(accountId))
+      const next = sync ? await restaurantGoogleApi.syncProfile(accountId) : await restaurantGoogleApi.profile(accountId)
+      if (seq !== requestSeq.current) return
+      setData(next)
     } catch (err) {
+      if (seq !== requestSeq.current) return
       if (!sync) setData(null)
+      setLoadFailure(err)
       setError(errorMessage(err, 'プロフィールを読み込めませんでした。'))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
       if (sync) {
         syncLock.current = false
         setSyncing(false)
@@ -57,11 +65,14 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
     }
   }, [accountId, canSync])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { requestSeq.current += 1 }
+  }, [load])
 
   if (loading && !data) return <div className={styles.stateBox}><ListState kind="loading" title="プロフィールを読み込んでいます" /></div>
   if (!data) {
-    return <ListState kind="error" title="プロフィールを表示できませんでした" description={error} onRetry={() => void load()} action={<TextLink inline href="/settings/sns">SNS連携で接続を確認する</TextLink>} />
+    return <ListState kind="error" title="プロフィールを表示できませんでした" error={loadFailure} description={error} onRetry={() => void load()} action={<TextLink inline href="/settings/sns">SNS連携で接続を確認する</TextLink>} />
   }
 
   const { profile } = data
@@ -88,7 +99,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       {data.stale ? <Notice tone="warn" action={<Button variant="text" lockedReason={syncReason} disabled={!canSync || syncing} onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="warn" role="alert">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認する</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${formatNumber(data.pendingChangeCount)} 件）。`}</Notice> : null}
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <Notice tone="danger" action={!data.stale && canSync ? <Button variant="text" size="inline" lockedReason={syncReason} disabled={!canSync || syncing} onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">再同期する</Button> : undefined}>{error}</Notice> : null}
       <div><Button variant="text" onClick={() => go({ tab: 'hours' })}>営業時間を開く</Button></div>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-store-info-title">
         <SectionHeader size="small" title={<span id="gb-store-info-title">店舗情報</span>}

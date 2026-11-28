@@ -2,7 +2,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Download } from 'lucide-react'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { AUDIT_ACTION_LABEL, formatDateTime, opsCall } from '@/components/ops/ops-ui'
@@ -78,23 +78,40 @@ export default function OpsAuditV8() {
   const [page, setPage] = useListUrlValue('page', 1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [errorSource, setErrorSource] = useState<'load' | 'export' | null>(null)
+  const [loadFailure, setLoadFailure] = useState<unknown>(null)
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState('')
+  const requestSeq = useRef(0)
 
   const counts = useAuditCounts(from, to, FILTERS)
   const actionsFor = (key: string) => FILTERS.find((f) => f.key === key)?.actions || undefined
 
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current
     setLoading(true)
     setError('')
+    setErrorSource(null)
+    setLoadFailure(null)
     const res = await opsCall(api.ops.audit({ action: actionsFor(filter), from: from || undefined, to: to ? `${to}T23:59:59` : undefined, limit: PAGE, offset: (page - 1) * PAGE }))
+    if (seq !== requestSeq.current) return
     setLoading(false)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
+    if (!res.success) {
+      const message = res.error || '読み込めませんでした'
+      setError(message)
+      setErrorSource('load')
+      setLoadFailure(new Error(message))
+      return
+    }
     setRows(res.data)
     setTotal(res.total)
   }, [filter, from, to, page])
 
-  useEffect(() => { setEntry(null); void load() }, [load])
+  useEffect(() => {
+    setEntry(null)
+    void load()
+    return () => { requestSeq.current += 1 }
+  }, [load])
 
   const exportCsv = async () => {
     setExporting(true)
@@ -104,7 +121,7 @@ export default function OpsAuditV8() {
     let truncated = false
     for (let offset = 0; ; offset += CSV_PAGE) {
       const res = await opsCall(api.ops.audit({ action: actionsFor(filter), from: from || undefined, to: to ? `${to}T23:59:59` : undefined, limit: CSV_PAGE, offset }))
-      if (!res.success) { setError(res.error || '書き出せませんでした'); setExporting(false); return }
+      if (!res.success) { setError(res.error || '書き出せませんでした'); setErrorSource('export'); setExporting(false); return }
       collected.push(...res.data)
       expected = res.total
       if (res.data.length < CSV_PAGE || collected.length >= res.total) break
@@ -154,13 +171,21 @@ export default function OpsAuditV8() {
         </div>
 
         {exportNote ? <p role="status" className={parts.status}>{exportNote}</p> : null}
-        {error && rows.length > 0 ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
+        {error && rows.length > 0 ? (
+          <Notice
+            tone="danger"
+            className={parts.alertNoticePlacement}
+            action={errorSource === 'load' ? <Button variant="text" size="inline" onClick={() => void load()} disabled={loading} busy={loading}>もう一度読み込む</Button> : undefined}
+          >
+            {error}
+          </Notice>
+        ) : null}
 
         {loading && rows.length === 0 ? (
           <ListState permissionScope="hq" kind="loading" title="記録を読み込んでいます" />
         ) : error && rows.length === 0 ? (
           <div className={parts.panel}>
-            <ListState permissionScope="hq" kind="error" title="記録を表示できませんでした" description={error} onRetry={() => void load()} />
+            <ListState permissionScope="hq" kind="error" title="記録を表示できませんでした" error={loadFailure} description={error} onRetry={() => void load()} />
           </div>
         ) : rows.length === 0 ? (
           <div className={parts.panel}>
