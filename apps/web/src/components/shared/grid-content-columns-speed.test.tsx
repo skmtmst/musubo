@@ -123,8 +123,8 @@ function TemplateLikeTable({ rows }: { rows: { name: string; preview: string; st
   )
 }
 
-describe('grid-content-columns の常駐プローブ・deferCommit・同一 scope 省略', () => {
-  it('生の行要素へプローブを挿さず contain:strict の常駐ホストで測り、同一 scope の再実行と幅のみ変化の再クローンを省く', () => {
+describe('grid-content-columns の常駐プローブと deferCommit', () => {
+  it('生の行要素へプローブを挿さず contain:strict の常駐ホストで測り、呼び出しごとに最新の内容を測り直す', () => {
     let clientWidth = 800
     let probeReads = 0
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
@@ -164,23 +164,20 @@ describe('grid-content-columns の常駐プローブ・deferCommit・同一 scop
     const cols800 = frame.style.getPropertyValue('--grid-table-content-columns')
     expect(cols800).not.toBe('')
 
-    // 同一 scope の再実行ではプローブ計測を完全に省略する
+    // リサイズ・文字変更のどちらでも常駐ホストを再利用して測り直し、生の行へは挿さない
     probeReads = 0
-    fitGridContentColumns(frame)
-    expect(probeReads).toBe(0)
-    expect(frame.style.getPropertyValue('--grid-table-content-columns')).toBe(cols800)
-
-    // 幅だけが変わったリサイズではセルの測り直し（クローン）を省いて配分だけ更新する
     clientWidth = 640
     fitGridContentColumns(frame)
-    expect(probeReads).toBe(0)
+    expect(probeReads).toBe(12)
     expect(frame.style.getPropertyValue('--grid-table-content-columns')).not.toBe(cols800)
 
-    // テキストが変わったときは再計測する
+    probeReads = 0
     row0.children[1].textContent = 'short@a.test'
     fitGridContentColumns(frame)
     expect(probeReads).toBe(12)
     expect(liveRowAppend).not.toHaveBeenCalled()
+    expect(document.documentElement.querySelectorAll('[data-grid-column-probe-host]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-column-probe]')).toHaveLength(0)
 
     clearGridContentColumns(frame)
     expect(frame.style.getPropertyValue('--grid-table-content-columns')).toBe('')
@@ -237,42 +234,7 @@ describe('grid-content-columns の常駐プローブ・deferCommit・同一 scop
   })
 })
 
-describe('list-column-sizing の読取中書込の排除と同一 scope 省略', () => {
-  it('同一 scope の再実行では Range 計測やプローブ計測をやり直さない', () => {
-    const longNote = 'とても長い補足テキストが二行以上に折り返される検証用サンプル文字列'
-    let rangeCalls = 0
-    vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
-      rangeCalls += 1
-      const text = this.toString().trim()
-      if (text === longNote) return [rect(120, 20), rect(120, 20)] as unknown as DOMRectList
-      return [rect(Math.max(24, text.length * 10), 20)] as unknown as DOMRectList
-    })
-    vi.spyOn(Range.prototype, 'getBoundingClientRect').mockImplementation(function (this: Range) {
-      return rect(Math.max(24, this.toString().trim().length * 10), 20)
-    })
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      if (this.hasAttribute('data-column-probe')) return rect((this.textContent?.length ?? 0) * 10, 20)
-      if (this.dataset.testid === 'tpl-frame' || this.tagName === 'TABLE' || this.tagName === 'TR') return rect(1100, 40)
-      return rect(180, 24)
-    })
-
-    const { getByTestId } = render(
-      <TemplateLikeTable rows={[{ name: 'テンプレート1', preview: longNote, status: '公開中' }]} />,
-    )
-    const frame = getByTestId('tpl-frame')
-
-    fitListColumns(frame)
-    expect(rangeCalls).toBeGreaterThan(0)
-    const widthAfterFirst = getByTestId('tpl-preview-0').style.getPropertyValue('--list-content-column-width')
-    expect(widthAfterFirst).not.toBe('')
-
-    // 同じ幅・同じ内容の再実行では Range 計測が 0 回で終わる
-    rangeCalls = 0
-    fitListColumns(frame)
-    expect(rangeCalls).toBe(0)
-    expect(getByTestId('tpl-preview-0').style.getPropertyValue('--list-content-column-width')).toBe(widthAfterFirst)
-  })
-
+describe('list-column-sizing の読取中書込の排除と再計測の保証', () => {
   it('同じ内容の後ろの行が新しい DOM に置き換わったときも必ず測り直し、列の印と幅を付け直す', () => {
     let rangeCalls = 0
     vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
@@ -300,7 +262,7 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     const expectedWidth = getByTestId('tpl-preview-1').style.getPropertyValue('--list-content-column-width')
     expect(expectedWidth).not.toBe('')
 
-    // 2行目だけを同じ内容の新しい DOM へ入れ替える（DOM 変更なので必ず測り直す）
+    // 2行目だけを同じ内容の新しい DOM へ入れ替える
     const tbody = frame.querySelector('tbody')!
     const fresh = document.createElement('tr')
     fresh.innerHTML = '<td data-cell-grow=""><span data-list-name="">テンプレート2</span></td><td><span>見本B</span></td><td><span>下書き</span></td>'
@@ -316,51 +278,6 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     expect(fresh.children[1].hasAttribute('data-content-support-column')).toBe(true)
     expect((fresh.children[1] as HTMLElement).style.getPropertyValue('--list-content-column-width')).toBe(expectedWidth)
     expect(fresh.children[2].hasAttribute('data-content-support-column')).toBe(true)
-
-    // 同じコマの中の変更が無い再実行では測り直しを省略する
-    rangeCalls = 0
-    expect(fitListColumns(frame, true)).toBeUndefined()
-    expect(rangeCalls).toBe(0)
-  })
-
-  it('1コマをまたぐと DOM 変更が無くても測り直し、また deferCommit の計測後〜commit 前の外部変更を捨てない', async () => {
-    let rangeCalls = 0
-    vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
-      rangeCalls += 1
-      return [rect(Math.max(24, this.toString().trim().length * 10), 20)] as unknown as DOMRectList
-    })
-    vi.spyOn(Range.prototype, 'getBoundingClientRect').mockImplementation(function (this: Range) {
-      return rect(Math.max(24, this.toString().trim().length * 10), 20)
-    })
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      if (this.dataset.testid === 'tpl-frame' || this.tagName === 'TABLE' || this.tagName === 'TR') return rect(1100, 40)
-      return rect(180, 24)
-    })
-
-    const { getByTestId } = render(
-      <TemplateLikeTable rows={[{ name: 'テンプレート1', preview: '短い', status: '公開中' }]} />,
-    )
-    const frame = getByTestId('tpl-frame')
-    const previewCell = getByTestId('tpl-preview-0')
-
-    // 1. 同じコマの中は省略し、マイクロタスク（コマ境界）をまたぐと必ず再計測する
-    fitListColumns(frame)
-    rangeCalls = 0
-    fitListColumns(frame)
-    expect(rangeCalls).toBe(0)
-    await Promise.resolve()
-    fitListColumns(frame)
-    expect(rangeCalls).toBeGreaterThan(0)
-
-    // 2. deferCommit で測ったあと commit する前に外部から文字を変えると、commit はその変更を捨てない
-    await Promise.resolve()
-    const staleCommit = fitListColumns(frame, true)
-    previewCell.firstElementChild!.textContent = 'とても長いテキストに変更されました'
-    staleCommit?.()
-
-    rangeCalls = 0
-    fitListColumns(frame)
-    expect(rangeCalls).toBeGreaterThan(0)
   })
 
   it('非 flexibleContent 表のリサイズ時でも deferCommit の読取フェーズ中は DOM へ書き込まず、書込フェーズ後に測り直す', async () => {

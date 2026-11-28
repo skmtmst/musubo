@@ -18,194 +18,99 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   const available = room - gap * (count - 1)
   const headFontSizes = headCells.map(cell => number(getComputedStyle(cell).fontSize))
 
-  // 同じ1コマの中で DOM 変更無く重ねて呼ばれたときだけ省く。
-  // 1コマをまたいだ呼び出しや DOM 変更があった呼び出しは必ず測り直す。
-  const siblingAttrs = new Set(['data-list-content-lines', 'data-list-density-scope'])
-  const isProbeNode = node => node?.nodeType === 1 && (
-    node.hasAttribute('data-column-probe')
-    || node.hasAttribute('data-column-probe-host')
-    || node.hasAttribute('data-grid-column-probe-host')
-  )
-  const isExternalMutation = record => {
-    if (record.type === 'childList') {
-      const changed = [...record.addedNodes, ...record.removedNodes]
-      return changed.length > 0 && !changed.every(isProbeNode)
-    }
-    if (record.type === 'attributes') {
-      if (siblingAttrs.has(record.attributeName)) return false
-      if (record.target === frame && record.attributeName === 'style') return false
-      return true
-    }
-    return true
-  }
-  let tracker = frame.__gridColumnDomTracker
-  if (!tracker) {
-    const view = doc.defaultView
-    const MO = view?.MutationObserver || (typeof MutationObserver === 'function' ? MutationObserver : null)
-    tracker = { dirty: true, observer: null }
-    if (MO) {
-      tracker.observer = new MO(records => {
-        if (records.some(isExternalMutation)) tracker.dirty = true
-      })
-      tracker.observer.observe(frame, { childList: true, subtree: true, characterData: true, attributes: true })
-    }
-    frame.__gridColumnDomTracker = tracker
-  } else if (tracker.observer) {
-    const pending = tracker.observer.takeRecords()
-    if (pending.some(isExternalMutation)) tracker.dirty = true
-  }
-
-  const scheduleTurnExpiry = () => {
-    frame.gridContentSameTurn = true
-    if (frame.__gridContentTurnExpiryScheduled) return
-    frame.__gridContentTurnExpiryScheduled = true
-    const expire = () => {
-      frame.__gridContentTurnExpiryScheduled = false
-      frame.gridContentSameTurn = false
-      frame.gridContentCache = undefined
-    }
-    if (typeof queueMicrotask === 'function') queueMicrotask(expire)
-    else Promise.resolve().then(expire)
-  }
-
-  const formControls = frame.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]),select,textarea')
-  const formState = formControls.length === 0
-    ? ''
-    : [...formControls].map(el => (el.tagName === 'SELECT'
-      ? [...el.options].map(option => (option.selected ? '1' : '0')).join('')
-      : `${el.value ?? ''}`)).join('\x1f')
-  const styleScope = `${rows.length}:${count}:${frame.className}|${frame.dataset.tablePresentation ?? ''}|${css.fontFamily}|${css.fontSize}|${css.fontWeight}|${css.letterSpacing}|${headFontSizes.join(',')}:${formState}`
-  const scope = `${clientWidth}:${Math.round(room)}:${Math.round(gap)}:${styleScope}`
-  const hasMedia = rows.some(row => row.querySelector('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,input[type="image"]'))
-  const appliedIntact = frame.gridContentSameTurn
-    && !tracker.dirty
-    && frame.gridContentScope === scope
-    && (frame.gridContentWasStacked
-      ? frame.hasAttribute('data-stacked') && Boolean(frame.style.getPropertyValue('--grid-table-content-rest-columns'))
-      : Boolean(frame.style.getPropertyValue('--grid-table-content-columns')))
-  if (appliedIntact) return
-
-  const canReuseSameTurnMeasured = frame.gridContentSameTurn
-    && !tracker.dirty
-    && !hasMedia
-    && frame.gridContentScope !== ''
-    && frame.gridContentCache?.styleScope === styleScope
-
-  // この時点より前の通知を基準としてクリアする（計測後〜commit 前の外部変更は commit 冒頭で検知）。
-  if (tracker.observer) tracker.observer.takeRecords()
-  tracker.dirty = false
-
-  const recordOwnWrite = (ownWrites, target, attrName) => {
-    let attrs = ownWrites.get(target)
-    if (!attrs) {
-      attrs = new Set()
-      ownWrites.set(target, attrs)
-    }
-    attrs.add(attrName)
-  }
-  const isOwnWriteRecord = (ownWrites, record) =>
-    record.type === 'attributes'
-    && Boolean(record.attributeName)
-    && Boolean(ownWrites.get(record.target)?.has(record.attributeName))
-
   const fontKeys = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing', 'lineHeight']
-  let measured
-  if (canReuseSameTurnMeasured) {
-    measured = frame.gridContentCache.measured
-  } else {
-    // 写しは contain:strict の常駐ホストにすべて置いてから幅を読み、最後にまとめて外す。
-    const copy = node => {
-      if (node.nodeType === 3) return node.cloneNode()
-      if (node.nodeType !== 1) return doc.createTextNode('')
-      // 通信や接続処理を持つ物は実寸の空要素へ。フォームは名前・所属・選択を外し、自然な幅だけ測る。
-      if (node.matches('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,script,style,link,input[type="image"]') || node.localName.includes('-')) {
-        const rect = node.getBoundingClientRect(), placeholder = doc.createElement('span')
-        placeholder.style.cssText = `display:inline-block;width:${rect.width}px;height:${rect.height}px;flex:none`
-        return placeholder
-      }
-      const clone = node.cloneNode(false)
-      for (const attr of ['id', 'name', 'form', 'for', 'autofocus']) clone.removeAttribute(attr)
-      if (node.matches('input')) { clone.checked = false; clone.removeAttribute('checked'); if (node.type !== 'file') clone.value = node.value }
-      if (node.matches('button')) clone.setAttribute('type', 'button')
-      for (const child of node.childNodes) clone.append(copy(child))
-      if (node.matches('textarea')) clone.value = node.value
-      if (node.matches('select')) [...node.options].forEach((option, index) => { if (clone.options[index]) clone.options[index].selected = option.selected })
-      return clone
+  // 写しは contain:strict の常駐ホストにすべて置いてから幅を読み、最後にまとめて外す。
+  const copy = node => {
+    if (node.nodeType === 3) return node.cloneNode()
+    if (node.nodeType !== 1) return doc.createTextNode('')
+    // 通信や接続処理を持つ物は実寸の空要素へ。フォームは名前・所属・選択を外し、自然な幅だけ測る。
+    if (node.matches('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,script,style,link,input[type="image"]') || node.localName.includes('-')) {
+      const rect = node.getBoundingClientRect(), placeholder = doc.createElement('span')
+      placeholder.style.cssText = `display:inline-block;width:${rect.width}px;height:${rect.height}px;flex:none`
+      return placeholder
     }
-    const probes = rows.map(row => [...row.children].map(cell => {
-      const probe = copy(cell)
-      probe.setAttribute('aria-hidden', 'true')
-      probe.setAttribute('inert', '')
-      probe.setAttribute('data-column-probe', '')
-      probe.removeAttribute('id')
-      for (const child of probe.querySelectorAll('[id]')) child.removeAttribute('id')
-      probe.style.cssText += ';position:absolute;inset:0 auto auto 0;width:max-content;min-width:0;max-width:none;visibility:hidden;pointer-events:none'
-      return probe
-    }))
+    const clone = node.cloneNode(false)
+    for (const attr of ['id', 'name', 'form', 'for', 'autofocus']) clone.removeAttribute(attr)
+    if (node.matches('input')) { clone.checked = false; clone.removeAttribute('checked'); if (node.type !== 'file') clone.value = node.value }
+    if (node.matches('button')) clone.setAttribute('type', 'button')
+    for (const child of node.childNodes) clone.append(copy(child))
+    if (node.matches('textarea')) clone.value = node.value
+    if (node.matches('select')) [...node.options].forEach((option, index) => { if (clone.options[index]) clone.options[index].selected = option.selected })
+    return clone
+  }
+  const probes = rows.map(row => [...row.children].map(cell => {
+    const probe = copy(cell)
+    probe.setAttribute('aria-hidden', 'true')
+    probe.setAttribute('inert', '')
+    probe.setAttribute('data-column-probe', '')
+    probe.removeAttribute('id')
+    for (const child of probe.querySelectorAll('[id]')) child.removeAttribute('id')
+    probe.style.cssText += ';position:absolute;inset:0 auto auto 0;width:max-content;min-width:0;max-width:none;visibility:hidden;pointer-events:none'
+    return probe
+  }))
 
-    let host = doc.__gridColumnProbeHost
-    if (!host || !host.isConnected) {
-      host = doc.createElement('div')
-      host.setAttribute('data-grid-column-probe-host', '')
-      host.setAttribute('aria-hidden', 'true')
-      host.setAttribute('inert', '')
-      host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;contain:strict'
-      doc.documentElement.append(host)
-      doc.__gridColumnProbeHost = host
+  let host = doc.__gridColumnProbeHost
+  if (!host || !host.isConnected) {
+    host = doc.createElement('div')
+    host.setAttribute('data-grid-column-probe-host', '')
+    host.setAttribute('aria-hidden', 'true')
+    host.setAttribute('inert', '')
+    host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;contain:strict'
+    doc.documentElement.append(host)
+    doc.__gridColumnProbeHost = host
+  }
+  let probeTable = host.__probeTable
+  if (!probeTable || !probeTable.isConnected) {
+    probeTable = doc.createElement('div')
+    probeTable.setAttribute('data-grid-probe-table', '')
+    host.append(probeTable)
+    host.__probeTable = probeTable
+  }
+  probeTable.className = frame.className
+  if (frame.dataset.tablePresentation) probeTable.dataset.tablePresentation = frame.dataset.tablePresentation
+  else delete probeTable.dataset.tablePresentation
+  probeTable.style.cssText = 'position:relative;display:block'
+  const frameCss = getComputedStyle(frame)
+  for (const key of fontKeys) {
+    if (frameCss[key]) probeTable.style[key] = frameCss[key]
+  }
+  for (let i = 0; i < frame.style.length; i++) {
+    const prop = frame.style[i]
+    if (prop.startsWith('--')) probeTable.style.setProperty(prop, frame.style.getPropertyValue(prop))
+  }
+
+  const probeRows = rows.map((row, rowIndex) => {
+    let probeRow = probeTable.children[rowIndex]
+    if (!probeRow) {
+      probeRow = doc.createElement('div')
+      probeRow.setAttribute('data-grid-probe-row', '')
+      probeTable.append(probeRow)
     }
-    let probeTable = host.__probeTable
-    if (!probeTable || !probeTable.isConnected) {
-      probeTable = doc.createElement('div')
-      probeTable.setAttribute('data-grid-probe-table', '')
-      host.append(probeTable)
-      host.__probeTable = probeTable
-    }
-    probeTable.className = frame.className
-    if (frame.dataset.tablePresentation) probeTable.dataset.tablePresentation = frame.dataset.tablePresentation
-    else delete probeTable.dataset.tablePresentation
-    probeTable.style.cssText = 'position:relative;display:block'
-    const frameCss = getComputedStyle(frame)
+    probeRow.className = row.className
+    if (row.hasAttribute('data-head')) probeRow.setAttribute('data-head', '')
+    else probeRow.removeAttribute('data-head')
+    const rowStyle = rowIndex === 0 ? css : getComputedStyle(row)
     for (const key of fontKeys) {
-      if (frameCss[key]) probeTable.style[key] = frameCss[key]
+      if (probeRow.style[key] !== rowStyle[key]) probeRow.style[key] = rowStyle[key]
     }
-    for (let i = 0; i < frame.style.length; i++) {
-      const prop = frame.style[i]
-      if (prop.startsWith('--')) probeTable.style.setProperty(prop, frame.style.getPropertyValue(prop))
-    }
+    probeRow.style.position = 'relative'
+    probeRow.style.display = 'block'
+    return probeRow
+  })
+  while (probeTable.children.length > rows.length) probeTable.lastElementChild.remove()
 
-    const probeRows = rows.map((row, rowIndex) => {
-      let probeRow = probeTable.children[rowIndex]
-      if (!probeRow) {
-        probeRow = doc.createElement('div')
-        probeRow.setAttribute('data-grid-probe-row', '')
-        probeTable.append(probeRow)
-      }
-      probeRow.className = row.className
-      if (row.hasAttribute('data-head')) probeRow.setAttribute('data-head', '')
-      else probeRow.removeAttribute('data-head')
-      const rowStyle = rowIndex === 0 ? css : getComputedStyle(row)
-      for (const key of fontKeys) {
-        if (probeRow.style[key] !== rowStyle[key]) probeRow.style[key] = rowStyle[key]
-      }
-      probeRow.style.position = 'relative'
-      probeRow.style.display = 'block'
-      return probeRow
-    })
-    while (probeTable.children.length > rows.length) probeTable.lastElementChild.remove()
-
-    try {
-      probeRows.forEach((probeRow, index) => probeRow.append(...probes[index]))
-      measured = probes.map(row => row.map(probe => Math.ceil(probe.getBoundingClientRect().width)))
-    } finally {
-      for (const row of probes) for (const probe of row) probe.remove()
-      probeTable.className = ''
-      delete probeTable.dataset.tablePresentation
-      for (const probeRow of probeRows) {
-        probeRow.className = ''
-        probeRow.removeAttribute('data-head')
-      }
+  let measured
+  try {
+    probeRows.forEach((probeRow, index) => probeRow.append(...probes[index]))
+    measured = probes.map(row => row.map(probe => Math.ceil(probe.getBoundingClientRect().width)))
+  } finally {
+    for (const row of probes) for (const probe of row) probe.remove()
+    probeTable.className = ''
+    delete probeTable.dataset.tablePresentation
+    for (const probeRow of probeRows) {
+      probeRow.className = ''
+      probeRow.removeAttribute('data-head')
     }
-    frame.gridContentCache = { styleScope, measured }
   }
 
   const wanted = headCells.map((_, index) => Math.max(...measured.map(row => row[index] ?? 0)))
@@ -214,46 +119,23 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   const minimum = wanted.map((width, index) => fixed[index] ? width : Math.min(width, Math.max(measured[0][index] ?? 0, headFontSizes[index])))
   const minimumTotal = minimum.reduce((sum, width) => sum + width, 0)
 
-  const finalizeCommit = (ownWrites, hadExternalBeforeCommit) => {
-    const postRecords = tracker.observer ? tracker.observer.takeRecords() : []
-    const hadUnexpectedDuringCommit = postRecords.some(record => !isOwnWriteRecord(ownWrites, record) && isExternalMutation(record))
-    if (hadExternalBeforeCommit || hadUnexpectedDuringCommit) {
-      tracker.dirty = true
-      frame.gridContentSameTurn = false
-      frame.gridContentCache = undefined
-    } else {
-      tracker.dirty = false
-      scheduleTurnExpiry()
-    }
-    return ownWrites
-  }
-
   let commit
   if (minimumTotal > available) {
     const rest = minimum.slice(1)
     const minTrack = Math.min(room, Math.max(...rest, 1))
     const restColumns = `repeat(auto-fit,minmax(${minTrack}px,1fr))`
     commit = () => {
-      const preRecords = tracker.observer ? tracker.observer.takeRecords() : []
-      const hadExternalBeforeCommit = tracker.dirty || preRecords.some(isExternalMutation)
-      const ownWrites = new Map()
       // 既存の2段表示へ戻す。残りの列も必要なら段を増やし、操作を隠さない。
       if (!frame.hasAttribute('data-stacked')) {
         frame.gridContentStacked = true
         frame.dataset.stacked = ''
-        recordOwnWrite(ownWrites, frame, 'data-stacked')
       }
       if (frame.style.getPropertyValue('--grid-table-content-rest-columns') !== restColumns) {
         frame.style.setProperty('--grid-table-content-rest-columns', restColumns)
-        recordOwnWrite(ownWrites, frame, 'style')
       }
       if (frame.style.getPropertyValue('--grid-table-content-columns')) {
         frame.style.removeProperty('--grid-table-content-columns')
-        recordOwnWrite(ownWrites, frame, 'style')
       }
-      frame.gridContentWasStacked = true
-      frame.gridContentScope = scope
-      return finalizeCommit(ownWrites, hadExternalBeforeCommit)
     }
   } else {
     let low = 0, high = Math.max(...wanted)
@@ -269,25 +151,14 @@ export function fitGridContentColumns(frame, deferCommit = false) {
     if (growIndex >= 0) widths[growIndex] += spare
     const columns = widths.map(width => `${width}px`).join(' ')
     commit = () => {
-      const preRecords = tracker.observer ? tracker.observer.takeRecords() : []
-      const hadExternalBeforeCommit = tracker.dirty || preRecords.some(isExternalMutation)
-      const ownWrites = new Map()
-      if (frame.gridContentStacked) {
-        delete frame.dataset.stacked
-        recordOwnWrite(ownWrites, frame, 'data-stacked')
-      }
+      if (frame.gridContentStacked) delete frame.dataset.stacked
       delete frame.gridContentStacked
       if (frame.style.getPropertyValue('--grid-table-content-rest-columns')) {
         frame.style.removeProperty('--grid-table-content-rest-columns')
-        recordOwnWrite(ownWrites, frame, 'style')
       }
       if (frame.style.getPropertyValue('--grid-table-content-columns') !== columns) {
         frame.style.setProperty('--grid-table-content-columns', columns)
-        recordOwnWrite(ownWrites, frame, 'style')
       }
-      frame.gridContentWasStacked = false
-      frame.gridContentScope = scope
-      return finalizeCommit(ownWrites, hadExternalBeforeCommit)
     }
   }
   if (deferCommit) return commit
@@ -300,10 +171,4 @@ export function clearGridContentColumns(frame) {
   frame.style.removeProperty('--grid-table-content-rest-columns')
   if (frame.gridContentStacked) delete frame.dataset.stacked
   delete frame.gridContentStacked
-  delete frame.gridContentWasStacked
-  delete frame.gridContentScope
-  delete frame.gridContentSameTurn
-  delete frame.gridContentCache
-  frame.__gridColumnDomTracker?.observer?.disconnect()
-  delete frame.__gridColumnDomTracker
 }

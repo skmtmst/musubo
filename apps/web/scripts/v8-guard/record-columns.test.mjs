@@ -189,27 +189,17 @@ test('Grid内容列は見出し幅を守り、境界で既存段組みへ戻し�
       window.restoreGridProbe = () => { Element.prototype.getBoundingClientRect = original }
       return frame.querySelectorAll('[role="row"] > *').length
     })
-    // 別のコマで呼び直したときは常駐の隔離ホストでまとめて測り直し、表の行へは挿さない。
-    // 同じコマの中で続けて2回目を呼んだときは重複計測を省く。
-    await page.locator('.table').evaluate((frame, fnSrc) => {
-      const fit = eval(`(${fnSrc})`)
-      fit(frame)
-      window.gridProbeCountAfterFirst = window.gridProbeCounts.length
-      fit(frame)
-      window.gridProbeCountAfterSecond = window.gridProbeCounts.length
-    }, fitGridContentColumns.toString())
-    const { counts, liveCounts, afterFirst, afterSecond } = await page.evaluate(() => {
+    // 常駐の隔離ホストで全セル分の probe をまとめて置いてから測り、生の表の行へは挿さない。
+    await page.locator('.table').evaluate(fitGridContentColumns)
+    const { counts, liveCounts } = await page.evaluate(() => {
       window.restoreGridProbe()
       return {
         counts: window.gridProbeCounts,
         liveCounts: window.gridLiveProbeCounts,
-        afterFirst: window.gridProbeCountAfterFirst,
-        afterSecond: window.gridProbeCountAfterSecond,
       }
     })
     assert.ok(counts.length > 0 && counts.every(count => count === batching), JSON.stringify(counts))
     assert.ok(liveCounts.every(count => count === 0), JSON.stringify(liveCounts))
-    assert.equal(afterSecond, afterFirst)
     assert.equal(await page.locator('[data-column-probe]').count(), 0)
   } finally { await browser.close() }
 })
@@ -434,5 +424,74 @@ test('deferCommit で測ったあと commit する前にセルの文字が変わ
     assert.ok(result.afterStaleCommit < 80, JSON.stringify(result))
     assert.ok(result.afterRemeasure > result.afterStaleCommit + 100, `external text edit before commit must not be dropped: ${JSON.stringify(result)}`)
     assert.ok(result.afterRemeasure >= result.textWidth, JSON.stringify(result))
+  } finally { await browser.close() }
+})
+
+test('frame の CSS 変数でボタンの余白を変えたあと、次のコマで測り直すと操作列が広がる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{font:inherit;white-space:nowrap;padding:0 var(--btn-pad, 2px)}</style><main><div class="frame" data-column-layout data-column-sizing="content" style="--btn-pad: 2px"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 1</span></td><td><button>開く</button></td></tr></tbody></table></div></main>`)
+    await page.locator('.frame').evaluate(fitListColumns)
+    const before = await page.locator('tbody tr td:last-child').evaluate(cell => ({
+      cellWidth: Math.round(cell.getBoundingClientRect().width),
+      buttonWidth: Math.round(cell.querySelector('button').getBoundingClientRect().width),
+    }))
+    assert.ok(before.cellWidth < 60, JSON.stringify(before))
+
+    // frame のインライン CSS 変数でボタン余白を変え、次のコマで測り直す
+    await page.locator('.frame').evaluate(frame => { frame.style.setProperty('--btn-pad', '40px') })
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => resolve(undefined))))
+    await page.locator('.frame').evaluate(fitListColumns)
+
+    const after = await page.locator('tbody tr td:last-child').evaluate(cell => ({
+      cellWidth: Math.round(cell.getBoundingClientRect().width),
+      buttonWidth: Math.round(cell.querySelector('button').getBoundingClientRect().width),
+    }))
+    assert.ok(after.buttonWidth >= 90, JSON.stringify(after))
+    assert.ok(after.cellWidth >= after.buttonWidth, `frame CSS variable change must remeasure on next frame: ${JSON.stringify({ before, after })}`)
+    assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+  } finally { await browser.close() }
+})
+
+test('同じ処理の中で測る→body の class や frame の CSS 変数で余白を変える→測り直すとしても操作列が広がる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{font:inherit;white-space:nowrap;padding:0 var(--btn-pad, 2px)}body.wide-buttons button{padding:0 40px}</style><main><div class="frame" data-column-layout data-column-sizing="content" style="--btn-pad: 2px"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 1</span></td><td><button>開く</button></td></tr></tbody></table></div></main>`)
+    const result = await page.locator('.frame').evaluate((frame, fnSrc) => {
+      const fit = eval(`(${fnSrc})`)
+      const cell = frame.querySelector('tbody tr td:last-child')
+      const button = cell.querySelector('button')
+      const read = () => ({
+        cellWidth: Math.round(cell.getBoundingClientRect().width),
+        buttonWidth: Math.round(button.getBoundingClientRect().width),
+      })
+
+      // 1. 同じ処理の中で frame の CSS 変数を変えてすぐ測り直す
+      fit(frame)
+      const initial = read()
+      frame.style.setProperty('--btn-pad', '40px')
+      fit(frame)
+      const afterCssVar = read()
+
+      // 2. 元に戻したあと、同じ処理の中で body の class を変えてすぐ測り直す
+      frame.style.setProperty('--btn-pad', '2px')
+      fit(frame)
+      const reset = read()
+      document.body.classList.add('wide-buttons')
+      fit(frame)
+      const afterBodyClass = read()
+
+      return { initial, afterCssVar, reset, afterBodyClass }
+    }, fitListColumns.toString())
+
+    assert.ok(result.initial.cellWidth < 60, JSON.stringify(result))
+    assert.ok(result.afterCssVar.buttonWidth >= 90, JSON.stringify(result))
+    assert.ok(result.afterCssVar.cellWidth >= result.afterCssVar.buttonWidth, `same-turn CSS var change must expand column: ${JSON.stringify(result)}`)
+    assert.ok(result.reset.cellWidth < 60, JSON.stringify(result))
+    assert.ok(result.afterBodyClass.buttonWidth >= 90, JSON.stringify(result))
+    assert.ok(result.afterBodyClass.cellWidth >= result.afterBodyClass.buttonWidth, `same-turn body class change must expand column: ${JSON.stringify(result)}`)
+    assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
   } finally { await browser.close() }
 })
