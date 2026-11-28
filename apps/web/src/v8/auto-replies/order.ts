@@ -25,12 +25,22 @@ export function inEvaluationOrder<T extends OrderedRule>(rules: T[]): T[] {
   )
 }
 
+function isValidPriority(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= PRIORITY_MIN && value <= PRIORITY_MAX
+}
+
+function sortablePriority(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : PRIORITY_MAX + 1
+}
+
 /** 実行側と同じ：個別・優先順位・キーワード・作った日時。 */
 export function compareEvaluationOrder(a: OrderedRule, b: OrderedRule): number {
+  const ca = typeof a.createdAt === 'string' ? a.createdAt : ''
+  const cb = typeof b.createdAt === 'string' ? b.createdAt : ''
   return Number(!a.lineAccountId) - Number(!b.lineAccountId)
-    || a.priority - b.priority
+    || sortablePriority(a.priority) - sortablePriority(b.priority)
     || Number(Boolean(a.respondToAll)) - Number(Boolean(b.respondToAll))
-    || a.createdAt.localeCompare(b.createdAt)
+    || ca.localeCompare(cb)
 }
 
 export interface PriorityUpdate {
@@ -49,6 +59,7 @@ export function movePriorityUpdates(
   id: string,
   delta: -1 | 1,
 ): PriorityUpdate[] | null {
+  if (!Array.isArray(ordered)) return null
   const index = ordered.findIndex((rule) => rule.id === id)
   const nextIndex = index + delta
   if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return null
@@ -57,14 +68,14 @@ export function movePriorityUpdates(
   if (Boolean(current.lineAccountId) !== Boolean(neighbor.lineAccountId)) return null
   const desired = ordered.map(rule => rule.id)
   ;[desired[index], desired[nextIndex]] = [desired[nextIndex], desired[index]]
-  if (current.priority !== neighbor.priority) {
+  if (isValidPriority(current.priority) && isValidPriority(neighbor.priority) && current.priority !== neighbor.priority) {
     const swaps = [{ id: current.id, priority: neighbor.priority }, { id: neighbor.id, priority: current.priority }]
     const priorities = new Map(swaps.map(update => [update.id, update.priority]))
     if (inEvaluationOrder(ordered.map(rule => ({...rule, priority: priorities.get(rule.id) ?? rule.priority})))
       .every((rule, position) => rule.id === desired[position])) return swaps
   }
-  const moved = current.priority + delta
-  if (current.priority === neighbor.priority && moved >= PRIORITY_MIN && moved <= PRIORITY_MAX) {
+  const moved = isValidPriority(current.priority) ? current.priority + delta : Number.NaN
+  if (isValidPriority(current.priority) && current.priority === neighbor.priority && moved >= PRIORITY_MIN && moved <= PRIORITY_MAX) {
     const trial = ordered.map(rule => rule.id === id ? { ...rule, priority: moved } : rule)
     if (inEvaluationOrder(trial).every((rule, position) => rule.id === desired[position])) {
       return [{ id: current.id, priority: moved }]
