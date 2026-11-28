@@ -81,7 +81,8 @@ export default function AiFeatures({ accountId, canManage, lockedReason }: { acc
           const refreshed = await accountAiFeaturesApi.get(accountId)
           if (!refreshed.success) throw new Error('reload failed')
           setSettings(refreshed.data)
-        } catch {
+        } catch (reloadError) {
+          saveErrors.capture(reloadError)
           setSettings(current => current ? { ...current, items: current.items.map(row => row.feature === item.feature ? { ...row, enabled: true, alwaysOn: true } : row) } : current)
         }
       } else if (cause instanceof ApiError && (cause.status === 409 || cause.code === 'ai_consent_required')) {
