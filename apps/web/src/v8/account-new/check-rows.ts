@@ -190,22 +190,25 @@ export interface HandoverProgress {
 }
 
 /** 読み取りと処理応答が前後しても、画面の段階・件数を巻き戻さない。 */
+const importPhaseRank = { not_started: 0, importing_ids: 1, hydrating_profiles: 2, completed: 3 } as const
+
+export function isValidFollowerImportState(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Record<string, unknown>
+  const count = (item: unknown) => typeof item === 'number' && Number.isFinite(item) && item >= 0
+  return typeof state.phase === 'string' && Object.prototype.hasOwnProperty.call(importPhaseRank, state.phase)
+    && count(state.received) && count(state.profilesProcessed) && count(state.profilesUpdated)
+}
+
 export function latestFollowerImportState<T extends {
   phase: 'not_started' | 'importing_ids' | 'hydrating_profiles' | 'completed'
   received: number
   profilesProcessed: number
   profilesUpdated: number
-}>(current: T | null, next: T): T {
-  const rank: Record<'not_started' | 'importing_ids' | 'hydrating_profiles' | 'completed', number> = { not_started: 0, importing_ids: 1, hydrating_profiles: 2, completed: 3 }
-  const isValid = (state: T) =>
-    Object.prototype.hasOwnProperty.call(rank, state.phase)
-    && Number.isFinite(state.received) && state.received >= 0
-    && Number.isFinite(state.profilesProcessed) && state.profilesProcessed >= 0
-    && Number.isFinite(state.profilesUpdated) && state.profilesUpdated >= 0
-  if (!current) return next
-  if (!isValid(next)) return current
-  if (!isValid(current)) return next
-  if (rank[next.phase] < rank[current.phase]) return current
+}>(current: T | null, next: T): T | null {
+  if (!isValidFollowerImportState(next)) return current
+  if (!current || !isValidFollowerImportState(current)) return next
+  if (importPhaseRank[next.phase] < importPhaseRank[current.phase]) return current
   if (next.received < current.received || next.profilesProcessed < current.profilesProcessed || next.profilesUpdated < current.profilesUpdated) return current
   return next
 }

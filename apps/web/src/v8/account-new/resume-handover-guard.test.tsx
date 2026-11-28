@@ -59,6 +59,7 @@ describe('ResumeFollowerHandover ガード', () => {
         claimedUnassigned: 0,
         conflicts: 0,
         invalid: 0,
+        profilesProcessed: 0,
         profilesUpdated: 0,
         profileErrors: 0,
       },

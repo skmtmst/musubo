@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type FollowerImportState } from '@/lib/api'
 import { ApiError } from '@/lib/api/transport/errors'
-import { handoverProgress, latestFollowerImportState } from './check-rows'
+import { handoverProgress, isValidFollowerImportState, latestFollowerImportState } from './check-rows'
 
 export function useRegistrationImport(createdId: string, enabled: boolean, initialPhase: FollowerImportState['phase'] | undefined, preference: boolean | undefined, resumed: boolean) {
   const [importState, setImportState] = useState<FollowerImportState | null>(null)
@@ -26,7 +26,7 @@ export function useRegistrationImport(createdId: string, enabled: boolean, initi
       try {
         const response = await api.lineAccounts.stepFollowerImport(createdId)
         if (!active) return
-        if (!response.success) {
+        if (!response.success || !isValidFollowerImportState(response.data?.state)) {
           setImportStepError(true)
           timer = setTimeout(() => void advance(), 5000)
           return
@@ -57,7 +57,7 @@ export function useRegistrationImport(createdId: string, enabled: boolean, initi
     const poll = async () => {
       try {
         const response = await api.lineAccounts.followerImportState(createdId)
-        if (active && response.success) {
+        if (active && response.success && isValidFollowerImportState(response.data)) {
           setImportState((current) => latestFollowerImportState(current, response.data))
           setImportReadError(false)
           if (response.data.phase === 'completed') setImportStepError(false)
@@ -102,7 +102,7 @@ export function useRegistrationImport(createdId: string, enabled: boolean, initi
     setImportRefreshing(true)
     try {
       const response = await api.lineAccounts.followerImportState(createdId)
-      if (response.success) {
+      if (response.success && isValidFollowerImportState(response.data)) {
         setImportState((current) => latestFollowerImportState(current, response.data))
         setImportReadError(false)
         if (response.data.phase === 'completed') setImportStepError(false)

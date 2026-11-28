@@ -17,7 +17,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import Step5Completion from './step5-completion'
-import { handoverProgress, latestFollowerImportState } from './logic'
+import { handoverProgress, isValidFollowerImportState, latestFollowerImportState } from './logic'
 import { REGISTRATION_STYLE_KEY, registrationImportChoiceKey, registrationStorageKey } from './registration-storage'
 import styles from './register.module.css'
 
@@ -62,6 +62,7 @@ function FollowerHandover({ accountId }: { accountId: string }) {
       const response = await withRequestTimeout(api.lineAccounts.followerImportState(accountId))
       if (request !== refreshSequence.current) return
       if (!response.success) throw new Error(response.error)
+      if (!isValidFollowerImportState(response.data)) throw new Error('invalid_import_state')
       setState((current) => latestFollowerImportState(current, response.data))
       setReadError(false)
     } catch {
@@ -103,6 +104,7 @@ function FollowerHandover({ accountId }: { accountId: string }) {
         const response = await api.lineAccounts.stepFollowerImport(accountId)
         if (!active) return
         if (!response.success) throw new Error(response.error)
+        if (!isValidFollowerImportState(response.data?.state)) throw new Error('invalid_import_state')
         setStepError(false)
         setState((current) => latestFollowerImportState(current, response.data.state))
         if (response.data.state.phase === 'importing_ids' || response.data.state.phase === 'hydrating_profiles') {
