@@ -42,8 +42,9 @@ export async function loadFormsPage({ activeFolderId, clearList, fetchQuery, for
         const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned?${account}`)
         if (!res.success) throw new Error('load_failed')
         if (request !== formRequest.current) return
-        // 未割り当て口は配列で返す契約。配列でない応答では一覧を空にして描く。
-        const unassigned = Array.isArray(res.data) ? res.data : []
+        // 形が違う応答を、確認対象がゼロだった結果として扱わない。
+        if (!Array.isArray(res.data)) throw new Error('load_failed')
+        const unassigned = res.data
         setForms(unassigned)
         setFolders([])
         setUnfiledCount(null)
@@ -91,7 +92,7 @@ export async function loadFormsPage({ activeFolderId, clearList, fetchQuery, for
       const formsData = formsResult.status === 'fulfilled' && formsResult.value.success
         ? formsResult.value.data
         : null
-      if (formsData === null) {
+      if (formsData === null || (!Array.isArray(formsData) && (!formsData || !Array.isArray(formsData.items)))) {
         setLoadFailure(formsResult.status === 'rejected' ? formsResult.reason : new Error('load_failed'))
         setLoadError('回答フォームを読み込めませんでした。')
         clearList()
