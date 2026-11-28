@@ -15,15 +15,60 @@ export interface ExclusionCondition {
   groups?: ExclusionCondition[]
 }
 
+function hasRuleValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false
+  if (typeof value === 'string') return value.trim() !== ''
+  if (typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((entry) =>
+      entry !== null && entry !== undefined && entry !== ''
+      && !(typeof entry === 'number' && !Number.isFinite(entry))
+      && !(Array.isArray(entry) && entry.length === 0))
+  }
+  return false
+}
+
+function isRuleShape(rule: unknown): rule is { type: string; value: unknown } {
+  if (!rule || typeof rule !== 'object' || Array.isArray(rule)) return false
+  const candidate = rule as { type?: unknown; value?: unknown }
+  if (candidate.type === 'friend_id_in') return false
+  return typeof candidate.type === 'string'
+    && candidate.type.length > 0
+    && hasRuleValue(candidate.value)
+}
+
+function isConditionShape(value: unknown, seen: WeakSet<object> = new WeakSet()): value is ExclusionCondition {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (seen.has(value)) return false
+  seen.add(value)
+  const candidate = value as { operator?: unknown; rules?: unknown; groups?: unknown }
+  const valid = (candidate.operator === 'AND' || candidate.operator === 'OR')
+    && Array.isArray(candidate.rules)
+    && candidate.rules.every(isRuleShape)
+    && (
+      candidate.groups === undefined
+      || (Array.isArray(candidate.groups) && candidate.groups.every((group) => isConditionShape(group, seen)))
+    )
+  seen.delete(value)
+  return valid
+}
+
+function isEmptyConditionValue(condition: ExclusionCondition): boolean {
+  const groupCount = (condition.groups ?? []).filter(
+    (group) => group.rules.length > 0 || (group.groups?.length ?? 0) > 0,
+  ).length
+  return condition.rules.length === 0 && groupCount === 0
+}
+
 /** sourceConfig から実効する条件オブジェクトだけを読む。無い・壊れたときは null。 */
 export function readExclusionCondition(sourceConfig: unknown): ExclusionCondition | null {
   if (!sourceConfig || typeof sourceConfig !== 'object' || Array.isArray(sourceConfig)) return null
   const raw = (sourceConfig as Record<string, unknown>).exclusion
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const node = raw as { operator?: unknown; rules?: unknown; groups?: unknown }
-  if ((node.operator !== 'AND' && node.operator !== 'OR') || !Array.isArray(node.rules)) return null
-  if (node.rules.length === 0 && (!Array.isArray(node.groups) || node.groups.length === 0)) return null
-  return raw as ExclusionCondition
+  if (!isConditionShape(raw)) return null
+  if (raw.rules.length === 0 && (!raw.groups || raw.groups.length === 0)) return null
+  return raw
 }
 
 /** sourceConfig からメモだけを読む(旧文字列もメモとして読む)。 */
@@ -123,18 +168,10 @@ export function readExclusionView(sourceConfig: unknown): ExclusionView {
   }
   const raw = config.exclusion
   if (raw === undefined || raw === null) return view
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ...view, invalid: true }
-  const node = raw as { operator?: unknown; rules?: unknown; groups?: unknown }
-  if ((node.operator !== 'AND' && node.operator !== 'OR') || !Array.isArray(node.rules)) {
-    return { ...view, invalid: true }
-  }
-  const shaped: { rules?: Array<{ type?: unknown }>; groups?: unknown } = {
-    rules: node.rules,
-    groups: node.groups,
-  }
-  const ruleCount = countRules(shaped)
-  if (ruleCount === 0) return view
-  const labels = collectRuleLabels(shaped)
+  if (!isConditionShape(raw)) return { ...view, invalid: true }
+  if (isEmptyConditionValue(raw)) return view
+  const ruleCount = countRules(raw)
+  const labels = collectRuleLabels(raw)
   return {
     ...view,
     hasCondition: true,
