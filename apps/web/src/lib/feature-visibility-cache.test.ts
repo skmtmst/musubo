@@ -86,3 +86,18 @@ describe('表示可否の共有は軽いまま（V6R-S0-b）', () => {
     expect(source).not.toMatch(/from '\.\/menu'/)
   })
 })
+
+describe('表示可否の初回読み込み', () => {
+  it.each(['./feature-settings', './menu'])('%s を実行しない', async (unneededModule) => {
+    vi.resetModules()
+    const loadUnneededModule = vi.fn(() => ({}))
+    vi.doMock(unneededModule, loadUnneededModule)
+    try {
+      await import('./feature-visibility-cache')
+      expect(loadUnneededModule).not.toHaveBeenCalled()
+    } finally {
+      vi.doUnmock(unneededModule)
+      vi.resetModules()
+    }
+  })
+})
