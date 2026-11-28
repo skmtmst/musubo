@@ -4,12 +4,14 @@
  * قياس: 確認窓の「ここを開く」が対象紹介者つきの明細へ向くこと、承認側で
  * 紹介者絞りが効いて件数が一致し、絞りを外して戻れること。
  */
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 
 const fixture = vi.hoisted(() => ({
   approvalsImpl: null as null | ((params: unknown) => Promise<unknown>),
+  archiveImpact: vi.fn(),
+  archive: vi.fn(),
 }))
 
 vi.mock('next/navigation', async () => (await import('@/test-utils/affiliate-navigation-mock')).affiliateNavigationMock())
@@ -19,11 +21,8 @@ vi.mock('@/lib/api', async (original) => ({
   api: {
     affiliates: {
       get: async () => ({ success: true, data: { lineAccountId: 'account-a' } }),
-      archiveImpact: async () => ({
-        success: true,
-        data: { activeLinks: 1, unsettledReward: 5000, pendingConversions: 2 },
-      }),
-      archive: async () => ({ success: true, data: {} }),
+      archiveImpact: fixture.archiveImpact,
+      archive: fixture.archive,
     },
     conversionApprovals: {
       list: (params: unknown) => fixture.approvalsImpl!(params),
@@ -38,6 +37,11 @@ const { AffiliateArchiveDialog } = await import('@/v8/affiliates/dialogs')
 const { ApprovalQueue } = await import('@/test-utils/affiliate-tabs')
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+beforeEach(() => {
+  fixture.archiveImpact.mockReset().mockResolvedValue({ success: true, data: { activeLinks: 1, unsettledReward: 5000, pendingConversions: 2 } })
+  fixture.archive.mockReset().mockResolvedValue({ success: true, data: {} })
+})
 
 afterEach(() => {
   cleanup()
@@ -123,6 +127,8 @@ describe('R291 停止前の確認は対象の明細を開く', () => {
     const onChanged = vi.fn()
     render(<AffiliateArchiveDialog target={{ id: 'aff-a', name: '候補A' }} onClose={() => {}} onChanged={onChanged} />)
     fireEvent.click(await screen.findByRole('radio', { name: /このままアーカイブする/ }))
+    expect(fixture.archiveImpact).toHaveBeenCalledWith('aff-a')
+    expect(screen.getByText(/過去の成果・報酬・支払いの記録は消えません/)).toBeTruthy()
     const confirm = screen.getByRole('button', { name: 'アーカイブする' }) as HTMLButtonElement
     const input = screen.getByRole('textbox', { name: '確認のため「候補A」と打ってください' })
     expect(confirm.disabled).toBe(true)
@@ -132,5 +138,24 @@ describe('R291 停止前の確認は対象の明細を開く', () => {
     expect(confirm.disabled).toBe(false)
     fireEvent.click(confirm)
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
+    expect(fixture.archive).toHaveBeenCalledWith('aff-a', { mode: 'archive', confirmationName: '候補A' })
   })
+})
+
+
+test('影響の読込・空・失敗を分け、失敗後に読み直せる', async () => {
+  let resolve!: (value: unknown) => void
+  fixture.archiveImpact.mockReturnValueOnce(new Promise(done => { resolve = done }))
+  const view = render(<AffiliateArchiveDialog target={{ id: 'aff-a', name: '候補A' }} onClose={() => {}} onChanged={() => {}} />)
+  expect(document.querySelector('[data-list-state="loading"]')?.getAttribute('aria-label')).toBe('使われている場所を確認しています')
+  await act(async () => { resolve({ success: true, data: null }) })
+  expect(await screen.findByText('確認できる情報がありません')).toBeTruthy()
+  view.unmount()
+  fixture.archiveImpact.mockRejectedValueOnce(new Error('private error'))
+  render(<AffiliateArchiveDialog target={{ id: 'aff-a', name: '候補A' }} onClose={() => {}} onChanged={() => {}} />)
+  expect(await screen.findByText('使われている場所を確認できませんでした')).toBeTruthy()
+  expect(screen.queryByText('private error')).toBeNull()
+  fixture.archiveImpact.mockResolvedValueOnce({ success: true, data: { activeLinks: 1, unsettledReward: 5000, pendingConversions: 2 } })
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  expect(await screen.findByText('発行ずみの紹介リンク')).toBeTruthy()
 })

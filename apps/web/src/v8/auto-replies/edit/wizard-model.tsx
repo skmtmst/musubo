@@ -148,6 +148,23 @@ export const EMPTY_FORM: WizardForm = {
   priority: 0,
 }
 
+function normalizeWeekdays(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return []
+  return Array.from(
+    new Set(raw.filter((day): day is number => typeof day === 'number' && Number.isInteger(day) && day >= 0 && day <= 6)),
+  ).sort((a, b) => a - b)
+}
+
+export function isKnownReceiveSource(value: unknown): value is 'line' | 'email' {
+  return value === 'line' || value === 'email'
+}
+
+function readReceiveSources(raw: unknown): Array<'line' | 'email'> {
+  if (raw == null) return ['line']
+  if (!Array.isArray(raw)) return [raw as 'line' | 'email']
+  return raw.length > 0 ? [...(raw as Array<'line' | 'email'>)] : ['line']
+}
+
 /** 保存済みの下書き・公開版の設定を画面の形へ。 */
 export function formFromSettings(s: AutoReplyDraftInput): WizardForm {
   const rules = readKeywordRules({
@@ -155,16 +172,19 @@ export function formFromSettings(s: AutoReplyDraftInput): WizardForm {
     matchType: s.matchType,
     keywords: s.keywords,
   })
+  const weekdays = normalizeWeekdays(s.responseWeekdays)
+  const validDelay = typeof s.replyDelaySeconds === 'number' && Number.isFinite(s.replyDelaySeconds) && s.replyDelaySeconds >= 0
+  const validCooldown = typeof s.cooldownMinutes === 'number' && Number.isFinite(s.cooldownMinutes) && s.cooldownMinutes >= 0
   return {
     ruleName: s.name ?? '',
     folderId: s.folderId ?? '',
     internalMemo: s.internalMemo ?? '',
-    respondToAll: s.respondToAll,
+    respondToAll: Boolean(s.respondToAll),
     keywordRules: rules,
     keywordMatchMode: s.keywordMatchMode ?? 'any',
     matchType: initialMatchType({ keyword: s.keyword, matchType: s.matchType, keywords: s.keywords }),
-    messageKinds: s.messageKinds ?? [],
-    weekdays: s.responseWeekdays?.length ? s.responseWeekdays : [0, 1, 2, 3, 4, 5, 6],
+    messageKinds: Array.isArray(s.messageKinds) ? s.messageKinds.filter((v): v is string => typeof v === 'string') : [],
+    weekdays: weekdays.length > 0 ? weekdays : [0, 1, 2, 3, 4, 5, 6],
     holidayRule: (s.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
     timeMode: s.activeFrom || s.activeUntil ? 'custom' : 'always',
     activeFrom: s.activeFrom ?? '',
@@ -175,14 +195,14 @@ export function formFromSettings(s: AutoReplyDraftInput): WizardForm {
     templateId: s.templateId,
     responseContent: s.responseContent ?? '',
     actions: readInlineActions(s.actions),
-    replyDelaySeconds: s.replyDelaySeconds == null ? '0' : String(s.replyDelaySeconds),
-    cooldownOn: s.cooldownMinutes != null && s.cooldownMinutes > 0,
-    cooldownMinutes: s.cooldownMinutes == null ? '60' : String(s.cooldownMinutes),
+    replyDelaySeconds: validDelay ? String(s.replyDelaySeconds) : '0',
+    cooldownOn: validCooldown && (s.cooldownMinutes as number) > 0,
+    cooldownMinutes: validCooldown ? String(s.cooldownMinutes) : '60',
     skipWhenOperatorActive: s.skipWhenOperatorActive ?? false,
     oncePerFriend: s.oncePerFriend ?? false,
     unmatchedMode: s.unmatchedAction?.type === 'notify_operator' ? 'notify_operator' : 'none',
-    receiveSources: s.receiveSources?.length ? s.receiveSources : ['line'],
-    priority: s.priority ?? 0,
+    receiveSources: readReceiveSources(s.receiveSources),
+    priority: typeof s.priority === 'number' && Number.isFinite(s.priority) ? s.priority : 0,
   }
 }
 
@@ -257,7 +277,7 @@ export const STARTER_TEMPLATES: Array<{
  * 日曜はじまりの番号のまま見る。土日（[0, 6]）はつながりにせず並べる。
  */
 export function weekdaySummary(days: number[]): string {
-  const sorted = days.slice().sort((a, b) => a - b)
+  const sorted = normalizeWeekdays(days)
   if (sorted.length === 0 || sorted.length === 7) return '毎日反応する'
   const consecutive = sorted.length > 1
     && sorted.every((day, index) => index === 0 || day === sorted[index - 1] + 1)
@@ -269,8 +289,10 @@ export function weekdaySummary(days: number[]): string {
 
 /** 手順④の行の2行目：そのルールの動き方（すべて／言葉・曜日・時間）。 */
 export function ruleTriggerSummary(rule: { keyword?: string | null; activeFrom?: string | null; activeUntil?: string | null }): string {
-  const what = rule.keyword ? `「${rule.keyword}」を含む` : 'すべてのメッセージ'
-  const when = rule.activeFrom ? `毎日 ${rule.activeFrom}〜${rule.activeUntil ?? ''}` : 'いつでも'
+  const what = rule.keyword?.trim() ? `「${rule.keyword.trim()}」を含む` : 'すべてのメッセージ'
+  const from = rule.activeFrom?.trim() || ''
+  const until = rule.activeUntil?.trim() || ''
+  const when = from || until ? `毎日 ${from || '00:00'}〜${until || '24:00'}` : 'いつでも'
   return `${what}・${when}`
 }
 

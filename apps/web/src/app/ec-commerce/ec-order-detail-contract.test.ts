@@ -30,7 +30,6 @@ describe('IDEA-23 注文の状況パネルの配線', () => {
 
   it('詳細APIは注文IDとアカウントを束ねて渡す', () => {
     expect(api).toContain('/api/ec-commerce/orders/${encodeURIComponent(id)}?lineAccountId=')
-    expect(drawer).toContain('api.ecCommerce.orderDetail(orderId, accountId)')
   })
 
   it('アカウント切替で別アカウントの注文を残さない', () => {
@@ -38,27 +37,13 @@ describe('IDEA-23 注文の状況パネルの配線', () => {
     expect(page).toContain('onClose={() => setDetailSlot({ accountId, orderId: null })}')
   })
 
-  it('権限なし・読み込み失敗・読み込み中を別の状態で出す', () => {
-    for (const state of ["'loading'", "'forbidden'", "'error'", "'ready'"]) {
-      expect(drawer).toContain(state)
-    }
-    expect(drawer).toContain('この注文の状況を見る権限がありません')
-    expect(drawer).toContain('注文の状況を読み込めませんでした')
-    // 古い返事で上書きしない（アカウント切替・連続オープンの両方で効く）
-    expect(drawer).toContain('loadSeq.current')
-  })
+  // 読込・権限・失敗・古い応答は order-detail-*-rendered-cx6 と order-detail-drawer で確かめる。
 
-  it('再実行は一覧の retry を引き継ぎ、終わったら詳細を読み直す', () => {
+  it('再実行は一覧の retry を引き継ぐ', () => {
     expect(page).toContain('onRetryAction={retry}')
-    expect(drawer).toContain('await onRetryAction(action)')
-    expect(drawer).toContain('await loadRef.current(false)')
-    // 二重実行しない約束を操作の隣に書く
-    expect(drawer).toContain('重ねません')
   })
 
   it('生の配送エラーを出さず、台帳の分類を運用の言葉で出す', () => {
     expect(drawer).not.toContain('lastError')
-    expect(drawer).toContain('FAILURE_KIND_TEXT')
-    expect(drawer).toContain('止まった段階：')
   })
 })

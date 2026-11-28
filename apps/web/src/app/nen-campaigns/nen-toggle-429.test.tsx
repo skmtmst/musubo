@@ -20,6 +20,7 @@ const net = vi.hoisted(() => ({
   /** 停止・再開の結果。'rateLimited' は429。 */
   toggleResult: 'rateLimited' as 'rateLimited' | 'serverError',
   calls: vi.fn(),
+  settings: [] as unknown[],
 }))
 
 const SETTING = {
@@ -78,7 +79,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       },
       nenCampaigns: {
         ...actual.api.nenCampaigns,
-        settings: async () => ({ success: true, data: [SETTING] }),
+        settings: async () => ({ success: true, data: net.settings }),
         columns: async () => ({ success: true, data: [], pagination: { total: 0, limit: 200, offset: 0 } }),
         flowMetrics: async () => ({ success: true, data: FLOW_METRICS }),
         columnMetrics: async () => ({ success: true, data: COLUMN_METRICS }),
@@ -151,6 +152,7 @@ function openRowMenu(): HTMLButtonElement {
 beforeEach(() => {
   net.toggleResult = 'rateLimited'
   net.calls.mockClear()
+  net.settings = [SETTING]
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -161,6 +163,30 @@ afterEach(async () => {
     root.unmount()
   })
   container.remove()
+})
+
+it('自動配信の表で内容・状態・操作を確認できる', async () => {
+  net.settings = [SETTING, { ...SETTING, campaignKey: 'arrival_check', label: '到着確認', category: 'follow_up', delayDays: 3, deliveryTime: '09:00', isEnabled: false }]
+  await act(async () => { root.render(<NenCampaignsPage />) })
+  await flush()
+  const table = container.querySelector('table')!
+  expect(table).toBeTruthy()
+  const headers = [...table.querySelectorAll('th')].map(node => node.textContent?.trim())
+  for (const name of ['配信', 'きっかけ', '対象', '注文', '状態']) expect(headers).toContain(name)
+  expect(headers.some(name => name?.includes('送信'))).toBe(true)
+  expect(headers).not.toContain('開封')
+  const active = table.querySelector('[data-row-id="birthday"]')!
+  const stopped = table.querySelector('[data-row-id="arrival_check"]')!
+  expect(active.textContent).toContain('有効')
+  expect(active.textContent).toContain('ペットを登録した会員')
+  expect(stopped.textContent).toContain('発送から3日後 09:00')
+  expect(stopped.textContent).toContain('注文した会員')
+  expect(stopped.textContent).toContain('停止中')
+  expect(active.querySelector('a')?.getAttribute('href')).toBe('/nen-campaigns/edit?key=birthday')
+  expect(container.textContent).toContain('自動配信は開封を取れません')
+  await act(async () => { openRowMenu().click() })
+  expect(findButtonByLabel('配信の文面を見る')).toBeTruthy()
+  expect(findButtonByLabel('止める')).toBeTruthy()
 })
 
 describe('M501 停止・再開の混雑時の案内', () => {

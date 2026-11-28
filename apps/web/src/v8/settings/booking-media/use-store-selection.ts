@@ -18,6 +18,17 @@ export function initialBookingMediaStore(stores: RestaurantStore[], contextId: s
   return active.length === 1 ? active[0].id : active.find(store => store.id === contextId)?.id ?? ''
 }
 
+function selectedStoreId(data: { selectedStore: { id: string } | null }): string | null {
+  const selected = data?.selectedStore
+  if (selected === null) return null
+  if (!selected || typeof selected.id !== 'string' || !selected.id.trim()) throw new Error('表示店舗を確認できませんでした。')
+  return selected.id
+}
+
+function validStores(stores: RestaurantStore[]): boolean {
+  return Array.isArray(stores) && stores.every(store => store && ['active', 'paused', 'archived'].includes(store.status))
+}
+
 /** 店舗欄の選択と、ログイン全体の表示店舗を区別する。 */
 export function useBookingMediaStoreSelection(accountId: string | null) {
   const [selection, setSelection] = useState<Selection>(() => empty(accountId ?? ''))
@@ -37,8 +48,9 @@ export function useBookingMediaStoreSelection(accountId: string | null) {
     void Promise.all([restaurantTestApi.listStores(accountId), restaurantTestApi.storeContext(accountId)])
       .then(([list, context]) => {
         if (!mounted.current || generation.current !== ticket || latestAccount.current !== accountId) return
+        if (!validStores(list.data.stores)) throw new Error('店舗一覧を確認できませんでした。')
         const stores = bookingMediaStores(list.data.stores, accountId)
-        const contextId = context.data.selectedStore?.id ?? null
+        const contextId = selectedStoreId(context.data)
         setSelection({ ...empty(accountId), stores, contextId, id: initialBookingMediaStore(stores, contextId), status: 'ready' })
       }).catch(error => {
         if (mounted.current && generation.current === ticket && latestAccount.current === accountId) setSelection({ ...empty(accountId), status: 'error', error })
@@ -62,7 +74,8 @@ export function useBookingMediaStoreSelection(accountId: string | null) {
     try {
       const response = await restaurantTestApi.storeContext(requestedAccount)
       if (!mounted.current || generation.current !== ticket || latestAccount.current !== requestedAccount) return
-      setSelection(value => value.accountId === requestedAccount ? { ...value, contextId: response.data.selectedStore?.id ?? null, changedElsewhere: true, error: null } : value)
+      const contextId = selectedStoreId(response.data)
+      setSelection(value => value.accountId === requestedAccount ? { ...value, contextId, changedElsewhere: true, error: null } : value)
     } catch (error) {
       if (mounted.current && generation.current === ticket && latestAccount.current === requestedAccount) setSelection(value => value.accountId === requestedAccount ? { ...value, error } : value)
     }
@@ -79,7 +92,7 @@ export function useBookingMediaStoreSelection(accountId: string | null) {
       if (generation.current !== ticket || latestAccount.current !== accountId) { void recheckContext(); return }
       const response = await restaurantTestApi.storeContext(accountId)
       if (!mounted.current || generation.current !== ticket || latestAccount.current !== accountId) return
-      if (response.data.selectedStore?.id !== id) throw new Error('表示店舗が変わりました。もう一度確認してください。')
+      if (selectedStoreId(response.data) !== id) throw new Error('表示店舗が変わりました。もう一度確認してください。')
       setSelection(value => ({ ...value, contextId: id, switching: false, changedElsewhere: false }))
     } catch (error) {
       if (mounted.current && generation.current === ticket && latestAccount.current === accountId) setSelection(value => ({ ...value, switching: false, error }))

@@ -40,6 +40,6 @@ export default function CommonVarDeleteFields({ impact, reason, typedKey, onReas
       names={['deleteReason', 'changeReason', 'reason', 'delete_reason']} submitted={Boolean(error)} />
     {impact.canDelete ? <DeleteField label="削除する場合は、差し込みキーを入力してください"
       value={typedKey} onChange={onTypedKeyChange} placeholder={placeholderText(impact.variable.varKey)}
-      requirement={typedKeyRequirement(impact)} names={['typedKey', 'typed_key']} /> : null}
+      requirement={typedKeyRequirement(impact)} names={['typedKey', 'typed_key']} submitted={Boolean(error)} /> : null}
   </>
 }

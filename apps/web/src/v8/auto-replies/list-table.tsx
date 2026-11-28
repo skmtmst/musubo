@@ -89,6 +89,10 @@ type RenderAutoReplyListContext = {
   visibleLoadState: LoadState
 }
 
+function validCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, reorderBusy, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
   return <DelayedSkeleton loading={visibleLoadState === 'loading'} skeleton={
     <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
@@ -150,7 +154,9 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
           <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, items).map((r) => r.id).join(',')}>
             {duplicateFeedback.order(liveOrder.shown, items).map((r, saveFieldIndex) => {
               const name = displayName(r)
-              const conflicts = r.conflictAttentionCount ?? 0
+              const conflicts = validCount(r.conflictAttentionCount) ? r.conflictAttentionCount : 0
+              const periodCount = validCount(r.hits?.period) ? r.hits.period : null
+              const totalCount = validCount(r.hits?.total) ? r.hits.total : null
               const actions = actionSummary(r)
               const tpl = templateWord(
                 r.templateId,
@@ -197,7 +203,7 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
                   <NameCell name={<div className={styles.nameRow}>
                       <>
                         {canEdit ? <RowNameLink
-                          href={`/auto-replies/edit?id=${r.id}`}
+                          href={`/auto-replies/edit?id=${encodeURIComponent(r.id)}`}
 
                           className={styles.cellTitle}
                           onClick={(event) => {
@@ -227,11 +233,13 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
                   {!narrow && (
                     <Td
                       className={styles.countCell}
-                      title={`今月 ${r.hits?.period ?? emptyValue('unknown')}回 ／ 累計 ${r.hits?.total ?? emptyValue('unknown')}回`}
+                      title={`今月 ${periodCount === null ? emptyValue('unknown') : formatNumber(periodCount)}回 ／ 累計 ${totalCount === null ? emptyValue('unknown') : formatNumber(totalCount)}回`}
                     >
                       {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
-                      <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>{`累計 ${r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回`}</div>
+                      <div className={styles.countMain}>
+                        {periodCount === null ? emptyValue('unknown') : formatNumber(periodCount)}<span className={styles.kpiUnit}>回</span>
+                      </div>
+                      <div className={styles.countSub}>{`累計 ${totalCount === null ? emptyValue('unknown') : formatNumber(totalCount)}回`}</div>
                     </Td>
                   )}
                   <Td>
@@ -285,18 +293,20 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
           const name = displayName(panelRow)
           const trigger = triggerSummary(panelRow)
           const canToggle = panelRow.isActive || panelRow.lifecycleStatus !== 'draft'
+          const panelPeriod = validCount(panelRow.hits?.period) ? panelRow.hits.period : null
+          const panelTotal = validCount(panelRow.hits?.total) ? panelRow.hits.total : null
+          const hasPrev = panelIndex > 0 && panelIndex < items.length
+          const hasNext = panelIndex >= 0 && panelIndex < items.length - 1
           return (
             <DetailPanel
               open
               title={name}
               description={trigger.text}
               onClose={() => setPanelId(null)}
-              onPrev={panelIndex > 0 ? () => setPanelId(items[panelIndex - 1].id) : undefined}
-              onNext={
-                panelIndex < items.length - 1 ? () => setPanelId(items[panelIndex + 1].id) : undefined
-              }
-              hasPrev={panelIndex > 0}
-              hasNext={panelIndex < items.length - 1}
+              onPrev={hasPrev ? () => setPanelId(items[panelIndex - 1].id) : undefined}
+              onNext={hasNext ? () => setPanelId(items[panelIndex + 1].id) : undefined}
+              hasPrev={hasPrev}
+              hasNext={hasNext}
               actions={{primary: <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
                     開く
                   </Button>,
@@ -304,7 +314,7 @@ secondary: <Button
                     variant="secondary"
                     onClick={() =>
                       withViewTransition(() => {
-                        router.push(`/auto-replies/runs?id=${panelRow.id}`)
+                        router.push(`/auto-replies/runs?id=${encodeURIComponent(panelRow.id)}`)
                       })
                     }
                    busyLabel="移動中…">
@@ -323,7 +333,7 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
                       requestDelete(panelRow)
                     }}]}}
              status={<SharedStatusPill tone={panelRow.isActive ? 'success' : 'neutral'} title={stopNote(panelRow) ?? undefined}>{panelRow.isActive ? '有効' : '停止中'}</SharedStatusPill>}>
-<DetailContent><DetailField label="きっかけ"><p title={trigger.title}>{trigger.text}</p><TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label) => <span key={label} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow></DetailField><DetailField label="応答した回数">今月 {panelRow.hits?.period ?? emptyValue('unknown')}回・累計 {panelRow.hits?.total ?? emptyValue('unknown')}回</DetailField></DetailContent>
+<DetailContent><DetailField label="きっかけ"><p title={trigger.title}>{trigger.text}</p><TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label, index) => <span key={`${label}-${index}`} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow></DetailField><DetailField label="応答した回数">今月 {panelPeriod === null ? emptyValue('unknown') : formatNumber(panelPeriod)}回・累計 {panelTotal === null ? emptyValue('unknown') : formatNumber(panelTotal)}回</DetailField></DetailContent>
 </DetailPanel>
           )
         })()}
@@ -364,7 +374,7 @@ menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedR
             variant="secondary"
             disabled={!canEdit}
             lockedReason={lockedReason}
-            onClick={() => openMove([...selectedIds])}
+            onClick={() => { if (!canRunList()) return; openMove([...selectedIds]) }}
           >
             <FolderIcon size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
             フォルダへ移す

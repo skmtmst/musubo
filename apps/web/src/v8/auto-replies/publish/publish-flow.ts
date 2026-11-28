@@ -22,40 +22,62 @@ export type PublishGate = {
  * 契約（#595）は「競合を全件確認し、試験で下書き自身が勝つまで公開しない」。
  * 画面もそれをそのまま出す。
  */
+function isValidConflictItem(value: unknown): value is AutoReplyConflict {
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && typeof (value as { autoReplyId?: unknown }).autoReplyId === 'string'
+    && (value as { autoReplyId: string }).autoReplyId.trim() !== '',
+  )
+}
+
 export function publishGates(
   validation: AutoReplyValidationResult | null,
   dryRun: AutoReplyDryRunResult | null,
   acknowledged: Set<string>,
 ): PublishGate[] {
-  const conflicts = validation?.conflicts ?? []
-  const unacknowledged = conflicts.filter((c) => !acknowledged.has(c.autoReplyId))
+  const ackSet = acknowledged instanceof Set ? acknowledged : new Set<string>()
+  const hasValidErrors = validation !== null
+    && typeof validation === 'object'
+    && Array.isArray(validation.errors)
+    && validation.errors.every((item) => typeof item === 'string')
+  const hasValidConflicts = validation !== null
+    && typeof validation === 'object'
+    && Array.isArray(validation.conflicts)
+    && validation.conflicts.every(isValidConflictItem)
+  const hasValidDryRun = dryRun !== null
+    && typeof dryRun === 'object'
+    && typeof dryRun.draftWon === 'boolean'
+  const errors = hasValidErrors ? validation.errors : []
+  const conflicts = hasValidConflicts ? validation.conflicts : []
+  const unacknowledged = conflicts.filter((c) => !ackSet.has(c.autoReplyId))
 
   return [
     {
       label: '動くきっかけが決まっています',
-      state: validation === null ? 'unknown' : validation.errors.length === 0 ? 'ok' : 'blocked',
+      state: !hasValidErrors ? 'unknown' : errors.length === 0 ? 'ok' : 'blocked',
       detail:
-        validation === null
+        !hasValidErrors
           ? '—（未取得）確認できていません'
-          : validation.errors.length === 0
+          : errors.length === 0
             ? '反応する言葉・時間・対象が決まっています'
-            : validation.errors.join(' / '),
+            : errors.join(' / '),
     },
     {
       label: '返す内容とアクションが決まっています',
-      state: validation === null ? 'unknown' : validation.errors.length === 0 ? 'ok' : 'blocked',
+      state: !hasValidErrors ? 'unknown' : errors.length === 0 ? 'ok' : 'blocked',
       detail:
-        validation === null
+        !hasValidErrors
           ? '—（未取得）確認できていません'
-          : validation.errors.length === 0
+          : errors.length === 0
             ? '返信と、そのあとにすることが決まっています'
-            : validation.errors.join(' / '),
+            : errors.join(' / '),
     },
     {
       label: 'テストが完了しています',
-      state: dryRun === null ? 'unknown' : dryRun.draftWon ? 'ok' : 'blocked',
+      state: !hasValidDryRun ? 'unknown' : dryRun.draftWon ? 'ok' : 'blocked',
       detail:
-        dryRun === null
+        !hasValidDryRun
           ? '—（未取得）まだ試していません'
           : dryRun.draftWon
             ? '実際の評価順で、この下書きが選ばれました'
@@ -63,9 +85,9 @@ export function publishGates(
     },
     {
       label: '競合とループ防止を確認しました',
-      state: validation === null ? 'unknown' : unacknowledged.length === 0 ? 'ok' : 'blocked',
+      state: !hasValidConflicts ? 'unknown' : unacknowledged.length === 0 ? 'ok' : 'blocked',
       detail:
-        validation === null
+        !hasValidConflicts
           ? '—（未取得）競合を読み込めていません'
           : conflicts.length === 0
             ? '重なる自動応答はありません'
@@ -82,7 +104,7 @@ export function publishGates(
  * 確かめたように扱わない。**
  */
 export function canPublish(gates: PublishGate[]): boolean {
-  return gates.length > 0 && gates.every((g) => g.state === 'ok')
+  return Array.isArray(gates) && gates.length > 0 && gates.every((g) => Boolean(g) && g.state === 'ok')
 }
 
 /** 競合の重さ。**「たぶん当たる」も落とさず、確かなものと分ける。** */
@@ -90,9 +112,9 @@ export function conflictTone(conflict: AutoReplyConflict, draftId: string): {
   label: string
   losing: boolean
 } {
-  const losing = conflict.winnerAutoReplyId !== draftId
+  const losing = !draftId || typeof conflict?.winnerAutoReplyId !== 'string' || conflict.winnerAutoReplyId !== draftId
   return {
-    label: conflict.certainty === 'certain' ? '必ず重なります' : '重なることがあります',
+    label: conflict?.certainty === 'certain' ? '必ず重なります' : '重なることがあります',
     losing,
   }
 }

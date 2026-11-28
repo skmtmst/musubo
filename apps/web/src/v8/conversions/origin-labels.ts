@@ -145,6 +145,8 @@ const FALLBACK: ConversionOriginInfo = {
 
 /** 起点キーから説明を引く。知らないキーは「その他」で返す(空の表示にしない)。 */
 export function originInfoOf(sourceType: string | null | undefined): ConversionOriginInfo {
-  if (!sourceType) return FALLBACK;
-  return ORIGINS[sourceType] ?? { ...FALLBACK, key: sourceType };
+  if (typeof sourceType !== 'string' || !sourceType.trim()) return FALLBACK;
+  return Object.prototype.hasOwnProperty.call(ORIGINS, sourceType)
+    ? ORIGINS[sourceType]
+    : { ...FALLBACK, key: sourceType };
 }

@@ -19,7 +19,10 @@ export type EmptyFilters = {
 }
 
 export function hasAnyFilter(filters: EmptyFilters): boolean {
-  return filters.search.trim() !== '' || filters.tagId !== '' || filters.advanced || filters.others
+  if (!filters || typeof filters !== 'object') return false
+  const search = typeof filters.search === 'string' ? filters.search.trim() : ''
+  const tagId = typeof filters.tagId === 'string' ? filters.tagId.trim() : ''
+  return search !== '' || tagId !== '' || Boolean(filters.advanced) || Boolean(filters.others)
 }
 
 export type EmptyMessage = { title: string; description: string }

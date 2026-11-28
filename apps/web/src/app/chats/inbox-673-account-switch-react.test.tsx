@@ -106,6 +106,7 @@ function chatDetail(id: string, name: string, message: string) {
       id: `message-${id}`,
       direction: 'incoming',
       messageType: 'text',
+      isUnsent: false,
       content: message,
       source: 'line',
       originKind: null,

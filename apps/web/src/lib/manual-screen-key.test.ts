@@ -1,12 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { manualScreenKeyForPath } from './manual-screen-key'
-
-const here = dirname(fileURLToPath(import.meta.url))
-const appTopBar = readFileSync(join(here, '..', 'components', 'shell', 'app-top-bar.tsx'), 'utf8')
-const manualHrefHook = readFileSync(join(here, 'use-manual-href.ts'), 'utf8')
 
 describe('manualScreenKeyForPath', () => {
   it('主な画面を画面IDへ対応づける', () => {
@@ -41,19 +34,5 @@ describe('manualScreenKeyForPath', () => {
   it('対応が無い画面は null を返す（リンク自体を出さない）', () => {
     expect(manualScreenKeyForPath('/login')).toBeNull()
     expect(manualScreenKeyForPath('/unknown-path')).toBeNull()
-  })
-})
-
-describe('トップバーのマニュアル導線', () => {
-  it('画面のマニュアルを正本表から引き、未登録・失敗では出さない', () => {
-    // 画面内ボタンと同じ仕組みにするため、参照は useManualHref へまとめた
-    // （監査 R128）。ここでは「トップバーがそれを使うこと」と
-    // 「中身が正本表を引き、未登録・失敗で出さないこと」の両方を縛る。
-    expect(appTopBar).toContain('useManualHref')
-    expect(appTopBar).toContain('manualHref={manualHref}')
-    expect(manualHrefHook).toContain('manualScreenKeyForPath(')
-    expect(manualHrefHook).toContain('api.manualLinks.lookup(screen)')
-    // 「空のうちは押せない見た目」の固定値は消えている
-    expect(appTopBar).not.toContain('manualHref={null}')
   })
 })

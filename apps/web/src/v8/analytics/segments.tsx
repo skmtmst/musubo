@@ -5,7 +5,7 @@ import DetailActions from '@/components/shared/detail-actions'
 import HeatmapTable from '@/components/shared/heatmap-table'
 import { ListToolbarRow } from '@/components/shared/list-toolbar'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CustomerSegments } from '@line-crm/shared'
 import { ListPageSection } from '@/components/templates/list-page'
@@ -55,7 +55,22 @@ type Friend = { id: string; display_name: string | null; activity_count: number;
 type FriendsPage = { items: Friend[]; total: number; optedOutCount: number; nextCursor: string | null }
 type Pick = { r: number; f: number }
 
-const md = (value?: string | null) => (value ? `${Number(value.slice(5, 7))}/${Number(value.slice(8, 10))}` : '—')
+function validNonNegInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
+const validCount = (count: number | null): number | null =>
+  typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : null
+
+const md = (value?: string | null) => {
+  if (typeof value !== 'string') return '—'
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match || !Number.isFinite(Date.parse(value))) return '—'
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '—'
+  return `${month}/${day}`
+}
 
 /** 人数の多さを 0〜4 の濃さにする（最大のマスを 4）。 */
 function levelOf(count: number | null, max: number): number {
@@ -74,22 +89,33 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
   const [actionError, setActionError] = useState('')
   const [data, setData] = useState<CustomerSegments | null>(null)
   const [pick, setPick] = useState<Pick | null>(null)
+  const loadSeqRef = useRef(0)
   useEffect(() => setActionError(''), [pick])
 
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current
     setStatus('loading')
     try {
       const response = await customerSegmentsApi.get(accountId, basis, measure)
-      if (!response.success) throw new Error('segments_failed')
-      setData(response.data)
+      if (seq !== loadSeqRef.current) return
+      if (!response.success || !response.data || !Array.isArray(response.data.cells)) throw new Error('segments_failed')
+      setData({
+        ...response.data,
+        total: validCount(response.data.total),
+        cells: response.data.cells.map((cell) => ({ ...cell, count: validCount(cell.count) })),
+      })
       setStatus('ready')
     } catch (reason) {
+      if (seq !== loadSeqRef.current) return
       setError(reason)
       setStatus('error')
     }
   }, [accountId, basis, measure])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { loadSeqRef.current += 1 }
+  }, [load])
 
   const max = useMemo(() => Math.max(0, ...(data?.cells ?? []).map((cell) => cell.count ?? 0)), [data])
   const cellAt = (r: number, f: number): Cell | undefined => data?.cells.find((cell) => cell.r === r && cell.f === f)
@@ -111,7 +137,7 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       <div className={styles.summary}>
         <span>
           <span className={styles.summaryStrong}>{`全員 ${data.total === null ? '—' : formatNumber(data.total)} 人`}</span>
-          {outside === null ? '' : `（${BASIS_WORD[basis]}なし ${formatNumber(outside)} 人は表の外）`}
+          {outside === null ? '' : `（${BASIS_WORD[basis]}なし ${validCount(outside) === null ? '—' : formatNumber(outside)} 人は表の外）`}
         </span>
         <Button variant="secondary" onClick={() => setPick({ r: 0, f: 0 })} disabled={notComputed}>全員を見る</Button>
       </div>
@@ -166,38 +192,54 @@ function PickBody({ accountId, pick, basis, measure }: { accountId: string; pick
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [page, setPage] = useState<FriendsPage | null>(null)
   const [more, setMore] = useState(false)
+  const seqRef = useRef(0)
+  const moreRef = useRef(false)
 
   const first = useCallback(async () => {
+    const seq = ++seqRef.current
+    moreRef.current = false
+    setMore(false)
     setStatus('loading')
     try {
       const response = await customerSegmentsApi.friends(accountId, pick.r, pick.f, basis, measure)
-      if (!response.success) throw new Error('friends_failed')
+      if (seq !== seqRef.current) return
+      if (!response.success || !response.data || !Array.isArray((response.data as FriendsPage).items)) throw new Error('friends_failed')
       setPage(response.data as FriendsPage)
       setStatus('ready')
     } catch {
-      setStatus('error')
+      if (seq === seqRef.current) setStatus('error')
     }
   }, [accountId, pick.r, pick.f, basis, measure])
 
-  useEffect(() => { void first() }, [first])
+  useEffect(() => {
+    void first()
+    return () => { seqRef.current += 1; moreRef.current = false }
+  }, [first])
 
   const loadMore = async () => {
-    if (!page?.nextCursor) return
+    if (!page?.nextCursor || moreRef.current) return
+    const seq = seqRef.current
+    moreRef.current = true
     setMore(true)
     try {
       const response = await customerSegmentsApi.friends(accountId, pick.r, pick.f, basis, measure, page.nextCursor)
-      if (!response.success) throw new Error('friends_failed')
+      if (seq !== seqRef.current) return
+      if (!response.success || !response.data || !Array.isArray((response.data as FriendsPage).items)) throw new Error('friends_failed')
       const next = response.data as FriendsPage
-      setPage({ ...next, items: [...page.items, ...next.items] })
+      setPage((current) => (current ? { ...next, items: [...current.items, ...next.items] } : next))
     } catch {
-      setStatus('error')
+      if (seq === seqRef.current) setStatus('error')
     } finally {
-      setMore(false)
+      if (seq === seqRef.current) {
+        moreRef.current = false
+        setMore(false)
+      }
     }
   }
 
   if (status === 'loading') return <ListState kind="loading" title="お客さまを読み込んでいます" />
   if (status === 'error' || !page) return <ListState kind="error" onRetry={() => void first()} />
+  const remaining = validNonNegInt(page.total) ? Math.max(0, page.total - page.items.length) : null
   return (
     <div className={styles.drawerBody}>
       <DataTable>
@@ -213,15 +255,19 @@ function PickBody({ accountId, pick, basis, measure }: { accountId: string; pick
             <Tr key={friend.id}>
               <Td grow><span className={styles.nameCell}>{friend.display_name || '（名前なし）'}</span></Td>
               <Td>{md(friend.last_activity_at)}</Td>
-              <Td align="right">{`${formatNumber(friend.activity_count)} 回`}</Td>
+              <Td align="right">{validNonNegInt(friend.activity_count) ? `${formatNumber(friend.activity_count)} 回` : '—'}</Td>
             </Tr>
           ))}
         </tbody>
       </DataTable>
       {page.nextCursor ? (
-        <Button variant="secondary" onClick={() => void loadMore()} busy={more}>{`ほか ${formatNumber(page.total - page.items.length)} 人を見る`}</Button>
+        <Button variant="secondary" onClick={() => void loadMore()} disabled={more} busy={more}>
+          {remaining !== null ? `ほか ${formatNumber(remaining)} 人を見る` : '続きを見る'}
+        </Button>
       ) : null}
-      <p className={styles.mute}>{`宣伝を止めている人 ${formatNumber(page.optedOutCount)} 人（LINE を送るときは除きます）`}</p>
+      <p className={styles.mute}>
+        {`宣伝を止めている人 ${validNonNegInt(page.optedOutCount) ? formatNumber(page.optedOutCount) : '—'} 人（LINE を送るときは除きます）`}
+      </p>
     </div>
   )
 }
@@ -240,9 +286,11 @@ function PickFooterHost({ onFailure, accountId, pick, basis, measure, data, cell
   onOpenBroadcast: (condition: unknown) => void
 }) {
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const setMessage = onFailure
   const errors = useSaveFormErrors()
-  const total = pick.r === 0 ? data.total : cellAt(pick.r, pick.f)?.count ?? null
+  const rawTotal = pick.r === 0 ? data.total : cellAt(pick.r, pick.f)?.count ?? null
+  const total = validNonNegInt(rawTotal) ? rawTotal : null
   const whole = pick.r === 0
   const cell = whole ? null : cellAt(pick.r, pick.f)
   const name = whole ? '全員' : cell?.name ?? ''
@@ -252,7 +300,8 @@ function PickFooterHost({ onFailure, accountId, pick, basis, measure, data, cell
     : { operator: 'AND', rules: [{ type: 'customer_segment', value: { r: pick.r, f: pick.f, basis, measure } }] }
 
   const saveSearch = async () => {
-    if (whole) return
+    if (whole || busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     setMessage('')
     try {
@@ -262,6 +311,7 @@ function PickFooterHost({ onFailure, accountId, pick, basis, measure, data, cell
     } catch (reason) {
       if (!errors.capture(reason)) setMessage('保存した検索にできませんでした。時間をおいてもう一度お試しください。')
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }

@@ -22,15 +22,25 @@ import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/a
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 
 const WEEKDAY_JP = '日月火水木金土'
 
 export type LiffPhoneStep = 'menu' | 'staff' | 'datetime'
 
+function isValidYmd(date: unknown): date is string {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const [year, month, day] = date.split('-').map(Number)
+  const d = new Date(0)
+  d.setUTCFullYear(year, month - 1, day)
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day
+}
+
 /** `YYYY-MM-DD` に n 日足す（実LIFFの addDays と同じ計算）。 */
 function addDaysStr(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`)
+  const base = isValidYmd(date) ? date : jstDate()
+  const d = new Date(`${base}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
 }
@@ -47,9 +57,17 @@ function formatJpDay(date: string): string {
   return polishFormatDate(date, { style: 'day' })
 }
 
+function durationLabel(minutes: unknown): string {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes <= 0) return emptyValue('unknown')
+  return `${polishFormatNumber(minutes)}分`
+}
+
 function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'free') return '無料'
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
+  if (typeof menu.base_price !== 'number' || !Number.isFinite(menu.base_price) || menu.base_price < 0) {
+    return emptyValue('unknown')
+  }
   return `¥${polishFormatNumber(menu.base_price)}`
 }
 
@@ -86,7 +104,7 @@ function MenuCard({ menu, picked, check }: { menu: PhoneMenuCard; picked?: boole
         {/* 説明が無くても1行ぶん空ける（カードの高さをそろえる。絵 owaS3 のシャンプーのみ）。 */}
         <span className={styles.phoneCardDesc}>{menu.description ?? ''}</span>
         <span className={styles.phoneCardMeta}>
-          <span className={styles.phoneCardMin}>{menu.duration_minutes}分</span>
+          <span className={styles.phoneCardMin}>{durationLabel(menu.duration_minutes)}</span>
           <span className={styles.phoneCardPrice}>{priceLabel(menu)}</span>
         </span>
       </span>
@@ -164,47 +182,55 @@ export function LiffPhoneStaffStep({
   accountName?: string
   status?: 'loading' | 'ready' | 'error'
 }) {
-  const shown = staff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
+  const safeStaff = Array.isArray(staff) ? staff : []
+  const shown = safeStaff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
   return (
     <PhoneChrome accountName={accountName} step={2}>
       <div className={styles.phoneBody}>
         <h3 className={styles.phoneTitle}>担当を選んでください</h3>
+        {menu && (
+          <p className={styles.phoneSub}>{menu.name}・{durationLabel(menu.duration_minutes)}・{priceLabel(menu)}</p>
+        )}
         {status === 'loading' ? (
           <DelayedSkeleton loading skeleton={<PhoneListSkeleton />} />
         ) : status === 'error' ? (
           <p className={styles.phoneSub}>読み込めませんでした。</p>
-        ) : null}
-        {menu && (
-          <p className={styles.phoneSub}>{menu.name}・{menu.duration_minutes}分・{priceLabel(menu)}</p>
-        )}
-        {designationFree && (
-          <div className={`${styles.phoneCard} ${styles.phoneCardPicked}`}>
-            <span className={`${styles.phoneAvatar} ${styles.phoneAvatarPlain}`} aria-hidden="true">
-              <Users size={20} aria-hidden="true" />
-            </span>
-            <span className={styles.phoneCardBody}>
-              <span className={styles.phoneCardName}>指名なし</span>
-              <span className={styles.phoneCardDesc}>いちばん早く空いている人</span>
-            </span>
-            <CircleCheck className={styles.phoneCardCheck} size={20} aria-hidden="true" />
-          </div>
-        )}
-        {shown.length === 0 && !designationFree ? (
-          <p className={styles.phoneSub}>担当できるスタッフはまだいません。</p>
         ) : (
-          shown.slice(0, 3).map((person) => (
-            <div key={person.id} className={styles.phoneCard}>
-              <span className={`${styles.phoneThumb} ${styles.phoneAvatar}`} aria-hidden="true">{person.display_name.slice(0, 1)}</span>
-              <span className={styles.phoneCardBody}>
-                <span className={styles.phoneCardName}>{person.display_name}</span>
-                <span className={styles.phoneCardDesc}>{`${person.role ?? 'スタッフ'}・${(person.nomination_fee ?? 0) > 0 ? `指名料 +¥${polishFormatNumber(person.nomination_fee ?? 0)}` : '指名料なし'}`}</span>
-              </span>
-            </div>
-          ))
+          <>
+            {designationFree && (
+              <div className={`${styles.phoneCard} ${styles.phoneCardPicked}`}>
+                <span className={`${styles.phoneAvatar} ${styles.phoneAvatarPlain}`} aria-hidden="true">
+                  <Users size={20} aria-hidden="true" />
+                </span>
+                <span className={styles.phoneCardBody}>
+                  <span className={styles.phoneCardName}>指名なし</span>
+                  <span className={styles.phoneCardDesc}>いちばん早く空いている人</span>
+                </span>
+                <CircleCheck className={styles.phoneCardCheck} size={20} aria-hidden="true" />
+              </div>
+            )}
+            {shown.length === 0 && !designationFree ? (
+              <p className={styles.phoneSub}>担当できるスタッフはまだいません。</p>
+            ) : (
+              shown.slice(0, 3).map((person) => {
+                const displayName = person.display_name || person.name || ''
+                const fee = typeof person.nomination_fee === 'number' && Number.isFinite(person.nomination_fee) ? person.nomination_fee : 0
+                return (
+                  <div key={person.id} className={styles.phoneCard}>
+                    <span className={`${styles.phoneThumb} ${styles.phoneAvatar}`} aria-hidden="true">{displayName.slice(0, 1)}</span>
+                    <span className={styles.phoneCardBody}>
+                      <span className={styles.phoneCardName}>{displayName}</span>
+                      <span className={styles.phoneCardDesc}>{`${person.role ?? 'スタッフ'}・${fee > 0 ? `指名料 +¥${polishFormatNumber(fee)}` : '指名料なし'}`}</span>
+                    </span>
+                  </div>
+                )
+              })
+            )}
+          </>
         )}
       </div>
       <div className={styles.phoneFoot}>
-        <span className={`${styles.phoneCta} ${shown.length === 0 && !designationFree ? styles.phoneCtaOff : ''}`}>
+        <span className={`${styles.phoneCta} ${status !== 'ready' || (shown.length === 0 && !designationFree) ? styles.phoneCtaOff : ''}`}>
           日時を選ぶ
         </span>
       </div>
@@ -234,8 +260,10 @@ export function LiffPhoneDatetimeStep({
   accountName?: string
   status?: 'loading' | 'ready' | 'error'
 }) {
+  const safeSlots = Array.isArray(slots) ? slots : []
   const byDate = new Map<string, BookingAvailabilitySlot[]>()
-  for (const slot of slots) {
+  for (const slot of safeSlots) {
+    if (!slot || !isValidYmd(slot.date)) continue
     const list = byDate.get(slot.date) ?? []
     list.push(slot)
     byDate.set(slot.date, list)
@@ -244,9 +272,9 @@ export function LiffPhoneDatetimeStep({
   // 見本は「空きのある先頭の日」から5日（LIFF で日を選んで戻ってきたときと同じ並び）。無ければ今日から。
   const anchor = openDates[0] ?? jstDate()
   const days = daysFrom(anchor)
-  const closed = new Set(closedDates)
-  const closedDow = new Set(closedWeekdays)
-  const selected = openDates[0] ?? null
+  const closed = new Set(Array.isArray(closedDates) ? closedDates : [])
+  const closedDow = new Set(Array.isArray(closedWeekdays) ? closedWeekdays : [])
+  const selected = status === 'ready' ? (openDates[0] ?? null) : null
   const selectedSlots = selected ? (byDate.get(selected) ?? []) : []
   const pickedSlot = selectedSlots.find((slot) => slot.remaining > 0) ?? selectedSlots[0] ?? null
 
@@ -265,14 +293,14 @@ export function LiffPhoneDatetimeStep({
           <ChevronLeft className={styles.phoneDayNav} aria-hidden="true" />
           {days.map((date) => {
             const d = new Date(`${date}T00:00:00Z`)
-            const hasSlots = (byDate.get(date)?.length ?? 0) > 0
+            const hasSlots = status === 'ready' && (byDate.get(date)?.length ?? 0) > 0
             const isClosed = closed.has(date) || closedDow.has(d.getUTCDay())
             const isNow = date === selected
-            const state = isClosed ? '休み' : hasSlots ? '空き' : '満'
+            const state = isClosed ? '休み' : status !== 'ready' ? emptyValue('unknown') : hasSlots ? '空き' : '満'
             return (
               <span
                 key={date}
-                className={`${styles.phoneDay} ${isNow ? styles.phoneDayNow : ''} ${isClosed ? styles.phoneDayOff : !hasSlots ? styles.phoneDayFull : ''}`}
+                className={`${styles.phoneDay} ${isNow ? styles.phoneDayNow : ''} ${isClosed ? styles.phoneDayOff : status === 'ready' && !hasSlots ? styles.phoneDayFull : ''}`}
               >
                 <span className={styles.phoneDayDow}>{WEEKDAY_JP[d.getUTCDay()]}</span>
                 <span className={styles.phoneDayNum}>{d.getUTCDate()}</span>

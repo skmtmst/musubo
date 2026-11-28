@@ -155,13 +155,15 @@ afterEach(async () => {
 })
 
 describe('D008: 形の違う詳細応答', () => {
-  it('本文の無い応答は幽霊詳細にせず「見つかりません」になり操作口が出ない', async () => {
-    // 存在しないIDへ、一覧形のまま詳細として返る場合の再現。
+  it('本文の無い応答は幽霊詳細にせず読み込み失敗として読み直しを出し、操作口が出ない', async () => {
+    // 一覧形のまま詳細として返る場合の再現。見つからないと決めるのは本当の 404 だけ（detail-response-invalid-cx3-35）。
     calls.templatesGet.mockResolvedValue({ success: true, data: { items: [] } })
 
     await mountAt('?id=template-9999')
 
-    expect(screenText()).toContain('このテンプレートは見つかりません')
+    expect(screenText()).toContain('テンプレートを読み込めませんでした')
+    expect(screenText()).not.toContain('このテンプレートは見つかりません')
+    expect(byText('button', 'もう一度読み込む')).not.toBeNull()
     // 存在しない相手への操作口は出さない。
     expect(byText('a', '編集する')).toBeNull()
     expect(byText('button', '削除する')).toBeNull()

@@ -71,6 +71,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   const readOnly = ctx.readOnly
   const [comments, setComments] = useState<WebinarSakuraComment[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'denied'>('loading')
+  const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [baseline, setBaseline] = useState('[]')
   const generation = useRef(0)
@@ -83,6 +84,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
   useEffect(() => {
     const request = ++generation.current
     setState('loading')
+    setLoadError('')
     setMessage(null)
     setComments([])
     setBaseline('[]')
@@ -94,7 +96,11 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
       setBaseline(JSON.stringify(response.data))
       setState('ready')
     }).catch((cause) => {
-      if (request === generation.current) setState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
+      if (request === generation.current) {
+        const denied = cause instanceof ApiError && cause.status === 403
+        setState(denied ? 'denied' : 'error')
+        setLoadError(denied ? '' : describeApiFailure(cause, 'コメントの読み込み'))
+      }
     })
     return () => { generation.current += 1 }
   }, [webinarId, attempt])
@@ -198,7 +204,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
           <div className={styles.cardHead}>
             <div className={styles.cardHeadText}>
               <h3 id="webinar-comments-title" className={styles.cardTitle}>流すコメント（演出）</h3>
-              <p className={styles.cardDesc}>{`動画の決まった秒に、用意したコメントを流します。マイナスの秒は開始前（待機ルーム）。最大 ${WEBINAR_SAKURA_COMMENTS_MAX} 件・いま ${formatNumber(comments.length)} 件`}</p>
+              <p className={styles.cardDesc}>{`動画の決まった秒に、用意したコメントを流します。マイナスの秒は開始前（待機ルーム）。最大 ${WEBINAR_SAKURA_COMMENTS_MAX} 件・${state === 'ready' ? `いま ${formatNumber(comments.length)} 件` : 'いま —'}`}</p>
             </div>
             {readOnly ? null : (
               <Button variant="primary" disabled={state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>
@@ -208,7 +214,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
           </div>
           {message ? <Notice tone={message.error ? 'danger' : 'info'}>{message.text}</Notice> : null}
           {state === 'error' ? (
-            <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>コメントを読み込めませんでした。保存前に読み直してください。</Notice>
+            <Notice tone="danger" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>コメントを読み込めませんでした。{loadError ? `（${loadError}）` : ''}保存前に読み直してください。</Notice>
           ) : state === 'denied' ? (
             <Notice tone="info">コメントを見る権限がありません。管理者に確認してください。</Notice>
           ) : state === 'loading' ? (

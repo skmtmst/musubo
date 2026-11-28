@@ -3,32 +3,49 @@ import type { CommonActionStep, CommonActionResources } from '@/lib/api'
 
 /** 処理の行の2行目（どれを・どれだけ）。選んでいないときは「〇〇を選ぶ」。 */
 export function stepSummary(step: CommonActionStep, resources: CommonActionResources): string {
-  const nameOf = (list: Array<{ id: string; name: string }>, id: unknown, label: string) => {
-    const found = list.find((item) => item.id === String(id ?? ''))
-    return found ? `${label}「${found.name}」` : `${label}を選ぶ`
+  if (!step || typeof step !== 'object') return ''
+  const params =
+    step.params && typeof step.params === 'object' && !Array.isArray(step.params)
+      ? (step.params as Record<string, unknown>)
+      : {}
+  const res = resources && typeof resources === 'object' ? resources : ({} as Partial<CommonActionResources>)
+  const nameOf = (list: unknown, id: unknown, label: string) => {
+    const key = typeof id === 'string' ? id : typeof id === 'number' && Number.isFinite(id) ? String(id) : ''
+    if (!key || !Array.isArray(list)) return `${label}を選ぶ`
+    const found = list.find(
+      (item) => item && typeof item === 'object' && (item as { id?: unknown }).id === key,
+    ) as { name?: unknown } | undefined
+    return found && typeof found.name === 'string' && found.name ? `${label}「${found.name}」` : `${label}を選ぶ`
   }
   switch (step.type) {
     case 'add_tag':
     case 'remove_tag':
-      return nameOf(resources.tags, step.params.tagId, 'タグ')
+      return nameOf(res.tags, params.tagId, 'タグ')
     case 'start_scenario':
     case 'stop_scenario':
     case 'resume_scenario':
-      return nameOf(resources.scenarios, step.params.scenarioId, 'シナリオ')
+      return nameOf(res.scenarios, params.scenarioId, 'シナリオ')
     case 'send_webhook':
-      return nameOf(resources.webhooks, step.params.webhookId, '送信先')
+      return nameOf(res.webhooks, params.webhookId, '送信先')
     case 'switch_rich_menu':
-      return nameOf(resources.richMenus, step.params.richMenuPageId, 'リッチメニュー')
+      return nameOf(res.richMenus, params.richMenuPageId, 'リッチメニュー')
     case 'common_action':
-      return nameOf(resources.commonActions, step.params.commonActionId, '共通アクション')
+      return nameOf(res.commonActions, params.commonActionId, '共通アクション')
     case 'send_message': {
-      if (step.params.templateId) return nameOf(resources.templates, step.params.templateId, 'テンプレート')
-      const content = String(step.params.content ?? '').trim()
+      const hasTemplateId =
+        (typeof params.templateId === 'string' && params.templateId.trim() !== '') ||
+        (typeof params.templateId === 'number' && Number.isFinite(params.templateId))
+      if (hasTemplateId) return nameOf(res.templates, params.templateId, 'テンプレート')
+      const content = typeof params.content === 'string' ? params.content.trim() : ''
       return content ? content.slice(0, 40) : '送る文を入れる'
     }
-    case 'wait': return automationWaitLabel(step.params)
+    case 'wait': return automationWaitLabel(params)
     case 'set_metadata': {
-      const keys = Object.keys((step.params.values as Record<string, unknown> | undefined) ?? {}).filter(Boolean)
+      const rawValues = params.values
+      const keys =
+        rawValues && typeof rawValues === 'object' && !Array.isArray(rawValues)
+          ? Object.keys(rawValues as Record<string, unknown>).filter((key) => key.trim() !== '')
+          : []
       return keys.length ? `友だち情報「${keys.join('・')}」` : '友だち情報を選ぶ'
     }
     case 'branch':

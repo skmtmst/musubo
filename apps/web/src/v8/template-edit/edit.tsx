@@ -7,6 +7,7 @@
  * ?example=<見本の番号>（見本から作る F-5：メッセージを作るに見本の名前と本文を入れて開く）。
  */
 import { useSearchParams } from 'next/navigation'
+import TargetMissing from '@/components/shared/target-missing'
 import TemplateMessageEditor from './message'
 import TemplateAssetEditor from './asset'
 import TemplateRichEditor from './rich'
@@ -18,6 +19,8 @@ export default function TemplateEditV8() {
   const kind = params.get('kind')
   const visual = params.get('visual') === '1'
   const example = params.get('example')
+  const knownKind = kind === null || kind === '' || kind === 'message' || kind === 'rich_video' || kind === 'rich_message' || kind === 'coupon' || kind === 'research'
+  if (!knownKind || (kind === 'rich_message' && id)) return <TargetMissing kind="unspecified" pageHeading title="テンプレートの種類を確認できません" description="一覧から対象を選び直してください。" backHref="/templates" backLabel="テンプレート一覧へ戻る" />
   if (kind === 'rich_video') return <TemplateRichVideoEditor key={`${id ?? 'new'}`} id={id} visual={visual} />
   if (kind === 'rich_message') return <TemplateRichEditor visual={visual} />
   if (kind === 'coupon' || kind === 'research') return <TemplateAssetEditor key={`${kind}:${id ?? 'new'}`} id={id} kind={kind} visual={visual} />

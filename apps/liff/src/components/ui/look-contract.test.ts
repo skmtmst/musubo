@@ -80,3 +80,22 @@ it.each([
   for (const [label, color] of [['本文', ink], ['補足', sub], ['残りわずか', few], ['満席', full]]) expect(await view.page.getByText(label, { exact: true }).evaluate(el => getComputedStyle(el).color)).toBe(rgb(color));
   expect(await view.page.locator('.liff-num').evaluate(el => getComputedStyle(el).fontWeight)).toBe(weight);
 });
+
+it.each(['modern', 'night'])('%s の画面で主ボタンと文字を真っ黒にしない', async theme => {
+  await view.show(`<main data-liff-theme="${theme}" class="bg-canvas text-ink"><p>本文</p>${renderToStaticMarkup(createElement(Button, {}, '次へ'))}</main>`);
+  const colors = await view.page.locator('main, main p, main button').evaluateAll(nodes => nodes.flatMap(el => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor]));
+  expect(colors).not.toContain('rgb(0, 0, 0)');
+});
+
+it('LINEの画面は型指定がない画面と同じ色を表示する', async () => {
+  const button = renderToStaticMarkup(createElement(Button, {}, '次へ'));
+  await view.show(`<main id="default" class="bg-canvas text-ink">${button}<aside class="bg-liff-note">お知らせ</aside></main><main id="line" data-liff-theme="line" class="bg-canvas text-ink">${button}<aside class="bg-liff-note">お知らせ</aside></main>`);
+  const colors = (selector: string) => view.page.locator(selector).evaluateAll(nodes => nodes.flatMap(el => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor]));
+  expect(await colors('#line, #line button, #line aside')).toEqual(await colors('#default, #default button, #default aside'));
+});
+
+it.each(['natural', 'modern', 'gentle', 'night'])('%s のお知らせは共通の背景色を保つ', async theme => {
+  await view.show(`<main><aside id="default" class="bg-liff-note">お知らせ</aside><div data-liff-theme="${theme}"><aside id="themed" class="bg-liff-note">お知らせ</aside></div></main>`);
+  const background = (selector: string) => view.page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(await background('#themed')).toBe(await background('#default'));
+});

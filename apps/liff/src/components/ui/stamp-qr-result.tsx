@@ -5,7 +5,10 @@ import styles from './stamp-qr-result.module.css';
 
 /** 押した結果のカード。保存済みの設定・残高だけで描き、未取得を見本の数字で補わない。 */
 export function StampQrCard({card,wallet,awarded=0}:{card:VisitStampCard;wallet:VisitStampWallet;awarded?:number}) {
- const slots=card.settings.slotCount??Math.max(...card.settings.rewards.map(r=>r.stamps));
+ const rewards=card?.settings?.rewards;
+ const validRewards=Array.isArray(rewards)&&rewards.every(r=>r&&Number.isSafeInteger(r.stamps)&&r.stamps>0);
+ const slots=card?.settings?.slotCount??(validRewards?Math.max(...rewards.map(r=>r.stamps)):NaN);
+ if(!validRewards||!Number.isSafeInteger(slots)||slots<1||slots>10000||!wallet||!Number.isSafeInteger(wallet.balance)||wallet.balance<0) return <p role="status">スタンプの数を確認できません。お店にお問い合わせください。</p>;
  const color=card.settings.backgroundColor??VISIT_STAMP_DEFAULT_COLOR;
  const ink=visitStampDarkInk(color)?'var(--color-ink)':'var(--color-canvas)';
  return <div className={styles.card} style={{backgroundColor:color,color:ink}}>

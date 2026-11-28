@@ -80,25 +80,61 @@ export function timelineStatusLabel(type: string, status: string | null) {
   return knownValue(labels, status, status)
 }
 
+const SAME_ORIGIN_BASE = 'https://same.invalid'
+
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i)
+    if (code <= 0x1f || code === 0x7f) return true
+  }
+  return false
+}
+
+function safeSourceUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  if (hasControlChar(raw)) return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  // 相対パスは //・/\ を明示拒否したうえで固定基準 URL で解決し、オリジンが変わらない場合のみ許可する。
+  if (trimmed.startsWith('/')) {
+    if (trimmed[1] === '/' || trimmed[1] === '\\') return null
+    try {
+      const resolved = new URL(trimmed, SAME_ORIGIN_BASE)
+      return resolved.origin === SAME_ORIGIN_BASE ? trimmed : null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? trimmed : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * 元情報へのリンク。実在する画面・URLだけを出す（IDEA-03「無いデータをあるように出さない」）。
  * label は履歴タブの「元」の列の言葉（ 3. 履歴）。
  */
 export function timelineSourceHref(item: FriendTimelineItem, friendId: string): { href: string; external: boolean; label: string } | null {
-  const source = item.source
-  if (!source) return null
-  if (source.url) return { href: source.url, external: true, label: item.type === 'ec_order' ? '注文' : '元の記録' }
+  const source = item?.source
+  if (!source || typeof source !== 'object') return null
+  if (typeof source.url === 'string' && source.url.trim() !== '') {
+    const safeUrl = safeSourceUrl(source.url)
+    return safeUrl ? { href: safeUrl, external: true, label: item.type === 'ec_order' ? '注文' : '元の記録' } : null
+  }
   switch (source.kind) {
     case 'message':
-      return { href: inboxHrefForFriend(friendId), external: false, label: '受信箱' }
+      return friendId ? { href: inboxHrefForFriend(friendId), external: false, label: '受信箱' } : null
     case 'form_submission':
       return source.parentId ? { href: `/form-submissions/responses?id=${encodeURIComponent(source.parentId)}`, external: false, label: '回答' } : null
     case 'booking':
-      return { href: `/booking/bookings/detail?id=${encodeURIComponent(source.id)}`, external: false, label: '予約' }
+      return source.id ? { href: `/booking/bookings/detail?id=${encodeURIComponent(source.id)}`, external: false, label: '予約' } : null
     case 'event_booking':
       return source.parentId ? { href: `/events/bookings?id=${encodeURIComponent(source.parentId)}`, external: false, label: '予約' } : null
     case 'friend_reminder':
-      return { href: friendFilterHref('/reminders', friendId), external: false, label: 'リマインダ' }
+      return friendId ? { href: friendFilterHref('/reminders', friendId), external: false, label: 'リマインダ' } : null
     default:
       return null
   }
@@ -126,9 +162,12 @@ export function matchesTimelineFilter(item: FriendTimelineItem, filter: Timeline
 /** 日の見出し（今日 10月1日（木）／昨日 9月30日（水）／9月26日（土））。 */
 export function dayHeading(value: string, now: Date = new Date()) {
   const key = dayKey(value)
-  const today = dayKey(now.toISOString())
-  const yesterday = dayKey(new Date(now.getTime() - 86_400_000).toISOString())
   const day = formatDay(value)
+  if (!key) return day
+  const nowTime = now instanceof Date ? now.getTime() : Number.NaN
+  if (!Number.isFinite(nowTime)) return day
+  const today = dayKey(new Date(nowTime).toISOString())
+  const yesterday = dayKey(new Date(nowTime - 86_400_000).toISOString())
   if (key === today) return `今日 ${day}`
   if (key === yesterday) return `昨日 ${day}`
   return day
@@ -136,6 +175,7 @@ export function dayHeading(value: string, now: Date = new Date()) {
 
 /** 日本時間の日付の鍵（日ごとにまとめるため）。 */
 export function dayKey(value: string) {
+  if (typeof value !== 'string' || !value.trim()) return ''
   const time = new Date(value).getTime()
   if (Number.isNaN(time)) return ''
   return jstDate(new Date(time))

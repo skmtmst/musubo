@@ -168,6 +168,7 @@ export function ClosureDialog({ open, date, targets, seatNoun, busy, error, affe
       if (generation !== previewGeneration.current || JSON.stringify(currentRef.current) !== JSON.stringify(input)) return
       const rows = Array.isArray(result) ? result : result.rows
       if (!Array.isArray(result) && (typeof result.snapshot !== 'string' || !result.snapshot)) throw new Error('invalid_confirmation')
+      if (!Array.isArray(rows) || !rows.every(row => row && typeof row.time === 'string' && typeof row.name === 'string' && typeof row.sub === 'string')) throw new Error('invalid_confirmation')
       const fixed = Array.isArray(result) ? input : { ...input, expectedSnapshot: result.snapshot }
       if (rows.length) { setOverlap(rows); setConfirmedInput(fixed); setStep(2) } else await save(fixed)
     } catch { if (generation === previewGeneration.current) setPreviewError('予約を確認できませんでした。読み直してから、もう一度お試しください。') }

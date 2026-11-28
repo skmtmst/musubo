@@ -14,9 +14,11 @@ const icons: Record<string, LucideIcon> = {
   image: Image, heading: Heading, 'text-deco': Type, button: MousePointerClick,
 }
 
-export const formKindIcon = (kind: string): LucideIcon => icons[kind] ?? HelpCircle
+export const formKindIcon = (kind: string): LucideIcon =>
+  typeof kind === 'string' && Object.prototype.hasOwnProperty.call(icons, kind) ? icons[kind] : HelpCircle
 
 export function formBlockIcon(block: FormBlock) {
+  if (!block || typeof block !== 'object') return <HelpCircle size={16} aria-hidden="true" />
   const Icon = formKindIcon(block.kind === 'input'
     ? block.fixedField ?? block.type
     : block.kind === 'text' ? 'text-deco' : block.kind)

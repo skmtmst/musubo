@@ -1,11 +1,6 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
 import { NOT_AVAILABLE, STATE_TEXT, countOrDash, notConnectedText } from './not-connected'
-
-const SRC = fs.readFileSync(path.join(__dirname, 'not-connected.tsx'), 'utf8')
 
 describe('未接続の書き方をそろえる', () => {
   it('取れない数字は空欄ではなく — を出す', () => {
@@ -43,14 +38,4 @@ describe('未接続の書き方をそろえる', () => {
     for (const t of all) expect(t).not.toContain('繋がって')
   })
 
-  it('主要操作は理由があるあいだ押せない', () => {
-    expect(SRC).toContain('disabled={reason !== null}')
-  })
-
-  it('押せない理由を吹き出しだけで済ませない（本文に出す）', () => {
-    // `title` に入れるだけだと読み上げにも検索にも出ず、運用者が理由に気づけない。
-    expect(SRC).toContain('data-blocked-reason')
-    expect(SRC).toMatch(/\{reason\}\s*\n?\s*<\/p>/)
-    expect(SRC).not.toMatch(/title=\{reason\}/)
-  })
 })

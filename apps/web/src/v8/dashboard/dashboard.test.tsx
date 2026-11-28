@@ -70,10 +70,9 @@ describe('ダッシュボード編集の入口', () => {
     expect(canEditDashboardLayout('viewer')).toBe(false)
   })
 
-  it('板の頭の編集ボタンと?edit=1 の窓を同じ判定で出し入れする（配信を作るの判定と混ぜない）', () => {
+  it('編集を開く参照を一か所に保つ', () => {
+    // 画面に出ない重複参照は描画試験では検出できないため残す。
     const src = readFileSync(join(__dirname, 'dashboard.tsx'), 'utf8')
-    expect(src).toMatch(/\{canEditLayout \? <Button type="button" onClick=\{d\.openEditor\}>/)
-    expect(src).toMatch(/overlays=\{d\.editorOpen && canEditLayout \? <DashboardEditor/)
     expect(src.match(/onClick=\{d\.openEditor\}|onSelect: d\.openEditor/g)).toHaveLength(1)
   })
 })

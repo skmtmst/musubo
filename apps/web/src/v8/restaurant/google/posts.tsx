@@ -822,11 +822,16 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const [sent, setSent] = useState<{ alreadyPublished: boolean } | null>(null)
   const loadRequestId = useRef(0)
   const alive = useRef(true)
+  const scopeRef = useRef({ accountId, id })
+  if (scopeRef.current.accountId !== accountId || scopeRef.current.id !== id) scopeRef.current = { accountId, id }
+  const viewScope = scopeRef.current
+  const loadedScope = useRef<typeof viewScope | null>(null)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   useEffect(() => {
     setChecked(false)
     setSent(null)
     setActionError('')
+    setBusy(false)
   }, [accountId, id])
 
   const load = useCallback(async () => {
@@ -835,44 +840,47 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
     setLoadError('')
     try {
       const response = await restaurantGoogleApi.post(accountId, id)
-      if (!alive.current || requestId !== loadRequestId.current) return
+      if (!alive.current || scopeRef.current !== viewScope || requestId !== loadRequestId.current) return
       const instagramMediaId = response.post.instagram?.mediaId
       let nextIgPreview: { filename: string; url: string } | null = null
       if (instagramMediaId && instagramMediaId === response.post.media[0]?.mediaId) {
         nextIgPreview = { filename: response.post.media[0].filename, url: response.post.media[0].sourceUrl }
       } else if (instagramMediaId) {
         const media = await api.media.detail(instagramMediaId, accountId)
-        if (!alive.current || requestId !== loadRequestId.current) return
+        if (!alive.current || scopeRef.current !== viewScope || requestId !== loadRequestId.current) return
         nextIgPreview = media.success ? media.data.item : null
       }
       setPost(response.post)
+      loadedScope.current = viewScope
       setIgPreview(nextIgPreview)
       setStoreName(response.store.name)
       setStoreId(response.store.id)
       setWriteEnabled(response.writeEnabled)
       setCanPublish(response.canPublish)
     } catch (err) {
-      if (!alive.current || requestId !== loadRequestId.current) return
+      if (!alive.current || scopeRef.current !== viewScope || requestId !== loadRequestId.current) return
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
       setLoadError(errorMessage(err, '投稿を読み込めませんでした。')) }
     } finally {
-      if (alive.current && requestId === loadRequestId.current) setLoading(false)
+      if (alive.current && scopeRef.current === viewScope && requestId === loadRequestId.current) setLoading(false)
     }
-  }, [accountId, id, saveErrors])
+  }, [accountId, id, saveErrors, viewScope])
 
   useEffect(() => { void load() }, [load])
 
   const publish = async () => {
-    if (!canSend || !writeEnabled || !checked || busy || !post || ['published', 'accepted', 'rejected', 'cancelled'].includes(post.status)) return
+    if (scopeRef.current !== viewScope || loadedScope.current !== viewScope || !canSend || !writeEnabled || !checked || busy || !post || post.id !== id || ['published', 'accepted', 'rejected', 'cancelled'].includes(post.status)) return
     setBusy(true)
     setActionError('')
     try {
       const response = await restaurantGoogleApi.publishPost(accountId, id)
+      if (!alive.current || scopeRef.current !== viewScope) return
       setPost(response.post)
       setSent({ alreadyPublished: response.alreadyPublished })
     } catch (err) {
+      if (!alive.current || scopeRef.current !== viewScope) return
       const fieldFailure = saveErrors.capture(err);
 
       if (err instanceof ApiError && err.status === 502) {
@@ -884,7 +892,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         setActionError(errorMessage(err, 'Googleへの投稿に失敗しました。')) }
       }
     } finally {
-      setBusy(false)
+      if (alive.current && scopeRef.current === viewScope) setBusy(false)
     }
   }
 
@@ -892,7 +900,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   if (loadError || !post) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} /></SaveErrorScope>
 
   const done = post.status === 'published' || post.status === 'accepted' || post.status === 'rejected'
-  const canPress = canSend && writeEnabled && checked && !busy && !done && post.status !== 'cancelled'
+  const canPress = loadedScope.current === viewScope && post.id === id && canSend && writeEnabled && checked && !busy && !done && post.status !== 'cancelled'
 
   return (
     <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" data-design-node="jqSak">

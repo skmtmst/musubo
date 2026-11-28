@@ -51,7 +51,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder';
+import { findConditionDraftIssue, isRuleComplete, pruneCondition } from '@/components/shared/condition-builder';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
@@ -60,7 +60,7 @@ import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import { api, describeSaveFailure, type ConversionDefinitionDeleteImpact, type ConversionDefinitionEvent, type ConversionDefinitionFilter, type ConversionDefinitionList, type ConversionDefinitionListItem, type ConversionDefinitionReport, type ConversionIngestionEvent } from '@/lib/api';
 import { deduplicationLabel } from './dedup';
 import { originInfoOf } from './origin-labels';
-import { readExclusionCondition, readExclusionMemo } from './exclusion';
+import { readEditableExclusion, readExclusionMemo } from './exclusion';
 import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog, EDIT_VALUE_MODE_LABELS, STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionStopAction, type EditForm } from './dialogs';
 import { notifyToast } from '@/components/shared/toast';
 import { focusConversionField, type ConversionFieldIssue } from './field-issue';
@@ -125,9 +125,26 @@ function toEditForm(item: ConversionDefinitionListItem): EditForm {
     reversalPolicy: item.reversalPolicy,
     attributionDays: item.attributionDays == null ? '' : String(item.attributionDays),
     targetUrl: item.targetUrl ?? '',
-    exclusion: readExclusionCondition(item.sourceConfig),
+    exclusion: readEditableExclusion(item.sourceConfig),
     exclusionMemo: readExclusionMemo(item.sourceConfig),
   }
+}
+
+function exclusionHasIncompleteRule(condition: NonNullable<EditForm['exclusion']>): boolean {
+  return (condition.rules ?? []).some((rule) => !isRuleComplete(rule))
+    || (condition.groups ?? []).some(exclusionHasIncompleteRule)
+}
+
+function exclusionHasEmptyGroup(condition: NonNullable<EditForm['exclusion']>): boolean {
+  return (condition.groups ?? []).some((group) =>
+    ((group.rules ?? []).length === 0 && (group.groups ?? []).length === 0) || exclusionHasEmptyGroup(group))
+}
+
+function exclusionHasInvalidShape(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return true
+  const node = value as { rules?: unknown; groups?: unknown }
+  if (!Array.isArray(node.rules) || (node.groups !== undefined && !Array.isArray(node.groups))) return true
+  return Array.isArray(node.groups) && node.groups.some(exclusionHasInvalidShape)
 }
 
 /* 「何が起きたら数えるか」の1行目（短い言葉）。くわしい起点は title と詳細で読む。 */
@@ -488,8 +505,18 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
       return
     }
     if (editForm.exclusionMemo.trim().length > 500) { invalid('cv-edit-memo', '数えない条件のメモは500文字以内で入力してください'); return }
+    if (editForm.exclusion && exclusionHasInvalidShape(editForm.exclusion)) {
+      invalid('cv-edit-exclusion', '保存された数えない条件を確認できません。条件を見直してください。')
+      return
+    }
     const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
-    if (exclusionIssue) { invalid('cv-edit-exclusion', exclusionIssue); return }
+    const unchangedExclusion = editForm.exclusion !== null
+      && JSON.stringify(editForm.exclusion) === JSON.stringify(readEditableExclusion(editTarget.sourceConfig))
+    if (editForm.exclusion && exclusionHasIncompleteRule(editForm.exclusion)) {
+      invalid('cv-edit-exclusion', '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。')
+      return
+    }
+    if (exclusionIssue && !(unchangedExclusion && editForm.exclusion && exclusionHasEmptyGroup(editForm.exclusion))) { invalid('cv-edit-exclusion', exclusionIssue); return }
     setEditFieldIssue(null)
     setEditSaving(true)
     setEditError('')
@@ -500,7 +527,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
         sourceType: editForm.sourceType,
         sourceConfig: {
           ...editTarget.sourceConfig,
-          exclusion: pruneCondition(editForm.exclusion),
+          exclusion: unchangedExclusion ? editForm.exclusion : pruneCondition(editForm.exclusion),
           exclusionMemo: editForm.exclusionMemo.trim() || null,
         },
         deduplicationMode: editForm.deduplicationMode,
@@ -1177,6 +1204,8 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           editTarget={editTarget}
           setEditTarget={(target) => { setEditTarget(target); if (!target && editId) router.push('/conversions') }}
           editForm={editForm}
+          invalidExclusion={Boolean(editForm?.exclusion && exclusionHasInvalidShape(editForm.exclusion))}
+          canEdit={canEdit}
           setEditForm={(next) => {
             const changed = typeof next === 'function' ? next(editForm) : next
             if (editFieldIssue && editForm && changed) {

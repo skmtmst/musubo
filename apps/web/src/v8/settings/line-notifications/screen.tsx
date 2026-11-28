@@ -163,12 +163,13 @@ export function buildSentBreakdown(
 function isSendCountsData(value: unknown): value is LineNotificationSendCounts {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const data = value as Record<string, unknown>
-  if (typeof data.sentToday !== 'number' || typeof data.sentLast30d !== 'number') return false
+  const count = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0
+  if (!count(data.sentToday) || !count(data.sentLast30d)) return false
   if (!Array.isArray(data.byEventType)) return false
   return (data.byEventType as unknown[]).every((item) => {
     if (typeof item !== 'object' || item === null || Array.isArray(item)) return false
     const row = item as Record<string, unknown>
-    return typeof row.eventType === 'string' && typeof row.today === 'number' && typeof row.last30d === 'number'
+    return typeof row.eventType === 'string' && count(row.today) && count(row.last30d)
   })
 }
 

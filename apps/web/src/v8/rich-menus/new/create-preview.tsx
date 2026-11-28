@@ -40,6 +40,15 @@ export function MenuContent({
   pages: Array<{ id: string; name: string }>
   activePageId: string | null
 }) {
+  if (!Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, size)) {
+    return (
+      <div>
+        <div className={styles.previewMenuEmpty}>
+          <span className={styles.previewMenuEmptyText}>サイズを確認できません</span>
+        </div>
+      </div>
+    )
+  }
   const dims = RICH_MENU_DIMENSIONS[size]
   const pct = (value: number, base: number) => (Number.isFinite(value) && base > 0 ? Math.max(0, Math.min(100, (value / base) * 100)) : 0)
   const areaBoxes = areas && areas.length > 0 ? (

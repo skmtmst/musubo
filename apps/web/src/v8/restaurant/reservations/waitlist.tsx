@@ -12,17 +12,44 @@ import {describeActionFailure,useActionError} from '@/lib/use-action-error'
 import { withHonorific } from '@line-crm/shared'
 /** 既存の席の待ちを読む。招待・期限・先着順は共通処理に任せる。 */
 export default function SeatWaitlistDialog({accountId,storeId,onClose}:{accountId:string;storeId:string;onClose:()=>void}) {
- const [rows,setRows]=useState<SeatWaitlistEntry[]|null>(null),[error,setError]=useState(''),[cancel,setCancel]=useState<SeatWaitlistEntry|null>(null),[busy,setBusy]=useState(false)
- const key=JSON.stringify([accountId,storeId]),scope=useRef({key,generation:1}),cancelGeneration=useRef(0)
+ const [rows,setRows]=useState<SeatWaitlistEntry[]|null>(null),[error,setError]=useState(''),[loadFailure,setLoadFailure]=useState<unknown>(null),[loading,setLoading]=useState(true),[cancel,setCancel]=useState<SeatWaitlistEntry|null>(null),[busy,setBusy]=useState(false)
+ const key=JSON.stringify([accountId,storeId]),scope=useRef({key,generation:1}),cancelGeneration=useRef(0),loadSeq=useRef(0),loadingRef=useRef(false)
  if(scope.current.key!==key)scope.current={key,generation:scope.current.generation+1}
  const generation=scope.current.generation
  const [loadedGeneration,setLoadedGeneration]=useState(0)
  const action=useActionError(`${accountId}:${storeId}`)
- const load=useCallback(async()=>{const request=scope.current.generation;try{const response=await restaurantTestApi.listSeatWaitlist(accountId,{storeId});if(request!==scope.current.generation)return;setRows(response.data.waitlist.filter(r=>['waiting','invited'].includes(r.status)));setLoadedGeneration(request);setError('')}catch{if(request!==scope.current.generation)return;setError('キャンセル待ちを読み込めませんでした。')}},[accountId,storeId])
- useEffect(()=>{setCancel(null);setBusy(false);setRows(null);setLoadedGeneration(0);void load();const timer=setInterval(()=>void load(),30000);return()=>clearInterval(timer)},[load])
+ const load=useCallback(async()=>{
+  if(loadingRef.current)return
+  const request=scope.current.generation
+  const seq=++loadSeq.current
+  loadingRef.current=true
+  setLoading(true)
+  try{
+   const response=await restaurantTestApi.listSeatWaitlist(accountId,{storeId})
+   if(request!==scope.current.generation||seq!==loadSeq.current)return
+   setRows(response.data.waitlist.filter(r=>['waiting','invited'].includes(r.status)))
+   setLoadedGeneration(request)
+   setError('')
+   setLoadFailure(null)
+  }catch(caught){
+   if(request!==scope.current.generation||seq!==loadSeq.current)return
+   setError('キャンセル待ちを読み込めませんでした。')
+   setLoadFailure(caught)
+  }finally{
+   if(seq===loadSeq.current){loadingRef.current=false;setLoading(false)}
+  }
+ },[accountId,storeId])
+ useEffect(()=>{
+  loadSeq.current+=1;loadingRef.current=false
+  setCancel(null);setBusy(false);setRows(null);setError('');setLoadFailure(null);setLoadedGeneration(0)
+  void load()
+  const timer=setInterval(()=>void load(),30000)
+  return()=>{clearInterval(timer);loadSeq.current+=1;loadingRef.current=false}
+ },[load])
  const remove=async()=>{if(!cancel||busy||cancelGeneration.current!==scope.current.generation||loadedGeneration!==scope.current.generation)return;const request=scope.current.generation;setBusy(true);action.clear();try{if(!Number.isSafeInteger(cancel.confirmation_revision))throw new Error('確認した版がありません');await restaurantTestApi.cancelSeatWaitlist(accountId,cancel.id,cancel.confirmation_revision);if(request!==scope.current.generation)return;setCancel(null);await load()}catch(caught){if(request!==scope.current.generation)return;action.setError(describeActionFailure(caught,'取り消し'));await load()}finally{if(request===scope.current.generation)setBusy(false)}}
+ const hasCurrentRows=Boolean(rows&&loadedGeneration===generation)
  return <><Dialog open title="キャンセル待ち" description="登録の早い順に1組ずつ案内します。仮押さえは30分、2時間前からは10分。1人3件まで、1時間前に受付を締めます。" onCancel={onClose}>
-  {error?<Notice tone="danger" message={error} action={rows?<Button size="inline" onClick={()=>void load()}>もう一度読み込む</Button>:undefined}/>:null}
-  {!rows||loadedGeneration!==generation?<ListState kind={error?'error':'loading'} onRetry={()=>void load()}/>:rows.length===0?<ListState kind="empty" title="キャンセル待ちはありません"/>:<DataTable><thead><TableHeadRow><Th>日時・お名前</Th><Th>人数</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead><tbody>{rows.map(r=><Tr key={r.id}><Td>{formatDate(r.starts_at,{style:'detail'})}<br/>{r.customer_name}</Td><Td>{r.guest_count}名</Td><Td>{r.status==='invited'?`案内中・${formatDate(r.hold_expires_at,{style:'time'})}まで`:'空き待ち'}</Td><Td><Button size="inline" onClick={()=>{if(loadedGeneration!==scope.current.generation)return;cancelGeneration.current=scope.current.generation;action.clear();setCancel(r)}}>取り消す</Button></Td></Tr>)}</tbody></DataTable>}
+  {error&&hasCurrentRows?<Notice tone="danger" message={error} action={<Button size="inline" disabled={loading} busy={loading} onClick={()=>void load()}>もう一度読み込む</Button>}/>:null}
+  {!hasCurrentRows?<ListState kind={error?'error':'loading'} title={error?'キャンセル待ちを読み込めませんでした':undefined} error={error?loadFailure:undefined} retrying={loading} onRetry={()=>void load()}/>:rows!.length===0?<ListState kind="empty" title="キャンセル待ちはありません"/>:<DataTable><thead><TableHeadRow><Th>日時・お名前</Th><Th>人数</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead><tbody>{rows!.map(r=><Tr key={r.id}><Td>{formatDate(r.starts_at,{style:'detail'})}<br/>{r.customer_name}</Td><Td>{r.guest_count}名</Td><Td>{r.status==='invited'?`案内中・${formatDate(r.hold_expires_at,{style:'time'})}まで`:'空き待ち'}</Td><Td><Button size="inline" onClick={()=>{if(loadedGeneration!==scope.current.generation)return;cancelGeneration.current=scope.current.generation;action.clear();setCancel(r)}}>取り消す</Button></Td></Tr>)}</tbody></DataTable>}
  </Dialog><Dialog open={!!cancel&&cancelGeneration.current===generation} title="キャンセル待ちを取り消しますか？" description={`${withHonorific(cancel?.customer_name??'')}の待ちを取り消します。案内中の枠は次の方へ回ります。`} confirmLabel="取り消す" tone="destructive" confirmation busy={busy} error={action.error} onCancel={()=>{action.clear();setCancel(null)}} onConfirm={()=>void remove()}><OperationTargetSummary accounts={[{id:accountId}]} store={{id:storeId}}/></Dialog></>
 }

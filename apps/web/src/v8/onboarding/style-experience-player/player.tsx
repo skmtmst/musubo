@@ -73,11 +73,17 @@ export function StyleExperiencePlayer({ accountName, script, style, onStyleChang
   const rootRef = useRef<HTMLElement>(null)
   const full = variant === 'full'
   // 全部版は右の画面がそろったスタイルだけを回す（教室は LIFF の描く部分の切り出しの後）。
-  const rotation = useMemo(() => script.order.filter((name) => !full || script.styles[name].scenes.every((scene) => scene.board)), [script, full])
+  const rotation = useMemo(() => script.order.filter((name) => {
+    const scenes = script.styles[name]?.scenes
+    if (!scenes?.length) return false
+    return !full || scenes.every((scene) => scene.board)
+  }), [script, full])
   const tabs = useMemo(() => script.tabs.filter((tab) => tab.styles.some((name) => rotation.includes(name))), [script, rotation])
+  const tabValue = (tab: StyleExperienceScript['tabs'][number]) => tab.styles.find((name) => rotation.includes(name)) ?? tab.styles[0]
   const { position, scene, running, reduced, manual, userPaused, togglePause, goToStep, selectStyle } = useStyleExperienceAutoplay({
     script, style, onStyleChange, rotation, repeatStyle: switcher === 'external', rootRef,
   })
+  const activeTab = tabs.find((tab) => tab.styles.includes(position.style))
   const { scale, stacked } = useStageScale(rootRef)
   const [base] = useState(() => (record ? new Date(RECORD_BASE) : new Date()))
   const sampleLook = script.styles[position.style]
@@ -90,8 +96,8 @@ export function StyleExperiencePlayer({ accountName, script, style, onStyleChang
     <section ref={rootRef} className={styles.root} aria-label="スタイル体験の見本" data-style-experience={position.style} data-variant={variant} data-layout={stacked ? 'stacked' : 'row'} data-reduced-motion={reduced || undefined}
       style={{ '--sxp-scale': scale } as CSSProperties}>
       {switcher === 'segmented' ? <>
-        <SegmentedControl aria-label="見るスタイル" value={tabs.find((tab) => tab.styles.includes(position.style))?.styles[0] ?? position.style}
-          onChange={(value) => selectStyle(value)} options={tabs.map((tab) => ({ value: tab.styles.find((name) => rotation.includes(name)) ?? tab.styles[0], label: tab.label }))} />
+        <SegmentedControl aria-label="見るスタイル" value={activeTab ? tabValue(activeTab) : position.style}
+          onChange={(value) => selectStyle(value)} options={tabs.map((tab) => ({ value: tabValue(tab), label: tab.label }))} />
         <CanList look={look} />
       </> : null}
       <KpiValueMotionProvider scope={`style-experience:${position.style}`}>

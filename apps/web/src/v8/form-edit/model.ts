@@ -47,12 +47,23 @@ export type FormSavedContent = {
   ogImageUrl: string | null
 }
 
-function canonicalize(value: unknown): string {
+function canonicalize(value: unknown, seen = new WeakSet<object>()): string {
   if (value === null || value === undefined) return 'null'
-  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
+  if (typeof value === 'bigint') return JSON.stringify(value.toString())
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return '"[Circular]"'
+    seen.add(value)
+    const out = `[${value.map((item) => canonicalize(item, seen)).join(',')}]`
+    seen.delete(value)
+    return out
+  }
   if (typeof value === 'object') {
+    if (seen.has(value)) return '"[Circular]"'
+    seen.add(value)
     const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalize(entry)}`).join(',')}}`
+    const out = `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalize(entry, seen)}`).join(',')}}`
+    seen.delete(value)
+    return out
   }
   return JSON.stringify(value) ?? 'null'
 }
@@ -90,29 +101,34 @@ const KIND_WORD: Record<FormBlock['kind'], string> = { input: '質問', button: 
  * 公開の確かめの「変わること」で使う。
  */
 export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide, maxLines = 20): { lines: ConflictDiffLine[]; omitted: number } {
+  const limit = Number.isInteger(maxLines) && maxLines >= 0 ? maxLines : 20
   const lines: ConflictDiffLine[] = []
   const push = (kind: ConflictDiffLine['kind'], text: string) => lines.push({ kind, text })
   if (mine.name !== incoming.name) push('change', `フォーム名が違います（最新「${incoming.name}」／あなた「${mine.name}」）`)
   if ((mine.description ?? '') !== (incoming.description ?? '')) push('change', 'フォームの説明が違います')
 
-  const mineSections = new Map(mine.layout.sections.map((s) => [s.id, s]))
-  const incomingSections = new Map(incoming.layout.sections.map((s) => [s.id, s]))
-  for (const section of mine.layout.sections) {
+  const mineSectionList = Array.isArray(mine.layout?.sections) ? mine.layout.sections : []
+  const incomingSectionList = Array.isArray(incoming.layout?.sections) ? incoming.layout.sections : []
+  const mineSections = new Map(mineSectionList.map((s) => [s.id, s]))
+  const incomingSections = new Map(incomingSectionList.map((s) => [s.id, s]))
+  for (const section of mineSectionList) {
     const other = incomingSections.get(section.id)
     if (!other) push('add', `「${section.name}」のページを足そうとしています`)
     else if (other.name !== section.name) push('change', `ページの名前が違います（最新「${other.name}」／あなた「${section.name}」）`)
   }
-  for (const section of incoming.layout.sections) {
+  for (const section of incomingSectionList) {
     if (!mineSections.has(section.id)) push('remove', `「${section.name}」のページを消そうとしています（最新にあります）`)
   }
   const sectionNameOf = (id: string): string => {
     if (id === '') return '共通ヘッダ'
     return [...mineSections.values(), ...incomingSections.values()].find((s) => s.id === id)?.name ?? 'ページ'
   }
-  const collect = (layout: FormLayout) => {
+  const collect = (layout: FormLayout | null | undefined) => {
     const map = new Map<string, { block: FormBlock; sectionId: string }>()
-    for (const block of layout.header) map.set(block.id, { block, sectionId: '' })
-    for (const section of layout.sections) for (const block of section.blocks) map.set(block.id, { block, sectionId: section.id })
+    for (const block of Array.isArray(layout?.header) ? layout.header : []) map.set(block.id, { block, sectionId: '' })
+    for (const section of Array.isArray(layout?.sections) ? layout.sections : []) {
+      for (const block of Array.isArray(section.blocks) ? section.blocks : []) map.set(block.id, { block, sectionId: section.id })
+    }
     return map
   }
   const mineBlocks = collect(mine.layout)
@@ -127,11 +143,11 @@ export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide,
   for (const [blockId, entry] of incomingBlocks) {
     if (!mineBlocks.has(blockId)) push('remove', `「${sectionNameOf(entry.sectionId)}」の${knownValue(KIND_WORD, entry.block.kind, '項目')}「${blockTitle(entry.block)}」を消そうとしています（最新にあります）`)
   }
-  if (JSON.stringify(mine.layout.options) !== JSON.stringify(incoming.layout.options)) {
+  if (canonicalize(mine.layout?.options) !== canonicalize(incoming.layout?.options)) {
     push('change', '答え終わったあと・受付のきまり・見た目の言葉のどれかが違います')
   }
-  if (lines.length <= maxLines) return { lines, omitted: 0 }
-  return { lines: lines.slice(0, maxLines), omitted: lines.length - maxLines }
+  if (lines.length <= limit) return { lines, omitted: 0 }
+  return { lines: lines.slice(0, limit), omitted: lines.length - limit }
 }
 
 /**
@@ -175,7 +191,10 @@ export function inputTypeLabel(block: FormInputBlock): string {
 export function blockKindLine(block: FormBlock): string {
   switch (block.kind) {
     case 'image': return '飾り・画像'
-    case 'heading': return `飾り・見出し${block.level ?? 2}`
+    case 'heading': {
+      const level = block.level ?? 2
+      return Number.isInteger(level) && level >= 1 && level <= 6 ? `飾り・見出し${level}` : '飾り・見出し'
+    }
     case 'text': return '飾り・本文'
     case 'button': return '飾り・ボタン'
     default: return block.type === 'rating' ? '入力・5段階' : `入力・${inputTypeLabel(block)}`
@@ -186,10 +205,10 @@ export function blockKindLine(block: FormBlock): string {
 export function blockTitleLine(block: FormBlock): string {
   switch (block.kind) {
     case 'image': return '画像'
-    case 'heading': return block.text.trim() || '見出し'
-    case 'text': return block.text.trim() || 'テキスト'
-    case 'button': return block.label.trim() || 'ボタン'
-    default: return block.label.trim() || inputTypeLabel(block)
+    case 'heading': return (typeof block.text === 'string' ? block.text.trim() : '') || '見出し'
+    case 'text': return (typeof block.text === 'string' ? block.text.trim() : '') || 'テキスト'
+    case 'button': return (typeof block.label === 'string' ? block.label.trim() : '') || 'ボタン'
+    default: return (typeof block.label === 'string' ? block.label.trim() : '') || inputTypeLabel(block)
   }
 }
 
@@ -267,23 +286,29 @@ export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action
 
 /** 行の文。「テキストを送る「〇〇」」のように、何をするかを1行で。 */
 export function describeAfterAction(action: FormAction, refs: FormRefs): string {
-  const nameOf = (list: { id: string; name: string }[], id: string, missing: string) => list.find((x) => x.id === id)?.name ?? missing
+  const nameOf = (list: { id: string; name: string }[] | undefined, id: string, missing: string) =>
+    (Array.isArray(list) ? list.find((x) => x.id === id)?.name : undefined) ?? missing
   switch (action.kind) {
     case 'research_action': return 'リサーチで設定した回答後の動作'
-    case 'send_text': return action.text.trim() ? `テキストを送る「${action.text.trim()}」` : 'テキストを送る（本文が未設定）'
-    case 'send_template': return action.templateId ? `テンプレート「${nameOf(refs.templates, action.templateId, '消えたテンプレート')}」を送る` : 'テンプレートを送る（未選択）'
+    case 'send_text': {
+      const text = typeof action.text === 'string' ? action.text.trim() : ''
+      return text ? `テキストを送る「${text}」` : 'テキストを送る（本文が未設定）'
+    }
+    case 'send_template': return action.templateId ? `テンプレート「${nameOf(refs?.templates, action.templateId, '消えたテンプレート')}」を送る` : 'テンプレートを送る（未選択）'
     case 'tag': {
-      if (action.tagIds.length === 0) return 'タグを付ける・外す（未選択）'
-      const names = action.tagIds.map((id) => `「${nameOf(refs.tags, id, '消えたタグ')}」`).join('・')
+      const tagIds = Array.isArray(action.tagIds) ? action.tagIds : []
+      if (tagIds.length === 0) return 'タグを付ける・外す（未選択）'
+      const names = tagIds.map((id) => `「${nameOf(refs?.tags, id, '消えたタグ')}」`).join('・')
       return action.op === 'remove' ? `タグ${names}を外す` : `タグ${names}を付ける`
     }
-    case 'friend_field': return action.fieldId ? `友だち情報「${nameOf(refs.friendFields, action.fieldId, '消えた項目')}」に書く` : '友だち情報に書く（未選択）'
+    case 'friend_field': return action.fieldId ? `友だち情報「${nameOf(refs?.friendFields, action.fieldId, '消えた項目')}」に書く` : '友だち情報に書く（未選択）'
     case 'scenario': {
       if (!action.scenarioId) return 'シナリオを始める・止める（未選択）'
-      const name = nameOf(refs.scenarios, action.scenarioId, '消えたシナリオ')
+      const name = nameOf(refs?.scenarios, action.scenarioId, '消えたシナリオ')
       return action.op === 'stop' ? `シナリオ「${name}」を止める` : `シナリオ「${name}」を始める`
     }
-    case 'reminder': return action.reminderId ? `リマインダ「${nameOf(refs.reminders, action.reminderId, '消えたリマインダ')}」に登録` : 'リマインダに登録（未選択）'
+    case 'reminder': return action.reminderId ? `リマインダ「${nameOf(refs?.reminders, action.reminderId, '消えたリマインダ')}」に登録` : 'リマインダに登録（未選択）'
+    default: return '回答後の動作を確認できません'
   }
 }
 
@@ -303,6 +328,8 @@ export function readTab(value: string | null): EditTab {
 
 /** `?page=`（1から）を添字にする。範囲外は 0。 */
 export function readPage(value: string | null, count: number): number {
+  if (!Number.isInteger(count) || count < 1) return 0
+  if (value === null || value.trim() === '') return 0
   const n = Number(value)
   if (!Number.isInteger(n) || n < 1 || n > count) return 0
   return n - 1
@@ -310,9 +337,13 @@ export function readPage(value: string | null, count: number): number {
 
 /** ページを開いたときに設定を開いておくブロック（最初の質問。無ければ閉じたまま）。 */
 export function firstInputBlockId(blocks: FormBlock[]): string | null {
-  return blocks.find((b) => b.kind === 'input')?.id ?? null
+  return Array.isArray(blocks) ? (blocks.find((b) => b.kind === 'input')?.id ?? null) : null
+}
+
+const BLOCK_TITLE_KIND: Record<FormBlock['kind'], string> = {
+  image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力',
 }
 
 export function blockTitleKind(block: FormBlock): string {
-  return { image: '画像', heading: '見出し', text: 'テキスト', button: 'ボタン', input: '入力' }[block.kind]
+  return knownValue(BLOCK_TITLE_KIND, block.kind, '項目')
 }

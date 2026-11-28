@@ -109,6 +109,7 @@ function OperatorEditInner() {
     void api.notifications.teams.list(accountId).then(result => {
       if (generation !== teamGeneration.current) return
       if (!result.success) throw new Error(result.error)
+      if (!Array.isArray(result.data) || result.data.some(team => !team || typeof team.id !== 'string' || typeof team.name !== 'string' || !Array.isArray(team.staffIds) || !team.staffIds.every(id => typeof id === 'string'))) throw new Error('invalid teams')
       setTeams(result.data)
       const first = result.data[0]
       if (!editId && first && !teamTouchedRef.current && !teamIdRef.current) {
@@ -242,6 +243,7 @@ function OperatorEditInner() {
     }).then((result) => {
       if (generation !== recipientsGeneration.current) return
       if (!result.success) throw new Error(result.error)
+      if (!result.data || !Array.isArray(result.data.items) || result.data.items.some(item => !item || typeof item.id !== 'string' || typeof item.name !== 'string' || !item.channels || typeof item.channels.line !== 'boolean' || typeof item.channels.dashboard !== 'boolean')) throw new Error('invalid recipients')
       setRecipients(result.data)
       setRecipientsError(null)
       setError((current) => (current === RECIPIENTS_SAVE_GUARD_MESSAGE ? '' : current))

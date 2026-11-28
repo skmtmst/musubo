@@ -8,7 +8,7 @@ import { RowStatusActions } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
 import { styleApi } from '@/lib/api/helpers/styles'
-import { styleLabel } from './model'
+import { STYLE_CHOICES, styleLabel } from './model'
 import styles from './style-entry.module.css'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
@@ -30,8 +30,12 @@ export default function StyleEntry() {
     if (!selectedAccountId) return
     let cancelled = false
     void styleApi.get(selectedAccountId).then((res) => {
-      if (!res.success) throw new Error('スタイルを読み込めませんでした')
-      if (!cancelled) setStyle({ accountId: selectedAccountId, style: res.data.style, selected: res.data.styleSelected })
+      const data = res?.success ? res.data : null
+      const knownStyle = Boolean(data && STYLE_CHOICES.some((choice) => choice.value === data.style))
+      if (!data || typeof data !== 'object' || typeof data.styleSelected !== 'boolean' || (data.styleSelected && !knownStyle)) {
+        throw new Error('スタイルを読み込めませんでした')
+      }
+      if (!cancelled) setStyle({ accountId: selectedAccountId, style: data.style, selected: data.styleSelected })
     }).catch((error: unknown) => { if (!cancelled) setError(error) })
     return () => { cancelled = true }
   }, [selectedAccountId, tick])

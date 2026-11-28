@@ -17,6 +17,7 @@ import {
 Check,
 CircleAlert
 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { SummaryRow,WizardForm,WizardStep,weekdaySummary } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
@@ -38,6 +39,39 @@ type WizardConfirmStepContext = {
 }
 
 export function WizardConfirmStep({ conflictsReadable = true, permissionPending = false, actionOptions, autoReplyId, confirmState, effectiveKeywords, folders, form, goToStep, loadValidation, myPositionLabel, selectedTemplate, thisRuleName, v8Checks }: WizardConfirmStepContext) {
+  const retryRunningRef = useRef(false)
+  const mountedRef = useRef(true)
+  const [retrying, setRetrying] = useState(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+  const safeKeywords = Array.isArray(effectiveKeywords) ? effectiveKeywords : []
+  const safeFolders = Array.isArray(folders) ? folders : []
+  const safeActions = Array.isArray(form.actions) ? form.actions : []
+  const safeChecks = Array.isArray(v8Checks) ? v8Checks : []
+  const safeResponseContent = typeof form.responseContent === 'string' ? form.responseContent : ''
+  const parsedDelay = Number(form.replyDelaySeconds)
+  const delaySummary = Number.isFinite(parsedDelay) && parsedDelay > 0 ? `${formatNumber(parsedDelay)}秒待つ` : 'すぐ返す'
+  const parsedCooldown = Number(form.cooldownMinutes)
+  const cooldownSummary = form.cooldownOn
+    ? (Number.isFinite(parsedCooldown) && parsedCooldown > 0
+      ? `同じ人へは${formatNumber(parsedCooldown)}分あける`
+      : '同じ人へは間をあける（時間未設定）')
+    : null
+  const handleRetryValidation = () => {
+    if (!autoReplyId || retryRunningRef.current) return
+    retryRunningRef.current = true
+    setRetrying(true)
+    Promise.resolve(loadValidation(autoReplyId))
+      .catch(() => {})
+      .finally(() => {
+        retryRunningRef.current = false
+        if (mountedRef.current) setRetrying(false)
+      })
+  }
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>設定の確認</>} />
@@ -45,14 +79,14 @@ export function WizardConfirmStep({ conflictsReadable = true, permissionPending 
                   <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
                     {thisRuleName}
                     {form.folderId
-                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '未分類'}`
+                      ? `・${safeFolders.find((f) => f.id === form.folderId)?.name ?? '未分類'}`
                       : '・未分類'}
                   </SummaryRow>
                   <SummaryRow label="反応する言葉" onEdit={() => goToStep('trigger')}>
                     {form.respondToAll
                       ? 'すべてのメッセージ'
-                      : effectiveKeywords.length > 0
-                        ? `${effectiveKeywords.map((r) => `「${r.keyword.trim()}」`).join('')}（${matchTypeWord(form.matchType)}）`
+                      : safeKeywords.length > 0
+                        ? `${safeKeywords.map((r) => `「${r.keyword.trim()}」`).join('')}（${matchTypeWord(form.matchType)}）`
                         : emptyValue('unconfigured')}
                   </SummaryRow>
                   <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
@@ -78,17 +112,17 @@ export function WizardConfirmStep({ conflictsReadable = true, permissionPending 
                           ? 'カード'
                           : form.mode === 'inline-image'
                             ? '画像'
-                            : `テキスト ${formatNumber(form.responseContent.length)}字`}
+                            : `テキスト ${formatNumber(safeResponseContent.length)}字`}
                   </SummaryRow>
                   <SummaryRow label="返したあと" onEdit={() => goToStep('response')}>
-                    {form.actions.length > 0
-                      ? form.actions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
+                    {safeActions.length > 0
+                      ? safeActions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
                       : emptyValue('none')}
                   </SummaryRow>
                   <SummaryRow label="細かい決まり" onEdit={() => goToStep('response')}>
                     {[
-                      Number(form.replyDelaySeconds) > 0 ? `${form.replyDelaySeconds}秒待つ` : 'すぐ返す',
-                      form.cooldownOn ? `同じ人へは${form.cooldownMinutes}分あける` : null,
+                      delaySummary,
+                      cooldownSummary,
                       form.skipWhenOperatorActive ? '対応中のトークには返さない' : null,
                       form.oncePerFriend ? '1人1回' : null,
                       form.unmatchedMode === 'notify_operator' ? '外れたら担当者へ' : null,
@@ -112,17 +146,18 @@ export function WizardConfirmStep({ conflictsReadable = true, permissionPending 
                     <button
                       type="button"
                       className={styles.weekdayPreset}
-                      onClick={() => autoReplyId && void loadValidation(autoReplyId)}
+                      disabled={!autoReplyId || retrying}
+                      onClick={handleRetryValidation}
                     >
                       読み直す
                     </button>
                   </p>
                 )}
                 {conflictsReadable && confirmState === 'ready' &&
-                  v8Checks.map((gate) => {
+                  safeChecks.map((gate, index) => {
                     const backTo = gate.back
                     return (
-                      <div key={gate.label} className={styles.checkRow}>
+                      <div key={`${gate.label}-${index}`} className={styles.checkRow}>
                         <span
                           className={`${styles.checkIcon} ${gate.state === 'ok' ? styles.checkIconOk : gate.state === 'blocked' ? styles.checkIconWarn : ''}`}
                           aria-hidden="true"

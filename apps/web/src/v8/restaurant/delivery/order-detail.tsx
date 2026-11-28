@@ -12,6 +12,7 @@
  */
 
 import { AlertTriangle, Ban, Check, X } from 'lucide-react'
+import { knownValue } from '@/lib/known-value'
 import Button from '@/components/shared/button'
 import OperationTargetSummary from '@/components/shared/operation-target-summary'
 import ListState from '@/components/shared/list-state'
@@ -140,7 +141,7 @@ export function OrderDetailDialog({
   const preparing = uberOrder && !uberOrderActionsEnabled
   const items = detail?.items ?? []
   const serviceLabel = order
-    ? order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]
+    ? order.serviceLabel || knownValue(DELIVERY_SERVICE_LABELS, order.service, DASH)
     : DASH
 
   /* 頭の下の一文（「12:02 受信・受け取り希望 12:15」）。取れない時刻は書かない。 */
@@ -154,7 +155,7 @@ export function OrderDetailDialog({
     return parts.length > 0 ? parts.join('・') : null
   })()
 
-  const urgencyTone = order ? URGENCY_NOTICE_TONES[order.urgency] : null
+  const urgencyTone = order ? knownValue(URGENCY_NOTICE_TONES, order.urgency, null) : null
 
   /*
    * 下のボタンは状態で変える。
@@ -257,8 +258,8 @@ export function OrderDetailDialog({
               * 絵（hjdqV）を 1440 で測った結果（2026-10-11）：サービス札は点なし、状態札は点あり、
               * 急ぎ札は点ではなく12pxの印＋字（一覧 kDQHr と同じ形）。印の札は一覧と共用する。
               */}
-            <StatusBadge tone={SERVICE_TONES[order.service]} size="delivery" dot={false}>{serviceLabel}</StatusBadge>
-            <StatusBadge tone={STATUS_TONES[order.status]} size="delivery">
+            <StatusBadge tone={knownValue(SERVICE_TONES, order.service, 'neutral')} size="delivery" dot={false}>{serviceLabel}</StatusBadge>
+            <StatusBadge tone={knownValue(STATUS_TONES, order.status, 'neutral')} size="delivery">
               {order.statusLabel || DASH}
             </StatusBadge>
             <UrgencyMark urgency={order.urgency} />
@@ -288,7 +289,7 @@ export function OrderDetailDialog({
                       {item.name || DASH}
                       {item.note ? <span className={styles.itemNote}>{item.note}</span> : null}
                     </span>
-                    <span className={styles.itemQty}>×{item.quantity}</span>
+                    <span className={styles.itemQty}>{typeof item.quantity === 'number' && Number.isFinite(item.quantity) && item.quantity >= 0 ? `×${Math.trunc(item.quantity)}` : `×${DASH}`}</span>
                     <span className={styles.itemAmount}>{formatYen(item.amount)}</span>
                   </li>
                 ))
@@ -408,6 +409,7 @@ export function CancelOrderDialog({
         <Select
           aria-label="キャンセルの理由"
           size="full"
+          disabled={busy}
           value={reasonCode}
           onChange={(value) => onReasonChange(value as DeliveryCancelReasonCode)}
           options={CANCEL_REASON_OPTIONS.map((option) => ({

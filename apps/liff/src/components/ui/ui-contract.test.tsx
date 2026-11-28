@@ -150,6 +150,7 @@ it('受付後はLINEへ戻る操作と履歴を出す', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'LINEに戻る' }));
   expect(liff.closeWindow).toHaveBeenCalledOnce();
   expect(screen.getByRole('button', { name: '予約の履歴を見る' })).toBeTruthy();
+  expect(screen.getByText('日時').closest('dl')?.querySelector('svg')).toBeNull();
 });
 
 it('履歴と完了画面の禁止の見張りを保つ', () => {

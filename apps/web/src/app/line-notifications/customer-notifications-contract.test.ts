@@ -129,22 +129,13 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(CODE).not.toContain('setting.label}とき')
     expect(CODE).not.toContain('全員に送る')
     expect(CODE).not.toContain('送らない相手')
-    // 宛先はその出来事に関わるお客さまだけ。
-    expect(CODE).toContain('その注文のお客さまだけ')
-    expect(CODE).toContain('その定期便のお客さまだけ')
-    expect(CODE).toContain('注文が確定したとき')
-    expect(CODE).toContain('定期便の決済に失敗したとき')
+    // 宛先・条件・表示例は line-notifications-n678-contract.test.tsx の描画で確かめる。
     // 見本は架空と明記し、実在の人物名を宛先のように見せない。
-    expect(CODE).toContain('架空の注文による表示例')
     expect(CODE).not.toContain('見本 16')
   })
 
-  it('#988 LAY-10拡張: つながる先はリンク色の p ではなく実リンク', () => {
-    expect(CODE).toContain('<Link href="/ec-commerce"')
-    expect(CODE).toContain('<Link href="/contents/vars"')
-    expect(CODE).toContain('<Link href="/chats"')
-    expect(CODE).toContain('<Link href="/nen-campaigns"')
-    expect(CODE).toContain('<Link href="/webhooks"')
+  it('#988 LAY-10拡張: つながる先に偽のリンク表示を置かない', () => {
+    // 5つのリンク先は line-notifications-n678-contract.test.tsx の描画で確かめる。
     expect(CODE).not.toContain('text-accent"><p>EC連携</p>')
   })
 

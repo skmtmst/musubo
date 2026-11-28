@@ -58,7 +58,9 @@ export function readDraft(storage: Pick<Storage, 'getItem'>, key = DRAFT_KEY): D
   try {
     const raw = storage.getItem(key)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<DraftState>
+    const rawParsed: unknown = JSON.parse(raw)
+    if (!rawParsed || typeof rawParsed !== 'object' || Array.isArray(rawParsed)) return null
+    const parsed = rawParsed as Partial<DraftState>
     if (parsed.step !== 1 && parsed.step !== 2 && parsed.step !== 3 && parsed.step !== 4) return null
     const text = (value: unknown) => typeof value === 'string' ? value : ''
     const ids = (value: unknown) => Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
@@ -66,11 +68,12 @@ export function readDraft(storage: Pick<Storage, 'getItem'>, key = DRAFT_KEY): D
     const savedSub = typeof parsed.sub === 'number' && Number.isInteger(parsed.sub) && parsed.sub >= 1 && parsed.sub <= Math.max(1, total) ? parsed.sub : 1
     const sub = parsed.step === 2 && parsed.connectionStepsVersion !== 4 && (savedSub === 2 || savedSub === 3) ? savedSub + 1 : savedSub
     const precheck = readPrecheckAnswers(parsed.precheck)
+    const rawAcks = parsed.acks && typeof parsed.acks === 'object' && !Array.isArray(parsed.acks) ? parsed.acks as Record<string, unknown> : null
     const draft: DraftState = {
       step: parsed.step, sub, connectionStepsVersion: 4, accountMethod: parsed.accountMethod === 'new' ? 'new' : 'existing',
       precheck, precheckAt: readPrecheckAt(parsed.precheckAt, precheck),
       acks: Object.fromEntries(
-        [...WEBHOOK_ACKS.map(item => item.key), ...LOGIN_ACKS.map(item => item.key), PRECHECK_VERIFIED_ACK].flatMap(key => parsed.acks?.[key] === true ? [[key, true]] : []),
+        [...WEBHOOK_ACKS.map(item => item.key), ...LOGIN_ACKS.map(item => item.key), PRECHECK_VERIFIED_ACK].flatMap(key => rawAcks && Object.prototype.hasOwnProperty.call(rawAcks, key) && rawAcks[key] === true ? [[key, true]] : []),
       ),
       name: text(parsed.name), channelId: text(parsed.channelId), providerId: text(parsed.providerId), loginChannelId: text(parsed.loginChannelId), lineId: text(parsed.lineId),
       tagIds: ids(parsed.tagIds), parentId: text(parsed.parentId), staffIds: ids(parsed.staffIds), liffId: text(parsed.liffId),
@@ -118,7 +121,7 @@ export function loginChannelErrors(form: Pick<ChannelFields, 'loginChannelId' | 
   const errors: Record<string, string> = {}
   if (!form.loginChannelId.trim()) errors.loginChannelId = 'LoginチャネルIDを入力してください。'
   else if (!/^\d+$/.test(form.loginChannelId)) errors.loginChannelId = 'LoginチャネルIDは余分な空白を除き、半角数字で入力してください。'
-  else if (form.channelId && form.loginChannelId === form.channelId) errors.loginChannelId = 'Messaging APIと同じIDです。LINEログインチャネルのIDをコピーしてください。'
+  else if (form.channelId?.trim() && form.loginChannelId.trim() === form.channelId.trim()) errors.loginChannelId = 'Messaging APIと同じIDです。LINEログインチャネルのIDをコピーしてください。'
   if (!form.loginChannelSecret) errors.loginChannelSecret = 'Loginチャネルシークレットを入力してください。'
   else if (/\s/.test(form.loginChannelSecret)) errors.loginChannelSecret = 'Loginチャネルシークレットに空白や改行があります。LINEのコピーから貼り直してください。'
   return errors
@@ -142,7 +145,9 @@ export function subTotal(stage: StepNumber): number {
 /** 小さな段の見出しの字。「Step 2 / 4」。状態の札ではない。段の無い画面では空。 */
 export function stepLabel(stage: StepNumber, sub: number): string {
   const total = subTotal(stage)
-  return total === 0 ? '' : `Step ${Math.min(Math.max(sub, 1), total)} / ${total}`
+  if (total === 0) return ''
+  const safeSub = Number.isFinite(sub) ? Math.min(Math.max(Math.trunc(sub), 1), total) : 1
+  return `Step ${safeSub} / ${total}`
 }
 
 /**
@@ -166,7 +171,8 @@ export const LOGIN_ACKS: ReadonlyArray<AckItem> = [
 
 /** 印がすべて入っているか。1つでも残っていれば次の段へ進めない。 */
 export function allAcked(acks: ReadonlyArray<{ key: string }>, checked: Record<string, boolean>): boolean {
-  return acks.every((ack) => checked[ack.key] === true)
+  if (!checked || typeof checked !== 'object') return false
+  return acks.every((ack) => Object.prototype.hasOwnProperty.call(checked, ack.key) && checked[ack.key] === true)
 }
 
 /**

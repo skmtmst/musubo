@@ -27,6 +27,7 @@ export const WAIT_CHOICES: Record<AutoLineKind, number[]> = {
 }
 
 export function waitLabel(minutes: number): string {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) return '—'
   if (minutes <= 0) return 'すぐ'
   if (minutes % 1440 === 0) return `${minutes / 1440} 日`
   if (minutes % 60 === 0) return `${minutes / 60} 時間`
@@ -35,6 +36,7 @@ export function waitLabel(minutes: number): string {
 
 /** 送る予定の本文（1つ目の文章）。 */
 export function ruleText(messages: unknown[]): string {
+  if (!Array.isArray(messages)) return ''
   const first = messages.find((m): m is { type?: string; text?: string } => typeof m === 'object' && m !== null && (m as { type?: string }).type === 'text')
   return typeof first?.text === 'string' ? first.text : ''
 }

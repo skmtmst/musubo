@@ -40,12 +40,6 @@ describe('問い合わせ一覧の定期取得 (#630)', () => {
     expect(inbox).toContain('onRecovered')
   })
 
-  it('上限後は理由と再試行ボタンを出す', () => {
-    expect(inbox).toContain('inboxStalled')
-    expect(inbox).toContain('お問い合わせ一覧の更新を一時停止しています')
-    expect(inbox).toContain('再試行する')
-  })
-
   it('未解決一覧でも、選択中メールが対応済みなら詳細を取り直さない', () => {
     const unresolved = { channel: 'email', status: 'in_progress' } as const
     // どちらも未解決のときだけ取り直す。

@@ -6,6 +6,7 @@ import { useHqRichMenuDraft } from './use-hq-rich-menu-draft'
 import { hqSeedFailureMessage, makeHqMenuSeed, MISSING_DEFAULT_PAGE_ERROR, resolveHqDefaultPageId } from './hq-menu-seed'
 
 import { RichMenuCreateNotices } from './create-notices'
+import { HqRichMenuFooterActions } from './create-host-footer'
 import { publishMenuNow } from './create-publish-actions'
 import { reloadMenuGroup } from './create-reload-group'
 import { seedMenuShape } from './create-seed-shape'
@@ -72,7 +73,6 @@ type RichMenuScheduleInput,
 type RichMenuTargetPreview,
 } from '@/lib/api'
 import { previewHqRichMenu,type HqRichMenuDraft,type HqRichMenuPreview } from '@/lib/api/helpers/hq-authoring'
-import { formatNumber } from '@/lib/format'
 import { hqRichMenuDefinitionFromSeed,type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
@@ -90,14 +90,14 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { orderTargetingGroups } from '@/v8/rich-menus/targeting-order'
 import {
+RICH_MENU_DIMENSIONS,
 type Folder,
 type MediaItem
 } from '@line-crm/shared'
 import {
 ArrowRight,
 CalendarClock,
-Send,
-Upload
+Send
 } from 'lucide-react'
 import { useCallback,useEffect,useRef,useState } from 'react'
 import { describeMenuAudience,describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
@@ -1022,8 +1022,14 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
     if (validatePublishLabels()) return publishMenuNow({ audience, group, confirmedImages:publishTarget.images, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing })
   }
 
+  const publishSizeKnown = Object.prototype.hasOwnProperty.call(RICH_MENU_DIMENSIONS, group?.size ?? size)
+
   /** 「公開する」/「予約する」。時刻を決めた公開は予約口へ。 */
   async function handlePublishSubmit() {
+    if (!publishSizeKnown) {
+      setError('メニューのサイズを確認できないため公開できません。画面を読み直すか新しく作り直してください。')
+      return
+    }
     if (!validatePublishLabels()) return
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (timingIsScheduled) {
@@ -1056,7 +1062,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
 
   const locked = group !== null // 形（大きさ・面・タブ数）は create 後は変えられない
   const template = TEMPLATES.find((t) => t.key === templateKey) ?? TEMPLATES[0]
-  const shownLayouts = V8_LAYOUT_KEYS[size]
+  const shownLayouts = (Object.prototype.hasOwnProperty.call(V8_LAYOUT_KEYS, size) ? V8_LAYOUT_KEYS[size] : [])
     .map((key) => TEMPLATES.find((t) => t.key === key))
     .filter((t): t is RichMenuTemplate => Boolean(t))
 
@@ -1200,6 +1206,10 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
   /** 統括：画面の中の下書きを一度に保存する（手順の途中でも同じ）。 */
   async function hostSave(distribute: boolean) {
     if (!host || saving) return
+    if (!publishSizeKnown) {
+      setError('メニューのサイズを確認できないため保存・配布できません。画面を読み直すか新しく作り直してください。')
+      return
+    }
     setError(null)
     if (!group) {
       setSaving(true)
@@ -1257,30 +1267,8 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
           </div>
         ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: describeMenuAudience(audience, Boolean(host)) }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
           !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
-            <>
-              <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>
-              {step === 'publish' ? (
-                <>
-                  <Button type="button" disabled={busy || !host.canOperate} busy={saving || host.busy} busyLabel="保存中…" onClick={() => void hostSave(false)}>
-                    下書きを保存
-                  </Button>
-                  <Button type="button" variant="primary" disabled={busy || !host.canOperate} title="保存したあとに、配る前の確認へ進みます" busy={saving || host.busy} busyLabel="保存しています…" onClick={() => void hostSave(true)}>
-                    <Upload size={16} aria-hidden="true" />
-                    {host.selectedCount > 0 ? `${formatNumber(host.selectedCount)} アカウントへ配る` : 'アカウントへ配る'}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button type="button" disabled={busy || !host.canOperate} busy={saving} busyLabel="保存中…" onClick={() => void hostSave(false)}>
-                    下書きを保存
-                  </Button>
-                  <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
-                    {nextLabel(step as Exclude<StepKey, 'publish'>)}
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </Button>
-                </>
-              )}
-            </>
+            <HqRichMenuFooterActions host={host} publishStep={step === 'publish'} busy={busy} saving={saving} sizeKnown={publishSizeKnown}
+              nextText={step === 'publish' ? '' : nextLabel(step)} onSave={(distribute) => void hostSave(distribute)} onNext={() => void goNext()} />
           ) : <>
             <Button href="/rich-menus">キャンセル</Button>
             {step === 'publish' ? (
@@ -1297,10 +1285,11 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
                     disabled={
                       busy ||
                       !canOperate ||
+                      !publishSizeKnown ||
                       (checks !== null && publishPlan.mode === 'now' && !checksAllOk) ||
                       (checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk)
                     }
-                    title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
+                    title={!canOperate ? '公開する権限がありません' : busy ? '処理が終わるまでお待ちください' : !publishSizeKnown ? 'メニューのサイズを確認できないため公開できません。画面を読み直すか新しく作り直してください' : checks !== null && publishPlan.mode === 'now' && !checksAllOk ? '公開前の確認で未完了の項目があります。確認結果を直してください' : checks !== null && publishPlan.mode !== 'now' && !scheduleGateOk ? '予約公開の確認に通っていません。確認結果を直してください' : undefined}
                     busy={publishing || saving} icon={publishPlan.mode === 'now' ? <Send size={16} aria-hidden="true" /> : <CalendarClock size={16} aria-hidden="true" />}
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
                     onClick={() => void handlePublishSubmit()}

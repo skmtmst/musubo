@@ -13,32 +13,52 @@ export interface ClosedRange {
   item: BookingException
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+function isValidIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !ISO_DATE.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const check = new Date(Date.UTC(y, m - 1, d))
+  return check.getUTCFullYear() === y && check.getUTCMonth() + 1 === m && check.getUTCDate() === d
+}
+
 /** 休み（kind=closed）の範囲。日付の無いものは除く。from>to は from だけの1日に寄せる。 */
 export function closedRanges(exceptions: BookingException[]): ClosedRange[] {
+  if (!Array.isArray(exceptions)) return []
   const ranges: ClosedRange[] = []
   for (const item of exceptions) {
-    if (item.kind !== 'closed') continue
-    const from = item.dateFrom || item.date || ''
-    if (!from) continue
-    const rawTo = item.dateTo || item.date || from
-    ranges.push({ from, to: rawTo < from ? from : rawTo, item })
+    if (!item || typeof item !== 'object' || item.kind !== 'closed') continue
+    const fromCandidate = item.dateFrom || item.date || ''
+    if (!isValidIsoDate(fromCandidate)) continue
+    const rawTo = item.dateTo || item.date || fromCandidate
+    const to = isValidIsoDate(rawTo) && rawTo >= fromCandidate ? rawTo : fromCandidate
+    ranges.push({ from: fromCandidate, to, item })
   }
   return ranges.sort((a, b) => a.from.localeCompare(b.from))
 }
 
 /** その日（YYYY-MM-DD）を休みにしている例外。無ければ undefined。 */
 export function closedOn(ranges: ClosedRange[], day: string): BookingException | undefined {
-  return ranges.find((range) => range.from <= day && day <= range.to)?.item
+  if (!Array.isArray(ranges) || !isValidIsoDate(day)) return undefined
+  return ranges.find(
+    (range) =>
+      Boolean(range) &&
+      isValidIsoDate(range.from) &&
+      isValidIsoDate(range.to) &&
+      range.from <= day &&
+      day <= range.to,
+  )?.item
 }
 
 /** すべての休みを覆う最初の日と最後の日。休みが無ければ null。 */
 export function closedSpan(ranges: ClosedRange[]): { from: string; to: string } | null {
-  if (ranges.length === 0) return null
-  let from = ranges[0].from
-  let to = ranges[0].to
+  if (!Array.isArray(ranges)) return null
+  let from: string | null = null
+  let to: string | null = null
   for (const range of ranges) {
-    if (range.from < from) from = range.from
-    if (range.to > to) to = range.to
+    if (!range || !isValidIsoDate(range.from) || !isValidIsoDate(range.to)) continue
+    if (from === null || range.from < from) from = range.from
+    if (to === null || range.to > to) to = range.to
   }
-  return { from, to }
+  return from !== null && to !== null ? { from, to } : null
 }

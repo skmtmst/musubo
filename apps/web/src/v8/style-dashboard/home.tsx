@@ -3,6 +3,8 @@ import dynamic from 'next/dynamic'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import StaleStyleNotice from '@/components/shared/stale-style-notice'
 import PagePending from '@/components/templates/page-pending'
+import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
+import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
 import type { IndustryStyle, UsageStyle } from './model'
 import { DashboardV8 as StandardDashboard } from '@/v8/dashboard/index'
@@ -23,8 +25,10 @@ const StyleDashboard = dynamic(() => import('./style-dashboard'), { ssr: false, 
 const INDUSTRY: readonly UsageStyle[] = ['restaurant', 'salon', 'consult', 'lesson']
 
 export default function HomeDashboard() {
-  const { selectedAccountId, loading: accountsLoading, error: accountsError, accounts } = useAccount()
+  const { selectedAccountId, loading: accountsLoading, error: accountsError, accounts, refreshAccounts } = useAccount()
   const profile = useAccountStyle(selectedAccountId)
+  if (!accountsLoading && !selectedAccountId && accountsError) return <PagePending variant="dashboard" stage="style" failed error={accountsError} errorTitle="アカウント一覧を読み込めませんでした" onRetry={() => void refreshAccounts()} />
+  if (!accountsLoading && !selectedAccountId && accounts.length > 1) return <PageFrame kind="dashboard"><PageHeading title="ダッシュボード" /><PageContent layout="stats"><ListState kind="empty" title="上部でLINE公式アカウントを選んでください" /></PageContent></PageFrame>
   // 店が1件も無い時だけ共通画面へ。それ以外は業種が分かるまで読み込み中の同じ形。
   const noAccounts = !accountsLoading && !accountsError && accounts.length === 0
   if (!profile.data && !profile.error && !noAccounts) return <HomeLoading />

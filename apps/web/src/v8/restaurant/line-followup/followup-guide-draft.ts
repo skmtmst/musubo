@@ -30,7 +30,13 @@ export function readFollowupGuideDraft(key: string | null, row: FollowupCardMode
 }
 
 export function followupHasMessage(bubbles: FollowupDraftContent['bubbles']): boolean {
-  return bubbles.length > 0 && bubbles.every(bubble => bubble.type !== 'text' || Boolean(String(bubble.content.text ?? '').trim()))
+  if (!Array.isArray(bubbles) || bubbles.length === 0) return false
+  return bubbles.every(bubble => {
+    if (!bubble || typeof bubble !== 'object') return false
+    if (bubble.type !== 'text') return true
+    if (!bubble.content || typeof bubble.content !== 'object') return false
+    return Boolean(String(bubble.content.text ?? '').trim())
+  })
 }
 
 export function saveFollowupGuideDraft(

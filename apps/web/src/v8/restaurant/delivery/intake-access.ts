@@ -7,9 +7,14 @@ export type IntakeAction = 'stop' | 'resume'
 export function intakeActionReason(state: DeliveryServiceState | undefined, action: IntakeAction): string | undefined {
   if (!state) return 'サービスの状態を読み直してから操作してください。'
   if (state.service === 'ubereats') return `営業状態の連携は${PREPARING_WORD}`
-  if (state.connectionStatus !== 'connected') return state.connectionStatus === 'error'
-    ? '接続の異常を解消してください。'
-    : '未接続のため操作できません。'
+  if (state.connectionStatus !== 'connected') {
+    if (state.connectionStatus === 'error') return '接続の異常を解消してください。'
+    if (state.connectionStatus === 'disconnected') return '未接続のため操作できません。'
+    return '接続の状態を確認できません。読み直してから操作してください。'
+  }
+  if (state.intakeStatus !== 'open' && state.intakeStatus !== 'stopped') {
+    return '受付の状態を確認できません。読み直してから操作してください。'
+  }
   if (state.intakeStatus !== (action === 'stop' ? 'open' : 'stopped')) return action === 'stop'
     ? 'すでに受付が停止しています。'
     : 'すでに受付を再開しています。'
@@ -37,9 +42,12 @@ export function intakeContextReason(current: IntakeAccess, scope: object): strin
 export function intakeOperationReason(current: IntakeAccess, scope: object, selected: DeliveryService[], action: IntakeAction): string | undefined {
   const contextReason = intakeContextReason(current, scope)
   if (contextReason) return contextReason
-  if (!selected.length) return '接続済みで受付中のサービスを選んでください。'
+  if (!selected.length) return action === 'resume'
+    ? '接続済みで停止中のサービスを選んでください。'
+    : '接続済みで受付中のサービスを選んでください。'
+  const services = Array.isArray(current.services) ? current.services : []
   for (const service of selected) {
-    const reason = intakeActionReason(current.services.find(state => state.service === service), action)
+    const reason = intakeActionReason(services.find(state => state.service === service), action)
     if (reason) return reason
   }
 }

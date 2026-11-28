@@ -73,3 +73,35 @@ it('一覧の後から届いたフォルダを表示し、閉じた窓の古い�
   await act(async () => { finish([{ id: 'old', name: '古いフォルダ' }]) })
   expect(screen.queryByText('古いフォルダ')).toBeNull()
 })
+
+it('不正な一覧は空と見せず、読み直せる', async () => {
+  list.mockResolvedValueOnce({}).mockResolvedValueOnce(rows)
+  render(<HqTemplatePicker open {...props} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }))
+  expect(await screen.findByRole('radio', { name: '店からの案内' })).toBeTruthy()
+  expect(list).toHaveBeenCalledTimes(2)
+})
+
+it('一覧の行が不正なときも読み直せる', async () => {
+  list.mockResolvedValueOnce([null]).mockResolvedValueOnce(rows)
+  render(<HqTemplatePicker open {...props} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }))
+  expect(await screen.findByRole('radio', { name: '店からの案内' })).toBeTruthy()
+})
+
+it('選択中の連打を止め、失敗したら選び直せる', async () => {
+  let reject!: (reason: Error) => void
+  const onPick = vi.fn(() => new Promise<string | null>((_, fail) => { reject = fail }))
+  render(<HqTemplatePicker open onClose={props.onClose} onPick={onPick} />)
+  fireEvent.click(await screen.findByRole('radio', { name: '店からの案内' }))
+  const button = screen.getByRole('button', { name: 'このテンプレートを使う' })
+  act(() => { fireEvent.click(button); fireEvent.click(button) })
+  expect(onPick).toHaveBeenCalledTimes(1)
+  await act(async () => { reject(new Error('offline')) })
+  expect(await screen.findByText('テンプレートを読み込めませんでした。もう一度お試しください。')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'このテンプレートを使う' }).hasAttribute('disabled')).toBe(false)
+  onPick.mockResolvedValueOnce(null)
+  fireEvent.click(screen.getByRole('button', { name: 'このテンプレートを使う' }))
+  await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(1))
+  expect(onPick).toHaveBeenCalledTimes(2)
+})

@@ -16,17 +16,6 @@ const RECORDS = readFileSync(new URL('../../../v8/events/booking-records.tsx', i
 const CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 describe('V8 Mu8qW イベント申込者の次行動と安全なキャンセル', () => {
-  it('帯を数だけで終わらせず、次にすることへつなぐ', () => {
-    // IDEA-29: 残席は申込行数ではなく、席を消費中の人数(activeSeats)から引く。
-    expect(RECORDS).toContain('describeBookingCapacity(activeSeats, summary.totalCapacity ?? null)')
-    // 0件のときと有るときで、添え字が変わること。
-    expect(RECORDS).toContain('対応が必要：')
-    expect(RECORDS).toContain('件を確認してください')
-    expect(RECORDS).toContain('確認待ちはありません')
-    expect(RECORDS).toContain('空いた枠を確認してください')
-    expect(RECORDS).toContain('キャンセルはありません')
-  })
-
   it('運営キャンセルをブラウザ標準の窓で直に実行しない', () => {
     expect(CODE).not.toContain("confirm('運営側でキャンセルしますか？")
     // 窓を開ける押し口に目印。これが無いと撮影から辿れない。

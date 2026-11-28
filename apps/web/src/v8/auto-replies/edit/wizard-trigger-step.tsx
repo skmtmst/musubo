@@ -27,7 +27,7 @@ Users,
 X
 } from 'lucide-react';
 import type { Dispatch,JSX,SetStateAction } from 'react';
-import { KIND_ICONS,MAIN_KINDS,WEEKDAY_PRESETS,WizardForm,kindOrder,weekdaySummary } from './wizard-model';
+import { KIND_ICONS,MAIN_KINDS,WEEKDAY_PRESETS,WizardForm,isKnownReceiveSource,kindOrder,weekdaySummary } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardTriggerStepContext = {
@@ -182,7 +182,7 @@ export function WizardTriggerStep({ disabled = false, lockedReason, effectiveKey
                       onCheckedChange={(on) =>
                         patch({
                           receiveSources: on
-                            ? [...new Set([...form.receiveSources, 'line' as const])]
+                            ? [...new Set([...form.receiveSources.filter(isKnownReceiveSource), 'line' as const])]
                             : form.receiveSources.filter((s) => s !== 'line'),
                         })
                       }
@@ -194,7 +194,7 @@ export function WizardTriggerStep({ disabled = false, lockedReason, effectiveKey
                       onCheckedChange={(on) =>
                         patch({
                           receiveSources: on
-                            ? [...new Set([...form.receiveSources, 'email' as const])]
+                            ? [...new Set([...form.receiveSources.filter(isKnownReceiveSource), 'email' as const])]
                             : form.receiveSources.filter((s) => s !== 'email'),
                         })
                       }

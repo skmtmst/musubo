@@ -200,6 +200,7 @@ function VisitStampsScreen() {
   const loadCards = useCallback(async () => {
     try {
       const res = await visitStampsApi.cards()
+      if (!Array.isArray(res.data)) throw new Error('カード一覧を読み込めませんでした。')
       setCards(res.data); setLoadError(null)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)

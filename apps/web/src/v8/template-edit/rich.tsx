@@ -265,7 +265,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
     setFolderState({ account: selectedAccountId, status: 'loading' })
     void api.folders.list('template', selectedAccountId).then(res => {
       if (cancelled) return
-      if (!res.success) throw new Error('folders unavailable')
+      if (!res.success || !Array.isArray(res.data)) throw new Error('folders unavailable')
       setFolders(res.data)
       setFolderState({ account: selectedAccountId, status: 'ready' })
     }).catch(() => { if (!cancelled) setFolderState({ account: selectedAccountId, status: 'error' }) })

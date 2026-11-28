@@ -41,7 +41,9 @@ export interface DuplicatesStatsData {
 }
 
 export function formatRelative(iso: string): string {
-  const elapsedMs = Date.now() - new Date(iso).getTime()
+  const timestamp = new Date(iso).getTime()
+  if (!Number.isFinite(timestamp)) return '確認できません'
+  const elapsedMs = Date.now() - timestamp
   if (elapsedMs < 0) return 'たった今'
   const sec = Math.floor(elapsedMs / 1000)
   // E33：秒だけここで言い、分以上は共通の関数へ（1282時間前→53日前）。
@@ -82,10 +84,16 @@ export function useDuplicatesData() {
   const candidatesReqRef = useRef(0)
   const candidatesKeyRef = useRef('')
   const statsReqRef = useRef(0)
-  useEffect(() => () => {
-    candidatesReqRef.current += 1
-    statsReqRef.current += 1
-    candidatesKeyRef.current = ''
+  const mountedRef = useRef(true)
+  const detectingRef = useRef(false)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      candidatesReqRef.current += 1
+      statsReqRef.current += 1
+      candidatesKeyRef.current = ''
+    }
   }, [])
 
   useEffect(() => {
@@ -127,7 +135,8 @@ export function useDuplicatesData() {
 
   const loadCandidates = useCallback(async () => {
     const req = ++candidatesReqRef.current
-    const key = JSON.stringify({ status, q: debouncedQuery.trim(), page })
+    const safePage = Number.isInteger(page) && page >= 1 ? page : 1
+    const key = JSON.stringify({ status, q: debouncedQuery.trim(), page: safePage })
     candidatesKeyRef.current = key
     setCandidatesLoading(true)
     setCandidateError('')
@@ -138,11 +147,16 @@ export function useDuplicatesData() {
         status: (status || 'all') as IdentityCandidateStatus | 'all',
         q: debouncedQuery.trim() || undefined,
         limit: CANDIDATE_PAGE_SIZE,
-        offset: (page - 1) * CANDIDATE_PAGE_SIZE,
+        offset: (safePage - 1) * CANDIDATE_PAGE_SIZE,
       })
       // 古い応答・別条件の応答は捨てる（FRIEND-12）。
       if (req !== candidatesReqRef.current || candidatesKeyRef.current !== key) return
-      if (res.success) {
+      const validList = res.success
+        && Array.isArray(res.data?.items)
+        && typeof res.data?.total === 'number'
+        && Number.isInteger(res.data.total)
+        && res.data.total >= 0
+      if (validList) {
         setCandidates(res.data.items)
         setCandidateTotal(res.data.total)
         setStatusCounts(res.data.statusCounts ?? null)
@@ -171,15 +185,22 @@ export function useDuplicatesData() {
   }, [loadStats, loadCandidates])
 
   const detect = useCallback(async () => {
+    if (detectingRef.current) return
+    detectingRef.current = true
     setRefreshing(true)
     setError('')
     try {
       const result = await api.identityCandidates.detectFriendDuplicates({ limit: 100 })
-      if (!result.success) throw new Error('failed')
+      if (!mountedRef.current) return
+      if (!result?.success) throw new Error('failed')
       await load({ forceRefresh: true })
     } catch {
-      setError('重複候補を再検出できませんでした。表示中の候補は前回の結果です。')
-      setRefreshing(false)
+      if (mountedRef.current) {
+        setError('重複候補を再検出できませんでした。表示中の候補は前回の結果です。')
+        setRefreshing(false)
+      }
+    } finally {
+      detectingRef.current = false
     }
   }, [load])
 
@@ -211,14 +232,19 @@ export function useDuplicatesData() {
    * 件数が出ている）。読み込み待ちの0も出さない（FRIEND-12）。
    */
   const unfilteredCandidates = status === '' && debouncedQuery.trim() === ''
+  const validStatusCounts =
+    !candidateError
+    && statusCounts !== null
+    && typeof statusCounts === 'object'
+    && Object.values(statusCounts).every((n) => n === undefined || (typeof n === 'number' && Number.isInteger(n) && n >= 0))
   const duplicateTotalText =
-    statusCounts !== null
+    validStatusCounts
       ? `${formatNumber(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`
       : !unfilteredCandidates || candidateError || (candidatesLoading && candidateTotal === 0)
         ? '—'
         : `${formatNumber(candidateTotal)}組`
   const duplicateDetail =
-    statusCounts !== null
+    validStatusCounts
       ? `${formatNumber(statusCounts.pending ?? 0)}組を確認待ち`
       : !unfilteredCandidates || candidateError
         ? '読み込めませんでした'

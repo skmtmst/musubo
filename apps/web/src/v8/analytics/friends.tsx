@@ -41,12 +41,54 @@ import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
+import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 type Day = AnalyticsFriendsOverview['data']['days'][number]
 type Campaign = AnalyticsFriendsOverview['data']['campaigns'][number]
 
+function isValidYmd(date: unknown): date is string {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const [year, month, day] = date.split('-').map(Number)
+  const parsed = new Date(0)
+  parsed.setUTCFullYear(year, month - 1, day)
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+}
+
+function isValidDayRow(row: unknown): row is Day {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return false
+  const d = row as Record<string, unknown>
+  return (
+    isValidYmd(d.date)
+    && typeof d.added === 'number' && Number.isFinite(d.added) && d.added >= 0
+    && typeof d.removed === 'number' && Number.isFinite(d.removed) && d.removed >= 0
+    && typeof d.net === 'number' && Number.isFinite(d.net)
+  )
+}
+
+function isValidDaysList(days: unknown): days is Day[] {
+  return Array.isArray(days) && days.every(isValidDayRow)
+}
+
+function formatBarDateTitle(date: unknown): string {
+  if (!isValidYmd(date)) return emptyValue('unknown')
+  const month = Number(date.slice(5, 7))
+  const day = Number(date.slice(8, 10))
+  const weekday = analyticsWeekday(date)
+  return weekday ? `${month}月${day}日（${weekday}）` : `${month}月${day}日`
+}
+
+function formatBarAxisLabel(date: unknown): string {
+  if (!isValidYmd(date)) return emptyValue('unknown')
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+}
+
+function safeDayNumber(value: unknown): string {
+  return typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : emptyValue('unknown')
+}
+
 function DailyBars({ days, campaigns, selected, onSelect }: { days: Day[]; campaigns: Campaign[]; selected: string; onSelect: (date: string) => void }) {
-  return <BarChart distribution="diverging" showLegend={false} items={toBarChartItems(days, {campaigns, formatTitle:(date)=>`${Number(date.slice(5,7))}月${Number(date.slice(8,10))}日（${analyticsWeekday(date)}）`})} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
+  return <BarChart distribution="diverging" showLegend={false} items={toBarChartItems(days, { campaigns, formatTitle: formatBarDateTitle, formatAxisLabel: formatBarAxisLabel })} selectedKey={selected} onSelect={(date)=>onSelect(selected===date?'':date)} />
 }
 
 /** 経路の内訳は概要の後に読む（2つの重い集計を同時に走らせない）。 */
@@ -59,8 +101,12 @@ function RouteBreakdown({ accountId, from, to }: { accountId: string; from: stri
     if (state.loading) return <ListState kind="loading" title="分析を読み込んでいます" />
     return <ListState kind="error" description={state.error} onRetry={state.retry} />
   }
+  const rawRoutes = state.data.data?.routes
+  if (!Array.isArray(rawRoutes) || !rawRoutes.every((route) => route && typeof route === 'object')) {
+    return <ListState kind="error" description="流入経路のデータを読み込めませんでした。" onRetry={state.retry} />
+  }
   // 右の列は人数の多い順に上位5件（全件は「流入と計測で詳しく見る」）。
-  const routes = [...state.data.data.routes].sort((a, b) => (shownValue(b.friendAdds) ?? -1) - (shownValue(a.friendAdds) ?? -1)).slice(0, 5)
+  const routes = [...rawRoutes].sort((a, b) => (shownValue(b.friendAdds) ?? -1) - (shownValue(a.friendAdds) ?? -1)).slice(0, 5)
   const max = Math.max(1, ...routes.map((route) => shownValue(route.friendAdds) ?? 0))
   if (routes.length === 0) return <p className={styles.sideNote}>この期間に流入リンクから増えた友だちはいません</p>
   return <ul className={styles.routeRows}>{routes.map((route) => <li key={route.id} className={styles.routeRow}>
@@ -79,17 +125,22 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
     `${accountId}:${range.from}:${range.to}:friends`,
   )
   const overview = state.data?.data ?? null
+  const daysList = isValidDaysList(overview?.days) ? overview.days : null
+  const campaignsList = Array.isArray(overview?.campaigns)
+    ? overview.campaigns.filter((item) => item && typeof item === 'object')
+    : []
   const daysShown = overview !== null && (overview.state === 'available' || overview.state === 'partial')
+  const canExport = daysShown && daysList !== null
   const exportCsv = () => {
-    if (!overview) return
-    downloadCsv(csvFileName("友だち分析"), [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])
+    if (!overview || !daysList) return
+    downloadCsv(csvFileName("友だち分析"), [['日付', '増えた', '減った', '差し引き'], ...daysList.map((day) => [day.date, day.added, day.removed, day.net])])
   }
-  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || overview?.stateReason || (overview ? knownValue(METRIC_STATE_TEXT, overview.state, '集計結果を確認できません。') : '集計結果を確認できません。')
-  useRegisterExport(exportCsv, !daysShown, exportReason)
+  const exportReason = state.loading ? '集計結果を読み込んでいます。' : state.error || (daysShown && daysList === null ? '日ごとの集計データを読み込めませんでした。' : overview?.stateReason || (overview ? knownValue(METRIC_STATE_TEXT, overview.state, '集計結果を確認できません。') : '集計結果を確認できません。'))
+  useRegisterExport(exportCsv, !canExport, exportReason)
 
   if (!state.data || !overview) {
     return <ListPageSection>
-      <div className={styles.periodRow}><RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={setDays} /></div>
+      <div className={styles.periodRow}><RangePickerV8 customRange={customRange} onRangeChange={(next) => { setRange(next); setSelectedDate('') }} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} /></div>
       {state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}
     </ListPageSection>
   }
@@ -99,8 +150,9 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
   const netValue = addedValue === null || removedValue === null ? null : shownValue(overview.metrics.net)
   const reasonShownInBanner = overview.state !== 'available' && Boolean(overview.stateReason)
   const pendingReason = overview.stateReason ?? '日ごとの集計がまだありません'
-  const selectedDay = overview.days.find((day) => day.date === selectedDate) ?? null
+  const selectedDay = daysList?.find((day) => day.date === selectedDate) ?? null
   const caption = periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)
+  const selectedWeekday = selectedDay ? analyticsWeekday(selectedDay.date) : ''
 
   return <>
     <ListPageStats><KpiBand className={styles.band}>
@@ -128,17 +180,19 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
           <CardHeader size="stacked" titleId="friends-daily-title"
             title={`日ごとの増減（${periodLabel}）`}
             help={<HelpTip label="日ごとの増減の説明">{`棒を選ぶとその日の数と配信・シナリオが出ます。${caption}`}</HelpTip>}
-            action={<RangePickerV8 customRange={customRange} onRangeChange={setRange} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />} />
+            action={<RangePickerV8 customRange={customRange} onRangeChange={(next) => { setRange(next); setSelectedDate('') }} size="small" days={days} onChange={(value) => { setDays(value); setSelectedDate('') }} />} />
           <BarChartLegend layout="analytics" items={[
             { label: '増えた', tone: 'added' }, { label: '減った', tone: 'removed' },
             { label: '配信した日', tone: 'broadcast' }, { label: 'シナリオを始めた日', tone: 'scenario' },
           ]} />
           {daysShown
-            ? <DailyBars days={overview.days} campaigns={overview.campaigns} selected={selectedDate} onSelect={setSelectedDate} />
+            ? (daysList === null
+              ? <ListState kind="error" description="日ごとの集計データを読み込めませんでした。" onRetry={state.retry} />
+              : <DailyBars days={daysList} campaigns={campaignsList} selected={selectedDate} onSelect={setSelectedDate} />)
             : <div className={styles.emptyChart} role="status"><p>{reasonShownInBanner ? (knownValue(METRIC_STATE_TEXT, overview.state, '未取得') || '未取得') : pendingReason}</p>{overview.state === 'pending' ? <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p> : null}</div>}
-          {daysShown && (selectedDay || overview.campaigns.length > 0) ? <div className={styles.notes}>
-            {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}（${analyticsWeekday(selectedDay.date)}） 増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人・差し引き ${selectedDay.net} 人`}</p> : null}
-            {overview.campaigns.map((item) => <p key={item.id} className={styles.note}><BarChartEventMark tone={item.kind} />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}
+          {daysShown && daysList !== null && (selectedDay || campaignsList.length > 0) ? <div className={styles.notes}>
+            {selectedDay ? <p className={styles.note}><i data-kind="selected" aria-hidden="true" />{`${shortDate(selectedDay.date)}${selectedWeekday ? `（${selectedWeekday}）` : ''} 増加 ${safeDayNumber(selectedDay.added)} 人・減少 ${safeDayNumber(selectedDay.removed)} 人・差し引き ${safeDayNumber(selectedDay.net)} 人`}</p> : null}
+            {campaignsList.map((item) => <p key={item.id} className={styles.note}><BarChartEventMark tone={item.kind} />{`${shortDate(item.date)} ${item.kind === 'scenario' ? 'シナリオを始めた' : '一斉配信'}「${item.name}」`}</p>)}
           </div> : null}
         </Card>
       </DetailColumns>

@@ -12,13 +12,19 @@ export function toSteps(result: { steps: CheckStep[] } | null): CheckStep[] {
     'LINE Loginチャネルを確認して、LIFFアプリを作成',
     '認証済みアカウントかを判定',
   ]
-  if (!result) return messages.map((message, i) => ({ order: i + 1, message, state: 'skipped' as const }))
-  return result.steps.map((item) => ({ ...item }))
+  if (!result || !Array.isArray(result.steps)) {
+    return messages.map((message, i) => ({ order: i + 1, message, state: 'skipped' as const }))
+  }
+  return result.steps.map((item, i) => (
+    item && typeof item === 'object'
+      ? { ...item }
+      : { order: i + 1, message: messages[i] ?? '', state: 'skipped' as const }
+  ))
 }
 
 /** 保存してよいか。5段すべて通ったときだけ保存する。 */
 export function canSave(steps: CheckStep[]): boolean {
-  return steps.every((s) => s.state === 'passed')
+  return Array.isArray(steps) && steps.length >= 5 && steps.every((s) => Boolean(s) && s.state === 'passed')
 }
 
 export type CheckRowState = 'passed' | 'failed' | 'todo'
@@ -48,7 +54,7 @@ export function toV8CheckRows(connection: LineAccountConnectData | null): V8Chec
   const channelFailed = Boolean(connection) && !channelPassed && (steps[0]?.state === 'failed' || steps[3]?.state === 'failed')
   const providerPassed = verification ? verification.sameProvider : channelPassed
   const providerFailed = Boolean(connection) && !providerPassed && (steps[0]?.state === 'failed' || steps[3]?.state === 'failed')
-  const basicId = connection?.basicId ?? null
+  const basicId = typeof connection?.basicId === 'string' && connection.basicId.trim() !== '' ? connection.basicId.trim() : null
   const lineIdState: CheckRowState = connection && webhookPassed && basicId ? 'passed' : 'todo'
   const addUrlState: CheckRowState = connection && webhookPassed && basicId ? 'passed' : 'todo'
   return [
@@ -84,5 +90,5 @@ export function checkRowText(row: V8CheckRow): string {
 }
 
 export function allV8RowsPassed(rows: V8CheckRow[]): boolean {
-  return rows.every((row) => row.state === 'passed')
+  return Array.isArray(rows) && rows.length >= 5 && rows.every((row) => Boolean(row) && row.state === 'passed')
 }

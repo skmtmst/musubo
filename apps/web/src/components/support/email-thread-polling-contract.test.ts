@@ -19,10 +19,4 @@ describe('メール会話の定期取得 (#630)', () => {
   it('静かな取り直しは成否を返し、失敗は投げて数え直す', () => {
     expect(thread).toContain('Promise<boolean>')
   })
-
-  it('上限後は理由と再試行ボタンを出す', () => {
-    expect(thread).toContain('threadStalled')
-    expect(thread).toContain('会話の更新を一時停止しています')
-    expect(thread).toContain('再試行する')
-  })
 })

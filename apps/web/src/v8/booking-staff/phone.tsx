@@ -18,12 +18,22 @@ import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './phone.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 
 const WEEKDAY_JP = '日月火水木金土'
 
+function isValidYmd(date: unknown): date is string {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const [year, month, day] = date.split('-').map(Number)
+  const d = new Date(0)
+  d.setUTCFullYear(year, month - 1, day)
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day
+}
+
 function addDaysStr(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`)
+  const base = isValidYmd(date) ? date : jstDate()
+  const d = new Date(`${base}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
 }
@@ -34,12 +44,21 @@ export function formatJpDay(date: string): string {
 
 /** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵の）。 */
 export function phoneTime(time: string): string {
+  if (typeof time !== 'string') return ''
   return time.replace(/^0(\d:)/, '$1')
+}
+
+function durationLabel(minutes: unknown): string {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes <= 0) return emptyValue('unknown')
+  return `${polishFormatNumber(minutes)}分`
 }
 
 export function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
   if (menu.price_mode === 'free' || menu.base_price === 0) return '無料'
+  if (typeof menu.base_price !== 'number' || !Number.isFinite(menu.base_price) || menu.base_price < 0) {
+    return emptyValue('unknown')
+  }
   return `¥${polishFormatNumber(menu.base_price)}`
 }
 
@@ -62,12 +81,14 @@ function ListSkeleton() {
 }
 
 function StaffPreviewCard({ person, draft = false }: { person: BookingStaff; draft?: boolean }) {
+  const displayName = person.display_name || person.name || ''
+  const fee = typeof person.nomination_fee === 'number' && Number.isFinite(person.nomination_fee) ? person.nomination_fee : 0
   return <div className={styles.card}>
-    <span className={styles.avatar} aria-hidden="true">{person.display_name.slice(0, 1)}</span>
+    <span className={styles.avatar} aria-hidden="true">{displayName.slice(0, 1)}</span>
     <span className={styles.cardText}>
       {draft ? <StatusBadge tone="neutral" dot={false}>入力中・未保存</StatusBadge> : null}
-      <span className={styles.cardName}>{person.display_name}</span>
-      <span className={styles.cardDesc}>{person.role ?? 'スタッフ'}・{draft && !person.is_active ? '登録後は非表示' : (person.nomination_fee ?? 0) > 0 ? `指名料 +¥${polishFormatNumber(person.nomination_fee ?? 0)}` : '指名料なし'}</span>
+      <span className={styles.cardName}>{displayName}</span>
+      <span className={styles.cardDesc}>{person.role ?? 'スタッフ'}・{draft && !person.is_active ? '登録後は非表示' : fee > 0 ? `指名料 +¥${polishFormatNumber(fee)}` : '指名料なし'}</span>
     </span>
   </div>
 }
@@ -80,7 +101,8 @@ export function PhoneStaffStep({ menu, staff, draft, designationFree, status = '
   designationFree: boolean
   status?: 'loading' | 'ready' | 'error'
 }) {
-  const shown = staff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
+  const safeStaff = Array.isArray(staff) ? staff : []
+  const shown = safeStaff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
   const people = shown
   const empty = shown.length === 0 && !designationFree && !draft?.is_active
   return (
@@ -88,12 +110,12 @@ export function PhoneStaffStep({ menu, staff, draft, designationFree, status = '
       step={2}
       bodyScroll
       foot={<>
-        <span className={styles.cta} data-off={empty || undefined}>日時を選ぶ</span>
+        <span className={styles.cta} data-off={status !== 'ready' || empty || undefined}>日時を選ぶ</span>
         <span className={styles.back}>← メニューを選び直す</span>
       </>}
     >
       <h3 className={styles.title}>担当を選んでください</h3>
-      {menu ? <p className={styles.sub}>{menu.name}・{menu.duration_minutes}分・{priceLabel(menu)}</p> : null}
+      {menu ? <p className={styles.sub}>{menu.name}・{durationLabel(menu.duration_minutes)}・{priceLabel(menu)}</p> : null}
       {draft !== undefined ? (draft ? <StaffPreviewCard person={draft} draft /> : <p className={styles.sub}>表示名を入れるとここに出ます</p>) : null}
       {status === 'loading' ? <DelayedSkeleton loading skeleton={<ListSkeleton />} />
         : status === 'error' ? <p className={styles.sub}>読み込めませんでした。</p>
@@ -131,8 +153,10 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
   onRetry?: () => void
   status?: 'loading' | 'ready' | 'error'
 }) {
+  const safeSlots = Array.isArray(slots) ? slots : []
   const byDate = new Map<string, BookingAvailabilitySlot[]>()
-  for (const slot of status === 'ready' ? slots : []) {
+  for (const slot of status === 'ready' ? safeSlots : []) {
+    if (!slot || !isValidYmd(slot.date)) continue
     const list = byDate.get(slot.date) ?? []
     list.push(slot)
     byDate.set(slot.date, list)
@@ -141,8 +165,8 @@ export function PhoneDatetimeStep({ menu, staffName, slots, closedDates, closedW
   const selected = openDates[0] ?? null
   const anchor = selected ?? jstDate()
   const days = Array.from({ length: 5 }, (_, i) => addDaysStr(anchor, i))
-  const closed = new Set(closedDates)
-  const closedDow = new Set(closedWeekdays)
+  const closed = new Set(Array.isArray(closedDates) ? closedDates : [])
+  const closedDow = new Set(Array.isArray(closedWeekdays) ? closedWeekdays : [])
   const selectedSlots = selected ? (byDate.get(selected) ?? []) : []
   const picked = selectedSlots.find((slot) => slot.remaining > 0) ?? null
   return (

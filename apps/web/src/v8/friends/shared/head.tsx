@@ -54,7 +54,11 @@ export function FriendsSectionHead({
   note?: ReactNode | null
   tabs?: boolean
 }) {
-  const noteText = note === undefined ? FRIENDS_TAB_NOTES[current] : note
+  const noteText = note === undefined
+    ? (typeof current === 'string' && Object.prototype.hasOwnProperty.call(FRIENDS_TAB_NOTES, current)
+        ? FRIENDS_TAB_NOTES[current]
+        : undefined)
+    : note
   return (
     <PageExplanationProvider pageKey={`friends:${current}`}>
       <PageHeading title={title} help={description} explanationToggle={noteText ? <PageExplanationToggle /> : undefined} tabs={<>

@@ -80,7 +80,11 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
             /></SaveErrorField>
           ) : (
             // 閲覧のみ：選ぶ部品は置かず、選んでいるフォルダを文字で見せる。
-            <ReadOnlyValue id="cv-folder" label="フォルダ" value={`フォルダ：${folders.find((folder) => folder.id === folderId)?.name ?? '未分類'}`} />
+            <ReadOnlyValue
+              id="cv-folder"
+              label="フォルダ"
+              value={`フォルダ：${foldersError ? '確認できません' : folderId ? (folders.find((folder) => folder.id === folderId)?.name ?? '確認できません') : '未分類'}`}
+            />
           )}
           {foldersError ? (
             <div className={styles.inlineError} data-folders-state="error">
@@ -120,7 +124,15 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
               options={[{ value: 'stop', label: '期間外の動き：配信を止める' }, { value: 'fallback', label: '期間外の動き：代わりの値を出す' }]}
             /></SaveErrorField>
           ) : (
-            <ReadOnlyValue id="cv-expiry-behavior" label="期間外の動き" value={expiryBehavior === 'fallback' ? '期間外の動き：代わりの値を出す' : '期間外の動き：配信を止める'} />
+            <ReadOnlyValue
+              id="cv-expiry-behavior"
+              label="期間外の動き"
+              value={expiryBehavior === 'fallback'
+                ? '期間外の動き：代わりの値を出す'
+                : expiryBehavior === 'stop'
+                  ? '期間外の動き：配信を止める'
+                  : '期間外の動き：確認できません'}
+            />
           )}
           {expiryBehavior === 'fallback' && (
             <div className={styles.field}><Field label="代わりの値" htmlFor="cv-fallback-value">{!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
@@ -146,9 +158,11 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
                   placeholder="お問い合わせください"
                   className={styles.fieldInput}
                   readOnly={!canWrite}
+                  aria-invalid={fallbackFieldError ? true : undefined}
+                  aria-describedby={fallbackFieldError ? 'cv-fallback-error' : undefined}
                 /></SaveErrorField>
               )}
-{fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}</Field></div>
+{fallbackFieldError ? <p id="cv-fallback-error" className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}</Field></div>
           )}
         </div>
       </section>

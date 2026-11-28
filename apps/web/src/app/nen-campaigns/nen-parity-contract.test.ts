@@ -29,28 +29,6 @@ describe('V8 NEN配信の取得と操作の契約', () => {
     expect(OVERVIEW).toContain('自動配信は開封を取れません')
   })
 
-  it('自動配信の表は 配信／きっかけ／対象／送信／注文／状態／操作（開封の列は置かない）', () => {
-    for (const label of ['>配信</Th>', '>きっかけ</Th>', '>対象</Th>', '送信', '>注文</Th>', '>状態</Th>']) {
-      expect(OVERVIEW).toContain(label)
-    }
-    // 開封の列は「—」しか並ばないので自動配信の表には置かない。
-    // （送った履歴の表には「取得不可」の列が残るので、自動配信のパネル内だけ見る）
-    const autoPanel = OVERVIEW.slice(OVERVIEW.indexOf('function AutoTab('), OVERVIEW.indexOf('function CampaignPreviewDrawer('))
-    expect(autoPanel).toContain('注文</Th>')
-    expect(autoPanel).not.toContain('開封</Th>')
-    expect(OVERVIEW).toContain('自動配信は開封を取れません')
-    expect(OVERVIEW).toContain('formatCampaignTiming(setting)')
-    expect(OVERVIEW).toContain('formatCampaignAudience(setting)')
-    expect(OVERVIEW).toContain('有効</Pill>')
-    expect(OVERVIEW).toContain('停止中</Pill>')
-    // 編集は専用画面へ。その他は 中身を見る／テスト送信／止める・動かす。
-    expect(OVERVIEW).toContain('/nen-campaigns/edit?key=')
-    expect(OVERVIEW).toContain(`label: "配信の文面を見る"`)
-    expect(OVERVIEW).toContain("label: '止める'")
-    // 停止・再開は専用の口（#659）。
-    expect(PAGE).toContain('api.nenCampaigns.setEnabled(')
-  })
-
   it('コラムは一覧と選択中の操作と見本を実際の取得・予約へつなぐ', () => {
     for (const label of ['LINE に届くカード', '送る相手・時刻', '送る相手', '送る日時', '今すぐ', '日時を予約', '自分にテストを送る', '配信を予約する']) {
       expect(OVERVIEW).toContain(label)

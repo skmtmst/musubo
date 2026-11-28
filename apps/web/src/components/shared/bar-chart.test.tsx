@@ -167,10 +167,10 @@ describe('まだ数えられないとき', () => {
 })
 
 describe('分析画面の配線（見た目と数字の一致）', () => {
+  // グラフへ渡す実際の増減と選択日の1行は app/analytics/readonly-v8-react.test.tsx が描いて確かめる。
   it('日ごとの増減の枠がV8のグラフへ実際の増減を渡す', () => {
     expect(analyticsPage).toContain("from '@/components/shared/charts'")
     expect(analyticsPage).toContain('<DailyBars')
-    expect(analyticsPage).toContain('days={overview.days}')
   })
 
   it('減った棒に赤を使わない', () => {
@@ -179,8 +179,6 @@ describe('分析画面の配線（見た目と数字の一致）', () => {
 
   it('日ごとの数は overview.days の増減をそのまま渡す', () => {
     expect(analyticsPage).toContain('overview.campaigns')
-    // 選択日の1行は BarChart の外で今までどおり出す。
-    expect(analyticsPage).toContain('増加 ${selectedDay.added} 人・減少 ${selectedDay.removed} 人')
   })
 })
 

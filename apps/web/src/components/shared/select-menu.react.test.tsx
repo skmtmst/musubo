@@ -126,9 +126,7 @@ describe('★V8 の Select は開いた中身を select-menu で描く', () => {
     expect(screen.queryByRole('listbox')).toBeNull()
   })
 
-  it('中身の幅はボタンの幅を下限にする（matchWidth="min"）', () => {
-    const source = read('select-menu.tsx')
-    expect(source).toContain('matchWidth="min"')
+  it('選択肢の文字は折り返さず薄い枠を使う', () => {
     const css = read('select-menu.module.css')
     // 1行のまま折り返さない。
     expect(css).toMatch(/\.item \{[^}]*white-space: nowrap/s)

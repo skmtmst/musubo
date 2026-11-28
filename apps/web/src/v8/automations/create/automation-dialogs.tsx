@@ -45,6 +45,15 @@ export function AutomationDialogs({
   confirmLeave: () => void
   cancelLeave: () => void
 }) {
+  const validPreviewCount = typeof previewCount === 'number' && Number.isFinite(previewCount) && previewCount >= 0
+    ? previewCount
+    : null
+  const validServerActionCount = conflict
+    && typeof conflict.serverActionCount === 'number'
+    && Number.isFinite(conflict.serverActionCount)
+    && conflict.serverActionCount >= 0
+    ? conflict.serverActionCount
+    : null
   return (<>
       {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}
       <Dialog
@@ -74,15 +83,21 @@ export function AutomationDialogs({
         confirmDisabled={Boolean(conflict)}
         confirmDisabledReason="閉じて最新の内容と比べてください。"
         onSuccess={() => setActivateConfirmOpen(false)}
-        onConfirm={() => save(true)}
-        onCancel={() => setActivateConfirmOpen(false)}
+        onConfirm={() => {
+          if (saving || conflict) return
+          return save(true)
+        }}
+        onCancel={() => {
+          if (saving) return
+          setActivateConfirmOpen(false)
+        }}
       >
         <dl className={styles.kvList}>
           <div className={styles.kvRow}><dt>名前</dt><dd><TruncatedText value={name.trim()} /></dd></div>
           <div className={styles.kvRow}><dt>きっかけ</dt><dd><TruncatedText value={`${selectedEvent.label}（${triggerConfigSummary}）`} /></dd></div>
           <div className={styles.kvRow}>
             <dt>だれに</dt>
-            <dd><TruncatedText value={`${targetSummary}${previewCount !== null ? ` 見込み ${formatNumber(previewCount)} 人` : ''}`} /></dd>
+            <dd><TruncatedText value={`${targetSummary}${validPreviewCount !== null ? ` 見込み ${formatNumber(validPreviewCount)} 人` : ''}`} /></dd>
           </div>
           <div className={styles.kvRow}><dt>すること</dt><dd><TruncatedText value={actionSummary || emptyValue('unconfigured')} /></dd></div>
           <div className={styles.kvRow}>
@@ -103,8 +118,12 @@ export function AutomationDialogs({
         confirmLabel="この内容で保存する"
         cancelLabel="閉じる"
         busy={saving}
-        onCancel={() => setCompareOpen(false)}
+        onCancel={() => {
+          if (saving) return
+          setCompareOpen(false)
+        }}
         onConfirm={() => {
+          if (saving || !conflict) return
           setCompareOpen(false)
           return save(false, true)
         }}
@@ -122,7 +141,9 @@ export function AutomationDialogs({
                 <p className={styles.sideNote}>保存されている内容</p>
                 <p className={styles.subTitle}>{conflict.serverName || '（名前なし）'}</p>
                 <p className={styles.sideNote}>{conflict.serverEventLabel}</p>
-                <p className={styles.sideNote}>処理 {formatNumber(conflict.serverActionCount)} 件</p>
+                <p className={styles.sideNote}>
+                  {validServerActionCount !== null ? `処理 ${formatNumber(validServerActionCount)} 件` : '処理件数を確認できません'}
+                </p>
               </section>
             </div>
             <p className={styles.sideNote}>

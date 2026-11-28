@@ -26,8 +26,35 @@ import { useReportPeriod, type PeriodRange } from '@/components/shared/period-pi
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 
+const SAFE_SEARCH_CONSOLE_ORIGIN = 'https://same.invalid'
+
+function safeSearchConsoleHref(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed || /[\u0000-\u001f\u007f]/.test(trimmed)) return null
+  if (trimmed.startsWith('/')) {
+    if (trimmed.length >= 2 && (trimmed[1] === '/' || trimmed[1] === '\\')) return null
+    try {
+      const resolved = new URL(trimmed, SAFE_SEARCH_CONSOLE_ORIGIN)
+      return resolved.origin === SAFE_SEARCH_CONSOLE_ORIGIN ? trimmed : null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? trimmed : null
+  } catch {
+    return null
+  }
+}
+
 function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
-  const values = metrics.map(shownValue)
+  const values = metrics.map((metric) => {
+    if (!metric || typeof metric !== 'object') return null
+    const value = shownValue(metric)
+    return typeof value === 'number' && Number.isFinite(value) ? value : null
+  })
   return values.some((value) => value === null) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
 }
 const yen = (value: number | null, signed = false) => value === null ? undefined : `${signed && value > 0 ? '+' : ''}${formatYen(value)}`
@@ -92,6 +119,8 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, ex
   const profit = metricSum(overview.routes.map((item) => item.profitAfterAdCost))
   const noCost = overview.routes.filter((item) => shownValue(item.adCost) === null).length
 
+  const safeSearchConsole = safeSearchConsoleHref(overview.searchConsoleHref)
+
   return <>
     <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="友だちになった" icon={<UserPlus size={16} aria-hidden="true" />} value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)} 回から`} />
@@ -104,7 +133,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, ex
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <TextLink href={overview.searchConsoleHref} truncate>Search Console を見る</TextLink>
+        {safeSearchConsole ? <TextLink href={safeSearchConsole} truncate>Search Console を見る</TextLink> : null}
         <CsvExportButton variant="secondary" onClick={onExport} disabled={disabled} disabledReason={exportReason}><Download size={16} aria-hidden="true" />CSVで書き出す</CsvExportButton>
       </div>
       {children ? children(overview) : <RoutesTable overview={overview} clicks={clicks} />}
@@ -127,10 +156,15 @@ function RoutesTable({ overview, clicks }: { overview: AnalyticsRoutesOverview['
       <h2 id="routes-flow-title" className={styles.hoursTitle}>全体の流れ</h2>
       {stages.map((stage, index) => {
         const previous = index > 0 ? stages[index - 1].value : null
-        const rate = previous && stage.value !== null ? `前段の ${(stage.value / previous * 100).toFixed(1)}%` : undefined
+        const rate = previous !== null && previous > 0 && stage.value !== null && stage.value >= 0
+          ? `前段の ${(stage.value / previous * 100).toFixed(1)}%`
+          : undefined
+        const width = stage.value !== null && clicks !== null && clicks > 0
+          ? `${Math.max(0, Math.min(100, (stage.value / clicks) * 100))}%`
+          : '0%'
         return <div key={stage.label} className={styles.routeRow} title={rate}>
           <div className={styles.sideRow}><span className={styles.flowLabel}>{stage.label}</span><strong className={styles.sideValue}>{stage.value === null ? emptyValue('unknown') : `${formatNumber(stage.value)} ${stage.unit}`}</strong></div>
-          <div className={styles.track} data-size="flow" aria-hidden="true"><span style={{ width: stage.value !== null && clicks ? `${Math.min(100, stage.value / clicks * 100)}%` : '0%' }} /></div>
+          <div className={styles.track} data-size="flow" aria-hidden="true"><span style={{ width }} /></div>
         </div>
       })}
     </section>
