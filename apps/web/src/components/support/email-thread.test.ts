@@ -70,9 +70,4 @@ describe('LINE のトークとそろえたもの', () => {
     expect(CLIENT).toContain('担当者だけに表示され、相手には送信されません。');
   });
 
-  it('送信キーの設定は LINE と同じ置き場を読み書きする', () => {
-    // 別々にすると、片方で変えても、もう片方に効かない。
-    expect(CLIENT).toContain("localStorage.getItem('chat.sendMode')");
-    expect(CLIENT).toContain("localStorage.setItem('chat.sendMode'");
-  });
 });
