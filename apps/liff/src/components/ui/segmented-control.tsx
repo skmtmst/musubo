@@ -8,15 +8,15 @@ type SegmentedControlProps<Value extends string> = {
   choices: readonly Choice<Value>[];
   value: Value;
   onChange: (value: Value) => void;
-} & ({ children: ReactNode } | { children?: never });
+} & ({ role?: 'tablist'; children: ReactNode } | { role: 'radiogroup'; children?: never });
 
 /** 中身を切り替えるタブと、表示形式の選択に使う。 */
 export default function SegmentedControl<Value extends string>({
-  label, choices, value, onChange, children,
+  label, choices, value, onChange, children, role = 'tablist',
 }: SegmentedControlProps<Value>) {
   const id = useId();
   const controls = useRef<Array<HTMLButtonElement | null>>([]);
-  const isTabList = children !== undefined;
+  const isTabList = role === 'tablist';
   const active = choices.findIndex((choice) => choice.value === value);
   const panelId = `${id}-panel`;
 
@@ -40,7 +40,7 @@ export default function SegmentedControl<Value extends string>({
 
   return <>
     <div
-      role={isTabList ? 'tablist' : 'radiogroup'}
+      role={role}
       aria-label={label}
       onKeyDown={move}
       className={isTabList ? 'flex min-h-[46px] rounded-(--liff-radius) bg-shell-gray p-[3px]' : 'flex gap-1 rounded-(--liff-radius) bg-liff-chip p-[3px]'}

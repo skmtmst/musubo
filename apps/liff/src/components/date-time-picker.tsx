@@ -679,7 +679,7 @@ export default function DateTimePicker({
       {hint && <p className="text-xs leading-5 text-liff-sub">{hint}</p>}
       {/* 週だけ・月だけの店では切り替えを出さない (見せ方が1つに決まる)。 */}
       {allowedViews(settings.calendarMode).length > 1 && (
-        <SegmentedControl label="表示の切り替え" choices={dateViewChoices} value={view} onChange={switchView} />
+        <SegmentedControl role="radiogroup" label="表示の切り替え" choices={dateViewChoices} value={view} onChange={switchView} />
       )}
 
       {view === 'list' ? (

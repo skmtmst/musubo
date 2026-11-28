@@ -173,6 +173,10 @@ describe('切り替え', () => {
     fireEvent.click(calendar);
     expect(calendar.getAttribute('aria-checked')).toBe('true');
     expect(week.getAttribute('aria-checked')).toBe('false');
+    fireEvent.keyDown(calendar, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(week);
+    expect(week.getAttribute('aria-checked')).toBe('true');
+    expect(calendar.getAttribute('aria-checked')).toBe('false');
   });
 
   it('最初の形は管理画面の設定に従う', async () => {
