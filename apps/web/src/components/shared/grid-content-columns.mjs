@@ -8,37 +8,26 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   if (rows.length < 2 || !frame.clientWidth) return
   const doc = frame.ownerDocument || document
   const number = value => parseFloat(value) || 0
-  const clientWidth = frame.clientWidth
-  const headCells = [...rows[0].children]
-  const count = headCells.length
-  if (count === 0) return
-  const css = getComputedStyle(rows[0])
-  const room = clientWidth - number(css.paddingLeft) - number(css.paddingRight)
-  const gap = number(css.columnGap)
-  const available = room - gap * (count - 1)
-  const headFontSizes = headCells.map(cell => number(getComputedStyle(cell).fontSize))
-
-  const fontKeys = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing', 'lineHeight']
-  // 写しは contain:strict の常駐ホストにすべて置いてから幅を読み、最後にまとめて外す。
-  const copy = node => {
-    if (node.nodeType === 3) return node.cloneNode()
-    if (node.nodeType !== 1) return doc.createTextNode('')
-    // 通信や接続処理を持つ物は実寸の空要素へ。フォームは名前・所属・選択を外し、自然な幅だけ測る。
-    if (node.matches('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,script,style,link,input[type="image"]') || node.localName.includes('-')) {
-      const rect = node.getBoundingClientRect(), placeholder = doc.createElement('span')
-      placeholder.style.cssText = `display:inline-block;width:${rect.width}px;height:${rect.height}px;flex:none`
-      return placeholder
-    }
-    const clone = node.cloneNode(false)
-    for (const attr of ['id', 'name', 'form', 'for', 'autofocus']) clone.removeAttribute(attr)
-    if (node.matches('input')) { clone.checked = false; clone.removeAttribute('checked'); if (node.type !== 'file') clone.value = node.value }
-    if (node.matches('button')) clone.setAttribute('type', 'button')
-    for (const child of node.childNodes) clone.append(copy(child))
-    if (node.matches('textarea')) clone.value = node.value
-    if (node.matches('select')) [...node.options].forEach((option, index) => { if (clone.options[index]) clone.options[index].selected = option.selected })
-    return clone
-  }
+  // 写しは本来の行へすべて置いてから幅を読み、最後にまとめて外す（先祖セレクタの CSS をそのまま再現する）。
   const probes = rows.map(row => [...row.children].map(cell => {
+    const copy = node => {
+      if (node.nodeType === 3) return node.cloneNode()
+      if (node.nodeType !== 1) return doc.createTextNode('')
+      // 通信や接続処理を持つ物は実寸の空要素へ。フォームは名前・所属・選択を外し、自然な幅だけ測る。
+      if (node.matches('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,script,style,link,input[type="image"]') || node.localName.includes('-')) {
+        const rect = node.getBoundingClientRect(), placeholder = doc.createElement('span')
+        placeholder.style.cssText = `display:inline-block;width:${rect.width}px;height:${rect.height}px;flex:none`
+        return placeholder
+      }
+      const clone = node.cloneNode(false)
+      for (const attr of ['id', 'name', 'form', 'for', 'autofocus']) clone.removeAttribute(attr)
+      if (node.matches('input')) { clone.checked = false; clone.removeAttribute('checked'); if (node.type !== 'file') clone.value = node.value }
+      if (node.matches('button')) clone.setAttribute('type', 'button')
+      for (const child of node.childNodes) clone.append(copy(child))
+      if (node.matches('textarea')) clone.value = node.value
+      if (node.matches('select')) [...node.options].forEach((option, index) => { if (clone.options[index]) clone.options[index].selected = option.selected })
+      return clone
+    }
     const probe = copy(cell)
     probe.setAttribute('aria-hidden', 'true')
     probe.setAttribute('inert', '')
@@ -48,75 +37,24 @@ export function fitGridContentColumns(frame, deferCommit = false) {
     probe.style.cssText += ';position:absolute;inset:0 auto auto 0;width:max-content;min-width:0;max-width:none;visibility:hidden;pointer-events:none'
     return probe
   }))
-
-  let host = doc.__gridColumnProbeHost
-  if (!host || !host.isConnected) {
-    host = doc.createElement('div')
-    host.setAttribute('data-grid-column-probe-host', '')
-    host.setAttribute('aria-hidden', 'true')
-    host.setAttribute('inert', '')
-    host.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;contain:strict'
-    doc.documentElement.append(host)
-    doc.__gridColumnProbeHost = host
-  }
-  let probeTable = host.__probeTable
-  if (!probeTable || !probeTable.isConnected) {
-    probeTable = doc.createElement('div')
-    probeTable.setAttribute('data-grid-probe-table', '')
-    host.append(probeTable)
-    host.__probeTable = probeTable
-  }
-  probeTable.className = frame.className
-  if (frame.dataset.tablePresentation) probeTable.dataset.tablePresentation = frame.dataset.tablePresentation
-  else delete probeTable.dataset.tablePresentation
-  probeTable.style.cssText = 'position:relative;display:block'
-  const frameCss = getComputedStyle(frame)
-  for (const key of fontKeys) {
-    if (frameCss[key]) probeTable.style[key] = frameCss[key]
-  }
-  for (let i = 0; i < frame.style.length; i++) {
-    const prop = frame.style[i]
-    if (prop.startsWith('--')) probeTable.style.setProperty(prop, frame.style.getPropertyValue(prop))
-  }
-
-  const probeRows = rows.map((row, rowIndex) => {
-    let probeRow = probeTable.children[rowIndex]
-    if (!probeRow) {
-      probeRow = doc.createElement('div')
-      probeRow.setAttribute('data-grid-probe-row', '')
-      probeTable.append(probeRow)
-    }
-    probeRow.className = row.className
-    if (row.hasAttribute('data-head')) probeRow.setAttribute('data-head', '')
-    else probeRow.removeAttribute('data-head')
-    const rowStyle = rowIndex === 0 ? css : getComputedStyle(row)
-    for (const key of fontKeys) {
-      if (probeRow.style[key] !== rowStyle[key]) probeRow.style[key] = rowStyle[key]
-    }
-    probeRow.style.position = 'relative'
-    probeRow.style.display = 'block'
-    return probeRow
-  })
-  while (probeTable.children.length > rows.length) probeTable.lastElementChild.remove()
-
   let measured
   try {
-    probeRows.forEach((probeRow, index) => probeRow.append(...probes[index]))
+    rows.forEach((row, index) => row.append(...probes[index]))
     measured = probes.map(row => row.map(probe => Math.ceil(probe.getBoundingClientRect().width)))
   } finally {
     for (const row of probes) for (const probe of row) probe.remove()
-    probeTable.className = ''
-    delete probeTable.dataset.tablePresentation
-    for (const probeRow of probeRows) {
-      probeRow.className = ''
-      probeRow.removeAttribute('data-head')
-    }
   }
-
+  const css = getComputedStyle(rows[0])
+  const headCells = [...rows[0].children]
+  const count = headCells.length
+  if (count === 0) return
+  const room = frame.clientWidth - number(css.paddingLeft) - number(css.paddingRight)
+  const gap = number(css.columnGap)
+  const available = room - gap * (count - 1)
   const wanted = headCells.map((_, index) => Math.max(...measured.map(row => row[index] ?? 0)))
   const fixed = headCells.map((_, index) => rows.some(row => row.children[index]?.querySelector('button,input,[role="button"]')))
   // 見出しが読める実幅を下限にする。無題の列も実際の1文字分を残す。
-  const minimum = wanted.map((width, index) => fixed[index] ? width : Math.min(width, Math.max(measured[0][index] ?? 0, headFontSizes[index])))
+  const minimum = wanted.map((width, index) => fixed[index] ? width : Math.min(width, Math.max(measured[0][index] ?? 0, number(getComputedStyle(headCells[index]).fontSize))))
   const minimumTotal = minimum.reduce((sum, width) => sum + width, 0)
 
   let commit

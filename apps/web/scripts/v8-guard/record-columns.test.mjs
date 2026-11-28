@@ -176,30 +176,17 @@ test('Grid内容列は見出し幅を守り、境界で既存段組みへ戻し�
     const batching = await page.locator('.table').evaluate(frame => {
       const original = Element.prototype.getBoundingClientRect
       const counts = []
-      const liveCounts = []
       Element.prototype.getBoundingClientRect = function () {
-        if (this.hasAttribute('data-column-probe')) {
-          counts.push(document.querySelectorAll('[data-column-probe]').length)
-          liveCounts.push(frame.querySelectorAll('[data-column-probe]').length)
-        }
+        if (this.hasAttribute('data-column-probe')) counts.push(frame.querySelectorAll('[data-column-probe]').length)
         return original.call(this)
       }
       window.gridProbeCounts = counts
-      window.gridLiveProbeCounts = liveCounts
       window.restoreGridProbe = () => { Element.prototype.getBoundingClientRect = original }
       return frame.querySelectorAll('[role="row"] > *').length
     })
-    // 常駐の隔離ホストで全セル分の probe をまとめて置いてから測り、生の表の行へは挿さない。
     await page.locator('.table').evaluate(fitGridContentColumns)
-    const { counts, liveCounts } = await page.evaluate(() => {
-      window.restoreGridProbe()
-      return {
-        counts: window.gridProbeCounts,
-        liveCounts: window.gridLiveProbeCounts,
-      }
-    })
+    const counts = await page.evaluate(() => { window.restoreGridProbe(); return window.gridProbeCounts })
     assert.ok(counts.length > 0 && counts.every(count => count === batching), JSON.stringify(counts))
-    assert.ok(liveCounts.every(count => count === 0), JSON.stringify(liveCounts))
     assert.equal(await page.locator('[data-column-probe]').count(), 0)
   } finally { await browser.close() }
 })
@@ -493,5 +480,31 @@ test('同じ処理の中で測る→body の class や frame の CSS 変数で�
     assert.ok(result.afterBodyClass.buttonWidth >= 90, JSON.stringify(result))
     assert.ok(result.afterBodyClass.cellWidth >= result.afterBodyClass.buttonWidth, `same-turn body class change must expand column: ${JSON.stringify(result)}`)
     assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+  } finally { await browser.close() }
+})
+
+test('先祖の class を含む CSS（.panel .table button）でボタン余白を広げた GridTable でも操作列がボタン幅に合う', async () => {
+  const { fitGridContentColumns } = await import('../../src/components/shared/grid-content-columns.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/grid-table.module.css')}*{box-sizing:border-box}:root{--tpl-list-inset:24px;--polish-table-row:56px;--polish-table-head:40px;--polish-space-row:8px;--space-4:4px}.table{width:800px;--grid-table-columns:minmax(0,1fr) 120px;--grid-table-rest-columns:120px;--grid-table-gap:16px;--grid-table-row-padding:0 24px;font:14px Arial}.text{display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}button{font:inherit;white-space:nowrap;padding:0 4px}.panel .table button{padding:0 40px}</style><main><div class="panel"><div class="table" role="table"><div class="row" role="row"><span class="cell">名前</span><span class="cell">操作</span></div><div class="row" role="row"><span class="cell text">担当者 1</span><span class="cell"><button>開く</button></span></div></div></div></main>`)
+    await page.locator('.table').evaluate(fitGridContentColumns)
+    const measured = await page.locator('.table').evaluate(frame => {
+      const cell = frame.querySelector('[role="row"]:last-child > .cell:last-child')
+      const button = cell.querySelector('button')
+      return {
+        columns: frame.style.getPropertyValue('--grid-table-content-columns'),
+        cellWidth: Math.round(cell.getBoundingClientRect().width),
+        buttonWidth: Math.round(button.getBoundingClientRect().width),
+        overflow: frame.scrollWidth - frame.clientWidth,
+        buttonRight: Math.round(button.getBoundingClientRect().right - frame.getBoundingClientRect().right),
+      }
+    })
+    assert.ok(measured.buttonWidth >= 90, JSON.stringify(measured))
+    assert.ok(measured.cellWidth >= measured.buttonWidth, `ancestor-scoped CSS must apply to grid probe: ${JSON.stringify(measured)}`)
+    assert.equal(measured.overflow, 0, JSON.stringify(measured))
+    assert.ok(measured.buttonRight <= 0, JSON.stringify(measured))
+    assert.equal(await page.locator('[data-column-probe]').count(), 0)
   } finally { await browser.close() }
 })

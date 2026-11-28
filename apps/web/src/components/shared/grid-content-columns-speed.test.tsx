@@ -123,8 +123,8 @@ function TemplateLikeTable({ rows }: { rows: { name: string; preview: string; st
   )
 }
 
-describe('grid-content-columns の常駐プローブと deferCommit', () => {
-  it('生の行要素へプローブを挿さず contain:strict の常駐ホストで測り、呼び出しごとに最新の内容を測り直す', () => {
+describe('grid-content-columns の deferCommit と本来の行での計測', () => {
+  it('本来の行の中でプローブをまとめて測り、計測後に残さず片づけ、呼び出しごとに最新の内容を測り直す', () => {
     let clientWidth = 800
     let probeReads = 0
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
@@ -154,17 +154,14 @@ describe('grid-content-columns の常駐プローブと deferCommit', () => {
 
     fitGridContentColumns(frame)
 
-    expect(liveRowAppend).not.toHaveBeenCalled()
+    expect(liveRowAppend).toHaveBeenCalledTimes(1)
     expect(bodyAppend).not.toHaveBeenCalled()
     expect(probeReads).toBe(12)
-    const hosts = document.documentElement.querySelectorAll<HTMLElement>('[data-grid-column-probe-host]')
-    expect(hosts).toHaveLength(1)
-    expect(hosts[0].style.contain).toBe('strict')
     expect(document.querySelectorAll('[data-column-probe]')).toHaveLength(0)
     const cols800 = frame.style.getPropertyValue('--grid-table-content-columns')
     expect(cols800).not.toBe('')
 
-    // リサイズ・文字変更のどちらでも常駐ホストを再利用して測り直し、生の行へは挿さない
+    // リサイズ・文字変更のどちらでも毎回測り直し、計測後にプローブを残さない
     probeReads = 0
     clientWidth = 640
     fitGridContentColumns(frame)
@@ -175,8 +172,6 @@ describe('grid-content-columns の常駐プローブと deferCommit', () => {
     row0.children[1].textContent = 'short@a.test'
     fitGridContentColumns(frame)
     expect(probeReads).toBe(12)
-    expect(liveRowAppend).not.toHaveBeenCalled()
-    expect(document.documentElement.querySelectorAll('[data-grid-column-probe-host]')).toHaveLength(1)
     expect(document.querySelectorAll('[data-column-probe]')).toHaveLength(0)
 
     clearGridContentColumns(frame)
