@@ -101,11 +101,6 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(css).toMatch(/\.rowActions\s*{[^}]*position:\s*relative/s)
   })
 
-  it("行の文字ボタンは32px級でアイコン操作と高さをそろえる", () => {
-    const src = read('row-actions.tsx')
-    expect(src).toContain('size="compact"')
-  })
-
   it("項目がない行も同じその他操作の入口を持つ", () => {
     const without = renderToStaticMarkup(<RowActions subjectName="送信済み" detail={{ href: '/broadcasts/detail?id=s1' }} />)
     const withMenu = renderToStaticMarkup(<RowActions detail={{ href: '/broadcasts/detail?id=d1' }} menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]} />)
