@@ -52,7 +52,7 @@ const STEP_SHORT: Record<string, string> = {
 
 /** 版の処理の並びを1行にする。 */
 export function stepChain(actions: CommonActionStep[]): string {
-  if (!validVersionActions(actions)) return '処理の内容を確認できません'
+  if (!validVersionActions(actions)) return '処理の内容を読み取れません'
   if (actions.length === 0) return '処理はありません'
   return actions.map((step) => {
     if (step.type === 'wait') return automationWaitLabel(step.params)
@@ -397,7 +397,7 @@ function VersionsInner() {
           <section>
             <p className={styles.compareLabel}>変わった点</p>
             <ul className={styles.changeList}>
-              {(validVersionActions(pendingVersion.actions) && validVersionActions(published.actions) ? describeVersionChanges(pendingVersion.actions, published.actions) : ['変更内容を確認できません']).map((line) => <li key={line}>{line}</li>)}
+              {(validVersionActions(pendingVersion.actions) && validVersionActions(published.actions) ? describeVersionChanges(pendingVersion.actions, published.actions) : ['変更内容を読み取れません']).map((line) => <li key={line}>{line}</li>)}
             </ul>
           </section>
         ) : null}

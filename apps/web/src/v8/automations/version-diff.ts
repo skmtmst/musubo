@@ -165,7 +165,7 @@ export function describeVersionChanges(
   previous: CommonActionStep[],
   current: CommonActionStep[],
 ): string[] {
-  if (!isValidActions(previous) || !isValidActions(current)) return ['変更内容を確認できません']
+  if (!isValidActions(previous) || !isValidActions(current)) return ['変更内容を読み取れません']
   const lines: string[] = []
   const previousById = new Map(previous.map((step) => [step.id, step]))
   const currentById = new Map(current.map((step) => [step.id, step]))
@@ -191,12 +191,12 @@ export function versionChangeLines(
   version: { versionNumber: number; actions: CommonActionStep[] },
   versions: Array<{ versionNumber: number; actions: CommonActionStep[] }>,
 ): string[] {
-  if (!version || !Array.isArray(versions) || !validVersionActions(version.actions)) return ['変更内容を確認できません']
+  if (!version || !Array.isArray(versions) || !validVersionActions(version.actions)) return ['変更内容を読み取れません']
   const previous = versions
     .filter((item) => item && typeof item.versionNumber === 'number' && Number.isFinite(item.versionNumber) && item.versionNumber < version.versionNumber)
     .sort((left, right) => right.versionNumber - left.versionNumber)[0]
   if (!previous) return ['はじめて公開した']
-  if (!validVersionActions(previous.actions)) return ['変更内容を確認できません']
+  if (!validVersionActions(previous.actions)) return ['変更内容を読み取れません']
   if (previous.actions.length !== version.actions.length) {
     return [`処理を${formatNumber(previous.actions.length)} 個から${formatNumber(version.actions.length)} 個にした`]
   }

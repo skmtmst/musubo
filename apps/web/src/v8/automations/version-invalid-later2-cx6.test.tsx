@@ -38,18 +38,18 @@ it.each(['typeなし', 'paramsなし', 'paramsが配列', 'idなし'] as const)(
   render(<Versions />)
   fireEvent.click(await screen.findByRole('button', { name: '第2版へ更新する' }))
   const dialog = screen.getByRole('dialog', { name: 'この利用先を第2版へ更新しますか' })
-  expect(within(dialog).getByText('変更内容を確認できません')).toBeTruthy()
+  expect(within(dialog).getByText('変更内容を読み取れません')).toBeTruthy()
   expect(within(dialog).queryByText('内容の変更はありません')).toBeNull()
 })
 
 it('版の処理数が違っても、不正な要素は変更内容を確認できないとする', () => {
   const previous = { versionNumber: 1, actions: [{ id: 'x', type: 'wait', params: {}, onFailure: 'stop' }] as CommonActionStep[] }
   const version = { versionNumber: 2, actions: [{ id: 'x' }, { id: 'y' }] as unknown as CommonActionStep[] }
-  expect(versionChangeLines(version, [previous, version])).toEqual(['変更内容を確認できません'])
+  expect(versionChangeLines(version, [previous, version])).toEqual(['変更内容を読み取れません'])
 })
 
 it('前の版に不正な処理がある場合も変更内容を確認できないとする', () => {
   const previous = { versionNumber: 1, actions: [{ id: 'x', type: 'wait', params: null }] as unknown as CommonActionStep[] }
   const version = { versionNumber: 2, actions: [{ id: 'x', type: 'wait', params: {}, onFailure: 'stop' }] as CommonActionStep[] }
-  expect(versionChangeLines(version, [previous, version])).toEqual(['変更内容を確認できません'])
+  expect(versionChangeLines(version, [previous, version])).toEqual(['変更内容を読み取れません'])
 })
