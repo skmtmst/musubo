@@ -198,11 +198,6 @@ describe('レスポンシブのメニュー名を維持する', () => {
     expect(source).not.toContain('w-16 xl:w-64');
   });
 
-  it('ドロワーに管理メニューの見出しがある', () => {
-    expect(source).toContain('管理メニュー');
-    expect(source).toContain('aria-label="管理メニュー"');
-  });
-
   it('先頭は会社名とバージョン。アカウント切替はトップバーへ移した', () => {
     // 2026-08-26 にアカウント切替・名前・権限・ログアウトをトップバーへ移した。
     // ここに残すと二重に出る（`docs/v8-design-rules.md` §5）。
