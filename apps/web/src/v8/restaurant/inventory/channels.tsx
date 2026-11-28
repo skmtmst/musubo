@@ -98,8 +98,14 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
   const [addresses, setAddresses] = useState<RestaurantIntakeAddress[] | null>(null)
   const [channels, setChannels] = useState<RestaurantChannel[] | null>(null)
   const [emails, setEmails] = useState<InboundEmail[] | null>(null)
-  const [total, setTotal] = useState(0)
+  const [total, setTotal] = useState<number | null>(null)
   const [failed, setFailed] = useState(false)
+  const [channelsError, setChannelsError] = useState('')
+  const [addressesError, setAddressesError] = useState('')
+  const [emailsError, setEmailsError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const loadingRef = useRef(false)
+  const loadSeqRef = useRef(0)
   const [howToOpen, setHowToOpen] = useState(false)
   const [preparingChannel, setPreparingChannel] = useState<RestaurantChannel | null>(null)
   const [reissueOpen, setReissueOpen] = useState(false)
@@ -129,26 +135,55 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
   const [reload, setReload] = useState(0)
 
   useEffect(() => {
-    let alive = true
+    const seq = ++loadSeqRef.current
+    loadingRef.current = true
+    setLoading(true)
     setFailed(false)
-    Promise.all([
+    setChannelsError('')
+    setAddressesError('')
+    setEmailsError('')
+    void Promise.allSettled([
       /* 取り込みアドレスと読めなかったメールは管理者だけの口。閲覧のみでは空として扱う。 */
-      canEdit ? restaurantTestApi.listIntakeAddresses(accountId, storeId).then((res) => res.data) : Promise.resolve([]),
+      canEdit ? restaurantTestApi.listIntakeAddresses(accountId, storeId).then((res) => res.data) : Promise.resolve([] as RestaurantIntakeAddress[]),
       fetchApi<{ success: true; data: RestaurantChannel[] }>(`/api/restaurant-test/channels?${accountQuery(accountId, storeId)}`).then((res) => res.data),
       canEdit
         ? fetchApi<{ success: true; data: InboundEmail[]; total: number }>(`/api/restaurant-test/inbound-emails?${accountQuery(accountId, storeId)}&status=quarantined`).then((res) => res)
         : Promise.resolve({ data: [] as InboundEmail[], total: 0 }),
-    ]).then(([addr, chans, mails]) => {
-      if (!alive) return
-      setAddresses(Array.isArray(addr) ? addr : [])
-      setChannels(Array.isArray(chans) ? chans : [])
-      setEmails(Array.isArray(mails.data) ? mails.data : [])
-      setTotal(mails.total ?? 0)
-    }).catch(() => {
-      if (alive) setFailed(true)
+    ]).then(([addrRes, chansRes, mailsRes]) => {
+      if (seq !== loadSeqRef.current) return
+      loadingRef.current = false
+      setLoading(false)
+      if (chansRes.status === 'rejected') {
+        setFailed(true)
+        setChannelsError(describeApiFailure(chansRes.reason, '予約経路の読み込み'))
+        return
+      }
+      setChannels(Array.isArray(chansRes.value) ? chansRes.value : [])
+      if (addrRes.status === 'fulfilled') {
+        setAddresses(Array.isArray(addrRes.value) ? addrRes.value : [])
+      } else {
+        setAddresses(null)
+        setAddressesError(describeApiFailure(addrRes.reason, '取り込みアドレスの読み込み'))
+      }
+      if (mailsRes.status === 'fulfilled') {
+        setEmails(Array.isArray(mailsRes.value.data) ? mailsRes.value.data : [])
+        setTotal(mailsRes.value.total ?? 0)
+      } else {
+        setEmails(null)
+        setTotal(null)
+        setEmailsError(describeApiFailure(mailsRes.reason, '読めなかったメールの読み込み'))
+      }
     })
-    return () => { alive = false }
+    return () => {
+      loadSeqRef.current += 1
+      loadingRef.current = false
+    }
   }, [accountId, storeId, canEdit, reload])
+
+  const retryLoad = () => {
+    if (loadingRef.current) return
+    setReload((n) => n + 1)
+  }
 
   const address = addresses?.[0]?.address ?? null
 
@@ -187,9 +222,9 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
   }
 
   if (failed) {
-    return <ListState kind="error" description="予約経路を読み込めませんでした。" onRetry={() => setReload((n) => n + 1)} />
+    return <ListState kind="error" title="予約経路を読み込めませんでした" description={channelsError || '予約経路を読み込めませんでした。'} onRetry={retryLoad} />
   }
-  if (!addresses || !channels || !emails) return <ListState kind="loading" />
+  if (!channels) return <ListState kind="loading" />
 
   const automaticChannels = channels.filter((channel) => channel.receiveMethod !== 'manual' && channel.status !== 'preparing')
   const received = automaticChannels.some((channel) => channel.todayCount === null)
@@ -212,16 +247,21 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
         <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-intake-title">
           <CardHeader size="stacked" titleId="rs-intake-title" title="予約メールの取り込みアドレス" />
           <p className={styles.cardText}>予約サイトから届く予約のお知らせメールを、このアドレスへ転送すると台帳に入ります。</p>
+          {addressesError ? (
+            <Notice tone="danger" action={<Button onClick={retryLoad} disabled={loading} busy={loading}>もう一度読み込む</Button>}>
+              {addressesError}
+            </Notice>
+          ) : null}
           <Field label="取り込みアドレス" htmlFor="rs-intake-address" optional={false}>
             <div className={styles.addressBox}>
-              <TextField id="rs-intake-address" readOnly title={address ?? undefined} value={address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')} />
+              <TextField id="rs-intake-address" readOnly title={address ?? undefined} value={addressesError ? '読み込めませんでした' : address ?? (canEdit ? 'まだ発行されていません' : '管理者だけが見られます')} />
               {address ? <CopyTextButton variant="secondary" icon={<Copy size={16} aria-hidden="true" />} value={address} aria-label="取り込みアドレスをコピー" /> : null}
             </div>
           </Field>
           <div className={styles.cardActions}>
             <Button onClick={() => setHowToOpen(true)}><CircleHelp size={16} aria-hidden="true" />転送の設定のしかた</Button>
             <Button href="/restaurant-test/reservations"><FlaskConical size={16} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
-            {address
+            {addressesError ? null : address
               ? <Button lockedReason={lockedReason} onClick={() => { reissueTicket.current = {}; setReissueScope(scope); setReissueOpen(true) }} disabled={!canEdit || busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
               : <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>}
           </div>
@@ -230,7 +270,7 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
           <CardHeader size="stacked" titleId="rs-today-title" title="今日の取り込み" />
           <div className={styles.todayStats} title={`${dayLabelParen(date)}0:00〜いま`}>
             <KpiCard className={styles.todayStat} title="取り込んだ" value={received} unit={received === null ? '' : '件'} detail={null} icon={null} presentation="inline" />
-            <KpiCard className={styles.todayStat} title="読めなかった" value={total} unit="件" detail={null} icon={null} presentation="inline" valueTone={total > 0 ? 'danger' : 'default'} />
+            <KpiCard className={styles.todayStat} title="読めなかった" value={emailsError || total === null ? null : total} unit={emailsError || total === null ? '' : '件'} detail={null} icon={null} presentation="inline" valueTone={!emailsError && total !== null && total > 0 ? 'danger' : 'default'} loading={loading && emails === null && !emailsError} />
           </div>
         </Card>
       </div>
@@ -268,7 +308,11 @@ export default function ChannelsBoard({ accountId, storeId, storeName, date, can
         <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.card} aria-labelledby="rs-unread-title">
           <CardHeader size="stacked" titleId="rs-unread-title" title="読めなかったもの" />
           <p className={styles.cardText}>本文は出さない</p>
-          {emails.length === 0 ? (
+          {emailsError ? (
+            <ListState kind="error" title="読めなかったメールを読み込めませんでした" description={emailsError} onRetry={retryLoad} />
+          ) : !emails ? (
+            <ListState kind="loading" />
+          ) : emails.length === 0 ? (
             <ListState kind="empty" title="いま残っているものはありません" description="読めなかった予約メールは、ここに残ります。" />
           ) : emails.map((mail) => (
             <div key={mail.id} className={styles.unreadRow}>
