@@ -211,3 +211,32 @@ it.each([1, 2])('保存済みの第%i階層に rules がないとき、落ちず
   expect(screen.getByText('保存された数えない条件を確認できません。条件を見直してください。')).toBeTruthy()
   expect(submitted).toBe(false)
 })
+
+it('壊れた条件を外してから保存すると、除外なしを送る', async () => {
+  items[0].sourceConfig = { exclusion: { operator: 'AND', rules: [], groups: [{ operator: 'OR' }] } }
+  let sent: unknown = null
+  const baseFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/conversions/definitions/cp-1/revise') {
+      sent = JSON.parse(String(init?.body))
+      return json({ success: true, data: { id: 'cp-1', version: 4 } })
+    }
+    return baseFetch(input, init)
+  })
+  await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+  await flush()
+  expect(screen.getByText('保存された数えない条件の形が読めません。外してから、もう一度作ってください。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'この条件を外す' }))
+  expect(screen.getByRole('button', { name: '追加する条件を選択する' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
+  await waitFor(() => expect(sent).toMatchObject({ sourceConfig: { exclusion: null } }))
+})
+
+it('閲覧のみでは編集画面を開けず、条件を外せない', async () => {
+  items[0].sourceConfig = { exclusion: { operator: 'AND', rules: [], groups: [{ operator: 'OR' }] } }
+  role.value = verifiedStaffRole('viewer')
+  await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+  await flush()
+  expect(screen.getByText('この成果地点を編集できません')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'この条件を外す' })).toBeNull()
+})

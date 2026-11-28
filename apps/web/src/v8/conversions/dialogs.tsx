@@ -472,6 +472,7 @@ export interface ConversionEditDialogProps {
   setEditTarget: (target: ConversionDefinitionListItem | null) => void
   editForm: EditForm | null
   invalidExclusion?: boolean
+  canEdit?: boolean
   setEditForm: Dispatch<SetStateAction<EditForm | null>>
   editValueModeNotice: string | null
   setEditValueModeNotice: (notice: string | null) => void
@@ -488,6 +489,7 @@ export function ConversionEditDialog(props: ConversionEditDialogProps & { surfac
     setEditTarget,
     editForm,
     invalidExclusion,
+    canEdit = true,
     setEditForm,
     editValueModeNotice,
     setEditValueModeNotice,
@@ -610,7 +612,11 @@ export function ConversionEditDialog(props: ConversionEditDialogProps & { surfac
           {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
           <div id="cv-edit-exclusion" aria-invalid={editFieldIssue?.field === 'cv-edit-exclusion' || undefined}>
             <Field label="数えない条件" error={editFieldIssue?.field === 'cv-edit-exclusion' ? editFieldIssue.message : undefined}>
-              {invalidExclusion ? <p>数えない条件を表示できません。</p> : <ConditionBuilder
+              {invalidExclusion ? <Notice
+                tone="warn"
+                message="保存された数えない条件の形が読めません。外してから、もう一度作ってください。"
+                action={<Button type="button" variant="secondary" disabled={editSaving} lockedReason={canEdit ? undefined : 'この操作にはオーナーか管理者の権限が要ります'} onClick={() => { if (canEdit) setEditForm({ ...editForm, exclusion: null }) }}>この条件を外す</Button>}
+              /> : <ConditionBuilder
                 value={editForm.exclusion}
                 onChange={(next) => setEditForm({ ...editForm, exclusion: next })}
                 label="数えない条件"

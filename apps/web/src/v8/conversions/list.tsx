@@ -1205,6 +1205,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           setEditTarget={(target) => { setEditTarget(target); if (!target && editId) router.push('/conversions') }}
           editForm={editForm}
           invalidExclusion={Boolean(editForm?.exclusion && exclusionHasInvalidShape(editForm.exclusion))}
+          canEdit={canEdit}
           setEditForm={(next) => {
             const changed = typeof next === 'function' ? next(editForm) : next
             if (editFieldIssue && editForm && changed) {
