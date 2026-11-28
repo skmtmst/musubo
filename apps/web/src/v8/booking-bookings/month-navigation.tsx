@@ -9,16 +9,37 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import IconButton from '@/components/shared/icon-button'
 import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
+const YEAR_MONTH = /^(\d{4})-(0[1-9]|1[0-2])$/
+
+function isValidIsoDate(value: string | undefined): value is string {
+  if (typeof value !== 'string') return false
+  const match = ISO_DATE.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const check = new Date(Date.UTC(year, month - 1, day))
+  return check.getUTCFullYear() === year && check.getUTCMonth() + 1 === month && check.getUTCDate() === day
+}
+
 export function monthKey(offset: number, anchor?: string): string {
-  const parsed = anchor ? new Date(`${anchor}T00:00:00+09:00`) : new Date(Date.now())
+  const parsed = isValidIsoDate(anchor) ? new Date(`${anchor}T00:00:00+09:00`) : new Date(Date.now())
   const now = Number.isNaN(parsed.getTime()) ? new Date(Date.now()) : parsed
+  const safeOffset = Number.isInteger(offset) ? offset : 0
   const jst = japanCalendar(now)
-  return new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + offset, 1)).toISOString().slice(0, 7)
+  const target = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + safeOffset, 1))
+  if (!Number.isFinite(target.getTime())) {
+    return new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), 1)).toISOString().slice(0, 7)
+  }
+  return target.toISOString().slice(0, 7)
 }
 
 export function monthLabel(key: string): string {
-  const [year, month] = key.split('-').map(Number)
-  return `${year}年${month}月`
+  if (typeof key !== 'string') return '—'
+  const match = YEAR_MONTH.exec(key)
+  if (!match) return '—'
+  return `${Number(match[1])}年${Number(match[2])}月`
 }
 
 export default function LedgerMonthNavigation({ anchor, onChange, shareUrl, historyUrl }: {
