@@ -17,11 +17,28 @@ export interface OrderedRule {
 export const PRIORITY_MIN = -9999
 export const PRIORITY_MAX = 9999
 
+function isValidPriority(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= PRIORITY_MIN && value <= PRIORITY_MAX
+}
+
+function sortablePriority(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER
+}
+
+function sortableCreatedAt(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
 /** Worker の ORDER BY と同じ：小さいほど先・同じなら作った順。 */
 export function inEvaluationOrder<T extends OrderedRule>(rules: T[]): T[] {
-  return [...rules].sort(
-    (a, b) => a.priority - b.priority || a.createdAt.localeCompare(b.createdAt),
-  )
+  if (!Array.isArray(rules)) return []
+  return rules
+    .filter((rule): rule is T => Boolean(rule) && typeof rule === 'object')
+    .sort(
+      (a, b) =>
+        sortablePriority(a.priority) - sortablePriority(b.priority) ||
+        sortableCreatedAt(a.createdAt).localeCompare(sortableCreatedAt(b.createdAt)),
+    )
 }
 
 export interface PriorityUpdate {
@@ -40,28 +57,34 @@ export function movePriorityUpdates(
   id: string,
   delta: -1 | 1,
 ): PriorityUpdate[] | null {
-  const index = ordered.findIndex((rule) => rule.id === id)
+  if (!Array.isArray(ordered) || !id) return null
+  const index = ordered.findIndex((rule) => rule && rule.id === id)
   const nextIndex = index + delta
   if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return null
   const current = ordered[index]
   const neighbor = ordered[nextIndex]
-  if (current.priority !== neighbor.priority) {
-    return [
-      { id: current.id, priority: neighbor.priority },
-      { id: neighbor.id, priority: current.priority },
-    ]
+  if (!current || !neighbor) return null
+  if (isValidPriority(current.priority) && isValidPriority(neighbor.priority)) {
+    if (current.priority !== neighbor.priority) {
+      return [
+        { id: current.id, priority: neighbor.priority },
+        { id: neighbor.id, priority: current.priority },
+      ]
+    }
+    const moved = current.priority + delta
+    if (moved >= PRIORITY_MIN && moved <= PRIORITY_MAX) {
+      return [{ id: current.id, priority: moved }]
+    }
   }
-  const moved = current.priority + delta
-  if (moved >= PRIORITY_MIN && moved <= PRIORITY_MAX) {
-    return [{ id: current.id, priority: moved }]
-  }
-  // 端で詰まった同点：順序だけ変えて全件を振り直す（変わる行だけ返す）。
+  // 端で詰まった同点や不正な優先度値：順序だけ変えて全件を安全範囲で振り直す（変わる行だけ返す）。
   const reordered = [...ordered]
   const [picked] = reordered.splice(index, 1)
   reordered.splice(nextIndex, 0, picked)
   const updates: PriorityUpdate[] = []
   reordered.forEach((rule, position) => {
-    if (rule.priority !== position) updates.push({ id: rule.id, priority: position })
+    if (!rule || typeof rule.id !== 'string' || !rule.id) return
+    const nextPriority = Math.min(PRIORITY_MAX, Math.max(PRIORITY_MIN, position))
+    if (rule.priority !== nextPriority) updates.push({ id: rule.id, priority: nextPriority })
   })
   return updates
 }
