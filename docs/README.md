@@ -1,11 +1,8 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
-- [統合ユーザーのCSV書き出しの試験の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx6-31-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
 # 文書の入口
-
-- [通知記録の既読案内の確認](release-log/unreleased/PR-kenta-src-assert-cx2-27-1128.md)
 
 
 目的を選び、文書を開いてください。動きの正本は要件の索引と追加要件、見た目はV8の決まりと画面ごとのPencilです。未実装・未検証・未配備を、要件に書かれていることだけで完了にしません。
@@ -14,7 +11,6 @@
 
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
-- [シナリオ一括プレビューの確認の反映履歴](release-log/unreleased/PR-kenta-src-assert-cx2-05-1128.md)（説明・2026-11-28確認）
 - [列車4の画面修正の反映履歴](release-log/unreleased/243-kenta-train4-1126.md)
 - [動作確認の名前を整理](release-log/unreleased/155-kenta-q04-test-titles.md)
 - [動作確認の名前を整理（続き）](release-log/unreleased/159-kenta-q04-test-titles2.md)
@@ -1451,4 +1447,3 @@
 - [列車11の画面と記録の修正](release-log/unreleased/270-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
 - [列車12の画面と試験の修正](release-log/unreleased/274-kenta-train-d-1128.md) — 反映履歴、確認 2026-11-28。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
-- [日本時間のうるう日と年越しの確認を追加](release-log/unreleased/PR-kenta-src-assert-cx3-16-1128.md) — 反映履歴、確認 2026-11-28。
