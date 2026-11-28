@@ -7,8 +7,8 @@ import type { CommonVar, CommonVarDeleteImpact, CommonVarDeleteImpactItem } from
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { requiredText, type FormRequirement } from '@/lib/form-requirement'
 
-function validNonNegInt(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+export function validNonNegInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
 export const reasonRequirement = requiredText('理由を入力してください。')
@@ -156,7 +156,7 @@ export function canDelete(input: {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
-  if (!validNonNegInt(impact.total)) return false
+  if (!validNonNegInt(impact.total) || !validNonNegInt(impact.blockingTotal)) return false
   if (reasonRequirement.check(input.reason)) return false
   return typedKeyRequirement(impact).check(input.typedKey) === null
 }
@@ -176,7 +176,7 @@ export function blockedReason(input: {
     return `${formatNumber(impact.blockingTotal)}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
-  if (!validNonNegInt(impact.total)) return '使用先件数を確認できないため削除できません。画面を読み直してからお試しください。'
+  if (!validNonNegInt(impact.total) || !validNonNegInt(impact.blockingTotal)) return '使用先件数を確認できないため削除できません。画面を読み直してからお試しください。'
   if (reasonRequirement.check(input.reason)) return '消した理由を入力してください。'
   const keyProblem = typedKeyRequirement(impact).check(input.typedKey)
   if (keyProblem) return keyProblem

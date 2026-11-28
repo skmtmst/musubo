@@ -5,7 +5,7 @@ import { api,type CommonVarReplacementCandidate,type CommonVarReplacementImpact 
 import type { CommonVar,CommonVarDeleteImpact } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { MAX_BATCH_DELETE_COUNT } from './list-model'
-import { reasonRequirement } from './model'
+import { reasonRequirement, validNonNegInt } from './model'
 import { formatNumber } from '@/lib/format'
 
 type OpenCommonVarDeleteContext = {
@@ -129,6 +129,7 @@ export async function prepareCommonVarRemoval({ batchRequestRef, items, saveErro
         [...selected].map(async (id) => {
           const response = await api.commonVars.deleteImpact(id, request.accountId)
           if (!response.success) throw new Error(response.error)
+          if (!response.data || typeof response.data.canDelete !== 'boolean' || !validNonNegInt(response.data.total) || !validNonNegInt(response.data.blockingTotal)) throw new Error('invalid_delete_impact')
           return { id, impact: response.data }
         }),
       )
