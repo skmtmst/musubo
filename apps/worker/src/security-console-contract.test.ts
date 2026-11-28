@@ -74,7 +74,7 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
     }
     return false;
   }
-  function closedSet(name:string):boolean {
+  function closedSet(name:string,literalPattern=/^[a-z][a-z0-9_]{0,95}$/):boolean {
     if(shadows(file,'Set'))return false;
     const declarations:ts.VariableDeclaration[]=[];
     function collect(node:ts.Node){if(ts.isVariableDeclaration(node)&&ts.isIdentifier(node.name)&&node.name.text===name)declarations.push(node);ts.forEachChild(node,collect);}
@@ -86,7 +86,7 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
     const entries=unwrap(initializer.arguments[0]);
     if(!ts.isArrayLiteralExpression(entries)||!entries.elements.length)return false;
     const fixed=entries.elements.every(entry=>{
-      if(ts.isStringLiteral(entry))return /^[a-z][a-z0-9_]{0,95}$/.test(entry.text);
+      if(ts.isStringLiteral(entry))return literalPattern.test(entry.text);
       if(!ts.isSpreadElement(entry)||!ts.isCallExpression(entry.expression))return false;
       const values=entry.expression;
       return values.expression.getText(file)==='Object.values'&&values.arguments.length===1
@@ -104,19 +104,43 @@ function unsafeConsoleCalls(source: string, readDependency: (specifier: string) 
     }
     check(file);return immutable;
   }
+  function categoryMembership(condition:ts.Expression,input:string,literalPattern?:RegExp):boolean {
+    const guard=unwrap(condition);
+    return ts.isCallExpression(guard)&&ts.isPropertyAccessExpression(guard.expression)
+      &&guard.expression.name.text==='has'&&ts.isIdentifier(guard.expression.expression)
+      &&guard.arguments.length===1&&guard.arguments[0].getText(file)===input
+      &&closedSet(guard.expression.expression.text,literalPattern);
+  }
+  function categoryConditions(node:ts.Expression):ts.Expression[] {
+    const condition=unwrap(node);
+    if(ts.isBinaryExpression(condition)&&condition.operatorToken.kind===ts.SyntaxKind.AmpersandAmpersandToken)
+      return [...categoryConditions(condition.left),...categoryConditions(condition.right)];
+    return [condition];
+  }
   function safeCategorySpread(node:ts.Expression):boolean {
     const expression=unwrap(node);
-    if(!ts.isConditionalExpression(expression)||!ts.isObjectLiteralExpression(expression.whenTrue)||expression.whenTrue.properties.length!==1
+    if(!ts.isConditionalExpression(expression)||!ts.isObjectLiteralExpression(expression.whenTrue)
       ||!ts.isObjectLiteralExpression(expression.whenFalse)||expression.whenFalse.properties.length)return false;
-    const property=expression.whenTrue.properties[0];
+    const {properties}=expression.whenTrue;
+    const conditions=categoryConditions(expression.condition);
+    if(properties.length===3){
+      const billingFields=[
+        ['billingEventType','metrics.billingWebhook.eventType',/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){1,2}$/],
+        ['billingStage','metrics.billingWebhook.stage',undefined],
+        ['billingReason','metrics.billingWebhook.reason',undefined],
+      ] as const;
+      return conditions.length===4&&conditions[0].getText(file)==='metrics.billingWebhook'
+        &&billingFields.every(([field,input,format],index)=>{
+          const property=properties[index];
+          return ts.isPropertyAssignment(property)&&ts.isIdentifier(property.name)&&property.name.text===field
+            &&property.initializer.getText(file)===input&&categoryMembership(conditions[index+1],input,format);
+        });
+    }
+    if(properties.length!==1||conditions.length!==2)return false;
+    const property=properties[0];
     if(!ts.isPropertyAssignment(property)||!ts.isIdentifier(property.name)||!['scheduledJob','failureKind'].includes(property.name.text))return false;
     const input=`metrics.${property.name.text}`;
-    const condition=unwrap(expression.condition);
-    if(property.initializer.getText(file)!==input||!ts.isBinaryExpression(condition)||condition.operatorToken.kind!==ts.SyntaxKind.AmpersandAmpersandToken
-      ||condition.left.getText(file)!==input||!ts.isCallExpression(condition.right))return false;
-    const guard=condition.right;
-    return ts.isPropertyAccessExpression(guard.expression)&&guard.expression.name.text==='has'&&ts.isIdentifier(guard.expression.expression)
-      &&guard.arguments.length===1&&guard.arguments[0].getText(file)===input&&closedSet(guard.expression.expression.text);
+    return property.initializer.getText(file)===input&&conditions[0].getText(file)===input&&categoryMembership(conditions[1],input);
   }
   // 共通serializerだけは、自由な文を含まない厳密な構造と採番元を検査する。
   function safeIntegerMetric(text:string):boolean {
@@ -249,6 +273,21 @@ it('category fields require exact membership checks and immutable literal sets',
   expect(unsafeConsoleCalls(shadowed,()=>"export const codes=Object.freeze({job:'booking_expirer'})")).toHaveLength(1);
   for(const registry of ["export const codes={job:'booking_expirer'} as const","export const codes=Object.freeze({job:body.category})","const Object=body.Object;export const codes=Object.freeze({job:'booking_expirer'})"])
     expect(unsafeConsoleCalls(imported,()=>registry)).toHaveLength(1);
+});
+
+it('billing diagnostic fields require matched closed-set checks for the entire group',()=>{
+  const prefix="const types=new Set(['invoice.paid']);const stages=new Set(['contract']);const reasons=new Set(['schema_missing']);";
+  const checked="metrics.billingWebhook && types.has(metrics.billingWebhook.eventType) && stages.has(metrics.billingWebhook.stage) && reasons.has(metrics.billingWebhook.reason) ? {billingEventType:metrics.billingWebhook.eventType,billingStage:metrics.billingWebhook.stage,billingReason:metrics.billingWebhook.reason} : {}";
+  const envelope=(setup:string,spread:string)=>`${setup}function write(level,code,metrics){const context=currentInvocation();const event={timestamp:new Date().toISOString(),level:level==='log'?'info':level,code:/^[a-zA-Z][a-zA-Z0-9_.-]{0,95}$/.test(code)?code:'invalid_log_event',requestId:context?.requestId??null,invocationId:context?.invocationId??null,source:context?.source??'background',...(${spread})};console.error(JSON.stringify(event));}`;
+  expect(unsafeConsoleCalls(envelope(prefix,checked))).toEqual([]);
+  for(const invalid of [
+    checked.replace(' && reasons.has(metrics.billingWebhook.reason)',''),
+    checked.replace('types.has(metrics.billingWebhook.eventType)','types.has(metrics.billingWebhook.stage)'),
+    checked.replace('billingReason:metrics.billingWebhook.reason','billingReason:body.customerId'),
+    checked.replace('billingReason:metrics.billingWebhook.reason','billingReason:metrics.billingWebhook.reason,raw:body'),
+  ])expect(unsafeConsoleCalls(envelope(prefix,invalid))).toHaveLength(1);
+  expect(unsafeConsoleCalls(envelope(prefix+"types.add(body.eventType);",checked))).toHaveLength(1);
+  expect(unsafeConsoleCalls(envelope(prefix.replace("'invoice.paid'","body.eventType"),checked))).toHaveLength(1);
 });
 
 it('S14 production console calls carry fixed codes, route templates and proven server UUIDs only',()=>{

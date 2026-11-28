@@ -498,6 +498,8 @@
 
 ## 反映履歴
 
+- [統括課金の決済通知を修正](release-log/unreleased/272-masato-stripe-webhook.md)
+
 - [統括のアカウントの数の帯の未確認をまとめる](release-log/unreleased/181-kenta-hq-kpi-unconfirmed.md)
 
 - [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)
@@ -507,6 +509,8 @@
 - [予約台帳と来店スタンプの操作を修正](release-log/unreleased/197-kenta-booking-stamp-tweaks.md)
 
 - [飲食メニューの画像とアレルギーの追加](release-log/unreleased/198-kenta-menu-image-upload.md)
+
+- [料理メニューのLINE表示の反映履歴](release-log/unreleased/271-masato-restaurant-menu-liff.md)（説明・2026-11-28確認）
 
 - [休業日カレンダーの過去の日付の表示を修正](release-log/unreleased/199-kenta-closures-day-click.md)
 

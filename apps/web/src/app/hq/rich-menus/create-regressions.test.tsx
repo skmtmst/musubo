@@ -246,10 +246,10 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
   })
   it('切り替えの行き先が無い面は保存せず、その面を選んで理由を出し、一覧に赤い丸を付ける', async () => {
     await start('2つ')
-    selectArea('A'); pickIntent('メニューを切り替える')
+    selectArea('A'); pickIntent('リッチメニューを切り替える')
     selectArea('B')
     click('下書きを保存')
-    await waitFor(() => expect(screen.getByText('「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('「リッチメニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。')).toBeTruthy())
     expect(screen.getByRole('heading', { name: /面 A「/ })).toBeTruthy()
     expect(screen.getByRole('img', { name: /直す欄が1か所/ })).toBeTruthy()
     expect(host.onSave).not.toHaveBeenCalled()

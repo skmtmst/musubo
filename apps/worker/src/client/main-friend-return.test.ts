@@ -34,6 +34,7 @@ test.each([
   ['salon-book&view=history&menu_id=m1', 'salon'],
   ['visit-stamps&card=card1&qr=qr1', 'stamps'],
   ['restaurant&token=seat1', 'restaurant'],
+  ['restaurant-menu&token=seat1', 'restaurant'],
   ['event&id=event1&eventWaitlistToken=offer1', 'event'],
   ['event-me&tab=past', 'event'],
   ['webinar&slug=seminar1', 'webinar'],
@@ -52,6 +53,7 @@ test.each([
   document.dispatchEvent(new Event('visibilitychange'));
   await vi.waitFor(() => expect(opened[target]).toHaveBeenCalledTimes(1));
   expect(window.location.pathname + window.location.search).toBe(original);
+  if (query.startsWith('restaurant-menu')) expect(opened.restaurant.mock.calls[0]?.[2]).toBe('restaurant-menu');
   expect(document.body.textContent).not.toContain('登録完了');
   document.dispatchEvent(new Event('visibilitychange'));
   expect(opened[target]).toHaveBeenCalledTimes(1);

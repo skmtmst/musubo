@@ -11,7 +11,7 @@ import {
 } from '@line-crm/db';
 
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import { stripeApi, type StripeEnv, type StripeInvoice } from './stripe-api.js';
+import { stripeApi, stripeExpandableId, stripeInvoiceSubscriptionId, type StripeEnv, type StripeInvoice } from './stripe-api.js';
 
 const DAY_SECONDS = 24 * 60 * 60;
 const INITIAL_MONTHS = 12;
@@ -58,8 +58,8 @@ export function billingInvoiceInput(
   return {
     id: invoice.id,
     tenantId: input.tenantId,
-    stripeCustomerId: typeof invoice.customer === 'string' ? invoice.customer : null,
-    subscriptionId: typeof invoice.subscription === 'string' ? invoice.subscription : null,
+    stripeCustomerId: stripeExpandableId(invoice.customer),
+    subscriptionId: stripeInvoiceSubscriptionId(invoice),
     status: invoice.status,
     amountPaid: Math.max(0, Math.floor(invoice.amount_paid ?? 0)),
     amountDue: Math.max(0, Math.floor(invoice.amount_due ?? 0)),

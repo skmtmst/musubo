@@ -22,7 +22,9 @@ it('見本から下書きを作ると完了を知らせて進む', async () => {
 it('下書きの作成に失敗したら完了を知らせず画面に残る', async () => {
  fixture.create.mockResolvedValueOnce({ success: false, error: '失敗' }); await open()
  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'この見本で下書きを作る' })) })
- expect(screen.queryByText('見本から下書きを作りました。')).toBeNull(); expect(fixture.push).not.toHaveBeenCalled(); expect(screen.getByText('見本')).toBeTruthy()
+ expect(screen.queryByText('見本から下書きを作りました。')).toBeNull()
+ expect(fixture.push).not.toHaveBeenCalled()
+ expect(screen.getByRole('heading', { name: '見本', exact: true })).toBeTruthy()
 })
 it('アカウント切替後の古い作成結果で通知や遷移をしない', async () => {
  let resolve!: (v: unknown) => void; fixture.create.mockImplementationOnce(() => new Promise(done => { resolve = done })); const view = await open()

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectLiffActionLocators, hqLiffActionFromLocator, hqLiffActionLocator, liffActionFromUrl, liffActionUrl, replaceLiffActionLocators, type LiffAction } from './liff-action.js';
+import { collectLiffActionLocators, hqLiffActionFromLocator, hqLiffActionLocator, liffActionFromUrl, liffActionUrl, replaceLiffActionLocators, restaurantMenuLiffToken, restaurantMenuLiffUrl, type LiffAction } from './liff-action.js';
 import { composeHqMessageCard, parseHqMessageCard } from './hq-message-card.js';
 import { convertBroadcastAsset, validateAssetPayload } from './broadcast-asset-conversion.js';
 
@@ -8,6 +8,16 @@ export const actions: LiffAction[] = [
   { kind: 'form', formId: 'form-1' }, { kind: 'visit_stamp' }, { kind: 'visit_stamp', cardId: 'card-1' },
 ];
 describe('押したらの共通URL', () => {
+  it('料理メニューのURLは有効なLIFFと店舗トークンだけを読み戻し、統括の配布用リンクにはしない', () => {
+    const url = restaurantMenuLiffUrl({ liffId: 'shop-liff', token: 'store-1' });
+    expect(url).toBe('https://liff.line.me/shop-liff/?page=restaurant-menu&token=store-1');
+    expect(restaurantMenuLiffToken(url, 'shop-liff')).toBe('store-1');
+    expect(restaurantMenuLiffToken(url, 'other')).toBeNull();
+    expect(restaurantMenuLiffToken(url.replace('liff.line.me', 'unrelated.test'))).toBeNull();
+    expect(restaurantMenuLiffToken(url.replace('store-1', 'invalid%26token'))).toBeNull();
+    expect(liffActionFromUrl(url)).toBeNull();
+  });
+
   it('管理画面の選択途中のフォームだけ空IDを許し、送信用の既定では拒否する', () => {
     const draft = liffActionUrl({ liffId: 'store', kind: 'form', formId: '', allowEmptyForm: true });
     expect(liffActionFromUrl(draft, { allowEmptyForm: true })).toEqual({ kind: 'form', formId: '' });

@@ -4,6 +4,10 @@ import styles from './icon.module.css';
 // 見た目は 24x24・線・角丸 (lucide の決まり) でそろえる。絵文字は使わない。
 
 const PATHS = {
+  utensils: [
+    <path key="a" d="M3 2v7a4 4 0 0 0 4 4h1m-1-11v20m4-20v7a4 4 0 0 1-4 4" />,
+    <path key="b" d="M21 2c-4 0-5 4-5 8v3h5m0-11v20" />,
+  ],
   /** 振替・繰り返し */
   repeat: [
     <path key="a" d="m17 2 4 4-4 4" />,

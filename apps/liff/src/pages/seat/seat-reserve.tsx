@@ -44,6 +44,7 @@ import SeatPick, { type DaySlots } from './seat-pick.js';
 import SeatConfirm from './seat-confirm.js';
 import SeatDone from './seat-done.js';
 import SeatMine from './seat-mine.js';
+import RestaurantMenu from '../restaurant-menu/menu.js';
 
 import type { View, Course, Store } from './seat-reserve-types.js';
 
@@ -99,6 +100,20 @@ export default function SeatReserve() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('LINEのお客さま');
+  const [showMenu, setShowMenu] = useState(false);
+  const menuButton = useRef<HTMLButtonElement | null>(null);
+  const menuOrigin = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (menuOrigin.current === null) return;
+    if (showMenu) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    window.scrollTo(0, menuOrigin.current);
+    menuOrigin.current = null;
+    menuButton.current?.focus({ preventScroll: true });
+  }, [showMenu]);
+
   // 再実行だけ同じ受付番号を使う。選び直したら新しくする。
   const requestId = useRef<string | null>(null);
   const generation = useRef(0);
@@ -431,6 +446,10 @@ export default function SeatReserve() {
       </LiffLookScope>
     );
 
+  if (showMenu && view === 'pick') {
+    return <RestaurantMenu storeId={store.id} onBack={() => setShowMenu(false)} />;
+  }
+
   const minutes = cancelMinutes ?? 0;
   return (
     <LiffLookScope className={`${view==='pick'||view==='confirm'?'restaurant-fusion ':''}min-h-screen bg-canvas`}>
@@ -485,6 +504,16 @@ export default function SeatReserve() {
               courseRef.current=id; setCourseId(id); setStartsAt(null); requestId.current=null;
               void loadDays(store,[...chips.map(c=>c.date),date],guestCount);
             }} />}
+
+            <div className="flex justify-end">
+              <Button ref={menuButton} variant="text-action"
+                disabled={busy} onClick={() => {
+                  menuOrigin.current = window.scrollY;
+                  setShowMenu(true);
+                }}>
+                <Icon name="utensils" className="h-4 w-4" />メニューを見る
+              </Button>
+            </div>
 
             </>
           )}

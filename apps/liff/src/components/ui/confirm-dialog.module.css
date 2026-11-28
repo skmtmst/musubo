@@ -1,0 +1,9 @@
+.photoPanel {
+  max-height: calc(100dvh - var(--liff-action-height));
+  padding: 15px 19px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.photoFooter { margin-top: 24px; }
+.galleryFooter { margin-top: 19px; }
