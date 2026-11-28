@@ -189,3 +189,25 @@ it('保存済みの空グループと未完成の条件が混ざるときは保�
   expect(submitted).toBe(false)
   expect(screen.getByText(/未完成の条件があります/)).toBeTruthy()
 })
+
+it.each([1, 2])('保存済みの第%i階層に rules がないとき、落ちずに案内して保存を止める', async (depth) => {
+  const broken = { operator: 'AND' }
+  items[0].sourceConfig = { exclusion: { operator: 'AND', rules: [], groups: [
+    depth === 1 ? broken : { operator: 'OR', rules: [], groups: [broken] },
+  ] } }
+  let submitted = false
+  const baseFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/conversions/definitions/cp-1/revise') {
+      submitted = true
+      return json({ success: true, data: {} })
+    }
+    return baseFetch(input, init)
+  })
+  await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+  await flush()
+  fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
+  await flush()
+  expect(screen.getByText('保存された数えない条件を確認できません。条件を見直してください。')).toBeTruthy()
+  expect(submitted).toBe(false)
+})

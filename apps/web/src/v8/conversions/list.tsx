@@ -131,13 +131,20 @@ function toEditForm(item: ConversionDefinitionListItem): EditForm {
 }
 
 function exclusionHasIncompleteRule(condition: NonNullable<EditForm['exclusion']>): boolean {
-  return condition.rules.some((rule) => !isRuleComplete(rule))
+  return (condition.rules ?? []).some((rule) => !isRuleComplete(rule))
     || (condition.groups ?? []).some(exclusionHasIncompleteRule)
 }
 
 function exclusionHasEmptyGroup(condition: NonNullable<EditForm['exclusion']>): boolean {
   return (condition.groups ?? []).some((group) =>
-    (group.rules.length === 0 && (group.groups?.length ?? 0) === 0) || exclusionHasEmptyGroup(group))
+    ((group.rules ?? []).length === 0 && (group.groups ?? []).length === 0) || exclusionHasEmptyGroup(group))
+}
+
+function exclusionHasInvalidShape(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return true
+  const node = value as { rules?: unknown; groups?: unknown }
+  if (!Array.isArray(node.rules) || (node.groups !== undefined && !Array.isArray(node.groups))) return true
+  return Array.isArray(node.groups) && node.groups.some(exclusionHasInvalidShape)
 }
 
 /* 「何が起きたら数えるか」の1行目（短い言葉）。くわしい起点は title と詳細で読む。 */
@@ -498,6 +505,10 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
       return
     }
     if (editForm.exclusionMemo.trim().length > 500) { invalid('cv-edit-memo', '数えない条件のメモは500文字以内で入力してください'); return }
+    if (editForm.exclusion && exclusionHasInvalidShape(editForm.exclusion)) {
+      invalid('cv-edit-exclusion', '保存された数えない条件を確認できません。条件を見直してください。')
+      return
+    }
     const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
     const unchangedExclusion = editForm.exclusion !== null
       && JSON.stringify(editForm.exclusion) === JSON.stringify(readExclusionCondition(editTarget.sourceConfig))
@@ -1193,6 +1204,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           editTarget={editTarget}
           setEditTarget={(target) => { setEditTarget(target); if (!target && editId) router.push('/conversions') }}
           editForm={editForm}
+          invalidExclusion={Boolean(editForm?.exclusion && exclusionHasInvalidShape(editForm.exclusion))}
           setEditForm={(next) => {
             const changed = typeof next === 'function' ? next(editForm) : next
             if (editFieldIssue && editForm && changed) {
