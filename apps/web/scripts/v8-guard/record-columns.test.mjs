@@ -464,7 +464,7 @@ test('同じ処理の中で測る→body の class や frame の CSS 変数で�
       fit(frame)
       const afterCssVar = read()
 
-      // 2. 元に戻したあと、同じ処理の中で body の class を変えてすぐ測り直す
+      // 2. CSS 変数を初めの値へ返してから、同じ処理の中で body の class を変えてすぐ測り直す
       frame.style.setProperty('--btn-pad', '2px')
       fit(frame)
       const reset = read()
