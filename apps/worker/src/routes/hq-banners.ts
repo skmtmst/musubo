@@ -6,7 +6,7 @@ import {GapError,gapAccount,gapWrite} from '../services/gap-common.js';
 import {requireAccountAi} from '../services/account-ai-features.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { hqBannerFolders } from './hq-banner-folders.js';
-import { processBannerGeneration, BannerJobFailure } from '../services/banner-jobs.js';
+import { processBannerGeneration, startBannerGeneration, BannerJobFailure } from '../services/banner-jobs.js';
 import { qaEnvironment, qaOutboundStopped } from '../services/staging-qa-safety.js';
 import { bannerGenerationOperationId, bannerGenerationRequestMatches } from '../services/banner-generation-retry.js';
 import { Hono, type Context } from 'hono';
@@ -477,6 +477,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', inputJsonBoundary(), 
       return c.json({ success: false, code: 'idempotency_conflict', error: '同じ操作キーで生成条件が変わっています' }, 409);
     }
     await touchBannerProject(c.env.DB, project.id);
+    await startBannerGeneration(c.env, generation);
     return c.json({ success: true, data: serializeGeneration(generation) }, 201);
   } catch (err) {
     throw err;

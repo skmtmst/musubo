@@ -33,6 +33,9 @@ describe('staging LINE token renewal', () => {
     const { unstable_readConfig } = await import('wrangler');
     const config = unstable_readConfig({ config: fileURLToPath(new URL('../../wrangler.staging.toml', import.meta.url)) });
     expect(config.triggers?.crons).toEqual([STAGING_LINE_TOKEN_REFRESH_CRON, STAGING_BANNER_GENERATION_CRON]);
+    expect(config.workflows).toEqual([{
+      binding: 'BANNER_GENERATION_WORKFLOW', name: 'musubo-banner-generation-stg', class_name: 'BannerGenerationWorkflow',
+    }]);
   });
 
   it('renews an expired token from stored credentials and skips fresh and inactive accounts', async () => {

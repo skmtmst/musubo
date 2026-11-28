@@ -1099,6 +1099,8 @@ app.onError(unhandledWorkerError);
 
 app.notFound(notFoundHandler);
 
+export { BannerGenerationWorkflow } from './services/banner-generation-workflow.js';
+
 export default {
   fetch: (...args: Parameters<typeof app.fetch>) => withInvocation('http', () => app.fetch(...args)),
   async scheduled(event: ScheduledEvent, env: Env['Bindings'], ctx: ExecutionContext): Promise<void> {

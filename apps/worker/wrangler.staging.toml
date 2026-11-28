@@ -63,6 +63,11 @@ max_batch_timeout = 5
 max_retries = 5
 retry_delay = 60
 
+[[workflows]]
+binding = "BANNER_GENERATION_WORKFLOW"
+name = "musubo-banner-generation-stg"
+class_name = "BannerGenerationWorkflow"
+
 [triggers]
 crons = ["2-57/5 * * * *", "*/2 * * * *"]
 
