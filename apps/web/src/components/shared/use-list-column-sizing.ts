@@ -18,8 +18,8 @@ export function useListColumnSizing(ref: RefObject<HTMLDivElement | null>, enabl
       cancel = null
       if (!active) return
       lastWidth = Math.round(frame.getBoundingClientRect().width)
-      if (frame.getAttribute('role') === 'table') { fitGridContentColumns(frame); return }
-      return fitListColumns(frame, true)
+      if (frame.getAttribute('role') === 'table') return fitGridContentColumns(frame, true)
+      return fitListColumns(frame, true, schedule)
     }
     const schedule = () => {
       if (!active || cancel) return
