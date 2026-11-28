@@ -24,8 +24,8 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-// 画面内ボタンと同じ仕組みにするため、参照は useManualHref へまとめた
-// （監査 R128）。ここでは上の帯への受け渡しと正本表の取得を確かめる。
+// 画面内ボタンと同じ仕組みにするため、参照は useManualHref へまとめた。
+// ここでは上の帯への受け渡しと正本表の取得を確かめる。
 it('現在の画面IDで正本表を読み、登録されたマニュアルのURLを上の帯へ渡す', async () => {
   fixture.lookup.mockResolvedValue({ success: true, data: { url: 'https://example.com/manual' } })
   render(<AppTopBar />)

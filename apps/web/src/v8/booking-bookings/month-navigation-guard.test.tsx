@@ -12,7 +12,7 @@ describe('booking-bookings/month-navigation の実在日付・異常 offset 保�
     cleanup()
   })
 
-  it('2026-02-31 のような実在しない日付は 3月へ繰り上げず今月へ戻す', () => {
+  it('2月31日のような実在しない日付は 3月へ繰り上げず今月へ戻す', () => {
     const todayMonth = monthKey(0)
     expect(monthKey(0, '2026-02-31')).toBe(todayMonth)
     expect(monthKey(Number.NaN, '2026-10-01')).toBe('2026-10')

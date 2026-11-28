@@ -7,7 +7,7 @@ describe('control-time の JST 統一と SQLite UTC 時刻の保護', () => {
   })
 
   it('formatMonthDay は端末タイムゾーンに依存せず日本時間の日付を返す', () => {
-    // 2026-06-30 16:00 UTC は日本時間で 2026-07-01 01:00
+    // UTC の月末 16:00 は、日本時間では翌月1日の 1:00
     expect(formatMonthDay('2026-06-30T16:00:00Z')).toBe('7/1')
     expect(formatMonthDay('2026-06-30 16:00:00')).toBe('7/1')
     expect(formatMonthDay('2026-07-01T00:30:00+09:00')).toBe('7/1')

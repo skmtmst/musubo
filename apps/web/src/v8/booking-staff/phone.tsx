@@ -25,8 +25,10 @@ const WEEKDAY_JP = '日月火水木金土'
 
 function isValidYmd(date: unknown): date is string {
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
-  const d = new Date(`${date}T00:00:00Z`)
-  return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === date
+  const [year, month, day] = date.split('-').map(Number)
+  const d = new Date(0)
+  d.setUTCFullYear(year, month - 1, day)
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day
 }
 
 function addDaysStr(date: string, days: number): string {
