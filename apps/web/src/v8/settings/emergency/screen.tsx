@@ -27,6 +27,7 @@ import styles from './screen.module.css'
 import { RowActions } from '@/components/shared/row-actions'
 import HistoryDetails, { type HistoryDetail } from './history-details'
 import Notice from '@/components/shared/notice'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SecurityMonitorPanel } from './security-monitor'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import type { EmergencyControlAccess } from '@/v8/emergency'
@@ -87,18 +88,46 @@ export default function EmergencyScreen({
     setManualBusy(false)
   }, [])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(false)
   const [accountsFailed, setAccountsFailed] = useState(false)
+  const [accountsError, setAccountsError] = useState('')
+  const accountsSeqRef = useRef(0)
+  const accountsLoadingRef = useRef(false)
   /* 対象アカウント欄の元。失敗しても黙らせない（#518 9）。 */
   const loadAccounts = useCallback(() => {
-    setAccountsFailed(false)
+    if (accountsLoadingRef.current) return
+    const seq = ++accountsSeqRef.current
+    accountsLoadingRef.current = true
+    setAccountsLoading(true)
     api.health.accounts()
       .then((response) => {
-        if (response.success) setAccounts(response.data)
-        else setAccountsFailed(true)
+        if (seq !== accountsSeqRef.current) return
+        accountsLoadingRef.current = false
+        setAccountsLoading(false)
+        if (response.success) {
+          setAccounts(response.data)
+          setAccountsFailed(false)
+          setAccountsError('')
+        } else {
+          setAccountsFailed(true)
+          setAccountsError(describeApiFailure(typeof response.error === 'string' && response.error.trim() ? new Error(response.error) : null, '読み込み'))
+        }
       })
-      .catch(() => setAccountsFailed(true))
+      .catch((caught: unknown) => {
+        if (seq !== accountsSeqRef.current) return
+        accountsLoadingRef.current = false
+        setAccountsLoading(false)
+        setAccountsFailed(true)
+        setAccountsError(describeApiFailure(caught, '読み込み'))
+      })
   }, [])
-  useEffect(() => { loadAccounts() }, [loadAccounts])
+  useEffect(() => {
+    loadAccounts()
+    return () => {
+      accountsSeqRef.current += 1
+      accountsLoadingRef.current = false
+    }
+  }, [loadAccounts])
   const controlRef = useRef<EmergencyControlHandle | null>(null)
   const [controlAccess, setControlAccess] = useState<EmergencyControlAccess>({ allowed: null, stopDisabled: true })
 
@@ -133,7 +162,7 @@ export default function EmergencyScreen({
     >
       <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={tabs.map((item) => ({ label: item.label, href: hqOrigin ? `${TAB_HREF[item.key]}${TAB_HREF[item.key].includes('?') ? '&' : '?'}from=hq` : TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
-        <Notice tone="danger" action={<> <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => loadAccounts()}>もう一度読み込む</Button> </>} >アカウント一覧を読み込めませんでした。{tab === 'security' ? '安全監視は選んだアカウントだけを確認します。選べないときは、一覧を読み直してください。' : '個別のアカウントを選べず、全体が対象になります。'}</Notice>
+        <Notice tone="danger" action={<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => loadAccounts()} disabled={accountsLoading} busy={accountsLoading}>もう一度読み込む</Button>} >アカウント一覧を読み込めませんでした。{accountsError ? `（${accountsError}）` : ''}{tab === 'security' ? '安全監視は選んだアカウントだけを確認します。選べないときは、一覧を読み直してください。' : '個別のアカウントを選べず、全体が対象になります。'}</Notice>
       ) : null}
       {tab === 'health' ? (
         <HealthPanelV8
