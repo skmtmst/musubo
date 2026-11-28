@@ -3,7 +3,7 @@
 import type { Folder } from '@line-crm/shared'
 import { FolderMovePermissionError, useFolderMove } from '@/components/shared/use-folder-move'
 import { api, type ApiBroadcast } from '@/lib/api'
-import { canEditBroadcastNow, captureBroadcastWriteAccess } from './write-access'
+import { canEditBroadcastNow, captureBroadcastWriteAccess, isFromHeadquarters } from './write-access'
 
 export function useBroadcastFolderSelection({ accountId, canEdit, lockedReason, broadcasts, folders, onChanged }: {
   accountId: string | null
@@ -14,7 +14,11 @@ export function useBroadcastFolderSelection({ accountId, canEdit, lockedReason, 
   onChanged: () => Promise<void>
 }) {
   const permitted = captureBroadcastWriteAccess()
-  const items = broadcasts.map(broadcast => ({ ...broadcast, name: broadcast.title }))
+  const items = Array.isArray(broadcasts)
+    ? broadcasts
+        .filter((broadcast): broadcast is ApiBroadcast => Boolean(broadcast && typeof broadcast === 'object' && !isFromHeadquarters(broadcast)))
+        .map(broadcast => ({ ...broadcast, name: broadcast.title }))
+    : []
   const selection = useFolderMove({
     accountId, canEdit, items, folders, onChanged,
     permission: { lockedReason, canWriteNow: canEditBroadcastNow },
@@ -27,7 +31,7 @@ export function useBroadcastFolderSelection({ accountId, canEdit, lockedReason, 
   return {
     isSelected: selection.isSelected,
     pageCheckbox: items.length ? selection.pageCheckbox : null,
-    checkbox: (broadcast: ApiBroadcast) => items.some(item => item.id === broadcast.id)
+    checkbox: (broadcast: ApiBroadcast) => broadcast && typeof broadcast === 'object' && items.some(item => item.id === broadcast.id)
       ? selection.checkbox({ ...broadcast, name: broadcast.title }) : null,
     overlays: selection.overlays,
   }
