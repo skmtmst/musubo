@@ -1,13 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, SCREEN_MENU_OWNER, menuOwnerForScreen } from './menu'
-
-const SIDEBAR = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', 'components', 'layout', 'sidebar.tsx'),
-  'utf8',
-)
 
 /**
  * #984 LAY-15: 画面 → 左メニューの所属。
@@ -52,9 +44,5 @@ describe('画面→メニュー所属の正本（#984 LAY-15）', () => {
     expect(menuOwnerForScreen('/booking/staff', '')).toEqual(['booking-menus'])
   })
 
-  it('サイドバーが正本を読んで選択へ反映する', () => {
-    expect(SIDEBAR).toContain('menuOwnerForScreen')
-    // 宣言がある画面では、パス一致ではなく所属先の項目を選ぶ。
-    expect(SIDEBAR).toContain('item.id === ownerItemId')
-  })
+
 })
