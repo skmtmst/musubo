@@ -51,7 +51,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder';
+import { findConditionDraftIssue, isRuleComplete, pruneCondition } from '@/components/shared/condition-builder';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
@@ -128,6 +128,16 @@ function toEditForm(item: ConversionDefinitionListItem): EditForm {
     exclusion: readExclusionCondition(item.sourceConfig),
     exclusionMemo: readExclusionMemo(item.sourceConfig),
   }
+}
+
+function exclusionHasIncompleteRule(condition: NonNullable<EditForm['exclusion']>): boolean {
+  return condition.rules.some((rule) => !isRuleComplete(rule))
+    || (condition.groups ?? []).some(exclusionHasIncompleteRule)
+}
+
+function exclusionHasEmptyGroup(condition: NonNullable<EditForm['exclusion']>): boolean {
+  return (condition.groups ?? []).some((group) =>
+    (group.rules.length === 0 && (group.groups?.length ?? 0) === 0) || exclusionHasEmptyGroup(group))
 }
 
 /* 「何が起きたら数えるか」の1行目（短い言葉）。くわしい起点は title と詳細で読む。 */
@@ -491,7 +501,11 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
     const unchangedExclusion = editForm.exclusion !== null
       && JSON.stringify(editForm.exclusion) === JSON.stringify(readExclusionCondition(editTarget.sourceConfig))
-    if (exclusionIssue && !(unchangedExclusion && exclusionIssue.startsWith('空の「いずれか」'))) { invalid('cv-edit-exclusion', exclusionIssue); return }
+    if (editForm.exclusion && exclusionHasIncompleteRule(editForm.exclusion)) {
+      invalid('cv-edit-exclusion', '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。')
+      return
+    }
+    if (exclusionIssue && !(unchangedExclusion && editForm.exclusion && exclusionHasEmptyGroup(editForm.exclusion))) { invalid('cv-edit-exclusion', exclusionIssue); return }
     setEditFieldIssue(null)
     setEditSaving(true)
     setEditError('')

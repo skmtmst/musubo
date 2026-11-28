@@ -167,3 +167,25 @@ it('編集で空の条件のかたまりを追加したときは、案内して�
   expect(await screen.findByText(/空の「いずれか」の条件のかたまりがあります/)).toBeTruthy()
   expect(submitted).toBe(false)
 })
+
+it('保存済みの空グループと未完成の条件が混ざるときは保存しない', async () => {
+  items[0].sourceConfig = { exclusion: { operator: 'AND', rules: [], groups: [
+    { operator: 'OR', rules: [] },
+    { operator: 'OR', rules: [{ type: 'tag_exists', value: '' }] },
+  ] } }
+  let submitted = false
+  const baseFetch = globalThis.fetch
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(input)).pathname === '/api/conversions/definitions/cp-1/revise') {
+      submitted = true
+      return json({ success: true, data: {} })
+    }
+    return baseFetch(input, init)
+  })
+  await act(async () => { root.render(<ConversionListV8 accountId="account-a" editId="cp-1" />) })
+  await flush()
+  fireEvent.click(screen.getByRole('button', { name: 'この内容にする' }))
+  await flush()
+  expect(submitted).toBe(false)
+  expect(screen.getByText(/未完成の条件があります/)).toBeTruthy()
+})
