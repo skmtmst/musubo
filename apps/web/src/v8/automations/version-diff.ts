@@ -29,16 +29,48 @@ function failureLabel(value: string): string {
   return Object.prototype.hasOwnProperty.call(FAILURE_LABELS, value) ? FAILURE_LABELS[value] : '動作を確認できません'
 }
 
+function asParams(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function canonicalize(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value === null || typeof value !== 'object') {
+    return typeof value === 'bigint' ? `${value}n` : value
+  }
+  if (seen.has(value)) return '[Circular]'
+  seen.add(value)
+  if (Array.isArray(value)) return value.map((item) => canonicalize(item, seen))
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    const v = (value as Record<string, unknown>)[key]
+    if (v !== undefined) out[key] = canonicalize(v, seen)
+  }
+  return out
+}
+
+function safeEqual(a: unknown, b: unknown): boolean {
+  try {
+    return JSON.stringify(canonicalize(a)) === JSON.stringify(canonicalize(b))
+  } catch {
+    return false
+  }
+}
+
 function waitMinutes(params: Record<string, unknown>): number | null {
+  if (params.mode !== undefined && params.mode !== 'duration') return null
   const value = params.durationMinutes ?? params.minutes
-  return typeof value === 'number' && Number.isInteger(value) ? value : null
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
 }
 
 /* 分岐の中身の変わり方を1〜数行で書く。 */
 function describeBranchChange(oldStep: CommonActionStep, newStep: CommonActionStep): string[] {
   const lines: string[] = []
-  const oldCondition = oldStep.params.condition as { operator?: unknown; rules?: unknown[] } | undefined
-  const newCondition = newStep.params.condition as { operator?: unknown; rules?: unknown[] } | undefined
+  const oldParams = asParams(oldStep.params)
+  const newParams = asParams(newStep.params)
+  const oldCondition = oldParams.condition as { operator?: unknown; rules?: unknown[] } | undefined
+  const newCondition = newParams.condition as { operator?: unknown; rules?: unknown[] } | undefined
   const operatorName = (operator: unknown) => operator === 'OR' ? 'どれかに当てはまる' : 'すべてに当てはまる'
   if (oldCondition && newCondition) {
     if (oldCondition.operator !== newCondition.operator) {
@@ -48,19 +80,25 @@ function describeBranchChange(oldStep: CommonActionStep, newStep: CommonActionSt
     const newRules = Array.isArray(newCondition.rules) ? newCondition.rules.length : 0
     if (oldRules !== newRules) {
       lines.push(`条件分岐の条件を${oldRules} 個から${newRules} 個にした`)
-    } else if (JSON.stringify(oldCondition.rules) !== JSON.stringify(newCondition.rules)) {
+    } else if (!safeEqual(oldCondition.rules, newCondition.rules)) {
       lines.push('条件分岐の条件の中身を変えた')
     }
+  } else if (Boolean(oldCondition) !== Boolean(newCondition)) {
+    lines.push('条件分岐の条件の中身を変えた')
   }
   for (const [key, name] of [['then', '当てはまるとき'], ['else', '当てはまらないとき']] as const) {
-    const oldSide = oldStep.params[key] as CommonActionStep[] | undefined
-    const newSide = newStep.params[key] as CommonActionStep[] | undefined
-    if (Array.isArray(oldSide) && Array.isArray(newSide) && JSON.stringify(oldSide) !== JSON.stringify(newSide)) {
-      if (oldSide.length !== newSide.length) {
-        lines.push(`条件分岐の${name}を${formatNumber(oldSide.length)} 個から${formatNumber(newSide.length)} 個にした`)
-      } else {
-        lines.push(`条件分岐の${name}の内容を変えた`)
+    const oldSide = oldParams[key] as CommonActionStep[] | undefined
+    const newSide = newParams[key] as CommonActionStep[] | undefined
+    if (Array.isArray(oldSide) && Array.isArray(newSide)) {
+      if (!safeEqual(oldSide, newSide)) {
+        if (oldSide.length !== newSide.length) {
+          lines.push(`条件分岐の${name}を${formatNumber(oldSide.length)} 個から${formatNumber(newSide.length)} 個にした`)
+        } else {
+          lines.push(`条件分岐の${name}の内容を変えた`)
+        }
       }
+    } else if (!safeEqual(oldSide, newSide)) {
+      lines.push(`条件分岐の${name}の内容を変えた`)
     }
   }
   return lines
@@ -73,15 +111,19 @@ function describeStepChange(oldStep: CommonActionStep, newStep: CommonActionStep
   }
   const lines: string[] = []
   const label = stepLabel(newStep.type)
+  const oldParams = asParams(oldStep.params)
+  const newParams = asParams(newStep.params)
   if (newStep.type === 'wait') {
-    const before = waitMinutes(oldStep.params)
-    const after = waitMinutes(newStep.params)
-    if (oldStep.params.mode === 'next_day' || newStep.params.mode === 'next_day') {
-      const oldLabel = automationWaitLabel(oldStep.params)
-      const newLabel = automationWaitLabel(newStep.params)
+    const before = waitMinutes(oldParams)
+    const after = waitMinutes(newParams)
+    if (oldParams.mode === 'next_day' || newParams.mode === 'next_day') {
+      const oldLabel = automationWaitLabel(oldParams)
+      const newLabel = automationWaitLabel(newParams)
       if (oldLabel !== newLabel) lines.push(`「${oldLabel}」から「${newLabel}」にした`)
-    } else if (before !== null && after !== null && before !== after) {
-      lines.push(`「待つ」を${before}分から${after}分にした`)
+    } else if (before !== null && after !== null) {
+      if (before !== after) lines.push(`「待つ」を${before}分から${after}分にした`)
+    } else if (!safeEqual(oldParams, newParams)) {
+      lines.push('「待つ」の内容を変えた')
     }
   }
   if (oldStep.onFailure !== newStep.onFailure) {
@@ -89,12 +131,22 @@ function describeStepChange(oldStep: CommonActionStep, newStep: CommonActionStep
   }
   if (newStep.type === 'branch') {
     lines.push(...describeBranchChange(oldStep, newStep))
-  } else if (newStep.type !== 'wait' && JSON.stringify({ ...oldStep.params, durationMinutes: undefined, minutes: undefined })
-    !== JSON.stringify({ ...newStep.params, durationMinutes: undefined, minutes: undefined })) {
+  } else if (newStep.type !== 'wait' && !safeEqual(
+    { ...oldParams, durationMinutes: undefined, minutes: undefined },
+    { ...newParams, durationMinutes: undefined, minutes: undefined },
+  )) {
     // 待ち時間と失敗時は上で個別に出す。残りの設定差は1行にまとめる。
     lines.push(`「${label}」の内容を変えた`)
   }
   return lines
+}
+
+function isStepObject(value: unknown): value is CommonActionStep {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && typeof (value as { id?: unknown }).id === 'string'
+}
+
+function isValidActions(actions: unknown): actions is CommonActionStep[] {
+  return Array.isArray(actions) && actions.every(isStepObject)
 }
 
 /*
@@ -105,15 +157,16 @@ export function describeVersionChanges(
   previous: CommonActionStep[],
   current: CommonActionStep[],
 ): string[] {
+  if (!isValidActions(previous) || !isValidActions(current)) {
+    return ['変更内容を確認できません']
+  }
   const lines: string[] = []
   const previousById = new Map(previous.map((step) => [step.id, step]))
   const currentById = new Map(current.map((step) => [step.id, step]))
   const sameMembers = previous.length === current.length
     && previous.every((step) => currentById.has(step.id))
   if (sameMembers) {
-    const before = previous.map((step) => step.id).join(',')
-    const after = current.map((step) => step.id).join(',')
-    if (before !== after) lines.push('処理の順番を変えた')
+    if (previous.some((step, index) => step.id !== current[index]?.id)) lines.push('処理の順番を変えた')
   }
   for (const step of current) {
     const oldStep = previousById.get(step.id)
@@ -132,10 +185,14 @@ export function versionChangeLines(
   version: { versionNumber: number; actions: CommonActionStep[] },
   versions: Array<{ versionNumber: number; actions: CommonActionStep[] }>,
 ): string[] {
+  if (!version || !Array.isArray(versions) || !isValidActions(version.actions)) {
+    return ['変更内容を確認できません']
+  }
   const previous = versions
-    .filter((item) => item.versionNumber < version.versionNumber)
+    .filter((item) => item && typeof item.versionNumber === 'number' && Number.isFinite(item.versionNumber) && item.versionNumber < version.versionNumber)
     .sort((left, right) => right.versionNumber - left.versionNumber)[0]
   if (!previous) return ['はじめて公開した']
+  if (!isValidActions(previous.actions)) return ['変更内容を確認できません']
   if (previous.actions.length !== version.actions.length) {
     return [`処理を${formatNumber(previous.actions.length)} 個から${formatNumber(version.actions.length)} 個にした`]
   }
