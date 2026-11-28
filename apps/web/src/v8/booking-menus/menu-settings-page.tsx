@@ -14,8 +14,32 @@ type MenuPageProps = Pick<ReturnType<typeof useBookingSettings>,
   'accountId' | 'tabNode' | 'canEditMenus' | 'menus' | 'menusStatus' | 'menusError' |
   'settings' | 'reloadCore' | 'previewUrl' | 'setPhoneOpen' | 'requestTab' | 'menuFormState'> & { phone: ReactNode }
 
+const SAFE_ORIGIN = 'https://same.invalid'
+
+function safePreviewHref(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed || /[\u0000-\u001f\u007f]/.test(trimmed)) return null
+  if (trimmed.startsWith('/')) {
+    if (trimmed.length >= 2 && (trimmed[1] === '/' || trimmed[1] === '\\')) return null
+    try {
+      const resolved = new URL(trimmed, SAFE_ORIGIN)
+      return resolved.origin === SAFE_ORIGIN ? trimmed : null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const parsed = new URL(trimmed)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? trimmed : null
+  } catch {
+    return null
+  }
+}
+
 export default function MenuSettingsPage({ accountId, tabNode, canEditMenus, menus, menusStatus, menusError, settings, reloadCore, previewUrl, phone, setPhoneOpen, requestTab, menuFormState }: MenuPageProps) {
-  const customerLink = previewUrl ? <Button href={previewUrl} external>
+  const safePreviewUrl = safePreviewHref(previewUrl)
+  const customerLink = safePreviewUrl ? <Button href={safePreviewUrl} external>
     <Smartphone aria-hidden="true" />お客さまに見える画面を確かめる
   </Button> : null
 
@@ -36,7 +60,7 @@ export default function MenuSettingsPage({ accountId, tabNode, canEditMenus, men
     preview={<>
       {customerLink}
       <CreateSummaryCard title="お客さまの予約画面" rows={[]}>{phone}</CreateSummaryCard>
-      {!previewUrl ? <CreatePreviewNote>このアカウントには予約画面のURLがまだありません</CreatePreviewNote> : null}
+      {!safePreviewUrl ? <CreatePreviewNote>このアカウントには予約画面のURLがまだありません</CreatePreviewNote> : null}
     </>}
   >
     {accountId ? <MenusTabV8
