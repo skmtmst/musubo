@@ -12,6 +12,7 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   const bodyCells = [...body.children]
   const nameIndex = bodyCells.findIndex(cell => cell.hasAttribute('data-cell-grow') || cell.querySelector('[data-list-name], [data-row-link], [data-list-name-cell]'))
   if (nameIndex < 0) return
+  const doc = frame.ownerDocument || document
   const flexibleContent = frame.hasAttribute('data-column-layout') && frame.dataset.columnSizing === 'content'
   const controlsOnly = frame.dataset.columnSizing === 'controls'
   const frameWidth = Math.round(frame.getBoundingClientRect().width)
@@ -22,89 +23,60 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   const cols = [...table.querySelectorAll(':scope > colgroup > col')]
   for (const col of cols) if (col.listColumnOriginalWidth === undefined) col.listColumnOriginalWidth = col.style.width
 
-  const layoutScope = `${frameWidth}:${tableWidth}:${bodyCells.length}:${nameIndex}:${visibleMask}:${flexibleContent ? 'F' : controlsOnly ? 'C' : 'S'}:${cols.map(col => col.listColumnOriginalWidth).join(',')}`
-  const cellSignature = cell => {
-    if (!cell) return ''
-    const flags = (cell.hasAttribute('data-cell-weight') ? `w${cell.dataset.cellWeight}` : '')
-      + (cell.hasAttribute('data-list-number') ? 'N' : '')
-      + (cell.hasAttribute('data-list-date-time') ? 'D' : '')
-      + (cell.hasAttribute('data-cell-grow') ? 'G' : '')
-    let sig = `${cell.className}:${flags}:${cell.textContent ?? ''}`
-    if (cell.childElementCount > 0) {
-      const descendants = cell.querySelectorAll('button,a,input,select,textarea,svg,img,[role="button"],[data-design-node="xRvDB"],[data-list-date-time],[hidden],[aria-hidden="true"],.sr-only')
-      if (descendants.length > 0) {
-        sig += `#${descendants.length}`
-        for (const el of descendants) {
-          sig += `,${el.tagName}:${el.getAttribute('data-design-node') ?? ''}:${el.hasAttribute('hidden') ? 1 : 0}:${'value' in el ? el.value : ''}`
-        }
-      }
+  // DOM が変わった呼び出しは必ず測り直す。省くのは DOM 変更も幅変更も無い再呼び出しだけ。
+  const siblingAttrs = new Set(['data-list-content-lines', 'data-list-density-scope'])
+  const isProbeNode = node => node?.nodeType === 1 && (
+    node.hasAttribute('data-column-probe')
+    || node.hasAttribute('data-column-probe-host')
+    || node.hasAttribute('data-grid-column-probe-host')
+  )
+  const isExternalMutation = record => {
+    if (record.type === 'childList') {
+      const changed = [...record.addedNodes, ...record.removedNodes]
+      return changed.length > 0 && !changed.every(isProbeNode)
     }
-    return sig
-  }
-  const measureKey = `${layoutScope}\x1d${rows.length}\x1d${rows.map(row => [...row.children].map(cellSignature).join('\x1f')).join('\x1e')}`
-  const usesGridColumns = frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')
-
-  const createCommit = cached => () => {
-    if (frame.hasAttribute('data-content-stacked') !== cached.mustStack) frame.toggleAttribute('data-content-stacked', cached.mustStack)
-    if (usesGridColumns) {
-      if (frame.style.getPropertyValue('--table-content-columns') !== cached.gridColumns) frame.style.setProperty('--table-content-columns', cached.gridColumns)
-    }
-    // A native fixed-layout table reads <col> before the first row's cell width.
-    // Keep its column model in sync with the same measured content budget.
-    if (!cached.bodyIsFlex) {
-      for (const [index, col] of cols.entries()) {
-        const nextWidth = cached.widths[index] != null ? `${cached.widths[index]}px` : col.listColumnOriginalWidth
-        if (col.style.width !== nextWidth) col.style.width = nextWidth
-      }
-    }
-    for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
-      const isName = index === cached.nameIndex
-      const isSupport = cached.widths[index] !== null && cached.widths[index] !== undefined
-      if (cell.hasAttribute('data-content-name-column') !== isName) cell.toggleAttribute('data-content-name-column', isName)
-      if (cell.hasAttribute('data-content-support-column') !== isSupport) cell.toggleAttribute('data-content-support-column', isSupport)
-      if (isSupport) {
-        const value = `${cached.widths[index]}px`
-        if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
-      } else if (cell.style.getPropertyValue('--list-content-column-width')) {
-        cell.style.removeProperty('--list-content-column-width')
-      }
-    }
-    frame.listColumnScope = layoutScope
-    frame.listColumnMeasureKey = measureKey
-    frame.listColumnCachedResult = cached
-  }
-
-  const isCommitApplied = cached => {
-    if (frame.hasAttribute('data-content-stacked') !== cached.mustStack) return false
-    if (usesGridColumns && frame.style.getPropertyValue('--table-content-columns') !== cached.gridColumns) return false
-    if (!cached.bodyIsFlex) {
-      for (const [index, col] of cols.entries()) {
-        const expected = cached.widths[index] != null ? `${cached.widths[index]}px` : col.listColumnOriginalWidth
-        if (col.style.width !== expected) return false
-      }
-    }
-    for (const row of rows) {
-      const cells = row.children
-      for (let index = 0; index < cells.length; index += 1) {
-        const cell = cells[index]
-        const isName = index === cached.nameIndex
-        const isSupport = cached.widths[index] !== null && cached.widths[index] !== undefined
-        if (cell.hasAttribute('data-content-name-column') !== isName) return false
-        if (cell.hasAttribute('data-content-support-column') !== isSupport) return false
-        const expected = isSupport ? `${cached.widths[index]}px` : ''
-        if (cell.style.getPropertyValue('--list-content-column-width') !== expected) return false
-      }
+    if (record.type === 'attributes') {
+      if (siblingAttrs.has(record.attributeName)) return false
+      if (record.target === frame && record.attributeName === 'style') return false
+      return true
     }
     return true
   }
+  let tracker = frame.__listColumnDomTracker
+  if (!tracker) {
+    const view = doc.defaultView
+    const MO = view?.MutationObserver || (typeof MutationObserver === 'function' ? MutationObserver : null)
+    tracker = { dirty: true, observer: null }
+    if (MO) {
+      tracker.observer = new MO(records => {
+        if (records.some(isExternalMutation)) tracker.dirty = true
+      })
+      tracker.observer.observe(frame, { childList: true, subtree: true, characterData: true, attributes: true })
+    }
+    frame.__listColumnDomTracker = tracker
+  } else if (tracker.observer) {
+    const pending = tracker.observer.takeRecords()
+    if (pending.some(isExternalMutation)) tracker.dirty = true
+  }
+  const drainOwnMutations = () => {
+    if (tracker.observer) tracker.observer.takeRecords()
+    tracker.dirty = false
+  }
 
-  if (frame.listColumnScope === layoutScope
-    && frame.listColumnMeasureKey === measureKey
-    && frame.listColumnCachedResult) {
-    if (isCommitApplied(frame.listColumnCachedResult)) return
-    const reapply = createCommit(frame.listColumnCachedResult)
-    if (deferCommit) return reapply
-    reapply()
+  const layoutScope = `${frameWidth}:${tableWidth}:${rows.length}:${bodyCells.length}:${nameIndex}:${visibleMask}:${flexibleContent ? 'F' : controlsOnly ? 'C' : 'S'}:${cols.map(col => col.listColumnOriginalWidth).join(',')}`
+  const formControls = frame.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]),select,textarea')
+  const formState = formControls.length === 0
+    ? ''
+    : [...formControls].map(el => (el.tagName === 'SELECT'
+      ? [...el.options].map(option => (option.selected ? '1' : '0')).join('')
+      : `${el.value ?? ''}`)).join('\x1f')
+  const usesGridColumns = frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')
+
+  if (!tracker.dirty
+    && frame.listColumnScope === layoutScope
+    && frame.listColumnFormState === formState
+    && bodyCells[nameIndex]?.hasAttribute('data-content-name-column')
+    && (!usesGridColumns || frame.style.getPropertyValue('--table-content-columns') === frame.listColumnAppliedGrid)) {
     return
   }
 
@@ -129,8 +101,9 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
     }
   }
 
+  const ceilingScope = `${frameWidth}:${tableWidth}:${bodyCells.length}:${nameIndex}:${visibleMask}:${flexibleContent ? 'F' : controlsOnly ? 'C' : 'S'}:${cols.map(col => col.listColumnOriginalWidth).join(',')}`
   let ceilings = frame.listColumnCeilings
-  if (frame.listColumnScope !== layoutScope || (!flexibleContent && (!Array.isArray(ceilings) || ceilings.length !== bodyCells.length))) {
+  if (frame.listColumnCeilingScope !== ceilingScope || (!flexibleContent && (!Array.isArray(ceilings) || ceilings.length !== bodyCells.length))) {
     if (!flexibleContent) {
       if (hasAppliedSizing()) {
         if (deferCommit && typeof onReset === 'function') {
@@ -138,8 +111,8 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
           return () => {
             resetAppliedSizing()
             frame.listColumnScope = ''
-            frame.listColumnMeasureKey = ''
-            frame.listColumnCachedResult = undefined
+            frame.listColumnCeilingScope = ''
+            drainOwnMutations()
             onReset()
           }
         }
@@ -149,11 +122,11 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
         ceilings = bodyWidths
       }
       frame.listColumnCeilings = ceilings
+      frame.listColumnCeilingScope = ceilingScope
     }
   }
 
   const number = value => parseFloat(value) || 0
-  const doc = frame.ownerDocument || document
   const textCache = new Map()
   const fontKeys = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing']
   const measureIsolatedProbe = (text, css) => {
@@ -280,7 +253,36 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   }
   const bodyIsFlex = getComputedStyle(body).display === 'flex'
   const gridColumns = usesGridColumns ? widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ') : ''
-  const commit = createCommit({ widths, mustStack, bodyIsFlex, gridColumns, nameIndex })
+  const commit = () => {
+    if (frame.hasAttribute('data-content-stacked') !== mustStack) frame.toggleAttribute('data-content-stacked', mustStack)
+    if (usesGridColumns) {
+      if (frame.style.getPropertyValue('--table-content-columns') !== gridColumns) frame.style.setProperty('--table-content-columns', gridColumns)
+      frame.listColumnAppliedGrid = gridColumns
+    }
+    // A native fixed-layout table reads <col> before the first row's cell width.
+    // Keep its column model in sync with the same measured content budget.
+    if (!bodyIsFlex) {
+      for (const [index, col] of cols.entries()) {
+        const nextWidth = widths[index] != null ? `${widths[index]}px` : col.listColumnOriginalWidth
+        if (col.style.width !== nextWidth) col.style.width = nextWidth
+      }
+    }
+    for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
+      const isName = index === nameIndex
+      const isSupport = widths[index] !== null && widths[index] !== undefined
+      if (cell.hasAttribute('data-content-name-column') !== isName) cell.toggleAttribute('data-content-name-column', isName)
+      if (cell.hasAttribute('data-content-support-column') !== isSupport) cell.toggleAttribute('data-content-support-column', isSupport)
+      if (isSupport) {
+        const value = `${widths[index]}px`
+        if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
+      } else if (cell.style.getPropertyValue('--list-content-column-width')) {
+        cell.style.removeProperty('--list-content-column-width')
+      }
+    }
+    frame.listColumnScope = layoutScope
+    frame.listColumnFormState = formState
+    drainOwnMutations()
+  }
   if (deferCommit) return commit
   commit()
 }

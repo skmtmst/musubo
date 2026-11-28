@@ -1,4 +1,8 @@
-/** 見出しと各行の内容から列幅を配り、長い文字へ残りを渡す。 */
+/**
+ * 見出しと各行の内容から列幅を配り、長い文字へ残りを渡す。
+ * @param {HTMLElement | null} frame
+ * @param {boolean} [deferCommit]
+ */
 export function fitGridContentColumns(frame, deferCommit = false) {
   const rows = frame ? [...frame.querySelectorAll(':scope > [role="row"]')] : []
   if (rows.length < 2 || !frame.clientWidth) return
@@ -14,30 +18,57 @@ export function fitGridContentColumns(frame, deferCommit = false) {
   const available = room - gap * (count - 1)
   const headFontSizes = headCells.map(cell => number(getComputedStyle(cell).fontSize))
 
-  const cellSig = cell => {
-    if (!cell) return ''
-    let sig = `${cell.className}:${cell.getAttribute('data-align') ?? ''}:${cell.hasAttribute('data-cell-grow') ? 'G' : ''}:${cell.textContent ?? ''}`
-    if (cell.childElementCount > 0) {
-      const controls = cell.querySelectorAll('button,input,select,textarea,[role="button"],img,video,audio,iframe,object,embed,source,canvas,svg,image,use')
-      if (controls.length > 0) {
-        sig += `#${controls.length}`
-        for (const el of controls) {
-          const val = el.tagName === 'SELECT'
-            ? [...el.options].map(option => (option.selected ? '1' : '0')).join('')
-            : el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'
-              ? `${el.type ?? ''}:${el.checked ? 1 : 0}:${el.value ?? ''}`
-              : ''
-          sig += `,${el.tagName}:${el.className}:${val}`
-        }
-      }
+  // DOM が変わった呼び出しは必ず測り直す。省くのは DOM 変更の無い再呼び出しだけ。
+  const siblingAttrs = new Set(['data-list-content-lines', 'data-list-density-scope'])
+  const isProbeNode = node => node?.nodeType === 1 && (
+    node.hasAttribute('data-column-probe')
+    || node.hasAttribute('data-column-probe-host')
+    || node.hasAttribute('data-grid-column-probe-host')
+  )
+  const isExternalMutation = record => {
+    if (record.type === 'childList') {
+      const changed = [...record.addedNodes, ...record.removedNodes]
+      return changed.length > 0 && !changed.every(isProbeNode)
     }
-    return sig
+    if (record.type === 'attributes') {
+      if (siblingAttrs.has(record.attributeName)) return false
+      if (record.target === frame && record.attributeName === 'style') return false
+      return true
+    }
+    return true
   }
-  const frameStyleKey = `${frame.className}|${frame.dataset.tablePresentation ?? ''}|${css.fontFamily}|${css.fontSize}|${css.fontWeight}|${css.letterSpacing}|${headFontSizes.join(',')}`
+  let tracker = frame.__gridColumnDomTracker
+  if (!tracker) {
+    const view = doc.defaultView
+    const MO = view?.MutationObserver || (typeof MutationObserver === 'function' ? MutationObserver : null)
+    tracker = { dirty: true, observer: null }
+    if (MO) {
+      tracker.observer = new MO(records => {
+        if (records.some(isExternalMutation)) tracker.dirty = true
+      })
+      tracker.observer.observe(frame, { childList: true, subtree: true, characterData: true, attributes: true })
+    }
+    frame.__gridColumnDomTracker = tracker
+  } else if (tracker.observer) {
+    const pending = tracker.observer.takeRecords()
+    if (pending.some(isExternalMutation)) tracker.dirty = true
+  }
+  const drainOwnMutations = () => {
+    if (tracker.observer) tracker.observer.takeRecords()
+    tracker.dirty = false
+  }
+
+  const formControls = frame.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]),select,textarea')
+  const formState = formControls.length === 0
+    ? ''
+    : [...formControls].map(el => (el.tagName === 'SELECT'
+      ? [...el.options].map(option => (option.selected ? '1' : '0')).join('')
+      : `${el.value ?? ''}`)).join('\x1f')
+  const styleScope = `${rows.length}:${count}:${frame.className}|${frame.dataset.tablePresentation ?? ''}|${css.fontFamily}|${css.fontSize}|${css.fontWeight}|${css.letterSpacing}|${headFontSizes.join(',')}:${formState}`
+  const scope = `${clientWidth}:${Math.round(room)}:${Math.round(gap)}:${styleScope}`
   const hasMedia = rows.some(row => row.querySelector('img,video,audio,iframe,object,embed,source,canvas,svg,image,use,input[type="image"]'))
-  const contentScope = `${rows.length}:${count}:${frameStyleKey}:${rows.map(row => `${row.className}:${row.hasAttribute('data-head') ? 'H' : ''}:${[...row.children].map(cellSig).join('\x1f')}`).join('\x1e')}`
-  const scope = `${clientWidth}:${Math.round(room)}:${Math.round(gap)}:${contentScope}`
-  const appliedIntact = frame.gridContentScope === scope
+  const appliedIntact = !tracker.dirty
+    && frame.gridContentScope === scope
     && (frame.gridContentWasStacked
       ? frame.hasAttribute('data-stacked') && Boolean(frame.style.getPropertyValue('--grid-table-content-rest-columns'))
       : Boolean(frame.style.getPropertyValue('--grid-table-content-columns')))
@@ -45,7 +76,7 @@ export function fitGridContentColumns(frame, deferCommit = false) {
 
   const fontKeys = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing', 'lineHeight']
   let measured
-  if (!hasMedia && frame.gridContentScope !== '' && frame.gridContentCache?.contentScope === contentScope) {
+  if (!tracker.dirty && !hasMedia && frame.gridContentScope !== '' && frame.gridContentCache?.styleScope === styleScope) {
     measured = frame.gridContentCache.measured
   } else {
     // 写しは contain:strict の常駐ホストにすべて置いてから幅を読み、最後にまとめて外す。
@@ -140,7 +171,7 @@ export function fitGridContentColumns(frame, deferCommit = false) {
         probeRow.removeAttribute('data-head')
       }
     }
-    frame.gridContentCache = { contentScope, measured }
+    frame.gridContentCache = { styleScope, measured }
   }
 
   const wanted = headCells.map((_, index) => Math.max(...measured.map(row => row[index] ?? 0)))
@@ -165,6 +196,7 @@ export function fitGridContentColumns(frame, deferCommit = false) {
       }
       frame.gridContentWasStacked = true
       frame.gridContentScope = scope
+      drainOwnMutations()
     }
   } else {
     let low = 0, high = Math.max(...wanted)
@@ -190,6 +222,7 @@ export function fitGridContentColumns(frame, deferCommit = false) {
       }
       frame.gridContentWasStacked = false
       frame.gridContentScope = scope
+      drainOwnMutations()
     }
   }
   if (deferCommit) return commit
@@ -205,4 +238,6 @@ export function clearGridContentColumns(frame) {
   delete frame.gridContentWasStacked
   delete frame.gridContentScope
   delete frame.gridContentCache
+  frame.__gridColumnDomTracker?.observer?.disconnect()
+  delete frame.__gridColumnDomTracker
 }

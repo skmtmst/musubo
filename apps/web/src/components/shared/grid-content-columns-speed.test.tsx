@@ -273,7 +273,7 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     expect(getByTestId('tpl-preview-0').style.getPropertyValue('--list-content-column-width')).toBe(widthAfterFirst)
   })
 
-  it('同じ内容の後ろの行が新しい DOM に置き換わっても、測り直しを省きつつ列の印と幅を付け直す', () => {
+  it('同じ内容の後ろの行が新しい DOM に置き換わったときも必ず測り直し、列の印と幅を付け直す', () => {
     let rangeCalls = 0
     vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
       rangeCalls += 1
@@ -300,7 +300,7 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     const expectedWidth = getByTestId('tpl-preview-1').style.getPropertyValue('--list-content-column-width')
     expect(expectedWidth).not.toBe('')
 
-    // 2行目だけを同じ内容の新しい DOM へ入れ替える
+    // 2行目だけを同じ内容の新しい DOM へ入れ替える（DOM 変更なので必ず測り直す）
     const tbody = frame.querySelector('tbody')!
     const fresh = document.createElement('tr')
     fresh.innerHTML = '<td data-cell-grow=""><span data-list-name="">テンプレート2</span></td><td><span>見本B</span></td><td><span>下書き</span></td>'
@@ -308,7 +308,7 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
 
     rangeCalls = 0
     const commit = fitListColumns(frame, true)
-    expect(rangeCalls).toBe(0)
+    expect(rangeCalls).toBeGreaterThan(0)
     expect(typeof commit).toBe('function')
     commit?.()
 
@@ -316,6 +316,11 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     expect(fresh.children[1].hasAttribute('data-content-support-column')).toBe(true)
     expect((fresh.children[1] as HTMLElement).style.getPropertyValue('--list-content-column-width')).toBe(expectedWidth)
     expect(fresh.children[2].hasAttribute('data-content-support-column')).toBe(true)
+
+    // 変更が無い再実行では測り直しを省略する
+    rangeCalls = 0
+    expect(fitListColumns(frame, true)).toBeUndefined()
+    expect(rangeCalls).toBe(0)
   })
 
   it('非 flexibleContent 表のリサイズ時でも deferCommit の読取フェーズ中は DOM へ書き込まず、書込フェーズ後に測り直す', async () => {

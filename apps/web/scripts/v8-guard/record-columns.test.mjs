@@ -341,3 +341,34 @@ test('同じ内容の行を新しい DOM に入れ替えたあとも、列の印
     assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
   } finally { await browser.close() }
 })
+
+test('同じ文字で余白が違うボタンへ入れ替わったときも必ず測り直し、操作列を広げる', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{font:inherit;white-space:nowrap}.narrowBtn{padding:0 4px}.wideBtn{padding:0 36px}</style><main><div class="frame" data-column-layout data-column-sizing="content"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 1</span></td><td><button class="narrowBtn">開く</button></td></tr></tbody></table></div></main>`)
+    await page.locator('.frame').evaluate(fitListColumns)
+    const before = await page.locator('tbody tr td:last-child').evaluate(cell => ({
+      cellWidth: Math.round(cell.getBoundingClientRect().width),
+      buttonWidth: Math.round(cell.querySelector('button').getBoundingClientRect().width),
+    }))
+    assert.ok(before.cellWidth < 60, JSON.stringify(before))
+
+    // 同じ文字「開く」のまま、CSS の余白が違う新しいボタン DOM へ入れ替える
+    await page.locator('tbody tr td:last-child').evaluate(cell => {
+      const fresh = document.createElement('button')
+      fresh.className = 'wideBtn'
+      fresh.textContent = '開く'
+      cell.replaceChild(fresh, cell.firstElementChild)
+    })
+
+    await page.locator('.frame').evaluate(fitListColumns)
+    const after = await page.locator('tbody tr td:last-child').evaluate(cell => ({
+      cellWidth: Math.round(cell.getBoundingClientRect().width),
+      buttonWidth: Math.round(cell.querySelector('button').getBoundingClientRect().width),
+    }))
+    assert.ok(after.buttonWidth >= 90, JSON.stringify(after))
+    assert.ok(after.cellWidth >= after.buttonWidth, `action column must grow for wider button: ${JSON.stringify({ before, after })}`)
+    assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+  } finally { await browser.close() }
+})
