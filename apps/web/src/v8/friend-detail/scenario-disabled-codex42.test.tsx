@@ -12,9 +12,9 @@ it('シナリオを選ぶまで理由を示し、登録を実行しない',async
  expect(await screen.findByText('登録するシナリオを選んでください。')).toBeTruthy()
  const confirm=screen.getByRole('button',{name:'このシナリオに登録する'}) as HTMLButtonElement
  expect(confirm.disabled).toBe(true);fireEvent.click(confirm);expect(fixture.enroll).not.toHaveBeenCalled()
- fireEvent.click(screen.getByRole('button',{name:'登録するシナリオ：選ぶ'}))
+ fireEvent.click(screen.getByRole('button',{name:'登録するシナリオ：選択する'}))
  fireEvent.click(screen.getByRole('radio',{name:'見本シナリオ'}))
- fireEvent.click(screen.getByRole('button',{name:'選ぶ'}))
+ fireEvent.click(screen.getByRole('button',{name:'選択する'}))
  expect(confirm.disabled).toBe(false)
  fixture.enroll.mockResolvedValue({success:true})
  fireEvent.click(confirm);expect(fixture.enroll).toHaveBeenCalledWith('sc','friend')
