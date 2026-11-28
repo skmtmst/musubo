@@ -273,6 +273,51 @@ describe('list-column-sizing の読取中書込の排除と同一 scope 省略',
     expect(getByTestId('tpl-preview-0').style.getPropertyValue('--list-content-column-width')).toBe(widthAfterFirst)
   })
 
+  it('同じ内容の後ろの行が新しい DOM に置き換わっても、測り直しを省きつつ列の印と幅を付け直す', () => {
+    let rangeCalls = 0
+    vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {
+      rangeCalls += 1
+      return [rect(Math.max(24, this.toString().trim().length * 10), 20)] as unknown as DOMRectList
+    })
+    vi.spyOn(Range.prototype, 'getBoundingClientRect').mockImplementation(function (this: Range) {
+      return rect(Math.max(24, this.toString().trim().length * 10), 20)
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.testid === 'tpl-frame' || this.tagName === 'TABLE' || this.tagName === 'TR') return rect(1100, 40)
+      return rect(180, 24)
+    })
+
+    const { getByTestId } = render(
+      <TemplateLikeTable
+        rows={[
+          { name: 'テンプレート1', preview: '見本A', status: '公開中' },
+          { name: 'テンプレート2', preview: '見本B', status: '下書き' },
+        ]}
+      />,
+    )
+    const frame = getByTestId('tpl-frame')
+    fitListColumns(frame)
+    const expectedWidth = getByTestId('tpl-preview-1').style.getPropertyValue('--list-content-column-width')
+    expect(expectedWidth).not.toBe('')
+
+    // 2行目だけを同じ内容の新しい DOM へ入れ替える
+    const tbody = frame.querySelector('tbody')!
+    const fresh = document.createElement('tr')
+    fresh.innerHTML = '<td data-cell-grow=""><span data-list-name="">テンプレート2</span></td><td><span>見本B</span></td><td><span>下書き</span></td>'
+    tbody.replaceChild(fresh, tbody.children[1])
+
+    rangeCalls = 0
+    const commit = fitListColumns(frame, true)
+    expect(rangeCalls).toBe(0)
+    expect(typeof commit).toBe('function')
+    commit?.()
+
+    expect(fresh.children[0].hasAttribute('data-content-name-column')).toBe(true)
+    expect(fresh.children[1].hasAttribute('data-content-support-column')).toBe(true)
+    expect((fresh.children[1] as HTMLElement).style.getPropertyValue('--list-content-column-width')).toBe(expectedWidth)
+    expect(fresh.children[2].hasAttribute('data-content-support-column')).toBe(true)
+  })
+
   it('非 flexibleContent 表のリサイズ時でも deferCommit の読取フェーズ中は DOM へ書き込まず、書込フェーズ後に測り直す', async () => {
     let frameWidth = 1100
     vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function (this: Range) {

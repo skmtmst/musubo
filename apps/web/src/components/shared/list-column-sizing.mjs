@@ -43,19 +43,78 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   }
   const measureKey = `${layoutScope}\x1d${rows.length}\x1d${rows.map(row => [...row.children].map(cellSignature).join('\x1f')).join('\x1e')}`
   const usesGridColumns = frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')
-  const appliedIntact = frame.listColumnScope === layoutScope
+
+  const createCommit = cached => () => {
+    if (frame.hasAttribute('data-content-stacked') !== cached.mustStack) frame.toggleAttribute('data-content-stacked', cached.mustStack)
+    if (usesGridColumns) {
+      if (frame.style.getPropertyValue('--table-content-columns') !== cached.gridColumns) frame.style.setProperty('--table-content-columns', cached.gridColumns)
+    }
+    // A native fixed-layout table reads <col> before the first row's cell width.
+    // Keep its column model in sync with the same measured content budget.
+    if (!cached.bodyIsFlex) {
+      for (const [index, col] of cols.entries()) {
+        const nextWidth = cached.widths[index] != null ? `${cached.widths[index]}px` : col.listColumnOriginalWidth
+        if (col.style.width !== nextWidth) col.style.width = nextWidth
+      }
+    }
+    for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
+      const isName = index === cached.nameIndex
+      const isSupport = cached.widths[index] !== null && cached.widths[index] !== undefined
+      if (cell.hasAttribute('data-content-name-column') !== isName) cell.toggleAttribute('data-content-name-column', isName)
+      if (cell.hasAttribute('data-content-support-column') !== isSupport) cell.toggleAttribute('data-content-support-column', isSupport)
+      if (isSupport) {
+        const value = `${cached.widths[index]}px`
+        if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
+      } else if (cell.style.getPropertyValue('--list-content-column-width')) {
+        cell.style.removeProperty('--list-content-column-width')
+      }
+    }
+    frame.listColumnScope = layoutScope
+    frame.listColumnMeasureKey = measureKey
+    frame.listColumnCachedResult = cached
+  }
+
+  const isCommitApplied = cached => {
+    if (frame.hasAttribute('data-content-stacked') !== cached.mustStack) return false
+    if (usesGridColumns && frame.style.getPropertyValue('--table-content-columns') !== cached.gridColumns) return false
+    if (!cached.bodyIsFlex) {
+      for (const [index, col] of cols.entries()) {
+        const expected = cached.widths[index] != null ? `${cached.widths[index]}px` : col.listColumnOriginalWidth
+        if (col.style.width !== expected) return false
+      }
+    }
+    for (const row of rows) {
+      const cells = row.children
+      for (let index = 0; index < cells.length; index += 1) {
+        const cell = cells[index]
+        const isName = index === cached.nameIndex
+        const isSupport = cached.widths[index] !== null && cached.widths[index] !== undefined
+        if (cell.hasAttribute('data-content-name-column') !== isName) return false
+        if (cell.hasAttribute('data-content-support-column') !== isSupport) return false
+        const expected = isSupport ? `${cached.widths[index]}px` : ''
+        if (cell.style.getPropertyValue('--list-content-column-width') !== expected) return false
+      }
+    }
+    return true
+  }
+
+  if (frame.listColumnScope === layoutScope
     && frame.listColumnMeasureKey === measureKey
-    && bodyCells[nameIndex]?.hasAttribute('data-content-name-column')
-    && (!usesGridColumns || frame.style.getPropertyValue('--table-content-columns') === frame.listColumnAppliedGrid)
-  if (appliedIntact) return
+    && frame.listColumnCachedResult) {
+    if (isCommitApplied(frame.listColumnCachedResult)) return
+    const reapply = createCommit(frame.listColumnCachedResult)
+    if (deferCommit) return reapply
+    reapply()
+    return
+  }
 
   const hasAppliedSizing = () =>
     cols.some(col => col.style.width !== col.listColumnOriginalWidth)
-    || bodyCells.some(cell =>
+    || rows.some(row => [...row.children].some(cell =>
       cell.hasAttribute('data-content-name-column')
       || cell.hasAttribute('data-content-support-column')
       || Boolean(cell.style.getPropertyValue('--list-content-column-width')),
-    )
+    ))
     || (usesGridColumns && Boolean(frame.style.getPropertyValue('--table-content-columns')))
 
   const resetAppliedSizing = () => {
@@ -80,6 +139,7 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
             resetAppliedSizing()
             frame.listColumnScope = ''
             frame.listColumnMeasureKey = ''
+            frame.listColumnCachedResult = undefined
             onReset()
           }
         }
@@ -220,35 +280,7 @@ export function fitListColumns(frame, deferCommit = false, onReset = null) {
   }
   const bodyIsFlex = getComputedStyle(body).display === 'flex'
   const gridColumns = usesGridColumns ? widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ') : ''
-  const commit = () => {
-    if (frame.hasAttribute('data-content-stacked') !== mustStack) frame.toggleAttribute('data-content-stacked', mustStack)
-    if (usesGridColumns) {
-      if (frame.style.getPropertyValue('--table-content-columns') !== gridColumns) frame.style.setProperty('--table-content-columns', gridColumns)
-      frame.listColumnAppliedGrid = gridColumns
-    }
-    // A native fixed-layout table reads <col> before the first row's cell width.
-    // Keep its column model in sync with the same measured content budget.
-    if (!bodyIsFlex) {
-      for (const [index, col] of cols.entries()) {
-        const nextWidth = widths[index] != null ? `${widths[index]}px` : col.listColumnOriginalWidth
-        if (col.style.width !== nextWidth) col.style.width = nextWidth
-      }
-    }
-    for (const row of rows) for (const [index, cell] of [...row.children].entries()) {
-      const isName = index === nameIndex
-      const isSupport = widths[index] !== null && widths[index] !== undefined
-      if (cell.hasAttribute('data-content-name-column') !== isName) cell.toggleAttribute('data-content-name-column', isName)
-      if (cell.hasAttribute('data-content-support-column') !== isSupport) cell.toggleAttribute('data-content-support-column', isSupport)
-      if (isSupport) {
-        const value = `${widths[index]}px`
-        if (cell.style.getPropertyValue('--list-content-column-width') !== value) cell.style.setProperty('--list-content-column-width', value)
-      } else if (cell.style.getPropertyValue('--list-content-column-width')) {
-        cell.style.removeProperty('--list-content-column-width')
-      }
-    }
-    frame.listColumnScope = layoutScope
-    frame.listColumnMeasureKey = measureKey
-  }
+  const commit = createCommit({ widths, mustStack, bodyIsFlex, gridColumns, nameIndex })
   if (deferCommit) return commit
   commit()
 }

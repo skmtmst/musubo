@@ -43,11 +43,13 @@ export function useListColumnSizing(ref: RefObject<HTMLDivElement | null>, enabl
         const target = frame as HTMLDivElement & {
           listColumnScope?: string
           listColumnMeasureKey?: string
+          listColumnCachedResult?: unknown
           gridContentScope?: string
           gridContentCache?: unknown
         }
         target.listColumnScope = ''
         target.listColumnMeasureKey = ''
+        target.listColumnCachedResult = undefined
         target.gridContentScope = ''
         target.gridContentCache = undefined
         schedule()

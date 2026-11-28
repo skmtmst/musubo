@@ -303,3 +303,44 @@ test('列型の内容表もgapを含む境界で段組みと復元を行い、�
     }
   } finally { await browser.close() }
 })
+
+test('同じ内容の行を新しい DOM に入れ替えたあとも、列の印と幅が付く', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}button{width:112px}</style><main><div class="frame" data-column-layout data-column-sizing="content"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>メールアドレス</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 1</span></td><td><span class="text">member1@example.test</span></td><td><button>担当を変更する</button></td></tr><tr data-table-layout="columns"><td data-cell-grow><span class="text">担当者 2</span></td><td><span class="text">member2@example.test</span></td><td><button>担当を変更する</button></td></tr></tbody></table></div></main>`)
+    await page.locator('.frame').evaluate(fitListColumns)
+    const before = await page.locator('tbody tr:nth-child(2) > td').evaluateAll(cells => cells.map(cell => ({
+      name: cell.hasAttribute('data-content-name-column'),
+      support: cell.hasAttribute('data-content-support-column'),
+      varWidth: cell.style.getPropertyValue('--list-content-column-width'),
+      x: Math.round(cell.getBoundingClientRect().x),
+      width: Math.round(cell.getBoundingClientRect().width),
+    })))
+    assert.equal(before[0].name, true)
+    assert.equal(before[1].support, true)
+    assert.notEqual(before[1].varWidth, '')
+    assert.equal(before[2].support, true)
+    assert.notEqual(before[2].varWidth, '')
+
+    // 2行目だけを同じ内容の新しい DOM へ入れ替える（React のキー差し替え等を再現）
+    await page.locator('tbody').evaluate(tbody => {
+      const fresh = document.createElement('tr')
+      fresh.setAttribute('data-table-layout', 'columns')
+      fresh.innerHTML = '<td data-cell-grow><span class="text">担当者 2</span></td><td><span class="text">member2@example.test</span></td><td><button>担当を変更する</button></td>'
+      tbody.replaceChild(fresh, tbody.children[1])
+    })
+
+    // 同じ内容でも欠けた行へ列の印と幅を付け直す
+    await page.locator('.frame').evaluate(fitListColumns)
+    const after = await page.locator('tbody tr:nth-child(2) > td').evaluateAll(cells => cells.map(cell => ({
+      name: cell.hasAttribute('data-content-name-column'),
+      support: cell.hasAttribute('data-content-support-column'),
+      varWidth: cell.style.getPropertyValue('--list-content-column-width'),
+      x: Math.round(cell.getBoundingClientRect().x),
+      width: Math.round(cell.getBoundingClientRect().width),
+    })))
+    assert.deepEqual(after, before)
+    assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+  } finally { await browser.close() }
+})
