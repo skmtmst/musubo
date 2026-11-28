@@ -62,8 +62,9 @@ const CONSENTS = ['利用目的の範囲で結び付ける', '本人の同意（
 function isValidCompareDetail(detail: IdentityCandidateWithProfiles): boolean {
   if (!detail.left || typeof detail.left.id !== 'string' || !detail.right || typeof detail.right.id !== 'string') return false
   if (!Array.isArray(detail.evidence) || !Array.isArray(detail.impact)) return false
+  if (detail.evidence.some((item) => item == null) || detail.impact.some((item) => item == null)) return false
   if (!('profileCandidates' in detail) || !Array.isArray(detail.profileCandidates)) return false
-  if (detail.profileCandidates.some((field) => !field || typeof field.fieldKey !== 'string' || !Array.isArray(field.options))) return false
+  if (detail.profileCandidates.some((field) => !field || typeof field.fieldKey !== 'string' || !Array.isArray(field.options) || field.options.some((option) => option == null))) return false
   return true
 }
 
