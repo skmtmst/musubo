@@ -1,17 +1,28 @@
 import { parseEventQuestions } from '@/components/events/event-questions-editor'
 import { type EventDetail } from '@/lib/api'
-import { formatDateTime,formatDay,formatTime } from '@/lib/format'
+import { formatDateTime, formatTime } from '@/lib/format'
+import { jstDate } from '@/lib/jst-datetime'
 
-
+function parseUtcDate(value: string): Date | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const normalized =
+    /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmed) && !/Z$|[+-]\d{2}:?\d{2}$/i.test(trimmed)
+      ? `${trimmed.replace(' ', 'T')}Z`
+      : trimmed
+  const parsed = new Date(normalized)
+  return Number.isFinite(parsed.getTime()) ? parsed : null
+}
 
 export function formatJpDateTime(iso: string): string {
-  const d = new Date(iso)
   /*
     EVENT-05: 一覧(app/events/page.tsx)は Asia/Tokyo 固定で出す。
     ここが端末の時間帯に依存すると、同じ開催回が一覧と編集で
     時差分ずれて見える。保存値(UTC)は変えず、表示だけ日本時間に固定する。
+    文字列のまま formatDateTime へ渡し、オフセットなしの SQLite UTC も同じ規則で扱う。
   */
-  return formatDateTime(d)
+  return formatDateTime(iso)
 }
 
 
@@ -24,7 +35,9 @@ export function formatJpDateTime(iso: string): string {
 export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   const start = formatJpDateTime(startsAt)
   const end = formatJpDateTime(endsAt)
-  const sameDay = formatDay(startsAt) === formatDay(endsAt)
+  const startDate = parseUtcDate(startsAt)
+  const endDate = parseUtcDate(endsAt)
+  const sameDay = startDate !== null && endDate !== null && jstDate(startDate) === jstDate(endDate)
   return `${start} 〜 ${sameDay ? formatTime(endsAt) : end}`
 }
 
