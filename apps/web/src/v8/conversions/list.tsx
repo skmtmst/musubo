@@ -60,7 +60,7 @@ import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import { api, describeSaveFailure, type ConversionDefinitionDeleteImpact, type ConversionDefinitionEvent, type ConversionDefinitionFilter, type ConversionDefinitionList, type ConversionDefinitionListItem, type ConversionDefinitionReport, type ConversionIngestionEvent } from '@/lib/api';
 import { deduplicationLabel } from './dedup';
 import { originInfoOf } from './origin-labels';
-import { readExclusionCondition, readExclusionMemo } from './exclusion';
+import { readEditableExclusion, readExclusionMemo } from './exclusion';
 import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog, EDIT_VALUE_MODE_LABELS, STATE_LABELS, sourceTriggerLabel, usageLabel, type ConversionStopAction, type EditForm } from './dialogs';
 import { notifyToast } from '@/components/shared/toast';
 import { focusConversionField, type ConversionFieldIssue } from './field-issue';
@@ -125,7 +125,7 @@ function toEditForm(item: ConversionDefinitionListItem): EditForm {
     reversalPolicy: item.reversalPolicy,
     attributionDays: item.attributionDays == null ? '' : String(item.attributionDays),
     targetUrl: item.targetUrl ?? '',
-    exclusion: readExclusionCondition(item.sourceConfig),
+    exclusion: readEditableExclusion(item.sourceConfig),
     exclusionMemo: readExclusionMemo(item.sourceConfig),
   }
 }
@@ -511,7 +511,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     }
     const exclusionIssue = findConditionDraftIssue(editForm.exclusion)
     const unchangedExclusion = editForm.exclusion !== null
-      && JSON.stringify(editForm.exclusion) === JSON.stringify(readExclusionCondition(editTarget.sourceConfig))
+      && JSON.stringify(editForm.exclusion) === JSON.stringify(readEditableExclusion(editTarget.sourceConfig))
     if (editForm.exclusion && exclusionHasIncompleteRule(editForm.exclusion)) {
       invalid('cv-edit-exclusion', '入力が未完成の条件があります。空欄を埋めるか、「この条件を外す」で取り除いてください。')
       return

@@ -71,6 +71,20 @@ export function readExclusionCondition(sourceConfig: unknown): ExclusionConditio
   return raw
 }
 
+/**
+ * 編集窓に入れる条件。形が崩れていても保存されている形のまま渡し、
+ * 編集窓の側で「読めない」「未完成」を案内して保存を止める（黙って消さない）。
+ */
+export function readEditableExclusion(sourceConfig: unknown): ExclusionCondition | null {
+  if (!sourceConfig || typeof sourceConfig !== 'object' || Array.isArray(sourceConfig)) return null
+  const raw = (sourceConfig as Record<string, unknown>).exclusion
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const node = raw as { operator?: unknown; rules?: unknown; groups?: unknown }
+  if ((node.operator !== 'AND' && node.operator !== 'OR') || !Array.isArray(node.rules)) return null
+  if (node.rules.length === 0 && (!Array.isArray(node.groups) || node.groups.length === 0)) return null
+  return raw as ExclusionCondition
+}
+
 /** sourceConfig からメモだけを読む(旧文字列もメモとして読む)。 */
 export function readExclusionMemo(sourceConfig: unknown): string {
   if (!sourceConfig || typeof sourceConfig !== 'object' || Array.isArray(sourceConfig)) return ''
