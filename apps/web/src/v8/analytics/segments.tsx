@@ -87,7 +87,6 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       setData({
         ...response.data,
         total: validCount(response.data.total),
-        outside: { ...response.data.outside, count: validCount(response.data.outside.count) },
         cells: response.data.cells.map((cell) => ({ ...cell, count: validCount(cell.count) })),
       })
       setStatus('ready')
@@ -119,7 +118,7 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       <div className={styles.summary}>
         <span>
           <span className={styles.summaryStrong}>{`全員 ${data.total === null ? '—' : formatNumber(data.total)} 人`}</span>
-          {`（${BASIS_WORD[basis]}なし ${outside === null ? '—' : formatNumber(outside)} 人は表の外）`}
+          {outside === null ? '' : `（${BASIS_WORD[basis]}なし ${validCount(outside) === null ? '—' : formatNumber(outside)} 人は表の外）`}
         </span>
         <Button variant="secondary" onClick={() => setPick({ r: 0, f: 0 })} disabled={notComputed}>全員を見る</Button>
       </div>
