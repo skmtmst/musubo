@@ -55,6 +55,9 @@ type Friend = { id: string; display_name: string | null; activity_count: number;
 type FriendsPage = { items: Friend[]; total: number; optedOutCount: number; nextCursor: string | null }
 type Pick = { r: number; f: number }
 
+const validCount = (count: number | null): number | null =>
+  typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : null
+
 const md = (value?: string | null) => (value ? `${Number(value.slice(5, 7))}/${Number(value.slice(8, 10))}` : '—')
 
 /** 人数の多さを 0〜4 の濃さにする（最大のマスを 4）。 */
@@ -81,7 +84,12 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
     try {
       const response = await customerSegmentsApi.get(accountId, basis, measure)
       if (!response.success) throw new Error('segments_failed')
-      setData(response.data)
+      setData({
+        ...response.data,
+        total: validCount(response.data.total),
+        outside: { ...response.data.outside, count: validCount(response.data.outside.count) },
+        cells: response.data.cells.map((cell) => ({ ...cell, count: validCount(cell.count) })),
+      })
       setStatus('ready')
     } catch (reason) {
       setError(reason)
@@ -111,7 +119,7 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
       <div className={styles.summary}>
         <span>
           <span className={styles.summaryStrong}>{`全員 ${data.total === null ? '—' : formatNumber(data.total)} 人`}</span>
-          {outside === null ? '' : `（${BASIS_WORD[basis]}なし ${formatNumber(outside)} 人は表の外）`}
+          {`（${BASIS_WORD[basis]}なし ${outside === null ? '—' : formatNumber(outside)} 人は表の外）`}
         </span>
         <Button variant="secondary" onClick={() => setPick({ r: 0, f: 0 })} disabled={notComputed}>全員を見る</Button>
       </div>
