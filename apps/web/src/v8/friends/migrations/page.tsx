@@ -10,7 +10,9 @@ import UidMigrationV8 from './uid'
 
 function Inner() {
   const params = useSearchParams()
-  if (params.get('tab') === 'uid') return <UidMigrationV8 initialRunId={params.get('run')} />
+  const tab = params?.get('tab')?.trim() ?? ''
+  const run = params?.get('run')?.trim() || null
+  if (tab === 'uid') return <UidMigrationV8 initialRunId={run} />
   return <CsvMigrationsV8 />
 }
 
