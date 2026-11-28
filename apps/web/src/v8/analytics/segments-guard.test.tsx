@@ -75,8 +75,9 @@ describe('SegmentsV8 ガード', () => {
     expect(screen.queryByText('全員 999 人')).toBeNull()
   })
 
-  it('引き出しの不正日付・不正回数・負の残り人数でも NaN や負数を出さず、不正人数の配信ボタンも止める', async () => {
-    fx.get.mockResolvedValue(makeSegments(10, Number.NaN))
+  it('引き出しの不正日付・不正回数・負の残り人数でも NaN や負数を出さない', async () => {
+    // 人数が不正なマスは押せない（segments-negative-later2-cx6.test.tsx）。引き出しの守りは正しい人数のマスから確かめる
+    fx.get.mockResolvedValue(makeSegments(10, 1))
     fx.friends.mockResolvedValue({
       success: true,
       data: {
@@ -104,8 +105,5 @@ describe('SegmentsV8 ガード', () => {
     expect(screen.queryByText(/ほか -1 人/)).toBeNull()
     expect(screen.getByText('ほか 0 人を見る')).toBeTruthy()
     expect(screen.getByText(/宣伝を止めている人 — 人/)).toBeTruthy()
-
-    const sendBtn = screen.getByRole('button', { name: /LINE を送る/ }) as HTMLButtonElement
-    expect(sendBtn.disabled).toBe(true)
   })
 })
