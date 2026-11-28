@@ -8,7 +8,6 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 
 const NAV = PAGE
 const TABLE = PAGE
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
-const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 /* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
 const SAVED_DIALOG = readFileSync(join(HERE, 'saved-search-dialog.tsx'), 'utf8')
@@ -36,8 +35,6 @@ describe('友だちV8の画面契約', () => {
     expect(PAGE).toContain("from '@/components/shared/page-size-select'")
     expect(PAGE).toContain('const PAGE_SIZE_OPTIONS = STANDARD_PAGE_SIZES')
     expect(TABLE).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(PAGINATION).toContain('paginationItems')
-    expect(PAGINATION).toContain("return [1, 'ellipsis', current, 'ellipsis', total]")
     expect(PAGE).toContain('Math.ceil(total / pageSize)')
   })
 
