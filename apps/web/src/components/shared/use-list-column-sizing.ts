@@ -18,8 +18,8 @@ export function useListColumnSizing(ref: RefObject<HTMLDivElement | null>, enabl
       cancel = null
       if (!active) return
       lastWidth = Math.round(frame.getBoundingClientRect().width)
-      if (frame.getAttribute('role') === 'table') { fitGridContentColumns(frame); return }
-      return fitListColumns(frame, true)
+      if (frame.getAttribute('role') === 'table') return fitGridContentColumns(frame, true)
+      return fitListColumns(frame, true, schedule)
     }
     const schedule = () => {
       if (!active || cancel) return
@@ -40,7 +40,16 @@ export function useListColumnSizing(ref: RefObject<HTMLDivElement | null>, enabl
     if (fonts && fonts.status !== 'loaded') {
       void fonts.ready.then(() => {
         if (!active) return
-        ;(frame as HTMLDivElement & { listColumnScope?: string }).listColumnScope = ''
+        const target = frame as HTMLDivElement & {
+          listColumnScope?: string
+          listColumnMeasureKey?: string
+          gridContentScope?: string
+          gridContentCache?: unknown
+        }
+        target.listColumnScope = ''
+        target.listColumnMeasureKey = ''
+        target.gridContentScope = ''
+        target.gridContentCache = undefined
         schedule()
       })
     }

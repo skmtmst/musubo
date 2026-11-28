@@ -176,17 +176,31 @@ test('Grid内容列は見出し幅を守り、境界で既存段組みへ戻し�
     const batching = await page.locator('.table').evaluate(frame => {
       const original = Element.prototype.getBoundingClientRect
       const counts = []
+      const liveCounts = []
       Element.prototype.getBoundingClientRect = function () {
-        if (this.hasAttribute('data-column-probe')) counts.push(frame.querySelectorAll('[data-column-probe]').length)
+        if (this.hasAttribute('data-column-probe')) {
+          counts.push(document.querySelectorAll('[data-column-probe]').length)
+          liveCounts.push(frame.querySelectorAll('[data-column-probe]').length)
+        }
         return original.call(this)
       }
       window.gridProbeCounts = counts
+      window.gridLiveProbeCounts = liveCounts
       window.restoreGridProbe = () => { Element.prototype.getBoundingClientRect = original }
       return frame.querySelectorAll('[role="row"] > *').length
     })
+    // 同じ幅・同じ内容の再実行では計測を省く。
     await page.locator('.table').evaluate(fitGridContentColumns)
-    const counts = await page.evaluate(() => { window.restoreGridProbe(); return window.gridProbeCounts })
+    assert.equal(await page.evaluate(() => window.gridProbeCounts.length), 0)
+    // scope を外して再計測するときは常駐の隔離ホストでまとめて測り、表の行へは挿さない。
+    await page.locator('.table').evaluate(frame => { frame.gridContentScope = '' })
+    await page.locator('.table').evaluate(fitGridContentColumns)
+    const { counts, liveCounts } = await page.evaluate(() => {
+      window.restoreGridProbe()
+      return { counts: window.gridProbeCounts, liveCounts: window.gridLiveProbeCounts }
+    })
     assert.ok(counts.length > 0 && counts.every(count => count === batching), JSON.stringify(counts))
+    assert.ok(liveCounts.every(count => count === 0), JSON.stringify(liveCounts))
     assert.equal(await page.locator('[data-column-probe]').count(), 0)
   } finally { await browser.close() }
 })
@@ -260,6 +274,7 @@ test('Gridは通信要素を複製せず、現在の選択と入力を写し、a
       }
       window.restoreProbeAppend = () => { Element.prototype.append = append }
     })
+    await page.locator('.table').evaluate(frame => { frame.gridContentScope = '' })
     await assert.rejects(page.locator('.table').evaluate(fitGridContentColumns), /append failed/)
     await page.evaluate(() => window.restoreProbeAppend())
     assert.equal(await page.locator('[data-column-probe]').count(), 0)
