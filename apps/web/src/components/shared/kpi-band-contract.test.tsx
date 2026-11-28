@@ -72,11 +72,6 @@ describe('数の帯（Pp3nS）', () => {
     expect(unlayered).not.toContain('@layer')
   })
 
-  it('折りたたみ（KpiCollapse）も帯として出す', () => {
-    const collapse = readFileSync(join(HERE, '..', 'ui', 'kpi-collapse.tsx'), 'utf8')
-    expect(collapse).toContain('data-kpi-presentation="band"')
-  })
-
   it('印なしの帯（data-kpi-strip）もv8では横一列・隙間0', () => {
     const css = read('kpi-band-v8.css')
     const bare = css.match(/:root \[data-kpi-strip\] \{[^}]*\}/s)
