@@ -498,6 +498,8 @@
 
 ## 反映履歴
 
+- [統括課金の決済通知を修正](release-log/unreleased/272-masato-stripe-webhook.md)
+
 - [統括のアカウントの数の帯の未確認をまとめる](release-log/unreleased/181-kenta-hq-kpi-unconfirmed.md)
 
 - [オーナーの指摘の直しをまとめて取り込み](release-log/unreleased/186-kenta-train-owner.md)

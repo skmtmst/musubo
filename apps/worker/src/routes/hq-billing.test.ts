@@ -83,7 +83,10 @@ async function sign(payload: string, secret = WEBHOOK_SECRET, timestamp = Math.f
 }
 
 async function webhook(event: Record<string, unknown>, opts: { secret?: string; env?: Partial<Env['Bindings']> } = {}) {
-  const payload = JSON.stringify(event);
+  return webhookPayload(JSON.stringify(event), opts);
+}
+
+async function webhookPayload(payload: string, opts: { secret?: string; env?: Partial<Env['Bindings']> } = {}) {
   return app(null).request('/api/hq/billing/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'stripe-signature': await sign(payload, opts.secret) },
@@ -407,6 +410,105 @@ describe('課金 Webhook', () => {
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
   });
 
+  it('旧料金の申込は新料金テーブル未適用でも確定する', async () => {
+    testDb.raw.exec('DROP TABLE musubo_tenant_billing');
+    expect((await webhook(completed('evt_legacy_without_migration'))).status).toBe(200);
+    expect(tenantRow()).toMatchObject({
+      plan_key: 'standard', plan_status: 'active', stripe_subscription_id: 'sub_1',
+    });
+  });
+
+  it.each(['missing-row', 'missing-table'])('新料金の契約が未確認なら再送で復旧する (%s)', async (missing) => {
+    setTenant({ plan_key: 'musubo', plan_status: 'exempt', stripe_customer_id: 'cus_1' });
+    const schema = testDb.raw.prepare("SELECT sql FROM sqlite_master WHERE name='musubo_tenant_billing'")
+      .get() as { sql: string };
+    if (missing === 'missing-table') testDb.raw.exec('DROP TABLE musubo_tenant_billing');
+    const event = { id: 'evt_missing_contract', type: 'customer.subscription.created', created: 100,
+      data: { object: { id: 'sub_musubo_core', customer: 'cus_1', status: 'active',
+        metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_core' } } } };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect((await webhook(event)).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_key: 'musubo', plan_status: 'exempt', stripe_subscription_id: null });
+    const receipt = testDb.raw.prepare('SELECT summary FROM billing_events WHERE id=?');
+    expect(receipt.get(event.id)).toEqual({ summary: 'pending' });
+    expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+    const reason = missing === 'missing-row' ? 'contract_missing' : 'schema_missing';
+    expect(warn.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({
+      code: 'billing_webhook_retry', billingEventType: 'customer.subscription.created', billingStage: 'contract',
+      billingReason: reason, timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background', status: 503,
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/evt_missing_contract|cus_1|sub_musubo_core|whsec_|sk_test_/);
+
+    if (missing === 'missing-table') testDb.raw.exec(schema.sql);
+    seedNewPricingTenant();
+    testDb.raw.prepare('UPDATE musubo_tenant_billing SET core_subscription_id=? WHERE tenant_id=?')
+      .run('sub_musubo_core', DEFAULT_TENANT_ID);
+    expect((await webhook(event)).status).toBe(200);
+    expect(receipt.get(event.id)).not.toEqual({ summary: 'pending' });
+    expect(tenantRow()).toMatchObject({ plan_status: 'exempt', stripe_subscription_id: null });
+  });
+
+  it('署名済みでも不正なJSONやイベント構造は受領しない', async () => {
+    expect((await webhookPayload('{invalid')).status).toBe(400);
+    expect((await webhook({ id: 'evt_bad_shape', type: 'invoice.paid', data: { object: [] } })).status).toBe(400);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_events').get()).toEqual({ n: 0 });
+  });
+
+  it.each([
+    ['invoice.created', {}],
+    ['setup_intent.succeeded', {}],
+    ['checkout.session.completed', { mode: 'payment' }],
+  ])('統括課金で扱わない通知をDBもStripe APIも呼ばずに受け取る (%s)', async (type, object) => {
+    const prepare = vi.spyOn(testDb.db, 'prepare');
+    const response = await webhook({ id: 'evt_other', type, data: { object: { customer: 'cus_1', ...object } } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { ignored: true } });
+    expect(prepare).not.toHaveBeenCalled();
+    expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+    expect(stripe.retrieveSetupIntent).not.toHaveBeenCalled();
+  });
+
+  it('新料金と明示された契約を旧料金の契約枠に書き込まない', async () => {
+    setTenant({ plan_key: 'standard', stripe_customer_id: 'cus_1' });
+    const event = { id: 'evt_plan_mismatch', type: 'customer.subscription.created', data: { object: {
+      id: 'sub_core', customer: 'cus_1', status: 'active', metadata: { purpose: 'musubo_core' },
+    } } };
+    expect((await webhook(event)).status).toBe(503);
+    expect(tenantRow()).toMatchObject({ plan_key: 'standard', stripe_subscription_id: null });
+    expect(stripe.retrieveSubscription).not.toHaveBeenCalled();
+  });
+
+  it('新料金のBasil形式の入金を一度だけ保存し、遅れて届いた失敗や取消済みの契約で利用状態を巻き戻さない', async () => {
+    seedNewPricingTenant();
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'exempt' });
+    const tenant = testDb.raw.prepare('SELECT status FROM musubo_tenant_billing WHERE tenant_id=?');
+    testDb.raw.prepare(`UPDATE musubo_tenant_billing
+      SET core_subscription_id='sub_core',status='past_due',
+        first_line_activated_at='2026-11-01',first_charge_date='2026-11-09' WHERE tenant_id=?`)
+      .run(DEFAULT_TENANT_ID);
+    const object = { id: 'in_basil', customer: { id: 'cus_1' }, amount_due: 5900, amount_paid: 5900, currency: 'jpy',
+      parent: { type: 'subscription_details', subscription_details: { subscription: { id: 'sub_core' } } } };
+    const created = Date.parse('2026-11-11T00:00:00Z') / 1000;
+    const paid = { id: 'evt_basil', type: 'invoice.paid', created, data: { object } };
+    const results = await Promise.all([webhook(paid), webhook(paid)]);
+    expect(results.map(response => response.status)).toEqual([200, 200]);
+    const bodies = await Promise.all(results.map(response => response.json<{ data: { duplicate?: boolean } }>()));
+    expect(bodies.filter(response => response.data.duplicate)).toHaveLength(1);
+    expect(tenant.get(DEFAULT_TENANT_ID)).toEqual({ status: 'active' });
+    expect(testDb.raw.prepare('SELECT status,subscription_id FROM billing_invoices WHERE id=?').get(object.id))
+      .toEqual({ status: 'paid', subscription_id: 'sub_core' });
+    expect((await webhook({ id: 'evt_old_failure', type: 'invoice.payment_failed', created: created - 1,
+      data: { object: { ...object, amount_paid: 0 } } })).status).toBe(200);
+    expect(tenant.get(DEFAULT_TENANT_ID)).toEqual({ status: 'active' });
+
+    expect((await webhook({ id: 'evt_core_deleted', type: 'customer.subscription.deleted', created: created + 1,
+      data: { object: { id: 'sub_core', customer: 'cus_1',
+        metadata: { tenant_id: DEFAULT_TENANT_ID, purpose: 'musubo_core' } } } })).status).toBe(200);
+    expect((await webhook({ ...paid, id: 'evt_paid_late' })).status).toBe(200);
+    expect(tenant.get(DEFAULT_TENANT_ID)).toEqual({ status: 'past_due' });
+    expect(tenantRow()).toMatchObject({ plan_key: 'musubo', plan_status: 'exempt', stripe_subscription_id: null });
+  });
+
   it('新料金の契約通知を旧プランへ適用せず、再処理可能な受領状態で残す', async () => {
     seedNewPricingTenant();
     setTenant({ plan_status: 'exempt', stripe_customer_id: 'cus_1' });
@@ -420,8 +522,9 @@ describe('課金 Webhook', () => {
       .toMatchObject({ summary: 'pending' });
   });
 
-  it('カードsetup完了通知は契約開始と区別し、Stripeの既定カードだけ更新する', async () => {
-    setTenant({ stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
+  it.each(['standard', 'musubo'])('カードsetup完了は契約と独立して既定カードだけ更新する (%s)', async (plan_key) => {
+    setTenant({ plan_key, stripe_customer_id: 'cus_setup', plan_status: 'trialing', trial_ends_at: null });
+    testDb.raw.exec('DROP TABLE musubo_tenant_billing');
     stripe.retrieveSetupIntent.mockResolvedValue({ id: 'seti_1', status: 'succeeded', customer: 'cus_setup', payment_method: 'pm_setup' });
     const event = { id: 'evt_card_setup_1', type: 'checkout.session.completed', created: 100,
       data: { object: { id: 'cs_setup', mode: 'setup', customer: 'cus_setup', setup_intent: 'seti_1',
@@ -763,6 +866,49 @@ describe('課金 Webhook', () => {
     expect(testDb.raw.prepare(`SELECT status, amount_refunded FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'paid', amount_refunded: 4_000 });
   });
 
+  it('新料金でも返金を記録し、古い通知や重複で返金総額を減らさない', async () => {
+    seedNewPricingTenant();
+    setTenant({ stripe_customer_id: 'cus_1' });
+    testDb.raw.prepare(`INSERT INTO billing_invoices
+      (id,tenant_id,stripe_customer_id,status,amount_paid,amount_due,currency,synced_at,created_at)
+      VALUES ('in_refund_new',?,'cus_1','paid',5900,5900,'jpy','2026-11-09','2026-11-09')`).run(DEFAULT_TENANT_ID);
+    stripe.retrievePaymentIntent.mockResolvedValue({ id: 'pi_refund_new', invoice: 'in_refund_new' });
+    const refund = (id: string, amount: number) => ({ id, type: 'charge.refunded', data: {
+      object: { id: 'ch_refund_new', customer: 'cus_1', payment_intent: 'pi_refund_new', amount_refunded: amount },
+    } });
+    expect((await webhook(refund('evt_refund_new', 5900))).status).toBe(200);
+    expect((await webhook(refund('evt_refund_older', 2000))).status).toBe(200);
+    expect((await webhook(refund('evt_refund_new', 5900))).status).toBe(200);
+    expect(stripe.retrievePaymentIntent).toHaveBeenCalledTimes(2);
+    expect(testDb.raw.prepare('SELECT amount_refunded FROM billing_invoices WHERE id=?').get('in_refund_new'))
+      .toEqual({ amount_refunded: 5900 });
+  });
+
+  it('他の統括に属する請求書を移し替えず、利用状態も回復させない', async () => {
+    const otherTenant = 'another-tenant';
+    testDb.raw.prepare('INSERT INTO tenants (id,name) VALUES (?,?)').run(otherTenant, 'Sample tenant');
+    testDb.raw.prepare(`INSERT INTO billing_invoices
+      (id,tenant_id,status,amount_paid,amount_due,currency,synced_at,created_at)
+      VALUES ('in_existing_other',?,'open',0,5900,'jpy','2026-11-09','2026-11-09')`).run(otherTenant);
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'past_due' });
+    const object = { id: 'in_existing_other', customer: 'cus_1', subscription: 'sub_1', amount_due: 5900, amount_paid: 5900 };
+    expect((await webhook({ id: 'evt_conflicting_invoice', type: 'invoice.paid', data: { object } })).status).toBe(503);
+    expect(testDb.raw.prepare('SELECT summary FROM billing_events WHERE id=?').get('evt_conflicting_invoice'))
+      .toEqual({ summary: 'pending' });
+    expect(testDb.raw.prepare('SELECT tenant_id,status FROM billing_invoices WHERE id=?').get(object.id))
+      .toEqual({ tenant_id: otherTenant, status: 'open' });
+    expect(tenantRow().plan_status).toBe('past_due');
+  });
+
+  it('旧料金の回収不能通知を保存し、遅延した支払い失敗で状態を戻さない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_1', plan_status: 'past_due' });
+    const object = { id: 'in_uncollectible', customer: 'cus_1', subscription: 'sub_1', amount_due: 5900, amount_paid: 0 };
+    expect((await webhook({ id: 'evt_uncollectible', type: 'invoice.marked_uncollectible', data: { object } })).status).toBe(200);
+    expect((await webhook({ id: 'evt_late_open', type: 'invoice.payment_failed', data: { object } })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT status FROM billing_invoices WHERE id=?').get(object.id))
+      .toEqual({ status: 'uncollectible' });
+  });
+
   it('統括IDが一致しても別のStripe顧客の請求書は取り込まない', async () => {
     setTenant({ stripe_customer_id: 'cus_1', plan_status: 'active' });
     const res = await webhook({ id: 'evt_wrong_invoice_customer', type: 'invoice.payment_failed',
@@ -801,6 +947,18 @@ describe('課金 Webhook', () => {
     expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
     expect(info.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_info', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
+  });
+
+  it('別サービスの返金でStripeの照合が失敗してもWebhookの再送を要求しない', async () => {
+    stripe.retrievePaymentIntent.mockRejectedValue(new Error('PaymentIntent is not available to this account'));
+    const event = { id: 'evt_foreign_refund', type: 'charge.refunded', data: {
+      object: { id: 'ch_foreign', customer: 'cus_foreign', payment_intent: 'pi_foreign', amount_refunded: 1800 },
+    } };
+    const response = await webhook(event);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { matched: false } });
+    expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toEqual({ n: 0 });
   });
 
   it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
