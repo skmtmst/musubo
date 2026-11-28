@@ -80,7 +80,7 @@ function matchesQuery(item: OutgoingWebhookOverview, query: string): boolean {
   // 管理画面 と同じ探し方：名前・URL・出来事の種類（大文字小文字を区別しない）。
   const q = query.trim().toLocaleLowerCase('ja-JP')
   if (!q) return true
-  return [item.name, item.url, ...item.eventTypes].some((value) => value.toLocaleLowerCase('ja-JP').includes(q))
+  return [item.name, item.url, ...item.eventTypes].some((value) => typeof value === 'string' && value.toLocaleLowerCase('ja-JP').includes(q))
 }
 
 function isFailing(item: OutgoingWebhookOverview): boolean {
