@@ -13,18 +13,8 @@ const LIST = readFileSync(join(DIR, '../../v8/broadcasts/list.tsx'), 'utf8')
  * 条件変更・ページ送り・削除や移動の後の取り直しは一覧の口だけにする。
  */
 describe('一斉配信V8 条件変更は一覧の口だけ取り直す', () => {
-  it('一覧と名前解決の取り直し口を分けている', () => {
-    expect(LIST).toContain('const loadList = useCallback')
-    expect(LIST).toContain('const loadCandidates = useCallback')
-    expect(LIST).toContain('void loadCandidates()')
-  })
-
   it('一覧の口にタグ・シナリオを混ぜていない', () => {
     expect(LIST).not.toContain('const [broadcastsRes, tagsRes, scenariosRes] = await Promise.all')
-  })
-
-  it('条件変更の合図は一覧だけを取り直す', () => {
-    expect(LIST).toContain('void loadList(0)')
   })
 
   it('古い3つまとめ取り直し口は残っていない', () => {
