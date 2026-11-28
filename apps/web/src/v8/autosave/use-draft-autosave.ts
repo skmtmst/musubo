@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatRelative } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /** 一斉配信と同じ間合い。 */
 export const AUTOSAVE_DELAY_MS = 2000
@@ -30,6 +31,7 @@ export const AUTOSAVE_WORDS = {
 
 /** 保存した時刻から「n秒前」（1分未満）・それより前は「n分前」などを作る。 */
 export function savedAgoLabel(savedAt: number, now: number): string {
+  if (!Number.isFinite(savedAt) || !Number.isFinite(now)) return emptyValue('unknown')
   const seconds = Math.floor((now - savedAt) / 1000)
   return seconds < 60 ? `${Math.max(0, seconds)}秒前` : formatRelative(savedAt, now)
 }
@@ -45,7 +47,11 @@ export function autosaveLabel(state: {
   if (state.autosaving) return AUTOSAVE_WORDS.saving
   if (state.dirty && state.failed) return AUTOSAVE_WORDS.failed
   if (state.dirty) return AUTOSAVE_WORDS.unsaved
-  if (state.savedAt !== null) return AUTOSAVE_WORDS.saved(savedAgoLabel(state.savedAt, state.now))
+  if (state.savedAt !== null) {
+    return Number.isFinite(state.savedAt) && Number.isFinite(state.now)
+      ? AUTOSAVE_WORDS.saved(savedAgoLabel(state.savedAt, state.now))
+      : '下書き保存済み'
+  }
   return null
 }
 
@@ -73,6 +79,9 @@ export function useDraftAutosave({ fingerprint, dirty, active = true, enabled, p
   const [failedFingerprint, setFailedFingerprint] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const runningRef = useRef(false)
+  const runSeqRef = useRef(0)
+  const activeRef = useRef(active)
+  activeRef.current = active
   const saveRef = useRef(save)
   saveRef.current = save
   const fingerprintRef = useRef(fingerprint)
@@ -80,26 +89,36 @@ export function useDraftAutosave({ fingerprint, dirty, active = true, enabled, p
   const mountedRef = useRef(true)
   useEffect(() => {
     mountedRef.current = true
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+      runSeqRef.current += 1
+    }
   }, [])
+  useEffect(() => {
+    if (!active) runSeqRef.current += 1
+  }, [active])
 
   const run = useCallback(async () => {
-    if (runningRef.current) return
+    if (runningRef.current || !activeRef.current) return
+    const seq = ++runSeqRef.current
     runningRef.current = true
     setAutosaving(true)
     const sent = fingerprintRef.current
     try {
       const ok = await saveRef.current()
-      if (!mountedRef.current) return
+      if (!mountedRef.current || seq !== runSeqRef.current || !activeRef.current) return
       if (ok) {
-        setSavedAt(Date.now())
-        setNow(Date.now())
+        const at = Date.now()
+        setSavedAt(at)
+        setNow(at)
         setFailedFingerprint(null)
       } else {
         setFailedFingerprint(sent)
       }
     } catch {
-      if (mountedRef.current) setFailedFingerprint(sent)
+      if (mountedRef.current && seq === runSeqRef.current && activeRef.current) {
+        setFailedFingerprint(sent)
+      }
     } finally {
       runningRef.current = false
       // 終わると下の effect がもう一度回り、保存中に進んだ入力があれば追って送る。
@@ -124,6 +143,7 @@ export function useDraftAutosave({ fingerprint, dirty, active = true, enabled, p
 
   /** 手で保存できたときに呼ぶ（帯を「保存済み・0秒前」にし、失敗の印を外す）。 */
   const markSaved = useCallback(() => {
+    runSeqRef.current += 1
     const at = Date.now()
     setSavedAt(at)
     setNow(at)
