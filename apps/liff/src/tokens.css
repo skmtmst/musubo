@@ -136,4 +136,10 @@
   --liff-action-height: 48px;
   --liff-content-max: 448px;
   --liff-safe-bottom: 30px;
+  --liff-caption-font-size: 11px;
+  --liff-photo-cover-max-width: 116px;
+  /* 面の内側が基準。長い説明や狭い幅では本文に合わせて伸びる。 */
+  --liff-course-summary-min-height: 148px;
+  --liff-course-with-photo-min-height: 186px;
+  --liff-dish-summary-min-height: 84px;
 }

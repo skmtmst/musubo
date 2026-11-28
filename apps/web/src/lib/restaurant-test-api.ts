@@ -10,7 +10,7 @@ export type RestaurantStore = {
   id: string; organization_id: string; name: string; code: string; area: string | null;
   capacity: number; timezone: string; status: 'active' | 'paused' | 'archived';
   line_status: 'connected' | 'warning' | 'error' | 'unconfigured'; google_status: string;
-  line_account_id: string | null; line_account_name: string | null; friend_count?: number | null
+  line_account_id: string | null; line_account_name: string | null; friend_count?: number | null; reservation_token?: string | null
 }
 export type RestaurantMembership = {
   id: string; store_id: string | null; staff_name: string; email: string | null; role: 'super_admin' | 'store_manager' | 'staff';

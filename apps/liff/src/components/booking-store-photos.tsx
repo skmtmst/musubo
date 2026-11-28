@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import Button from './ui/button/index.js';
 import ConfirmDialog from './ui/confirm-dialog.js';
+import { PhotoButton, PhotoFrame } from './ui/photo-preview.js';
 
 const labels = { exterior: '外観', interior: '店内', waiting: '待合' };
 type Photo = { slot: keyof typeof labels; url: string };
@@ -32,14 +33,13 @@ export default function BookingStorePhotos() {
     <h2 className="text-sm font-bold text-ink">お店の案内</h2>
     <div className="grid grid-cols-3 gap-3">
       {photos.map(photo => <figure key={photo.slot} className="min-w-0 space-y-1.5">
-        <Button variant="plain" aria-label={`${labels[photo.slot]}の写真を大きく見る`} onClick={() => setSelected(photo)} className="block w-full rounded-[10px] focus-visible:outline-2 focus-visible:outline-accent">
-          <img src={photo.url} alt={`お店の${labels[photo.slot]}`} loading="lazy" className="aspect-video w-full rounded-[10px] object-cover" />
-        </Button>
+        <PhotoButton kind="landscape" src={photo.url} label={`${labels[photo.slot]}の写真を大きく見る`}
+          description={`お店の${labels[photo.slot]}`} onClick={() => setSelected(photo)} />
         <figcaption className="text-xs text-liff-sub">{labels[photo.slot]}</figcaption>
       </figure>)}
     </div>
     <ConfirmDialog open={selected !== null} title={selected ? `お店の${labels[selected.slot]}` : 'お店の写真'} description="" onCancel={() => setSelected(null)}>
-      {selected ? <img src={selected.url} alt={`お店の${labels[selected.slot]}（拡大）`} className="mt-3 max-h-[60vh] w-full rounded-[10px] object-contain" /> : null}
+      {selected && <PhotoFrame appearance="intrinsic"><img src={selected.url} alt={`お店の${labels[selected.slot]}（拡大）`} /></PhotoFrame>}
     </ConfirmDialog>
   </section>;
 }

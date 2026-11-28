@@ -158,7 +158,7 @@ export function renderPreviewRail({ activePage, audience, conditionEmpty, condit
           >
             {hasSelectedArea ? null : <p className={styles.cardNote}>面を選ぶと、ここに数が出ます。</p>}
             <p className={styles.tapNote}>
-              「メニューを切り替える」「日時を選ぶ」などLINEの中で終わる動きは、押されたことがこちらに届きません。
+              「リッチメニューを切り替える」「日時を選ぶ」などLINEの中で終わる動きは、押されたことがこちらに届きません。
             </p>
           </CreateSummaryCard>
           )

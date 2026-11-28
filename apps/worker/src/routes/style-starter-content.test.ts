@@ -108,7 +108,7 @@ test('受け皿が作られた時のまま（移行で作られた ID）なら�
   expect(starterRows()).toMatchObject([{ target_id: 'mine' }]);
 });
 
-test('飲食の4面は、フォームと同じ店の予約履歴へつなぎ、未設定でも並びを保つ', async () => {
+test('飲食の4面は同じ店の予約履歴と料理メニューへつなぎ、未設定でも並びを保つ', async () => {
   const item = standardStarter('restaurant').items.find((i) => i.kind === 'rich_menu')!;
   expect(item.buttons!.map((b) => b.label)).toEqual(['予約する','予約の確認と変更','メニュー','アクセス']);
   f.raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','統括');
@@ -122,11 +122,28 @@ test('飲食の4面は、フォームと同じ店の予約履歴へつなぎ、�
   expect(new URL(buttons[0]!.actionData).searchParams.get('page')).toBe('form');
   expect(new URL(buttons[0]!.actionData).searchParams.get('id')).toBe(buttons[0]!.formId);
   expect(buttons[1]!.actionData).toBe('https://liff.line.me/liff-a/?page=restaurant&token=tok&view=mine');
-  expect(buttons.slice(2).every(button=>button.actionData.includes('/information/'))).toBe(true);
+  expect(buttons[2]).toMatchObject({
+    actionData: 'https://liff.line.me/liff-a/?page=restaurant-menu&token=tok',
+    intent: 'url',
+    formId: null,
+    ready: true,
+  });
+  expect(buttons[3]!.actionData).toContain('/information/');
+  expect(standardStarter('restaurant').items.some(item => item.key === 'initial-restaurant-menu')).toBe(false);
+  expect(f.raw.prepare("SELECT 1 FROM style_starter_items WHERE item_key='initial-restaurant-menu'").get()).toBeUndefined();
   f.raw.exec('DELETE FROM rt_reservation_links');
   const pending=await styleMenuButtons(f.db,'a','restaurant',item,answers);
   expect(pending.map(button=>button.label)).toEqual(buttons.map(button=>button.label));
   expect(pending[1]).toMatchObject({actionData:'',ready:false});
+  expect(pending[2]).toMatchObject({actionData:'',ready:false});
+});
+
+test('旧い飲食の初期セットを読めても、料理メニュー用の回答フォームは作成しない', () => {
+  const definition = standardStarter('restaurant');
+  const legacyItem = { key: 'initial-restaurant-menu', kind: 'form', name: 'メニュー', formTarget: 'menu' };
+  const parsed = readDefinition({ ...definition, items: [...definition.items, legacyItem] }, 'restaurant');
+  expect(parsed.items.some(item => item.key === legacyItem.key)).toBe(false);
+  expect(standardStarter('salon').items.some(item => item.key === 'initial-salon-menu')).toBe(true);
 });
 
 test('スタイルを後で選ぶ店は、選択後にも初期セットを重複なく受け取る', async () => {

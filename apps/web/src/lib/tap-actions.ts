@@ -40,6 +40,18 @@ export const TAP_ACTION_DEFS: readonly TapActionDef[] = [
   { kind: 'visit_stamp', label: '来店スタンプ', description: 'お客さまのスタンプカードを開く', needsLiff: true, target: { noun: 'スタンプカード', required: false } },
 ]
 
+/** 飲食店のリッチメニューだけに出す動きと、一覧での並び。 */
+export const RESTAURANT_MENU_ACTION = {
+  kind: 'restaurant_menu',
+  label: '料理メニューを開く',
+  description: 'メニュー管理で公開した料理を表示する',
+} as const
+
+export const RESTAURANT_RICH_MENU_TAP_ORDER = [
+  'uri', 'message', 'booking', RESTAURANT_MENU_ACTION.kind, 'booking_history', 'visit_stamp', 'form', 'template',
+  'tel', 'switch', 'postback', 'datetime', 'clipboard',
+] as const
+
 /** 6つ全部（店の既定）。 */
 export const TAP_ACTION_KINDS: readonly TapActionKind[] = TAP_ACTION_DEFS.map((def) => def.kind)
 

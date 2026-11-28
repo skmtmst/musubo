@@ -565,7 +565,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
       page.areas.forEach((area, areaIndex) => {
         if (area.actionType !== 'richmenuswitch') return
         fields.define(`area-${area.id}`, `タブ${pageIndex + 1}の面 ${String.fromCharCode(65 + areaIndex)} の切り替え先`, () => (
-          String(area.actionData?.targetPageId ?? '').trim() ? null : '「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。'
+          String(area.actionData?.targetPageId ?? '').trim() ? null : '「リッチメニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。'
         ), { required: true, reveal: () => { setStep('buttons'); setActivePageId(page.id); setSelectedAreaId(area.id) }, group: `area-${area.id}` })
       })
     })
@@ -1156,7 +1156,7 @@ export default function RichMenuCreateV8({ editGroupId, host, initialStep }: { e
     const intent = intentOf(area)
     if (intent === 'switch') {
       const target = pages.find((p) => p.id === String(area.actionData?.targetPageId ?? ''))
-      return target ? `${target.name}を開く` : 'メニューを切り替える'
+      return target ? `${target.name}を開く` : 'リッチメニューを切り替える'
     }
     return intentLabelOf(area)
   }
