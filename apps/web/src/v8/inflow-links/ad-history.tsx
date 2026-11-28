@@ -175,7 +175,7 @@ export default function AdHistoryV8() {
   return (
     <DetailPage boardId="p0kA3" contentPadding="0 var(--tpl-head-pad-side)" title={<>広告への送信履歴</>}
         help={<>成果と広告のクリックが結びつき、送信処理が始まるとここに並びます。</>}
-        actions={<><Button onClick={exportLogs} disabled={visible.length === 0}><Download size={16} aria-hidden="true" />CSVで書き出す</Button></>}>
+        actions={<><Button onClick={exportLogs} disabled={model.loading || model.failed || visible.length === 0} disabledReason={model.loading ? '送信履歴を読み込んでいます。' : model.failed ? '送信履歴を読み直してください。' : visible.length === 0 ? '書き出す送信履歴がありません。' : undefined}><Download size={16} aria-hidden="true" />CSVで書き出す</Button></>}>
       <div className={adsStyles.body}>
         <ListToolbar
           search={{ value: query, onChange: (value) => { setQuery(value); setPage(1) }, placeholder: '成果・クリックの種類で探す' }}
