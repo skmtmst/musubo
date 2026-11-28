@@ -71,24 +71,28 @@ export default function AccountDetailV8() {
   const [credentials, setCredentials] = useState<CredentialKind | null>(null)
   const [recipientsOpen, setRecipientsOpen] = useState(false)
 
-  const loadAll = useCallback(async () => {
-    setAllState('loading')
-    try {
-      const list = await api.lineAccounts.list()
-      if (!list.success) { setAllState('error'); return }
-      setAll(list.data)
-      setAllState('ready')
-    } catch {
-      setAllState('error')
-    }
-  }, [])
-
   /*
    * 読込の世代（WEB132）。同じ画面のまま ?id= が A→B と変わったとき、A の遅い応答で B の画面・
    * 「送らなかった」一覧・テスト送信先を上書きしない。最後に出した要求の応答だけを使う。
    */
   const loadSeq = useRef(0)
   const recipientsSeq = useRef(0)
+  const allSeq = useRef(0)
+
+  const loadAll = useCallback(async () => {
+    const seq = ++allSeq.current
+    setAllState('loading')
+    try {
+      const list = await api.lineAccounts.list()
+      if (seq !== allSeq.current) return
+      if (!list.success || !Array.isArray(list.data)) { setAllState('error'); return }
+      setAll(list.data)
+      setAllState('ready')
+    } catch {
+      if (seq !== allSeq.current) return
+      setAllState('error')
+    }
+  }, [])
 
   const loadRecipients = useCallback(async () => {
     if (!id) return
@@ -107,10 +111,11 @@ export default function AccountDetailV8() {
     if (!id) return
     const seq = ++loadSeq.current
     setMissing(false)
+    setStatus((prev) => (prev === 'error' ? 'loading' : prev))
     try {
       const one = await api.lineAccounts.get(id)
       if (seq !== loadSeq.current) return
-      if (!one.success) { setStatus('error'); return }
+      if (!one.success || !one.data || typeof one.data !== 'object') { setStatus('error'); return }
       const data = one.data as AccountDetailView
       setAccount(data)
       // 止まっているアカウントでは「送らなかった」一覧も読む（X-1）。
@@ -141,6 +146,8 @@ export default function AccountDetailV8() {
   useEffect(() => {
     if (shownId.current === id) return
     shownId.current = id
+    loadSeq.current += 1
+    recipientsSeq.current += 1
     setAccount(null)
     setStatus('loading')
     setMissing(false)
@@ -153,6 +160,22 @@ export default function AccountDetailV8() {
     setCredentials(null)
     setRecipientsOpen(false)
   }, [id])
+
+  useEffect(() => {
+    if (canManage) return
+    setStopTarget(null)
+    setArchiveTarget(null)
+    setRestoreTarget(null)
+    setEditing(false)
+    setCredentials(null)
+    setRecipientsOpen(false)
+  }, [canManage])
+
+  useEffect(() => () => {
+    loadSeq.current += 1
+    recipientsSeq.current += 1
+    allSeq.current += 1
+  }, [])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => { void loadAll() }, [loadAll])
@@ -212,6 +235,8 @@ export default function AccountDetailV8() {
   const match = webhookMatch(account)
   const blocked = archiveBlockedReason(account)
   const lastReceived = account.connection?.lastReceivedAt ?? account.lastWebhookReceivedAt ?? null
+  const lastReceivedText = shortDateTime(lastReceived)
+  const inactivatedAtText = shortDateTime(account.inactivatedAt)
 
   const parentValue = !account.parentLineAccountId
     ? emptyValue('none')
@@ -230,10 +255,10 @@ export default function AccountDetailV8() {
   const headActions = (
     <div className={styles.headActions}>
       {/* 閲覧のみでも隠さず、灰色＋理由の吹き出し。押しても Button が止める。 */}
-      <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setEditing(true)}>
+      <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => { if (canManage) setEditing(true) }}>
         <Pencil size={16} aria-hidden="true" />編集する
       </Button>
-      <Button href={`/accounts/handover?id=${account.id}`}>
+      <Button href={`/accounts/handover?id=${encodeURIComponent(account.id)}`}>
         <ArrowLeftRight size={16} aria-hidden="true" />乗り換え
       </Button>
     </div>
@@ -302,7 +327,7 @@ export default function AccountDetailV8() {
               <Row label="Webhookの利用" id="acd-webhook">
                 <span className={styles.inline}>
                   <StatusBadge tone={use.tone}>{use.label}</StatusBadge>
-                  {lastReceived ? <span className={styles.faint}>最後の受信 {shortDateTime(lastReceived)}</span> : null}
+                  {lastReceivedText ? <span className={styles.faint}>最後の受信 {lastReceivedText}</span> : null}
                 </span>
               </Row>
               <Row label="このシステムが待っているURL">
@@ -320,9 +345,10 @@ export default function AccountDetailV8() {
               <Card variant="form" aria-labelledby="acd-skipped">
                 <div className={styles.cardHead}>
                   <CardHeader size="stacked" headingLevel={3} titleId="acd-skipped" title="止まっている間に送らなかったもの" />
-                  {account.inactivatedAt ? (
+                  {inactivatedAtText || account.inactiveReasonDetail ? (
                     <p className={styles.cardSub}>
-                      {formatDateTime(account.inactivatedAt)} から止まっています{account.inactiveReasonDetail ? `（理由: ${account.inactiveReasonDetail}）` : ''}
+                      {inactivatedAtText ? `${formatDateTime(account.inactivatedAt)} から止まっています` : '止まっています'}
+                      {account.inactiveReasonDetail ? `（理由: ${account.inactiveReasonDetail}）` : ''}
                     </p>
                   ) : null}
                 </div>
@@ -334,12 +360,15 @@ export default function AccountDetailV8() {
                   <p className={styles.muted}>送らなかった配信はありません。</p>
                 ) : (
                   <ul className={styles.skippedList}>
-                    {skipped.map((row) => (
-                      <li key={row.id} className={styles.skippedRow}>
-                        <span className={styles.truncate} title={row.title ?? row.kind}>{row.title ?? skippedKindLabel(row.kind)}</span>
-                        <span className={styles.faint}>{skippedKindLabel(row.kind)}・{formatDateTime(row.skippedAt)}</span>
-                      </li>
-                    ))}
+                    {skipped.map((row) => {
+                      const skippedAtText = shortDateTime(row.skippedAt)
+                      return (
+                        <li key={row.id} className={styles.skippedRow}>
+                          <span className={styles.truncate} title={row.title ?? row.kind}>{row.title ?? skippedKindLabel(row.kind)}</span>
+                          <span className={styles.faint}>{skippedKindLabel(row.kind)}{skippedAtText ? `・${formatDateTime(row.skippedAt)}` : ''}</span>
+                        </li>
+                      )
+                    })}
                   </ul>
                 )}
                 <p className={styles.faint}>再開しても、ここに並んだ配信は自動では送り直しません。</p>
@@ -367,16 +396,16 @@ export default function AccountDetailV8() {
             </Card>
             <div className={styles.actions}>
               {account.archivedAt ? (
-                <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setRestoreTarget(account)}>
+                <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => { if (canManage) setRestoreTarget(account) }}>
                   <ArchiveRestore size={16} aria-hidden="true" />アーカイブから戻す
                 </Button>
               ) : (
                 <>
-                  <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => setStopTarget(account)}>
+                  <Button type="button" lockedReason={canManage ? undefined : manageLockReason} disabled={!canManage && !manageLockReason} onClick={() => { if (canManage) setStopTarget(account) }}>
                     {account.isActive ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
                     {account.isActive ? '送受信を止める' : '送受信を再開する'}
                   </Button>
-                  <Button type="button" variant="danger" lockedReason={canManage ? undefined : manageLockReason} disabled={blocked !== null || (!canManage && !manageLockReason)} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => setArchiveTarget(account)}>
+                  <Button type="button" variant="danger" lockedReason={canManage ? undefined : manageLockReason} disabled={blocked !== null || (!canManage && !manageLockReason)} title={blocked ?? undefined} aria-describedby={blocked ? archiveReasonId : undefined} onClick={() => { if (canManage && blocked === null) setArchiveTarget(account) }}>
                     アーカイブする
                   </Button>
                   {blocked ? <p id={archiveReasonId} className={styles.note}>{blocked}</p> : null}
