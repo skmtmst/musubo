@@ -50,12 +50,24 @@ function jobStatusLabel(status: string): string {
   return Object.prototype.hasOwnProperty.call(JOB_STATUS_LABELS, status) ? JOB_STATUS_LABELS[status] : '確認中'
 }
 
+function validNonNegInt(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 export default function CsvMigrationsV8() {
   usePageTitle('友だち')
   const m = useFriendMigrations()
   const manageLockedReason = usePermissionLockReason(!m.manageLocked, 'manager')
-  const reflectable = m.summary ? m.summary.add + m.summary.update : 0
-  const blocked = m.summary ? m.summary.conflict + m.summary.error > 0 : true
+  const summaryValid = Boolean(
+    m.summary
+      && validNonNegInt(m.summary.add)
+      && validNonNegInt(m.summary.update)
+      && validNonNegInt(m.summary.unchanged)
+      && validNonNegInt(m.summary.conflict)
+      && validNonNegInt(m.summary.error),
+  )
+  const reflectable = summaryValid ? m.summary!.add + m.summary!.update : null
+  const blocked = !summaryValid || (m.summary!.conflict + m.summary!.error > 0)
 
   /* 頭の「表示中をCSVで書き出す」：いま出ている履歴の表を CSV にする（友だちの情報は含まない）。 */
   const exportHistory = () => {
@@ -116,7 +128,7 @@ export default function CsvMigrationsV8() {
           <div className={styles.cardFoot}>
             {m.exportResult ? (
               <Button variant="text" size="inline" lockedReason={manageLockedReason} disabled={m.manageLocked || m.busy} busy={m.downloadId === m.exportResult.id} busyLabel="保存しています…" onClick={() => void m.downloadExport(m.exportResult!.id)}>
-                {`CSVで書き出す（${m.exportResult.rowCount ?? emptyValue('unknown')}件）`}
+                {`CSVで書き出す（${validNonNegInt(m.exportResult.rowCount) ? formatNumber(m.exportResult.rowCount) : emptyValue('unknown')}件）`}
               </Button>
             ) : null}
               <Button variant="primary" disabled={m.manageLocked || m.busy} lockedReason={manageLockedReason} busy={m.busy && !m.summary && !m.downloadId} onClick={() => void m.createExport()} title="件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。">
@@ -165,7 +177,8 @@ export default function CsvMigrationsV8() {
             ['conflict', '競合', '人', '同じIDで値が違う'],
             ['error', 'エラー', '行', '直して再確認'],
           ] as const).map(([key, title, unit, detail]) => {
-            const value = m.summary ? m.summary[key] : null
+            const rawValue = m.summary ? m.summary[key] : null
+            const value = validNonNegInt(rawValue) ? rawValue : null
             return (
               <KpiCard
                 key={key}
@@ -184,7 +197,7 @@ export default function CsvMigrationsV8() {
             <>
               <Button type="button" variant="secondary" onClick={m.cancelImport} disabled={m.busy}>取り込みをやめる</Button>
               <Button type="button" variant="primary" lockedReason={manageLockedReason} disabled={m.manageLocked || blocked || m.busy} busy={m.busy} busyLabel="反映中…" onClick={() => void m.executeImport()}>
-                {`確認した内容を反映（${formatNumber(reflectable)} 人）`}
+                {reflectable === null ? '件数を確認できないため反映できません' : `確認した内容を反映（${formatNumber(reflectable)} 人）`}
               </Button>
             </>
           ) : (
@@ -219,8 +232,12 @@ export default function CsvMigrationsV8() {
             <tbody>
               {m.jobs.map((job) => {
                 const account = m.accounts.find((item) => item.id === job.line_account_id)?.name
-                const count = job.row_count ?? job.total_count ?? null
-                const downloadable = job.kind === 'export' && job.status === 'completed' && (!job.expires_at || job.expires_at > new Date().toISOString())
+                const rawCount = job.row_count ?? job.total_count ?? null
+                const count = validNonNegInt(rawCount) ? rawCount : null
+                const expiresMs = job.expires_at ? Date.parse(job.expires_at) : null
+                const downloadable = job.kind === 'export'
+                  && job.status === 'completed'
+                  && (!job.expires_at || (expiresMs !== null && Number.isFinite(expiresMs) && expiresMs > Date.now()))
                 return (
                   <Tr key={`${job.kind}-${job.id}`} className={styles.row}>
                     <Td>{slashDateTime(job.created_at)}</Td>
