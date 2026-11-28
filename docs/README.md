@@ -1441,5 +1441,5 @@
 - [読み込みの再試行と保存のお知らせ](release-log/unreleased/267-kenta-train-night4-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車10の画面の修正](release-log/unreleased/269-kenta-train-b-1127.md) — 反映履歴、確認 2026-11-27。
 - [列車11の画面と記録の修正](release-log/unreleased/270-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
-- [列車12の画面と試験の修正](release-log/unreleased/PR-kenta-train-d-1128.md) — 反映履歴、確認 2026-11-28。
+- [列車12の画面と試験の修正](release-log/unreleased/274-kenta-train-d-1128.md) — 反映履歴、確認 2026-11-28。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
