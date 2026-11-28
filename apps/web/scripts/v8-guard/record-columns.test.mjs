@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { fitListColumns } from '../../src/components/shared/list-column-sizing.mjs'
 import scanColumns from './table-column-alignment-browser.mjs'
@@ -506,5 +508,102 @@ test('先祖の class を含む CSS（.panel .table button）でボタン余白�
     assert.equal(measured.overflow, 0, JSON.stringify(measured))
     assert.ok(measured.buttonRight <= 0, JSON.stringify(measured))
     assert.equal(await page.locator('[data-column-probe]').count(), 0)
+  } finally { await browser.close() }
+})
+
+test('実フック（useListColumnSizing）で測ってから commit の前に文字が長くなっても、何も呼ばず次のコマで列が広がる', async () => {
+  const require = createRequire(import.meta.url)
+  const fromVitest = createRequire(require.resolve('vitest/package.json'))
+  const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
+  const webRoot = fileURLToPath(new URL('../..', import.meta.url))
+  const compiled = await build({
+    stdin: {
+      resolveDir: webRoot,
+      loader: 'tsx',
+      contents: `
+        import React, { useLayoutEffect, useRef } from 'react'
+        import { createRoot } from 'react-dom/client'
+        import { useListColumnSizing } from './src/components/shared/use-list-column-sizing'
+        import { scheduleTableMeasure } from './src/components/shared/table-measure-batch'
+
+        function Fixture() {
+          const ref = useRef<HTMLDivElement>(null)
+          useListColumnSizing(ref, true)
+          useLayoutEffect(() => {
+            const frame = ref.current
+            if (!frame) return
+            // 1フレーム目の読取フェーズで「計測のあと・commit の前」にセルの文字を長くする
+            return scheduleTableMeasure(window, {}, () => {
+              const note = frame.querySelector('.note') as HTMLElement | null
+              const cell = note?.closest('td') as HTMLElement | null
+              if (note) note.textContent = 'とても長い補足テキストに変更されました'
+              return () => {
+                if (cell) (window as Window & { __widthAfterFirstCommit?: number }).__widthAfterFirstCommit = Math.round(cell.getBoundingClientRect().width)
+              }
+            })
+          }, [])
+          return (
+            <main>
+              <div ref={ref} className="frame" data-column-layout="" data-column-sizing="content">
+                <table className="table">
+                  <thead>
+                    <tr data-table-layout="columns"><th data-cell-grow="">名前</th><th>補足</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr data-table-layout="columns">
+                      <td data-cell-grow=""><span className="text">担当者 1</span></td>
+                      <td><span className="note">短い</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </main>
+          )
+        }
+
+        const root = createRoot(document.getElementById('root')!)
+        root.render(<Fixture />)
+        ;(window as Window & { __unmountColumnHookFixture?: () => void }).__unmountColumnHookFixture = () => root.unmount()
+      `,
+    },
+    bundle: true,
+    write: false,
+    platform: 'browser',
+    format: 'iife',
+    jsx: 'automatic',
+    tsconfig: `${webRoot}/tsconfig.json`,
+    define: { 'process.env.NODE_ENV': '"production"' },
+  })
+
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ viewport: { width: 1152, height: 900 } })
+    await page.setContent(`<style>${css('../../src/components/shared/data-table.module.css')}*{box-sizing:border-box}:root{--polish-space-row:8px}.frame{width:800px;--table-column-gap:12px;--table-column-padding:0 24px;--table-head-padding:0 24px;--table-head-height:40px;--table-row-height:56px;--table-head-text-size:14px;--table-body-text-size:14px;font:14px Arial}.table{width:100%}.table tr[data-table-layout='columns']{display:flex}.text{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.note{display:block;white-space:nowrap}</style><div id="root"></div>`)
+    await page.addScriptTag({ content: compiled.outputFiles[0].text })
+
+    const result = await page.evaluate(async () => {
+      // 1フレーム目（計測→commit前の文字変更→古い幅のcommit）と、何も呼ばずに次のコマを待つ
+      for (let i = 0; i < 4; i++) {
+        await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)))
+      }
+      const note = document.querySelector('.note')
+      const cell = note.closest('td')
+      const out = {
+        widthRightAfterCommit: window.__widthAfterFirstCommit ?? -1,
+        widthAfterNextFrame: Math.round(cell.getBoundingClientRect().width),
+        textWidth: Math.round(note.scrollWidth),
+      }
+      return out
+    })
+
+    assert.ok(result.widthRightAfterCommit > 0 && result.widthRightAfterCommit < 80, JSON.stringify(result))
+    assert.ok(result.textWidth > 150, JSON.stringify(result))
+    assert.ok(
+      result.widthAfterNextFrame > result.widthRightAfterCommit + 100,
+      `hook MutationObserver must auto-schedule remeasure on next frame: ${JSON.stringify(result)}`,
+    )
+    assert.ok(result.widthAfterNextFrame >= result.textWidth, JSON.stringify(result))
+    assert.equal((await page.evaluate(scanColumns)).findings.length, 0)
+    await page.evaluate(() => { window.__unmountColumnHookFixture?.() })
   } finally { await browser.close() }
 })
