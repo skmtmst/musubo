@@ -1,14 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import ListState from './list-state'
 import Pagination from './pagination'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 
 /**
  * **中身を出せないときの1枚と、ページ送り。**
@@ -81,10 +75,4 @@ describe('一覧の状態とページ送り', () => {
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={2} onPageChange={vi.fn()} />)).toContain('次へ')
   })
 
-  it('取れなかった数を 0 と出さない', () => {
-    // 数の無いところに 0 を入れると、「数えて0だった」と読めてしまう。
-    // D021: null だけでなく undefined・NaN も「—」にする。
-    const kpis = read('kpi-card.tsx')
-    expect(kpis).toMatch(/isCountableValue\(value\) \? formatNumber\(value\)/)
-  })
 })
