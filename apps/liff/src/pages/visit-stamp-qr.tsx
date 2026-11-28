@@ -33,6 +33,7 @@ function VisitStampQrResult() {
      if(config.data.accountId!==account||!token) {setResult({status:'invalid',reason:'invalid'});return;}
      const response=await visitStampsApi.redeemQr(account,token,request.current.id,visitId);
      if(!response?.data || !['success','limited','visit_required','invalid','friend_required'].includes(response.data.status))throw new Error('Invalid stamp result');
+     if((response.data.status==='success'||response.data.status==='limited')&&(!response.data.wallet||!Number.isSafeInteger(response.data.wallet.balance)||response.data.wallet.balance<0))throw new Error('Invalid stamp balance');
      if(current===sequence.current)setResult(response.data);
    }catch(e){if(current===sequence.current){setError(liffErrorMessage((e as {body?:unknown})?.body,'押印を確認できませんでした。読み直してください。'));}}
    finally{if(current===sequence.current)setBusy(false);}
