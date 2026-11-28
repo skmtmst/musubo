@@ -124,13 +124,34 @@ export function AccountIcon() {
   )
 }
 
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function isValidIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const match = ISO_DATE.exec(value)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const check = new Date(Date.UTC(year, month - 1, day))
+  return check.getUTCFullYear() === year && check.getUTCMonth() + 1 === month && check.getUTCDate() === day
+}
+
 /** `YYYY-MM-DD` に n 日足す。 */
 export function addDaysStr(date: string, days: number): string {
+  if (!isValidIsoDate(date)) return ''
   const d = new Date(`${date}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
+  const safeDays = typeof days === 'number' && Number.isInteger(days) ? days : 0
+  d.setUTCDate(d.getUTCDate() + safeDays)
+  return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : date
 }
 
 export function sortedMenus(menus: BookingMenu[]): BookingMenu[] {
-  return [...menus].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+  if (!Array.isArray(menus)) return []
+  const orderOf = (menu: BookingMenu) =>
+    typeof menu.sort_order === 'number' && Number.isFinite(menu.sort_order) ? menu.sort_order : Number.MAX_SAFE_INTEGER
+  const idOf = (menu: BookingMenu) => (typeof menu.id === 'string' ? menu.id : '')
+  return menus
+    .filter((menu): menu is BookingMenu => Boolean(menu) && typeof menu === 'object')
+    .sort((a, b) => orderOf(a) - orderOf(b) || idOf(a).localeCompare(idOf(b)))
 }
