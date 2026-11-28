@@ -1,6 +1,8 @@
 import type { D1Database, R2Bucket, Fetcher, Ai, ImagesBinding, SendEmail, Queue } from '@cloudflare/workers-types/index.ts';
 import type { CodexMentionQueueMessage } from './services/codex-cloud-types.js';
 
+export type BannerGenerationRequest = { generationId: string; tenantId: string };
+
 export type WorkerBindings = {
     OPERATOR_PUSH_VAPID_PUBLIC_KEY?:string;
     OPERATOR_PUSH_VAPID_PRIVATE_KEY?:string;
@@ -22,6 +24,7 @@ export type WorkerBindings = {
      * 未設定の環境（手元・試験）では変換を飛ばして元の画像を保存する。
      */
     CF_IMAGES?: ImagesBinding;
+    BANNER_GENERATION_WORKFLOW?: Workflow<BannerGenerationRequest>;
     /** 運営コンソールの返信下書きに使う Workers AI のモデル名。未設定なら routes/ops-support.ts の既定。 */
     OPS_SUPPORT_AI_MODEL?: string;
     EMAIL?: SendEmail;

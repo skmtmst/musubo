@@ -8,6 +8,7 @@ export default defineConfig({
       // the worktree; point Vitest directly at the TS sources so tests resolve
       // without a build step.
       '@line-crm/line-sdk': path.resolve(__dirname, '../../packages/line-sdk/src/index.ts'),
+      'cloudflare:workers': path.resolve(__dirname, './src/test-utils/cloudflare-workers-stub.ts'),
     },
   },
   test: {

@@ -38,6 +38,11 @@ binding = "AI"
 [images]
 binding = "CF_IMAGES"
 
+[[workflows]]
+binding = "BANNER_GENERATION_WORKFLOW"
+name = "musubo-banner-generation"
+class_name = "BannerGenerationWorkflow"
+
 [triggers]
 # :00/:05... は時刻厳守の通知・配信、:01/:06... は再実行可能な重い集計。
 # 6時間処理も別 invocation にして、走査の遅延を通知へ波及させない。

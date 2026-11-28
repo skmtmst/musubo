@@ -15,10 +15,25 @@ import { findBannerPreset } from './banner-prompt.js';
 import { resizeBannerToPreset,type BannerCropPosition } from './banner-resize.js';
 import { generateOpenAIImage,OpenAIImageError,DEFAULT_OPENAI_IMAGE_MODEL,type OpenAIReferenceImage } from './openai-images.js';
 import { stableWebhookStepId } from './incoming-webhook-receipts.js';
+import { logger } from '@line-crm/shared/server';
 
 export class BannerJobFailure extends Error { constructor(message:string,public status:number){super(message)} }
 
-/** 1回に画像1枚を永続的に処理し、定期処理が未完了の続きへ進む。 */
+export async function startBannerGeneration(env: Env['Bindings'], generation: BannerGeneration): Promise<void> {
+  if (!env.BANNER_GENERATION_WORKFLOW || generation.status !== 'queued') return;
+  try {
+    await env.BANNER_GENERATION_WORKFLOW.create({
+      id: generation.id,
+      params: { generationId: generation.id, tenantId: generation.tenant_id },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('(instance.already_exists)')) return;
+    // The persisted request is recovered by the existing cron if dispatch fails.
+    logger.warn('banner_generation_start_failed');
+  }
+}
+
+/** 1回に画像1枚を永続的に処理し、Workflowと定期処理で同じ実行権を使う。 */
 export async function processBannerGeneration(env:Env['Bindings'],generationId:string,tenantId:string):Promise<string|null>{
   const db=env.DB;
   const ref=bannerGenerationWorkflowRef(tenantId,generationId);
