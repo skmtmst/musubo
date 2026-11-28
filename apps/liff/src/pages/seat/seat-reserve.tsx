@@ -506,7 +506,7 @@ export default function SeatReserve() {
             }} />}
 
             <div className="flex justify-end">
-              <Button ref={menuButton} variant="text" className="min-h-11! px-5! text-sm! font-bold text-liff-primary!"
+              <Button ref={menuButton} variant="text-action"
                 disabled={busy} onClick={() => {
                   menuOrigin.current = window.scrollY;
                   setShowMenu(true);

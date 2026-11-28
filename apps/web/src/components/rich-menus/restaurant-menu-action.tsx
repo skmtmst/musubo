@@ -1,16 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Copy } from 'lucide-react'
 import { restaurantMenuLiffToken, restaurantMenuLiffUrl } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { Field } from '@/components/shared/form-controls'
-import Select from '@/components/shared/select'
+import EntitySelect from '@/components/shared/entity-select'
+import { Field, FieldError } from '@/components/shared/form-controls'
+import Notice from '@/components/shared/notice'
 import TextLink from '@/components/shared/text-link'
 import { restaurantTestApi, type RestaurantStore } from '@/lib/restaurant-test-api'
 
-export const RESTAURANT_MENU_ACTION = 'restaurant_menu'
 export const RESTAURANT_MENU_DRAFT_URL = 'https://liff.line.me/{{liff_id}}/?page=restaurant-menu'
 
 type Props = {
@@ -37,6 +37,7 @@ export default function RestaurantMenuAction({ accountId, liffId, uri, readOnly,
   const [attempt, setAttempt] = useState(0)
   const [pending, setPending] = useState(false)
   const [failedStore, setFailedStore] = useState<RestaurantStore | null>(null)
+  const errorId = useId()
   const request = useRef(0)
   const saveUrl = useRef(onUrl)
   useEffect(() => { saveUrl.current = onUrl }, [onUrl])
@@ -94,19 +95,24 @@ export default function RestaurantMenuAction({ accountId, liffId, uri, readOnly,
     </div>
   }
   if (storeError) {
-    return <div className="space-y-2">
-      <p role="alert" className="text-ink-secondary text-xs">対象店舗を読み込めませんでした。</p>
-      <Button variant="secondary" onClick={() => setAttempt(previous => previous + 1)}>もう一度読み込む</Button>
-    </div>
+    return <Notice tone="danger" density="compact" actionLayout="stack-on-narrow"
+      action={<Button variant="secondary" onClick={() => setAttempt(previous => previous + 1)}>もう一度読み込む</Button>}>
+      対象店舗を読み込めませんでした。
+    </Notice>
   }
   if (!stores) return <p role="status" className="text-ink-secondary text-xs">対象店舗を読み込んでいます。</p>
   if (!stores.length) return <p className="text-ink-secondary text-xs">このLINEアカウントで公開できる店舗がありません。</p>
 
+  const destinationError = failedStore ? '料理メニューのURLを設定できませんでした。'
+    : uri !== RESTAURANT_MENU_DRAFT_URL && !destination && !pending
+      ? 'このURLの対象店舗を確認できません。店舗を選び直してください。' : null
+
   return <div className="border-hairline min-w-0 space-y-3 border-t pt-3">
     <Field label="対象店舗" optional={false}>
       {!readOnly && stores.length > 1
-        ? <Select aria-label="対象店舗" size="full" value={destination?.id ?? ''} disabled={pending}
-            options={[{ value: '', label: '店舗を選ぶ', disabled: true }, ...options]}
+        ? <EntitySelect aria-label="対象店舗" noun="店舗" size="full" value={destination?.id ?? ''} disabled={pending}
+            invalid={Boolean(destinationError)} aria-describedby={destinationError ? errorId : undefined}
+            options={options}
             onChange={id => {
               const store = stores.find(item => item.id === id)
               if (store) void configure(store)
@@ -114,15 +120,12 @@ export default function RestaurantMenuAction({ accountId, liffId, uri, readOnly,
         : <p className="text-ink text-sm font-semibold">{destination?.name ?? onlyStore?.name ?? '—'}</p>}
     </Field>
     {pending ? <p role="status" className="text-ink-secondary text-xs">URLを設定しています。</p> : null}
-    {failedStore ? <p role="alert" className="text-danger text-xs">料理メニューのURLを設定できませんでした。</p> : null}
+    <FieldError id={errorId}>{destinationError}</FieldError>
     {!readOnly && !pending && (failedStore || (onlyStore && !destination))
       ? <Button variant="secondary" onClick={() => {
           const store = failedStore ?? onlyStore
           if (store) void configure(store)
         }}>{failedStore ? 'もう一度設定する' : 'URLを設定する'}</Button>
-      : null}
-    {uri !== RESTAURANT_MENU_DRAFT_URL && !destination && !pending
-      ? <p role="alert" className="text-danger text-xs">このURLの対象店舗を確認できません。店舗を選び直してください。</p>
       : null}
     {destination && !pending ? <Field label="料理メニューのURL" optional={false}>
       <div className="rounded-control bg-surface-pearl flex min-w-0 flex-wrap items-center gap-2 px-3 py-1">

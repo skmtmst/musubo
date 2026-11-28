@@ -10,6 +10,7 @@ import WaitlistSheet from './waitlist-sheet.js';
 import Icon from './ui/icon.js';
 import BottomBar from './ui/bottom-bar.js';
 import Button from './ui/button/index.js';
+import SegmentedControl from './ui/segmented-control.js';
 
 /**
  * 選んだ枠。date・start は店の暦日・壁時刻（表示用）。startUtc・timeZone は
@@ -25,6 +26,10 @@ const WEEK_DAYS = 5;
 /** 空き枠の口は28日までしか受けないので、月ぶんは割って呼ぶ。 */
 const CHUNK_DAYS = 28;
 const WEEKDAY_JP = '日月火水木金土';
+const dateViewChoices = [
+  { value: 'list', label: '週で見る' },
+  { value: 'calendar', label: 'カレンダー' },
+] as const;
 
 function monthOf(date: string): string {
   return date.slice(0, 7);
@@ -318,8 +323,6 @@ export default function DateTimePicker({
   const [view, setView] = useState<DateView | null>(null);
   /** 空いたら知らせるシートを開いている満席の枠。 */
   const [waitSlot, setWaitSlot] = useState<SlotPick | null>(null);
-  const listButtonRef = useRef<HTMLButtonElement | null>(null);
-  const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // 週表示用。5日ぶんずつ読んで足していく。選んだ日を持って戻ってきた
   // ときは、その日が見える位置から始める。
@@ -582,16 +585,6 @@ export default function DateTimePicker({
     rememberView(next);
   }
 
-  function moveViewKey(event: React.KeyboardEvent) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowDown' && event.key !== 'ArrowLeft' && event.key !== 'ArrowUp') {
-      return;
-    }
-    event.preventDefault();
-    const next: DateView = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 'calendar' : 'list';
-    switchView(next);
-    (next === 'calendar' ? calendarButtonRef : listButtonRef).current?.focus();
-  }
-
   /** カレンダーで選んだ日へ週表示を移す (この日の時間を選ぶ)。 */
   function jumpToWeekDay(day: string) {
     userPickedDayRef.current = true;
@@ -646,22 +639,6 @@ export default function DateTimePicker({
   const slotEnd =
     selected && addMinutesHm(selected.start, staff.duration_minutes + additionalDurationMinutes);
 
-  const toggleButton = (target: DateView, label: string) => {
-    const active = view === target;
-    return (
-      <Button variant="tab" selected={active}
-        key={target}
-        ref={target === 'list' ? listButtonRef : calendarButtonRef}
-        type="button"
-        role="radio"
-        aria-checked={active}
-        onClick={() => switchView(target)}
-      >
-        {label}
-      </Button>
-    );
-  };
-
   /** 下の帯。「担当を選び直す」の戻るを添える。 */
   const bar = (
     <BottomBar>
@@ -702,15 +679,7 @@ export default function DateTimePicker({
       {hint && <p className="text-xs leading-5 text-liff-sub">{hint}</p>}
       {/* 週だけ・月だけの店では切り替えを出さない (見せ方が1つに決まる)。 */}
       {allowedViews(settings.calendarMode).length > 1 && (
-        <div
-          role="radiogroup"
-          aria-label="表示の切り替え"
-          onKeyDown={moveViewKey}
-          className="flex gap-1 rounded-(--liff-radius) bg-liff-chip p-[3px]"
-        >
-          {toggleButton('list', '週で見る')}
-          {toggleButton('calendar', 'カレンダー')}
-        </div>
+        <SegmentedControl label="表示の切り替え" choices={dateViewChoices} value={view} onChange={switchView} />
       )}
 
       {view === 'list' ? (

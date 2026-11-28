@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type TouchEvent } from
 import Button from '../../components/ui/button/index.js';
 import ConfirmDialog from '../../components/ui/confirm-dialog.js';
 import Icon from '../../components/ui/icon.js';
+import { PhotoButton, PhotoFrame } from '../../components/ui/photo-preview.js';
 import type { RestaurantMenuItem } from '../../lib/api.js';
 import styles from './menu.module.css';
 
@@ -75,10 +76,10 @@ export default function PhotoGallery({
   }
 
   return (
-    <ConfirmDialog open title={item.name} onCancel={onClose} panelClassName={styles.modal}
+    <ConfirmDialog open title={item.name} onCancel={onClose} appearance={count > 1 ? 'photo-with-thumbnails' : 'photo'}
       titleAside={count > 1 && <span className="shrink-0 text-xs leading-6 font-semibold text-liff-sub" aria-live="polite">{index + 1} / {count}</span>}>
       <div ref={gallery} onKeyDown={moveViaKey} tabIndex={count > 1 ? 0 : -1}>
-        <div className={styles.photoStage}
+        <PhotoFrame appearance="inset"
           onTouchStart={(event) => {
             const point = event.touches[0];
             touch.current = count > 1 && event.touches.length === 1 && point ? { x: point.clientX, y: point.clientY } : null;
@@ -97,18 +98,14 @@ export default function PhotoGallery({
             <img key={photoKey} src={photoUrl} alt={`${item.name}の写真 ${index + 1}`} decoding="async"
               onError={() => setFailures((current) => ({ ...current, [index]: photoKey }))} />
           )}
-        </div>
+        </PhotoFrame>
         {count > 1 && (
           <div className={styles.photoStrip} aria-label="写真を選ぶ" role="group">
             {item.photos.map((entry, photoIndex) => (
-              <Button key={entry.id} ref={(node) => { thumbs.current[photoIndex] = node; }}
-                variant="plain" className={styles.thumb} aria-pressed={photoIndex === index}
-                aria-label={`写真 ${photoIndex + 1} を表示`} onClick={() => setIndex(photoIndex)}>
-                <img src={overrides[photoIndex]?.url ?? entry.url} alt="" decoding="async"
-                  style={{ objectPosition: `${entry.x}% ${entry.y}%` }}
-                  onError={(event) => { event.currentTarget.style.visibility = 'hidden'; }}
-                  onLoad={(event) => { event.currentTarget.style.visibility = ''; }} />
-              </Button>
+              <PhotoButton key={entry.id} ref={(node) => { thumbs.current[photoIndex] = node; }} kind="thumbnail"
+                src={overrides[photoIndex]?.url ?? entry.url} version={overrides[photoIndex]?.revision}
+                crop={entry} selected={photoIndex === index}
+                label={`写真 ${photoIndex + 1} を表示`} onClick={() => setIndex(photoIndex)} />
             ))}
           </div>
         )}

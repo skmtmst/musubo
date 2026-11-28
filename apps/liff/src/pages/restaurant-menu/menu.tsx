@@ -1,5 +1,5 @@
 import { formatYen } from '@line-crm/shared';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import LiffLookScope from '../../components/liff-look-scope.js';
 import LoadingView from '../../components/loading-view.js';
@@ -7,6 +7,8 @@ import BottomBar from '../../components/ui/bottom-bar.js';
 import Button from '../../components/ui/button/index.js';
 import Card from '../../components/ui/card.js';
 import LiffHeader from '../../components/ui/liff-header.js';
+import { PhotoButton } from '../../components/ui/photo-preview.js';
+import SegmentedControl from '../../components/ui/segmented-control.js';
 import StatusView from '../../components/ui/status-view.js';
 import { restaurantBookingApi, type RestaurantMenuData, type RestaurantMenuItem, type RestaurantMenuScope } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
@@ -14,8 +16,8 @@ import PhotoGallery from './photo-gallery.js';
 import styles from './menu.module.css';
 
 const choices = [
-  { kind: 'course', label: 'コース' },
-  { kind: 'a_la_carte', label: '単品' },
+  { value: 'course', label: 'コース' },
+  { value: 'a_la_carte', label: '単品' },
 ] as const;
 
 type MenuLoad = { state: 'loading' | 'failed' } | { state: 'ready'; menu: RestaurantMenuData };
@@ -36,43 +38,36 @@ function MenuItem({
   onOpenPhoto,
 }: { item: RestaurantMenuItem; onOpenPhoto: (item: RestaurantMenuItem) => void }) {
   const photo = item.photos[0];
-  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const course = item.kind === 'course';
   const period = menuPeriod(item);
   const price = formatYen(item.price).replace(/^¥(.+)$/, '$1円');
   const text = item.photos.length > 1 ? `写真を見る · ${item.photos.length}枚` : '写真を見る';
   return (
-    <Card className={`${styles.item} ${course ? styles.course : styles.dish} ${photo ? styles.cardWithPhoto : ''}`}>
-      <h2 className={`break-words font-bold leading-6 ${course ? 'text-lg' : 'text-[15px]'} ${styles.name}`}>
-        {item.name}
-      </h2>
-      <div className={styles.itemDetails}>
-        {item.description && <p className={`mt-2 whitespace-pre-line break-words text-[13px] leading-5 text-liff-sub ${styles.description}`}>{item.description}</p>}
-        <div className={`${styles.itemMeta} ${course ? styles.courseMeta : ''}`}>
-          {period && <p className="text-[13px] leading-5 text-liff-sub">{period}</p>}
-          <p className={styles.price}>
-            <strong className={`liff-num text-ink ${course ? 'text-[22px]' : 'text-base'}`}>{price}</strong>
-            {course && <span className={styles.perGuest}>1名</span>}
-          </p>
+    <Card>
+      <div className={`${styles.item} ${course ? styles.course : styles.dish} ${photo ? styles.cardWithPhoto : ''}`}>
+        <h2 className={`break-words font-bold leading-6 ${course ? 'text-lg' : 'text-[15px]'} ${styles.name}`}>
+          {item.name}
+        </h2>
+        <div className={styles.itemDetails}>
+          {item.description && <p className={`mt-2 whitespace-pre-line break-words text-[13px] leading-5 text-liff-sub ${styles.description}`}>{item.description}</p>}
+          <div className={`${styles.itemMeta} ${course ? styles.courseMeta : ''}`}>
+            {period && <p className="text-[13px] leading-5 text-liff-sub">{period}</p>}
+            <p className={styles.price}>
+              <strong className={`liff-num text-ink ${course ? 'text-[22px]' : 'text-base'}`}>{price}</strong>
+              {course && <span className={styles.perGuest}>1名</span>}
+            </p>
+          </div>
         </div>
+        {photo && (
+          <div className={styles.coverPlacement}>
+            <PhotoButton kind="cover" src={photo.url} crop={photo} caption={text} label={`${item.name}の${text}`}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                onOpenPhoto(item);
+              }} />
+          </div>
+        )}
       </div>
-      {photo && (
-        <Button
-          variant="plain"
-          className={styles.cover}
-          aria-label={`${item.name}の${text}`}
-          onClick={(event) => {
-            event.currentTarget.focus({ preventScroll: true });
-            onOpenPhoto(item);
-          }}
-        >
-          {failedPhoto !== photo.url && (
-            <img src={photo.url} alt="" loading="lazy" decoding="async" onError={() => setFailedPhoto(photo.url)}
-              style={{ objectPosition: `${photo.x}% ${photo.y}%` }} />
-          )}
-          <span className={styles.coverCaption}>{text}</span>
-        </Button>
-      )}
     </Card>
   );
 }
@@ -84,8 +79,6 @@ function MenuScreen({
   const [revision, setRevision] = useState(0);
   const [kind, setKind] = useState<RestaurantMenuItem['kind']>('course');
   const [selected, setSelected] = useState<RestaurantMenuItem | null>(null);
-  const tabs = useRef<Array<HTMLButtonElement | null>>([]);
-  const id = useId();
   const ready = load.state === 'ready' ? load.menu : null;
 
   useEffect(() => {
@@ -120,34 +113,13 @@ function MenuScreen({
         )}
         {ready && (ready.items.length ? (
           <>
-            <div className={styles.tabs} role="tablist" aria-label="メニューの種類"
-              onKeyDown={(event) => {
-                const current = choices.findIndex((choice) => choice.kind === kind);
-                let next: number;
-                if (event.key === 'Home') next = 0;
-                else if (event.key === 'End') next = choices.length - 1;
-                else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-                  next = (current + (event.key === 'ArrowLeft' ? -1 : 1) + choices.length) % choices.length;
-                } else return;
-                event.preventDefault();
-                setKind(choices[next]!.kind);
-                tabs.current[next]?.focus();
-              }}>
-              {choices.map((choice, index) => (
-                <Button key={choice.kind} ref={(node) => { tabs.current[index] = node; }}
-                  role="tab" id={`${id}-${choice.kind}`} aria-controls={`${id}-items`}
-                  aria-selected={kind === choice.kind} tabIndex={kind === choice.kind ? 0 : -1}
-                  variant="tab" selected={kind === choice.kind} className={styles.tab}
-                  onClick={() => setKind(choice.kind)}>
-                  {choice.label}
-                </Button>
-              ))}
-            </div>
-            <div className="space-y-3.5" id={`${id}-items`} role="tabpanel" aria-labelledby={`${id}-${kind}`}>
-              {screenItems.length ? screenItems.map((item) => (
-                <MenuItem key={item.id} item={item} onOpenPhoto={setSelected} />
-              )) : <StatusView icon="utensils" title={kind === 'course' ? 'コースは準備中です' : '単品メニューは準備中です'} />}
-            </div>
+            <SegmentedControl label="メニューの種類" choices={choices} value={kind} onChange={setKind}>
+              <div className="space-y-3.5">
+                {screenItems.length ? screenItems.map((item) => (
+                  <MenuItem key={item.id} item={item} onOpenPhoto={setSelected} />
+                )) : <StatusView icon="utensils" title={kind === 'course' ? 'コースは準備中です' : '単品メニューは準備中です'} />}
+              </div>
+            </SegmentedControl>
           </>
         ) : <StatusView icon="utensils" title="メニューは準備中です" />)}
       </main>

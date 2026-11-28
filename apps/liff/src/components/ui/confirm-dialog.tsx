@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import Button from './button/index.js';
 import Icon from './icon.js';
+import styles from './confirm-dialog.module.css';
 
 /**
  * LIFF 共通の確認窓。管理画面の ConfirmDialog と同じ形
@@ -38,13 +39,13 @@ export default function ConfirmDialog({
   surface = 'dialog',
   footer,
   titleAside,
-  panelClassName = '',
+  appearance,
 }: {
   open: boolean;
   surface?: 'dialog' | 'sheet';
   footer?: ReactNode;
   titleAside?: ReactNode;
-  panelClassName?: string;
+  appearance?: 'photo' | 'photo-with-thumbnails';
   title: string;
   description?: string;
   confirmLabel?: string;
@@ -122,6 +123,9 @@ export default function ConfirmDialog({
   };
 
   if (!open) return null;
+  const panelAppearance = appearance ? styles.photoPanel : 'p-5';
+  const footerSpacing = appearance === 'photo-with-thumbnails' ? styles.galleryFooter
+    : appearance === 'photo' ? styles.photoFooter : 'mt-4';
   return (
     <div
       className={surface === 'sheet' ? "fixed inset-0 z-50 flex items-end justify-center bg-ink/60" :"fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-6"}
@@ -138,7 +142,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-label={title}
         onKeyDown={trapTab}
-        className={`w-full max-w-[480px] rounded-xl border border-hairline bg-canvas p-5 ${panelClassName}`}
+        className={`w-full max-w-[480px] rounded-xl border border-hairline bg-canvas ${panelAppearance}`}
       >
         {surface === 'sheet' ? <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-hairline" /> : null}
         <div className="flex items-start gap-2">
@@ -164,7 +168,7 @@ export default function ConfirmDialog({
           </p>
         )}
         {footer ??
-        <div className="mt-4 flex gap-2">
+        <div className={`${footerSpacing} flex gap-2`}>
           <Button variant="secondary" ref={cancelRef} onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </Button>
