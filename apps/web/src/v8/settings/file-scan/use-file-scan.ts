@@ -35,6 +35,7 @@ export function useFileScan() {
   const canEditRef = useRef(canEdit); canEditRef.current = canEdit
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const [phase, setPhase] = useState<FileScanPhase>('loading')
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useListUrlValue('statusFilter', 'quarantined')
@@ -98,12 +99,14 @@ export function useFileScan() {
     const sequence = ++loadSequence.current
     const current = () => mounted.current && renderedScope === scope.current && sequence === loadSequence.current
     if (!selectedAccountId) {
+      setLoadError(null)
       setPhase('ready')
       setItems([])
       setTotal(0)
       setCounts({ quarantined: 0, pending: 0, released: 0 })
       return
     }
+    setLoadError(null)
     setPhase('loading')
     setActionError('')
     try {
@@ -123,6 +126,8 @@ export function useFileScan() {
       ])
       if (!current()) return
       if (!me.success || !list.success || !configRes.success) {
+        const failed = !me.success ? me : !list.success ? list : configRes
+        setLoadError('error' in failed && failed.error ? new Error(failed.error) : null)
         setPhase('error')
         return
       }
@@ -147,8 +152,11 @@ export function useFileScan() {
       setSecretRef(configRes.data.config?.externalSecretRef ?? '')
       setPhase('ready')
       return latestItems
-    } catch {
-      if (current()) setPhase('error')
+    } catch (caught) {
+      if (current()) {
+        setLoadError(caught)
+        setPhase('error')
+      }
     }
   }, [selectedAccountId, statusFilter, deferredQuery, page, renderedScope])
 
@@ -349,6 +357,7 @@ export function useFileScan() {
     canEdit,
     selectedAccountId,
     phase,
+    loadError,
     items,
     total,
     counts,
