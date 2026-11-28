@@ -1,5 +1,4 @@
 > 文書：目的別の文書入口｜区分：今の説明｜最終確認：2026-10-19（日本時間）
-- [お客さまの分け方の人数表示の修正](release-log/unreleased/PR-kenta-later2-cx6-04-1128.md)
 - [LINEアカウント登録のスタイル選択の反映履歴](release-log/unreleased/234-kenta-style-dialog.md)（説明・2026-11-25確認）
 
 
@@ -1449,4 +1448,4 @@
 - [列車11の画面と記録の修正](release-log/unreleased/270-kenta-train-c-1128.md) — 反映履歴、確認 2026-11-28。
 - [列車12の画面と試験の修正](release-log/unreleased/274-kenta-train-d-1128.md) — 反映履歴、確認 2026-11-28。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
-- [一覧表・格子表の列幅計測の高速化（2周目）](release-log/unreleased/PR-kenta-perf-gemini177-1128.md) — 反映履歴、確認 2026-11-28。
+- [列車13の画面の読み込み失敗・不正な値の修正](release-log/unreleased/PR-kenta-train-e-1128.md) — 反映履歴、確認 2026-11-28。
