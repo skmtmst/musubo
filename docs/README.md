@@ -1451,3 +1451,5 @@
 - [列車12の画面と試験の修正](release-log/unreleased/274-kenta-train-d-1128.md) — 反映履歴、確認 2026-11-28。
 - [V8 の見張りを4本に分けて約1時間にする（中身と基準は同じ・#244 の後）](release-log/unreleased/268-kenta-v8-guard-shards.md) — 反映履歴、確認 2026-11-27。
 - [列車13の画面の読み込み失敗・不正な値の修正](release-log/unreleased/278-kenta-train-e-1128.md) — 反映履歴、確認 2026-11-28。
+
+- [マイル明細の画面試験](release-log/unreleased/PR-kenta-src-assert-b-01-1129.md) — 反映履歴、確認 2026-11-28。

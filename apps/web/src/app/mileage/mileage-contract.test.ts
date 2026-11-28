@@ -44,15 +44,6 @@ describe("管理画面 マイルの正本URLと概念分離", () => {
     expect(FRIEND_DETAIL).not.toContain('準備中')
   })
 
-  it('R54: ランク未公開と最高到達を区別する', () => {
-    // 未公開なのに「いちばん上のランクです」と出していた。今のランクが
-    // あるときだけ最高到達と言い、未公開は理由＋作り先の案内にする。
-    expect(FRIEND_DETAIL).toContain('rankUnpublished')
-    expect(FRIEND_DETAIL).toContain('使い道・ランクを作る')
-    expect(FRIEND_DETAIL).toContain("href=\"/mileage?tab=rewards\"")
-    expect(readFileSync(new URL('../../v8/mileage/display.ts', import.meta.url), 'utf8')).toContain('いちばん上のランクです')
-  })
-
   it('APIの入れ子が欠けても画面を落とさず、0件とも書かない', () => {
     expect(HISTORY).toContain('mileagePaginationTotal(result)')
     expect(HISTORY).not.toContain('result?.pagination.total')

@@ -77,6 +77,7 @@ test('最高ランクと接続先0件を区別し、接続先の同じアカウ�
   connections = []
   const view = render(<FriendDetailV8 />)
   await screen.findByTitle(/いちばん上のランクです/)
+  expect(screen.getByRole('link', { name: '使い道を見る', exact: true }).getAttribute('href')).toBe('/mileage?tab=rewards')
   expect(screen.getByTitle('接続先はありません')).toBeTruthy()
   expect(screen.queryByText('使い道・ランクを作る')).toBeNull()
   view.unmount()
